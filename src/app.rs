@@ -191,6 +191,8 @@ pub struct AppModel {
     reader_actions_collapsed: bool,
     /// The collapsed header's ⋯ button — the anchor its menu pops from.
     reader_overflow_btn: gtk::Button,
+    /// The toolbar's tag button (#71) — the anchor its menu pops from.
+    reader_tag_btn: gtk::Button,
     /// Cache of fetched attachments, keyed by (account_id, message_id), so
     /// revisiting a message doesn't re-download them. Byte-bounded — raw
     /// attachment bytes for every message ever opened added up to hundreds of
@@ -406,6 +408,17 @@ pub struct AppModel {
     read_mark: config::ReadMark,
     /// Mail filter rules (#47), applied to inbox syncs.
     filters: Vec<config::FilterRule>,
+    /// Tags (#71): a name and colour per keyword.
+    tags: Vec<config::Tag>,
+    /// The keyword whose messages the list shows (a sidebar tag row), if
+    /// that is the view — alongside `unified` and `selected`, never with.
+    tag_view: Option<String>,
+    /// The tag colours as `.tag-<keyword>` classes, app-wide (the list's
+    /// chips, the sidebar's rows, the menus' swatches).
+    tag_provider: gtk::CssProvider,
+    /// The on-disk index, for reads the main thread makes itself: the tag
+    /// views and folding locally-kept tags into synced summaries.
+    cache: Option<crate::cache::Cache>,
     /// Inbox UIDs whose filter move has been requested but not yet observed
     /// (the message still showed up in the last sync). A sync racing the
     /// server-side move must neither re-request the move nor re-notify.
@@ -793,6 +806,16 @@ pub enum AppMsg {
     ImportSettings,
     /// The filter rules changed in Settings (#47).
     SetFilters(Vec<config::FilterRule>),
+    /// The tags changed in Settings (#71).
+    SetTags(Vec<config::Tag>),
+    /// A tag row in the sidebar was chosen: list everything carrying it.
+    TagSelected(String),
+    /// Put a tag on one message, or take it off (row menu, palette, card).
+    SetTag { message: Box<Message>, keyword: String, add: bool },
+    /// The reader toolbar's tag menu: toggle a tag on the reader's target.
+    ToggleTagCurrent(String),
+    /// Pop the tag menu on the reader toolbar's tag button.
+    ReaderTagMenu,
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
@@ -1245,6 +1268,19 @@ impl SimpleComponent for AppModel {
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::ToggleStar),
                                 },
+                                // Tags (#71), right of the star: a menu of the
+                                // tags, ticked where the target carries them.
+                                // Only once a tag exists.
+                                pack_start = &gtk::Box {
+                                    #[local_ref]
+                                    reader_tag_btn -> gtk::Button {
+                                        #[watch]
+                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
+                                            && model.reader_compose.is_none() && !model.tags.is_empty(),
+                                        #[watch]
+                                        set_sensitive: model.reply_target().is_some(),
+                                    },
+                                },
                                 // In-message find (#103), right of the star.
                                 pack_start = &gtk::Button {
                                     set_icon_name: "co.hyprlab.Vireo-system-search-symbolic",
@@ -1534,6 +1570,7 @@ impl SimpleComponent for AppModel {
             })
             .forward(sender.input_sender(), |out| match out {
                 SidebarOutput::UnifiedSelected => AppMsg::UnifiedSelected,
+                SidebarOutput::TagSelected(keyword) => AppMsg::TagSelected(keyword),
                 SidebarOutput::AttachmentsSelected => AppMsg::ShowAttachments,
                 SidebarOutput::ContactsClicked => AppMsg::OpenContacts,
                 SidebarOutput::RefreshRequested => AppMsg::Refresh,
@@ -1577,6 +1614,9 @@ impl SimpleComponent for AppModel {
                     }
                     MessageListOutput::Action { action, message } => {
                         AppMsg::RowAction { action, message }
+                    }
+                    MessageListOutput::SetTag { message, keyword, add } => {
+                        AppMsg::SetTag { message, keyword, add }
                     }
                     MessageListOutput::Bulk { action, messages } => {
                         AppMsg::Bulk { action, messages }
@@ -1757,6 +1797,12 @@ impl SimpleComponent for AppModel {
                 b.set_visible(false);
                 b
             },
+            reader_tag_btn: {
+                let b = gtk::Button::from_icon_name("co.hyprlab.Vireo-tag-symbolic");
+                b.set_tooltip_text(Some(i18n("Tags").as_str()));
+                b.add_css_class("flat");
+                b
+            },
             attachment_cache: crate::ram_cache::RamCache::new(ATTACHMENT_CACHE_BUDGET),
             unified: false,
             unified_by_account: HashMap::new(),
@@ -1855,6 +1901,10 @@ impl SimpleComponent for AppModel {
             console_mode: config::load_console_mode(),
             read_mark: config::load_read_mark(),
             filters: config::load_filters(),
+            tags: config::load_tags(),
+            tag_view: None,
+            tag_provider: gtk::CssProvider::new(),
+            cache: crate::cache::Cache::open().ok(),
             filter_moved: Default::default(),
             single_message_card: config::load_single_message_card(),
             thread_expansion: config::load_thread_expansion(),
@@ -1887,6 +1937,16 @@ impl SimpleComponent for AppModel {
             gallery_by_account: HashMap::new(),
         };
         model.prime_from_cache();
+        if let Some(display) = gtk::gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &model.tag_provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+        model.refresh_tag_css();
+        model.message_list.emit(MessageListInput::SetTags(model.tags.clone()));
+        model.message_view.emit(MessageViewInput::SetTags(model.tags.clone()));
         model.spawn_workers(&sender);
         if model.tray_enabled {
             model.start_tray(&sender);
@@ -1979,6 +2039,7 @@ impl SimpleComponent for AppModel {
 
         // The app-wide theme choice must be in force before the first frame.
         apply_app_theme(model.app_theme);
+        let reader_tag_btn = model.reader_tag_btn.clone();
         let widgets = view_output!();
         let _ = model.reader_header.set(widgets.reader_header.clone());
         // Collapse the reader header's actions into the overflow menu when the
@@ -2060,6 +2121,10 @@ impl SimpleComponent for AppModel {
             let s = sender.input_sender().clone();
             model.reader_overflow_btn.connect_clicked(move |_| {
                 let _ = s.send(AppMsg::ReaderOverflowMenu);
+            });
+            let s = sender.input_sender().clone();
+            model.reader_tag_btn.connect_clicked(move |_| {
+                let _ = s.send(AppMsg::ReaderTagMenu);
             });
         }
         // The inline compose/reply pane is an overlay over the WHOLE reader
@@ -2790,6 +2855,7 @@ impl SimpleComponent for AppModel {
                 self.leave_gallery();
                 self.showing_contacts = false;
                 self.unified = false;
+                self.tag_view = None;
                 self.selected = None;
                 self.current = None;
                 self.current_thread.clear();
@@ -2895,6 +2961,7 @@ impl SimpleComponent for AppModel {
                 self.showing_contacts = false;
                 self.showing_outbox = false;
                 self.unified = true;
+                self.tag_view = None;
                 self.selected = None;
                 self.current = None;
                 self.current_thread.clear();
@@ -4846,6 +4913,68 @@ impl SimpleComponent for AppModel {
                 self.sync_unloaded_counted_folders();
             }
 
+            AppMsg::SetTags(tags) => {
+                config::save_tags(&tags);
+                self.tags = tags;
+                self.refresh_tag_css();
+                self.message_list.emit(MessageListInput::SetTags(self.tags.clone()));
+                self.message_view.emit(MessageViewInput::SetTags(self.tags.clone()));
+                for p in self.popouts.values() {
+                    p.controller.emit(MessageWindowInput::SetTags(self.tags.clone()));
+                }
+                // The sidebar lists the tags; a removed one that was the open
+                // view falls back to All Inboxes there (SetContents).
+                self.rebuild_sidebar();
+                // Rules may name a tag that now exists: tag what already sits
+                // in the inboxes, through the same sweep the filters use.
+                self.sweep_blacklisted();
+            }
+
+            AppMsg::TagSelected(keyword) => {
+                self.close_sidebar_peek();
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.showing_outbox = false;
+                self.unified = false;
+                self.selected = None;
+                self.tag_view = Some(keyword);
+                self.current = None;
+                self.current_thread.clear();
+                self.attachments.clear();
+                self.attachments_loading = false;
+                self.sync_attachment_drawer();
+                self.show_message(None, false);
+                self.message_list.emit(MessageListInput::SetSelected(None));
+                self.message_list.emit(MessageListInput::SetColorize(true));
+                self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list.emit(MessageListInput::SetShowRecipient(false));
+                self.emit_tag_view();
+                self.push_index_complete();
+            }
+
+            AppMsg::SetTag { message, keyword, add } => {
+                self.set_tag(&message, &keyword, add);
+            }
+
+            AppMsg::ToggleTagCurrent(keyword) => {
+                if let Some(m) = self.reply_target() {
+                    let add = !m.has_keyword(&keyword);
+                    self.set_tag(&m, &keyword, add);
+                }
+            }
+
+            AppMsg::ReaderTagMenu => {
+                if let Some(entries) = self.reader_tag_entries(&sender) {
+                    let btn = &self.reader_tag_btn;
+                    crate::ui::context_menu::show_context_menu(
+                        btn,
+                        (btn.width() / 2) as f64,
+                        btn.height() as f64,
+                        vec![entries],
+                    );
+                }
+            }
+
             AppMsg::OpenListSearch => {
                 // Ctrl+F routes by focus (#102/#103): in the reader it finds
                 // within the message, everywhere else it searches the list.
@@ -5260,6 +5389,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Messages { account_id, folder_id, messages } => {
                 self.notifications.emit(NotifyInput::ClearConnectivity);
+                let messages = self.merge_local_tags(account_id, messages);
                 // Auto-delete blacklisted senders from the inbox before anything
                 // else sees them.
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
@@ -5368,6 +5498,9 @@ impl SimpleComponent for AppModel {
                         self.message_list
                             .emit(MessageListInput::SetMessages { messages });
                     }
+                } else if self.tag_view.is_some() {
+                    // The index just took this folder's flags: re-read the tag.
+                    self.emit_tag_view();
                 }
                 // The reader's message was removed by this sync (deleted/moved on
                 // another device). Clear it right away so nothing stale lingers, then
@@ -5406,6 +5539,7 @@ impl SimpleComponent for AppModel {
             AppMsg::MessagesAppend { account_id, folder_id, messages } => {
                 // Background backfill: grow the folder's search index without
                 // disturbing the current view (no title/query reset).
+                let messages = self.merge_local_tags(account_id, messages);
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
                 let entry = self.message_cache.entry((account_id, folder_id)).or_default();
                 let existing: std::collections::HashSet<u32> =
@@ -6316,6 +6450,7 @@ impl AppModel {
         self.folders.clear();
         self.selected = None;
         self.unified = false;
+        self.tag_view = None;
         self.unified_by_account.clear();
         self.message_cache.clear();
         self.body_cache.clear();
@@ -7084,6 +7219,7 @@ impl AppModel {
             chevrons_left: self.chevrons_left,
             unified_unread,
             unified_folders,
+            tags: self.tags.clone(),
         });
 
         // Keep the list's per-account tint colours in sync.
@@ -7208,6 +7344,23 @@ impl AppModel {
 
     /// The collapsed reader header's overflow menu: every action the full row
     /// of buttons offers, same icons, enabled under the same conditions.
+    /// The tag entries of the reader's menus (#71): one per tag, its swatch
+    /// filled where the reader's target message carries it. None without a
+    /// target or a tag.
+    fn reader_tag_entries(
+        &self,
+        sender: &ComponentSender<Self>,
+    ) -> Option<Vec<crate::ui::context_menu::MenuEntry>> {
+        let target = self.reply_target()?;
+        if self.tags.is_empty() {
+            return None;
+        }
+        let s = sender.input_sender().clone();
+        Some(crate::ui::message_list::tag_menu_entries(&self.tags, &target, move |keyword, _add| {
+            let _ = s.send(AppMsg::ToggleTagCurrent(keyword));
+        }))
+    }
+
     fn show_reader_overflow_menu(&self, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
@@ -7262,6 +7415,8 @@ impl AppModel {
                         entry!(i18n("Flag"), "starred", AppMsg::ToggleStar, acts)
                     },
                 ],
+                // Tags (#71), where there are any and something to tag.
+                self.reader_tag_entries(sender).unwrap_or_default(),
                 // View Source is deliberately absent: it lives in the message
                 // list's context menu only (the Outbox variant above keeps it —
                 // queued rows have no such menu).
@@ -7396,6 +7551,7 @@ impl AppModel {
             path: path.clone(),
         });
         self.unified = false;
+        self.tag_view = None;
         self.attachments.clear();
         self.sync_attachment_drawer();
         self.attachments_loading = false;
@@ -7659,6 +7815,7 @@ impl AppModel {
             attachments_available: false,
             attachments_loading: atts_loading,
             content_dark: self.message_theme.dark_override(),
+            tags: self.tags.clone(),
         };
 
         let controller = MessageWindow::builder()
@@ -9187,9 +9344,119 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetMessages { messages: merged });
     }
 
+    /// The tag view (#71): every cached message of every account carrying
+    /// the open tag, newest first. Trash and Junk keep their tags but stay
+    /// out; Gmail's per-label copies of one message collapse to one row,
+    /// the inbox copy where there is one (its actions land where expected).
+    fn emit_tag_view(&self) {
+        let Some(kw) = self.tag_view.as_deref() else { return };
+        let mut out: Vec<Message> = Vec::new();
+        if let Some(cache) = self.cache.as_ref() {
+            for account in &self.accounts {
+                let Some(folders) = self.folders.get(&account.id) else { continue };
+                for (path, mut m) in cache.messages_with_keyword(account.id, kw) {
+                    let Some(f) = folders.iter().find(|f| f.path == path) else { continue };
+                    if matches!(f.kind, FolderKind::Trash | FolderKind::Junk) {
+                        continue;
+                    }
+                    m.folder_id = f.id;
+                    out.push(m);
+                }
+            }
+        }
+        let inbox_first = |m: &Message| {
+            self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox)
+        };
+        out.sort_by(|a, b| {
+            b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b)))
+        });
+        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+        out.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        self.message_list.emit(MessageListInput::SetMessages { messages: out });
+    }
+
+    /// Fold an account's locally-kept tags (POP3, keyword-less servers) into
+    /// summaries fresh from its worker, so they show like server-side ones.
+    fn merge_local_tags(&self, account_id: u32, mut messages: Vec<Message>) -> Vec<Message> {
+        if let Some(cache) = self.cache.as_ref() {
+            cache.apply_local_tags(account_id, &mut messages);
+        }
+        messages
+    }
+
+    /// The tag colours as CSS: `.tag-<keyword>` fills (chips), and the same
+    /// class on a `.tag-tint` widget colours its glyph instead.
+    fn refresh_tag_css(&self) {
+        let mut css = String::new();
+        for t in &self.tags {
+            let class = t.css_class();
+            let text = crate::color::readable_text(&t.color);
+            css.push_str(&format!(
+                ".{class} {{ background-color: {color}; color: {text}; }} \
+                 .{class} label {{ color: {text}; }} \
+                 .tag-tint.{class} {{ color: {color}; background-color: transparent; }}\n",
+                color = t.color,
+            ));
+        }
+        self.tag_provider.load_from_data(&css);
+    }
+
+    /// Put a tag on a message or take it off (#71): the server (or the local
+    /// store, where the server keeps none), then every copy the UI holds —
+    /// the list row, the reader, a pop-out — so nothing waits for a sync.
+    fn set_tag(&mut self, m: &Message, keyword: &str, add: bool) {
+        if self.outbox_item(m.account_id, m.id).is_some() {
+            return;
+        }
+        let Some(path) = self.resolve_folder_path(m) else { return };
+        self.send_to(m.account_id, MailRequest::SetKeyword {
+            path,
+            uid: m.uid,
+            message_id: m.message_id.clone(),
+            keyword: keyword.to_string(),
+            add,
+        });
+        let mut patched = m.clone();
+        patched.set_keyword(keyword, add);
+        let keywords = patched.keywords.clone();
+        let (aid, fid, id) = (m.account_id, m.folder_id, m.id);
+        let same = |c: &Message| c.account_id == aid && c.id == id;
+        if let Some(msgs) = self.message_cache.get_mut(&(aid, fid)) {
+            for c in msgs.iter_mut().filter(|c| same(c)) {
+                c.keywords = keywords.clone();
+            }
+        }
+        if let Some(msgs) = self.unified_by_account.get_mut(&aid) {
+            for c in msgs.iter_mut().filter(|c| same(c) && c.folder_id == fid) {
+                c.keywords = keywords.clone();
+            }
+        }
+        for tm in self.current_thread.iter_mut().filter(|c| same(c)) {
+            tm.keywords = keywords.clone();
+        }
+        if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
+            cur.keywords = keywords.clone();
+        }
+        self.message_list.emit(MessageListInput::SetKeywords { id, keywords: keywords.clone() });
+        self.message_view.emit(MessageViewInput::SetCardKeywords {
+            account_id: aid,
+            id,
+            keywords: keywords.clone(),
+        });
+        if let Some(p) = self.popouts.get(&(aid, id)) {
+            p.controller.emit(MessageWindowInput::SetKeywords(keywords));
+        }
+        // In this tag's own view an untagged message has no row to keep.
+        if !add && self.tag_view.as_deref().is_some_and(|v| v.eq_ignore_ascii_case(keyword)) {
+            self.message_list.emit(MessageListInput::Remove(id));
+        }
+    }
+
     fn refresh_list_display(&self) {
         if self.unified {
             self.emit_unified();
+        } else if self.tag_view.is_some() {
+            self.emit_tag_view();
         } else if let Some(sel) = self.selected.as_ref() {
             if let Some(msgs) = self.message_cache.get(&(sel.account_id, sel.folder_id)) {
                 self.message_list.emit(MessageListInput::SetMessages { messages: msgs.clone() });
@@ -9329,6 +9596,7 @@ impl AppModel {
                 allowed_senders: self.allowed_senders.clone(),
                 blacklist: self.blacklist.clone(),
                 filters: self.filters.clone(),
+                tags: self.tags.clone(),
             })
             .forward(sender.input_sender(), |out| match out {
                 AccountsOutput::Saved { original_email, account } => {
@@ -9346,6 +9614,7 @@ impl AppModel {
                 AccountsOutput::AddBlacklist(addr) => AppMsg::AddBlacklist(addr),
                 AccountsOutput::RemoveBlacklist(addr) => AppMsg::RemoveBlacklist(addr),
                 AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
+                AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
             });
         if add_new {
             accounts.emit(crate::ui::accounts::AccountsInput::AddAccount);
@@ -10059,10 +10328,41 @@ impl AppModel {
         let mut still_pending = std::collections::HashSet::new();
         let mut kept = Vec::with_capacity(messages.len());
         let mut filed = Vec::new();
-        for m in messages {
+        for mut m in messages {
             let recipients = format!("{} {}", m.to, m.cc);
-            let hit = rules.iter().find(|r| {
-                r.matches(&m.from_addr, &m.from_name, &m.subject, &recipients)
+            let matching: Vec<&&config::FilterRule> = rules
+                .iter()
+                .filter(|r| r.matches(&m.from_addr, &m.from_name, &m.subject, &recipients))
+                .collect();
+            // Tags first (#71), from every matching rule, and only where the
+            // message lacks the tag — this runs on every sync, and the flag
+            // comes back down with the next one. Tagged before any move, so
+            // the move carries the keyword along. A tag that no longer
+            // exists tags nothing.
+            if let Some(src) = &src {
+                let wanted: Vec<String> = matching
+                    .iter()
+                    .filter(|r| !r.tag.is_empty() && !m.has_keyword(&r.tag))
+                    .filter(|r| self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(&r.tag)))
+                    .map(|r| r.tag.clone())
+                    .collect();
+                for tag in wanted {
+                    if m.has_keyword(&tag) {
+                        continue; // two rules naming one tag
+                    }
+                    tracing::info!("filter: {} tagged {tag}", m.from_addr);
+                    self.send_to(account_id, MailRequest::SetKeyword {
+                        path: src.clone(),
+                        uid: m.uid,
+                        message_id: m.message_id.clone(),
+                        keyword: tag.clone(),
+                        add: true,
+                    });
+                    m.keywords.push(tag);
+                }
+            }
+            let hit = matching.iter().copied().find(|r| {
+                !r.dest_path.is_empty()
                     // A destination that vanished from the server keeps the
                     // mail in the inbox rather than erroring it into limbo.
                     && known(&r.dest_path)
@@ -11769,6 +12069,7 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            keywords: Vec::new(),
             has_attachment: false,
             message_id: message_id.to_string(),
             references: String::new(),
@@ -11995,6 +12296,7 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),
             references: String::new(),

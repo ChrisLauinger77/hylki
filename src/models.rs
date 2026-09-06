@@ -83,6 +83,11 @@ pub struct Message {
     pub timestamp: i64,
     pub unread: bool,
     pub starred: bool,
+    /// The message's IMAP keywords (user flags) as the server reports them —
+    /// `$label1`, `Work`, `$Junk`… — verbatim and in server order. Tags (#71)
+    /// are the ones a [`crate::config::Tag`] maps to; the rest are ignored.
+    /// Microsoft 365 categories and POP3's local-only tags land here too.
+    pub keywords: Vec<String>,
     pub has_attachment: bool,
     /// This message's own Message-ID (normalized, no angle brackets). Empty if
     /// unknown. Used to thread replies accurately (instead of by subject alone).
@@ -292,6 +297,7 @@ impl OutboxItem {
             // Never dimmed as read: it is still waiting to go out.
             unread: true,
             starred: false,
+            keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),
             references: String::new(),
@@ -390,6 +396,20 @@ impl GalleryItem {
 }
 
 impl Message {
+    /// Whether the message carries `keyword`. IMAP keywords are atoms
+    /// compared case-insensitively (RFC 3501), so `work` and `Work` are one.
+    pub fn has_keyword(&self, keyword: &str) -> bool {
+        self.keywords.iter().any(|k| k.eq_ignore_ascii_case(keyword))
+    }
+
+    /// Add or drop `keyword`, keeping the list free of duplicates.
+    pub fn set_keyword(&mut self, keyword: &str, add: bool) {
+        self.keywords.retain(|k| !k.eq_ignore_ascii_case(keyword));
+        if add {
+            self.keywords.push(keyword.to_string());
+        }
+    }
+
     /// Strip interior NUL bytes from every text field. GTK's C strings end at
     /// the first NUL and glib panics rather than truncate when handed one
     /// mid-string — a single message with a stray 0x00 in its envelope (they

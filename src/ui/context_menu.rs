@@ -19,13 +19,29 @@ use gtk::prelude::*;
 pub struct MenuEntry {
     label: String,
     icon: Option<String>,
+    /// A colour swatch in the icon slot instead of an icon (a tag's colour,
+    /// #71): filled when the entry's state is on, a ring when off.
+    swatch: Option<(String, bool)>,
     enabled: bool,
     activate: Box<dyn Fn()>,
 }
 
 impl MenuEntry {
     pub fn new(label: impl Into<String>, activate: impl Fn() + 'static) -> Self {
-        Self { label: label.into(), icon: None, enabled: true, activate: Box::new(activate) }
+        Self {
+            label: label.into(),
+            icon: None,
+            swatch: None,
+            enabled: true,
+            activate: Box::new(activate),
+        }
+    }
+
+    /// A coloured disc in the icon slot — `on` fills it, off draws a ring —
+    /// for entries that toggle something with a colour of its own (tags).
+    pub fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
+        self.swatch = Some((color.into(), on));
+        self
     }
 
     /// Leading symbolic icon — use the same icon as the toolbar button that
@@ -80,7 +96,7 @@ pub fn show_context_menu_with_header(
 
     // Any icon in the menu means every row reserves the icon slot, keeping
     // the labels of iconless entries aligned with the rest.
-    let has_icons = sections.iter().flatten().any(|e| e.icon.is_some());
+    let has_icons = sections.iter().flatten().any(|e| e.icon.is_some() || e.swatch.is_some());
 
     let mut first = true;
     for entries in sections {
@@ -93,10 +109,12 @@ pub fn show_context_menu_with_header(
         first = false;
 
         for entry in entries {
-            let MenuEntry { label, icon, enabled, activate } = entry;
+            let MenuEntry { label, icon, swatch, enabled, activate } = entry;
 
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            if has_icons {
+            if let Some((color, on)) = swatch {
+                row.append(&swatch_widget(&color, on));
+            } else if has_icons {
                 let img = match &icon {
                     Some(name) => gtk::Image::from_icon_name(name),
                     None => gtk::Image::new(),
@@ -132,4 +150,32 @@ pub fn show_context_menu_with_header(
     popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
     popover.connect_closed(|p| p.unparent());
     popover.popup();
+}
+
+/// A 16px colour swatch for a menu row: a filled disc when `on`, a ring when
+/// not, in `color` (`#rrggbb`; an unparsable colour falls back to grey).
+pub fn swatch_widget(color: &str, on: bool) -> gtk::DrawingArea {
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(16);
+    area.set_content_height(16);
+    area.set_valign(gtk::Align::Center);
+    let rgba = gtk::gdk::RGBA::parse(color).unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
+    area.set_draw_func(move |_, cr, w, h| {
+        let (cx, cy) = (w as f64 / 2.0, h as f64 / 2.0);
+        cr.set_source_rgba(
+            rgba.red() as f64,
+            rgba.green() as f64,
+            rgba.blue() as f64,
+            rgba.alpha() as f64,
+        );
+        if on {
+            cr.arc(cx, cy, 6.0, 0.0, std::f64::consts::TAU);
+            let _ = cr.fill();
+        } else {
+            cr.set_line_width(2.0);
+            cr.arc(cx, cy, 5.0, 0.0, std::f64::consts::TAU);
+            let _ = cr.stroke();
+        }
+    });
+    area
 }

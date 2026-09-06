@@ -596,6 +596,29 @@ button.star-active {
 /* Thread heads: the conversation's message count and its expand/collapse
    caret, one grey borderless pill (the old count chip's styling, now
    clickable). */
+/* Tag chips (#71): a solid pill in the tag's colour, the colour class
+   (.tag-<keyword>) coming from the app's tag stylesheet. Same geometry as
+   the conversation chip so the two sit level on a row. */
+.tag-chip {
+  border-radius: 9999px;
+  min-height: 0;
+  padding: 1px 7px;
+  font-size: 0.72em;
+  font-weight: 700;
+}
+
+.message-listbox > row:selected .message-row .tag-chip {
+  /* Keep the tag's own colour on a selected row; the selection paints
+     everything else white. */
+  opacity: 0.95;
+}
+
+/* A tag row's glyph in the sidebar, in the tag's colour (.tag-tint keeps
+   the background off). */
+.tag-tint {
+  background-color: transparent;
+}
+
 .thread-chip {
   background: alpha(currentColor, 0.1);
   border: none;

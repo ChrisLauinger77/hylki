@@ -31,6 +31,8 @@ pub struct MessageWindowInit {
     pub attachments_loading: bool,
     /// Message-content theme override (`None` follows the system).
     pub content_dark: Option<bool>,
+    /// The tags (#71), for the cards' chips.
+    pub tags: Vec<crate::config::Tag>,
 }
 
 pub struct MessageWindow {
@@ -63,6 +65,10 @@ pub enum MessageWindowInput {
     SetSenderCheck(Box<crate::models::SenderCheck>),
     /// Reflect a star toggle that happened elsewhere (or came back from the app).
     SetStarred(bool),
+    /// The message's keywords changed (#71).
+    SetKeywords(Vec<String>),
+    /// The tag definitions changed.
+    SetTags(Vec<crate::config::Tag>),
     /// Downloaded attachments are now available.
     SetAttachments(Vec<Attachment>),
     /// Attachments exist but need an explicit download.
@@ -273,6 +279,7 @@ impl Component for MessageWindow {
             });
         // Apply the message-content theme before the first render.
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
+        view.emit(MessageViewInput::SetTags(init.tags.clone()));
 
         let thread = if init.thread.is_empty() {
             vec![init.message.clone()]
@@ -359,6 +366,22 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetStarred(starred) => {
                 self.msg.starred = starred;
+            }
+            MessageWindowInput::SetKeywords(keywords) => {
+                self.msg.keywords = keywords.clone();
+                for m in self.thread.iter_mut() {
+                    if m.account_id == self.msg.account_id && m.id == self.msg.id {
+                        m.keywords = keywords.clone();
+                    }
+                }
+                self.view.emit(MessageViewInput::SetCardKeywords {
+                    account_id: self.msg.account_id,
+                    id: self.msg.id,
+                    keywords,
+                });
+            }
+            MessageWindowInput::SetTags(tags) => {
+                self.view.emit(MessageViewInput::SetTags(tags));
             }
             MessageWindowInput::SetAttachments(items) => {
                 self.attachments = items;

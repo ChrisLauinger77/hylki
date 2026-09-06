@@ -28,6 +28,11 @@ pub struct MessageView {
     /// Which of the conversation's messages came from another folder, and what to
     /// call that folder.
     folder_labels: std::collections::HashMap<(u32, u32), String>,
+    /// The tags (#71): what a message's keywords are drawn as.
+    tags: Vec<crate::config::Tag>,
+    /// The keywords the GTK header's chips were last built for (a lone
+    /// full-bleed message; cards carry their chips in the document).
+    header_tags_rendered: std::cell::RefCell<Option<Vec<String>>>,
     /// Remote content was detected and is currently withheld — this drives the
     /// "blocked" banner, and nothing else.
     blocked: bool,
@@ -338,6 +343,11 @@ pub enum MessageViewInput {
     /// A message's star changed outside the card (list row, toolbar): sync
     /// the card's star button without a re-render.
     SetCardStar { account_id: u32, id: u32, starred: bool },
+    /// A message's keywords changed (#71): the card's chips are patched in
+    /// place, like the star.
+    SetCardKeywords { account_id: u32, id: u32, keywords: Vec<String> },
+    /// The tag definitions changed: re-render with the new names and colours.
+    SetTags(Vec<crate::config::Tag>),
     /// Read-marking policy changed (#100).
     SetReadMark(crate::config::ReadMark),
     /// In-message find (#103): open/close the bar, run/step the search.
@@ -395,6 +405,55 @@ pub enum MessageViewOutput {
     ComposeTo(String),
     /// "Add to Contacts" picked on an address's right-click menu.
     AddContactAddr(String),
+}
+
+impl MessageView {
+    /// Whether the GTK header carries tag chips: a lone message shown
+    /// full-bleed (not as a card) that has a tag to show.
+    fn header_tags_shown(&self) -> bool {
+        self.thread.len() == 1
+            && !self.single_message_card
+            && self
+                .current
+                .as_ref()
+                .is_some_and(|c| self.tags.iter().any(|t| c.has_keyword(&t.keyword)))
+    }
+
+    /// Rebuild the GTK header's chips when the shown message's keywords (or
+    /// the tags) changed since they were last built.
+    fn sync_header_tags(&self, header_tags: &gtk::Box) {
+        let keywords = self.current.as_ref().map(|c| c.keywords.clone()).unwrap_or_default();
+        if self.header_tags_rendered.borrow().as_ref() == Some(&keywords) {
+            return;
+        }
+        while let Some(child) = header_tags.first_child() {
+            header_tags.remove(&child);
+        }
+        for t in self.tags.iter().filter(|t| keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))) {
+            let chip = gtk::Label::new(Some(&t.name));
+            chip.add_css_class("tag-chip");
+            chip.add_css_class(&t.css_class());
+            chip.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            chip.set_max_width_chars(20);
+            header_tags.append(&chip);
+        }
+        *self.header_tags_rendered.borrow_mut() = Some(keywords);
+    }
+}
+
+/// The tag chips of a card header (#71): one pill per keyword naming a tag,
+/// coloured inline (the document has no access to the app's stylesheet).
+fn tag_chips_html(tags: &[crate::config::Tag], keywords: &[String]) -> String {
+    let mut out = String::new();
+    for t in tags.iter().filter(|t| keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))) {
+        out.push_str(&format!(
+            "<span class=\"vireo-tag\" style=\"background:{bg};color:{fg}\">{name}</span>",
+            bg = gtk::glib::markup_escape_text(&t.color),
+            fg = crate::color::readable_text(&t.color),
+            name = gtk::glib::markup_escape_text(&t.name),
+        ));
+    }
+    out
 }
 
 #[relm4::component(pub)]
@@ -580,6 +639,16 @@ impl Component for MessageView {
                         add_css_class: "reader-subject",
                     },
 
+                    // Tag chips (#71) for a lone full-bleed message, whose
+                    // header is these widgets; cards draw theirs in the
+                    // document. Filled by post_view.
+                    #[local_ref]
+                    header_tags -> gtk::Box {
+                        set_spacing: 4,
+                        set_halign: gtk::Align::Start,
+                        #[watch]
+                        set_visible: model.header_tags_shown(),
+                    },
                 },
 
 
@@ -676,6 +745,8 @@ impl Component for MessageView {
             single_message_card: false,
             current: None,
             thread: Vec::new(),
+            tags: Vec::new(),
+            header_tags_rendered: std::cell::RefCell::new(None),
             folder_labels: std::collections::HashMap::new(),
             blocked: false,
             no_autoread: std::collections::HashSet::new(),
@@ -900,6 +971,7 @@ impl Component for MessageView {
             theme_sender.input(MessageViewInput::ThemeChanged);
         });
 
+        let header_tags = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         let widgets = view_output!();
         model.find_entry = Some(widgets.find_entry.clone());
         let body_overlay = gtk::Overlay::new();
@@ -908,6 +980,10 @@ impl Component for MessageView {
         widgets.body_stack.add_named(&body_overlay, Some("body"));
         widgets.body_stack.set_visible_child_name("body");
         ComponentParts { model, widgets }
+    }
+
+    fn post_view() {
+        self.sync_header_tags(&widgets.header_tags);
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
@@ -1308,6 +1384,42 @@ impl Component for MessageView {
             MessageViewInput::FindCounted { current, total } => {
                 self.find_matches = Some((current, total));
             }
+            MessageViewInput::SetTags(tags) => {
+                if self.tags != tags {
+                    self.tags = tags;
+                    *self.header_tags_rendered.borrow_mut() = None;
+                    if !self.thread.is_empty() {
+                        // The chips are baked into the document: draw it again.
+                        self.shown_fingerprint = None;
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::SetCardKeywords { account_id, id, keywords } => {
+                for m in self.thread.iter_mut() {
+                    if m.account_id == account_id && m.id == id {
+                        m.keywords = keywords.clone();
+                    }
+                }
+                if let Some(c) = self.current.as_mut() {
+                    if c.account_id == account_id && c.id == id {
+                        c.keywords = keywords.clone();
+                    }
+                }
+                let chips = tag_chips_html(&self.tags, &keywords);
+                let js = format!(
+                    "(function(){{\
+                     var t=document.querySelector('.vireo-tags[data-key=\"{account_id}:{id}\"]');\
+                     if(t)t.innerHTML={chips};}})()",
+                    chips = serde_json::to_string(&chips).unwrap_or_else(|_| "''".into()),
+                );
+                self.webview
+                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                        if let Err(e) = r {
+                            tracing::warn!("card tag patch failed: {e}");
+                        }
+                    });
+            }
             MessageViewInput::SetCardStar { account_id, id, starred } => {
                 for m in self.thread.iter_mut() {
                     if m.account_id == account_id && m.id == id {
@@ -1582,6 +1694,7 @@ impl MessageView {
         // Hand the live theme grounds to the (display-free, testable) document
         // builder without widening its signature — see LIVE_GROUNDS.
         LIVE_GROUNDS.with(|g| *g.borrow_mut() = Some(self.theme_grounds(dark)));
+        LIVE_TAGS.with(|t| *t.borrow_mut() = self.tags.clone());
         Self::conversation_document(
             &self.thread,
             &self.folder_labels,
@@ -1648,6 +1761,7 @@ impl MessageView {
                          title=\"Double-click to open in a new window\">\
                          <div class=\"vireo-hdr-line\">\
                            {ava}{dot}<span class=\"vireo-from\">{from}</span>{verify}{addr}\
+                           <span class=\"vireo-tags\" data-key=\"{aid}:{id}\">{tags}</span>\
                            <span class=\"vireo-hdr-meta\">{folder}{rcpt_toggle}\
                              <span class=\"vireo-date\">{date}</span></span>\
                            {acts_toggle}{acts}\
@@ -1655,6 +1769,7 @@ impl MessageView {
                        </header>{body}</section>",
                     aid = m.account_id,
                     id = m.id,
+                    tags = LIVE_TAGS.with(|t| tag_chips_html(&t.borrow(), &m.keywords)),
                     // The ⋯ toggle that expands/collapses the action row when
                     // the hidden-until-hover preference is on; CSS keeps it
                     // display:none otherwise, so it costs nothing when off.
@@ -1963,6 +2078,10 @@ impl MessageView {
                   edge; the name ellipsizes only after that. */\
                .vireo-from{{font-weight:700;flex:99 1 0;max-width:max-content;min-width:0;\
                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}\
+               .vireo-tags{{display:inline-flex;gap:4px;align-items:center;flex:0 0 auto;}}\
+               .vireo-tags:empty{{display:none;}}\
+               .vireo-tag{{font-size:0.72em;font-weight:700;line-height:1.4;padding:1px 7px;\
+                 border-radius:9999px;white-space:nowrap;}}\
                .vireo-addr{{opacity:0.55;font-size:0.9em;flex:1 1 0;max-width:max-content;\
                  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:clip;\
                  position:relative;}}\
@@ -3575,6 +3694,10 @@ thread_local! {
     /// tests) falls back to the stock GNOME values above.
     static LIVE_GROUNDS: std::cell::RefCell<Option<(String, String, String)>> =
         const { std::cell::RefCell::new(None) };
+    /// The tags (#71), handed to the document builder the same way, for the
+    /// card headers' chips. Empty in tests: no chips.
+    static LIVE_TAGS: std::cell::RefCell<Vec<crate::config::Tag>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 /// That ground as a colour the WebView itself can be painted with.
@@ -4374,6 +4497,7 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),
             references: String::new(),

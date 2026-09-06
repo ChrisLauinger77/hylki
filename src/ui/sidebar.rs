@@ -77,6 +77,8 @@ enum Sel {
     /// A filtered folder (account, path) selected via the "Filtered Folders"
     /// section inside All Inboxes.
     UnifiedFolder(u32, String),
+    /// A tag (its keyword) selected in the "Tags" section (#71).
+    Tag(String),
 }
 
 pub struct Sidebar {
@@ -175,6 +177,13 @@ pub struct Sidebar {
     /// while that account's section is collapsed (its Inbox row — and normal
     /// chip — is then hidden inside the revealer). Keyed by account_id.
     account_circle_badges: HashMap<u32, gtk::Label>,
+    /// The tags (#71), listed in their own section above the accounts; the
+    /// section exists only while there is a tag.
+    tags: Vec<crate::config::Tag>,
+    tags_expanded: bool,
+    tags_revealer: Option<gtk::Revealer>,
+    tags_chevron: Option<gtk::Image>,
+    tag_list: Option<gtk::ListBox>,
 }
 
 #[derive(Debug)]
@@ -188,7 +197,13 @@ pub enum SidebarInput {
         /// Filter-rule folders to list inside All Inboxes (already
         /// narrowed to the rules that opt in and the Settings switch).
         unified_folders: Vec<UnifiedFolderRef>,
+        /// The tags (#71), for the Tags section.
+        tags: Vec<crate::config::Tag>,
     },
+    /// A tag row in the Tags section was chosen.
+    TagRowSelected(i32),
+    /// Toggle the Tags section.
+    ToggleTagsExpand,
     UnifiedRowSelected,
     /// Select the "All Inboxes" row programmatically (the tray menu's
     /// "View all unread"): the highlight follows, and the selection goes
@@ -262,6 +277,8 @@ pub enum SidebarOutput {
     /// A folder was dropped onto a new parent ("" = the account's top level).
     MoveFolder { account_id: u32, path: String, dest: String },
     UnifiedSelected,
+    /// A tag was selected (#71): its keyword.
+    TagSelected(String),
     /// The attachments gallery was selected.
     AttachmentsSelected,
     /// The "Contacts" row was clicked — open the contacts browser.
@@ -439,6 +456,11 @@ impl Component for Sidebar {
             unified_folders_badge: None,
             unified_folders_unread: 0,
             account_circle_badges: HashMap::new(),
+            tags: Vec::new(),
+            tags_expanded: true,
+            tags_revealer: None,
+            tags_chevron: None,
+            tag_list: None,
         };
 
         let widgets = view_output!();
@@ -472,6 +494,7 @@ impl Component for Sidebar {
                 chevrons_left,
                 unified_unread,
                 unified_folders,
+                tags,
             } => {
                 // Order each account's folders essential-first, then custom, so
                 // the essential/custom split lines up with row indices (the main
@@ -495,6 +518,13 @@ impl Component for Sidebar {
                 self.unified_folders = unified_folders;
                 self.unified_folders_unread =
                     self.unified_folders.iter().map(|r| r.folder.unread).sum();
+                self.tags = tags;
+                // The open tag was removed: fall back to the default view.
+                if let Sel::Tag(kw) = &self.selected {
+                    if !self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(kw)) {
+                        self.selected = Sel::None;
+                    }
+                }
                 // A selected filtered folder that just left the section (its
                 // rule opted out, or the section was switched off) is still
                 // the open folder: carry the highlight to the account
@@ -649,6 +679,28 @@ impl Component for Sidebar {
                         name: r.folder.name,
                         path: r.folder.path,
                     });
+                }
+            }
+
+            SidebarInput::TagRowSelected(index) => {
+                if let Some(t) = self.tags.get(index as usize).cloned() {
+                    let key = Sel::Tag(t.keyword.clone());
+                    if self.selected == key {
+                        return;
+                    }
+                    self.selected = key.clone();
+                    self.clear_other_selections(key);
+                    let _ = sender.output(SidebarOutput::TagSelected(t.keyword));
+                }
+            }
+
+            SidebarInput::ToggleTagsExpand => {
+                self.tags_expanded = !self.tags_expanded;
+                if let Some(rev) = &self.tags_revealer {
+                    rev.set_reveal_child(self.tags_expanded);
+                }
+                if let Some(ch) = &self.tags_chevron {
+                    ch.set_icon_name(Some(if self.tags_expanded { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }));
                 }
             }
 
@@ -1122,6 +1174,9 @@ impl Sidebar {
         self.unified_folder_badges.clear();
         self.unified_folders_badge = None;
         self.account_circle_badges.clear();
+        self.tags_revealer = None;
+        self.tags_chevron = None;
+        self.tag_list = None;
 
         // No accounts yet: show a prompt to add the first one instead of an empty
         // sidebar (the app is blank in this state).
@@ -1666,6 +1721,10 @@ impl Sidebar {
             });
             container.append(&list);
             self.outbox_list = Some(list);
+        }
+
+        if !self.tags.is_empty() {
+            self.build_tags_section(container, sender);
         }
 
         for section in &sections {
@@ -2334,11 +2393,116 @@ impl Sidebar {
         self.unified_folder_list = Some(list);
     }
 
+    /// The "Tags" section (#71), above the account sections: a toggle header
+    /// and, under a revealer, one row per tag — its colour as a disc, its
+    /// name. In the rail the header is a tag glyph and the rows are discs.
+    fn build_tags_section(&mut self, container: &gtk::Box, sender: &ComponentSender<Self>) {
+        let chevron = gtk::Image::from_icon_name(if self.tags_expanded {
+            "co.hyprlab.Vireo-pan-down-symbolic"
+        } else {
+            "co.hyprlab.Vireo-pan-end-symbolic"
+        });
+        let toggle = gtk::Button::new();
+        toggle.add_css_class("flat");
+        toggle.add_css_class("folders-toggle");
+        toggle.add_css_class("unified-folders-toggle");
+        let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        hb.add_css_class("folder-row");
+        if self.collapsed {
+            let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-tag-symbolic");
+            pin_icon_size(&icon);
+            hb.set_halign(gtk::Align::Center);
+            hb.append(&icon);
+            toggle.set_tooltip_text(Some(i18n("Tags").as_str()));
+        } else {
+            if self.chevrons_left {
+                chevron.set_margin_start(2);
+            }
+            hb.append(&chevron);
+            let lbl = gtk::Label::new(Some(i18n("Tags").as_str()));
+            lbl.add_css_class("account-name");
+            lbl.set_halign(gtk::Align::Start);
+            lbl.set_hexpand(true);
+            lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            hb.append(&lbl);
+        }
+        toggle.set_child(Some(&hb));
+        let st = sender.input_sender().clone();
+        toggle.connect_clicked(move |_| {
+            let _ = st.send(SidebarInput::ToggleTagsExpand);
+        });
+        container.append(&toggle);
+        self.tags_chevron = Some(chevron);
+
+        let list = gtk::ListBox::new();
+        list.set_selection_mode(gtk::SelectionMode::Single);
+        list.add_css_class("navigation-sidebar");
+        list.set_margin_bottom(10);
+        for t in &self.tags {
+            let row = gtk::ListBoxRow::new();
+            let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            hbox.add_css_class("folder-row");
+            let disc = crate::ui::context_menu::swatch_widget(&t.color, true);
+            if self.collapsed {
+                hbox.set_halign(gtk::Align::Center);
+                hbox.append(&disc);
+                row.set_tooltip_text(Some(&t.name));
+            } else {
+                if self.chevrons_left {
+                    disc.set_margin_start(ROW_LEFT_INSET);
+                } else {
+                    // Under the header's caret, like a folder under its
+                    // account heading.
+                    disc.set_margin_start(TREE_EXPANDER_WIDTH);
+                }
+                hbox.append(&disc);
+                let label = gtk::Label::new(Some(&t.name));
+                label.set_hexpand(true);
+                label.set_halign(gtk::Align::Start);
+                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                label.add_css_class("account-name");
+                hbox.append(&label);
+            }
+            row.set_child(Some(&hbox));
+            list.append(&row);
+        }
+        let ss = sender.input_sender().clone();
+        list.connect_row_selected(move |_, row| {
+            if let Some(row) = row {
+                let _ = ss.send(SidebarInput::TagRowSelected(row.index()));
+            }
+        });
+
+        let revealer = gtk::Revealer::new();
+        revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
+        revealer.set_transition_duration(0);
+        revealer.set_reveal_child(self.tags_expanded);
+        revealer.set_child(Some(&list));
+        container.append(&revealer);
+        self.tags_revealer = Some(revealer);
+        self.tag_list = Some(list);
+    }
+
+    fn select_tag(&self, keyword: &str) {
+        if let Some(list) = &self.tag_list {
+            if let Some(idx) = self.tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
+                if let Some(row) = list.row_at_index(idx as i32) {
+                    list.select_row(Some(&row));
+                }
+            }
+        }
+    }
+
     /// Deselect every list except the one owning `keep` (whose own list keeps its
     /// selection). Used when a selection moves between sections.
     fn clear_other_selections(&self, keep: Sel) {
         if keep != Sel::Unified {
             if let Some(l) = &self.unified_list {
+                l.unselect_all();
+            }
+        }
+        if !matches!(keep, Sel::Tag(_)) {
+            if let Some(l) = &self.tag_list {
                 l.unselect_all();
             }
         }
@@ -2415,6 +2579,7 @@ impl Sidebar {
             Sel::Folder(acc, path) => self.select_folder(acc, &path),
             Sel::UnifiedInbox(acc) => self.select_unified_inbox(acc),
             Sel::UnifiedFolder(acc, path) => self.select_unified_folder(acc, &path),
+            Sel::Tag(kw) => self.select_tag(&kw),
             Sel::None => {
                 if self.show_unified {
                     self.select_unified();

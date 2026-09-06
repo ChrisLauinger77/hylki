@@ -45,6 +45,9 @@ pub struct RowInit {
     pub palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared "open the palette on row hover" flag (read live on each hover).
     pub palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
+    /// The tags (#71), shared with every row: the chips a row shows are the
+    /// message's keywords that name one of these.
+    pub tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
     /// Whether the row carries the Actions Palette line at all (preference);
     /// off returns its reserved space to the row.
     pub show_palette: bool,
@@ -184,6 +187,11 @@ pub struct MessageRow {
     palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared "open the palette on row hover" flag (read live per hover).
     palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
+    /// The tags, shared with the list (#71).
+    tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
+    /// The keywords the chips were last built for, so post_view (which runs
+    /// on every update) rebuilds them only when they changed.
+    tags_rendered: std::cell::RefCell<Vec<String>>,
     /// Whether this row shows the Actions Palette line at all (preference).
     show_palette: bool,
     /// Conversation size (only meaningful on a thread head).
@@ -217,6 +225,9 @@ pub struct MessageRow {
 pub enum MessageRowInput {
     SetRead(bool),
     SetStarred(bool),
+    SetKeywords(Vec<String>),
+    /// The palette's tag button: pop the tag menu on it.
+    OpenTagMenu(gtk::Button),
     SetHasAttachment(bool),
     /// The pointer entered/left the row — fade the chevron in/out.
     SetRowHover(bool),
@@ -248,6 +259,8 @@ pub enum MessageRowInput {
 #[derive(Debug)]
 pub enum MessageRowOutput {
     Action { action: RowAction, message: Box<Message> },
+    /// A tag toggled from the palette's tag menu (#71).
+    SetTag { message: Box<Message>, keyword: String, add: bool },
     ToggleThread((u32, String)),
     /// This row's palette just opened — the list closes every other one.
     PaletteOpened(usize),
@@ -296,6 +309,45 @@ fn drag_selection(src: &gtk::DragSource, keys: &DragKeys) -> Vec<(u32, u32, u32,
     list.selected_rows()
         .iter()
         .filter_map(|r| keys.get(r.index() as usize).copied())
+        .collect()
+}
+
+impl MessageRow {
+    /// Rebuild the row's tag chips (#71): one pill per keyword that names a
+    /// tag, in tag order, wearing the tag's colour class.
+    fn render_tags(&self, tags_box: &gtk::Box) {
+        while let Some(child) = tags_box.first_child() {
+            tags_box.remove(&child);
+        }
+        for t in self.tags.borrow().iter().filter(|t| self.msg.has_keyword(&t.keyword)) {
+            let chip = gtk::Label::new(Some(&t.name));
+            chip.add_css_class("tag-chip");
+            chip.add_css_class(&t.css_class());
+            chip.set_valign(gtk::Align::Center);
+            chip.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            chip.set_max_width_chars(14);
+            tags_box.append(&chip);
+        }
+        *self.tags_rendered.borrow_mut() = self.msg.keywords.clone();
+    }
+}
+
+/// The tag section of a message menu (#71): one entry per tag, its swatch
+/// filled where the message carries it; choosing an entry toggles that tag
+/// through `toggle(keyword, add)`.
+pub fn tag_menu_entries(
+    tags: &[crate::config::Tag],
+    msg: &Message,
+    toggle: impl Fn(String, bool) + Clone + 'static,
+) -> Vec<MenuEntry> {
+    tags.iter()
+        .map(|t| {
+            let on = msg.has_keyword(&t.keyword);
+            let keyword = t.keyword.clone();
+            let toggle = toggle.clone();
+            MenuEntry::new(t.name.clone(), move || toggle(keyword.clone(), !on))
+                .swatch(t.color.clone(), on)
+        })
         .collect()
 }
 
@@ -520,6 +572,15 @@ impl FactoryComponent for MessageRow {
                                 connect_clicked[sender] => move |_| sender.input(MessageRowInput::Action(RowAction::ToggleStar)),
                             },
                             gtk::Button {
+                                set_icon_name: "co.hyprlab.Vireo-tag-symbolic",
+                                set_tooltip_text: Some(i18n("Tags").as_str()),
+                                add_css_class: "flat",
+                                // Only once there is a tag to give.
+                                #[watch]
+                                set_visible: !self.tags.borrow().is_empty(),
+                                connect_clicked[sender] => move |b| sender.input(MessageRowInput::OpenTagMenu(b.clone())),
+                            },
+                            gtk::Button {
                                 set_icon_name: "co.hyprlab.Vireo-mail-archive-symbolic",
                                 set_tooltip_text: Some(i18n("Archive").as_str()),
                                 add_css_class: "flat",
@@ -678,12 +739,25 @@ impl FactoryComponent for MessageRow {
                     },
                 },
 
-                gtk::Label {
-                    set_label: &self.msg.subject,
-                    set_halign: gtk::Align::Start,
-                    set_ellipsize: gtk::pango::EllipsizeMode::End,
-                    #[watch]
-                    set_css_classes: &self.subject_classes(),
+                gtk::Box {
+                    set_spacing: 6,
+                    gtk::Label {
+                        set_label: &self.msg.subject,
+                        set_halign: gtk::Align::Start,
+                        set_hexpand: true,
+                        set_ellipsize: gtk::pango::EllipsizeMode::End,
+                        #[watch]
+                        set_css_classes: &self.subject_classes(),
+                    },
+                    // Tag chips (#71) at the subject's end, where a long
+                    // subject gives way before the sender's name would.
+                    // Built from the message's keywords in init_widgets and
+                    // rebuilt by post_view when they change.
+                    #[local_ref]
+                    tags_box -> gtk::Box {
+                        set_spacing: 4,
+                        set_valign: gtk::Align::Center,
+                    },
                 },
 
                 // The message's own text, at full width: nothing shares this line,
@@ -720,6 +794,9 @@ impl FactoryComponent for MessageRow {
     }
 
     fn post_view() {
+        if *self.tags_rendered.borrow() != self.msg.keywords {
+            self.render_tags(&widgets.tags_box);
+        }
         // Slide the palette open/shut by animating the spacer that gives the
         // clip Overlay its width — driven here (not a GtkRevealer) because
         // revealer transitions don't repaint inside an Overlay's overlay
@@ -779,6 +856,7 @@ impl FactoryComponent for MessageRow {
             ring_class,
             palette_collapse_secs,
             palette_hover,
+            tags,
             show_palette,
             thread_count,
             is_thread_child,
@@ -809,6 +887,8 @@ impl FactoryComponent for MessageRow {
             collapse_timer: None,
             palette_collapse_secs,
             palette_hover,
+            tags,
+            tags_rendered: std::cell::RefCell::new(Vec::new()),
             show_palette,
             thread_count,
             is_thread_child,
@@ -845,9 +925,38 @@ impl FactoryComponent for MessageRow {
         model
     }
 
+    fn init_widgets(
+        &mut self,
+        _index: &DynamicIndex,
+        root: Self::Root,
+        _returned_widget: &gtk::ListBoxRow,
+        sender: FactorySender<Self>,
+    ) -> Self::Widgets {
+        // The chips are children added by hand (their number varies), so the
+        // box is built here and handed to the view; post_view keeps it fresh.
+        let tags_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        self.render_tags(&tags_box);
+        let widgets = view_output!();
+        widgets
+    }
+
     fn update(&mut self, msg: Self::Input, sender: FactorySender<Self>) {
         match msg {
             MessageRowInput::SetRead(read) => self.msg.unread = !read,
+            MessageRowInput::SetKeywords(keywords) => self.msg.keywords = keywords,
+            MessageRowInput::OpenTagMenu(btn) => {
+                let tags = self.tags.borrow().clone();
+                let msg = self.msg.clone();
+                let target = msg.clone();
+                let entries = tag_menu_entries(&tags, &msg, move |keyword, add| {
+                    let _ = sender.output(MessageRowOutput::SetTag {
+                        message: Box::new(target.clone()),
+                        keyword,
+                        add,
+                    });
+                });
+                show_context_menu(&btn, (btn.width() / 2) as f64, btn.height() as f64, vec![entries]);
+            }
             MessageRowInput::SetStarred(starred) => self.msg.starred = starred,
             MessageRowInput::SetHasAttachment(has) => self.msg.has_attachment = has,
             MessageRowInput::SetRowHover(over) => {
@@ -1353,6 +1462,8 @@ pub struct MessageList {
     palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared with every row: open the palette on row hover.
     palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
+    /// The tags (#71), shared with every row for its chips and tag menu.
+    tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
     /// The message currently being viewed, kept selected across list rebuilds.
     /// Keyed by (account_id, id) since UIDs collide across accounts in the
     /// unified "All Inboxes" view.
@@ -1579,6 +1690,12 @@ pub enum MessageListInput {
     /// A hover-palette action for a specific message (forwarded to the app).
     RowAction { action: RowAction, message: Box<Message> },
     SetStarred { id: u32, starred: bool },
+    /// A message's keywords changed (a tag put on or taken off, #71).
+    SetKeywords { id: u32, keywords: Vec<String> },
+    /// The tag definitions changed: rows rebuild their chips.
+    SetTags(Vec<crate::config::Tag>),
+    /// A row's tag menu toggled a tag — passed up to the app.
+    SetTagFor { message: Box<Message>, keyword: String, add: bool },
     /// Update a message's attachment indicator (e.g. clearing a false paperclip).
     SetHasAttachment { id: u32, has: bool },
     Remove(u32),
@@ -1627,6 +1744,8 @@ pub enum MessageListOutput {
     Activated { message: Message, thread: Vec<Message> },
     /// A context-menu action chosen for a specific message.
     Action { action: RowAction, message: Box<Message> },
+    /// A tag toggled on a specific message (#71).
+    SetTag { message: Box<Message>, keyword: String, add: bool },
     /// A bulk action chosen for every currently-selected message.
     Bulk { action: BulkAction, messages: Vec<Message> },
     /// Delete requested on a lone selected row that heads a whole conversation:
@@ -1892,6 +2011,9 @@ impl SimpleComponent for MessageList {
                 MessageRowOutput::Action { action, message } => {
                     MessageListInput::RowAction { action, message }
                 }
+                MessageRowOutput::SetTag { message, keyword, add } => {
+                    MessageListInput::SetTagFor { message, keyword, add }
+                }
                 MessageRowOutput::ToggleThread(key) => MessageListInput::ToggleThread(key),
                 MessageRowOutput::PaletteOpened(idx) => MessageListInput::PaletteOpened(idx),
             });
@@ -1927,6 +2049,7 @@ impl SimpleComponent for MessageList {
             colorize: false,
             account_colors: std::collections::HashMap::new(),
             color_provider,
+            tags: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             palette_collapse_secs: std::rc::Rc::new(std::cell::Cell::new(5)),
             palette_hover: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_list_palette_hover(),
@@ -2591,6 +2714,26 @@ impl SimpleComponent for MessageList {
                 }
                 self.refresh_thread_star(id);
             }
+            MessageListInput::SetKeywords { id, keywords } => {
+                if let Some(m) = self.all.iter_mut().find(|m| m.id == id) {
+                    m.keywords = keywords.clone();
+                }
+                if let Some(idx) = self.shown.iter().position(|m| m.id == id) {
+                    self.shown[idx].keywords = keywords.clone();
+                    self.rows.send(idx, MessageRowInput::SetKeywords(keywords));
+                }
+            }
+            MessageListInput::SetTags(tags) => {
+                if *self.tags.borrow() != tags {
+                    *self.tags.borrow_mut() = tags;
+                    // Chips and the palette's tag button follow the
+                    // definitions; the rows are rebuilt to pick them up.
+                    self.rebuild_preserving_scroll();
+                }
+            }
+            MessageListInput::SetTagFor { message, keyword, add } => {
+                let _ = sender.output(MessageListOutput::SetTag { message, keyword, add });
+            }
             MessageListInput::SetHasAttachment { id, has } => {
                 if let Some(m) = self.all.iter_mut().find(|m| m.id == id) {
                     m.has_attachment = has;
@@ -2949,6 +3092,21 @@ impl MessageList {
             ));
         }
 
+        // Tags (#71): one toggle per tag, a filled swatch where the message
+        // carries it. Absent until a tag exists.
+        let tag_section = {
+            let tags = self.tags.borrow().clone();
+            let s = sender.clone();
+            let m = msg.clone();
+            tag_menu_entries(&tags, msg, move |keyword, add| {
+                let _ = s.output(MessageListOutput::SetTag {
+                    message: Box::new(m.clone()),
+                    keyword,
+                    add,
+                });
+            })
+        };
+
         let sections = vec![
             vec![
                 item(RowAction::Reply, &i18n("Reply"), "co.hyprlab.Vireo-mail-reply-sender-symbolic"),
@@ -2956,6 +3114,7 @@ impl MessageList {
                 item(RowAction::Forward, &i18n("Forward"), "co.hyprlab.Vireo-mail-forward-symbolic"),
             ],
             flag_section,
+            tag_section,
             vec![
                 item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"),
                 item(RowAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"),
@@ -3209,6 +3368,7 @@ impl MessageList {
                         ring_class,
                         palette_collapse_secs: self.palette_collapse_secs.clone(),
                         palette_hover: self.palette_hover.clone(),
+                        tags: self.tags.clone(),
                         show_palette: self.list_palette,
                         thread_count: 0,
                         is_thread_child: true,
@@ -3484,6 +3644,7 @@ impl MessageList {
                     ring_class,
                     palette_collapse_secs: self.palette_collapse_secs.clone(),
                     palette_hover: self.palette_hover.clone(),
+                    tags: self.tags.clone(),
                     show_palette: self.list_palette,
                     thread_count: meta.count,
                     is_thread_child: meta.is_child,
@@ -3691,6 +3852,7 @@ mod tests {
             timestamp: 1000,
             unread: false,
             starred: false,
+            keywords: Vec::new(),
             has_attachment: false,
             message_id: message_id.into(),
             references: references.into(),

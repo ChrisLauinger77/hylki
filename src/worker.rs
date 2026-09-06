@@ -178,6 +178,17 @@ pub enum MailRequest {
         uid: u32,
         flagged: bool,
     },
+    /// Put a tag's keyword on a message, or take it off (#71). IMAP stores it
+    /// as a user flag where the mailbox allows custom keywords, Microsoft 365
+    /// as a category; POP3 and refusing servers keep it in the cache against
+    /// `message_id` instead.
+    SetKeyword {
+        path: String,
+        uid: u32,
+        message_id: String,
+        keyword: String,
+        add: bool,
+    },
     /// Move a message to another mailbox (archive / trash).
     MoveMessage {
         path: String,
@@ -739,6 +750,9 @@ async fn run_imap(
         }
     }
 
+    // Whether the user has been told this account's server keeps no tags
+    // (one notice per session, not one per tagged message).
+    let mut local_tags_noticed = false;
     loop {
         // Back online with something queued: send it before anything else, so a
         // message the user thinks they sent doesn't sit behind a mailbox sync.
@@ -1330,6 +1344,41 @@ async fn run_imap(
                     lost = true;
                 } else if let Some(c) = cache.as_ref() {
                     c.set_starred(account_id, &path, uid, flagged);
+                }
+            }
+
+            MailRequest::SetKeyword { path, uid, message_id, keyword, add } => {
+                let sess = session.as_mut().unwrap();
+                match store_keyword(sess, &path, uid, &keyword, add).await {
+                    Ok(true) => {
+                        if let Some(c) = cache.as_ref() {
+                            c.set_keyword(account_id, &path, uid, &keyword, add);
+                        }
+                    }
+                    Ok(false) => {
+                        // The mailbox takes no custom keywords: keep the tag
+                        // in Vireo, and say so once per session.
+                        if let Some(c) = cache.as_ref() {
+                            if message_id.is_empty() {
+                                c.set_keyword(account_id, &path, uid, &keyword, add);
+                            } else {
+                                c.set_local_tag(account_id, &message_id, &keyword, add);
+                            }
+                        }
+                        if !local_tags_noticed {
+                            local_tags_noticed = true;
+                            emit(WorkerEvent::Notice(i18n(
+                                "This server does not store tags, so Vireo keeps them on this computer only",
+                            )));
+                        }
+                    }
+                    Err(e) => {
+                        emit(WorkerEvent::Error {
+                            text: i18n_f("Could not tag message: {e}", &[("e", &(e).to_string())]),
+                            connectivity: false,
+                        });
+                        lost = true;
+                    }
                 }
             }
 
@@ -3603,6 +3652,38 @@ async fn store_flag(
     Ok(())
 }
 
+/// Add or remove a user-defined keyword (a tag, #71). Answers whether the
+/// server took it: `Ok(false)` means the mailbox's PERMANENTFLAGS lists no
+/// `\*` (and not this keyword either), so a STORE would be refused or
+/// forgotten at the end of the session — the caller keeps the tag locally.
+/// A server that sends no PERMANENTFLAGS at all keeps every flag (RFC 3501).
+async fn store_keyword(
+    session: &mut ImapSession,
+    path: &str,
+    uid: u32,
+    keyword: &str,
+    add: bool,
+) -> Result<bool, async_imap::error::Error> {
+    let mailbox = session.select(path).await?;
+    let allowed = mailbox.permanent_flags.is_empty()
+        || mailbox.permanent_flags.iter().any(|f| match f {
+            Flag::MayCreate => true,
+            Flag::Custom(k) => k.eq_ignore_ascii_case(keyword),
+            _ => false,
+        });
+    if !allowed {
+        return Ok(false);
+    }
+    let op = if add { "+FLAGS" } else { "-FLAGS" };
+    let query = format!("{op} ({keyword})");
+    let _: Vec<Fetch> = session
+        .uid_store(uid.to_string(), query)
+        .await?
+        .try_collect()
+        .await?;
+    Ok(true)
+}
+
 /// Move a message to `dest`, creating (and subscribing to) the destination
 /// mailbox first if it doesn't exist yet. Returns whether a folder was created,
 /// so the caller can refresh the folder list.
@@ -4680,6 +4761,7 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
     let flags: Vec<Flag> = fetch.flags().collect();
     let unread = !flags.iter().any(|f| matches!(f, Flag::Seen));
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
+    let keywords = custom_flags(&flags);
 
     let raw = fetch.header().unwrap_or(&[]);
     let parsed = MessageParser::default().parse(raw);
@@ -4761,6 +4843,7 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
         timestamp,
         unread,
         starred,
+        keywords,
         has_attachment,
         message_id,
         references,
@@ -5255,6 +5338,7 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
     let flags: Vec<Flag> = fetch.flags().collect();
     let unread = !flags.iter().any(|f| matches!(f, Flag::Seen));
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
+    let keywords = custom_flags(&flags);
 
     let env = fetch.envelope();
     let (from_name, from_addr) = env
@@ -5316,12 +5400,24 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
         timestamp,
         unread,
         starred,
+        keywords,
         has_attachment,
         message_id,
         references,
     };
     msg.scrub_nuls();
     msg
+}
+
+/// The user-defined keywords among a message's flags, verbatim.
+fn custom_flags(flags: &[Flag]) -> Vec<String> {
+    flags
+        .iter()
+        .filter_map(|f| match f {
+            Flag::Custom(k) => Some(k.to_string()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Normalize a single Message-ID: strip angle brackets/whitespace, lowercase.
@@ -5656,6 +5752,7 @@ fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &[u8]) -> Me
         timestamp,
         unread: true,
         starred: false,
+        keywords: Vec::new(),
         has_attachment,
         message_id,
         references,
@@ -5857,6 +5954,16 @@ async fn run_pop3(
             MailRequest::SetFlagged { uid, flagged, .. } => {
                 if let Some(c) = cache.as_ref() {
                     c.set_starred(account_id, INBOX, uid, flagged);
+                }
+            }
+            // POP3 has no flags at all: every tag is Vireo's own.
+            MailRequest::SetKeyword { uid, message_id, keyword, add, .. } => {
+                if let Some(c) = cache.as_ref() {
+                    if message_id.is_empty() {
+                        c.set_keyword(account_id, INBOX, uid, &keyword, add);
+                    } else {
+                        c.set_local_tag(account_id, &message_id, &keyword, add);
+                    }
                 }
             }
             MailRequest::MarkAllRead { folder_id, .. } => {
@@ -6120,6 +6227,7 @@ async fn run_mock(
             // Mutations are no-ops offline; the UI updates optimistically.
             MailRequest::SetSeen { .. }
             | MailRequest::SetFlagged { .. }
+            | MailRequest::SetKeyword { .. }
             | MailRequest::MarkAllRead { .. }
             | MailRequest::MarkSpam { .. }
             | MailRequest::MoveMessage { .. }
@@ -6992,6 +7100,10 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
         timestamp: ts,
         unread: !v["isRead"].as_bool().unwrap_or(true),
         starred: v["flag"]["flagStatus"].as_str() == Some("flagged"),
+        keywords: v["categories"]
+            .as_array()
+            .map(|cs| cs.iter().filter_map(|c| c.as_str().map(str::to_string)).collect())
+            .unwrap_or_default(),
         has_attachment: v["hasAttachments"].as_bool().unwrap_or(false),
         message_id: normalize_msgid(v["internetMessageId"].as_str().unwrap_or("").as_bytes()),
         references: v["conversationId"]
@@ -7004,7 +7116,7 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
 
 const GRAPH_MSG_SELECT: &str = "$select=id,internetMessageId,conversationId,subject,bodyPreview,\
                                 from,replyTo,toRecipients,ccRecipients,receivedDateTime,isRead,\
-                                flag,hasAttachments";
+                                flag,hasAttachments,categories";
 
 /// List a folder's newest summaries (newest first).
 fn graph_list_messages(
@@ -7277,6 +7389,28 @@ async fn run_graph(
                     &path,
                     uid,
                     serde_json::json!({ "flag": { "flagStatus": status } }),
+                    &emit,
+                )
+                .await;
+            }
+
+            MailRequest::SetKeyword { path, uid, keyword, add, .. } => {
+                // Categories travel as the whole list, so the cached row is
+                // the base: patched first, then sent as it now stands.
+                let categories = match cache.as_ref() {
+                    Some(c) => {
+                        c.set_keyword(account_id, &path, uid, &keyword, add);
+                        c.keywords_of(account_id, &path, uid)
+                    }
+                    None if add => vec![keyword.clone()],
+                    None => Vec::new(),
+                };
+                graph_patch_message(
+                    &account,
+                    &mut state,
+                    &path,
+                    uid,
+                    serde_json::json!({ "categories": categories }),
                     &emit,
                 )
                 .await;

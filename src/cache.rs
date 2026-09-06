@@ -48,9 +48,16 @@ CREATE TABLE IF NOT EXISTS messages (
     references_    TEXT    NOT NULL DEFAULT '',
     preview        TEXT    NOT NULL DEFAULT '',
     reply_to       TEXT    NOT NULL DEFAULT '',
+    keywords       TEXT    NOT NULL DEFAULT '',
     PRIMARY KEY (account_id, folder_path, uid)
 );
 CREATE INDEX IF NOT EXISTS messages_by_message_id ON messages (message_id);
+CREATE TABLE IF NOT EXISTS local_tags (
+    account_id  INTEGER NOT NULL,
+    message_id  TEXT    NOT NULL,
+    keyword     TEXT    NOT NULL,
+    PRIMARY KEY (account_id, message_id, keyword)
+);
 CREATE TABLE IF NOT EXISTS bodies (
     account_id  INTEGER NOT NULL,
     folder_path TEXT NOT NULL,
@@ -121,6 +128,28 @@ CREATE TABLE IF NOT EXISTS attachments_checked (
 /// checked table remembers those messages as done, so the wrong lists would
 /// survive forever — drop both tables and let attachments re-fetch on demand.
 const SCHEMA_VERSION: i64 = 13;
+
+/// A message's keywords as one column: the server's, then any tag kept
+/// locally for the same Message-ID (POP3, or an IMAP server that refuses
+/// custom keywords). `local_tags` is small and keyed for this lookup, so the
+/// correlated subquery is an index seek per row.
+const KEYWORDS_COL: &str = "messages.keywords || ' ' || COALESCE((SELECT group_concat(lt.keyword, ' ') \
+    FROM local_tags lt WHERE lt.account_id = messages.account_id \
+    AND messages.message_id <> '' AND lt.message_id = messages.message_id), '')";
+
+/// Split a keywords column back into the list a [`Message`] carries.
+fn split_keywords(col: String) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for k in col.split_whitespace() {
+        if !out.iter().any(|o| o.eq_ignore_ascii_case(k)) {
+            out.push(k.to_string());
+        }
+    }
+    out
+}
+
+/// Most messages one tag view lists per account; the list pages within it.
+const TAG_VIEW_LIMIT: i64 = 5000;
 
 /// Most Message-IDs one cross-folder conversation lookup matches against. A
 /// thread's ancestry is short in practice, and the references half of that query
@@ -246,6 +275,10 @@ impl Cache {
         // re-syncs, and Reply falls back to the sender until then.
         let _ =
             conn.execute("ALTER TABLE messages ADD COLUMN reply_to TEXT NOT NULL DEFAULT ''", []);
+        // And for `keywords` (tags, #71): existing rows read as untagged until
+        // their folder syncs again and the flags come down with the rest.
+        let _ =
+            conn.execute("ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
         // Previews cached by a build that showed MIME machinery or a tracking
         // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
         // the rendered link a marketing mail opens with ("( https://…"). Clearing
@@ -363,10 +396,10 @@ impl Cache {
 
     pub fn load_messages(&self, account_id: u32, folder_path: &str, folder_id: u32) -> Vec<Message> {
         let run = || -> rusqlite::Result<Vec<Message>> {
-            let mut stmt = self.conn.prepare(
-                "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}
                  FROM messages WHERE account_id = ?1 AND folder_path = ?2 ORDER BY uid DESC",
-            )?;
+            ))?;
             let rows = stmt.query_map(params![account_id, folder_path], |row| {
                 let uid: u32 = row.get(0)?;
                 let mut m = Message {
@@ -386,6 +419,7 @@ impl Cache {
                     timestamp: row.get(5)?,
                     unread: row.get(6)?,
                     starred: row.get(7)?,
+                    keywords: split_keywords(row.get(15)?),
                     has_attachment: row.get(8)?,
                     message_id: row.get(11)?,
                     references: row.get(12)?,
@@ -451,12 +485,12 @@ impl Cache {
             for m in messages {
                 tx.execute(
                     "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, reply_to)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, reply_to, keywords)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                     params![
                         account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
                         m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
-                        m.message_id, m.references, m.reply_to
+                        m.message_id, m.references, m.reply_to, m.keywords.join(" ")
                     ],
                 )?;
             }
@@ -480,8 +514,8 @@ impl Cache {
                 // lost its preview.
                 tx.execute(
                     "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
                      ON CONFLICT(account_id, folder_path, uid) DO UPDATE SET
                        from_name = excluded.from_name,
                        from_addr = excluded.from_addr,
@@ -496,11 +530,12 @@ impl Cache {
                        message_id = excluded.message_id,
                        references_ = excluded.references_,
                        preview = CASE WHEN excluded.preview = '' THEN messages.preview ELSE excluded.preview END,
-                       reply_to = excluded.reply_to",
+                       reply_to = excluded.reply_to,
+                       keywords = excluded.keywords",
                     params![
                         account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
                         m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
-                        m.message_id, m.references, m.preview, m.reply_to
+                        m.message_id, m.references, m.preview, m.reply_to, m.keywords.join(" ")
                     ],
                 )?;
             }
@@ -559,7 +594,8 @@ impl Cache {
             .collect::<Vec<_>>()
             .join(" OR ");
         let sql = format!(
-            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred,                     has_attachment, recipients, cc, message_id, references_, preview, reply_to              FROM messages             WHERE account_id = ?{account} AND (message_id IN ({in_list}) OR {refs_match})              ORDER BY ts DESC LIMIT ?{limit}",
+            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred,                     has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords}              FROM messages             WHERE account_id = ?{account} AND (message_id IN ({in_list}) OR {refs_match})              ORDER BY ts DESC LIMIT ?{limit}",
+            keywords = KEYWORDS_COL,
             account = ids.len() * 2 + 1,
             limit = ids.len() * 2 + 2,
             in_list = slots(0),
@@ -599,6 +635,7 @@ impl Cache {
                         timestamp: row.get(6)?,
                         unread: row.get(7)?,
                         starred: row.get(8)?,
+                        keywords: split_keywords(row.get(16)?),
                         has_attachment: row.get(9)?,
                         message_id: row.get(12)?,
                         references: row.get(13)?,
@@ -1183,6 +1220,125 @@ impl Cache {
             "UPDATE messages SET starred = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
             params![starred, account_id, folder_path, uid],
         );
+    }
+
+    /// Add or drop a keyword on a cached row (the server copy just changed).
+    pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) {
+        let mut current = self.keywords_of(account_id, folder_path, uid);
+        current.retain(|k| !k.eq_ignore_ascii_case(keyword));
+        if add {
+            current.push(keyword.to_string());
+        }
+        let _ = self.conn.execute(
+            "UPDATE messages SET keywords = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
+            params![current.join(" "), account_id, folder_path, uid],
+        );
+    }
+
+    /// The server-side keywords cached for one message (local tags excluded).
+    pub fn keywords_of(&self, account_id: u32, folder_path: &str, uid: u32) -> Vec<String> {
+        self.conn
+            .query_row(
+                "SELECT keywords FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+                params![account_id, folder_path, uid],
+                |r| r.get::<_, String>(0),
+            )
+            .map(split_keywords)
+            .unwrap_or_default()
+    }
+
+    /// Add or drop a tag kept in Vireo only (#71), for accounts whose server
+    /// can't hold it: POP3, or IMAP without `\*` in PERMANENTFLAGS. Keyed by
+    /// Message-ID so the tag follows the message between folders and
+    /// survives a re-sync of the row.
+    pub fn set_local_tag(&self, account_id: u32, message_id: &str, keyword: &str, add: bool) {
+        if message_id.is_empty() {
+            return;
+        }
+        let _ = if add {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO local_tags (account_id, message_id, keyword) VALUES (?1, ?2, ?3)",
+                params![account_id, message_id, keyword],
+            )
+        } else {
+            self.conn.execute(
+                "DELETE FROM local_tags WHERE account_id = ?1 AND message_id = ?2 AND lower(keyword) = lower(?3)",
+                params![account_id, message_id, keyword],
+            )
+        };
+    }
+
+    /// Fold the account's locally-kept tags into freshly fetched summaries, so
+    /// what the worker hands the app matches what a cache load would show.
+    pub fn apply_local_tags(&self, account_id: u32, messages: &mut [Message]) {
+        let run = || -> rusqlite::Result<Vec<(String, String)>> {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT message_id, keyword FROM local_tags WHERE account_id = ?1")?;
+            let rows = stmt.query_map(params![account_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect()
+        };
+        let local = run().unwrap_or_default();
+        if local.is_empty() {
+            return;
+        }
+        for m in messages.iter_mut().filter(|m| !m.message_id.is_empty()) {
+            for (_, kw) in local.iter().filter(|(id, _)| *id == m.message_id) {
+                if !m.has_keyword(kw) {
+                    m.keywords.push(kw.clone());
+                }
+            }
+        }
+    }
+
+    /// Every cached message of the account carrying `keyword` — on the server
+    /// or locally — newest first, with the folder each sits in. Backs the
+    /// sidebar's tag views (#71); the caller maps paths to folder ids and
+    /// drops the copies Gmail keeps per label.
+    pub fn messages_with_keyword(&self, account_id: u32, keyword: &str) -> Vec<(String, Message)> {
+        let needle = format!(" {} ", keyword.to_ascii_lowercase());
+        let sql = format!(
+            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
+                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL} \
+             FROM messages \
+             WHERE account_id = ?1 AND instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0 \
+             ORDER BY ts DESC LIMIT ?3"
+        );
+        let run = || -> rusqlite::Result<Vec<(String, Message)>> {
+            let mut stmt = self.conn.prepare(&sql)?;
+            let rows = stmt.query_map(params![account_id, needle, TAG_VIEW_LIMIT], |row| {
+                let uid: u32 = row.get(1)?;
+                let mut m = Message {
+                    id: uid,
+                    account_id,
+                    folder_id: 0, // filled in by the caller, which knows the ids
+                    uid,
+                    from_name: row.get(2)?,
+                    from_addr: row.get(3)?,
+                    reply_to: row.get(15)?,
+                    to: row.get(10)?,
+                    cc: row.get(11)?,
+                    subject: row.get(4)?,
+                    preview: row.get(14)?,
+                    body: String::new(),
+                    date: row.get(5)?,
+                    timestamp: row.get(6)?,
+                    unread: row.get(7)?,
+                    starred: row.get(8)?,
+                    keywords: split_keywords(row.get(16)?),
+                    has_attachment: row.get(9)?,
+                    message_id: row.get(12)?,
+                    references: row.get(13)?,
+                };
+                m.scrub_nuls();
+                Ok((row.get::<_, String>(0)?, m))
+            })?;
+            rows.collect()
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache messages_with_keyword failed: {e}");
+            Vec::new()
+        })
     }
 
     pub fn delete_message(&self, account_id: u32, folder_path: &str, uid: u32) {

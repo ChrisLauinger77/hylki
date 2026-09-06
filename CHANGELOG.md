@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.23.0 — 2026-09-06
+
+Tags.
+
+- **Tags** (#71, requested by @yioannides, with the folders-versus-tags
+  discussion from @p-mitana and @deusnovus). Coloured labels a message can
+  carry several of, defined in Settings → Accounts → Tags (name, colour,
+  keyword). A tag is stored on the server as an IMAP keyword, the
+  standard's own per-message user flag beside `\Seen` and `\Flagged`, so
+  the same tag shows in Thunderbird, Apple Mail or a webmail, and theirs
+  show in Vireo once a tag names their keyword (Thunderbird's built-in
+  five are `$label1` to `$label5`; the tag dialog explains). Microsoft 365
+  accounts store them as categories. POP3 accounts, and IMAP servers whose
+  PERMANENTFLAGS refuse custom keywords, keep the tag in Vireo's own index
+  against the Message-ID instead, with a one-time notice.
+- **Where tags show.** A pill at the end of the subject on every list row;
+  chips beside the sender on conversation cards and under the subject of a
+  full-bleed message; a collapsible Tags section in the sidebar, above the
+  accounts, that lists every tag and opens a cross-account view of the
+  mail carrying it (Trash and Junk excluded, Gmail's per-label copies
+  collapsed to one row).
+- **Where tags are set.** The message's right-click menu, the Actions
+  Palette's new tag button, the reader toolbar's tag button and the
+  reader's overflow menu: one entry per tag, its swatch filled where the
+  message already carries it. Untagging a message inside its own tag view
+  drops the row.
+- **Rules can tag.** The filter dialog gains "Tag with" beside "Move to",
+  and "Move to" gains "Leave in Inbox", so a rule can tag, file, or both
+  (the tag goes on before the move and travels with it). Tag-only rules
+  hide the two folder switches on their row.
+- Under the hood: a `keywords` column on the message index (added in
+  place; rows fill in as folders re-sync), a `local_tags` table for the
+  Vireo-only tags, `tags.toml` beside `filters.toml` (both in the settings
+  bundle), a `.tag-<keyword>` colour stylesheet the chips and sidebar
+  share, and a `tag-symbolic` icon.
+
 ## 1.22.0 — 2026-09-06
 
 A translatable interface with a French translation, pictures from the
