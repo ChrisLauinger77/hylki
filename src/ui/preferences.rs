@@ -51,6 +51,12 @@ pub struct PrefInit {
     pub spellcheck: bool,
     pub spellcheck_langs: String,
     pub message_theme: MessageTheme,
+    /// Set every message in the reader's own font (#56).
+    pub override_fonts: bool,
+    /// That font, as a Pango description; empty = the interface font.
+    pub reader_font: String,
+    /// Ignore the senders' text and background colours (#56).
+    pub override_colors: bool,
     pub app_theme: AppTheme,
     pub notifications: bool,
     pub notification_content: bool,
@@ -245,6 +251,9 @@ pub enum PrefInput {
     ChangeAppIcon(String),
     ChangePaletteCollapse(u64),
     ChangeMessageTheme(u32),
+    ToggleOverrideFonts(bool),
+    ChangeReaderFont(String),
+    ToggleOverrideColors(bool),
     ChangeAppTheme(u32),
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
@@ -310,6 +319,9 @@ pub enum PrefOutput {
     SetAppIcon(String),
     SetPaletteCollapse(u64),
     SetMessageTheme(MessageTheme),
+    SetOverrideFonts(bool),
+    SetReaderFont(String),
+    SetOverrideColors(bool),
     Closed,
 }
 
@@ -670,6 +682,49 @@ impl Component for Preferences {
                             set_subtitle: &i18n("Theme for email content only, not the app itself."),
                             connect_selected_notify[sender] => move |row| {
                                 sender.input(PrefInput::ChangeMessageTheme(row.selected()));
+                            },
+                        },
+
+                        #[name = "override_fonts_row"]
+                        adw::SwitchRow {
+                            set_title: &i18n("Use my own font"),
+                            set_subtitle: &i18n("Show every message in the font and size chosen \
+                                           below instead of the sender's. Headings keep \
+                                           their relative size; code stays monospaced."),
+                            connect_active_notify[sender] => move |row| {
+                                sender.input(PrefInput::ToggleOverrideFonts(row.is_active()));
+                            },
+                        },
+
+                        #[name = "reader_font_row"]
+                        adw::ActionRow {
+                            set_title: &i18n("Message font"),
+                            set_subtitle: &i18n("The interface font unless another is chosen."),
+                            #[name = "reader_font_button"]
+                            add_suffix = &gtk::FontDialogButton {
+                                set_valign: gtk::Align::Center,
+                                set_dialog: &gtk::FontDialog::new(),
+                                set_level: gtk::FontLevel::Font,
+                                set_use_font: true,
+                                connect_font_desc_notify[sender] => move |button| {
+                                    let font = button
+                                        .font_desc()
+                                        .map(|d| d.to_string())
+                                        .unwrap_or_default();
+                                    sender.input(PrefInput::ChangeReaderFont(font));
+                                },
+                            },
+                        },
+
+                        #[name = "override_colors_row"]
+                        adw::SwitchRow {
+                            set_title: &i18n("Use my own colours"),
+                            set_subtitle: &i18n("Ignore the text and background colours senders \
+                                           set, so every message reads in the same black or \
+                                           white on the reader's ground. Pictures are kept; \
+                                           links take the accent colour."),
+                            connect_active_notify[sender] => move |row| {
+                                sender.input(PrefInput::ToggleOverrideColors(row.is_active()));
                             },
                         },
 
@@ -1320,6 +1375,31 @@ impl Component for Preferences {
             .unwrap_or(0);
         widgets.message_theme_row.set_selected(theme_sel as u32);
 
+        // The reader's font override (#56): the button shows the chosen font,
+        // or the interface font when none was chosen yet (so what it shows is
+        // what the reader will use); the row only responds while the switch
+        // is on.
+        {
+            let desc = if init.reader_font.trim().is_empty() {
+                gtk::Settings::default()
+                    .and_then(|s| s.gtk_font_name())
+                    .map(|f| f.to_string())
+                    .unwrap_or_else(|| "Cantarell 11".to_string())
+            } else {
+                init.reader_font.clone()
+            };
+            widgets
+                .reader_font_button
+                .set_font_desc(&gtk::pango::FontDescription::from_string(&desc));
+            widgets.reader_font_row.set_sensitive(init.override_fonts);
+            let font_row = widgets.reader_font_row.clone();
+            widgets.override_fonts_row.connect_active_notify(move |row| {
+                font_row.set_sensitive(row.is_active());
+            });
+        }
+        widgets.override_fonts_row.set_active(init.override_fonts);
+        widgets.override_colors_row.set_active(init.override_colors);
+
         // Hover-palette delay spinner (0–3000ms, step 50).
         // Actions Palette timeout: 1–30 seconds.
         let adj = gtk::Adjustment::new(init.palette_collapse_secs as f64, 1.0, 30.0, 1.0, 5.0, 0.0);
@@ -1566,6 +1646,15 @@ impl Component for Preferences {
             }
             PrefInput::ToggleShowRemoteBanner(on) => {
                 let _ = sender.output(PrefOutput::SetShowRemoteBanner(on));
+            }
+            PrefInput::ToggleOverrideFonts(on) => {
+                let _ = sender.output(PrefOutput::SetOverrideFonts(on));
+            }
+            PrefInput::ChangeReaderFont(font) => {
+                let _ = sender.output(PrefOutput::SetReaderFont(font));
+            }
+            PrefInput::ToggleOverrideColors(on) => {
+                let _ = sender.output(PrefOutput::SetOverrideColors(on));
             }
         }
     }

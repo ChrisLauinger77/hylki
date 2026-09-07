@@ -41,6 +41,13 @@ pub struct MessageView {
     /// having them in view can't undo the thing the user just asked for. Cleared
     /// whenever a conversation is opened afresh.
     no_autoread: std::collections::HashSet<(u32, u32)>,
+    /// The reader's own fonts and colours laid over every message (#56);
+    /// `NONE` shows each message as its sender formatted it.
+    reader_style: crate::config::ReaderStyle,
+    /// Messages the user asked to see with the sender's own formatting
+    /// despite `reader_style` (the card's "sender's formatting" toggle).
+    /// Kept for the session, so a thread reopened keeps the choice.
+    sender_style: std::collections::HashSet<(u32, u32)>,
     /// Read-marking policy (#100), stamped on the document for the
     /// viewport observer.
     read_mark: crate::config::ReadMark,
@@ -282,6 +289,11 @@ pub enum MessageViewInput {
     /// Set the message-content theme: `None` follows the system, `Some(dark)`
     /// forces light/dark for email content only (not the app UI).
     SetContentTheme(Option<bool>),
+    /// The reader's own fonts and colours over the senders' (#56).
+    SetReaderStyle(crate::config::ReaderStyle),
+    /// The card's "sender's formatting" toggle: show that one message as its
+    /// sender formatted it, or back under the reader's style.
+    ToggleSenderStyle { account_id: u32, id: u32 },
     /// The WebView finished loading the current document — reveal it.
     Rendered,
     /// The sender-authentication verdict for the message now on screen.
@@ -750,6 +762,8 @@ impl Component for MessageView {
             folder_labels: std::collections::HashMap::new(),
             blocked: false,
             no_autoread: std::collections::HashSet::new(),
+            reader_style: crate::config::ReaderStyle::NONE,
+            sender_style: std::collections::HashSet::new(),
             read_mark: crate::config::ReadMark::default(),
             show_banner: crate::config::load_show_remote_banner(),
             card_actions_hover: crate::config::load_card_actions_hover(),
@@ -947,6 +961,9 @@ impl Component for MessageView {
                     "contact" => {
                         open_sender.input(MessageViewInput::CardContact { account_id, id })
                     }
+                    "senderfmt" => {
+                        open_sender.input(MessageViewInput::ToggleSenderStyle { account_id, id })
+                    }
                     // "scrollat:<aid>:<id>:<offset>" — the topmost visible card.
                     "scrollat" => {
                         if let Some(Ok(offset)) = extra.map(|o| o.parse::<u32>()) {
@@ -1113,6 +1130,23 @@ impl Component for MessageView {
                     if self.current.is_some() && !self.loading {
                         self.render();
                     }
+                }
+            }
+            MessageViewInput::SetReaderStyle(style) => {
+                if self.reader_style != style {
+                    self.reader_style = style;
+                    if self.current.is_some() && !self.loading {
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::ToggleSenderStyle { account_id, id } => {
+                let key = (account_id, id);
+                if !self.sender_style.remove(&key) {
+                    self.sender_style.insert(key);
+                }
+                if self.current.is_some() && !self.loading {
+                    self.render();
                 }
             }
             MessageViewInput::SetSenderCheck(check) => {
@@ -1670,6 +1704,7 @@ impl MessageView {
         // different GTK theme variant, say) — the document must follow.
         self.theme_grounds(dark).hash(&mut h);
         self.remote_allowed.hash(&mut h);
+        self.reader_style.hash(&mut h);
         self.card_actions_hover.hash(&mut h);
         self.card_actions_auto.hash(&mut h);
         self.palette_collapse_secs.hash(&mut h);
@@ -1685,6 +1720,7 @@ impl MessageView {
             m.body.hash(&mut h);
             m.datetime_full().hash(&mut h);
             self.no_autoread.contains(&key).hash(&mut h);
+            self.sender_style.contains(&key).hash(&mut h);
             self.folder_labels.get(&key).hash(&mut h);
         }
         h.finish()
@@ -1706,6 +1742,8 @@ impl MessageView {
             dark,
             self.always_show_recipients,
             self.single_message_card,
+            &self.reader_style,
+            &self.sender_style,
         )
     }
 
@@ -1728,6 +1766,8 @@ impl MessageView {
         dark: bool,
         always_show_recipients: bool,
         single_message_card: bool,
+        style: &crate::config::ReaderStyle,
+        sender_style: &std::collections::HashSet<(u32, u32)>,
     ) -> String {
         // Every message renders with the conversation chrome — a thread of one
         // gets the same in-document header. But only a real conversation is
@@ -1752,6 +1792,13 @@ impl MessageView {
                     dark,
                     (m.account_id, m.id),
                     heights.get(&(m.account_id, m.id)).copied(),
+                    // The card's toggle wins over the preference.
+                    if sender_style.contains(&(m.account_id, m.id)) {
+                        &crate::config::ReaderStyle::NONE
+                    } else {
+                        style
+                    },
+                    accent,
                 )
             };
             if conversation {
@@ -1792,7 +1839,7 @@ impl MessageView {
                     acts = if !thread.is_empty() {
                         let key = (m.account_id, m.id);
                         format!(
-                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}</span>",
+                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}</span>",
                             // Same order as the reader toolbar and the list's
                             // Actions Palette, View Source closing the line.
                             card_action_button(key, "reply", "mail-reply-sender-symbolic", &i18n("Reply to this message")),
@@ -1830,6 +1877,27 @@ impl MessageView {
                             card_action_button(key, "spam", "mail-mark-junk-symbolic", &i18n("Mark as Spam")),
                             card_action_button(key, "contact", "contact-new-symbolic", &i18n("Add sender to Contacts")),
                             card_action_button(key, "viewsource", "code-symbolic", &i18n("View source")),
+                            // The escape from the reader's own fonts and
+                            // colours (#56): only offered while an override
+                            // is on, lit while this card shows the sender's.
+                            if style.active() {
+                                let on = sender_style.contains(&key);
+                                format!(
+                                    "<button type=\"button\" class=\"vireo-act{on_cls}\" data-act=\"senderfmt\" \
+                                     data-key=\"{aid}:{id}\" title=\"{title}\">{svg}</button>",
+                                    on_cls = if on { " on" } else { "" },
+                                    aid = key.0,
+                                    id = key.1,
+                                    title = gtk::glib::markup_escape_text(&if on {
+                                        i18n("Back to my fonts and colours")
+                                    } else {
+                                        i18n("Show the sender's fonts and colours")
+                                    }),
+                                    svg = inline_icon_svg("format-text-rich-symbolic"),
+                                )
+                            } else {
+                                String::new()
+                            },
                         )
                     } else {
                         String::new()
@@ -2254,9 +2322,23 @@ impl MessageView {
         let messages: Vec<(String, String)> = self
             .thread
             .iter()
-            .map(|m| {
+            .enumerate()
+            .map(|(n, m)| {
                 let doc = body_html(&m.body);
                 let doc = if self.remote_allowed { doc } else { strip_remote(&doc) };
+                // The reader's own fonts and colours (#56) reach paper too,
+                // scoped to this message's block; a card shown with the
+                // sender's formatting prints that way as well.
+                let style = if self.sender_style.contains(&(m.account_id, m.id)) {
+                    &crate::config::ReaderStyle::NONE
+                } else {
+                    &self.reader_style
+                };
+                let scope = format!(".{}", print_block_class(n));
+                let doc = inject_reader_style(
+                    &doc,
+                    &reader_style_css(style, false, &self.accent_hex(), &scope),
+                );
                 let head = if conversation {
                     print_message_header_html(m)
                 } else {
@@ -2660,6 +2742,12 @@ fn card_action_button(key: (u32, u32), act: &str, icon: &str, title: &str) -> St
         id = key.1,
     )
 }
+
+/// The card's "sender's formatting" toggle icon (#56), named in full here
+/// so `tools/gen-icon-gresource.sh` (which scans for the prefixed literal)
+/// bundles it; the card draws it inline through `inline_icon_svg`.
+#[allow(dead_code)]
+const SENDER_STYLE_ICON: &str = "co.hyprlab.Vireo-format-text-rich-symbolic";
 
 /// An embedded symbolic icon's SVG, inlined for the wrapper document (its
 /// paths carry no fill, so the document's `fill:currentColor` recolours it);
@@ -3622,6 +3710,136 @@ fn adapt_colors_for_dark(doc: &str) -> String {
     out
 }
 
+/// The stylesheet that lays the reader's own fonts and colours over a message
+/// (#56), or nothing when `style` overrides nothing.
+///
+/// `scope` is the element the rules hang under: `:root` in a sandboxed frame,
+/// the message's own block in the printed document. Each selector carries
+/// three `:not(#…)` clauses it trivially satisfies, so it outranks anything
+/// a sender wrote short of an inline `!important`, ids included — the sheet
+/// goes in last, and at equal weight the later rule wins.
+///
+/// Fonts: one family and size for everything, headings scaled from it so a
+/// message keeps its hierarchy, code kept monospaced. Colours: the reader's
+/// text on a transparent ground (the frame paints the card's), links in the
+/// accent; `img` carries no colour, so pictures stand. Background images
+/// go with the backgrounds: they are decoration in the same sense.
+fn reader_style_css(style: &crate::config::ReaderStyle, dark: bool, accent: &str, scope: &str) -> String {
+    if !style.active() {
+        return String::new();
+    }
+    // "everything under the scope", at id weight.
+    let all = format!("{scope} :not(#vireo-a):not(#vireo-b):not(#vireo-c)");
+    let of = |sel: &str| format!("{scope} {sel}:not(#vireo-a):not(#vireo-b):not(#vireo-c)");
+    let mut css = String::new();
+    if let Some(font) = &style.font {
+        let (family, size, face) = css_font(font);
+        css.push_str(&format!(
+            "{scope},{all}{{font-family:{family} !important;font-size:{size} !important;\
+             line-height:1.45 !important;{face}}}\
+             {h}{{line-height:1.25 !important;}}\
+             {h1}{{font-size:calc({size} * 1.6) !important;}}\
+             {h2}{{font-size:calc({size} * 1.35) !important;}}\
+             {h3}{{font-size:calc({size} * 1.15) !important;}}\
+             {small}{{font-size:calc({size} * 0.85) !important;}}\
+             {code}{{font-family:monospace !important;font-size:calc({size} * 0.9) !important;}}",
+            h = of(":is(h1,h2,h3,h4,h5,h6)"),
+            h1 = of("h1"),
+            h2 = of("h2"),
+            h3 = of("h3"),
+            small = of(":is(small,sub,sup)"),
+            code = of(":is(pre,code,kbd,samp,tt)"),
+        ));
+    }
+    if style.colors {
+        let fg = if dark { "#e6e6e6" } else { "#1a1a1a" };
+        css.push_str(&format!(
+            "{scope},{all}{{color:{fg} !important;-webkit-text-fill-color:{fg} !important;\
+             background-color:transparent !important;background-image:none !important;\
+             text-shadow:none !important;}}\
+             {a},{a} *{{color:{accent} !important;-webkit-text-fill-color:{accent} !important;}}",
+            a = of("a"),
+        ));
+    }
+    css
+}
+
+/// A Pango font description as a CSS family list, a size, and the face's
+/// declarations. Pango sizes are points (or device pixels when absolute);
+/// `0` means none was given, and the interface font's customary 11pt stands
+/// in. The face — weight, italic, stretch — is written only where it departs
+/// from regular: "Adwaita Sans Black" must come out black, but a regular
+/// pick must not flatten the sender's own bold and italic.
+fn css_font(desc: &str) -> (String, String, String) {
+    let fd = gtk::pango::FontDescription::from_string(desc);
+    let family = fd
+        .family()
+        .map(|f| f.to_string())
+        .filter(|f| !f.trim().is_empty())
+        .unwrap_or_else(|| "sans-serif".to_string());
+    // Every family quoted (a name with spaces or digits needs it; the rest
+    // tolerate it); a generic fallback closes the list.
+    let families: Vec<String> = family
+        .split(',')
+        .map(str::trim)
+        .filter(|f| !f.is_empty())
+        .map(|f| format!("\"{}\"", f.replace('\\', "").replace('"', "")))
+        .collect();
+    let generic = if family.to_ascii_lowercase().contains("mono") { "monospace" } else { "sans-serif" };
+    let family = format!("{},{generic}", families.join(","));
+    let units = fd.size();
+    let size = if units <= 0 {
+        "11pt".to_string()
+    } else if fd.is_size_absolute() {
+        format!("{}px", units as f64 / gtk::pango::SCALE as f64)
+    } else {
+        format!("{}pt", units as f64 / gtk::pango::SCALE as f64)
+    };
+    let mut face = String::new();
+    use gtk::glib::translate::IntoGlib;
+    let weight = fd.weight().into_glib();
+    if weight != gtk::pango::Weight::Normal.into_glib() {
+        // CSS takes 1–1000; Pango's scale is the same, `Ultraheavy` = 1000.
+        face.push_str(&format!("font-weight:{} !important;", weight.clamp(1, 1000)));
+    }
+    match fd.style() {
+        gtk::pango::Style::Italic => face.push_str("font-style:italic !important;"),
+        gtk::pango::Style::Oblique => face.push_str("font-style:oblique !important;"),
+        _ => {}
+    }
+    let stretch = match fd.stretch() {
+        gtk::pango::Stretch::UltraCondensed => "ultra-condensed",
+        gtk::pango::Stretch::ExtraCondensed => "extra-condensed",
+        gtk::pango::Stretch::Condensed => "condensed",
+        gtk::pango::Stretch::SemiCondensed => "semi-condensed",
+        gtk::pango::Stretch::SemiExpanded => "semi-expanded",
+        gtk::pango::Stretch::Expanded => "expanded",
+        gtk::pango::Stretch::ExtraExpanded => "extra-expanded",
+        gtk::pango::Stretch::UltraExpanded => "ultra-expanded",
+        _ => "",
+    };
+    if !stretch.is_empty() {
+        face.push_str(&format!("font-stretch:{stretch} !important;"));
+    }
+    (family, size, face)
+}
+
+/// Put a stylesheet at the end of a document's body, after everything the
+/// sender wrote, so its rules are the last word.
+fn inject_reader_style(doc: &str, css: &str) -> String {
+    if css.is_empty() {
+        return doc.to_string();
+    }
+    let block = format!("<style>{css}</style>");
+    let lower = doc.to_ascii_lowercase();
+    for close in ["</body", "</html"] {
+        if let Some(at) = lower.rfind(close) {
+            return format!("{}{block}{}", &doc[..at], &doc[at..]);
+        }
+    }
+    format!("{doc}{block}")
+}
+
 fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     let policy = if allow_remote {
         "default-src 'none'; img-src http: https: data: cid:; \
@@ -4006,19 +4224,30 @@ try{a.blur();window.focus();}catch(_){}}},0);});";
 /// One message body as a sandboxed iframe: its own document (so CSS can't leak to
 /// other messages) with no `allow-scripts` (so the email can't run JavaScript).
 /// `allow-same-origin` lets the wrapper script measure its height.
-fn message_frame(body: &str, restrict: bool, dark: bool, key: (u32, u32), height: Option<u32>) -> String {
+fn message_frame(
+    body: &str,
+    restrict: bool,
+    dark: bool,
+    key: (u32, u32),
+    height: Option<u32>,
+    style: &crate::config::ReaderStyle,
+    accent: &str,
+) -> String {
     let doc = body_html(body);
     let doc = if restrict { strip_remote(&doc) } else { doc };
     // Dark mode: adapt the message's own colours so dark-on-dark text can't
     // happen (issue #35). `color-scheme` only helps unstyled mail; anything
     // that sets explicit dark text without a background needs its colours
-    // transformed, and the sandboxed frames run no JS to do it live.
-    let doc = if dark { adapt_colors_for_dark(&doc) } else { doc };
+    // transformed, and the sandboxed frames run no JS to do it live. Moot
+    // when the reader's own colours are laid over the message anyway.
+    let doc = if dark && !style.colors { adapt_colors_for_dark(&doc) } else { doc };
     // Make the email's own light/dark rules follow the ground we chose rather
     // than the desktop's preference (see `pin_color_scheme`). Runs after the
     // dark adaptation so a message's hand-authored dark palette is used as-is,
     // not double-transformed.
     let doc = pin_color_scheme(&doc, dark);
+    // The reader's own fonts and colours (#56), last so they win.
+    let doc = inject_reader_style(&doc, &reader_style_css(style, dark, accent, ":root"));
     let doc = inject_csp(&doc, !restrict, dark);
     format!(
         // `allow-same-origin` lets our wrapper script measure the frame height;
@@ -4208,6 +4437,11 @@ const PRINT_DOCUMENT_STYLES: &str = "\
 /// and that document is the body alone. Printed mail without a sender or a date
 /// is close to useless (issue #16), so the same facts go into the document and
 /// are hidden with `@media`.
+/// The class naming the `n`th message's block in the printed document.
+fn print_block_class(n: usize) -> String {
+    format!("vireo-print-m{n}")
+}
+
 /// Assemble the printed page: the header, then every message inlined into it.
 fn print_document(
     header: &str,
@@ -4216,7 +4450,7 @@ fn print_document(
 ) -> String {
     let mut body = header.to_string();
     for (n, (head, doc)) in messages.iter().enumerate() {
-        let block = format!("vireo-print-m{n}");
+        let block = print_block_class(n);
         body.push_str(&format!("<article class=\"vireo-print-msg {block}\">"));
         body.push_str(head);
         body.push_str(&scope_styles(&inline_body(doc), &format!(".{block}")));
@@ -4473,10 +4707,142 @@ mod tests {
     #[test]
     fn light_mode_frames_are_untouched() {
         let body = r#"<p style="color:#000">x</p>"#;
-        let frame = message_frame(body, true, false, (1, 1), None);
+        let frame = message_frame(body, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
         assert!(frame.contains("color:#000"), "{frame}");
-        let frame = message_frame(body, true, true, (1, 1), None);
+        let frame = message_frame(body, true, true, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
         assert!(!frame.contains("color:#000"), "{frame}");
+    }
+
+    /// With nothing overridden the frame carries no reader stylesheet.
+    #[test]
+    fn reader_style_none_adds_nothing() {
+        let frame = message_frame("<p>x</p>", true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        assert!(!frame.contains(":not(#vireo-a)"), "{frame}");
+        assert_eq!(inject_reader_style("<p>x</p>", ""), "<p>x</p>");
+    }
+
+    /// The font override sets one family and size over everything, after the
+    /// sender's own stylesheet so it has the last word, with headings scaled
+    /// and code kept monospaced.
+    #[test]
+    fn reader_font_lands_after_the_senders_css() {
+        let style = crate::config::ReaderStyle { font: Some("DejaVu Serif 12".into()), colors: false };
+        let body = "<html><head><style>p{font-family:Comic Sans MS}</style></head>\
+                    <body><p style=\"font-size:30px\">x</p></body></html>";
+        let frame = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
+        let ours = frame.find(":root :not(#vireo-a):not(#vireo-b):not(#vireo-c)").expect("override sheet");
+        let theirs = frame.find("Comic Sans").expect("sender css kept");
+        assert!(ours > theirs, "the reader's sheet must come last: {frame}");
+        // srcdoc attribute: quotes are escaped, so match the family unquoted.
+        assert!(frame.contains("DejaVu Serif&quot;,sans-serif !important;font-size:12pt !important"), "{frame}");
+        assert!(frame.contains("h1:not(#vireo-a):not(#vireo-b):not(#vireo-c){font-size:calc(12pt * 1.6) !important"), "{frame}");
+        assert!(frame.contains(":is(pre,code,kbd,samp,tt):not(#vireo-a):not(#vireo-b):not(#vireo-c){font-family:monospace !important"), "{frame}");
+        // Colours untouched: no colour rule was asked for.
+        assert!(!frame.contains("-webkit-text-fill-color"), "{frame}");
+    }
+
+    /// The colour override paints the reader's text and clears backgrounds,
+    /// links in the accent; on the dark ground the dark adaptation is
+    /// skipped, since the sender's colours are not shown anyway.
+    #[test]
+    fn reader_colours_force_text_and_links() {
+        let style = crate::config::ReaderStyle { font: None, colors: true };
+        let body = r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
+        let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
+        assert!(light.contains("color:#1a1a1a !important;-webkit-text-fill-color:#1a1a1a !important;background-color:transparent !important;background-image:none !important"), "{light}");
+        assert!(light.contains(":root a:not(#vireo-a):not(#vireo-b):not(#vireo-c),:root a:not(#vireo-a):not(#vireo-b):not(#vireo-c) *{color:#3584e4 !important"), "{light}");
+        assert!(!light.contains("font-family"), "no font rule was asked for: {light}");
+        let dark = message_frame(body, true, true, (1, 1), None, &style, "#3584e4");
+        assert!(dark.contains("color:#e6e6e6 !important"), "{dark}");
+        assert!(dark.contains("color:#000"), "sender colours left as written when overridden: {dark}");
+    }
+
+    /// Pango descriptions become a quoted CSS family list with a generic
+    /// fallback, and a point size; a missing size falls back to 11pt.
+    #[test]
+    fn css_font_reads_pango_descriptions() {
+        let s = |v: &str| v.to_string();
+        assert_eq!(css_font("Cantarell 11"), (s("\"Cantarell\",sans-serif"), s("11pt"), s("")));
+        assert_eq!(
+            css_font("JetBrains Mono Bold 10"),
+            (s("\"JetBrains Mono\",monospace"), s("10pt"), s("font-weight:700 !important;"))
+        );
+        assert_eq!(css_font("Sans"), (s("\"Sans\",sans-serif"), s("11pt"), s("")));
+        assert_eq!(css_font("Noto Serif 10.5"), (s("\"Noto Serif\",sans-serif"), s("10.5pt"), s("")));
+        // The face the user picked reaches the page: black, italic, condensed.
+        assert_eq!(
+            css_font("Adwaita Sans Black 16"),
+            (s("\"Adwaita Sans\",sans-serif"), s("16pt"), s("font-weight:900 !important;"))
+        );
+        assert_eq!(
+            css_font("Cantarell Condensed Light Italic 12").2,
+            "font-weight:300 !important;font-style:italic !important;font-stretch:condensed !important;"
+        );
+    }
+
+    /// The card's "sender's formatting" toggle: offered on every card while
+    /// an override is on, lit on the card it was used on, and that card's
+    /// frame goes out without the reader's sheet.
+    #[test]
+    fn sender_style_toggle_escapes_one_card() {
+        let mut a = msg_for_print();
+        a.body = "<p>one</p>".into();
+        let mut b = msg_for_print();
+        b.id = 2;
+        b.body = "<p>two</p>".into();
+        let style = crate::config::ReaderStyle { font: Some("Cantarell 11".into()), colors: false };
+        let mut escaped = std::collections::HashSet::new();
+        escaped.insert((a.account_id, a.id));
+        let doc = MessageView::conversation_document(
+            &[a.clone(), b.clone()],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &style,
+            &escaped,
+        );
+        assert_eq!(doc.matches("data-act=\"senderfmt\"").count(), 2, "{doc}");
+        assert_eq!(doc.matches("class=\"vireo-act on\" data-act=\"senderfmt\"").count(), 1, "{doc}");
+        assert_eq!(doc.matches(":root :not(#vireo-a)").count(), 1, "only the other card is styled: {doc}");
+
+        // No override: no toggle, nothing injected.
+        let plain = MessageView::conversation_document(
+            &[a, b],
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &[],
+            "#3584e4",
+            true,
+            false,
+            false,
+            false,
+            &crate::config::ReaderStyle::NONE,
+            &escaped,
+        );
+        assert!(!plain.contains("senderfmt"), "{plain}");
+        assert!(!plain.contains(":not(#vireo-a)"), "{plain}");
+    }
+
+    /// The sheet goes in before `</body>` (or `</html>`), and at the very end
+    /// of a bare fragment.
+    #[test]
+    fn reader_style_is_injected_last() {
+        assert_eq!(
+            inject_reader_style("<html><body><p>x</p></body></html>", "p{}"),
+            "<html><body><p>x</p><style>p{}</style></body></html>"
+        );
+        assert_eq!(
+            inject_reader_style("<html><p>x</p></HTML>", "p{}"),
+            "<html><p>x</p><style>p{}</style></HTML>"
+        );
+        assert_eq!(inject_reader_style("<p>x</p>", "p{}"), "<p>x</p><style>p{}</style>");
     }
 
     fn msg_for_print() -> Message {
@@ -4526,6 +4892,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert_eq!(
             doc.matches("<section class=\"vireo-msg\"").count(),
@@ -4563,6 +4931,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert_eq!(
             doc.matches("class=\"vireo-rcpt\" hidden").count(),
@@ -4600,6 +4970,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert_eq!(
             doc.matches("<button type=\"button\" class=\"vireo-rcpt-toggle\"").count(),
@@ -4627,6 +4999,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         for act in ["reply", "replyall", "forward"] {
             assert_eq!(
@@ -4660,6 +5034,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert_eq!(doc.matches("class=\"vireo-dot\"").count(), 1, "one dot: {doc}");
         assert_eq!(doc.matches("class=\"vireo-end\"").count(), 0, "no sentinel: {doc}");
@@ -4689,6 +5065,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert_eq!(doc.matches("class=\"vireo-dot\"").count(), 1, "still marked: {doc}");
         assert_eq!(doc.matches("class=\"vireo-end\"").count(), 0, "no sentinel: {doc}");
@@ -4714,6 +5092,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert!(doc.contains("style=\"height:640px\""), "known height used: {doc}");
         assert_eq!(doc.matches("style=\"height:").count(), 1, "only the known one");
@@ -4738,6 +5118,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert!(doc.contains("class=\"vireo-msg selected\" data-key=\"1:2\""), "{doc}");
         assert_eq!(doc.matches("vireo-msg selected").count(), 1, "only the selected one");
@@ -4761,6 +5143,8 @@ mod tests {
             false,
             false,
             false,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert!(doc.contains("<section class=\"vireo-msg\""), "message chrome: {doc}");
         assert!(doc.contains("class=\"vireo-msg-hdr\""), "in-document header: {doc}");
@@ -4786,6 +5170,8 @@ mod tests {
             false,
             false,
             true,
+            &crate::config::ReaderStyle::NONE,
+            &Default::default(),
         );
         assert!(doc.contains("<body class=\"vireo-conv\">"), "card gutter: {doc}");
         assert!(doc.contains(&format!("background:{}", PAGE.0)), "deeper page ground: {doc}");
@@ -4798,7 +5184,7 @@ mod tests {
         b.id = 2;
         b.folder_id = 3; // pulled in from Sent
         let labels = std::collections::HashMap::from([((1u32, 2u32), "Sent".to_string())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false);
+        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
         assert_eq!(
             doc.matches("vireo-folder").count(),
             // once in the stylesheet, once on the message that came from Sent —
@@ -4818,7 +5204,7 @@ mod tests {
         b.id = 2;
         let labels =
             std::collections::HashMap::from([((1u32, 2u32), "<img src=x onerror=alert(1)>".into())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false);
+        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
         assert!(!doc.contains("<img src=x"), "the label must be escaped, not rendered");
         assert!(doc.contains("&lt;img src=x"));
     }
@@ -4837,7 +5223,7 @@ mod tests {
         b.id = 2;
         // Two messages: the per-message headers only render in conversation mode.
         let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false);
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
 
         assert!(!doc.contains("<script>x=1"), "{doc}");
         assert!(!doc.contains("<img src=y"), "{doc}");
@@ -4852,7 +5238,7 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false);
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
 
         // A nonce'd CSP, so an injected `<script>` or `onerror=` is refused by
         // the engine even if the escaping above ever regresses.
@@ -4889,6 +5275,8 @@ mod tests {
                 false,
                 false,
                 false,
+                &crate::config::ReaderStyle::NONE,
+                &Default::default(),
             );
         assert!(!again.contains(nonce), "nonce was reused across renders");
     }
@@ -4959,13 +5347,13 @@ mod tests {
         // about, a frame built while remote content is disallowed carries the
         // restrictive policy. A detector miss costs a banner, not the blocking.
         let sneaky = r#"<img data-x="y" src="//tracker.example/p.gif">"#;
-        let frame = message_frame(sneaky, true, false, (1, 1), None);
+        let frame = message_frame(sneaky, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
         assert!(frame.contains("img-src data: cid:"), "{frame}");
         assert!(!frame.contains("img-src http:"), "{frame}");
         assert!(!frame.contains("tracker.example"), "{frame}");
 
         // And once the user allows it, the same body renders untouched.
-        let allowed = message_frame(sneaky, false, false, (1, 1), None);
+        let allowed = message_frame(sneaky, false, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
         assert!(allowed.contains("img-src http: https:"), "{allowed}");
         assert!(allowed.contains("tracker.example"), "{allowed}");
     }
@@ -5018,7 +5406,7 @@ mod tests {
         b.id = 2;
         b.body = "<p style=\"height:300px\">second</p>".into();
         let html = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false);
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
 
         let view = webkit6::WebView::new();
         let settings = webkit6::Settings::new();

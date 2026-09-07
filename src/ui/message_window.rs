@@ -31,6 +31,8 @@ pub struct MessageWindowInit {
     pub attachments_loading: bool,
     /// Message-content theme override (`None` follows the system).
     pub content_dark: Option<bool>,
+    /// The reader's own fonts and colours over the senders' (#56).
+    pub reader_style: crate::config::ReaderStyle,
     /// The tags (#71), for the cards' chips.
     pub tags: Vec<crate::config::Tag>,
 }
@@ -75,6 +77,8 @@ pub enum MessageWindowInput {
     AttachmentsPending,
     /// Update the message-content theme (`None` follows the system).
     SetContentTheme(Option<bool>),
+    /// The reader's own fonts and colours changed (#56).
+    SetReaderStyle(crate::config::ReaderStyle),
     // ---- toolbar actions ----
     Reply,
     ReplyAll,
@@ -279,6 +283,7 @@ impl Component for MessageWindow {
             });
         // Apply the message-content theme before the first render.
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
+        view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
 
         let thread = if init.thread.is_empty() {
@@ -336,6 +341,9 @@ impl Component for MessageWindow {
             MessageWindowInput::Ignore => {}
             MessageWindowInput::SetContentTheme(o) => {
                 self.view.emit(MessageViewInput::SetContentTheme(o));
+            }
+            MessageWindowInput::SetReaderStyle(style) => {
+                self.view.emit(MessageViewInput::SetReaderStyle(style));
             }
             MessageWindowInput::SetSenderCheck(check) => {
                 // Light the popout's header seal too (#88).

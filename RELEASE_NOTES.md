@@ -2,6 +2,10 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.24.0
+
+**Your own font and colours for every message.** Two switches in Settings under Reading. "Use my own font" shows every message in one font and size instead of whatever the sender chose: the interface font, or any font you pick under the switch. Headings stay larger than body text and code stays monospaced. "Use my own colours" ignores the sender's text and background colours, so each message reads as plain text on the reader's ground, with links in the accent colour; pictures are kept. Each message card has a toggle on its action line that shows that one message as its sender formatted it, and back. Both settings apply to printing as well. Requested by [@yioannides](https://github.com/yioannides) (#56).
+
 ## What's new in 1.23.1
 
 **iCloud deletes and moves work again.** Since 1.22.0, deleting, archiving or moving a message on an iCloud account failed with "Parse Error": iCloud does not announce the MOVE command, the fallback path sent the Trash folder's name "Deleted Messages" without quotes, and the server refused it. The name is quoted now. If you use iCloud, this is the update to take.

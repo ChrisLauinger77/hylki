@@ -457,6 +457,12 @@ pub struct AppModel {
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
     message_theme: config::MessageTheme,
+    /// Set every message in the reader's own font (#56).
+    override_fonts: bool,
+    /// That font, as a Pango description; empty = the interface font.
+    reader_font: String,
+    /// Ignore the senders' text and background colours (#56).
+    override_colors: bool,
     /// The repeating auto-fetch timer, if armed.
     auto_fetch_source: Option<gtk::glib::SourceId>,
     notifications: Controller<NotificationCenter>,
@@ -751,6 +757,9 @@ pub enum AppMsg {
     PrintPreview,
     SetPaletteCollapse(u64),
     SetMessageTheme(config::MessageTheme),
+    SetOverrideFonts(bool),
+    SetReaderFont(String),
+    SetOverrideColors(bool),
     ComposeTo(String),
     Reply,
     ReplyAll,
@@ -1749,6 +1758,7 @@ impl SimpleComponent for AppModel {
             menu.append_section(None, &quit);
         }
 
+        let reader_override = config::load_reader_override();
         let mut model = AppModel {
             workers: HashMap::new(),
             mid_searches: HashMap::new(),
@@ -1940,6 +1950,9 @@ impl SimpleComponent for AppModel {
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
+            override_fonts: reader_override.0,
+            reader_font: reader_override.1,
+            override_colors: reader_override.2,
             auto_fetch_source: None,
             notifications,
             welcome: None,
@@ -2050,6 +2063,7 @@ impl SimpleComponent for AppModel {
         model
             .message_view
             .emit(MessageViewInput::SetContentTheme(model.message_theme.dark_override()));
+        model.message_view.emit(MessageViewInput::SetReaderStyle(model.reader_style()));
         model
             .message_view
             .emit(MessageViewInput::SetAlwaysShowRecipients(model.always_show_recipients));
@@ -4652,6 +4666,28 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetOverrideFonts(on) => {
+                if self.override_fonts != on {
+                    self.override_fonts = on;
+                    self.save_settings();
+                    self.push_reader_style();
+                }
+            }
+            AppMsg::SetReaderFont(font) => {
+                if self.reader_font != font {
+                    self.reader_font = font;
+                    self.save_settings();
+                    self.push_reader_style();
+                }
+            }
+            AppMsg::SetOverrideColors(on) => {
+                if self.override_colors != on {
+                    self.override_colors = on;
+                    self.save_settings();
+                    self.push_reader_style();
+                }
+            }
+
             AppMsg::ComposeTo(addr) => {
                 // The contacts view hosts its own compose slot (the composer
                 // slides down over the contact card); from the gallery there is
@@ -6186,6 +6222,29 @@ impl AppModel {
             .append(Some(format!("About {}", crate::APP_NAME).as_str()), Some("win.about"));
     }
 
+    /// The reader's font-and-colour override (#56) as the reader applies it:
+    /// the font only when the switch is on, the interface font standing in
+    /// where none was chosen.
+    fn reader_style(&self) -> config::ReaderStyle {
+        let font = self.override_fonts.then(|| {
+            if self.reader_font.trim().is_empty() {
+                interface_font()
+            } else {
+                self.reader_font.clone()
+            }
+        });
+        config::ReaderStyle { font, colors: self.override_colors }
+    }
+
+    /// Hand the current reader style to the reader and every popped-out window.
+    fn push_reader_style(&self) {
+        let style = self.reader_style();
+        self.message_view.emit(MessageViewInput::SetReaderStyle(style.clone()));
+        for p in self.popouts.values() {
+            p.controller.emit(MessageWindowInput::SetReaderStyle(style.clone()));
+        }
+    }
+
     fn save_settings(&self) {
         config::save_privacy(
             &self.allowed_senders,
@@ -6207,6 +6266,9 @@ impl AppModel {
             self.single_message_card,
             self.confirm_thread_delete,
             self.message_theme,
+            self.override_fonts,
+            self.reader_font.clone(),
+            self.override_colors,
             self.notifications_enabled,
             self.notification_content,
             self.show_attachments,
@@ -7958,6 +8020,7 @@ impl AppModel {
             attachments_available: false,
             attachments_loading: atts_loading,
             content_dark: self.message_theme.dark_override(),
+            reader_style: self.reader_style(),
             tags: self.tags.clone(),
         };
 
@@ -9784,6 +9847,9 @@ impl AppModel {
             thread_expansion: self.thread_expansion,
             confirm_thread_delete: self.confirm_thread_delete,
             message_theme: self.message_theme,
+            override_fonts: self.override_fonts,
+            reader_font: self.reader_font.clone(),
+            override_colors: self.override_colors,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             show_attachments: self.show_attachments,
@@ -9887,6 +9953,9 @@ impl AppModel {
                 PrefOutput::SetAppIcon(id) => AppMsg::SetAppIcon(id),
                 PrefOutput::SetPaletteCollapse(secs) => AppMsg::SetPaletteCollapse(secs),
                 PrefOutput::SetMessageTheme(t) => AppMsg::SetMessageTheme(t),
+                PrefOutput::SetOverrideFonts(on) => AppMsg::SetOverrideFonts(on),
+                PrefOutput::SetReaderFont(font) => AppMsg::SetReaderFont(font),
+                PrefOutput::SetOverrideColors(on) => AppMsg::SetOverrideColors(on),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         prefs.widget().present();
@@ -10736,6 +10805,17 @@ impl AppModel {
         }
     }
 
+}
+
+/// The desktop's interface font ("Adwaita Sans 11") as a Pango description:
+/// what the reader sets mail in when the font override is on but no font
+/// was chosen (#56). Cantarell 11 when GTK has no settings (headless).
+fn interface_font() -> String {
+    gtk::Settings::default()
+        .and_then(|s| s.gtk_font_name())
+        .map(|f| f.to_string())
+        .filter(|f| !f.trim().is_empty())
+        .unwrap_or_else(|| "Cantarell 11".to_string())
 }
 
 /// The About window's "Release Notes" page, rendered from the single source of
