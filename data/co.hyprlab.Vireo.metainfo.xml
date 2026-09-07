@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.23.1" date="2026-09-07">
+
+      <description><p>Deleting, archiving and moving mail on iCloud works again (the no-MOVE fallback sent the Trash folder's name unquoted); the log records every command sent to the mail server and the server's answer, for IMAP, Microsoft 365, POP3 and outgoing mail; an uninstall script for source installs.</p></description>
+
+    </release>
     <release version="1.23.0" date="2026-09-07">
 
       <description><p>Tags: coloured labels stored on the server as IMAP keywords, with a Tags section in the sidebar and rules that tag; swipe a message row to archive or delete it; a redrawn icon set with a new default; a log export for bug reports; fixes for an account vanishing from All Inboxes, forwards without a To field, leaving a quote in the editor, and restoring mail from Trash; the French translation completed.</p></description>
