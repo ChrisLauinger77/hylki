@@ -1472,6 +1472,10 @@ async fn run_imap(
                         }
                     }
                     Err(e) => {
+                        tracing::warn!(
+                            "move failed: {path:?} -> {dest:?} set={} ({e})",
+                            uid_set(&uids)
+                        );
                         emit(WorkerEvent::Error {
                             text: i18n_f("Could not move {len} messages: {e}", &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())]),
                             connectivity: false,
@@ -1493,11 +1497,10 @@ async fn run_imap(
                 match list_folders(account_id, sess).await {
                     Ok(folders) => {
                         for f in folders {
-                            if sess.select(&f.path).await.is_err() {
+                            if sel(sess, &f.path).await.is_err() {
                                 continue;
                             }
-                            let Ok(set) = sess
-                                .uid_search(format!("HEADER Message-ID \"{message_id}\""))
+                            let Ok(set) = search_uids(sess, format!("HEADER Message-ID \"{message_id}\""))
                                 .await
                             else {
                                 continue;
@@ -1521,12 +1524,12 @@ async fn run_imap(
                 {
                     let sess = session.as_mut().unwrap();
                     let mut exists = 0u32;
-                    match sess.select(&path).await {
+                    match sel(sess, &path).await {
                         Err(e) => failed = Some(e.to_string()),
                         Ok(mb) => {
                             exists = mb.exists;
                             for id in &message_ids {
-                                match sess.uid_search(format!("HEADER Message-ID \"{id}\"")).await {
+                                match search_uids(sess, format!("HEADER Message-ID \"{id}\"")).await {
                                     Ok(set) => uids.extend(set),
                                     Err(e) => {
                                         failed = Some(e.to_string());
@@ -2047,10 +2050,9 @@ async fn load_source(
     path: &str,
     uid: u32,
 ) -> Result<String, async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
 
-    let fetches: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), "(BODY.PEEK[])")
+    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
         .await?
         .try_collect()
         .await?;
@@ -2301,11 +2303,12 @@ async fn idle_wait(
     // Stale or wedged connection — drop it so the next request reconnects.
     // The timeout matters as much as the error: a dead-but-open connection
     // (silently dropped by a NAT during a long IDLE) answers nothing at all.
-    match tokio::time::timeout(IDLE_START_TIMEOUT, sess.select(path)).await {
+    match tokio::time::timeout(IDLE_START_TIMEOUT, sel(&mut sess, path)).await {
         Ok(Ok(_)) => {}
         _ => return recv_one(rx).await,
     }
 
+    tracing::debug!(target: "vireo::imap", "> IDLE");
     let mut handle = sess.idle();
     match tokio::time::timeout(IDLE_START_TIMEOUT, handle.init()).await {
         Ok(Ok(())) => {}
@@ -2512,7 +2515,7 @@ async fn watch_folder(
             continue;
         };
         backoff = Duration::from_secs(60);
-        match tokio::time::timeout(IDLE_START_TIMEOUT, sess.examine(&path)).await {
+        match tokio::time::timeout(IDLE_START_TIMEOUT, exam(&mut sess, &path)).await {
             Ok(Ok(_)) => {}
             Ok(Err(_)) => {
                 tracing::info!("unwatching {path}: no longer selectable");
@@ -2543,6 +2546,7 @@ async fn watch_folder(
                     .as_secs()
                     .clamp(1, WATCH_VERIFY.as_secs())
             });
+            tracing::debug!(target: "vireo::imap", "> IDLE");
             let mut handle = sess.idle();
             match tokio::time::timeout(IDLE_START_TIMEOUT, handle.init()).await {
                 Ok(Ok(())) => {}
@@ -2608,9 +2612,8 @@ async fn load_raw(
     path: &str,
     uid: u32,
 ) -> Result<Vec<u8>, async_imap::error::Error> {
-    session.select(path).await?;
-    let fetches: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), "(BODY.PEEK[])")
+    sel(session, path).await?;
+    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
         .await?
         .try_collect()
         .await?;
@@ -3444,7 +3447,20 @@ async fn send_raw_smtp(
         .from()
         .and_then(|f| alias_with_own_smtp(account, f.as_ref()));
     let mailer = smtp_transport(account, alias).await?;
-    mailer.send_raw(envelope, raw).await?;
+    // The SMTP leg for the console: size and recipient count, then the verdict.
+    tracing::debug!(
+        target: "vireo::smtp",
+        "> send {} bytes to {} recipient(s) via {}",
+        raw.len(),
+        envelope.to().len(),
+        alias.map(|a| a.smtp_host.as_str()).unwrap_or(&smtp_host(account)),
+    );
+    let r = mailer.send_raw(envelope, raw).await;
+    match &r {
+        Ok(_) => tracing::debug!(target: "vireo::smtp", "< OK (send)"),
+        Err(e) => tracing::warn!(target: "vireo::smtp", "< {e} (send)"),
+    }
+    r?;
     Ok(())
 }
 
@@ -3515,7 +3531,7 @@ async fn append_to_sent(
     raw: &[u8],
 ) -> Result<(), async_imap::error::Error> {
     // Mark the saved copy as already read.
-    session.append(path, Some("(\\Seen)"), None, raw).await
+    append_msg(session, path, Some("(\\Seen)"), raw).await
 }
 
 /// APPEND a draft to the Drafts folder (flagged `\Draft \Seen`), creating the
@@ -3525,17 +3541,16 @@ async fn append_draft(
     path: &str,
     raw: &[u8],
 ) -> Result<(), async_imap::error::Error> {
-    if session
-        .append(path, Some("(\\Draft \\Seen)"), None, raw)
+    if append_msg(session, path, Some("(\\Draft \\Seen)"), raw)
         .await
         .is_ok()
     {
         return Ok(());
     }
     // Folder likely doesn't exist — create it and retry.
-    let _ = session.create(path).await;
-    let _ = session.subscribe(path).await;
-    session.append(path, Some("(\\Draft \\Seen)"), None, raw).await
+    let _ = create_box(session, path).await;
+    let _ = subscribe_box(session, path).await;
+    append_msg(session, path, Some("(\\Draft \\Seen)"), raw).await
 }
 
 /// Delete a superseded draft (the previous version being replaced or sent):
@@ -3545,13 +3560,12 @@ async fn delete_draft(
     path: &str,
     uid: u32,
 ) -> Result<(), async_imap::error::Error> {
-    session.select(path).await?;
-    let _: Result<Vec<Fetch>, _> = session
-        .uid_store(uid.to_string(), "+FLAGS (\\Deleted)")
+    sel(session, path).await?;
+    let _: Result<Vec<Fetch>, _> = store_uids(session, uid.to_string(), "+FLAGS (\\Deleted)")
         .await?
         .try_collect()
         .await;
-    let _: Vec<u32> = session.expunge().await?.try_collect().await?;
+    let _: Vec<u32> = expunge_all(session).await?.try_collect().await?;
     Ok(())
 }
 
@@ -3568,8 +3582,8 @@ async fn purge_messages(
     if uids.is_empty() {
         return Ok(());
     }
-    let set = uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
-    session.select(path).await?;
+    let set = uid_set(uids);
+    sel(session, path).await?;
     flag_deleted_and_expunge(session, &set).await
 }
 
@@ -3579,22 +3593,193 @@ async fn flag_deleted_and_expunge(
     session: &mut ImapSession,
     set: &str,
 ) -> Result<(), async_imap::error::Error> {
-    let _: Vec<Fetch> = session
-        .uid_store(set, "+FLAGS (\\Deleted)")
+    let _: Vec<Fetch> = store_uids(session, set, "+FLAGS (\\Deleted)")
         .await?
         .try_collect()
         .await?;
     // A server without UIDPLUS answers `BAD`, which surfaces while draining the
     // response stream rather than from the call itself — so judge it on the
     // collected result, not with `?`.
-    let uid_expunged = match session.uid_expunge(set).await {
+    let uid_expunged = match expunge_uids(session, set).await {
         Ok(stream) => stream.try_collect::<Vec<u32>>().await.is_ok(),
         Err(_) => false,
     };
     if !uid_expunged {
-        let _: Vec<u32> = session.expunge().await?.try_collect().await?;
+        let _: Vec<u32> = expunge_all(session).await?.try_collect().await?;
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// The IMAP conversation, for the console (#132 and every "it failed on my
+// server" report): each command Vireo sends is logged as `> …` and the
+// server's verdict as `< OK` or `< <error>`, under the `vireo::imap`
+// target — commands and results only, never a message body or a password.
+// The console keeps it whether or not console mode is on, so "Export log"
+// carries it after the fact; stderr sees only the failures.
+fn wire(cmd: &str) {
+    tracing::debug!(target: "vireo::imap", "> {cmd}");
+}
+
+fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
+    match r {
+        Ok(_) => tracing::debug!(target: "vireo::imap", "< OK ({})", cmd_head(cmd)),
+        Err(e) => tracing::warn!(target: "vireo::imap", "< {e} ({cmd})"),
+    }
+}
+
+/// The command's verb and first argument, for the terse OK line.
+fn cmd_head(cmd: &str) -> String {
+    cmd.split_whitespace().take(3).collect::<Vec<_>>().join(" ")
+}
+
+async fn sel(session: &mut ImapSession, path: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+    let cmd = format!("SELECT {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.select(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn exam(session: &mut ImapSession, path: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+    let cmd = format!("EXAMINE {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.examine(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn fetch_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
+    session: &'a mut ImapSession,
+    set: S1,
+    items: S2,
+) -> Result<impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin, async_imap::error::Error> {
+    let (set, items) = (set.as_ref().to_string(), items.as_ref().to_string());
+    let cmd = format!("UID FETCH {set} {items}");
+    wire(&cmd);
+    let r = session.uid_fetch(set, items).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn store_uids<'a, S1: AsRef<str>, S2: AsRef<str>>(
+    session: &'a mut ImapSession,
+    set: S1,
+    query: S2,
+) -> Result<impl futures::Stream<Item = Result<Fetch, async_imap::error::Error>> + 'a + Send + Unpin, async_imap::error::Error> {
+    let (set, query) = (set.as_ref().to_string(), query.as_ref().to_string());
+    let cmd = format!("UID STORE {set} {query}");
+    wire(&cmd);
+    let r = session.uid_store(set, query).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn copy_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("UID COPY {set} {}", quote_mailbox(dest));
+    wire(&cmd);
+    let r = session.uid_copy(set, quote_mailbox(dest)).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn mv_uids(session: &mut ImapSession, set: &str, dest: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("UID MOVE {set} {}", quote_mailbox(dest));
+    wire(&cmd);
+    let r = session.uid_mv(set, dest).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn expunge_uids<'a, S: AsRef<str>>(
+    session: &'a mut ImapSession,
+    set: S,
+) -> Result<impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send, async_imap::error::Error> {
+    let set = set.as_ref().to_string();
+    let cmd = format!("UID EXPUNGE {set}");
+    wire(&cmd);
+    let r = session.uid_expunge(set).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn expunge_all<'a>(
+    session: &'a mut ImapSession,
+) -> Result<impl futures::Stream<Item = Result<u32, async_imap::error::Error>> + 'a + Send, async_imap::error::Error> {
+    let cmd = "EXPUNGE";
+    wire(cmd);
+    let r = session.expunge().await;
+    wired(cmd, &r);
+    r
+}
+
+async fn search_uids<S: AsRef<str>>(session: &mut ImapSession, query: S) -> Result<std::collections::HashSet<u32>, async_imap::error::Error> {
+    let cmd = format!("UID SEARCH {}", query.as_ref());
+    wire(&cmd);
+    let r = session.uid_search(query.as_ref()).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn create_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("CREATE {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.create(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn subscribe_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("SUBSCRIBE {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.subscribe(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn unsubscribe_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("UNSUBSCRIBE {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.unsubscribe(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn rename_box(session: &mut ImapSession, from: &str, to: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("RENAME {} {}", quote_mailbox(from), quote_mailbox(to));
+    wire(&cmd);
+    let r = session.rename(from, to).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn delete_box(session: &mut ImapSession, path: &str) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("DELETE {}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.delete(path).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn box_status(session: &mut ImapSession, path: &str, items: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
+    let cmd = format!("STATUS {} {items}", quote_mailbox(path));
+    wire(&cmd);
+    let r = session.status(path, items).await;
+    wired(&cmd, &r);
+    r
+}
+
+async fn append_msg(
+    session: &mut ImapSession,
+    path: &str,
+    flags: Option<&str>,
+    raw: &[u8],
+) -> Result<(), async_imap::error::Error> {
+    let cmd = format!("APPEND {} {} ({} bytes)", quote_mailbox(path), flags.unwrap_or(""), raw.len());
+    wire(&cmd);
+    let r = session.append(path, flags, None, raw).await;
+    wired(&cmd, &r);
+    r
 }
 
 /// `UID MOVE` where the server offers it (RFC 6851), else what every client
@@ -3614,11 +3799,32 @@ async fn uid_move(
         // If even CAPABILITY fails, let MOVE produce the real error.
         Err(_) => true,
     };
+    tracing::debug!(target: "vireo::imap", "server {} MOVE", if can_move { "offers" } else { "lacks" });
     if can_move {
-        return session.uid_mv(set, dest).await;
+        return mv_uids(session, set, dest).await;
     }
-    session.uid_copy(set, dest).await?;
+    // `uid_copy` sends the mailbox name as given (unlike `uid_mv`, which
+    // quotes it), so a name with a space — iCloud's "Deleted Messages", the
+    // one server this path actually serves — went out bare and every move
+    // and delete there answered "BAD Parse Error" (1.22.0 to 1.23.0).
+    // `copy_uids` quotes it.
+    copy_uids(session, set, dest).await?;
     flag_deleted_and_expunge(session, set).await
+}
+
+/// A mailbox name as an IMAP quoted string: backslashes and quotes escaped,
+/// the whole wrapped in quotes (RFC 3501 §4.3).
+fn quote_mailbox(name: &str) -> String {
+    let mut out = String::with_capacity(name.len() + 2);
+    out.push('"');
+    for c in name.chars() {
+        if c == '"' || c == '\\' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out.push('"');
+    out
 }
 
 /// SMTP host: the configured value, or derived from the IMAP host.
@@ -3640,12 +3846,11 @@ async fn store_flag(
     flag: &str,
     add: bool,
 ) -> Result<(), async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
     let op = if add { "+FLAGS" } else { "-FLAGS" };
     let query = format!("{op} ({flag})");
     // Drain the resulting FETCH stream so the command completes.
-    let _: Vec<Fetch> = session
-        .uid_store(uid.to_string(), query)
+    let _: Vec<Fetch> = store_uids(session, uid.to_string(), query)
         .await?
         .try_collect()
         .await?;
@@ -3664,7 +3869,7 @@ async fn store_keyword(
     keyword: &str,
     add: bool,
 ) -> Result<bool, async_imap::error::Error> {
-    let mailbox = session.select(path).await?;
+    let mailbox = sel(session, path).await?;
     let allowed = mailbox.permanent_flags.is_empty()
         || mailbox.permanent_flags.iter().any(|f| match f {
             Flag::MayCreate => true,
@@ -3676,8 +3881,7 @@ async fn store_keyword(
     }
     let op = if add { "+FLAGS" } else { "-FLAGS" };
     let query = format!("{op} ({keyword})");
-    let _: Vec<Fetch> = session
-        .uid_store(uid.to_string(), query)
+    let _: Vec<Fetch> = store_uids(session, uid.to_string(), query)
         .await?
         .try_collect()
         .await?;
@@ -3693,16 +3897,16 @@ async fn move_or_create(
     uid: u32,
     dest: &str,
 ) -> Result<bool, async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
     if uid_move(session, &uid.to_string(), dest).await.is_ok() {
         return Ok(false);
     }
     // The move failed — most likely the destination mailbox doesn't exist (the
     // account has no Archive/Junk/… folder yet). Create it, subscribe, and retry;
     // if it still fails, surface that error.
-    let created = session.create(dest).await.is_ok();
-    let _ = session.subscribe(dest).await;
-    session.select(path).await?;
+    let created = create_box(session, dest).await.is_ok();
+    let _ = subscribe_box(session, dest).await;
+    sel(session, path).await?;
     uid_move(session, &uid.to_string(), dest).await?;
     Ok(created)
 }
@@ -3726,21 +3930,21 @@ async fn move_messages(
     uids: &[u32],
     dest: &str,
 ) -> Result<bool, async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
     let mut created = false;
     let mut ensured_dest = false;
     for chunk in uids.chunks(300) {
-        let set = chunk.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+        let set = uid_set(chunk);
         if uid_move(session, &set, dest).await.is_ok() {
             continue;
         }
         // First failure is most likely a missing destination mailbox — create,
         // subscribe, re-select the source, and retry this chunk (then the rest).
         if !ensured_dest {
-            created = session.create(dest).await.is_ok();
-            let _ = session.subscribe(dest).await;
+            created = create_box(session, dest).await.is_ok();
+            let _ = subscribe_box(session, dest).await;
             ensured_dest = true;
-            session.select(path).await?;
+            sel(session, path).await?;
         }
         uid_move(session, &set, dest).await?;
     }
@@ -3752,8 +3956,8 @@ async fn create_folder(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<(), async_imap::error::Error> {
-    session.create(path).await?;
-    let _ = session.subscribe(path).await;
+    create_box(session, path).await?;
+    let _ = subscribe_box(session, path).await;
     Ok(())
 }
 
@@ -3764,9 +3968,9 @@ async fn rename_folder(
     old_path: &str,
     new_path: &str,
 ) -> Result<(), async_imap::error::Error> {
-    session.rename(old_path, new_path).await?;
-    let _ = session.unsubscribe(old_path).await;
-    let _ = session.subscribe(new_path).await;
+    rename_box(session, old_path, new_path).await?;
+    let _ = unsubscribe_box(session, old_path).await;
+    let _ = subscribe_box(session, new_path).await;
     Ok(())
 }
 
@@ -3777,15 +3981,15 @@ async fn delete_folder(
     path: &str,
     trash: Option<&str>,
 ) -> Result<(), async_imap::error::Error> {
-    let mailbox = session.select(path).await?;
+    let mailbox = sel(session, path).await?;
     if mailbox.exists > 0 {
         if let Some(trash) = trash {
             if !trash.eq_ignore_ascii_case(path) {
                 // Move everything to Trash; create it first if the move fails.
                 if uid_move(session, "1:*", trash).await.is_err() {
-                    let _ = session.create(trash).await;
-                    let _ = session.subscribe(trash).await;
-                    session.select(path).await?;
+                    let _ = create_box(session, trash).await;
+                    let _ = subscribe_box(session, trash).await;
+                    sel(session, path).await?;
                     uid_move(session, "1:*", trash).await?;
                 }
             }
@@ -3793,7 +3997,7 @@ async fn delete_folder(
     }
     // A mailbox can't be deleted while selected — close it first.
     let _ = session.close().await;
-    session.delete(path).await?;
+    delete_box(session, path).await?;
     Ok(())
 }
 
@@ -3802,12 +4006,11 @@ async fn mark_all_read(
     session: &mut ImapSession,
     path: &str,
 ) -> Result<(), async_imap::error::Error> {
-    let mailbox = session.select(path).await?;
+    let mailbox = sel(session, path).await?;
     if mailbox.exists == 0 {
         return Ok(());
     }
-    let _: Vec<Fetch> = session
-        .uid_store("1:*", "+FLAGS (\\Seen)")
+    let _: Vec<Fetch> = store_uids(session, "1:*", "+FLAGS (\\Seen)")
         .await?
         .try_collect()
         .await?;
@@ -3824,9 +4027,9 @@ async fn mark_spam(
     uid: u32,
     dest: &str,
 ) -> Result<bool, async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
     for query in ["+FLAGS ($Junk)", "-FLAGS ($NotJunk)"] {
-        if let Ok(stream) = session.uid_store(uid.to_string(), query).await {
+        if let Ok(stream) = store_uids(session, uid.to_string(), query).await {
             let _: Result<Vec<Fetch>, _> = stream.try_collect().await;
         }
     }
@@ -3907,21 +4110,32 @@ async fn connect_inner(account: &AccountConfig) -> Result<ImapSession, Box<dyn s
         let _ = client.read_response().await;
         client
     };
+    // The sign-in for the console: mechanism and user, never the secret.
     let session = if account.oauth {
         // XOAUTH2 with a fresh access token (from GOA or a native refresh token).
-        let token = fetch_oauth_token(account)
-            .await
-            .ok_or("could not get an OAuth token")?;
+        tracing::debug!(target: "vireo::imap", "> AUTHENTICATE XOAUTH2 {}", oauth_user(account));
+        let token = match fetch_oauth_token(account).await {
+            Some(t) => t,
+            None => {
+                tracing::warn!(target: "vireo::imap", "< no OAuth token (AUTHENTICATE XOAUTH2)");
+                return Err("could not get an OAuth token".into());
+            }
+        };
         let auth = XOAuth2 { user: oauth_user(account), token, step: 0 };
-        client
-            .authenticate("XOAUTH2", auth)
-            .await
-            .map_err(|(e, _client)| e)?
+        let r = client.authenticate("XOAUTH2", auth).await.map_err(|(e, _client)| e);
+        match &r {
+            Ok(_) => tracing::debug!(target: "vireo::imap", "< OK (AUTHENTICATE XOAUTH2)"),
+            Err(e) => tracing::warn!(target: "vireo::imap", "< {e} (AUTHENTICATE XOAUTH2)"),
+        }
+        r?
     } else {
-        client
-            .login(&account.username, &account.password)
-            .await
-            .map_err(|(e, _client)| e)?
+        tracing::debug!(target: "vireo::imap", "> LOGIN {} ****", account.username);
+        let r = client.login(&account.username, &account.password).await.map_err(|(e, _client)| e);
+        match &r {
+            Ok(_) => tracing::debug!(target: "vireo::imap", "< OK (LOGIN)"),
+            Err(e) => tracing::warn!(target: "vireo::imap", "< {e} (LOGIN)"),
+        }
+        r?
     };
     Ok(session)
 }
@@ -4145,7 +4359,7 @@ async fn list_folders(
     // Ask the server for each folder's true unread count. STATUS is cheap and
     // downloads no message content, so this stays fast even for huge mailboxes.
     for f in folders.iter_mut() {
-        if let Ok(mb) = session.status(&f.path, "(UNSEEN)").await {
+        if let Ok(mb) = box_status(session, &f.path, "(UNSEEN)").await {
             f.unread = mb.unseen.unwrap_or(0);
         }
     }
@@ -4156,7 +4370,7 @@ async fn list_folders(
     // accurate EXAMINE + SEARCH UNSEEN (read-only; leaves the mailbox unselected
     // for the main loop to re-select as needed).
     if let Some(inbox) = folders.iter_mut().find(|f| f.kind == FolderKind::Inbox) {
-        if session.examine(&inbox.path).await.is_ok() {
+        if exam(session, &inbox.path).await.is_ok() {
             if let Some(n) = selected_unseen(session).await {
                 inbox.unread = n;
             }
@@ -4227,7 +4441,7 @@ async fn refresh_unread_counts(
         if Some(f.path.as_str()) == selected {
             continue;
         }
-        let Ok(mb) = session.examine(&f.path).await else {
+        let Ok(mb) = exam(session, &f.path).await else {
             tracing::debug!("sweep: cannot examine {}", f.path);
             continue;
         };
@@ -4256,8 +4470,7 @@ async fn refresh_unread_counts(
 /// Count unseen messages in the currently-selected mailbox via SEARCH (safe on
 /// the selected folder, unlike STATUS on some servers). Downloads only ids.
 async fn selected_unseen(session: &mut ImapSession) -> Option<u32> {
-    session
-        .uid_search("UNSEEN")
+    search_uids(session, "UNSEEN")
         .await
         .ok()
         .map(|uids| uids.len() as u32)
@@ -4278,7 +4491,7 @@ async fn load_messages(
     use_envelope: bool,
     cache: Option<&Cache>,
 ) -> Result<Vec<Message>, async_imap::error::Error> {
-    let mailbox = session.select(path).await?;
+    let mailbox = sel(session, path).await?;
     let total = mailbox.exists;
     if total == 0 {
         // Folder emptied on the server — drop any cached copies so they don't linger.
@@ -4306,7 +4519,7 @@ async fn load_messages(
         // message whose UID the server no longer lists (a plain merge would keep it
         // forever), and prune it from the cache so it doesn't come back. The full
         // UID set is a cheap server-side search even for large mailboxes.
-        let server: std::collections::HashSet<u32> = session.uid_search("ALL").await?;
+        let server: std::collections::HashSet<u32> = search_uids(session, "ALL").await?;
         if let Some(c) = cache {
             for m in merged.iter().filter(|m| !server.contains(&m.uid)) {
                 c.delete_message(account_id, path, m.uid);
@@ -4413,20 +4626,19 @@ async fn fetch_window(
     // run the same MIME-prefix extraction. Bounded: genuinely body-less
     // messages stay empty and shouldn't grow the fetch each sync.
     if want_preview {
-        let missing: Vec<String> = messages
+        let missing: Vec<u32> = messages
             .iter()
             .filter(|m| m.preview.is_empty())
             .take(12)
-            .map(|m| m.uid.to_string())
+            .map(|m| m.uid)
             .collect();
         if !missing.is_empty() {
             tracing::info!(
                 "previews: retrying via BODY[TEXT] acct={account_id} folder={folder_id} uids={missing:?}"
             );
             let refetched: Result<Vec<Fetch>, _> = async {
-                session
-                    .uid_fetch(
-                        missing.join(","),
+                fetch_uids(session, 
+                        uid_set(&missing),
                         format!("(UID BODY.PEEK[TEXT]<0.{PREVIEW_REPAIR_BYTES}>)"),
                     )
                     .await?
@@ -4934,10 +5146,10 @@ async fn run_one_refs_repair(
         return;
     }
 
-    let set = chunk.iter().map(|(uid, _)| uid.to_string()).collect::<Vec<_>>().join(",");
+    let set = uid_set(&chunk.iter().map(|(uid, _)| *uid).collect::<Vec<_>>());
     let fetched: Result<Vec<Fetch>, _> = async {
-        s.select(&path).await?;
-        s.uid_fetch(&set, format!("(UID{REFS_FETCH_ITEM})")).await?.try_collect().await
+        sel(&mut s, &path).await?;
+        fetch_uids(&mut s, &set, format!("(UID{REFS_FETCH_ITEM})")).await?.try_collect().await
     }
     .await;
     let Ok(fetches) = fetched else {
@@ -4993,8 +5205,8 @@ async fn backfill_worklist(
     path: &str,
     cache: Option<&Cache>,
 ) -> Result<Vec<u32>, async_imap::error::Error> {
-    session.select(path).await?;
-    let server: std::collections::HashSet<u32> = session.uid_search("ALL").await?;
+    sel(session, path).await?;
+    let server: std::collections::HashSet<u32> = search_uids(session, "ALL").await?;
     let cached = cache
         .map(|c| c.cached_uids(account_id, path))
         .unwrap_or_default();
@@ -5022,14 +5234,14 @@ async fn fetch_summaries_by_uid(
     if uids.is_empty() {
         return Ok(Vec::new());
     }
-    session.select(path).await?;
-    let set = uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
+    sel(session, path).await?;
+    let set = uid_set(uids);
     let items: String = if use_envelope {
         format!("(UID ENVELOPE FLAGS BODYSTRUCTURE INTERNALDATE{REFS_FETCH_ITEM})")
     } else {
         "(UID FLAGS BODY.PEEK[HEADER] INTERNALDATE)".to_string()
     };
-    let fetches: Vec<Fetch> = session.uid_fetch(set, items).await?.try_collect().await?;
+    let fetches: Vec<Fetch> = fetch_uids(session, set, items).await?.try_collect().await?;
     Ok(fetches
         .iter()
         .map(|f| {
@@ -5147,14 +5359,13 @@ async fn load_body(
     path: &str,
     uid: u32,
 ) -> Result<(String, crate::models::SenderCheck, bool), async_imap::error::Error> {
-    session.select(path).await?;
+    sel(session, path).await?;
 
     // Fetch the whole message (PEEK so \Seen isn't set) and extract the body with
     // mail-parser. We deliberately avoid a BODYSTRUCTURE-based "text part only"
     // fast path: some servers (iCloud) return structures our IMAP parser rejects,
     // which would fail the fetch and corrupt the session.
-    let fetches: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), "(BODY.PEEK[])")
+    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
         .await?
         .try_collect()
         .await?;
@@ -5189,14 +5400,9 @@ async fn load_bodies(
     std::collections::HashMap<u32, (String, crate::models::SenderCheck, bool)>,
     async_imap::error::Error,
 > {
-    session.select(path).await?;
-    let set = uids
-        .iter()
-        .map(|u| u.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
-    let fetches: Vec<Fetch> = session
-        .uid_fetch(set, "(BODY.PEEK[])")
+    sel(session, path).await?;
+    let set = uid_set(uids);
+    let fetches: Vec<Fetch> = fetch_uids(session, set, "(BODY.PEEK[])")
         .await?
         .try_collect()
         .await?;
@@ -5233,8 +5439,7 @@ async fn body_section(
     session: &mut ImapSession,
     uid: u32,
 ) -> Result<Option<String>, async_imap::error::Error> {
-    let fetches: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), "BODYSTRUCTURE")
+    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "BODYSTRUCTURE")
         .await?
         .try_collect()
         .await?;
@@ -5251,15 +5456,13 @@ async fn fetch_part_body(
     uid: u32,
     section: &str,
 ) -> Result<Option<String>, async_imap::error::Error> {
-    let mime: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), format!("(BODY.PEEK[{section}.MIME])"))
+    let mime: Vec<Fetch> = fetch_uids(session, uid.to_string(), format!("(BODY.PEEK[{section}.MIME])"))
         .await?
         .try_collect()
         .await?;
     let headers = mime.iter().find_map(|f| f.body()).map(|b| b.to_vec());
 
-    let part: Vec<Fetch> = session
-        .uid_fetch(uid.to_string(), format!("(BODY.PEEK[{section}])"))
+    let part: Vec<Fetch> = fetch_uids(session, uid.to_string(), format!("(BODY.PEEK[{section}])"))
         .await?
         .try_collect()
         .await?;
@@ -5409,6 +5612,37 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
     msg
 }
 
+/// A UID list as an IMAP sequence set: sorted, without repeats, and with
+/// runs collapsed to ranges (`3,4,5,9` → `3:5,9`). Every command that takes
+/// a set goes through here: iCloud (and Exchange) answer an unsorted set —
+/// which a selection taken in list order, newest first, always was — with
+/// "Parse Error", so a bulk delete or move there failed outright.
+fn uid_set(uids: &[u32]) -> String {
+    let mut sorted: Vec<u32> = uids.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < sorted.len() {
+        let start = sorted[i];
+        let mut end = start;
+        while i + 1 < sorted.len() && sorted[i + 1] == end + 1 {
+            i += 1;
+            end = sorted[i];
+        }
+        if !out.is_empty() {
+            out.push(',');
+        }
+        if end > start {
+            out.push_str(&format!("{start}:{end}"));
+        } else {
+            out.push_str(&start.to_string());
+        }
+        i += 1;
+    }
+    out
+}
+
 /// The user-defined keywords among a message's flags, verbatim.
 fn custom_flags(flags: &[Flag]) -> Vec<String> {
     flags
@@ -5532,6 +5766,24 @@ fn structure_has_attachment(bs: &async_imap::imap_proto::types::BodyStructure) -
 const POP3_LIMIT: usize = 200;
 
 /// A minimal async POP3 client over TLS (implicit on 995, STLS otherwise).
+/// The POP3 conversation for the console, like the IMAP one: the command
+/// (a PASS line with its secret dropped) and the server's first reply line.
+fn pop3_wire(cmd: &str) {
+    let shown = if cmd.starts_with("PASS ") { "PASS ****" } else { cmd };
+    tracing::debug!(target: "vireo::pop3", "> {shown}");
+}
+
+fn pop3_wired(cmd: &str, reply: &[u8]) {
+    let line = String::from_utf8_lossy(reply);
+    let line = line.trim();
+    let shown = if cmd.starts_with("PASS ") { "PASS" } else { cmd };
+    if reply.starts_with(b"+OK") {
+        tracing::debug!(target: "vireo::pop3", "< {} ({shown})", line.chars().take(80).collect::<String>());
+    } else {
+        tracing::warn!(target: "vireo::pop3", "< {line} ({shown})");
+    }
+}
+
 struct Pop3 {
     stream: tokio::io::BufReader<async_native_tls::TlsStream<TcpStream>>,
 }
@@ -5594,8 +5846,10 @@ impl Pop3 {
 
     /// Single-line command: returns Err with the server text on `-ERR`.
     async fn command(&mut self, cmd: &str) -> Result<(), String> {
+        pop3_wire(cmd);
         self.send(cmd).await?;
         let reply = self.read_reply().await?;
+        pop3_wired(cmd, &reply);
         if reply.starts_with(b"+OK") {
             Ok(())
         } else {
@@ -5605,8 +5859,10 @@ impl Pop3 {
 
     /// Multi-line command: returns the dot-unstuffed body bytes after `+OK`.
     async fn multiline(&mut self, cmd: &str) -> Result<Vec<u8>, String> {
+        pop3_wire(cmd);
         self.send(cmd).await?;
         let first = self.read_reply().await?;
+        pop3_wired(cmd, &first);
         if !first.starts_with(b"+OK") {
             return Err(String::from_utf8_lossy(&first).trim().to_string());
         }
@@ -6889,20 +7145,39 @@ fn graph_err(e: ureq::Error) -> String {
     }
 }
 
+/// The Microsoft Graph conversation for the console: method and URL (the
+/// token travels in a header and is never logged), then the verdict.
+fn graph_wire(method: &str, url: &str) {
+    tracing::debug!(target: "vireo::graph", "> {method} {}", url.strip_prefix(GRAPH_BASE).unwrap_or(url));
+}
+
+fn graph_wired<T>(method: &str, url: &str, r: &Result<T, String>) {
+    let path = url.strip_prefix(GRAPH_BASE).unwrap_or(url);
+    match r {
+        Ok(_) => tracing::debug!(target: "vireo::graph", "< OK ({method} {path})"),
+        Err(e) => tracing::warn!(target: "vireo::graph", "< {e} ({method} {path})"),
+    }
+}
+
 fn graph_get_json(token: &str, url: &str) -> Result<serde_json::Value, String> {
-    ureq::get(url)
+    graph_wire("GET", url);
+    let r = ureq::get(url)
         .set("Authorization", &graph_auth(token))
         .call()
-        .map_err(graph_err)?
-        .into_json()
-        .map_err(|e| e.to_string())
+        .map_err(graph_err)
+        .and_then(|resp| resp.into_json().map_err(|e| e.to_string()));
+    graph_wired("GET", url, &r);
+    r
 }
 
 fn graph_get_bytes(token: &str, url: &str) -> Result<Vec<u8>, String> {
+    graph_wire("GET", url);
     let resp = ureq::get(url)
         .set("Authorization", &graph_auth(token))
         .call()
-        .map_err(graph_err)?;
+        .map_err(graph_err);
+    graph_wired("GET", url, &resp);
+    let resp = resp?;
     let mut out = Vec::new();
     use std::io::Read;
     // Raw MIME can be large; cap well above any sane message (64 MB).
@@ -6920,11 +7195,13 @@ fn graph_send_json(
     url: &str,
     body: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    graph_wire(method, url);
     let resp = ureq::request(method, url)
         .set("Authorization", &graph_auth(token))
         .send_json(body.clone())
-        .map_err(graph_err)?;
-    let text = resp.into_string().map_err(|e| e.to_string())?;
+        .map_err(graph_err);
+    graph_wired(method, url, &resp);
+    let text = resp?.into_string().map_err(|e| e.to_string())?;
     if text.trim().is_empty() {
         return Ok(serde_json::Value::Null);
     }
@@ -6936,12 +7213,14 @@ fn graph_send_json(
 fn graph_post_mime(token: &str, url: &str, raw: &[u8]) -> Result<serde_json::Value, String> {
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(raw);
+    graph_wire("POST(mime)", url);
     let resp = ureq::post(url)
         .set("Authorization", &graph_auth(token))
         .set("Content-Type", "text/plain")
         .send_string(&b64)
-        .map_err(graph_err)?;
-    let text = resp.into_string().map_err(|e| e.to_string())?;
+        .map_err(graph_err);
+    graph_wired("POST(mime)", url, &resp);
+    let text = resp?.into_string().map_err(|e| e.to_string())?;
     if text.trim().is_empty() {
         return Ok(serde_json::Value::Null);
     }
@@ -6949,11 +7228,14 @@ fn graph_post_mime(token: &str, url: &str, raw: &[u8]) -> Result<serde_json::Val
 }
 
 fn graph_delete_req(token: &str, url: &str) -> Result<(), String> {
-    ureq::delete(url)
+    graph_wire("DELETE", url);
+    let r = ureq::delete(url)
         .set("Authorization", &graph_auth(token))
         .call()
-        .map_err(graph_err)?;
-    Ok(())
+        .map_err(graph_err)
+        .map(|_| ());
+    graph_wired("DELETE", url, &r);
+    r
 }
 
 /// Follow `@odata.nextLink` pagination, collecting `value` arrays up to `cap`.
@@ -9455,5 +9737,25 @@ mod tests {
         let parsed = mail_parser::MessageParser::default().parse(raw.as_slice()).unwrap();
         let part = parsed.html_bodies().next().unwrap();
         assert!(image_mime(part).is_none());
+    }
+}
+
+#[cfg(test)]
+mod uid_set_tests {
+    use super::{quote_mailbox, uid_set};
+
+    #[test]
+    fn mailbox_names_are_quoted_for_copy() {
+        assert_eq!(quote_mailbox("Deleted Messages"), "\"Deleted Messages\"");
+        assert_eq!(quote_mailbox("INBOX"), "\"INBOX\"");
+        assert_eq!(quote_mailbox("a\"b\\c"), "\"a\\\"b\\\\c\"");
+    }
+
+    #[test]
+    fn sets_are_sorted_deduplicated_and_ranged() {
+        assert_eq!(uid_set(&[1005, 1003, 999, 1004]), "999,1003:1005");
+        assert_eq!(uid_set(&[7, 7, 7]), "7");
+        assert_eq!(uid_set(&[3, 4, 5, 9]), "3:5,9");
+        assert_eq!(uid_set(&[]), "");
     }
 }

@@ -1,6 +1,29 @@
 # Changelog
 
-## 1.23.0 — 2026-09-07
+## 1.23.1 — 2026-09-07
+
+Every move and delete on iCloud failed since 1.22.0; the fix, and the
+server conversation in the log so the next such report explains itself.
+
+- **iCloud: "Could not move … Parse Error" on every delete, archive or
+  move** (reported by Jason on his own account). iCloud's capability list
+  has no MOVE, so since 1.22.0 the no-MOVE fallback (#128) ran there, and
+  the IMAP crate sends `UID COPY`'s mailbox name as given, unlike `UID
+  MOVE`'s: iCloud's "Deleted Messages", with its space, went out bare and
+  the server rejected the command. The name is now quoted (RFC 3501 quoted
+  string), with a test. Every UID set the worker sends is also
+  normalised: sorted, deduplicated and collapsed into ranges.
+- **The server conversation is in the log.** The console records each
+  IMAP command Vireo sends (`> UID COPY 150100:150103 "Deleted
+  Messages"`) and the server's verdict (`< OK` or `< BAD Parse Error`),
+  plus the sign-in mechanism and IDLE starts, without message bodies or
+  secrets; the Microsoft Graph requests and their status; the POP3
+  commands (PASS redacted); and each SMTP send. All of it under the
+  `vireo::imap`, `vireo::graph`, `vireo::pop3` and `vireo::smtp` targets,
+  so "Export log" carries it after the fact; stderr sees the failures
+  only. On failure the bulk-move path also names the folders and the set.
+
+
 
 Tags, swipe actions on message rows, a redrawn icon set with a new
 default, a log export for bug reports, four fixes, and the French

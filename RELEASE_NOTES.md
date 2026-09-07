@@ -2,6 +2,12 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.23.1
+
+**iCloud deletes and moves work again.** Since 1.22.0, deleting, archiving or moving a message on an iCloud account failed with "Parse Error": iCloud does not announce the MOVE command, the fallback path sent the Trash folder's name "Deleted Messages" without quotes, and the server refused it. The name is quoted now. If you use iCloud, this is the update to take.
+
+**The server conversation in the log.** The log now records every command Vireo sends to a mail server and the server's answer, for IMAP, Microsoft 365, POP3 and outgoing mail, without message contents or passwords. When something fails, "Export log" in Settings shows exactly what was asked and what came back.
+
 ## What's new in 1.23.0
 
 **Tags.** Label messages with one or more coloured tags, alongside their folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.
