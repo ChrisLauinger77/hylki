@@ -126,6 +126,8 @@ pub enum NotifyInput {
     TogglePanel,
     /// Open the panel straight into console mode.
     ShowConsole,
+    /// The console's Export button (#132).
+    ExportLog,
     /// Settings: whether console mode is offered (button + menu).
     SetConsoleEnabled(bool),
     /// Console tick: pull new log lines (and reschedule while open).
@@ -141,6 +143,8 @@ pub enum NotifyInput {
 #[derive(Debug)]
 pub enum NotifyOutput {
     CountChanged(usize),
+    /// The console's Export button: save the log to a file (#132).
+    ExportLog,
 }
 
 #[relm4::component(pub)]
@@ -204,6 +208,15 @@ impl SimpleComponent for NotificationCenter {
                             set_tooltip_text: Some(i18n("Console").as_str()),
                             add_css_class: "flat",
                             connect_clicked => NotifyInput::ShowConsole,
+                        },
+                        // While the console is open: save its log to a file.
+                        gtk::Button {
+                            #[watch]
+                            set_visible: model.console_enabled && model.console_open,
+                            set_icon_name: "co.hyprlab.Vireo-document-save-symbolic",
+                            set_tooltip_text: Some(i18n("Export log").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::ExportLog,
                         },
                     },
                 },
@@ -457,6 +470,9 @@ impl SimpleComponent for NotificationCenter {
                 }
             }
 
+            NotifyInput::ExportLog => {
+                let _ = sender.output(NotifyOutput::ExportLog);
+            }
             NotifyInput::ShowConsole => {
                 // The console button (and shortcut) toggles: a second press
                 // folds the console back into the plain status bar.

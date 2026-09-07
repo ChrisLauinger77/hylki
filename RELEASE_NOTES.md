@@ -12,6 +12,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **Fixes.** An account whose Sent folder was pointed at its Inbox disappeared from All Inboxes ([@EmmanuelP](https://github.com/EmmanuelP), #136); the Inbox can no longer be given another role. Forwarding from the main window showed no To field ([@7system7](https://github.com/7system7), #139). Pressing Enter twice inside a quoted block now steps out of the quote, so you can reply below an excerpt (EmmanuelP, #137). Trash and Junk rows offer "Move to Inbox" in their menus, for a message deleted by mistake ([Isaac](https://github.com/thecalamityjoe87), #138).
 
+**Export the log.** For a bug report, Settings has "Export log", and the console in the status bar has an export button. The file names the build and desktop and holds everything the console recorded since the app started, with email addresses shortened to their domain so it can be attached to an issue as it is.
+
 **French, completed.** [@frenchy82](https://github.com/frenchy82) translated the composer's picture-resizing menu and the last loose strings (#134).
 
 ## What's new in 1.22.0

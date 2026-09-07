@@ -235,6 +235,7 @@ pub enum PrefInput {
     ToggleConsoleMode(bool),
     ChangeReadMark(u32),
     ExportSettings,
+    ExportLog,
     ImportSettings,
     ToggleRunInBackground(bool),
     ToggleAutostart(bool),
@@ -293,6 +294,7 @@ pub enum PrefOutput {
     SetConsoleMode(bool),
     SetReadMark(crate::config::ReadMark),
     ExportSettings,
+    ExportLog,
     ImportSettings,
     SetSidebarHoverExpand(bool),
     SetAppTheme(AppTheme),
@@ -871,6 +873,18 @@ impl Component for Preferences {
                                            everything Vireo is doing under the hood."),
                             connect_active_notify[sender] => move |row| {
                                 sender.input(PrefInput::ToggleConsoleMode(row.is_active()));
+                            },
+                        },
+
+                        adw::ActionRow {
+                            set_title: &i18n("Export log"),
+                            set_subtitle: &i18n("Save everything the console has recorded since Vireo \
+                                           started, to attach to a bug report. Email addresses \
+                                           are shortened to their domain."),
+                            set_activatable: true,
+                            connect_activated => PrefInput::ExportLog,
+                            add_suffix = &gtk::Image {
+                                set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
                             },
                         },
                     },
@@ -1483,6 +1497,9 @@ impl Component for Preferences {
                     _ => crate::config::ReadMark::Shown,
                 };
                 let _ = sender.output(PrefOutput::SetReadMark(policy));
+            }
+            PrefInput::ExportLog => {
+                let _ = sender.output(PrefOutput::ExportLog);
             }
             PrefInput::ExportSettings => {
                 let _ = sender.output(PrefOutput::ExportSettings);

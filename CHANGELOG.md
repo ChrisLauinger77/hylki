@@ -77,6 +77,12 @@ default, and the French translation completed.
   Junk rows offer "Move to Inbox" in their right-click menu, the
   multi-selection menu and the reader's overflow menu, alongside the
   existing Undo toast and dragging the row onto a folder.
+- **Export log** (for #132 and any report that needs one): Settings →
+  System has "Export log", and the status bar's console carries an export
+  button while it is open. The file starts with the build, the desktop,
+  GTK and libadwaita versions, then everything the console recorded since
+  the app started (the console's buffer grows from 2,000 to 20,000 lines
+  so a session fits), with email addresses shortened to their domain.
 - **French** (PR #134, @frenchy82): the composer's picture-resizing menu
   and the last loose strings; 713 of 717 messages translated.
 - Under the hood: a `keywords` column on the message index (added in

@@ -815,6 +815,8 @@ pub enum AppMsg {
     SetStarredFilter(bool),
     /// Backup (#50): save/load the whole configuration as one file.
     ExportSettings,
+    /// Save the console's log to a file for a bug report (#132).
+    ExportLog,
     ImportSettings,
     /// The filter rules changed in Settings (#47).
     SetFilters(Vec<config::FilterRule>),
@@ -1722,6 +1724,7 @@ impl SimpleComponent for AppModel {
             sender.input_sender(),
             |out| match out {
                 NotifyOutput::CountChanged(n) => AppMsg::NotifyCount(n),
+                NotifyOutput::ExportLog => AppMsg::ExportLog,
             },
         );
 
@@ -5127,6 +5130,33 @@ impl SimpleComponent for AppModel {
                     let _ = notif.send(match outcome {
                         Ok(()) => NotifyInput::Push {
                             text: i18n_f("Settings exported to {display}", &[("display", &(path.display()).to_string())]),
+                            error: false,
+                            connectivity: false,
+                        },
+                        Err(e) => NotifyInput::Push {
+                            text: i18n_f("Export failed: {e}", &[("e", &(e).to_string())]),
+                            error: true,
+                            connectivity: false,
+                        },
+                    });
+                });
+            }
+
+            AppMsg::ExportLog => {
+                let dialog = gtk::FileDialog::builder()
+                    .title(&i18n("Export Log"))
+                    .initial_name(&format!("vireo-log-{}.txt", chrono::Local::now().format("%Y%m%d-%H%M")))
+                    .build();
+                let win = self.window.clone();
+                let notif = self.notifications.sender().clone();
+                dialog.save(Some(&win), gtk::gio::Cancellable::NONE, move |res| {
+                    let Ok(file) = res else { return };
+                    let Some(path) = file.path() else { return };
+                    let outcome = std::fs::write(&path, crate::console_log::export_text())
+                        .map_err(|e| e.to_string());
+                    let _ = notif.send(match outcome {
+                        Ok(()) => NotifyInput::Push {
+                            text: i18n_f("Log exported to {display}", &[("display", &(path.display()).to_string())]),
                             error: false,
                             connectivity: false,
                         },
@@ -9838,6 +9868,7 @@ impl AppModel {
                 PrefOutput::SetConsoleMode(on) => AppMsg::SetConsoleMode(on),
                 PrefOutput::SetReadMark(policy) => AppMsg::SetReadMark(policy),
                 PrefOutput::ExportSettings => AppMsg::ExportSettings,
+                PrefOutput::ExportLog => AppMsg::ExportLog,
                 PrefOutput::ImportSettings => AppMsg::ImportSettings,
                 PrefOutput::SetSidebarHoverExpand(on) => {
                     AppMsg::SetSidebarHoverExpand(on)
