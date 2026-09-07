@@ -1,9 +1,10 @@
 # Changelog
 
-## 1.23.0 — 2026-09-06
+## 1.23.0 — 2026-09-07
 
 Tags, swipe actions on message rows, a redrawn icon set with a new
-default, and the French translation completed.
+default, a log export for bug reports, four fixes, and the French
+translation completed.
 
 - **Tags** (#71, requested by @yioannides, with the folders-versus-tags
   discussion from @p-mitana and @deusnovus). Coloured labels a message can

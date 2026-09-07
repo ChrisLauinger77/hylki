@@ -103,6 +103,9 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
+msgid "Tags"
+msgstr ""
+
 msgid "Refresh or long-press for Status Bar"
 msgstr ""
 
@@ -180,6 +183,12 @@ msgstr ""
 msgid "Export failed: {e}"
 msgstr ""
 
+msgid "Export Log"
+msgstr ""
+
+msgid "Log exported to {display}"
+msgstr ""
+
 msgid "Import Settings"
 msgstr ""
 
@@ -253,6 +262,9 @@ msgid "Remove Flag"
 msgstr ""
 
 msgid "Print Preview"
+msgstr ""
+
+msgid "Move to Inbox"
 msgstr ""
 
 msgid "Message Source"
@@ -583,12 +595,20 @@ msgstr ""
 msgid "Add Account"
 msgstr ""
 
+msgid ""
+"Label messages with one or more coloured tags. Tags are stored on the mail "
+"server as IMAP keywords, so Thunderbird and other clients show the same tags."
+msgstr ""
+
+msgid "Add Tag…"
+msgstr ""
+
 msgid "Filters"
 msgstr ""
 
 msgid ""
-"File incoming mail into folders automatically, by sender, subject or "
-"recipients. Applied to each account's Inbox as Vireo syncs it."
+"File incoming mail into folders or tag it automatically, by sender, subject "
+"or recipients. Applied to each account's Inbox as Vireo syncs it."
 msgstr ""
 
 msgid "Add Filter…"
@@ -915,7 +935,30 @@ msgstr ""
 msgid "Use this account in Vireo"
 msgstr ""
 
+msgid ", tagged {tag}"
+msgstr ""
+
 msgid "Remove filter"
+msgstr ""
+
+msgid "Remove tag"
+msgstr ""
+
+msgid "Edit Tag"
+msgstr ""
+
+msgid "Add Tag"
+msgstr ""
+
+msgid "Keyword"
+msgstr ""
+
+msgid ""
+"How the tag is stored on the server: letters, digits and most punctuation, "
+"no spaces. Thunderbird's built-in tags are $label1 to $label5."
+msgstr ""
+
+msgid "Colour"
 msgstr ""
 
 msgid "Edit Filter"
@@ -958,6 +1001,19 @@ msgid "Text to match"
 msgstr ""
 
 msgid "Move to"
+msgstr ""
+
+msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgstr ""
+
+#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
+msgid "Leave in Inbox"
+msgstr ""
+
+msgid "Tag with"
+msgstr ""
+
+msgid "None"
 msgstr ""
 
 msgid "Count unread mail"
@@ -1339,6 +1395,9 @@ msgstr ""
 msgid "Collapse status bar"
 msgstr ""
 
+msgid "Export log"
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr ""
 
@@ -1437,13 +1496,27 @@ msgid ""
 "is folded up."
 msgstr ""
 
-msgid "Filtered folders under All Inboxes"
+msgid "Filtered Folders section"
 msgstr ""
 
 msgid ""
-"List the folders your filter rules file into in a collapsible section inside "
-"All Inboxes. Each rule chooses whether its folder appears there; this switch "
-"hides the section altogether."
+"List the folders your filter rules file into in a collapsible section. Each "
+"rule chooses whether its folder appears there; this switch hides the section "
+"altogether."
+msgstr ""
+
+msgid "Filtered Folders placement"
+msgstr ""
+
+msgid ""
+"Inside All Inboxes, folding away with it, or in the scrolling sidebar above "
+"or below the accounts."
+msgstr ""
+
+msgid "Tags placement"
+msgstr ""
+
+msgid "Where the Tags section sits, with the same choices."
 msgstr ""
 
 msgid "Chevron placement"
@@ -1512,6 +1585,22 @@ msgstr ""
 msgid ""
 "The message list's ⋯ palette slides open by itself while the pointer rests "
 "on a row."
+msgstr ""
+
+msgid "Swipe actions"
+msgstr ""
+
+msgid ""
+"Drag a message sideways with the mouse, or swipe it with two fingers on a "
+"trackpad, to archive or delete it."
+msgstr ""
+
+msgid "Reverse swipe directions"
+msgstr ""
+
+msgid ""
+"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+"archive it. Turning this on swaps the two: left archives, right deletes."
 msgstr ""
 
 msgid "Actions Palette timeout"
@@ -1720,6 +1809,11 @@ msgid ""
 "under the hood."
 msgstr ""
 
+msgid ""
+"Save everything the console has recorded since Vireo started, to attach to a "
+"bug report. Email addresses are shortened to their domain."
+msgstr ""
+
 msgid "Backup"
 msgstr ""
 
@@ -1796,6 +1890,15 @@ msgid ""
 "Fills the sender's avatar with the brand's own site icon, fetched from the "
 "sender's domain. That domain learns your IP address, which is what blocking "
 "remote content otherwise avoids."
+msgstr ""
+
+msgid "Inside All Inboxes"
+msgstr ""
+
+msgid "Above the accounts"
+msgstr ""
+
+msgid "Below the accounts"
 msgstr ""
 
 msgid "Left"
@@ -2052,9 +2155,6 @@ msgstr ""
 msgid "Message text shown under each subject"
 msgstr ""
 
-msgid "None"
-msgstr ""
-
 msgid "Colourful initials beside each message"
 msgstr ""
 
@@ -2187,6 +2287,13 @@ msgid "Could not update message: {e}"
 msgstr ""
 
 msgid "Could not flag message: {e}"
+msgstr ""
+
+msgid ""
+"This server does not store tags, so Vireo keeps them on this computer only"
+msgstr ""
+
+msgid "Could not tag message: {e}"
 msgstr ""
 
 msgid "Could not mark folder read: {e}"

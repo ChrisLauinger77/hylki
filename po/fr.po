@@ -109,6 +109,9 @@ msgstr "Quitter"
 msgid "Actions"
 msgstr "Actions"
 
+msgid "Tags"
+msgstr ""
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualiser ou appuyer longuement pour la barre d'état"
 
@@ -187,6 +190,14 @@ msgstr "Paramètres exportés vers {display}"
 
 msgid "Export failed: {e}"
 msgstr "Échec de l'exportation : {e}"
+
+#, fuzzy
+msgid "Export Log"
+msgstr "Exporter les paramètres"
+
+#, fuzzy
+msgid "Log exported to {display}"
+msgstr "Paramètres exportés vers {display}"
 
 msgid "Import Settings"
 msgstr "Importer des paramètres"
@@ -268,6 +279,10 @@ msgstr "Retirer le drapeau"
 
 msgid "Print Preview"
 msgstr "Aperçu avant impression"
+
+#, fuzzy
+msgid "Move to Inbox"
+msgstr "Déplacer vers"
 
 msgid "Message Source"
 msgstr "Code source du message"
@@ -619,12 +634,22 @@ msgstr ""
 msgid "Add Account"
 msgstr "Ajouter un compte"
 
+msgid ""
+"Label messages with one or more coloured tags. Tags are stored on the mail "
+"server as IMAP keywords, so Thunderbird and other clients show the same tags."
+msgstr ""
+
+#, fuzzy
+msgid "Add Tag…"
+msgstr "Ajouter un alias…"
+
 msgid "Filters"
 msgstr "Filtres"
 
+#, fuzzy
 msgid ""
-"File incoming mail into folders automatically, by sender, subject or "
-"recipients. Applied to each account's Inbox as Vireo syncs it."
+"File incoming mail into folders or tag it automatically, by sender, subject "
+"or recipients. Applied to each account's Inbox as Vireo syncs it."
 msgstr ""
 "Classez automatiquement les e-mails entrants dans des dossiers, par "
 "expéditeur, objet ou destinataires. Appliqué à la boîte de réception de "
@@ -984,8 +1009,34 @@ msgstr "Activer ce compte"
 msgid "Use this account in Vireo"
 msgstr "Utiliser ce compte dans Vireo"
 
+msgid ", tagged {tag}"
+msgstr ""
+
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
+
+#, fuzzy
+msgid "Remove tag"
+msgstr "Retirer le drapeau"
+
+#, fuzzy
+msgid "Edit Tag"
+msgstr "Modifier"
+
+#, fuzzy
+msgid "Add Tag"
+msgstr "Ajouter une adresse e-mail"
+
+msgid "Keyword"
+msgstr ""
+
+msgid ""
+"How the tag is stored on the server: letters, digits and most punctuation, "
+"no spaces. Thunderbird's built-in tags are $label1 to $label5."
+msgstr ""
+
+msgid "Colour"
+msgstr ""
 
 msgid "Edit Filter"
 msgstr "Modifier le filtre"
@@ -1028,6 +1079,20 @@ msgstr "Texte à rechercher"
 
 msgid "Move to"
 msgstr "Déplacer vers"
+
+msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgstr ""
+
+#. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
+msgid "Leave in Inbox"
+msgstr ""
+
+#, fuzzy
+msgid "Tag with"
+msgstr "commence par"
+
+msgid "None"
+msgstr "Aucun"
 
 msgid "Count unread mail"
 msgstr "Compter les messages non lus"
@@ -1414,6 +1479,10 @@ msgstr "Tout effacer"
 msgid "Collapse status bar"
 msgstr "Réduire la barre d'état"
 
+#, fuzzy
+msgid "Export log"
+msgstr "Exporter les paramètres"
+
 msgid "Status bar ({n})"
 msgstr "Barre d'état ({n})"
 
@@ -1520,18 +1589,36 @@ msgstr ""
 "Afficher la pastille des messages non lus à côté de Toutes les boîtes de "
 "recpetionlorsque la liste par compte est repliée."
 
-msgid "Filtered folders under All Inboxes"
-msgstr "Dossiers filtrés sous toutes les boîtes"
+#, fuzzy
+msgid "Filtered Folders section"
+msgstr "Dossiers filtrés"
 
+#, fuzzy
 msgid ""
-"List the folders your filter rules file into in a collapsible section inside "
-"All Inboxes. Each rule chooses whether its folder appears there; this switch "
-"hides the section altogether."
+"List the folders your filter rules file into in a collapsible section. Each "
+"rule chooses whether its folder appears there; this switch hides the section "
+"altogether."
 msgstr ""
 "Répertoriez les dossiers dans lesquels votre fichier de règles de "
 "filtragedans une section repliable située dans Toutes les boîtes de "
 "réception.Chaque règle détermine si son dossier y apparaît ;ce bouton masque "
 "complètement la section."
+
+#, fuzzy
+msgid "Filtered Folders placement"
+msgstr "Dossiers filtrés"
+
+msgid ""
+"Inside All Inboxes, folding away with it, or in the scrolling sidebar above "
+"or below the accounts."
+msgstr ""
+
+#, fuzzy
+msgid "Tags placement"
+msgstr "Emplacement des chevrons"
+
+msgid "Where the Tags section sits, with the same choices."
+msgstr ""
 
 msgid "Chevron placement"
 msgstr "Emplacement des chevrons"
@@ -1618,6 +1705,23 @@ msgid ""
 msgstr ""
 "La palette ⋯ de la liste des messages s'ouvre automatiquement lorsque le "
 "pointeur s'arrête sur une ligne."
+
+#, fuzzy
+msgid "Swipe actions"
+msgstr "Actions"
+
+msgid ""
+"Drag a message sideways with the mouse, or swipe it with two fingers on a "
+"trackpad, to archive or delete it."
+msgstr ""
+
+msgid "Reverse swipe directions"
+msgstr ""
+
+msgid ""
+"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+"archive it. Turning this on swaps the two: left archives, right deletes."
+msgstr ""
 
 msgid "Actions Palette timeout"
 msgstr "Délai d'expiration de la palette d'actions"
@@ -1880,6 +1984,11 @@ msgstr ""
 "Une console détaillée en direct dans la barre d'état montrant tout ce que "
 "Vireo exécute en arrière-plan."
 
+msgid ""
+"Save everything the console has recorded since Vireo started, to attach to a "
+"bug report. Email addresses are shortened to their domain."
+msgstr ""
+
 msgid "Backup"
 msgstr "Sauvegarde"
 
@@ -1979,6 +2088,18 @@ msgstr ""
 "Remplace l'avatar de l'expéditeur par le favicon officiel de la marque, "
 "récupéré depuis son domaine. Ce domaine prend alors connaissance de votre "
 "adresse IP, ce que le blocage de contenu distant vise à éviter."
+
+#, fuzzy
+msgid "Inside All Inboxes"
+msgstr "Toutes les boîtes"
+
+#, fuzzy
+msgid "Above the accounts"
+msgstr "Activer ce compte"
+
+#, fuzzy
+msgid "Below the accounts"
+msgstr "Activer ce compte"
 
 msgid "Left"
 msgstr "Gauche"
@@ -2246,9 +2367,6 @@ msgstr ""
 msgid "Message text shown under each subject"
 msgstr "Texte du message affiché sous chaque objet"
 
-msgid "None"
-msgstr "Aucun"
-
 msgid "Colourful initials beside each message"
 msgstr "Initiales colorées à côté de chaque message"
 
@@ -2393,6 +2511,14 @@ msgid "Could not update message: {e}"
 msgstr "Impossible de mettre à jour le message : {e}"
 
 msgid "Could not flag message: {e}"
+msgstr "Impossible de marquer le message : {e}"
+
+msgid ""
+"This server does not store tags, so Vireo keeps them on this computer only"
+msgstr ""
+
+#, fuzzy
+msgid "Could not tag message: {e}"
 msgstr "Impossible de marquer le message : {e}"
 
 msgid "Could not mark folder read: {e}"
@@ -2562,3 +2688,6 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Filtered folders under All Inboxes"
+#~ msgstr "Dossiers filtrés sous toutes les boîtes"
