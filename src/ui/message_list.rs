@@ -25,6 +25,8 @@ pub enum RowAction {
     Spam,
     Archive,
     Delete,
+    /// Put a message from Trash or Junk back in its account's Inbox (#138).
+    MoveToInbox,
     ViewSource,
     AddContact,
 }
@@ -1980,6 +1982,8 @@ pub struct MessageList {
     default_expanded: bool,
     /// The open folder is Sent: rows name recipients instead of senders (#27).
     show_recipient: bool,
+    /// The list shows Trash or Junk, where menus offer "Move to Inbox" (#138).
+    restorable: bool,
     /// Rendered thread membership: message key → conversation key, rebuilt with
     /// the rows. Lets a read-state change on a hidden reply refresh its head.
     msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
@@ -2066,6 +2070,8 @@ pub enum BulkAction {
     Archive,
     Spam,
     Delete,
+    /// Back to the Inbox, for a selection in Trash or Junk (#138).
+    MoveToInbox,
 }
 
 #[derive(Debug)]
@@ -2190,6 +2196,8 @@ pub enum MessageListInput {
     SetSwipeReversed(bool),
     /// Turn the swipe gesture on or off (#92).
     SetSwipeEnabled(bool),
+    /// The list shows Trash or Junk: menus offer "Move to Inbox" (#138).
+    SetRestorable(bool),
     /// Folder switch: reset infinite-scroll paging back to the first page and
     /// scroll to the top (a plain `SetMessages` now preserves paging for refreshes).
     ResetPaging,
@@ -2552,6 +2560,7 @@ impl SimpleComponent for MessageList {
             reader_keys: Vec::new(),
             expanded_threads: std::collections::HashSet::new(),
             show_recipient: false,
+            restorable: false,
             default_expanded: false,
             msg_thread: std::collections::HashMap::new(),
             thread_members: std::collections::HashMap::new(),
@@ -2793,6 +2802,7 @@ impl SimpleComponent for MessageList {
                     self.rebuild();
                 }
             }
+            MessageListInput::SetRestorable(on) => self.restorable = on,
             MessageListInput::ContactPhotosChanged => {
                 // Pointless when the circles aren't drawn; rows check the
                 // fresh index as they are rebuilt.
@@ -3611,11 +3621,17 @@ impl MessageList {
             ],
             flag_section,
             tag_section,
-            vec![
-                item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"),
-                item(RowAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"),
-                item(RowAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"),
-            ],
+            {
+                let mut section = Vec::new();
+                // In Trash or Junk the way back is the first thing offered.
+                if self.restorable {
+                    section.push(item(RowAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                }
+                section.push(item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
+                section.push(item(RowAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
+                section.push(item(RowAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
+                section
+            },
             vec![item(
                 RowAction::AddContact,
                 &i18n("Add Sender to Contacts"),
@@ -3640,11 +3656,16 @@ impl MessageList {
                 item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "co.hyprlab.Vireo-mail-unread-symbolic"),
                 item(BulkAction::Flag, &i18n("Flag"), "co.hyprlab.Vireo-starred-symbolic"),
             ],
-            vec![
-                item(BulkAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"),
-                item(BulkAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"),
-                item(BulkAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"),
-            ],
+            {
+                let mut section = Vec::new();
+                if self.restorable {
+                    section.push(item(BulkAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                }
+                section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
+                section.push(item(BulkAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
+                section.push(item(BulkAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
+                section
+            },
         ];
 
         show_context_menu_with_header(

@@ -885,6 +885,29 @@ const PASTE_SCRIPT: &str = r#"<script>
       spellHl.add(spellRange);
     }
   };
+  /* Enter twice inside a quote leaves it (#137), the way a list ends: the
+     first Enter opens an empty line in the quote, the second takes that
+     line out below it (WebKit's outdent drops one quote level for the
+     caret's paragraph). Any other key in between makes the next Enter an
+     ordinary one again. */
+  var enterInQuote = false;
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || composing){
+      enterInQuote = false;
+      return;
+    }
+    var sel = getSelection();
+    var n = sel.rangeCount ? sel.anchorNode : null;
+    var el = n && n.nodeType === 3 ? n.parentNode : n;
+    var inQuote = !!(el && el.closest && el.closest('blockquote'));
+    if(inQuote && enterInQuote && sel.isCollapsed){
+      e.preventDefault();
+      document.execCommand('outdent');
+      enterInQuote = false;
+      return;
+    }
+    enterInQuote = inQuote;
+  }, true);
   document.addEventListener('compositionstart', function(){ composing = true; });
   document.addEventListener('compositionend', function(){ composing = false; });
   document.addEventListener('input', function(){

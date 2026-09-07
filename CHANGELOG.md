@@ -61,6 +61,22 @@ default, and the French translation completed.
   sources to `alt/<id>.Devel.png` and takes the bird envelope, plain and
   `.Devel`, as the hicolor icons of the two builds (the beta now has a
   scalable SVG too).
+- **An account whose Sent folder was set to the Inbox vanished from All
+  Inboxes** (#136, @EmmanuelP): the role took the Inbox's kind with it, so
+  the account had no inbox to list, notify for or filter. A role never
+  takes the Inbox now (the assignment is ignored), and the account
+  editor's Special Folders combos no longer offer it.
+- **Forward in the main window had no To field** (#139, @7system7): the
+  inline reply pane hides its address rows to stay compact, and a forward
+  got the same treatment although it arrives unaddressed. A pane whose To
+  is empty keeps its rows.
+- **Leaving a quote in the editor** (#137, @EmmanuelP): Enter twice inside
+  a quoted block now steps out below it, the way a list ends, so a reply
+  can be written under an excerpt.
+- **Getting a deleted message back** (#138, @thecalamityjoe87): Trash and
+  Junk rows offer "Move to Inbox" in their right-click menu, the
+  multi-selection menu and the reader's overflow menu, alongside the
+  existing Undo toast and dragging the row onto a folder.
 - **French** (PR #134, @frenchy82): the composer's picture-resizing menu
   and the last loose strings; 713 of 717 messages translated.
 - Under the hood: a `keywords` column on the message index (added in

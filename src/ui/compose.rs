@@ -397,7 +397,9 @@ impl Component for Compose {
             compose_id,
             windowed,
             can_toggle,
-            compact,
+            // A compact (fields-hidden) pane only makes sense once it is
+            // addressed: replies arrive with To filled, forwards do not.
+            compact: compact && !prefill.to.trim().is_empty(),
             fields_dirty: false,
         };
         let widgets = view_output!();
@@ -422,7 +424,9 @@ impl Component for Compose {
         widgets.reply_to_row.set_visible(false);
         widgets.subject_row.set_visible(true);
         // Compact split reply: only the editor shows; the full field rows
-        // return when the composer pops out to a window.
+        // return when the composer pops out to a window. Never for a pane
+        // that arrives unaddressed — a forward — which needs its To row
+        // (#139).
         widgets.fields_list.set_visible(!model.compact);
         {
             let more = gtk::Button::with_label(&i18n("More"));

@@ -2066,10 +2066,15 @@ impl AccountsWindow {
     /// account, whose folders aren't known yet): "Automatic" plus the account's
     /// live folder list, with any saved assignment selected.
     fn populate_folder_combos(&mut self, widgets: &AccountsWindowWidgets, acc: Option<&AccountConfig>) {
-        let choices = acc
+        // The Inbox is never offered as a role (#136): giving it one took
+        // its own role away, and the account lost its inbox.
+        let choices: Vec<(String, String)> = acc
             .and_then(|a| self.folders_by_email.get(&a.email))
             .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(path, _)| !path.eq_ignore_ascii_case("INBOX"))
+            .collect();
         let mut labels: Vec<&str> = vec!["Automatic"];
         labels.extend(choices.iter().map(|(_, display)| display.as_str()));
         self.folder_paths = choices.iter().map(|(path, _)| path.clone()).collect();

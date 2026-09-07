@@ -826,6 +826,8 @@ pub enum AppMsg {
     SetTag { message: Box<Message>, keyword: String, add: bool },
     /// The reader toolbar's tag menu: toggle a tag on the reader's target.
     ToggleTagCurrent(String),
+    /// Put the reader's target back in its Inbox (from Trash or Junk, #138).
+    MoveToInbox,
     /// Pop the tag menu on the reader toolbar's tag button.
     ReaderTagMenu,
     /// Second stage of ImportSettings: the chosen file, applied on a clean
@@ -3020,6 +3022,7 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 self.message_list.emit(MessageListInput::ResetPaging);
                 self.message_list.emit(MessageListInput::SetShowRecipient(false));
+                self.message_list.emit(MessageListInput::SetRestorable(false));
                 let reqs: Vec<(u32, u32, String)> = self
                     .accounts
                     .iter()
@@ -3805,6 +3808,7 @@ impl SimpleComponent for AppModel {
                     RowAction::ToggleRead => self.set_read(&m, m.unread),
                     RowAction::Spam => self.mark_spam_msg(m),
                     RowAction::Archive => self.move_to(m, FolderKind::Archive),
+                    RowAction::MoveToInbox => self.move_to(m, FolderKind::Inbox),
                     RowAction::Delete => self.delete_messages(vec![m], &sender),
                     RowAction::ViewSource => {
                         if let Some(path) = self.resolve_folder_path(&m) {
@@ -3842,7 +3846,10 @@ impl SimpleComponent for AppModel {
                     // trips GTK's "app is not responding" dialog for large selections.
                     // Batch it; for big selections show a spinner and defer the apply
                     // one tick so the spinner paints before the blocking work runs.
-                    BulkAction::Archive | BulkAction::Spam | BulkAction::Delete => {
+                    BulkAction::Archive
+                    | BulkAction::Spam
+                    | BulkAction::Delete
+                    | BulkAction::MoveToInbox => {
                         // Deleting in Trash means erasing, not moving — split the
                         // selection so each half takes the right path (and the
                         // erasures get their confirmation).
@@ -5027,12 +5034,19 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 self.message_list.emit(MessageListInput::ResetPaging);
                 self.message_list.emit(MessageListInput::SetShowRecipient(false));
+                self.message_list.emit(MessageListInput::SetRestorable(false));
                 self.emit_tag_view();
                 self.push_index_complete();
             }
 
             AppMsg::SetTag { message, keyword, add } => {
                 self.set_tag(&message, &keyword, add);
+            }
+
+            AppMsg::MoveToInbox => {
+                if let Some(m) = self.reply_target() {
+                    self.move_to(m, FolderKind::Inbox);
+                }
             }
 
             AppMsg::ToggleTagCurrent(keyword) => {
@@ -7506,16 +7520,25 @@ impl AppModel {
                 // list's context menu only (the Outbox variant above keeps it —
                 // queued rows have no such menu).
                 vec![entry!(i18n("Print Preview"), "printer", AppMsg::PrintPreview, has_current)],
-                vec![
-                    entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts),
-                    entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts),
-                    entry!(
+                {
+                    let mut section = Vec::new();
+                    let restorable = target.as_ref().is_some_and(|m| {
+                        self.folder_kind(m.account_id, m.folder_id)
+                            .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk))
+                    });
+                    if restorable {
+                        section.push(entry!(i18n("Move to Inbox"), "mail-inbox", AppMsg::MoveToInbox, acts));
+                    }
+                    section.push(entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts));
+                    section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts));
+                    section.push(entry!(
                         i18n("Delete"),
                         "user-trash",
                         AppMsg::Delete,
                         acts || self.list_selection.len() > 1
-                    ),
-                ],
+                    ));
+                    section
+                },
             ]
         };
 
@@ -7650,6 +7673,11 @@ impl AppModel {
             .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
             .is_some_and(|f| f.kind == FolderKind::Sent);
         self.message_list.emit(MessageListInput::SetShowRecipient(is_sent));
+        // Trash and Junk offer the way back to the Inbox (#138).
+        let restorable = self
+            .folder_kind(account_id, folder_id)
+            .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk));
+        self.message_list.emit(MessageListInput::SetRestorable(restorable));
         self.selected = Some(SelectedFolder {
             account_id,
             folder_id,
@@ -10234,6 +10262,7 @@ impl AppModel {
             BulkAction::Archive => FolderKind::Archive,
             BulkAction::Delete => FolderKind::Trash,
             BulkAction::Spam => FolderKind::Junk,
+            BulkAction::MoveToInbox => FolderKind::Inbox,
             // Non-removing actions never reach here (handled inline).
             BulkAction::MarkRead
             | BulkAction::MarkUnread
@@ -11126,6 +11155,13 @@ fn apply_folder_roles(
         let Some(kind) = role_kind(role) else { continue };
         if !folders.iter().any(|f| &f.path == path) {
             // The assigned folder vanished server-side: leave detection alone.
+            continue;
+        }
+        // The Inbox is never re-roled (#136): an account whose "Sent" was
+        // pointed at INBOX lost its inbox — and with it its place under All
+        // Inboxes, its new-mail notifications and its filters. The
+        // assignment is ignored; the editor no longer offers the Inbox.
+        if folders.iter().any(|f| &f.path == path && f.kind == FolderKind::Inbox) {
             continue;
         }
         for f in folders.iter_mut() {
@@ -12051,6 +12087,19 @@ mod tests {
         assert_eq!(kind_of("INBOX"), FolderKind::Inbox);
         // Ids survive the re-sort (cached messages reference them).
         assert_eq!(folders.iter().find(|f| f.path == "Sent Items").unwrap().id, 2);
+    }
+
+    #[test]
+    fn a_role_never_takes_the_inbox() {
+        let mut folders = vec![
+            Folder { id: 1, account_id: 1, name: "Inbox".into(), path: "INBOX".into(), kind: FolderKind::Inbox, unread: 0 },
+            Folder { id: 2, account_id: 1, name: "Sent".into(), path: "Sent".into(), kind: FolderKind::Sent, unread: 0 },
+        ];
+        let mut roles = std::collections::BTreeMap::new();
+        roles.insert("sent".to_string(), "INBOX".to_string());
+        super::apply_folder_roles(&roles, &mut folders);
+        assert_eq!(folders.iter().find(|f| f.path == "INBOX").unwrap().kind, FolderKind::Inbox);
+        assert_eq!(folders.iter().find(|f| f.path == "Sent").unwrap().kind, FolderKind::Sent);
     }
 
     #[test]

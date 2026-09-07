@@ -10,6 +10,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **A new icon, and a redrawn gallery.** Vireo's icon is now a blue envelope with the bird on it. The gallery in Settings is redrawn to GNOME's icon guidelines: more Vireo envelopes in yellow, white, beige and faded blue, plain envelopes from blue to starfield, the Vireo bird, and the squircle that was the default since 1.21 staying on as "Logotype". The beta channel wears the development-build version of the icon, with GNOME's hazard stripe. This release puts the new icon on every install once, whatever was chosen before; pick another in Settings any time and that choice stands.
 
+**Fixes.** An account whose Sent folder was pointed at its Inbox disappeared from All Inboxes ([@EmmanuelP](https://github.com/EmmanuelP), #136); the Inbox can no longer be given another role. Forwarding from the main window showed no To field ([@7system7](https://github.com/7system7), #139). Pressing Enter twice inside a quoted block now steps out of the quote, so you can reply below an excerpt (EmmanuelP, #137). Trash and Junk rows offer "Move to Inbox" in their menus, for a message deleted by mistake ([Isaac](https://github.com/thecalamityjoe87), #138).
+
 **French, completed.** [@frenchy82](https://github.com/frenchy82) translated the composer's picture-resizing menu and the last loose strings (#134).
 
 ## What's new in 1.22.0
