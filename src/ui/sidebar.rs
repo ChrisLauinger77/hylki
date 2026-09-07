@@ -183,7 +183,12 @@ pub struct Sidebar {
     tags_expanded: bool,
     tags_revealer: Option<gtk::Revealer>,
     tags_chevron: Option<gtk::Image>,
+    /// The section's header button, for its folded-up bottom margin.
+    tags_toggle: Option<gtk::Button>,
     tag_list: Option<gtk::ListBox>,
+    /// Where the two sections sit (Settings → Sidebar).
+    filtered_placement: crate::config::SectionPlacement,
+    tags_placement: crate::config::SectionPlacement,
 }
 
 #[derive(Debug)]
@@ -199,6 +204,9 @@ pub enum SidebarInput {
         unified_folders: Vec<UnifiedFolderRef>,
         /// The tags (#71), for the Tags section.
         tags: Vec<crate::config::Tag>,
+        /// Where the Filtered Folders and Tags sections are drawn.
+        filtered_placement: crate::config::SectionPlacement,
+        tags_placement: crate::config::SectionPlacement,
     },
     /// A tag row in the Tags section was chosen.
     TagRowSelected(i32),
@@ -460,7 +468,10 @@ impl Component for Sidebar {
             tags_expanded: true,
             tags_revealer: None,
             tags_chevron: None,
+            tags_toggle: None,
             tag_list: None,
+            filtered_placement: crate::config::SectionPlacement::default(),
+            tags_placement: crate::config::SectionPlacement::default(),
         };
 
         let widgets = view_output!();
@@ -495,6 +506,8 @@ impl Component for Sidebar {
                 unified_unread,
                 unified_folders,
                 tags,
+                filtered_placement,
+                tags_placement,
             } => {
                 // Order each account's folders essential-first, then custom, so
                 // the essential/custom split lines up with row indices (the main
@@ -519,6 +532,8 @@ impl Component for Sidebar {
                 self.unified_folders_unread =
                     self.unified_folders.iter().map(|r| r.folder.unread).sum();
                 self.tags = tags;
+                self.filtered_placement = filtered_placement;
+                self.tags_placement = tags_placement;
                 // The open tag was removed: fall back to the default view.
                 if let Sel::Tag(kw) = &self.selected {
                     if !self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(kw)) {
@@ -530,11 +545,10 @@ impl Component for Sidebar {
                 // the open folder: carry the highlight to the account
                 // section's own row for it.
                 if let Sel::UnifiedFolder(acc, path) = &self.selected {
-                    let listed = show_unified
-                        && self
-                            .unified_folders
-                            .iter()
-                            .any(|r| r.account_id == *acc && r.folder.path == *path);
+                    let listed = self
+                        .unified_folders
+                        .iter()
+                        .any(|r| r.account_id == *acc && r.folder.path == *path);
                     if !listed {
                         self.selected = Sel::Folder(*acc, path.clone());
                     }
@@ -698,6 +712,9 @@ impl Component for Sidebar {
                 self.tags_expanded = !self.tags_expanded;
                 if let Some(rev) = &self.tags_revealer {
                     rev.set_reveal_child(self.tags_expanded);
+                }
+                if let Some(t) = &self.tags_toggle {
+                    t.set_margin_bottom(tags_toggle_gap(self.tags_expanded));
                 }
                 if let Some(ch) = &self.tags_chevron {
                     ch.set_icon_name(Some(if self.tags_expanded { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }));
@@ -1093,6 +1110,7 @@ impl Sidebar {
         footer: &gtk::Box,
         sender: &ComponentSender<Self>,
     ) {
+        use crate::config::SectionPlacement::{self, AboveAccounts, AllInboxes, BelowAccounts};
         // Keep the scroll offset: rebuilding otherwise snaps the sidebar to
         // the top — felt on every folder drag-and-drop, whose optimistic move
         // rebuilds immediately under the pointer.
@@ -1176,6 +1194,7 @@ impl Sidebar {
         self.account_circle_badges.clear();
         self.tags_revealer = None;
         self.tags_chevron = None;
+        self.tags_toggle = None;
         self.tag_list = None;
 
         // No accounts yet: show a prompt to add the first one instead of an empty
@@ -1486,7 +1505,10 @@ impl Sidebar {
                 // account section below; folds away with the revealer. With
                 // a Filtered Folders section underneath, that section's list
                 // carries the gap instead.
-                if self.unified_folders.is_empty() {
+                let filtered_here =
+                    !self.unified_folders.is_empty() && self.filtered_placement == AllInboxes;
+                let tags_here = !self.tags.is_empty() && self.tags_placement == AllInboxes;
+                if !filtered_here && !tags_here {
                     sub.set_margin_bottom(14);
                 }
                 for section in &sections {
@@ -1547,11 +1569,16 @@ impl Sidebar {
 
                 // Everything that folds away with All Inboxes: the inbox
                 // sub-list, then (when any rule opts in) the collapsible
-                // "Filtered Folders" section beneath it.
+                // "Filtered Folders" section beneath it, then (when any tag
+                // exists) the "Tags" section (#71) — tag views span every
+                // account, like the rest of this block.
                 let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
                 body.append(&sub);
-                if !self.unified_folders.is_empty() {
+                if filtered_here {
                     self.build_unified_folders(&body, &sections, sender);
+                }
+                if tags_here {
+                    self.build_tags_section(&body, filtered_here, sender);
                 }
 
                 let revealer = gtk::Revealer::new();
@@ -1723,8 +1750,18 @@ impl Sidebar {
             self.outbox_list = Some(list);
         }
 
-        if !self.tags.is_empty() {
-            self.build_tags_section(container, sender);
+        // The sections placed in the scrolling sidebar above the accounts —
+        // including those meant for All Inboxes when it is hidden (a single
+        // account), which would otherwise have nowhere to be.
+        let no_unified = !self.show_unified;
+        let above = |p: SectionPlacement| p == AboveAccounts || (p == AllInboxes && no_unified);
+        let filtered_above = !self.unified_folders.is_empty() && above(self.filtered_placement);
+        let tags_above = !self.tags.is_empty() && above(self.tags_placement);
+        if filtered_above {
+            self.build_unified_folders(container, &sections, sender);
+        }
+        if tags_above {
+            self.build_tags_section(container, filtered_above, sender);
         }
 
         for section in &sections {
@@ -2164,6 +2201,16 @@ impl Sidebar {
             self.custom_chevrons.insert(id, custom_chevron);
         }
 
+        // And the sections placed after the last account.
+        let filtered_below =
+            !self.unified_folders.is_empty() && self.filtered_placement == BelowAccounts;
+        if filtered_below {
+            self.build_unified_folders(container, &sections, sender);
+        }
+        if !self.tags.is_empty() && self.tags_placement == BelowAccounts {
+            self.build_tags_section(container, filtered_below, sender);
+        }
+
         // Per-account avatar colours (background + readable text).
         let mut css = String::new();
         for s in &sections {
@@ -2189,6 +2236,7 @@ impl Sidebar {
                 .cloned()
                 .chain(self.unified_revealer.clone())
                 .chain(self.unified_folders_revealer.clone())
+                .chain(self.tags_revealer.clone())
                 .collect();
             gtk::glib::idle_add_local_once(move || {
                 for r in &revs {
@@ -2305,9 +2353,12 @@ impl Sidebar {
         let list = gtk::ListBox::new();
         list.set_selection_mode(gtk::SelectionMode::Single);
         list.add_css_class("navigation-sidebar");
+        list.add_css_class("section-child-list");
         // The gap to the first account section below (the inbox sub-list
         // carries 14 when this section is absent; the folder rows' own
-        // bottom padding makes 10 read the same here).
+        // bottom padding makes 10 read the same here). With a Tags section
+        // beneath, 10px keeps these rows off its heading (Jason,
+        // 2026-09-07); folded up, the list takes the gap away with it.
         list.set_margin_bottom(10);
         for r in &self.unified_folders {
             let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
@@ -2393,10 +2444,17 @@ impl Sidebar {
         self.unified_folder_list = Some(list);
     }
 
-    /// The "Tags" section (#71), above the account sections: a toggle header
-    /// and, under a revealer, one row per tag — its colour as a disc, its
-    /// name. In the rail the header is a tag glyph and the rows are discs.
-    fn build_tags_section(&mut self, container: &gtk::Box, sender: &ComponentSender<Self>) {
+    /// The "Tags" section (#71), inside All Inboxes under Filtered Folders
+    /// (or heading the account list when All Inboxes is hidden): a toggle
+    /// header and, under a revealer, one row per tag — its colour as a
+    /// disc, its name. In the rail the header is a tag glyph and the rows
+    /// are discs.
+    fn build_tags_section(
+        &mut self,
+        parent: &gtk::Box,
+        after_filtered: bool,
+        sender: &ComponentSender<Self>,
+    ) {
         let chevron = gtk::Image::from_icon_name(if self.tags_expanded {
             "co.hyprlab.Vireo-pan-down-symbolic"
         } else {
@@ -2406,6 +2464,11 @@ impl Sidebar {
         toggle.add_css_class("flat");
         toggle.add_css_class("folders-toggle");
         toggle.add_css_class("unified-folders-toggle");
+        // Rides 16px up onto the Filtered Folders rows (Jason, 2026-09-07)
+        // when that section sits right above.
+        if after_filtered {
+            toggle.add_css_class("tags-toggle");
+        }
         let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         hb.add_css_class("folder-row");
         if self.collapsed {
@@ -2431,12 +2494,15 @@ impl Sidebar {
         toggle.connect_clicked(move |_| {
             let _ = st.send(SidebarInput::ToggleTagsExpand);
         });
-        container.append(&toggle);
+        toggle.set_margin_bottom(tags_toggle_gap(self.tags_expanded));
+        parent.append(&toggle);
         self.tags_chevron = Some(chevron);
+        self.tags_toggle = Some(toggle);
 
         let list = gtk::ListBox::new();
         list.set_selection_mode(gtk::SelectionMode::Single);
         list.add_css_class("navigation-sidebar");
+        list.add_css_class("section-child-list");
         list.set_margin_bottom(10);
         for t in &self.tags {
             let row = gtk::ListBoxRow::new();
@@ -2478,7 +2544,7 @@ impl Sidebar {
         revealer.set_transition_duration(0);
         revealer.set_reveal_child(self.tags_expanded);
         revealer.set_child(Some(&list));
-        container.append(&revealer);
+        parent.append(&revealer);
         self.tags_revealer = Some(revealer);
         self.tag_list = Some(list);
     }
@@ -2935,6 +3001,12 @@ fn pin_icon_size(icon: &gtk::Image) {
 /// keeps the accounts at a balanced distance; open, the list carries it.
 fn unified_folders_toggle_gap(expanded: bool) -> i32 {
     if expanded { 0 } else { 16 }
+}
+
+/// Room under the "Tags" heading: 5px when folded up (Jason, 2026-09-07);
+/// open, its list carries the gap to the accounts.
+fn tags_toggle_gap(expanded: bool) -> i32 {
+    if expanded { 0 } else { 5 }
 }
 
 /// Extra left inset on every expanded row's leading icon in the leading-

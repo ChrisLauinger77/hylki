@@ -395,9 +395,9 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Tags"),
                                 set_description: Some(
-                                    i18n("Coloured labels a message can carry several of. \
-                                     Stored on the server as IMAP keywords, so other \
-                                     clients such as Thunderbird see the same tags.").as_str()
+                                    i18n("Label messages with one or more coloured tags. \
+                                     Tags are stored on the mail server as IMAP keywords, \
+                                     so Thunderbird and other clients show the same tags.").as_str()
                                 ),
                                 #[wrap(Some)]
                                 set_header_suffix = &gtk::Button {
@@ -2924,58 +2924,86 @@ impl AccountsWindow {
                 .as_str(),
         ));
 
-        // The keyword follows the name until it is typed into by hand.
+        // The keyword follows the name until it is typed into by hand. The
+        // follow is done under a guard: set_text empties the field before
+        // refilling it, and each step fires `changed`, so without the guard
+        // the empty step read as hand-editing after the second letter.
         let keyword_touched = std::rc::Rc::new(std::cell::Cell::new(edit.is_some()));
+        let syncing = std::rc::Rc::new(std::cell::Cell::new(false));
         {
             let keyword_row = keyword_row.clone();
             let touched = keyword_touched.clone();
+            let syncing = syncing.clone();
             name_row.connect_changed(move |row| {
                 if !touched.get() {
+                    syncing.set(true);
                     keyword_row.set_text(&Tag::keyword_for(&row.text()));
+                    syncing.set(false);
                 }
             });
         }
         {
             let touched = keyword_touched.clone();
-            let name_row = name_row.clone();
-            keyword_row.connect_changed(move |row| {
-                // Typing that isn't the derived keyword marks it as chosen.
-                if row.text() != Tag::keyword_for(&name_row.text()) {
+            let syncing = syncing.clone();
+            keyword_row.connect_changed(move |_| {
+                if !syncing.get() {
                     touched.set(true);
                 }
             });
         }
 
-        // The colour: one disc per palette entry, radio-style.
-        let color_row = adw::ActionRow::new();
-        color_row.set_title(&i18n("Colour"));
-        let swatches = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        swatches.set_valign(gtk::Align::Center);
+        // The colour: one disc per palette entry on a line of its own under
+        // a caption (beside a title, eight discs left the title wrapping one
+        // letter per line in the dialog's width). Toggle buttons in one
+        // group behave as radios; the pressed one is the choice.
+        let color_row = gtk::ListBoxRow::new();
+        color_row.set_activatable(false);
+        color_row.set_selectable(false);
+        let color_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        color_box.set_margin_top(10);
+        color_box.set_margin_bottom(10);
+        color_box.set_margin_start(12);
+        color_box.set_margin_end(12);
+        let color_label = gtk::Label::new(Some(i18n("Colour").as_str()));
+        color_label.set_halign(gtk::Align::Start);
+        color_label.add_css_class("caption");
+        color_label.add_css_class("dim-label");
+        color_box.append(&color_label);
+        let swatches = gtk::FlowBox::new();
+        swatches.set_selection_mode(gtk::SelectionMode::None);
+        swatches.set_homogeneous(true);
+        swatches.set_min_children_per_line(4);
+        swatches.set_max_children_per_line(8);
+        swatches.set_column_spacing(4);
+        swatches.set_row_spacing(4);
+        swatches.set_halign(gtk::Align::Start);
         let chosen = std::rc::Rc::new(std::cell::RefCell::new(
             edit.as_ref().map(|(_, t)| t.color.clone()).unwrap_or_else(|| TAG_COLORS[0].to_string()),
         ));
-        let mut first: Option<gtk::CheckButton> = None;
+        let mut first: Option<gtk::ToggleButton> = None;
         for color in TAG_COLORS {
-            let check = gtk::CheckButton::new();
-            check.add_css_class("tag-swatch");
-            check.set_child(Some(&crate::ui::context_menu::swatch_widget(color, true)));
-            check.set_tooltip_text(Some(color));
+            let toggle = gtk::ToggleButton::new();
+            toggle.add_css_class("flat");
+            toggle.add_css_class("circular");
+            toggle.set_child(Some(&crate::ui::context_menu::swatch_widget(color, true)));
+            toggle.set_tooltip_text(Some(color));
             if let Some(f) = &first {
-                check.set_group(Some(f));
+                toggle.set_group(Some(f));
             } else {
-                first = Some(check.clone());
+                first = Some(toggle.clone());
             }
-            check.set_active(chosen.borrow().eq_ignore_ascii_case(color));
+            toggle.set_active(chosen.borrow().eq_ignore_ascii_case(color));
             let chosen = chosen.clone();
             let color = color.to_string();
-            check.connect_toggled(move |c| {
-                if c.is_active() {
+            toggle.connect_toggled(move |t| {
+                if t.is_active() {
                     *chosen.borrow_mut() = color.clone();
                 }
             });
-            swatches.append(&check);
+            swatches.insert(&toggle, -1);
         }
-        color_row.add_suffix(&swatches);
+        color_box.append(&swatches);
+        color_row.set_child(Some(&color_box));
 
         let edit_index = edit.as_ref().map(|(i, _)| *i);
         if let Some((_, tag)) = &edit {

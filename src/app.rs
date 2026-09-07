@@ -400,6 +400,9 @@ pub struct AppModel {
     /// Whether All Inboxes lists the folders that opted-in filter rules file
     /// into, in its "Filtered Folders" section (Settings → Sidebar).
     unified_filtered: bool,
+    /// Where the Filtered Folders and Tags sections sit (Settings → Sidebar).
+    filtered_placement: config::SectionPlacement,
+    tags_placement: config::SectionPlacement,
     /// Whether the sidebar's disclosure chevrons lead their rows.
     chevrons_left: bool,
     /// Console mode offered in the status bar (Settings → System & Appearance).
@@ -701,6 +704,9 @@ pub enum AppMsg {
     SetUnifiedChip(bool),
     SetUnifiedFiltered(bool),
     SetChevronsLeft(bool),
+    /// Where the Filtered Folders / Tags sections sit (Settings → Sidebar).
+    SetFilteredPlacement(config::SectionPlacement),
+    SetTagsPlacement(config::SectionPlacement),
     /// The message list's visible-count text changed.
     ListCount(String),
     /// Preference: hovering the narrow-window rail floats the sidebar out.
@@ -1897,6 +1903,8 @@ impl SimpleComponent for AppModel {
             show_unified_pref: config::load_show_unified(),
             unified_chip: config::load_unified_chip(),
             unified_filtered: config::load_unified_filtered(),
+            filtered_placement: config::load_filtered_placement(),
+            tags_placement: config::load_tags_placement(),
             chevrons_left: config::load_chevrons_left(),
             console_mode: config::load_console_mode(),
             read_mark: config::load_read_mark(),
@@ -2664,6 +2672,37 @@ impl SimpleComponent for AppModel {
                     .ok()
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(9);
+                // VIREO_SHOWCASE_HEIGHTS=1 logs the allocated height of the
+                // sidebar's section headings and their rows just before the
+                // capture, for checking pill geometry without a pointer.
+                if std::env::var("VIREO_SHOWCASE_HEIGHTS").is_ok() {
+                    let sidebar = model.sidebar.widget().clone().upcast::<gtk::Widget>();
+                    gtk::glib::timeout_add_seconds_local_once(delay.saturating_sub(1).max(1), move || {
+                        fn walk(w: &gtk::Widget, depth: usize, root: &gtk::Widget) {
+                            let classes = w.css_classes();
+                            let heading = classes.iter().any(|c| c == "unified-folders-toggle");
+                            let child_row = w.is::<gtk::ListBoxRow>()
+                                && w.parent().is_some_and(|p| p.css_classes().iter().any(|c| c == "section-child-list"));
+                            if heading || child_row {
+                                let y = w.compute_bounds(root).map(|b| b.y() as i32).unwrap_or(-1);
+                                tracing::info!(
+                                    "showcase heights: {} y={y} h={} margins={}/{} classes={:?}",
+                                    if heading { "heading" } else { "row" },
+                                    w.height(),
+                                    w.margin_top(),
+                                    w.margin_bottom(),
+                                    classes,
+                                );
+                            }
+                            let mut c = w.first_child();
+                            while let Some(ch) = c {
+                                walk(&ch, depth + 1, root);
+                                c = ch.next_sibling();
+                            }
+                        }
+                        walk(&sidebar, 0, &sidebar);
+                    });
+                }
                 if stage {
                     let list = model.message_list.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
@@ -4358,6 +4397,22 @@ impl SimpleComponent for AppModel {
                     self.unified_filtered = show;
                     self.save_settings();
                     // Adds or removes the Filtered Folders section.
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::SetFilteredPlacement(p) => {
+                if self.filtered_placement != p {
+                    self.filtered_placement = p;
+                    self.save_settings();
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::SetTagsPlacement(p) => {
+                if self.tags_placement != p {
+                    self.tags_placement = p;
+                    self.save_settings();
                     self.rebuild_sidebar();
                 }
             }
@@ -6110,6 +6165,8 @@ impl AppModel {
             self.show_unified_pref,
             self.unified_chip,
             self.unified_filtered,
+            self.filtered_placement,
+            self.tags_placement,
             self.chevrons_left,
             self.console_mode,
             self.read_mark,
@@ -7220,6 +7277,8 @@ impl AppModel {
             unified_unread,
             unified_folders,
             tags: self.tags.clone(),
+            filtered_placement: self.filtered_placement,
+            tags_placement: self.tags_placement,
         });
 
         // Keep the list's per-account tint colours in sync.
@@ -9648,6 +9707,8 @@ impl AppModel {
             show_unified: self.show_unified_pref,
             unified_chip: self.unified_chip,
             unified_filtered: self.unified_filtered,
+            filtered_placement: self.filtered_placement,
+            tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
             console_mode: self.console_mode,
             read_mark: self.read_mark,
@@ -9713,6 +9774,8 @@ impl AppModel {
                 PrefOutput::SetShowUnified(show) => AppMsg::SetShowUnified(show),
                 PrefOutput::SetUnifiedChip(show) => AppMsg::SetUnifiedChip(show),
                 PrefOutput::SetUnifiedFiltered(show) => AppMsg::SetUnifiedFiltered(show),
+                PrefOutput::SetFilteredPlacement(p) => AppMsg::SetFilteredPlacement(p),
+                PrefOutput::SetTagsPlacement(p) => AppMsg::SetTagsPlacement(p),
                 PrefOutput::SetChevronsLeft(left) => AppMsg::SetChevronsLeft(left),
                 PrefOutput::SetConsoleMode(on) => AppMsg::SetConsoleMode(on),
                 PrefOutput::SetReadMark(policy) => AppMsg::SetReadMark(policy),

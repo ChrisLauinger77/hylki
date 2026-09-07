@@ -401,14 +401,35 @@ button.star-active {
 .unified-folders-toggle image {
   opacity: 0.75;
 }
-/* Tighter onto its first folder row (Jason, 2026-09-04: 7px less). */
+/* Tighter onto its first folder row (Jason, 2026-09-04: 7px less). The
+   row's 7px top padding became a margin on the button (2026-09-07): the
+   hover pill covers padding but not margin, so with 7px above the text
+   and 0 below it sat visibly high. Now the pill is centred on the text
+   and the text sits exactly where it did. */
+.unified-folders-toggle {
+  /* 2 + the row's 5 keeps the text where the old 7 put it. */
+  margin-top: 2px;
+  /* The button's 24px content floor would centre the now-shorter row
+     inside it and push the text down: the row's own height rules. */
+  min-height: 0;
+}
 .unified-folders-toggle .folder-row {
-  padding-bottom: 0;
+  /* 5px of pill above and below the text (Jason, 2026-09-07). */
+  padding-top: 5px;
+  padding-bottom: 5px;
   /* Its folded-up chip onto the folder rows' chip column: the heading's
      button padding otherwise leaves it 2px short. */
   padding-right: 6px;
 }
 
+
+/* The Tags heading sits 16px closer to the Filtered Folders rows above it
+   than the stock 2px margin puts it (Jason, 2026-09-07). The two pills
+   overlap by 8px, which shows only when that last row is selected and the
+   heading hovered at the same time. */
+.unified-folders-toggle.tags-toggle {
+  margin-top: -14px;
+}
 
 /* Unread count: a perfect circle for a single digit that grows horizontally
    into a pill for larger numbers, but never taller. */

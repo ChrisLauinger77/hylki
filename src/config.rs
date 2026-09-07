@@ -804,6 +804,13 @@ struct PrivacyFile {
     /// section of its own. Off hides that section whatever the rules say.
     #[serde(default = "default_unified_filtered")]
     unified_filtered: bool,
+    /// Where the Filtered Folders section sits (#71 follow-up): inside All
+    /// Inboxes, or in the scrolling sidebar above or below the accounts.
+    #[serde(default)]
+    filtered_placement: SectionPlacement,
+    /// Where the Tags section sits, the same three choices.
+    #[serde(default)]
+    tags_placement: SectionPlacement,
     /// Whether the sidebar's disclosure chevrons (All Inboxes, account
     /// headers) LEAD their rows; off puts them back at the row's end.
     #[serde(default = "default_chevrons_left")]
@@ -935,6 +942,8 @@ impl Default for PrivacyFile {
             show_unified: default_show_unified(),
             unified_chip: default_unified_chip(),
             unified_filtered: default_unified_filtered(),
+            filtered_placement: SectionPlacement::default(),
+            tags_placement: SectionPlacement::default(),
             chevrons_left: default_chevrons_left(),
             console_mode: false,
             read_mark: ReadMark::default(),
@@ -1079,6 +1088,28 @@ pub fn load_unified_chip() -> bool {
 
 pub fn load_unified_filtered() -> bool {
     load_privacy().unified_filtered
+}
+
+pub fn load_filtered_placement() -> SectionPlacement {
+    load_privacy().filtered_placement
+}
+
+pub fn load_tags_placement() -> SectionPlacement {
+    load_privacy().tags_placement
+}
+
+/// Where a sidebar section (Filtered Folders, Tags) is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionPlacement {
+    /// Inside the All Inboxes block, folding away with it. With All
+    /// Inboxes hidden (a single account) this reads as `AboveAccounts`.
+    #[default]
+    AllInboxes,
+    /// In the scrolling sidebar, above the first account.
+    AboveAccounts,
+    /// In the scrolling sidebar, after the last account.
+    BelowAccounts,
 }
 
 pub fn load_chevrons_left() -> bool {
@@ -1565,6 +1596,8 @@ pub fn save_privacy(
     show_unified: bool,
     unified_chip: bool,
     unified_filtered: bool,
+    filtered_placement: SectionPlacement,
+    tags_placement: SectionPlacement,
     chevrons_left: bool,
     console_mode: bool,
     read_mark: ReadMark,
@@ -1621,6 +1654,8 @@ pub fn save_privacy(
         show_unified,
         unified_chip,
         unified_filtered,
+        filtered_placement,
+        tags_placement,
         chevrons_left,
         console_mode,
         read_mark,

@@ -4,7 +4,7 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 ## What's new in 1.23.0
 
-**Tags.** Coloured labels a message can carry several of, alongside its folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.
+**Tags.** Label messages with one or more coloured tags, alongside their folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.
 
 ## What's new in 1.22.0
 

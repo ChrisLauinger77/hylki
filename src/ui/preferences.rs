@@ -55,6 +55,8 @@ pub struct PrefInit {
     pub show_unified: bool,
     pub unified_chip: bool,
     pub unified_filtered: bool,
+    pub filtered_placement: crate::config::SectionPlacement,
+    pub tags_placement: crate::config::SectionPlacement,
     pub chevrons_left: bool,
     pub console_mode: bool,
     pub read_mark: crate::config::ReadMark,
@@ -217,6 +219,8 @@ pub enum PrefInput {
     ToggleUnifiedChip(bool),
     ToggleUnifiedFiltered(bool),
     ChangeChevronSide(u32),
+    ChangeFilteredPlacement(u32),
+    ChangeTagsPlacement(u32),
     ToggleSidebarHoverExpand(bool),
     ChangePreviewLines(u32),
     ToggleSingleKey(bool),
@@ -274,6 +278,8 @@ pub enum PrefOutput {
     SetUnifiedChip(bool),
     SetUnifiedFiltered(bool),
     SetChevronsLeft(bool),
+    SetFilteredPlacement(crate::config::SectionPlacement),
+    SetTagsPlacement(crate::config::SectionPlacement),
     SetConsoleMode(bool),
     SetReadMark(crate::config::ReadMark),
     ExportSettings,
@@ -415,15 +421,32 @@ impl Component for Preferences {
 
                         #[name = "unified_filtered_row"]
                         adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.show_unified,
-                            set_title: &i18n("Filtered folders under All Inboxes"),
+                            set_title: &i18n("Filtered Folders section"),
                             set_subtitle: &i18n("List the folders your filter rules file into in a \
-                                           collapsible section inside All Inboxes. Each rule \
-                                           chooses whether its folder appears there; this \
-                                           switch hides the section altogether."),
+                                           collapsible section. Each rule chooses whether its \
+                                           folder appears there; this switch hides the section \
+                                           altogether."),
                             connect_active_notify[sender] => move |row| {
                                 sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
+                            },
+                        },
+
+                        #[name = "filtered_placement_row"]
+                        adw::ComboRow {
+                            set_title: &i18n("Filtered Folders placement"),
+                            set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
+                                           scrolling sidebar above or below the accounts."),
+                            connect_selected_notify[sender] => move |row| {
+                                sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
+                            },
+                        },
+
+                        #[name = "tags_placement_row"]
+                        adw::ComboRow {
+                            set_title: &i18n("Tags placement"),
+                            set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
+                            connect_selected_notify[sender] => move |row| {
+                                sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
                             },
                         },
 
@@ -1017,6 +1040,17 @@ impl Component for Preferences {
         widgets.show_unified_row.set_active(init.show_unified);
         widgets.unified_chip_row.set_active(init.unified_chip);
         widgets.unified_filtered_row.set_active(init.unified_filtered);
+        for (row, placement) in [
+            (&widgets.filtered_placement_row, init.filtered_placement),
+            (&widgets.tags_placement_row, init.tags_placement),
+        ] {
+            row.set_model(Some(&gtk::StringList::new(&[
+                i18n("Inside All Inboxes").as_str(),
+                i18n("Above the accounts").as_str(),
+                i18n("Below the accounts").as_str(),
+            ])));
+            row.set_selected(placement_index(placement));
+        }
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
@@ -1378,6 +1412,12 @@ impl Component for Preferences {
             PrefInput::ToggleUnifiedFiltered(on) => {
                 let _ = sender.output(PrefOutput::SetUnifiedFiltered(on));
             }
+            PrefInput::ChangeFilteredPlacement(idx) => {
+                let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));
+            }
+            PrefInput::ChangeTagsPlacement(idx) => {
+                let _ = sender.output(PrefOutput::SetTagsPlacement(placement_from_index(idx)));
+            }
             PrefInput::ChangeChevronSide(idx) => {
                 let _ = sender.output(PrefOutput::SetChevronsLeft(idx == 0));
             }
@@ -1522,5 +1562,24 @@ fn collect_named(root: &gtk::Widget, name: &str, out: &mut Vec<gtk::Widget>) {
     while let Some(c) = child {
         collect_named(&c, name, out);
         child = c.next_sibling();
+    }
+}
+
+/// The placement combos' rows, in the order [`SectionPlacement`] lists them.
+fn placement_index(p: crate::config::SectionPlacement) -> u32 {
+    use crate::config::SectionPlacement::*;
+    match p {
+        AllInboxes => 0,
+        AboveAccounts => 1,
+        BelowAccounts => 2,
+    }
+}
+
+fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
+    use crate::config::SectionPlacement::*;
+    match idx {
+        1 => AboveAccounts,
+        2 => BelowAccounts,
+        _ => AllInboxes,
     }
 }
