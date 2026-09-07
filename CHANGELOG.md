@@ -22,6 +22,11 @@ server conversation in the log so the next such report explains itself.
   `vireo::imap`, `vireo::graph`, `vireo::pop3` and `vireo::smtp` targets,
   so "Export log" carries it after the fact; stderr sees the failures
   only. On failure the bulk-move path also names the folders and the set.
+- **`uninstall.sh`** (PR #142 by @thecalamityjoe87): undoes what
+  `install.sh` placed in the prefix — binary, icons, launcher,
+  translations — and the icon override the app writes for a chosen app
+  icon; `--purge` also removes the settings, cache and data directories
+  (keyring passwords stay). Same `PREFIX` convention as the installer.
 
 
 

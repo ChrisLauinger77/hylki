@@ -8,6 +8,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **The server conversation in the log.** The log now records every command Vireo sends to a mail server and the server's answer, for IMAP, Microsoft 365, POP3 and outgoing mail, without message contents or passwords. When something fails, "Export log" in Settings shows exactly what was asked and what came back.
 
+**An uninstall script.** For source installs, `./uninstall.sh` removes what `install.sh` put in place; `--purge` also clears settings and the mail cache. Contributed by [Isaac](https://github.com/thecalamityjoe87) (#142).
+
 ## What's new in 1.23.0
 
 **Tags.** Label messages with one or more coloured tags, alongside their folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.

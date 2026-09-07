@@ -152,6 +152,7 @@ git clone https://github.com/hyprlab/vireo.git
 cd vireo
 cargo build --release
 ./install.sh          # installs the binary, icon and .desktop file into ~/.local
+./uninstall.sh        # removes them again (--purge also removes settings and the mail cache)
 ```
 
 ## Configuration
@@ -260,12 +261,12 @@ upstream — their work ships in the app and is credited in the About window:
 - [**Isaac**](https://github.com/thecalamityjoe87) ([#31](https://github.com/hyprlab/vireo/pull/31),
   [#43](https://github.com/hyprlab/vireo/pull/43), [#44](https://github.com/hyprlab/vireo/pull/44),
   [#49](https://github.com/hyprlab/vireo/pull/49), [#63](https://github.com/hyprlab/vireo/pull/63),
-  [#135](https://github.com/hyprlab/vireo/pull/135)) — PDF first-page thumbnails
+  [#135](https://github.com/hyprlab/vireo/pull/135), [#142](https://github.com/hyprlab/vireo/pull/142)) — PDF first-page thumbnails
   in the attachment gallery and drawer, the fix for attachments not opening
   (wrong O_NOFOLLOW constant + portal-based launching), the reader header's
   "To:" line, the preference to always load remote content, the shared
-  GNOME-styled right-click context menus, and swipe-to-archive/delete on
-  message rows.
+  GNOME-styled right-click context menus, swipe-to-archive/delete on
+  message rows, and the uninstall script.
 - [**Alexander Lubovenko**](https://github.com/typedev) ([#45](https://github.com/hyprlab/vireo/pull/45),
   [#110](https://github.com/hyprlab/vireo/pull/110), [#112](https://github.com/hyprlab/vireo/pull/112),
   [#118](https://github.com/hyprlab/vireo/pull/118),
