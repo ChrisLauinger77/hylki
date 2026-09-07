@@ -28,7 +28,7 @@ server conversation in the log so the next such report explains itself.
   icon; `--purge` also removes the settings, cache and data directories
   (keyring passwords stay). Same `PREFIX` convention as the installer.
 
-
+## 1.23.0 — 2026-09-07
 
 Tags, swipe actions on message rows, a redrawn icon set with a new
 default, a log export for bug reports, four fixes, and the French
