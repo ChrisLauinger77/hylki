@@ -1583,3 +1583,9 @@ textview.console-view text selection {
   border-bottom: 1px solid alpha(currentColor, 0.1);
 }
 
+
+/* A row being dragged to a folder (`.dragging`, set for the drag's
+   duration) fades to half strength while the envelope travels. */
+.message-listbox > row.dragging .message-row {
+  opacity: 0.5;
+}

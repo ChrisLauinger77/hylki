@@ -638,3 +638,41 @@ pub fn run_restart_helper() -> ! {
     eprintln!("vireo: restart failed: {err}");
     std::process::exit(1);
 }
+
+/// The white envelope from the icon gallery as the image a dragged message
+/// travels under: a cursor-sized picture whose texture holds `scale` device
+/// pixels per logical one, so it stays crisp on a HiDPI display (a plain
+/// 32px texture drawn there was upscaled and fuzzy). One texture per scale
+/// is decoded, then shared.
+pub fn drag_envelope(scale: i32) -> Option<gtk::Picture> {
+    thread_local! {
+        static TEXTURES: std::cell::RefCell<std::collections::HashMap<i32, gtk::gdk::Texture>> =
+            std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+    use gtk::gdk_pixbuf::prelude::PixbufLoaderExt;
+    use gtk::prelude::WidgetExt;
+    let scale = scale.max(1);
+    let texture = TEXTURES.with(|t| {
+        if let Some(tex) = t.borrow().get(&scale) {
+            return Some(tex.clone());
+        }
+        let png = CATALOG.iter().find(|c| c.id == "envelope-white")?.png;
+        let loader = gtk::gdk_pixbuf::PixbufLoader::new();
+        loader.write(png).ok()?;
+        loader.close().ok()?;
+        let pixbuf = loader.pixbuf()?;
+        let px = DRAG_ICON_SIZE * scale;
+        let scaled = pixbuf.scale_simple(px, px, gtk::gdk_pixbuf::InterpType::Hyper)?;
+        let tex = gtk::gdk::Texture::for_pixbuf(&scaled);
+        t.borrow_mut().insert(scale, tex.clone());
+        Some(tex)
+    })?;
+    let picture = gtk::Picture::for_paintable(&texture);
+    picture.set_can_shrink(true);
+    picture.set_content_fit(gtk::ContentFit::Contain);
+    picture.set_size_request(DRAG_ICON_SIZE, DRAG_ICON_SIZE);
+    Some(picture)
+}
+
+/// The dragged-message envelope's edge, in logical px.
+pub const DRAG_ICON_SIZE: i32 = 16;

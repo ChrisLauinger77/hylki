@@ -41,6 +41,8 @@ pub struct PrefInit {
     pub list_palette: bool,
     /// The list's Actions Palette opens on row hover (no ⋯ click).
     pub list_palette_hover: bool,
+    /// Message rows take a sideways swipe to archive / delete (#92).
+    pub swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
     pub swipe_reversed: bool,
     /// "New message" composes inline over the reading pane (vs a window).
@@ -172,6 +174,8 @@ pub struct Preferences {
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
     show_unified: bool,
+    /// Whether swipe actions are on (the reverse switch follows it).
+    swipe_enabled: bool,
     /// Mirrors the threading switch, so the "threaded message list" row below
     /// it can grey out when conversations aren't grouped at all.
     threading: bool,
@@ -207,6 +211,7 @@ pub enum PrefInput {
     ChangeCardActionsMode(u32),
     ToggleListPalette(bool),
     ToggleListPaletteHover(bool),
+    ToggleSwipeEnabled(bool),
     ToggleSwipeReversed(bool),
     ToggleComposeInline(bool),
     TogglePastePlain(bool),
@@ -267,6 +272,7 @@ pub enum PrefOutput {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
+    SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
     SetPastePlain(bool),
@@ -545,8 +551,20 @@ impl Component for Preferences {
                             },
                         },
 
+                        #[name = "swipe_enabled_row"]
+                        adw::SwitchRow {
+                            set_title: &i18n("Swipe actions"),
+                            set_subtitle: &i18n("Drag a message sideways with the mouse, or swipe it \
+                                           with two fingers on a trackpad, to archive or delete it."),
+                            connect_active_notify[sender] => move |row| {
+                                sender.input(PrefInput::ToggleSwipeEnabled(row.is_active()));
+                            },
+                        },
+
                         #[name = "swipe_reversed_row"]
                         adw::SwitchRow {
+                            #[watch]
+                            set_sensitive: model.swipe_enabled,
                             set_title: &i18n("Reverse swipe directions"),
                             set_subtitle: &i18n("Swipe (mouse-drag or trackpad) a message left \
                                            to delete it and right to archive it. Turning this \
@@ -982,6 +1000,7 @@ impl Component for Preferences {
         let mut model = Preferences {
             notifications: init.notifications,
             show_unified: init.show_unified,
+            swipe_enabled: init.swipe_enabled,
             threading: init.threading,
             thread_expansion: init.thread_expansion,
             list_palette: init.list_palette,
@@ -1177,6 +1196,7 @@ impl Component for Preferences {
         });
         widgets.list_palette_row.set_active(init.list_palette);
         widgets.list_palette_hover_row.set_active(init.list_palette_hover);
+        widgets.swipe_enabled_row.set_active(init.swipe_enabled);
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
         widgets.paste_plain_row.set_active(init.paste_plain);
@@ -1385,6 +1405,10 @@ impl Component for Preferences {
             }
             PrefInput::ToggleListPaletteHover(on) => {
                 let _ = sender.output(PrefOutput::SetListPaletteHover(on));
+            }
+            PrefInput::ToggleSwipeEnabled(on) => {
+                self.swipe_enabled = on;
+                let _ = sender.output(PrefOutput::SetSwipeEnabled(on));
             }
             PrefInput::ToggleSwipeReversed(on) => {
                 let _ = sender.output(PrefOutput::SetSwipeReversed(on));

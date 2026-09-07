@@ -35,10 +35,16 @@ completed.
   @taprobane99): drag a message row sideways with the mouse or a
   two-finger trackpad swipe. Left deletes, right archives; the row slides
   off a coloured strip naming the action, dimmed until the drag passes the
-  commit distance. Settings → Message List gains "Reverse swipe
-  directions". Built on `AdwSwipeTracker` over a small `AdwSwipeable`
-  container (`SwipeSurface`) that keeps the row's content on top of a
-  fixed action strip.
+  commit distance. Settings → Message List gains "Swipe actions" (on by
+  default) and "Reverse swipe directions". Built on `AdwSwipeTracker` over
+  a small `AdwSwipeable` container (`SwipeSurface`) that keeps the row's
+  content on top of a fixed action strip.
+- **Dragging a message to a folder** now carries a cursor-sized white
+  envelope (the icon gallery's) instead of the raw payload text, and the
+  row fades to half strength until it lands (#92 aside). The
+  per-account rows under All Inboxes and the Filtered Folders rows take
+  drops too: a message dropped on one moves to that folder, provided it
+  belongs to the same account.
 - **French** (PR #134, @frenchy82): the composer's picture-resizing menu
   and the last loose strings; 713 of 717 messages translated.
 - Under the hood: a `keywords` column on the message index (added in

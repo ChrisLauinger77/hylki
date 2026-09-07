@@ -95,6 +95,9 @@ pub struct RowInit {
     /// shared and read live so a change in Settings applies without a
     /// rebuild — false: left deletes, right archives; true: reversed).
     pub swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Whether the swipe gesture is on at all (preference, shared and read
+    /// live: the tracker is enabled or not on each render).
+    pub swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
 }
 
 /// A full swipe (#swipe): also `AdwSwipeable`'s reported `distance`, the px
@@ -234,6 +237,8 @@ pub struct MessageRow {
     revealed: bool,
     /// Shared "swap swipe sides" preference, read live on each drag (#swipe).
     swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Shared "swipe at all" preference (#92).
+    swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
     /// Current swipe distance in px (negative = dragged left) — the source
     /// of truth while a gesture is live; reset to 0 the instant a release is
     /// resolved (post_view animates the strip back out of view).
@@ -294,6 +299,9 @@ pub enum MessageRowInput {
     /// flick short of the commit distance reads as a false positive when
     /// the intent was clearly to back out, not to commit fast.
     SwipeEnd,
+    /// The swipe preference changed: post_view enables or disables the
+    /// row's tracker accordingly.
+    SwipeEnabledChanged,
 }
 
 #[derive(Debug)]
@@ -638,6 +646,36 @@ impl FactoryComponent for MessageRow {
             // pointer (#23).
             add_controller = gtk::DragSource {
                 set_actions: gtk::gdk::DragAction::MOVE,
+                // The row itself travels under the pointer, held where it was
+                // grabbed — without an icon GTK draws the payload string.
+                connect_drag_begin => move |src, drag| {
+                    let scale = src.widget().map(|w| w.scale_factor()).unwrap_or(1);
+                    if let Some(row) = src.widget() {
+                        // `.dragging` fades the row while it is away.
+                        row.add_css_class("dragging");
+                    }
+                    // A white envelope, cursor-sized, centred under the
+                    // pointer — without an icon GTK draws the payload text.
+                    // Set on the drag's own icon window as a widget, so it
+                    // is drawn at logical size from a display-scale texture.
+                    if let Some(envelope) = crate::app_icon::drag_envelope(scale) {
+                        let icon = gtk::DragIcon::for_drag(drag);
+                        icon.set_child(Some(&envelope));
+                        let half = crate::app_icon::DRAG_ICON_SIZE / 2;
+                        drag.set_hotspot(half, half);
+                    }
+                },
+                connect_drag_end => move |src, _, _| {
+                    if let Some(row) = src.widget() {
+                        row.remove_css_class("dragging");
+                    }
+                },
+                connect_drag_cancel => move |src, _, _| {
+                    if let Some(row) = src.widget() {
+                        row.remove_css_class("dragging");
+                    }
+                    false
+                },
                 connect_prepare[aid = self.msg.account_id, fid = self.msg.folder_id, uid = self.msg.uid, id = self.msg.id, keys = self.drag_keys.clone()] => move |src, _, _| {
                     let mut items = drag_selection(src, &keys);
                     // Dragging a row outside the selection (or before the list has
@@ -1147,6 +1185,9 @@ impl FactoryComponent for MessageRow {
             let tracker = wire_swipe_tracker(&widgets.swipe_surface, &sender);
             self.swipe_tracker.replace(Some(tracker));
         }
+        if let Some(t) = self.swipe_tracker.borrow().as_ref() {
+            t.set_enabled(self.swipe_enabled.get());
+        }
 
         // A live drag already tracks 1:1 — `wire_swipe_tracker`'s
         // `update-swipe` handler sets the surface's progress directly, every
@@ -1214,6 +1255,7 @@ impl FactoryComponent for MessageRow {
             show_recipient,
             revealed,
             swipe_reversed,
+            swipe_enabled,
         } = init;
         let mut model = Self {
             msg,
@@ -1249,6 +1291,7 @@ impl FactoryComponent for MessageRow {
             palette_target: std::cell::Cell::new(0),
             palette_anim: std::cell::RefCell::new(None),
             swipe_reversed,
+            swipe_enabled,
             swipe_progress: 0.0,
             swipe_side: 0,
             swipe_dragging: false,
@@ -1376,6 +1419,7 @@ impl FactoryComponent for MessageRow {
                     self.swipe_side = if self.swipe_progress < 0.0 { -1 } else { 1 };
                 }
             }
+            MessageRowInput::SwipeEnabledChanged => {}
             MessageRowInput::SwipeEnd => {
                 self.swipe_dragging = false;
                 if self.swipe_progress.abs() >= SWIPE_ARM {
@@ -1896,6 +1940,8 @@ pub struct MessageList {
     tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
     /// Shared with every row: swap the swipe-gesture sides (#swipe).
     swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Shared with every row: whether swiping is on at all (#92).
+    swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
     /// The message currently being viewed, kept selected across list rebuilds.
     /// Keyed by (account_id, id) since UIDs collide across accounts in the
     /// unified "All Inboxes" view.
@@ -2142,6 +2188,8 @@ pub enum MessageListInput {
     SetPaletteHover(bool),
     /// Swap the swipe-gesture sides (#swipe).
     SetSwipeReversed(bool),
+    /// Turn the swipe gesture on or off (#92).
+    SetSwipeEnabled(bool),
     /// Folder switch: reset infinite-scroll paging back to the first page and
     /// scroll to the top (a plain `SetMessages` now preserves paging for refreshes).
     ResetPaging,
@@ -2490,6 +2538,9 @@ impl SimpleComponent for MessageList {
             )),
             swipe_reversed: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_swipe_reversed(),
+            )),
+            swipe_enabled: std::rc::Rc::new(std::cell::Cell::new(
+                crate::config::load_swipe_enabled(),
             )),
             thread_links: Vec::new(),
             drag_keys: DragKeys::default(),
@@ -3339,6 +3390,13 @@ impl SimpleComponent for MessageList {
             MessageListInput::SetPaletteCollapse(secs) => self.palette_collapse_secs.set(secs),
             MessageListInput::SetPaletteHover(on) => self.palette_hover.set(on),
             MessageListInput::SetSwipeReversed(on) => self.swipe_reversed.set(on),
+            MessageListInput::SetSwipeEnabled(on) => {
+                self.swipe_enabled.set(on);
+                // Every mounted row re-renders and flips its tracker.
+                for i in 0..self.rows.len() {
+                    self.rows.send(i, MessageRowInput::SwipeEnabledChanged);
+                }
+            }
             MessageListInput::SetSelected(id) => {
                 match id {
                     // Account-less id resolved against the shown list (the app
@@ -3823,6 +3881,7 @@ impl MessageList {
                         show_recipient: self.show_recipient,
                         revealed: false,
                         swipe_reversed: self.swipe_reversed.clone(),
+                        swipe_enabled: self.swipe_enabled.clone(),
                     },
                 );
             }
@@ -4102,6 +4161,7 @@ impl MessageList {
                     // that's only for `expand_thread`'s surgical insert.
                     revealed: true,
                     swipe_reversed: self.swipe_reversed.clone(),
+                    swipe_enabled: self.swipe_enabled.clone(),
                 });
             }
         }

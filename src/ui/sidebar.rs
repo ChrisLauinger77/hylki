@@ -1520,6 +1520,9 @@ impl Sidebar {
                     let aid = section.account.id;
                     let (row, badge) =
                         build_unified_inbox_row(section, inbox, self.collapsed, self.chevrons_left);
+                    // A message dropped here moves to that account's inbox
+                    // (the app declines mail from other accounts, #23).
+                    row.add_controller(folder_drop_target(aid, inbox.path.clone(), sender));
                     sub.append(&row);
                     self.unified_inbox_badges.insert((aid, inbox.id), badge);
                     self.unified_inboxes.push(InboxRef {
@@ -2394,6 +2397,8 @@ impl Sidebar {
             } else {
                 tip.clone()
             }));
+            // Filtered folders take drops like any folder of their account.
+            row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
             list.append(&row);
             self.unified_folder_badges.insert((r.account_id, r.folder.id), badge);
         }

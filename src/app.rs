@@ -446,6 +446,8 @@ pub struct AppModel {
     /// Whether the message list rows carry an Actions Palette at all.
     list_palette: bool,
     list_palette_hover: bool,
+    /// Message rows take a sideways swipe to archive / delete (#92).
+    swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
     swipe_reversed: bool,
     /// "New message" composes inline over the reading pane (vs a window).
@@ -690,6 +692,7 @@ pub enum AppMsg {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
+    SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
     SetPastePlain(bool),
@@ -1925,6 +1928,7 @@ impl SimpleComponent for AppModel {
             card_actions_auto: config::load_card_actions_auto(),
             list_palette: config::load_list_palette(),
             list_palette_hover: config::load_list_palette_hover(),
+            swipe_enabled: config::load_swipe_enabled(),
             swipe_reversed: config::load_swipe_reversed(),
             compose_inline: config::load_compose_inline(),
             paste_plain: config::load_paste_plain(),
@@ -4553,6 +4557,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetSwipeEnabled(on) => {
+                if self.swipe_enabled != on {
+                    self.swipe_enabled = on;
+                    self.save_settings();
+                    self.message_list.emit(MessageListInput::SetSwipeEnabled(on));
+                }
+            }
+
             AppMsg::SetSwipeReversed(on) => {
                 if self.swipe_reversed != on {
                     self.swipe_reversed = on;
@@ -6160,6 +6172,7 @@ impl AppModel {
             self.card_actions_auto,
             self.list_palette,
             self.list_palette_hover,
+            self.swipe_enabled,
             self.swipe_reversed,
             self.compose_inline,
             self.paste_plain,
@@ -9731,6 +9744,7 @@ impl AppModel {
             card_actions_auto: self.card_actions_auto,
             list_palette: self.list_palette,
             list_palette_hover: self.list_palette_hover,
+            swipe_enabled: self.swipe_enabled,
             swipe_reversed: self.swipe_reversed,
             compose_inline: self.compose_inline,
             paste_plain: self.paste_plain,
@@ -9773,6 +9787,7 @@ impl AppModel {
                 }
                 PrefOutput::SetListPalette(on) => AppMsg::SetListPalette(on),
                 PrefOutput::SetListPaletteHover(on) => AppMsg::SetListPaletteHover(on),
+                PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),

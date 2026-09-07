@@ -737,6 +737,9 @@ struct PrivacyFile {
     /// needing the ⋯ click.
     #[serde(default)]
     list_palette_hover: bool,
+    /// Whether message rows take a sideways swipe at all (#92, PR #135).
+    #[serde(default = "default_swipe_enabled")]
+    swipe_enabled: bool,
     /// Swap the message list's swipe-gesture sides: off (default) swipes
     /// left to delete and right to archive, on reverses them.
     #[serde(default)]
@@ -977,6 +980,7 @@ impl Default for PrivacyFile {
             card_actions_auto: default_card_actions_auto(),
             list_palette: default_list_palette(),
             list_palette_hover: false,
+            swipe_enabled: default_swipe_enabled(),
             swipe_reversed: false,
             compose_inline: default_compose_inline(),
             paste_plain: default_paste_plain(),
@@ -1484,6 +1488,15 @@ pub fn load_list_palette_hover() -> bool {
     load_privacy().list_palette_hover
 }
 
+fn default_swipe_enabled() -> bool {
+    true
+}
+
+/// Whether message rows take a sideways swipe (archive / delete).
+pub fn load_swipe_enabled() -> bool {
+    load_privacy().swipe_enabled
+}
+
 /// Whether the message list's swipe-gesture sides are swapped.
 pub fn load_swipe_reversed() -> bool {
     load_privacy().swipe_reversed
@@ -1589,6 +1602,7 @@ pub fn save_privacy(
     card_actions_auto: bool,
     list_palette: bool,
     list_palette_hover: bool,
+    swipe_enabled: bool,
     swipe_reversed: bool,
     compose_inline: bool,
     paste_plain: bool,
@@ -1648,6 +1662,7 @@ pub fn save_privacy(
         card_actions_auto,
         list_palette,
         list_palette_hover,
+        swipe_enabled,
         swipe_reversed,
         compose_inline,
         paste_plain,
