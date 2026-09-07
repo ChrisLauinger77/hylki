@@ -2,7 +2,8 @@
 
 ## 1.23.0 — 2026-09-06
 
-Tags.
+Tags, swipe actions on message rows, and the French translation
+completed.
 
 - **Tags** (#71, requested by @yioannides, with the folders-versus-tags
   discussion from @p-mitana and @deusnovus). Coloured labels a message can
@@ -30,6 +31,16 @@ Tags.
   and "Move to" gains "Leave in Inbox", so a rule can tag, file, or both
   (the tag goes on before the move and travels with it). Tag-only rules
   hide the two folder switches on their row.
+- **Swipe actions** (PR #135 by @thecalamityjoe87, for #92 by
+  @taprobane99): drag a message row sideways with the mouse or a
+  two-finger trackpad swipe. Left deletes, right archives; the row slides
+  off a coloured strip naming the action, dimmed until the drag passes the
+  commit distance. Settings → Message List gains "Reverse swipe
+  directions". Built on `AdwSwipeTracker` over a small `AdwSwipeable`
+  container (`SwipeSurface`) that keeps the row's content on top of a
+  fixed action strip.
+- **French** (PR #134, @frenchy82): the composer's picture-resizing menu
+  and the last loose strings; 713 of 717 messages translated.
 - Under the hood: a `keywords` column on the message index (added in
   place; rows fill in as folders re-sync), a `local_tags` table for the
   Vireo-only tags, `tags.toml` beside `filters.toml` (both in the settings

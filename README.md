@@ -259,11 +259,13 @@ upstream — their work ships in the app and is credited in the About window:
   Bridge connections: IMAP STARTTLS and locally signed certificates.
 - [**Isaac**](https://github.com/thecalamityjoe87) ([#31](https://github.com/hyprlab/vireo/pull/31),
   [#43](https://github.com/hyprlab/vireo/pull/43), [#44](https://github.com/hyprlab/vireo/pull/44),
-  [#49](https://github.com/hyprlab/vireo/pull/49), [#63](https://github.com/hyprlab/vireo/pull/63)) — PDF first-page thumbnails
+  [#49](https://github.com/hyprlab/vireo/pull/49), [#63](https://github.com/hyprlab/vireo/pull/63),
+  [#135](https://github.com/hyprlab/vireo/pull/135)) — PDF first-page thumbnails
   in the attachment gallery and drawer, the fix for attachments not opening
   (wrong O_NOFOLLOW constant + portal-based launching), the reader header's
-  "To:" line, the preference to always load remote content, and the shared
-  GNOME-styled right-click context menus.
+  "To:" line, the preference to always load remote content, the shared
+  GNOME-styled right-click context menus, and swipe-to-archive/delete on
+  message rows.
 - [**Alexander Lubovenko**](https://github.com/typedev) ([#45](https://github.com/hyprlab/vireo/pull/45),
   [#110](https://github.com/hyprlab/vireo/pull/110), [#112](https://github.com/hyprlab/vireo/pull/112),
   [#118](https://github.com/hyprlab/vireo/pull/118),
@@ -277,7 +279,8 @@ upstream — their work ships in the app and is credited in the About window:
   dropped or pasted from a file manager landing in the message, keeping their
   filename, with resizing by handle or menu and an optional recompress on send.
 - [**frenchy82**](https://github.com/frenchy82) ([#122](https://github.com/hyprlab/vireo/issues/122),
-  [#131](https://github.com/hyprlab/vireo/pull/131)) — the French translation,
+  [#131](https://github.com/hyprlab/vireo/pull/131),
+  [#134](https://github.com/hyprlab/vireo/pull/134)) — the French translation,
   Vireo's first, and the report that found the labels the app was showing in
   English despite having the translation.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/vireo/pull/7),
