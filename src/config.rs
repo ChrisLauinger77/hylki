@@ -1880,6 +1880,12 @@ struct StateFile {
     /// restart right after the wizard, for the app icon, must not loop.
     #[serde(default)]
     wizard_completed: bool,
+    /// The icon generation whose default has been asserted over the stored
+    /// choice (see `app_icon::ICON_GENERATION`): a release that brings a new
+    /// authoritative icon bumps the constant, and the first start on it puts
+    /// that icon on every install once, whatever was chosen before.
+    #[serde(default)]
+    app_icon_generation: u32,
     /// The chosen app icon (an id from `app_icon::catalog`). Absent until
     /// the first start of a build that offers the choice settles it — see
     /// `app_icon::init_on_startup`.
@@ -1950,6 +1956,16 @@ pub fn mark_wizard_completed() {
 /// The chosen app icon id, if one has been settled.
 pub fn load_app_icon() -> Option<String> {
     load_state().app_icon.filter(|s| !s.is_empty())
+}
+
+pub fn load_app_icon_generation() -> u32 {
+    load_state().app_icon_generation
+}
+
+pub fn save_app_icon_generation(generation: u32) {
+    let mut s = load_state();
+    s.app_icon_generation = generation;
+    save_state(&s);
 }
 
 pub fn save_app_icon(id: &str) {

@@ -1,7 +1,9 @@
 //! The app icon the user chose, and how it reaches the desktop.
 //!
-//! Vireo ships one icon (the yellow squircle since 1.21; the round envelope
-//! before it) and carries a gallery of alternatives inside the binary. A
+//! Vireo ships one icon (the envelope with the bird since 1.23; the yellow
+//! squircle in 1.21 and 1.22, the round envelope before) and carries a gallery of
+//! alternatives inside the binary. The beta ships the envelope's `.Devel`
+//! twin, GNOME's development-build styling (the hazard stripe). A
 //! choice is applied by writing that artwork over the app's icon name in the
 //! user's own icon directory (`~/.local/share/icons/hicolor`), which every
 //! desktop searches before the install's — the Flatpak export included — so
@@ -30,6 +32,11 @@ pub struct IconChoice {
 
 /// The id meaning "whatever this build ships".
 pub const DEFAULT_ID: &str = "default";
+/// Bumped when a release's new default icon is to replace every existing
+/// choice once (1.23's blue bird envelope, generation 1): the first start
+/// on such a release resets the stored choice to the default, and records
+/// the generation so a choice made afterwards stands.
+pub const ICON_GENERATION: u32 = 1;
 /// The pre-1.21 round envelope, kept for installs that had it.
 pub const LEGACY_ID: &str = "legacy";
 
@@ -50,17 +57,25 @@ macro_rules! alt {
     };
 }
 
-/// The gallery, in display order: the build's own icon, the envelope and the
-/// birds first, then the colours, and the classic icon last. The beta's
-/// ribboned icon is its "Default" and is never offered as a colour of its own.
+/// The gallery, in display order: the build's own icon (the blue envelope
+/// with the bird, so it has no entry of its own), the other bird
+/// envelopes, the plain envelopes, the birds, the logotype, then the
+/// colours, and the classic icon last.
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
-    alt!("envelope", "Envelope, yellow"),
-    alt!("envelope-cream", "Envelope, cream"),
+    alt!("envelope-bird-yellow", "Vireo envelope, yellow"),
+    alt!("envelope-bird-white", "Vireo envelope, white"),
+    alt!("envelope-bird-beige", "Vireo envelope, beige"),
+    alt!("envelope-bird-faded-blue", "Vireo envelope, faded blue"),
     alt!("envelope-blue", "Envelope, blue"),
+    alt!("envelope-yellow", "Envelope, yellow"),
     alt!("envelope-white", "Envelope, white"),
-    alt!("bird-blue", "Bird"),
-    alt!("bird-blue-at-symbol", "Bird, @"),
+    alt!("envelope-beige", "Envelope, beige"),
+    alt!("envelope-starfield", "Envelope, starfield"),
+    alt!("envelope-faded-blue", "Envelope, faded blue"),
+    alt!("bird", "Vireo"),
+    alt!("bird-at-symbol", "Vireo, @"),
+    alt!("logotype-yellow", "Logotype"),
     alt!("yellow-blue", "Yellow & blue"),
     alt!("blue", "Blue"),
     alt!("blue-dark", "Dark blue"),
@@ -86,8 +101,19 @@ pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
     CATALOG.iter().filter(|c| !(cfg!(feature = "beta") && c.id == LEGACY_ID))
 }
 
-/// Normalise a stored id to one this build offers.
+/// Normalise a stored id to one this build offers. Ids from the 1.22
+/// gallery map onto their redrawn successors, so a choice made there keeps
+/// its look after the upgrade.
 fn effective(id: &str) -> &'static str {
+    let id = match id {
+        "envelope" => "envelope-yellow",
+        "envelope-cream" => "envelope-beige",
+        "bird-blue" => "bird",
+        "bird-blue-at-symbol" => "bird-at-symbol",
+        "envelope-bird" => DEFAULT_ID,
+        "logotype" => "logotype-yellow",
+        other => other,
+    };
     catalog().find(|c| c.id == id).map(|c| c.id).unwrap_or(DEFAULT_ID)
 }
 
@@ -106,12 +132,20 @@ pub fn init_on_startup() -> String {
     if std::env::var("VIREO_DEMO").is_ok() {
         return DEFAULT_ID.to_string();
     }
-    let id = match crate::config::load_app_icon() {
-        Some(id) => id,
-        None => {
-            let id = if crate::config::settings_on_disk() { LEGACY_ID } else { DEFAULT_ID };
-            crate::config::save_app_icon(id);
-            id.to_string()
+    let id = if crate::config::load_app_icon_generation() < ICON_GENERATION {
+        // A release with a new authoritative icon: everyone gets it once,
+        // over whatever the previous install had chosen or kept.
+        crate::config::save_app_icon(DEFAULT_ID);
+        crate::config::save_app_icon_generation(ICON_GENERATION);
+        DEFAULT_ID.to_string()
+    } else {
+        match crate::config::load_app_icon() {
+            Some(id) => id,
+            None => {
+                let id = if crate::config::settings_on_disk() { LEGACY_ID } else { DEFAULT_ID };
+                crate::config::save_app_icon(id);
+                id.to_string()
+            }
         }
     };
     let id = effective(&id).to_string();

@@ -8,6 +8,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **Swipe a message to archive or delete it.** Drag a row sideways with the mouse, or swipe it with two fingers on a trackpad: left deletes, right archives, and a coloured strip under the row names the action as you go. Swap the two in Settings if you prefer, or turn swiping off there. Dragging a message to a folder now shows a small envelope under the pointer, and the account rows under All Inboxes and the Filtered Folders rows accept drops as well. Contributed by [Isaac](https://github.com/thecalamityjoe87) (#135), answering [@taprobane99](https://github.com/taprobane99)'s request (#92).
 
+**A new icon, and a redrawn gallery.** Vireo's icon is now a blue envelope with the bird on it. The gallery in Settings is redrawn to GNOME's icon guidelines: more Vireo envelopes in yellow, white, beige and faded blue, plain envelopes from blue to starfield, the Vireo bird, and the squircle that was the default since 1.21 staying on as "Logotype". The beta channel wears the development-build version of the icon, with GNOME's hazard stripe. This release puts the new icon on every install once, whatever was chosen before; pick another in Settings any time and that choice stands.
+
 **French, completed.** [@frenchy82](https://github.com/frenchy82) translated the composer's picture-resizing menu and the last loose strings (#134).
 
 ## What's new in 1.22.0

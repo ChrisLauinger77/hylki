@@ -2,9 +2,10 @@
 """Regenerate the app icons from their sources in data/icons/src.
 
 Every gallery entry is a 512² PNG in data/icons/alt/<id>.png, embedded into
-the binary by src/app_icon.rs. `default` and `beta` become the hicolor icons
-this build installs under its app ID (512 and 256 PNG, plus the SVG itself
-as the scalable icon), and `default` also refreshes docs/logo.png.
+the binary by src/app_icon.rs; a `<id>.Devel.svg` source is the beta build's
+art for that entry. The bird envelope (and its .Devel twin) also becomes
+the hicolor icon each build installs under its app ID (512 and 256 PNG,
+plus the SVG itself as the scalable icon), and refreshes docs/logo.png.
 
 Sources are either an SVG (rendered with librsvg, the same renderer GNOME
 uses, so what ships matches what the desktop would draw) or a PNG master
@@ -23,7 +24,12 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "data/icons/src"
 ALT = ROOT / "data/icons/alt"
 HICOLOR = ROOT / "data/icons/hicolor"
-APP_ID = {"default": "co.hyprlab.Vireo", "beta": "co.hyprlab.Vireo.Beta"}
+# The icon each build installs under its app ID: the stable app ships the
+# envelope with the bird, the beta its `.Devel` twin (GNOME's
+# development-build styling: the hazard stripe). Sources named
+# `<id>.Devel.svg` are the beta gallery's art for `<id>` and land in alt/
+# as `<id>.Devel.png`.
+SHIPPED = {"envelope-bird-blue": "co.hyprlab.Vireo", "envelope-bird-blue.Devel": "co.hyprlab.Vireo.Beta"}
 
 
 def render_svg(svg: pathlib.Path, png: pathlib.Path, size: int) -> None:
@@ -50,17 +56,17 @@ def make(src: pathlib.Path, png: pathlib.Path, size: int) -> None:
 
 
 for src in sorted(SRC.iterdir()):
-    name = src.stem
-    if name in APP_ID:
-        app_id = APP_ID[name]
+    # `<id>.Devel.svg` has two suffixes; keep ".Devel" as part of the id.
+    name = src.name[: -len(src.suffix)]
+    make(src, ALT / f"{name}.png", 512)
+    if name in SHIPPED:
+        app_id = SHIPPED[name]
         for size in (512, 256):
             make(src, HICOLOR / f"{size}x{size}/apps/{app_id}.png", size)
         if src.suffix == ".svg":
             scalable = HICOLOR / f"scalable/apps/{app_id}.svg"
             scalable.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, scalable)
-        if name == "default":
+        if app_id == "co.hyprlab.Vireo":
             shutil.copyfile(HICOLOR / "512x512/apps/co.hyprlab.Vireo.png", ROOT / "docs/logo.png")
-    else:
-        make(src, ALT / f"{name}.png", 512)
-    print(f"{name:<22} <- {src.name}")
+    print(f"{name:<28} <- {src.name}")

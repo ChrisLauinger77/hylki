@@ -1509,12 +1509,20 @@ window.welcome-window,
   opacity: 1;
   font-weight: 700;
 }
-/* The strip's edges melt into the card where more icons lie beyond. */
+/* The strip's edges melt into the card where more icons lie beyond. Two
+   layers, because the dark card colour is a translucent white over the
+   window ground: a gradient of it alone reads as a pale haze there. The
+   card gradient over a window-ground gradient composites to the row's own
+   colour at the edge, in both schemes. */
 .icon-strip-fade.left {
-  background: linear-gradient(to right, @card_bg_color, alpha(@card_bg_color, 0));
+  background:
+    linear-gradient(to right, @card_bg_color, alpha(@card_bg_color, 0)),
+    linear-gradient(to right, @window_bg_color, alpha(@window_bg_color, 0));
 }
 .icon-strip-fade.right {
-  background: linear-gradient(to left, @card_bg_color, alpha(@card_bg_color, 0));
+  background:
+    linear-gradient(to left, @card_bg_color, alpha(@card_bg_color, 0)),
+    linear-gradient(to left, @window_bg_color, alpha(@window_bg_color, 0));
 }
 /* On the wizard's yellow the selection ring wears the wordmark blue. */
 .welcome-window .icon-gallery flowboxchild:hover {

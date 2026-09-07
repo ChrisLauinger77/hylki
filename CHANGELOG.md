@@ -2,8 +2,8 @@
 
 ## 1.23.0 — 2026-09-06
 
-Tags, swipe actions on message rows, and the French translation
-completed.
+Tags, swipe actions on message rows, a redrawn icon set with a new
+default, and the French translation completed.
 
 - **Tags** (#71, requested by @yioannides, with the folders-versus-tags
   discussion from @p-mitana and @deusnovus). Coloured labels a message can
@@ -45,6 +45,22 @@ completed.
   per-account rows under All Inboxes and the Filtered Folders rows take
   drops too: a message dropped on one moves to that folder, provided it
   belongs to the same account.
+- **A redrawn icon set, and a new default.** The app's icon is now a
+  blue envelope with the bird on it; the 1.21 squircle-with-a-V becomes
+  the "Logotype" gallery entry. The gallery is redrawn to GNOME's icon
+  guidelines: four more Vireo envelopes (yellow, white, beige, faded
+  blue), six plain envelopes (blue, yellow, white, beige, starfield,
+  faded blue) and the two birds, ahead of the colours. The
+  beta build ships the default's `.Devel` twin with GNOME's hazard stripe
+  (the old ribboned beta icon is gone). The new default is asserted once:
+  the first start on this release resets the stored choice to it on every
+  install (`app_icon::ICON_GENERATION`, recorded in `state.toml` so a
+  choice made afterwards stands). Ids from the 1.22 gallery still resolve
+  for imported settings: envelope → yellow envelope, cream → beige, the
+  blue birds → the new birds. `tools/gen-app-icons.py` renders `<id>.Devel.svg`
+  sources to `alt/<id>.Devel.png` and takes the bird envelope, plain and
+  `.Devel`, as the hicolor icons of the two builds (the beta now has a
+  scalable SVG too).
 - **French** (PR #134, @frenchy82): the composer's picture-resizing menu
   and the last loose strings; 713 of 717 messages translated.
 - Under the hood: a `keywords` column on the message index (added in
