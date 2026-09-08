@@ -8281,11 +8281,13 @@ impl AppModel {
                 };
                 let cfg = Some(cfg);
                 let signature = cfg.and_then(|c| c.signature.clone()).unwrap_or_default();
+                let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
                 let mut identities = vec![ComposeAccount {
                     id,
                     label,
                     signature: signature.clone(),
                     email: email.clone(),
+                    pgp_key: pgp_key.clone(),
                     alias_from: None,
                 }];
                 for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
@@ -8303,6 +8305,7 @@ impl AppModel {
                         label: display.clone(),
                         signature: signature.clone(),
                         email: addr,
+                        pgp_key: pgp_key.clone(),
                         alias_from: Some(display),
                     });
                 }
@@ -11266,6 +11269,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         folder_roles: Default::default(),
         empty_junk_days: 0,
         empty_trash_days: 0,
+        pgp_key: None,
     };
     vec![
         mk("Jason M.", "jason@vireo.hyprlab.co", "#3584e4", "🚀"),

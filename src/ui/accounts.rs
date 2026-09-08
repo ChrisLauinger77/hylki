@@ -916,6 +916,22 @@ impl Component for AccountsWindow {
                                 adw::ComboRow { set_title: &i18n("Archive") },
                             },
 
+                            // OpenPGP (#133): which of the user's keys this
+                            // account signs and decrypts with.
+                            add = &adw::PreferencesGroup {
+                                set_title: &i18n("OpenPGP"),
+                                set_description: Some(
+                                    i18n("The key that signs mail sent from this account and opens \
+                                     what is encrypted to it. Keys are managed under OpenPGP in \
+                                     the sidebar.").as_str()
+                                ),
+                                #[name = "pgp_key_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Key"),
+                                    set_subtitle: &i18n("Automatic uses the key whose address matches."),
+                                },
+                            },
+
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Signature"),
                                 set_description: Some(
@@ -2618,7 +2634,43 @@ fn read_account(widgets: &AccountsWindowWidgets, emoji: Option<String>) -> Accou
             .get(widgets.empty_trash_row.selected() as usize)
             .copied()
             .unwrap_or(0),
+        // Row 0 is Automatic; the rest follow PGP_KEY_CHOICES.
+        pgp_key: PGP_KEY_CHOICES.with(|c| {
+            let sel = widgets.pgp_key_row.selected() as usize;
+            sel.checked_sub(1).and_then(|i| c.borrow().get(i).map(|k| k.fingerprint.clone()))
+        }),
     }
+}
+
+thread_local! {
+    /// The user's own keys as the editor's OpenPGP combo lists them (#133),
+    /// filled when the editor opens and read when it saves. The combo shows
+    /// labels; this keeps the fingerprints behind them.
+    static PGP_KEY_CHOICES: std::cell::RefCell<Vec<crate::pgp::KeyInfo>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Fill the OpenPGP key combo with the user's own keys and select the
+/// account's, or Automatic.
+fn fill_pgp_key_row(widgets: &AccountsWindowWidgets, chosen: Option<&str>) {
+    let keys: Vec<crate::pgp::KeyInfo> = if crate::pgp::available() {
+        crate::pgp::list_keys(&crate::pgp::Gpg::system(), true)
+            .into_iter()
+            .filter(|k| k.usable() && k.can_sign)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut labels = vec![i18n("Automatic")];
+    labels.extend(keys.iter().map(|k| format!("{} ({})", k.primary_uid(), crate::pgp::key_display(&k.key_id))));
+    let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+    widgets.pgp_key_row.set_model(Some(&gtk::StringList::new(&refs)));
+    widgets.pgp_key_row.set_list_factory(Some(&non_ellipsizing_factory()));
+    let selected = chosen
+        .and_then(|f| keys.iter().position(|k| k.fingerprint.eq_ignore_ascii_case(f)))
+        .map(|i| i as u32 + 1)
+        .unwrap_or(0);
+    widgets.pgp_key_row.set_selected(selected);
+    PGP_KEY_CHOICES.with(|c| *c.borrow_mut() = keys);
 }
 
 /// Auto-empty choices (#140), in combo order: never, then the ages.
@@ -2686,6 +2738,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     });
     widgets.empty_junk_row.set_selected(auto_empty_index(acc.empty_junk_days));
     widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
+    fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -2765,6 +2818,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.push_row.set_selected(0);
     widgets.empty_junk_row.set_selected(0);
     widgets.empty_trash_row.set_selected(0);
+    fill_pgp_key_row(widgets, None);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");
     widgets.label_row.set_text("");

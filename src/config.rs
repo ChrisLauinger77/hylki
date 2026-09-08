@@ -204,6 +204,11 @@ pub struct AccountConfig {
     /// The same for the Trash folder.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub empty_trash_days: u32,
+    /// The OpenPGP key (fingerprint) that signs mail from this account and
+    /// opens what is encrypted to it (#133); `None` = the key whose address
+    /// matches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pgp_key: Option<String>,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -2405,6 +2410,7 @@ mod filter_tests {
             folder_roles: Default::default(),
             empty_junk_days: 0,
             empty_trash_days: 0,
+            pgp_key: None,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {

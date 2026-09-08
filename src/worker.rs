@@ -293,6 +293,11 @@ pub struct OutgoingMessage {
     /// Dropped once this version is sent or re-queued, so the queue never holds
     /// the message twice.
     pub outbox_origin: Option<u32>,
+    /// Sign with the account's OpenPGP key (#133): PGP/MIME multipart/signed.
+    pub sign: bool,
+    /// Encrypt to every recipient's key (and the sender's): multipart/encrypted,
+    /// signed inside when `sign` is set too.
+    pub encrypt: bool,
 }
 
 /// An event pushed from the worker back to the UI.
@@ -1805,6 +1810,9 @@ async fn run_imap(
 
             MailRequest::SaveDraft { message, folder_id, path } => {
                 emit(WorkerEvent::Status(i18n("Saving draft…")));
+                // A draft is kept as written: signing and encrypting happen
+                // at send time (#133).
+                let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
                 match build_email(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
@@ -3260,34 +3268,158 @@ fn build_email(account: &AccountConfig, msg: &OutgoingMessage) -> Result<LettreM
         }
         related
     });
+    // OpenPGP (#133): the body as one MIME entity, signed and/or encrypted
+    // into the PGP/MIME shape the reader recognises.
+    if msg.sign || msg.encrypt {
+        let entity = if msg.attachments.is_empty() {
+            match content {
+                Some(content) => PgpEntity::Multi(content),
+                None => PgpEntity::Single(SinglePart::plain(msg.body.clone())),
+            }
+        } else {
+            PgpEntity::Multi(attachments_multipart(content, msg)?)
+        };
+        let wrapped = pgp_wrap(account, msg, &from_addr, entity)?;
+        return Ok(builder.multipart(wrapped)?);
+    }
     let email = if msg.attachments.is_empty() {
         match content {
             Some(content) => builder.multipart(content)?,
             None => builder.body(msg.body.clone())?,
         }
     } else {
-        // text part (plain, or alternative plain+html) followed by attachments.
-        let mut multipart = match content {
-            Some(content) => MultiPart::mixed().multipart(content),
-            None => MultiPart::mixed().singlepart(SinglePart::plain(msg.body.clone())),
-        };
-        for path in &msg.attachments {
-            // Name the file in the error: "No such file or directory" on its own
-            // gives no clue which attachment went missing, and under Flatpak the
-            // portal's /run/user/.../doc/ paths do expire.
-            let bytes = std::fs::read(path)
-                .map_err(|e| format!("could not read the attachment {path}: {e}"))?;
-            let name = std::path::Path::new(path)
-                .file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "attachment".to_string());
-            let ct = ContentType::parse(guess_mime(&name))
-                .unwrap_or(ContentType::TEXT_PLAIN);
-            multipart = multipart.singlepart(Attachment::new(name).body(bytes, ct));
-        }
-        builder.multipart(multipart)?
+        builder.multipart(attachments_multipart(content, msg)?)?
     };
     Ok(email)
+}
+
+/// The text part (plain, or alternative plain+html) followed by the
+/// attachments, as one mixed multipart.
+fn attachments_multipart(
+    content: Option<lettre::message::MultiPart>,
+    msg: &OutgoingMessage,
+) -> Result<lettre::message::MultiPart, SmtpError> {
+    use lettre::message::{header::ContentType, Attachment, MultiPart, SinglePart};
+    let mut multipart = match content {
+        Some(content) => MultiPart::mixed().multipart(content),
+        None => MultiPart::mixed().singlepart(SinglePart::plain(msg.body.clone())),
+    };
+    for path in &msg.attachments {
+        // Name the file in the error: "No such file or directory" on its own
+        // gives no clue which attachment went missing, and under Flatpak the
+        // portal's /run/user/.../doc/ paths do expire.
+        let bytes = std::fs::read(path)
+            .map_err(|e| format!("could not read the attachment {path}: {e}"))?;
+        let name = std::path::Path::new(path)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "attachment".to_string());
+        let ct = ContentType::parse(guess_mime(&name))
+            .unwrap_or(ContentType::TEXT_PLAIN);
+        multipart = multipart.singlepart(Attachment::new(name).body(bytes, ct));
+    }
+    Ok(multipart)
+}
+
+/// A message body before OpenPGP wrapping: one MIME entity either way.
+enum PgpEntity {
+    Multi(lettre::message::MultiPart),
+    Single(lettre::message::SinglePart),
+}
+
+impl PgpEntity {
+    /// The entity's exact bytes, headers included: what a signature covers
+    /// and what encryption hides. lettre formats a part the same way every
+    /// time (its boundary is fixed at creation), so the signed bytes are
+    /// the bytes that go on the wire.
+    fn formatted(&self) -> Vec<u8> {
+        match self {
+            PgpEntity::Multi(m) => m.formatted(),
+            PgpEntity::Single(s) => s.formatted(),
+        }
+    }
+}
+
+/// The user's key for an outgoing message: the account's chosen key, else
+/// the key whose address matches the From, else the account's own address.
+fn signing_key(account: &AccountConfig, from_addr: &str) -> Option<crate::pgp::KeyInfo> {
+    let gpg = crate::pgp::Gpg::system();
+    account
+        .pgp_key
+        .as_deref()
+        .and_then(|f| crate::pgp::secret_key_by_fingerprint(&gpg, f))
+        .or_else(|| crate::pgp::secret_key_for(&gpg, from_addr))
+        .or_else(|| crate::pgp::secret_key_for(&gpg, &account.email))
+}
+
+/// Sign and/or encrypt an outgoing entity into PGP/MIME (RFC 3156).
+fn pgp_wrap(
+    account: &AccountConfig,
+    msg: &OutgoingMessage,
+    from_addr: &str,
+    entity: PgpEntity,
+) -> Result<lettre::message::MultiPart, SmtpError> {
+    use lettre::message::{header::ContentType, MultiPart, SinglePart};
+    let gpg = crate::pgp::Gpg::system();
+    let key = signing_key(account, from_addr);
+    let inner = entity.formatted();
+    let no_key = || {
+        i18n_f(
+            "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP",
+            &[("addr", from_addr)],
+        )
+    };
+    if msg.encrypt {
+        let mut recipients: Vec<String> = [&msg.to, &msg.cc, &msg.bcc]
+            .iter()
+            .flat_map(|field| parse_recipients(field).into_iter().map(|(_, addr)| addr.to_ascii_lowercase()))
+            .collect();
+        recipients.sort();
+        recipients.dedup();
+        for r in &recipients {
+            if crate::pgp::public_key_for(&gpg, r).is_none() {
+                return Err(i18n_f("no OpenPGP key for {addr}", &[("addr", r)]).into());
+            }
+        }
+        // The sender's own copy: to the account's key when it has one (by
+        // fingerprint, so a chosen key with another address still reads its
+        // Sent mail), else to whatever key the From address has.
+        match &key {
+            Some(k) => recipients.push(k.fingerprint.clone()),
+            None => {
+                if crate::pgp::public_key_for(&gpg, from_addr).is_none() {
+                    return Err(no_key().into());
+                }
+                recipients.push(from_addr.to_ascii_lowercase());
+            }
+        }
+        let signer = if msg.sign { Some(key.ok_or_else(no_key)?.fingerprint) } else { None };
+        let ciphertext = crate::pgp::encrypt(&gpg, &inner, &recipients, signer.as_deref())?;
+        let control = SinglePart::builder()
+            .header(ContentType::parse("application/pgp-encrypted").expect("static content type"))
+            .body(String::from("Version: 1\r\n"));
+        let payload = SinglePart::builder()
+            .header(ContentType::parse("application/octet-stream; name=\"encrypted.asc\"").expect("static content type"))
+            .body(ciphertext);
+        return Ok(MultiPart::encrypted("application/pgp-encrypted".into())
+            .singlepart(control)
+            .singlepart(payload));
+    }
+    let key = key.ok_or_else(no_key)?;
+    // lettre writes a part as its formatted bytes, CRLF-terminated, and the
+    // boundary delimiter straight after; RFC 3156 counts that CRLF as part
+    // of the boundary, so the signature covers everything before it.
+    let signed_bytes = inner.strip_suffix(b"\r\n").unwrap_or(&inner);
+    let (signature, micalg) = crate::pgp::sign_detached(&gpg, signed_bytes, &key.fingerprint)?;
+    let signed = MultiPart::signed("application/pgp-signature".into(), micalg);
+    let signed = match entity {
+        PgpEntity::Multi(m) => signed.multipart(m),
+        PgpEntity::Single(s) => signed.singlepart(s),
+    };
+    let sig_part = SinglePart::builder()
+        .header(ContentType::parse("application/pgp-signature; name=\"signature.asc\"").expect("static content type"))
+        .body(signature);
+    Ok(signed.singlepart(sig_part))
 }
 
 /// One image the composer embedded, lifted out of the outgoing HTML: its
@@ -8230,6 +8362,7 @@ async fn run_graph(
 
             MailRequest::SaveDraft { message, folder_id, path } => {
                 emit(WorkerEvent::Status(i18n("Saving draft…")));
+                let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
                 let saved = match build_email(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
@@ -8793,6 +8926,7 @@ mod tests {
             folder_roles: Default::default(),
             empty_junk_days: 0,
             empty_trash_days: 0,
+            pgp_key: None,
             push: None,
             name: String::new(),
             email: "me@example.com".into(),
@@ -8838,7 +8972,95 @@ mod tests {
             references: String::new(),
             draft_origin: None,
             outbox_origin: None,
+            sign: false,
+            encrypt: false,
         }
+    }
+
+    /// OpenPGP sending (#133), end to end against a real gpg in a throwaway
+    /// keyring: a signed message comes out as PGP/MIME multipart/signed whose
+    /// signature the reader's own path verifies over lettre's exact bytes; an
+    /// encrypted one as multipart/encrypted that decrypts back to the body.
+    /// Skipped where gpg is missing.
+    #[test]
+    fn build_email_signs_and_encrypts_with_pgp_mime() {
+        if !crate::pgp::available() {
+            eprintln!("gpg not installed; skipping");
+            return;
+        }
+        let home = std::env::temp_dir().join(format!("vireo-gpg-send-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&home, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        // `Gpg::system()` (what build_email uses) honours this override.
+        std::env::set_var("VIREO_GNUPGHOME", &home);
+        let gpg = crate::pgp::Gpg::system();
+        let mut account = sample_account();
+        account.email = "sender@vireo.invalid".into();
+        let fpr = crate::pgp::generate_key(&gpg, "Sender", "sender@vireo.invalid", "never", "").expect("own key");
+        crate::pgp::generate_key(&gpg, "Peer", "peer@vireo.invalid", "never", "").expect("peer key");
+
+        let mut msg = sample_outgoing();
+        msg.to = "Peer <peer@vireo.invalid>".into();
+        msg.body = "signed body text".into();
+        msg.sign = true;
+        let raw = build_email(&account, &msg).expect("builds").formatted();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(text.contains("multipart/signed"), "{text}");
+        assert!(text.contains("micalg=\"pgp-sha"), "{text}");
+        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(!u.status.encrypted);
+        let inner = String::from_utf8_lossy(&u.inner.unwrap()).to_string();
+        assert!(inner.contains("signed body text"), "{inner}");
+
+        // With an attachment the signed entity is the whole mixed multipart.
+        let path = home.join("note.txt");
+        std::fs::write(&path, b"attached").unwrap();
+        msg.attachments = vec![path.to_string_lossy().to_string()];
+        let raw = build_email(&account, &msg).expect("builds").formatted();
+        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        assert!(!extract_attachments(&u.inner.unwrap()).is_empty());
+
+        // Encrypted and signed: readable by the peer and by the sender.
+        msg.attachments.clear();
+        msg.encrypt = true;
+        msg.body = "secret body text".into();
+        let raw = build_email(&account, &msg).expect("builds").formatted();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(text.contains("multipart/encrypted"), "{text}");
+        assert!(!text.contains("secret body text"), "plaintext must not appear: {text}");
+        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        assert!(u.status.encrypted && u.status.decrypted, "{:?}", u.status);
+        assert!(matches!(u.status.signature, crate::models::PgpSignature::Good { .. }), "{:?}", u.status);
+        let inner = String::from_utf8_lossy(&u.inner.unwrap()).to_string();
+        assert!(inner.contains("secret body text"), "{inner}");
+
+        // A recipient without a key is refused by name; a From without a key too.
+        msg.cc = "nobody@vireo.invalid".into();
+        let err = build_email(&account, &msg).expect_err("no key for nobody").to_string();
+        assert!(err.contains("nobody@vireo.invalid"), "{err}");
+        msg.cc.clear();
+        account.email = "keyless@vireo.invalid".into();
+        let err = build_email(&account, &msg).expect_err("no own key").to_string();
+        assert!(err.contains("keyless@vireo.invalid"), "{err}");
+        // The account's chosen key overrides the address match.
+        account.pgp_key = Some(fpr);
+        build_email(&account, &msg).expect("chosen key signs");
+
+        // A draft of the same message stays plain.
+        let plain = OutgoingMessage { sign: false, encrypt: false, ..msg.clone() };
+        let raw = build_email(&account, &plain).expect("builds").formatted();
+        assert!(String::from_utf8_lossy(&raw).contains("secret body text"));
+
+        std::env::remove_var("VIREO_GNUPGHOME");
+        let _ = std::process::Command::new("gpgconf").env("GNUPGHOME", &home).args(["--kill", "all"]).status();
+        let _ = std::fs::remove_dir_all(&home);
     }
 
     /// A reply with no In-Reply-To/References is a new conversation to every

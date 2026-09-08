@@ -58,8 +58,25 @@ The reader's own fonts and colours over the senders'.
   cached, and the background prefetch leaves encrypted mail alone so no
   passphrase prompt appears on its own. Signature verdicts are cached with
   the sender check. The Flatpak gains access to `~/.gnupg` and the agent
-  socket. Signing and encrypting outgoing mail, and key management, are the
-  next slices.
+  socket.
+- **OpenPGP, second slice: keys and sending, without a terminal** (#133).
+  An OpenPGP page in the settings sidebar lists your own keys and other
+  people's: generate a key for one of your addresses (a signing key with
+  an encryption subkey; the passphrase goes to gpg down a pipe and is not
+  kept), import a key file, export a public key, fetch a key by address
+  (WKD, then the keyservers), trust a key (a local signature with your own,
+  the fingerprint shown to check first) and remove one. In the reader, the
+  verdict popover offers "Fetch the sender's key" when the signing key is
+  missing (the message's own Autocrypt key first) and "Trust this key…"
+  when it is unvouched; either re-fetches the message so the chip follows
+  the keyring. An attached public key gets an "Import OpenPGP key" action in
+  the attachment drawer. Each account can name the key it signs with
+  (Automatic picks by address). The composer gains Sign and Encrypt
+  toggles: Sign sends PGP/MIME `multipart/signed` (the signed bytes are the
+  entity lettre puts on the wire; `micalg` from gpg's own digest), Encrypt
+  sends `multipart/encrypted` to every recipient's key and your own, signed
+  inside; a missing key of yours or theirs is named before anything leaves.
+  Drafts are kept as written; signing and encrypting happen at send.
 
 ## 1.23.1 — 2026-09-07
 

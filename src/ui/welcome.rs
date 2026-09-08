@@ -910,5 +910,6 @@ fn blank_account() -> AccountConfig {
         folder_roles: Default::default(),
         empty_junk_days: 0,
         empty_trash_days: 0,
+        pgp_key: None,
     }
 }

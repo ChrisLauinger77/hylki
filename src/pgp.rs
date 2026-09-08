@@ -826,13 +826,39 @@ pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// A detached, armoured signature over `data` by `local_user`.
-pub fn sign_detached(gpg: &Gpg, data: &[u8], local_user: &str) -> Result<Vec<u8>, String> {
+/// A detached, armoured signature over `data` by `local_user`, with the
+/// `micalg` value RFC 3156 wants beside it ("pgp-sha256"), read from gpg's
+/// SIG_CREATED line.
+pub fn sign_detached(gpg: &Gpg, data: &[u8], local_user: &str) -> Result<(Vec<u8>, String), String> {
     let out = run(gpg, &["--armor", "--local-user", local_user, "--detach-sign"], data, None);
     if out.stdout.is_empty() {
         return Err(out.detail.unwrap_or_else(|| i18n("gpg did not sign the message.")));
     }
-    Ok(out.stdout)
+    // SIG_CREATED <type> <pk algo> <hash algo> <class> <timestamp> <fpr>
+    let hash = out
+        .status_lines
+        .iter()
+        .find_map(|l| l.strip_prefix("SIG_CREATED "))
+        .and_then(|rest| rest.split(' ').nth(2))
+        .and_then(|h| h.parse::<u32>().ok())
+        .unwrap_or(8);
+    let micalg = match hash {
+        1 => "pgp-md5",
+        2 => "pgp-sha1",
+        3 => "pgp-ripemd160",
+        9 => "pgp-sha384",
+        10 => "pgp-sha512",
+        11 => "pgp-sha224",
+        _ => "pgp-sha256",
+    };
+    Ok((out.stdout, micalg.to_string()))
+}
+
+/// One of the user's own keys by fingerprint, if usable for signing.
+pub fn secret_key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
+    list_keys(gpg, true)
+        .into_iter()
+        .find(|k| k.fingerprint.eq_ignore_ascii_case(fpr) && k.usable() && k.can_sign)
 }
 
 /// `data` encrypted (and, with `local_user`, signed) to every recipient
@@ -1154,8 +1180,10 @@ uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
         let out = run(&gpg_pw, &["--pinentry-mode", "loopback", "--passphrase", "pw", "--decrypt"], &ct, None);
         assert!(String::from_utf8_lossy(&out.stdout).contains("for second"), "{:?}", out.status_lines);
         let _ = mail;
-        let sig = sign_detached(&gpg2, b"data", &own).expect("signed");
+        let (sig, micalg) = sign_detached(&gpg2, b"data", &own).expect("signed");
         assert!(String::from_utf8_lossy(&sig).contains("BEGIN PGP SIGNATURE"));
+        assert!(micalg.starts_with("pgp-sha"), "{micalg}");
+        assert!(secret_key_by_fingerprint(&gpg2, &own).is_some());
         delete_key(&gpg2, &fpr, false).expect("deleted");
         assert!(key_by_fingerprint(&gpg2, &fpr).is_none());
         delete_key(&gpg2, &own, true).expect("deleted own");

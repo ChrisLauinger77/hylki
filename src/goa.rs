@@ -55,6 +55,7 @@ impl GoaMailAccount {
             folder_roles: Default::default(),
             empty_junk_days: 0,
             empty_trash_days: 0,
+            pgp_key: None,
             name: if self.name.trim().is_empty() {
                 self.email.clone()
             } else {

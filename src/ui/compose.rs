@@ -71,6 +71,8 @@ pub struct ComposeAccount {
     pub signature: String,
     /// The identity's sending address (the account's own, or an alias's).
     pub email: String,
+    /// The account's chosen OpenPGP key (fingerprint), if any (#133).
+    pub pgp_key: Option<String>,
     /// Set for a send-as alias (#34): the full From to put on the wire
     /// ("Name <alias@host>"). `None` sends as the account itself.
     pub alias_from: Option<String>,
@@ -158,11 +160,18 @@ pub struct Compose {
     /// A recipient/subject field was edited since open (body edits are tracked
     /// separately by the editor itself). Used for save-if-dirty.
     fields_dirty: bool,
+    /// OpenPGP (#133): sign the message; encrypt it to every recipient.
+    sign: bool,
+    encrypt: bool,
 }
 
 #[derive(Debug)]
 pub enum ComposeInput {
     Send,
+    /// The OpenPGP Sign toggle (#133).
+    ToggleSign(bool),
+    /// The OpenPGP Encrypt toggle; encrypting turns signing on too.
+    ToggleEncrypt(bool),
     /// The editor's HTML + plain text came back asynchronously — finish sending.
     SendBody { html: String, text: String, to: String, cc: String, bcc: String, reply_to: String, subject: String, from_account_id: u32, from_alias: Option<String> },
     /// Save the current message to Drafts.
@@ -242,6 +251,25 @@ impl Component for Compose {
                         set_label: &i18n("Send"),
                         add_css_class: "suggested-action",
                         connect_clicked => ComposeInput::Send,
+                    },
+                    // OpenPGP (#133): only offered where a gpg exists.
+                    #[name = "encrypt_btn"]
+                    pack_end = &gtk::ToggleButton {
+                        set_icon_name: "co.hyprlab.Vireo-channel-secure-symbolic",
+                        set_tooltip_text: Some(i18n("Encrypt with OpenPGP to every recipient's key").as_str()),
+                        set_visible: crate::pgp::available(),
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
+                        },
+                    },
+                    #[name = "sign_btn"]
+                    pack_end = &gtk::ToggleButton {
+                        set_icon_name: "co.hyprlab.Vireo-security-high-symbolic",
+                        set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
+                        set_visible: crate::pgp::available(),
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::ToggleSign(b.is_active()));
+                        },
                     },
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-attachment-symbolic",
@@ -401,6 +429,8 @@ impl Component for Compose {
             // addressed: replies arrive with To filled, forwards do not.
             compact: compact && !prefill.to.trim().is_empty(),
             fields_dirty: false,
+            sign: false,
+            encrypt: false,
         };
         let widgets = view_output!();
         widgets.editor_holder.append(&model.editor.widget);
@@ -792,6 +822,14 @@ impl Component for Compose {
                 self.completion.popdown();
             }
 
+            ComposeInput::ToggleSign(on) => self.sign = on,
+            ComposeInput::ToggleEncrypt(on) => {
+                self.encrypt = on;
+                if on && !self.sign {
+                    self.sign = true;
+                    widgets.sign_btn.set_active(true);
+                }
+            }
             ComposeInput::Send => {
                 let to = widgets.to_row.text().trim().to_string();
                 if to.is_empty() {
@@ -803,6 +841,27 @@ impl Component for Compose {
                 let reply_to = widgets.reply_to_row.text().trim().to_string();
                 let subject = widgets.subject_row.text().to_string();
                 let idx = widgets.from_row.selected() as usize;
+                // OpenPGP (#133): say what is missing before anything leaves.
+                if self.sign || self.encrypt {
+                    let from = self.accounts.get(idx);
+                    let problem = pgp_send_check(
+                        from.map(|a| a.email.as_str()).unwrap_or(""),
+                        from.and_then(|a| a.pgp_key.as_deref()),
+                        &[to.as_str(), cc.as_str(), bcc.as_str()],
+                        self.encrypt,
+                    );
+                    if let Err(problem) = problem {
+                        let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
+                        let dialog = adw::MessageDialog::new(
+                            parent.as_ref(),
+                            Some(&i18n("Cannot send with OpenPGP")),
+                            Some(&problem),
+                        );
+                        dialog.add_response("ok", &i18n("OK"));
+                        dialog.present();
+                        return;
+                    }
+                }
                 let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
                 let from_alias = self.accounts.get(idx).and_then(|a| a.alias_from.clone());
 
@@ -903,6 +962,8 @@ impl Compose {
             references: self.references.clone(),
             draft_origin: self.draft_origin.clone(),
             outbox_origin: self.outbox_origin,
+            sign: self.sign,
+            encrypt: self.encrypt,
         }
     }
 
@@ -1077,4 +1138,40 @@ fn inner_text(widget: &gtk::Widget) -> Option<gtk::Text> {
         child = c.next_sibling();
     }
     None
+}
+
+/// Whether an OpenPGP send can go ahead (#133): a key of the user's own
+/// for the From address (or the account's chosen key), and, to encrypt, a
+/// public key for every recipient. The message names the first gap.
+fn pgp_send_check(from: &str, chosen_key: Option<&str>, fields: &[&str], encrypt: bool) -> Result<(), String> {
+    let gpg = crate::pgp::Gpg::system();
+    let own = chosen_key
+        .and_then(|f| crate::pgp::secret_key_by_fingerprint(&gpg, f))
+        .or_else(|| crate::pgp::secret_key_for(&gpg, from));
+    if own.is_none() {
+        return Err(crate::i18n::i18n_f(
+            "There is no OpenPGP key of your own for {addr}. Generate one under Settings, OpenPGP, \
+             or choose a key in the account's settings.",
+            &[("addr", from)],
+        ));
+    }
+    if encrypt {
+        for field in fields {
+            for part in field.split(',') {
+                let (_, addr) = crate::config::split_identity(part.trim());
+                let addr = addr.trim();
+                if addr.is_empty() {
+                    continue;
+                }
+                if crate::pgp::public_key_for(&gpg, addr).is_none() {
+                    return Err(crate::i18n::i18n_f(
+                        "There is no OpenPGP key for {addr}. Ask them for their public key, or fetch it \
+                         under Settings, OpenPGP.",
+                        &[("addr", addr)],
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
