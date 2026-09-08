@@ -499,9 +499,10 @@ button.star-active {
 .message-listbox > row {
   padding: 0;
   /* No separator hairlines between rows — the inset highlight pills carry the
-     visual rhythm on their own. The side margin matches the inset the pills
-     use (they drop their own horizontal margin in exchange). */
-  margin: 0 6px;
+     visual rhythm on their own. No side margin either: the pills carry their
+     own 6px inset, so the row (and the swipe strip that fills it) runs the
+     full width of the list. */
+  margin: 0;
   /* No focus ring either: keyboard navigation moves the selection itself, so
      the accent pill is the position indicator — the ring only ever showed up
      as an artifact on rows that inherit focus programmatically (e.g. the
@@ -519,8 +520,11 @@ button.star-active {
   background: none;
 }
 
-/* Reactive hover highlight (kept below the selection colour). */
-.message-listbox > row:hover:not(:selected) .message-row {
+/* Reactive hover highlight (kept below the selection colour). Every state
+   tint is suspended on a row mid-swipe (.swiping): the pill vanishes and the
+   content slides bare over the strip, with no card outline to clash with the
+   strip's edge. */
+.message-listbox > row:hover:not(:selected):not(.swiping) .message-row {
   background-color: alpha(currentColor, 0.05);
 }
 
@@ -532,13 +536,13 @@ button.star-active {
    default 25% while the list holds focus, dimming — never vanishing — when
    focus moves to the reader. The hover/active variants are overridden too so
    the highlight stays uniform when the cursor passes over the selected row. */
-.message-listbox > row:selected .message-row {
+.message-listbox > row:selected:not(.swiping) .message-row {
   background-color: alpha(@accent_bg_color, 0.3);
 }
 
-.message-listbox:focus-within > row:selected .message-row,
-.message-listbox > row.activatable:selected:hover .message-row,
-.message-listbox > row.activatable:selected:active .message-row {
+.message-listbox:focus-within > row:selected:not(.swiping) .message-row,
+.message-listbox > row.activatable:selected:hover:not(.swiping) .message-row,
+.message-listbox > row.activatable:selected:active:not(.swiping) .message-row {
   background-color: alpha(@accent_bg_color, 0.5);
 }
 
@@ -546,7 +550,7 @@ button.star-active {
   /* The pill: inset from the list edges, rounded like the thread cards.
      Vertical padding is symmetric — the Actions Palette floats in an overlay
      and takes no room, so the text block sits centred in the pill. */
-  margin: 2px 0;
+  margin: 2px 6px;
   border-radius: 12px;
   padding: 13px 8px 13px 10px;
 }
@@ -697,13 +701,12 @@ button.star-active {
   background: none;
 }
 
-/* No right margin: the cards end at the same right edge as every pill in the
-   list (the rows' shared 6px margin), so an expanded thread never opens a gap
-   along the pane's right side. */
+/* The same 6px right inset as every pill in the list, so an expanded thread
+   never opens a gap along the pane's right side. */
 .message-listbox > row.thread-child .message-row {
   /* Identical geometry to the top-level pills — same padding, same vertical
      rhythm — the only difference is the 10px indent onto the thread rail. */
-  margin: 2px 0 2px 10px;
+  margin: 2px 6px 2px 10px;
   border-radius: 12px;
   padding: 13px 8px 13px 10px;
 }
@@ -723,15 +726,15 @@ button.star-active {
   box-shadow: 0 0 0 2px @window_bg_color;
 }
 
-.message-listbox > row.thread-child:hover:not(:selected) .message-row {
+.message-listbox > row.thread-child:hover:not(:selected):not(.swiping) .message-row {
   background-color: alpha(currentColor, 0.05);
 }
 
-.message-listbox > row.thread-child:selected .message-row {
+.message-listbox > row.thread-child:selected:not(.swiping) .message-row {
   background-color: alpha(@accent_bg_color, 0.3);
 }
 
-.message-listbox:focus-within > row.thread-child:selected .message-row {
+.message-listbox:focus-within > row.thread-child:selected:not(.swiping) .message-row {
   background-color: alpha(@accent_bg_color, 0.5);
 }
 
@@ -801,6 +804,16 @@ button.star-active {
 
 .palette-toggle image {
   -gtk-icon-size: 14px;
+}
+
+/* Mid-swipe (.swiping, held from the first drag until the snap-back lands):
+   the pill disappears — its hover/selection tint is suspended above and its
+   rounding dropped here — so the bare content slides over the strip, which
+   fills the row edge to edge. Nothing about the geometry changes, so the
+   list never shifts as a drag starts or settles; the tint just fades out. */
+.message-listbox > row.swiping .message-row {
+  border-radius: 0;
+  transition: background-color 150ms ease-out;
 }
 
 /* Swipe-to-act strip (#swipe): sits fixed under the row, revealed as the

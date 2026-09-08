@@ -251,6 +251,12 @@ pub struct MessageRow {
     swipe_side: i8,
     /// A mouse-button or trackpad gesture is actively dragging this row.
     swipe_dragging: bool,
+    /// The row is mid-swipe: from the first drag until the snap-back
+    /// animation lands — the `.swiping` class squares the pill off and
+    /// drops its margins for that whole span, so the content and the strip
+    /// under it read as one full-width surface rather than a rounded card
+    /// sliding over a coloured band.
+    swipe_active: bool,
     /// The row's `AdwSwipeTracker`, built once against its `SwipeSurface` in
     /// post_view — also doubles as the wiring guard, since the tracker has
     /// to stay alive for as long as the row does or it stops firing.
@@ -301,6 +307,9 @@ pub enum MessageRowInput {
     /// flick short of the commit distance reads as a false positive when
     /// the intent was clearly to back out, not to commit fast.
     SwipeEnd,
+    /// The post-release snap-back animation landed (or there was nothing
+    /// to animate): the row can drop its `.swiping` geometry again.
+    SwipeSettled,
     /// The swipe preference changed: post_view enables or disables the
     /// row's tracker accordingly.
     SwipeEnabledChanged,
@@ -788,16 +797,17 @@ impl FactoryComponent for MessageRow {
                     set_halign: gtk::Align::Start,
                     set_valign: gtk::Align::End,
                     // With avatars on, the ⋯ centres under the avatar:
-                    // circle centre (pill padding + 19) minus half the button.
-                    // Thread children share the exact pill geometry and only
-                    // add their card's 10px indent. Without circles it hugs
-                    // the pill's edge.
+                    // circle centre (pill inset 6 + padding + 19) minus half
+                    // the button. Thread children share the exact pill
+                    // geometry and only add their card's 10px indent. Without
+                    // circles it hugs the pill's edge. All measured from the
+                    // row's edge, which now sits 6px outside the pill's.
                     set_margin_start: if self.avatars {
-                        if self.is_thread_child { 26 } else { 16 }
+                        if self.is_thread_child { 32 } else { 22 }
                     } else if self.is_thread_child {
-                        14
+                        20
                     } else {
-                        4
+                        10
                     },
                     // With circles on, ride lower for a sliver of air between
                     // the circle's bottom edge and the ⋯ — but keep 1px clear
@@ -1225,7 +1235,13 @@ impl FactoryComponent for MessageRow {
             // `size_allocate`'s translation.
             let target = -self.swipe_progress;
             let current = widgets.swipe_surface.progress_px();
-            if (current - target).abs() > 0.5 {
+            if (current - target).abs() <= 0.5 {
+                // Already at rest (a release right at 0): nothing to animate,
+                // so settle the `.swiping` geometry straight away.
+                if self.swipe_active && self.swipe_progress == 0.0 {
+                    sender.input(MessageRowInput::SwipeSettled);
+                }
+            } else {
                 let surface = widgets.swipe_surface.clone();
                 let setter = {
                     let surface = surface.clone();
@@ -1241,6 +1257,12 @@ impl FactoryComponent for MessageRow {
                     setter,
                 );
                 anim.set_easing(adw::Easing::EaseOutCubic);
+                // The pill only rounds off and re-insets once the content
+                // has fully slid back over the strip.
+                if self.swipe_progress == 0.0 {
+                    let sender = sender.clone();
+                    anim.connect_done(move |_| sender.input(MessageRowInput::SwipeSettled));
+                }
                 if let Some(old) = self.swipe_anim.replace(Some(anim)) {
                     old.pause();
                 }
@@ -1318,6 +1340,7 @@ impl FactoryComponent for MessageRow {
             swipe_progress: 0.0,
             swipe_side: 0,
             swipe_dragging: false,
+            swipe_active: false,
             swipe_tracker: std::cell::RefCell::new(None),
             swipe_anim: std::cell::RefCell::new(None),
         };
@@ -1437,12 +1460,20 @@ impl FactoryComponent for MessageRow {
             MessageRowInput::SetThreadExpanded(expanded) => self.thread_expanded = expanded,
             MessageRowInput::SwipeUpdate(offset) => {
                 self.swipe_dragging = true;
+                self.swipe_active = true;
                 self.swipe_progress = offset.clamp(-SWIPE_MAX, SWIPE_MAX);
                 if self.swipe_progress != 0.0 {
                     self.swipe_side = if self.swipe_progress < 0.0 { -1 } else { 1 };
                 }
             }
             MessageRowInput::SwipeEnabledChanged => {}
+            MessageRowInput::SwipeSettled => {
+                // Ignored if a new drag started before the old snap-back
+                // finished — that drag owns the state now.
+                if !self.swipe_dragging && self.swipe_progress == 0.0 {
+                    self.swipe_active = false;
+                }
+            }
             MessageRowInput::SwipeEnd => {
                 self.swipe_dragging = false;
                 if self.swipe_progress.abs() >= SWIPE_ARM {
@@ -1760,6 +1791,9 @@ impl MessageRow {
         }
         if self.is_last_child {
             v.push("thread-last");
+        }
+        if self.swipe_active {
+            v.push("swiping");
         }
         v
     }
