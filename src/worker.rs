@@ -81,6 +81,9 @@ const PREFETCH_BODY_LIMIT: usize = 50;
 /// tree over and over. Explicit [`MailRequest::RefreshUnread`]s are never
 /// throttled — a refresh the user asked for always runs.
 const UNREAD_SWEEP_MIN: Duration = Duration::from_secs(60);
+/// How often an account's Junk / Trash auto-empty (#140) may run: it rides
+/// the unread sweep, but a server needs asking only a few times a day.
+const AUTO_EMPTY_MIN: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// How many leased per-folder IDLE watcher connections one account may hold at
 /// once (see [`watch_folder`]). The Inbox's permanent watcher and the main
@@ -697,6 +700,8 @@ async fn run_imap(
     // When the other folders' unread chips were last re-checked (None = not
     // yet this session; connect_and_list's full listing covers startup itself).
     let mut last_unread_sweep: Option<std::time::Instant> = None;
+    // When the Junk / Trash auto-empty (#140) last ran for this connection.
+    let mut last_auto_empty: Option<std::time::Instant> = None;
     // Whether the Inbox's permanent IDLE watcher has been spawned. It waits for
     // the main session to be up first — its connection must win the first slot
     // on servers with a per-user cap — and needs the folder list in the cache.
@@ -804,6 +809,8 @@ async fn run_imap(
                         .await;
                         last_unread_sweep = Some(std::time::Instant::now());
                         watch_changed_folders(&mut watchers, &account, &changed, &emit);
+                        auto_empty_imap(account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit)
+                            .await;
                     }
                 }
                 // Connected but the listing hasn't landed in the cache yet
@@ -1414,6 +1421,8 @@ async fn run_imap(
                 .await;
                 last_unread_sweep = Some(std::time::Instant::now());
                 watch_changed_folders(&mut watchers, &account, &changed, &emit);
+                auto_empty_imap(account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit)
+                    .await;
             }
 
             MailRequest::MarkSpam { path, uid, dest } => {
@@ -4380,6 +4389,184 @@ async fn list_folders(
 }
 
 /// Re-list folders (e.g. after auto-creating one) and push them to the UI.
+/// Auto-empty (#140): the roles the account wants emptied, with their ages.
+fn auto_empty_roles(account: &AccountConfig) -> Vec<(FolderKind, &'static str, u32)> {
+    [
+        (FolderKind::Junk, "junk", account.empty_junk_days),
+        (FolderKind::Trash, "trash", account.empty_trash_days),
+    ]
+    .into_iter()
+    .filter(|(_, _, days)| *days > 0)
+    .collect()
+}
+
+/// The folder holding a role for this account: the manual assignment (#82)
+/// when there is one, else the folder the listing detected.
+fn role_folder_path(account: &AccountConfig, folders: &[Folder], kind: FolderKind, role: &str) -> Option<String> {
+    if let Some(p) = account.folder_roles.get(role) {
+        if !p.is_empty() {
+            return Some(p.clone());
+        }
+    }
+    folders.iter().find(|f| f.kind == kind).map(|f| f.path.clone())
+}
+
+/// Whether the auto-empty is due: something is configured, and the last run
+/// on this connection is older than [`AUTO_EMPTY_MIN`] (or never happened).
+fn auto_empty_due(account: &AccountConfig, last: &mut Option<std::time::Instant>) -> bool {
+    if auto_empty_roles(account).is_empty() {
+        return false;
+    }
+    if last.is_some_and(|t| t.elapsed() < AUTO_EMPTY_MIN) {
+        return false;
+    }
+    *last = Some(std::time::Instant::now());
+    true
+}
+
+/// The cut-off, `days` ago, in the form IMAP SEARCH wants ("1-Aug-2026").
+/// SEARCH BEFORE compares internal dates by day, in the server's clock.
+fn imap_before_date(days: u32) -> String {
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
+    cutoff.format("%-d-%b-%Y").to_string()
+}
+
+/// The same cut-off as an RFC 3339 instant for Graph's `$filter`.
+fn graph_before_date(days: u32) -> String {
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
+    cutoff.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+/// Auto-empty (#140) for an IMAP account: delete for good whatever in the
+/// Junk / Trash folder is older than the account's chosen age. Rides the
+/// unread sweep, at most every [`AUTO_EMPTY_MIN`]. Age is the message's
+/// internal date, the day it reached the server, which is how the other
+/// clients count too. A failure is logged and tried again next time; the
+/// sweep never surfaces an error for a chore nobody is waiting on.
+async fn auto_empty_imap(
+    account_id: u32,
+    account: &AccountConfig,
+    session: &mut ImapSession,
+    cache: Option<&Cache>,
+    last: &mut Option<std::time::Instant>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if !auto_empty_due(account, last) {
+        return;
+    }
+    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let mut purged_any = false;
+    for (kind, role, days) in auto_empty_roles(account) {
+        let Some(path) = role_folder_path(account, &folders, kind, role) else {
+            tracing::info!("auto-empty: account {account_id} has no {role} folder");
+            continue;
+        };
+        let before = imap_before_date(days);
+        let found = match sel(session, &path).await {
+            Ok(_) => search_uids(session, format!("BEFORE {before}")).await,
+            Err(e) => Err(e),
+        };
+        let uids: Vec<u32> = match found {
+            Ok(set) => set.into_iter().collect(),
+            Err(e) => {
+                tracing::warn!("auto-empty: could not search {path} on account {account_id}: {e}");
+                continue;
+            }
+        };
+        if uids.is_empty() {
+            continue;
+        }
+        match purge_messages(session, &path, &uids).await {
+            Ok(()) => {
+                if let Some(c) = cache {
+                    for uid in &uids {
+                        c.delete_message(account_id, &path, *uid);
+                    }
+                }
+                tracing::info!(
+                    "auto-empty: deleted {} message(s) older than {days} days from {path} on account {account_id}",
+                    uids.len()
+                );
+                purged_any = true;
+            }
+            Err(e) => {
+                tracing::warn!("auto-empty: could not delete from {path} on account {account_id}: {e}");
+            }
+        }
+    }
+    if purged_any {
+        refresh_folders(account_id, session, cache, emit).await;
+    }
+}
+
+/// Auto-empty (#140) for a Microsoft 365 account, by the well-known folder
+/// names and `receivedDateTime`.
+async fn auto_empty_graph(
+    token: &str,
+    account_id: u32,
+    account: &AccountConfig,
+    cache: Option<&Cache>,
+    state: &mut GraphState,
+    last: &mut Option<std::time::Instant>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if !auto_empty_due(account, last) {
+        return;
+    }
+    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let mut purged_any = false;
+    for (kind, role, days) in auto_empty_roles(account) {
+        let well_known = match kind {
+            FolderKind::Junk => "junkemail",
+            _ => "deleteditems",
+        };
+        let path = role_folder_path(account, &folders, kind, role);
+        let url = format!(
+            "{GRAPH_BASE}/me/mailFolders/{well_known}/messages\
+             ?$filter=receivedDateTime%20le%20{}&$select=id&$top=100",
+            graph_before_date(days)
+        );
+        let t = token.to_string();
+        let items = tokio::task::spawn_blocking(move || graph_paged(&t, &url, GRAPH_INDEX_CAP))
+            .await
+            .unwrap_or_else(|_| Err("task failed".into()));
+        let ids: Vec<String> = match items {
+            Ok(items) => items.iter().filter_map(|v| v["id"].as_str().map(str::to_string)).collect(),
+            Err(e) => {
+                tracing::warn!("auto-empty: could not list {well_known} on account {account_id}: {e}");
+                continue;
+            }
+        };
+        if ids.is_empty() {
+            continue;
+        }
+        let mut deleted = 0usize;
+        for gid in ids {
+            let t = token.to_string();
+            let url = format!("{GRAPH_BASE}/me/messages/{gid}");
+            let ok = tokio::task::spawn_blocking(move || graph_delete_req(&t, &url))
+                .await
+                .unwrap_or_else(|_| Err("task failed".into()))
+                .is_ok();
+            if ok {
+                deleted += 1;
+                let uid = hash_uid(&gid);
+                state.uids.remove(&uid);
+                if let (Some(c), Some(path)) = (cache, path.as_deref()) {
+                    c.delete_message(account_id, path, uid);
+                }
+            }
+        }
+        tracing::info!(
+            "auto-empty: deleted {deleted} message(s) older than {days} days from {well_known} on account {account_id}"
+        );
+        purged_any |= deleted > 0;
+    }
+    if purged_any {
+        graph_refresh_unread(token, account_id, cache, state, emit).await;
+    }
+}
+
 async fn refresh_folders(
     account_id: u32,
     session: &mut ImapSession,
@@ -7466,6 +7653,8 @@ async fn run_graph(
         emit(WorkerEvent::Folders(cached_folders));
     }
 
+    // When the Junk / Trash auto-empty (#140) last ran for this worker.
+    let mut last_auto_empty: Option<std::time::Instant> = None;
     let mut state = GraphState {
         folders: Default::default(),
         uids: Default::default(),
@@ -8093,6 +8282,8 @@ async fn run_graph(
                 if let Some(token) = graph_token(&account, &quiet).await {
                     graph_refresh_unread(&token, account_id, cache.as_ref(), &mut state, &emit)
                         .await;
+                    auto_empty_graph(&token, account_id, &account, cache.as_ref(), &mut state, &mut last_auto_empty, &emit)
+                        .await;
                 }
             }
 
@@ -8483,6 +8674,8 @@ mod tests {
     fn sample_account() -> AccountConfig {
         AccountConfig {
             folder_roles: Default::default(),
+            empty_junk_days: 0,
+            empty_trash_days: 0,
             push: None,
             name: String::new(),
             email: "me@example.com".into(),
@@ -9333,6 +9526,74 @@ mod tests {
         // "javascript:" isn't one of our recognized prefixes, so it stays plain text.
         let out = linkify("javascript:alert(1)");
         assert!(!out.contains("<a "), "got: {out}");
+    }
+
+    /// Auto-empty (#140): only the roles with an age are swept.
+    #[test]
+    fn auto_empty_roles_follow_the_ages() {
+        let mut acc = sample_account();
+        assert!(auto_empty_roles(&acc).is_empty());
+        acc.empty_trash_days = 14;
+        let roles = auto_empty_roles(&acc);
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles[0].0, FolderKind::Trash);
+        assert_eq!(roles[0].2, 14);
+        acc.empty_junk_days = 7;
+        assert_eq!(auto_empty_roles(&acc).len(), 2);
+    }
+
+    /// The manual role assignment (#82) names the folder first; otherwise
+    /// the detected kind does.
+    #[test]
+    fn auto_empty_role_folder_prefers_the_assignment() {
+        let mut acc = sample_account();
+        let folders = vec![Folder {
+            id: 7,
+            account_id: 1,
+            name: "Deleted Messages".into(),
+            path: "Deleted Messages".into(),
+            kind: FolderKind::Trash,
+            unread: 0,
+        }];
+        assert_eq!(
+            role_folder_path(&acc, &folders, FolderKind::Trash, "trash").as_deref(),
+            Some("Deleted Messages")
+        );
+        assert_eq!(role_folder_path(&acc, &folders, FolderKind::Junk, "junk"), None);
+        acc.folder_roles.insert("trash".into(), "INBOX.Bin".into());
+        assert_eq!(
+            role_folder_path(&acc, &folders, FolderKind::Trash, "trash").as_deref(),
+            Some("INBOX.Bin")
+        );
+    }
+
+    /// The sweep runs once, then not again until the interval has passed.
+    #[test]
+    fn auto_empty_is_throttled() {
+        let mut acc = sample_account();
+        let mut last = None;
+        assert!(!auto_empty_due(&acc, &mut last), "nothing configured");
+        assert!(last.is_none());
+        acc.empty_junk_days = 7;
+        assert!(auto_empty_due(&acc, &mut last));
+        assert!(!auto_empty_due(&acc, &mut last), "just ran");
+        last = Some(std::time::Instant::now() - AUTO_EMPTY_MIN - Duration::from_secs(1));
+        assert!(auto_empty_due(&acc, &mut last));
+    }
+
+    /// IMAP wants "1-Aug-2026" (no zero padding); Graph an RFC 3339 instant.
+    #[test]
+    fn auto_empty_cutoffs_are_well_formed() {
+        let imap = imap_before_date(0);
+        let today = chrono::Utc::now().format("%-d-%b-%Y").to_string();
+        assert_eq!(imap, today);
+        assert!(!imap.starts_with('0'), "{imap}");
+        let parts: Vec<&str> = imap.split('-').collect();
+        assert_eq!(parts.len(), 3, "{imap}");
+        assert_eq!(parts[1].len(), 3, "{imap}");
+        let graph = graph_before_date(30);
+        assert!(chrono::DateTime::parse_from_rfc3339(&graph).is_ok(), "{graph}");
+        assert!(graph < chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
     }
 
     #[test]

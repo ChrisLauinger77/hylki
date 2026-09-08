@@ -19,6 +19,18 @@ The reader's own fonts and colours over the senders'.
   untouched, so View source, replies and forwards carry the original.
   Stored in `privacy.toml` as `override_fonts`, `reader_font` (a Pango
   description) and `override_colors`.
+- **Empty Junk and Trash automatically** (#140, requested by @typedev).
+  Two per-account choices in the account editor's Syncing group: never,
+  or after 7, 14 or 30 days. At each sync (a few times a day at most) the
+  worker deletes for good whatever in that folder is older than the age,
+  counted from the day the message reached the server, the way Thunderbird
+  and Apple Mail count. IMAP asks the server with `SEARCH BEFORE` and
+  expunges; Microsoft 365 filters the well-known folder on
+  `receivedDateTime` and deletes each message. A manual Special Folders
+  assignment names the folder to sweep. POP3 accounts have no server
+  folders, so the choice does nothing there. Failures are logged and
+  retried at the next sync. Stored per account as `empty_junk_days` and
+  `empty_trash_days`.
 
 ## 1.23.1 — 2026-09-07
 

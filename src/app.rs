@@ -11227,6 +11227,8 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         oauth_refresh: String::new(),
         push: None,
         folder_roles: Default::default(),
+        empty_junk_days: 0,
+        empty_trash_days: 0,
     };
     vec![
         mk("Jason M.", "jason@vireo.hyprlab.co", "#3584e4", "🚀"),

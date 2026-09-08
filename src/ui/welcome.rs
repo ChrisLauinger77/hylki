@@ -908,5 +908,7 @@ fn blank_account() -> AccountConfig {
         oauth_refresh: String::new(),
         push: None,
         folder_roles: Default::default(),
+        empty_junk_days: 0,
+        empty_trash_days: 0,
     }
 }

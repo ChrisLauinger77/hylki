@@ -814,6 +814,21 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Instant new mail (IMAP push)"),
                                     set_subtitle: &i18n("Turn off for servers that stall on push connections."),
                                 },
+
+                                // Auto-empty (#140): mail past the chosen age in
+                                // Junk / Trash is deleted for good at each sync.
+                                #[name = "empty_junk_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Empty Junk automatically"),
+                                    set_subtitle: &i18n("Delete junk mail older than this for good, \
+                                                   checked at each sync."),
+                                },
+                                #[name = "empty_trash_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Empty Trash automatically"),
+                                    set_subtitle: &i18n("Delete mail in the Trash older than this for \
+                                                   good, checked at each sync."),
+                                },
                             },
 
                             // Manual special-folder mapping (#82): for servers
@@ -988,6 +1003,12 @@ impl Component for AccountsWindow {
             .push_row
             .set_model(Some(&gtk::StringList::new(&[i18n("Follow Settings").as_str(), i18n("On").as_str(), i18n("Off").as_str()])));
         widgets.push_row.set_list_factory(Some(&non_ellipsizing_factory()));
+        let empty_labels = auto_empty_labels();
+        let empty_labels: Vec<&str> = empty_labels.iter().map(String::as_str).collect();
+        for row in [&widgets.empty_junk_row, &widgets.empty_trash_row] {
+            row.set_model(Some(&gtk::StringList::new(&empty_labels)));
+            row.set_list_factory(Some(&non_ellipsizing_factory()));
+        }
 
         // Show the SMTP credential fields only when the toggle is on.
         widgets
@@ -2503,7 +2524,37 @@ fn read_account(widgets: &AccountsWindowWidgets, emoji: Option<String>) -> Accou
         },
         // Assigned by SaveWithSig from the Special Folders combos.
         folder_roles: Default::default(),
+        empty_junk_days: AUTO_EMPTY_DAYS
+            .get(widgets.empty_junk_row.selected() as usize)
+            .copied()
+            .unwrap_or(0),
+        empty_trash_days: AUTO_EMPTY_DAYS
+            .get(widgets.empty_trash_row.selected() as usize)
+            .copied()
+            .unwrap_or(0),
     }
+}
+
+/// Auto-empty choices (#140), in combo order: never, then the ages.
+const AUTO_EMPTY_DAYS: &[u32] = &[0, 7, 14, 30];
+
+/// The combo index for a stored age (an unknown value shows as "Never").
+fn auto_empty_index(days: u32) -> u32 {
+    AUTO_EMPTY_DAYS.iter().position(|d| *d == days).unwrap_or(0) as u32
+}
+
+/// The combo's labels, translated.
+fn auto_empty_labels() -> Vec<String> {
+    AUTO_EMPTY_DAYS
+        .iter()
+        .map(|d| {
+            if *d == 0 {
+                i18n("Never")
+            } else {
+                crate::i18n::ni18n_f("After {n} day", "After {n} days", *d, &[("n", &d.to_string())])
+            }
+        })
+        .collect()
 }
 
 /// Whether the editor's HTML is effectively empty (no visible content).
@@ -2547,6 +2598,8 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
         Some(true) => 1,
         Some(false) => 2,
     });
+    widgets.empty_junk_row.set_selected(auto_empty_index(acc.empty_junk_days));
+    widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -2624,6 +2677,8 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.pass_row.set_text("");
     widgets.smtp_separate_row.set_active(false);
     widgets.push_row.set_selected(0);
+    widgets.empty_junk_row.set_selected(0);
+    widgets.empty_trash_row.set_selected(0);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");
     widgets.label_row.set_text("");

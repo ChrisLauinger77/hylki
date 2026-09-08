@@ -197,6 +197,17 @@ pub struct AccountConfig {
     /// "archive". Empty = fully automatic.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub folder_roles: std::collections::BTreeMap<String, String>,
+    /// Auto-empty (#140): mail in the Junk folder older than this many days
+    /// is deleted for good at each sync. 0 = never.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub empty_junk_days: u32,
+    /// The same for the Trash folder.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub empty_trash_days: u32,
+}
+
+fn is_zero(v: &u32) -> bool {
+    *v == 0
 }
 
 /// A send-as alias (#34): an extra From identity the composer offers. By
@@ -2392,6 +2403,8 @@ mod filter_tests {
             oauth_refresh: "TOKEN".into(),
             push: None,
             folder_roles: Default::default(),
+            empty_junk_days: 0,
+            empty_trash_days: 0,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {
@@ -2410,6 +2423,16 @@ mod filter_tests {
         let back: SettingsBundle = toml::from_str(&text).unwrap();
         assert_eq!(back.accounts[0].email, "a@b.c");
         assert!(back.accounts[0].password.is_empty());
+        // Auto-empty (#140): "never" is left out of the file, an age is kept.
+        assert!(!text.contains("empty_junk_days"), "{text}");
+        assert_eq!(back.accounts[0].empty_trash_days, 0);
+        let mut aged = bundle;
+        aged.accounts[0].empty_trash_days = 30;
+        let text = toml::to_string_pretty(&aged).unwrap();
+        assert!(text.contains("empty_trash_days = 30"), "{text}");
+        let back: SettingsBundle = toml::from_str(&text).unwrap();
+        assert_eq!(back.accounts[0].empty_trash_days, 30);
+        assert_eq!(back.accounts[0].empty_junk_days, 0);
     }
 
     #[test]

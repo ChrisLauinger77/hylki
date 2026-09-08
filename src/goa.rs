@@ -53,6 +53,8 @@ impl GoaMailAccount {
     pub fn to_config(&self, password: String, oauth: bool) -> AccountConfig {
         AccountConfig {
             folder_roles: Default::default(),
+            empty_junk_days: 0,
+            empty_trash_days: 0,
             name: if self.name.trim().is_empty() {
                 self.email.clone()
             } else {
