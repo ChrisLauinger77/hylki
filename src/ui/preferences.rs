@@ -232,7 +232,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
     (
         i18n_noop("Settings"),
         &[
-            SidePage { id: "general", title: i18n_noop("General"), icon: "co.hyprlab.Vireo-preferences-system-symbolic", accounts: false },
+            SidePage { id: "general", title: i18n_noop("General"), icon: "co.hyprlab.Vireo-puzzle-piece-symbolic", accounts: false },
             SidePage { id: "appearance", title: i18n_noop("Appearance"), icon: "co.hyprlab.Vireo-preferences-desktop-appearance-symbolic", accounts: false },
             SidePage { id: "sidebar", title: i18n_noop("Sidebar"), icon: "co.hyprlab.Vireo-sidebar-show-symbolic", accounts: false },
             SidePage { id: "list", title: i18n_noop("Message List"), icon: "co.hyprlab.Vireo-view-list-bullet-symbolic", accounts: false },
