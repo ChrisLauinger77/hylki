@@ -306,6 +306,13 @@ impl Cache {
             "UPDATE messages SET preview = ''              WHERE preview LIKE '--%' OR preview LIKE '( http%'",
             [],
         );
+        // Previews cached as the PGP/MIME version stub (#133) become the
+        // encrypted-message marker the list draws a lock for.
+        let _ = conn.execute(
+            "UPDATE messages SET preview = ?1 \
+             WHERE preview LIKE 'Version: 1' OR preview = 'Encrypted message'",
+            [crate::models::ENCRYPTED_PREVIEW],
+        );
         if upgrading_index {
             Self::redecode_encoded_subjects(&conn);
         }

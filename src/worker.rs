@@ -5036,7 +5036,23 @@ fn finish_preview(decoded: String) -> String {
         })
         .collect();
     let collapsed = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    if let Some(p) = pgp_preview(&collapsed) {
+        return p;
+    }
     collapsed.chars().take(PREVIEW_CHARS).collect()
+}
+
+/// What the list says for an OpenPGP-encrypted message (#133), whose first
+/// text is otherwise the PGP/MIME version stub ("Version: 1") or the
+/// armour itself — neither of which says anything a reader wants to see.
+fn pgp_preview(collapsed: &str) -> Option<String> {
+    let t = collapsed.trim();
+    let stub = t.to_ascii_lowercase();
+    let stub = stub.trim_start_matches("version:").trim();
+    if stub == "1" || t.starts_with("-----BEGIN PGP MESSAGE-----") {
+        return Some(crate::models::ENCRYPTED_PREVIEW.to_string());
+    }
+    None
 }
 
 /// Drop the link furniture that plain-text alternatives are built from, so the
@@ -7633,6 +7649,7 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
         .chars()
         .take(200)
         .collect();
+    let preview = pgp_preview(&preview).unwrap_or(preview);
     let from_addr = v["from"]["emailAddress"]["address"].as_str().unwrap_or("").to_string();
     let reply_to = graph_addrs(&v["replyTo"]);
     let reply_to =
@@ -9090,6 +9107,24 @@ mod tests {
             "-- Regards, Steve"
         );
         assert_eq!(preview_from_part(b"--\r\nsigned off"), "-- signed off");
+    }
+
+    /// A PGP/MIME message's first part is the "Version: 1" stub, and an
+    /// inline one begins with the armour; the list says what it is instead.
+    #[test]
+    fn preview_names_an_encrypted_message() {
+        let marker = crate::models::ENCRYPTED_PREVIEW;
+        assert_eq!(preview_from_part(b"Version: 1\r\n"), marker);
+        assert_eq!(preview_from_part(b"version: 1"), marker);
+        assert_eq!(
+            preview_from_part(b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n"),
+            marker
+        );
+        assert!(crate::models::preview_is_encrypted(marker));
+        assert_eq!(crate::models::preview_display(marker), "Encrypted message");
+        assert_eq!(crate::models::preview_display("Hello"), "Hello");
+        assert_eq!(pgp_preview("Version 1 of the plan is attached"), None);
+        assert_eq!(preview_from_part(b"Hello there"), "Hello there");
     }
 
     #[test]

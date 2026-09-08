@@ -1095,10 +1095,30 @@ impl FactoryComponent for MessageRow {
 
                 // The message's own text, at full width: nothing shares this line,
                 // so it never reflows or gets covered.
-                gtk::Label {
+                gtk::Box {
+                    set_orientation: gtk::Orientation::Horizontal,
+                    set_spacing: 4,
                     // 0 lines: previews are off, so the row gives them no space.
                     set_visible: self.preview_lines > 0,
-                    set_label: self.thread_preview.as_deref().unwrap_or(&self.msg.preview),
+
+                    // An encrypted message (#133) shows a lock where its text
+                    // would be, in the preview's own dimmed colour: a symbolic
+                    // icon takes the label's foreground, so it follows the
+                    // light and dark themes with it.
+                    gtk::Image {
+                        set_icon_name: Some("co.hyprlab.Vireo-channel-secure-symbolic"),
+                        set_pixel_size: 12,
+                        set_valign: gtk::Align::Center,
+                        set_visible: crate::models::preview_is_encrypted(
+                            self.thread_preview.as_deref().unwrap_or(&self.msg.preview),
+                        ),
+                        add_css_class: "message-preview",
+                    },
+
+                gtk::Label {
+                    set_label: &crate::models::preview_display(
+                        self.thread_preview.as_deref().unwrap_or(&self.msg.preview),
+                    ),
                     // Fill (not Start): the layout width then matches the
                     // allocation exactly, so the ellipsis lands right where the
                     // text is cut instead of stranded at a stale layout edge.
@@ -1117,6 +1137,7 @@ impl FactoryComponent for MessageRow {
                     // the extra lines.
                     set_lines: self.preview_lines.max(1) as i32,
                     add_css_class: "message-preview",
+                },
                 },
 
             },

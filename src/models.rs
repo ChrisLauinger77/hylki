@@ -176,6 +176,27 @@ impl SenderTrust {
     }
 }
 
+/// The list preview stored for an OpenPGP-encrypted message (#133): a
+/// marker rather than words, so the row can draw a lock icon and say
+/// "Encrypted message" in whatever language is current, and nothing of the
+/// message itself is written down. A lock glyph, so it still reads if it
+/// ever shows raw.
+pub const ENCRYPTED_PREVIEW: &str = "\u{1F512}";
+
+/// Whether a stored preview is the encrypted-message marker.
+pub fn preview_is_encrypted(preview: &str) -> bool {
+    preview.trim() == ENCRYPTED_PREVIEW
+}
+
+/// The words the list shows for a stored preview.
+pub fn preview_display(preview: &str) -> String {
+    if preview_is_encrypted(preview) {
+        i18n("Encrypted message")
+    } else {
+        preview.to_string()
+    }
+}
+
 /// How far the user's keyring trusts an OpenPGP signing key (#133).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PgpTrust {
