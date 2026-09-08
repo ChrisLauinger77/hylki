@@ -18,6 +18,21 @@ pub struct RichEditor {
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
     attach_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    /// The style manager's dark-notify handler that re-grounds the document
+    /// on a live theme flip; disconnected when the last clone of the editor
+    /// goes (the editor is a cloneable handle, so the guard is shared).
+    _theme_handler: std::rc::Rc<ThemeHandlerGuard>,
+}
+
+/// Disconnects a style-manager handler on drop.
+struct ThemeHandlerGuard(Option<gtk::glib::SignalHandlerId>);
+
+impl Drop for ThemeHandlerGuard {
+    fn drop(&mut self) {
+        if let Some(id) = self.0.take() {
+            adw::StyleManager::default().disconnect(id);
+        }
+    }
 }
 
 /// Push the spell-checking preference onto the shared web context (#114).
@@ -177,6 +192,34 @@ impl RichEditor {
             });
         }
         webview.load_html(&document(initial_html, &webview), Some("https://vireo.localhost/editor"));
+        // A live theme flip re-grounds the open document (#148): the scheme
+        // and the ground are baked into the document at load, so without
+        // this the editor stays in the scheme it was opened in. Deferred to
+        // the next main-loop pass — the theme's named colours are only
+        // re-resolved after the signal fires.
+        let theme_handler = {
+            let weak = webview.downgrade();
+            adw::StyleManager::default().connect_dark_notify(move |sm| {
+                let dark = sm.is_dark();
+                let weak = weak.clone();
+                gtk::glib::idle_add_local_once(move || {
+                    let Some(v) = weak.upgrade() else { return };
+                    let (ground, _, _) = crate::ui::message_view::theme_grounds_for(&v, dark);
+                    let scheme = if dark { "dark" } else { "light" };
+                    exec(
+                        &v,
+                        &format!(
+                            "(function(){{\
+                               var m=document.querySelector('meta[name=color-scheme]');\
+                               if(m)m.content='{scheme}';\
+                               document.documentElement.style.colorScheme='{scheme}';\
+                               document.body.style.background='{ground}';\
+                             }})()"
+                        ),
+                    );
+                });
+            })
+        };
 
         // The stock editable menu's single "Paste" hides the plain/rich choice
         // behind the preference; the menu offers both, always, in its place.
@@ -326,7 +369,12 @@ impl RichEditor {
         bx.append(&toolbar);
         bx.append(&frame);
 
-        RichEditor { widget: bx, webview, attach_cb }
+        RichEditor {
+            widget: bx,
+            webview,
+            attach_cb,
+            _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
+        }
     }
 
     /// What "Send as Attachment Instead" does with the lifted image: the

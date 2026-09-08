@@ -2798,10 +2798,22 @@ impl SimpleComponent for AppModel {
                 }
                 // VIREO_SHOWCASE_REPLY opens the inline reply composer on the
                 // selected message, to check the composer's grounds (#148).
+                // VIREO_SHOWCASE_FLIP=dark|light then switches the app theme
+                // at 6 s, to check a live flip re-resolves those grounds.
                 if std::env::var("VIREO_SHOWCASE_REPLY").is_ok() {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         s.input(AppMsg::Reply);
+                    });
+                }
+                if let Ok(flip) = std::env::var("VIREO_SHOWCASE_FLIP") {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        s.input(AppMsg::SetAppTheme(if flip == "dark" {
+                            config::AppTheme::Dark
+                        } else {
+                            config::AppTheme::Light
+                        }));
                     });
                 }
                 // VIREO_SHOWCASE_SETTINGS=accounts|prefs opens the Settings
@@ -11868,7 +11880,16 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     };
     let style = adw::StyleManager::default();
     apply(&provider, style.is_dark());
-    style.connect_dark_notify(move |sm| apply(&provider, sm.is_dark()));
+    style.connect_dark_notify(move |sm| {
+        // The theme's named colours are re-resolved after this signal, not
+        // before it: read them now and the lookup answers for the scheme
+        // just left (a light-grey composer in dark mode). Apply once the
+        // main loop comes round, as the reader does through its own message.
+        let dark = sm.is_dark();
+        let provider = provider.clone();
+        let apply = apply.clone();
+        gtk::glib::idle_add_local_once(move || apply(&provider, dark));
+    });
 }
 
 fn reply_prefill(m: &Message) -> ComposePrefill {
