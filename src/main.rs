@@ -18,6 +18,7 @@ mod models;
 mod mutf7;
 mod notify;
 mod oauth;
+mod pgp;
 mod platform;
 mod power;
 mod ram_cache;

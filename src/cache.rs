@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS sender_checks (
     trust       TEXT NOT NULL,
     summary     TEXT NOT NULL,
     findings    TEXT NOT NULL,
+    pgp         TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (account_id, folder_path, uid)
 );
 CREATE TABLE IF NOT EXISTS attachments (
@@ -279,6 +280,10 @@ impl Cache {
         // their folder syncs again and the flags come down with the rest.
         let _ =
             conn.execute("ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
+        // And the OpenPGP verdict (#133) beside the sender check, as JSON;
+        // empty for a message that carried none.
+        let _ =
+            conn.execute("ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''", []);
         // Previews cached by a build that showed MIME machinery or a tracking
         // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
         // the rendered link a marketing mail opens with ("( https://…"). Clearing
@@ -819,7 +824,7 @@ impl Cache {
     ) -> Option<crate::models::SenderCheck> {
         self.conn
             .query_row(
-                "SELECT trust, summary, findings FROM sender_checks \
+                "SELECT trust, summary, findings, pgp FROM sender_checks \
                  WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
                 params![account_id, folder_path, uid],
                 |row| {
@@ -832,6 +837,7 @@ impl Cache {
                             .filter(|l| !l.is_empty())
                             .map(str::to_string)
                             .collect(),
+                        pgp: serde_json::from_str(&row.get::<_, String>(3)?).ok(),
                     })
                 },
             )
@@ -847,15 +853,20 @@ impl Cache {
     ) {
         if let Err(e) = self.conn.execute(
             "INSERT OR REPLACE INTO sender_checks \
-             (account_id, folder_path, uid, trust, summary, findings) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+             (account_id, folder_path, uid, trust, summary, findings, pgp) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 account_id,
                 folder_path,
                 uid,
                 check.trust.as_tag(),
                 check.summary,
-                check.findings.join("\n")
+                check.findings.join("\n"),
+                check
+                    .pgp
+                    .as_ref()
+                    .and_then(|p| serde_json::to_string(p).ok())
+                    .unwrap_or_default()
             ],
         ) {
             tracing::warn!("cache save_sender_check failed: {e}");

@@ -1206,7 +1206,9 @@ async fn run_imap(
             } => match load_body_retry(&mut session, &account, &path, uid).await {
                 Ok((body, check, has_attachments)) => {
                     if let Some(c) = cache.as_ref() {
-                        c.save_body(account_id, &path, uid, &body);
+                        if body_cacheable(&check) {
+                            c.save_body(account_id, &path, uid, &body);
+                        }
                         c.save_sender_check(account_id, &path, uid, &check);
                         c.set_has_attachment(account_id, &path, uid, has_attachments);
                     }
@@ -1255,7 +1257,9 @@ async fn run_imap(
                                     continue;
                                 };
                                 if let Some(c) = cache.as_ref() {
-                                    c.save_body(account_id, &path, *uid, &body);
+                                    if body_cacheable(&check) {
+                                        c.save_body(account_id, &path, *uid, &body);
+                                    }
                                     c.save_sender_check(account_id, &path, *uid, &check);
                                     c.set_has_attachment(account_id, &path, *uid, has_attachments);
                                 }
@@ -1309,10 +1313,12 @@ async fn run_imap(
                 download: _,
             } => match load_raw_retry(&mut session, &account, &path, uid).await {
                 Ok(raw) => {
-                    let items = extract_attachments(&raw);
+                    let (items, cacheable) = attachments_of(&raw);
                     if let Some(c) = cache.as_ref() {
-                        c.save_attachments(account_id, &path, uid, &items);
-                        c.mark_attachments_checked(account_id, &path, uid);
+                        if cacheable {
+                            c.save_attachments(account_id, &path, uid, &items);
+                            c.mark_attachments_checked(account_id, &path, uid);
+                        }
                     }
                     emit(WorkerEvent::Attachments { message_id, items });
                 }
@@ -2107,11 +2113,18 @@ async fn run_one_prefetch(
             .unwrap_or(false);
         if !already {
             if let Ok(raw) = load_raw_retry(session, account, &path, uid).await {
-                let attachments = extract_attachments(&raw);
-                let check = crate::verify::check_sender(&raw);
+                // An encrypted message is left for an explicit open (#133):
+                // decrypting here would raise the passphrase prompt out of
+                // nowhere, and nothing decrypted is cached anyway.
+                if crate::pgp::is_encrypted(&raw) {
+                    emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
+                    return;
+                }
+                let (_, check, _) = render_raw(&raw);
+                let (attachments, _) = attachments_of(&raw);
                 emit(WorkerEvent::SenderChecked { message_id: uid, check: check.clone() });
                 if let Some(c) = cache {
-                    c.save_body(account_id, &path, uid, &extract_body(&raw));
+                    c.save_body(account_id, &path, uid, &render_raw(&raw).0);
                     c.save_sender_check(account_id, &path, uid, &check);
                     c.save_attachments(account_id, &path, uid, &attachments);
                     // Mark as fetched so it's never re-downloaded to re-check,
@@ -2649,6 +2662,59 @@ const INLINE_ATTACHMENT_MIN: usize = 64 * 1024;
 /// message's files without a fetch.
 pub fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
     extract_attachments(raw)
+}
+
+/// What a raw message renders to: body HTML, the sender check (carrying the
+/// OpenPGP verdict, #133, when the message had any), and whether it has
+/// attachments. An encrypted message is decrypted through the user's GnuPG
+/// here, which may raise the agent's passphrase prompt — so this runs only
+/// for an explicit open, never for the background prefetch.
+fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, bool) {
+    let mut check = crate::verify::check_sender(raw);
+    match crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system()) {
+        Some(u) => {
+            let body = match &u.inner {
+                Some(inner) => extract_body(inner),
+                None => wrap_plain(&pgp_notice(&u.status)),
+            };
+            let has = u.inner.as_deref().is_some_and(|i| !extract_attachments(i).is_empty());
+            check.pgp = Some(u.status);
+            (body, check, has)
+        }
+        None => (extract_body(raw), check, !extract_attachments(raw).is_empty()),
+    }
+}
+
+/// The reader's stand-in for a message that could not be decrypted.
+fn pgp_notice(status: &crate::models::PgpStatus) -> String {
+    let mut text = status.summary();
+    for n in &status.notes {
+        text.push_str("\n");
+        text.push_str(n);
+    }
+    text
+}
+
+/// Whether a rendered body may go into the cache: never for anything that
+/// was encrypted, decrypted or not — the plaintext lives only in the reader,
+/// and a failed decryption is retried at the next open.
+fn body_cacheable(check: &crate::models::SenderCheck) -> bool {
+    !check.pgp.as_ref().is_some_and(|p| p.encrypted)
+}
+
+/// The attachments of a raw message, through any OpenPGP wrapping, and
+/// whether they may be cached (not when they were encrypted).
+fn attachments_of(raw: &[u8]) -> (Vec<crate::models::Attachment>, bool) {
+    match crate::pgp::detect(raw) {
+        None => (extract_attachments(raw), true),
+        Some(shape) => {
+            let items = crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system())
+                .and_then(|u| u.inner)
+                .map(|inner| extract_attachments(&inner))
+                .unwrap_or_default();
+            (items, !shape.is_encrypted())
+        }
+    }
 }
 
 /// Parse attachment parts (name, mime, decoded bytes) out of a raw message.
@@ -5559,17 +5625,14 @@ async fn load_body(
     // The whole message is in hand, so the sender check rides along for free
     // rather than costing a second fetch.
     let raw = fetches.iter().find_map(|f| f.body());
-    let body = raw
-        .map(extract_body)
-        .unwrap_or_else(|| "(empty message)".to_string());
-    let check = raw.map(crate::verify::check_sender).unwrap_or_default();
     // The paperclip is guessed from BODYSTRUCTURE (or, on servers whose structure
     // we can't parse, from the top-level Content-Type), and both guesses miss
     // shapes like Apple Mail's inline PDF nested under an alternative (issue #9).
     // The whole message is in hand here, so the guess can be replaced with fact
     // — at no extra network cost.
-    let has_attachments = raw.map(|r| !extract_attachments(r).is_empty()).unwrap_or(false);
-    Ok((body, check, has_attachments))
+    Ok(raw
+        .map(render_raw)
+        .unwrap_or_else(|| ("(empty message)".to_string(), Default::default(), false)))
 }
 
 /// Fetch several messages' bodies from one folder in a single `uid_fetch`.
@@ -5608,13 +5671,7 @@ async fn load_bodies(
         let (Some(uid), Some(raw)) = (last_uid, f.body()) else {
             continue;
         };
-        out.entry(uid).or_insert_with(|| {
-            (
-                extract_body(raw),
-                crate::verify::check_sender(raw),
-                !extract_attachments(raw).is_empty(),
-            )
-        });
+        out.entry(uid).or_insert_with(|| render_raw(raw));
     }
     Ok(out)
 }
@@ -6307,15 +6364,22 @@ async fn run_pop3(
             MailRequest::LoadBody { message_id, path: _, uid } => {
                 if let Some(body) = cache.as_ref().and_then(|c| c.load_body(account_id, INBOX, uid)) {
                     emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
+                    if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
+                        emit(WorkerEvent::SenderChecked { message_id, check });
+                    }
                     continue;
                 }
                 match pop3_fetch_raw(&account, uid).await {
                     Ok(raw) => {
-                        let body = extract_body(&raw);
+                        let (body, check, _) = render_raw(&raw);
                         if let Some(c) = cache.as_ref() {
-                            c.save_body(account_id, INBOX, uid, &body);
+                            if body_cacheable(&check) {
+                                c.save_body(account_id, INBOX, uid, &body);
+                            }
+                            c.save_sender_check(account_id, INBOX, uid, &check);
                         }
                         emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
+                        emit(WorkerEvent::SenderChecked { message_id, check });
                     }
                     Err(e) => emit(WorkerEvent::Error {
                         text: i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]),
@@ -6332,15 +6396,22 @@ async fn run_pop3(
                         cache.as_ref().and_then(|c| c.load_body(account_id, INBOX, uid))
                     {
                         emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
+                        if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
+                            emit(WorkerEvent::SenderChecked { message_id, check });
+                        }
                         continue;
                     }
                     match pop3_fetch_raw(&account, uid).await {
                         Ok(raw) => {
-                            let body = extract_body(&raw);
+                            let (body, check, _) = render_raw(&raw);
                             if let Some(c) = cache.as_ref() {
-                                c.save_body(account_id, INBOX, uid, &body);
+                                if body_cacheable(&check) {
+                                    c.save_body(account_id, INBOX, uid, &body);
+                                }
+                                c.save_sender_check(account_id, INBOX, uid, &check);
                             }
                             emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
+                            emit(WorkerEvent::SenderChecked { message_id, check });
                         }
                         Err(e) => emit(WorkerEvent::Error {
                             text: i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]),
@@ -6558,9 +6629,13 @@ async fn pop3_sync(
         // New message: download in full, cache its body + attachments.
         let raw = pop.retr(*num).await?;
         let msg = summary_from_raw(account_id, inbox_id, uid, &raw);
-        if let Some(c) = cache {
-            c.save_body(account_id, INBOX, uid, &extract_body(&raw));
-            let items = extract_attachments(&raw);
+        // An encrypted message (#133) is neither rendered nor cached here:
+        // it is decrypted, in the reader only, when opened.
+        if let Some(c) = cache.filter(|_| !crate::pgp::is_encrypted(&raw)) {
+            let (body, check, _) = render_raw(&raw);
+            c.save_body(account_id, INBOX, uid, &body);
+            c.save_sender_check(account_id, INBOX, uid, &check);
+            let (items, _) = attachments_of(&raw);
             if !items.is_empty() {
                 c.save_attachments(account_id, INBOX, uid, &items);
             }
@@ -7753,16 +7828,24 @@ async fn run_graph(
             MailRequest::LoadBody { message_id, path, uid } => {
                 if let Some(body) = cache.as_ref().and_then(|c| c.load_body(account_id, &path, uid))
                 {
+                    let check = cache.as_ref().and_then(|c| c.load_sender_check(account_id, &path, uid));
                     emit(WorkerEvent::Body { message_id, path, body });
+                    if let Some(check) = check {
+                        emit(WorkerEvent::SenderChecked { message_id, check });
+                    }
                     continue;
                 }
                 match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
                     Ok(raw) => {
-                        let body = extract_body(&raw);
+                        let (body, check, _) = render_raw(&raw);
                         if let Some(c) = cache.as_ref() {
-                            c.save_body(account_id, &path, uid, &body);
+                            if body_cacheable(&check) {
+                                c.save_body(account_id, &path, uid, &body);
+                            }
+                            c.save_sender_check(account_id, &path, uid, &check);
                         }
                         emit(WorkerEvent::Body { message_id, path, body });
+                        emit(WorkerEvent::SenderChecked { message_id, check });
                     }
                     Err(e) => emit(WorkerEvent::Error {
                         text: i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]),
@@ -7777,15 +7860,22 @@ async fn run_graph(
                         cache.as_ref().and_then(|c| c.load_body(account_id, &path, uid))
                     {
                         emit(WorkerEvent::Body { message_id, path: path.clone(), body });
+                        if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, &path, uid)) {
+                            emit(WorkerEvent::SenderChecked { message_id, check });
+                        }
                         continue;
                     }
                     match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
                         Ok(raw) => {
-                            let body = extract_body(&raw);
+                            let (body, check, _) = render_raw(&raw);
                             if let Some(c) = cache.as_ref() {
-                                c.save_body(account_id, &path, uid, &body);
+                                if body_cacheable(&check) {
+                                    c.save_body(account_id, &path, uid, &body);
+                                }
+                                c.save_sender_check(account_id, &path, uid, &check);
                             }
                             emit(WorkerEvent::Body { message_id, path: path.clone(), body });
+                            emit(WorkerEvent::SenderChecked { message_id, check });
                         }
                         Err(e) => emit(WorkerEvent::Error {
                             text: i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]),

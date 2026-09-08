@@ -36,6 +36,10 @@ finish-args:
   # above; that is the path that actually runs.
   # Read the host's Evolution Data Server address books (contacts list is read
   # from these SQLite caches; the sandbox's own XDG dirs are empty).
+  # OpenPGP (#133): the runtime's gpg reads the user's keyring and talks to
+  # the host's gpg-agent (passphrases, pinentry) over its socket.
+  - --filesystem=~/.gnupg
+  - --filesystem=xdg-run/gnupg
   - --filesystem=xdg-data/evolution:ro
   - --filesystem=xdg-cache/evolution:ro
   - --filesystem=xdg-config/evolution:ro

@@ -344,6 +344,7 @@ fn judge(ev: &Evidence) -> SenderCheck {
         trust,
         summary,
         findings,
+        pgp: None,
     }
 }
 

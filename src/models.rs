@@ -176,6 +176,97 @@ impl SenderTrust {
     }
 }
 
+/// How far the user's keyring trusts an OpenPGP signing key (#133).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum PgpTrust {
+    /// Fully or ultimately trusted: a key the user vouched for.
+    Full,
+    Marginal,
+    /// In the keyring, but never assessed.
+    Unknown,
+    /// Explicitly distrusted.
+    Never,
+}
+
+/// The verdict on an OpenPGP signature (#133).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum PgpSignature {
+    /// Not signed (or nothing gpg could say about it).
+    None,
+    Good { signer: String, key_id: String, trust: PgpTrust },
+    /// The signature does not match the content.
+    Bad { signer: String },
+    /// Signed with a key the keyring does not hold.
+    NoKey { key_id: String },
+    ExpiredKey { signer: String },
+    RevokedKey { signer: String },
+    ExpiredSignature { signer: String },
+}
+
+/// What OpenPGP made of a message (#133): encrypted or not, decrypted or
+/// not, and the signature's standing. Carried on the sender check so it
+/// reaches the reader and the cache by the same road.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct PgpStatus {
+    pub encrypted: bool,
+    pub decrypted: bool,
+    pub signature: PgpSignature,
+    /// Supporting lines for the details popover.
+    pub notes: Vec<String>,
+}
+
+impl PgpStatus {
+    /// Whether a signature was present at all.
+    pub fn signed(&self) -> bool {
+        !matches!(self.signature, PgpSignature::None)
+    }
+
+    /// One line for the chip's tooltip and the popover heading.
+    pub fn summary(&self) -> String {
+        use PgpSignature as S;
+        let key = |k: &str| crate::pgp::key_display(k);
+        if self.encrypted && !self.decrypted {
+            return i18n("Encrypted with OpenPGP; could not be decrypted");
+        }
+        if self.encrypted {
+            return match &self.signature {
+                S::None => i18n("Encrypted with OpenPGP"),
+                S::Good { signer, .. } => i18n_f("Encrypted, and signed by {signer}", &[("signer", signer)]),
+                S::Bad { .. } => i18n("Encrypted; the signature does not match, the message may have been altered"),
+                S::NoKey { key_id } => i18n_f("Encrypted; signed with a key you don't have ({id})", &[("id", &key(key_id))]),
+                S::ExpiredKey { signer } => i18n_f("Encrypted, and signed by {signer} with an expired key", &[("signer", signer)]),
+                S::RevokedKey { signer } => i18n_f("Encrypted, and signed by {signer} with a revoked key", &[("signer", signer)]),
+                S::ExpiredSignature { signer } => i18n_f("Encrypted, and signed by {signer}; the signature has expired", &[("signer", signer)]),
+            };
+        }
+        match &self.signature {
+            S::None => i18n("OpenPGP-signed; the signature could not be checked"),
+            S::Good { signer, .. } => i18n_f("Signed by {signer}", &[("signer", signer)]),
+            S::Bad { .. } => i18n("The OpenPGP signature does not match; the message may have been altered"),
+            S::NoKey { key_id } => i18n_f("Signed with a key you don't have ({id})", &[("id", &key(key_id))]),
+            S::ExpiredKey { signer } => i18n_f("Signed by {signer} with an expired key", &[("signer", signer)]),
+            S::RevokedKey { signer } => i18n_f("Signed by {signer} with a revoked key", &[("signer", signer)]),
+            S::ExpiredSignature { signer } => i18n_f("Signed by {signer}; the signature has expired", &[("signer", signer)]),
+        }
+    }
+
+    /// CSS class for the chip's colour: green when everything checks out,
+    /// amber for a doubt, red for a failure.
+    pub fn css_class(&self) -> &'static str {
+        use PgpSignature as S;
+        if self.encrypted && !self.decrypted {
+            return "pgp-bad";
+        }
+        match &self.signature {
+            S::Bad { .. } | S::RevokedKey { .. } => "pgp-bad",
+            S::Good { trust: PgpTrust::Full, .. } => "pgp-good",
+            S::Good { .. } | S::NoKey { .. } | S::ExpiredKey { .. } | S::ExpiredSignature { .. } => "pgp-warn",
+            S::None if self.encrypted => "pgp-good",
+            S::None => "pgp-warn",
+        }
+    }
+}
+
 /// The result of checking whether a message's From: address was forged.
 #[derive(Debug, Clone)]
 pub struct SenderCheck {
@@ -184,6 +275,8 @@ pub struct SenderCheck {
     pub summary: String,
     /// Supporting detail, one line each, for the "Details" popover.
     pub findings: Vec<String>,
+    /// The OpenPGP verdict (#133), when the message carried any.
+    pub pgp: Option<PgpStatus>,
 }
 
 impl Default for SenderCheck {
@@ -192,6 +285,7 @@ impl Default for SenderCheck {
             trust: SenderTrust::Unverified,
             summary: i18n("This message hasn't been checked."),
             findings: Vec::new(),
+            pgp: None,
         }
     }
 }

@@ -31,6 +31,24 @@ The reader's own fonts and colours over the senders'.
   folders, so the choice does nothing there. Failures are logged and
   retried at the next sync. Stored per account as `empty_junk_days` and
   `empty_trash_days`.
+- **OpenPGP, first slice: reading** (#133, requested by @greedykangaroo01).
+  Vireo now decrypts and verifies incoming OpenPGP mail through the user's
+  own GnuPG: `gpg` on the path, the keyring in `~/.gnupg`, the agent and its
+  pinentry for passphrases. PGP/MIME (`multipart/encrypted`,
+  `multipart/signed`) and the inline forms (an armoured block or a
+  clear-signed block in the text) are recognised. A message card shows a
+  lock (encrypted) and/or a shield (signed) beside the sender, green when
+  the signature checks out against a key the keyring trusts, amber for a
+  doubt (unknown or untrusted key, expired), red for a failure (bad
+  signature, revoked key, undecryptable); clicking it opens the verdict
+  with the details, above the sender check. Nothing decrypted is written
+  to disk: an encrypted message is decrypted for the reader at each open
+  (the agent remembers the passphrase), its body and attachments are never
+  cached, and the background prefetch leaves encrypted mail alone so no
+  passphrase prompt appears on its own. Signature verdicts are cached with
+  the sender check. The Flatpak gains access to `~/.gnupg` and the agent
+  socket. Signing and encrypting outgoing mail, and key management, are the
+  next slices.
 
 ## 1.23.1 — 2026-09-07
 

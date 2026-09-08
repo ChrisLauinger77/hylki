@@ -139,8 +139,21 @@ impl MessageView {
     /// Light the header seal for one member with its verdict class + tooltip.
     fn patch_verify_badge(&self, account_id: u32, id: u32) {
         let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
+        // The OpenPGP chip (#133) rides the same patch: shown with its
+        // lock/shield and colour once a verdict exists.
+        let pgp = match &check.pgp {
+            Some(p) => format!(
+                "var p=document.querySelector('.vireo-pgp[data-key=\"{account_id}:{id}\"]');\
+                 if(p){{p.className='vireo-pgp on{enc}{sig} {cls}';p.title={title:?};}}",
+                enc = if p.encrypted { " enc" } else { "" },
+                sig = if p.signed() { " sig" } else { "" },
+                cls = p.css_class(),
+                title = p.summary(),
+            ),
+            None => String::new(),
+        };
         let js = format!(
-            "(function(){{\
+            "(function(){{{pgp}\
              var b=document.querySelector('.vireo-verify[data-key=\"{account_id}:{id}\"]');\
              if(!b)return;b.className='vireo-verify on {cls}';b.title={title:?};}})()",
             cls = check.trust.css_class(),
@@ -185,6 +198,30 @@ impl MessageView {
         let rect = (rect.0 * ratio, rect.1 * ratio, rect.2 * ratio, rect.3 * ratio);
         let content = gtk::Box::new(gtk::Orientation::Vertical, 10);
         content.add_css_class("sender-detail");
+        // The OpenPGP verdict (#133) leads when there is one: what the
+        // encryption and signature say, then the sender check below it.
+        if let Some(pgp) = &check.pgp {
+            let head = gtk::Label::new(Some(&i18n("OpenPGP")));
+            head.set_halign(gtk::Align::Start);
+            head.add_css_class("heading");
+            content.append(&head);
+            let line = gtk::Label::new(Some(&pgp.summary()));
+            line.set_halign(gtk::Align::Start);
+            line.set_wrap(true);
+            line.set_xalign(0.0);
+            line.set_max_width_chars(44);
+            content.append(&line);
+            if !pgp.notes.is_empty() {
+                let notes = gtk::Label::new(Some(&pgp.notes.join("\n")));
+                notes.set_halign(gtk::Align::Start);
+                notes.set_wrap(true);
+                notes.set_xalign(0.0);
+                notes.set_max_width_chars(44);
+                notes.add_css_class("dim-label");
+                content.append(&notes);
+            }
+            content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        }
         let heading = gtk::Label::new(Some(&check.trust.label()));
         heading.set_halign(gtk::Align::Start);
         heading.add_css_class("heading");
@@ -1919,10 +1956,17 @@ impl MessageView {
                     // tinted by trust — Bazaar's fixed blue for a pass.
                     verify = format!(
                         "<button type=\"button\" class=\"vireo-verify\" data-key=\"{aid}:{id}\" \
-                         title=\"\">{svg}</button>",
+                         title=\"\">{svg}</button>\
+                         <button type=\"button\" class=\"vireo-pgp\" data-key=\"{aid}:{id}\" \
+                         title=\"\">{lock}{sig}</button>",
                         aid = m.account_id,
                         id = m.id,
                         svg = inline_icon_svg("verified-checkmark-symbolic"),
+                        // The OpenPGP chip (#133): a lock for an encrypted
+                        // message, a shield for a signed one, both when both;
+                        // hidden until the verdict is patched in.
+                        lock = inline_icon_svg("channel-secure-symbolic"),
+                        sig = inline_icon_svg("security-high-symbolic"),
                     ),
                     // An initials circle, tinted per sender address, so who
                     // wrote each card — and which cards are your own replies —
@@ -2184,6 +2228,17 @@ impl MessageView {
                .vireo-verify.trust-unverified{{color:currentColor;opacity:0.4;}}\
                .vireo-verify.trust-suspicious{{color:#cd9309;}}\
                .vireo-verify.trust-fail{{color:#c01c28;}}\
+               .vireo-pgp{{display:none;background:none;border:none;gap:1px;\
+                 padding:0 2px;margin-left:2px;cursor:pointer;line-height:0;\
+                 align-self:baseline;transform:translateY(0.18em);flex:none;}}\
+               .vireo-pgp.on{{display:inline-flex;}}\
+               .vireo-pgp svg{{width:0.95em;height:0.95em;display:none;}}\
+               .vireo-pgp svg,.vireo-pgp svg *{{fill:currentColor;}}\
+               .vireo-pgp.enc svg:first-child{{display:block;}}\
+               .vireo-pgp.sig svg:last-child{{display:block;}}\
+               .vireo-pgp.pgp-good{{color:#26a269;}}\
+               .vireo-pgp.pgp-warn{{color:#cd9309;}}\
+               .vireo-pgp.pgp-bad{{color:#c01c28;}}\
                .vireo-mail{{cursor:pointer;}}\
                .vireo-mail:hover{{text-decoration:underline;}}\
                /* Styled after the app's own context menus (context_menu.rs +\
@@ -2748,6 +2803,9 @@ fn card_action_button(key: (u32, u32), act: &str, icon: &str, title: &str) -> St
 /// bundles it; the card draws it inline through `inline_icon_svg`.
 #[allow(dead_code)]
 const SENDER_STYLE_ICON: &str = "co.hyprlab.Vireo-format-text-rich-symbolic";
+/// The OpenPGP chip's lock (#133), named in full for the same reason.
+#[allow(dead_code)]
+const PGP_LOCK_ICON: &str = "co.hyprlab.Vireo-channel-secure-symbolic";
 
 /// An embedded symbolic icon's SVG, inlined for the wrapper document (its
 /// paths carry no fill, so the document's `fill:currentColor` recolours it);
@@ -4156,7 +4214,7 @@ var t=e.target&&e.target.closest?e.target.closest('.vireo-mail'):null;\
 if(!t||!t.dataset.mail)return;\
 e.preventDefault();e.stopPropagation();mailMsg(t.dataset.mail);},true);\
 document.addEventListener('click',function(e){\
-var v=e.target&&e.target.closest?e.target.closest('.vireo-verify'):null;\
+var v=e.target&&e.target.closest?e.target.closest('.vireo-verify,.vireo-pgp'):null;\
 if(!v||!v.dataset.key)return;e.preventDefault();e.stopPropagation();\
 var r=v.getBoundingClientRect();\
 try{window.webkit.messageHandlers.vireo.postMessage(\
