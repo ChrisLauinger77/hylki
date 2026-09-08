@@ -281,9 +281,22 @@ impl Cache {
         let _ =
             conn.execute("ALTER TABLE messages ADD COLUMN keywords TEXT NOT NULL DEFAULT ''", []);
         // And the OpenPGP verdict (#133) beside the sender check, as JSON;
-        // empty for a message that carried none.
+        // empty for a message that carried none. Kept as a marker: nothing
+        // OpenPGP is cached, so a body that was (by the first build of the
+        // feature, which cached signed mail) is dropped here, and the
+        // message is fetched and verified afresh at its next open.
         let _ =
             conn.execute("ALTER TABLE sender_checks ADD COLUMN pgp TEXT NOT NULL DEFAULT ''", []);
+        for table in ["bodies", "attachments", "attachments_checked"] {
+            let _ = conn.execute(
+                &format!(
+                    "DELETE FROM {table} WHERE EXISTS (SELECT 1 FROM sender_checks s \
+                     WHERE s.account_id = {table}.account_id AND s.folder_path = {table}.folder_path \
+                     AND s.uid = {table}.uid AND s.pgp != '')"
+                ),
+                [],
+            );
+        }
         // Previews cached by a build that showed MIME machinery or a tracking
         // link instead of the message: a multipart's boundary ("--b2=_cipk…") or
         // the rendered link a marketing mail opens with ("( https://…"). Clearing
@@ -837,7 +850,9 @@ impl Cache {
                             .filter(|l| !l.is_empty())
                             .map(str::to_string)
                             .collect(),
-                        pgp: serde_json::from_str(&row.get::<_, String>(3)?).ok(),
+                        // The stored verdict is a marker only (see the
+                        // cleanup in `open`): a served verdict must be fresh.
+                        pgp: None,
                     })
                 },
             )

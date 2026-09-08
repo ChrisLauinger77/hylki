@@ -2113,10 +2113,10 @@ async fn run_one_prefetch(
             .unwrap_or(false);
         if !already {
             if let Ok(raw) = load_raw_retry(session, account, &path, uid).await {
-                // An encrypted message is left for an explicit open (#133):
-                // decrypting here would raise the passphrase prompt out of
-                // nowhere, and nothing decrypted is cached anyway.
-                if crate::pgp::is_encrypted(&raw) {
+                // OpenPGP mail is left for an explicit open (#133): nothing
+                // of it is cached, and decrypting here would raise the
+                // passphrase prompt out of nowhere.
+                if crate::pgp::detect(&raw).is_some() {
                     emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
                     return;
                 }
@@ -2695,24 +2695,27 @@ fn pgp_notice(status: &crate::models::PgpStatus) -> String {
     text
 }
 
-/// Whether a rendered body may go into the cache: never for anything that
-/// was encrypted, decrypted or not — the plaintext lives only in the reader,
-/// and a failed decryption is retried at the next open.
+/// Whether a rendered body may go into the cache: never for anything
+/// OpenPGP. An encrypted message's plaintext lives only in the reader, and
+/// a failed decryption is retried at the next open. A signed one is fetched
+/// and verified afresh each time too, so importing or trusting the sender's
+/// key changes the verdict at the next open — a cached verdict would be the
+/// keyring as it stood the first time, for ever.
 fn body_cacheable(check: &crate::models::SenderCheck) -> bool {
-    !check.pgp.as_ref().is_some_and(|p| p.encrypted)
+    check.pgp.is_none()
 }
 
 /// The attachments of a raw message, through any OpenPGP wrapping, and
-/// whether they may be cached (not when they were encrypted).
+/// whether they may be cached (never for OpenPGP mail, like its body).
 fn attachments_of(raw: &[u8]) -> (Vec<crate::models::Attachment>, bool) {
     match crate::pgp::detect(raw) {
         None => (extract_attachments(raw), true),
-        Some(shape) => {
+        Some(_) => {
             let items = crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system())
                 .and_then(|u| u.inner)
                 .map(|inner| extract_attachments(&inner))
                 .unwrap_or_default();
-            (items, !shape.is_encrypted())
+            (items, false)
         }
     }
 }
@@ -6629,9 +6632,9 @@ async fn pop3_sync(
         // New message: download in full, cache its body + attachments.
         let raw = pop.retr(*num).await?;
         let msg = summary_from_raw(account_id, inbox_id, uid, &raw);
-        // An encrypted message (#133) is neither rendered nor cached here:
-        // it is decrypted, in the reader only, when opened.
-        if let Some(c) = cache.filter(|_| !crate::pgp::is_encrypted(&raw)) {
+        // OpenPGP mail (#133) is neither rendered nor cached here: it is
+        // decrypted or verified, in the reader only, when opened.
+        if let Some(c) = cache.filter(|_| crate::pgp::detect(&raw).is_none()) {
             let (body, check, _) = render_raw(&raw);
             c.save_body(account_id, INBOX, uid, &body);
             c.save_sender_check(account_id, INBOX, uid, &check);
