@@ -94,8 +94,8 @@ msgstr "Ouvrir"
 msgid "Download…"
 msgstr "Télécharger…"
 
-msgid "Accounts & Settings"
-msgstr "Comptes et paramètres"
+msgid "Settings"
+msgstr "Paramètres"
 
 msgid "Print Preview…"
 msgstr "Aperçu avant impression…"
@@ -558,6 +558,57 @@ msgstr "Sur cet ordinateur"
 msgid "CardDAV Address Book"
 msgstr "Carnet d'adresses CardDAV"
 
+#, fuzzy
+msgid "Encrypted message"
+msgstr "{n} message non lu"
+
+msgid "Encrypted with OpenPGP; could not be decrypted"
+msgstr ""
+
+msgid "Encrypted with OpenPGP"
+msgstr ""
+
+msgid "Encrypted, and signed by {signer}"
+msgstr ""
+
+msgid ""
+"Encrypted; the signature does not match, the message may have been altered"
+msgstr ""
+
+msgid "Encrypted; signed with a key you don't have ({id})"
+msgstr ""
+
+msgid "Encrypted, and signed by {signer} with an expired key"
+msgstr ""
+
+msgid "Encrypted, and signed by {signer} with a revoked key"
+msgstr ""
+
+msgid "Encrypted, and signed by {signer}; the signature has expired"
+msgstr ""
+
+msgid "OpenPGP-signed; the signature could not be checked"
+msgstr ""
+
+#, fuzzy
+msgid "Signed by {signer}"
+msgstr "Signé par : {d}"
+
+msgid "The OpenPGP signature does not match; the message may have been altered"
+msgstr ""
+
+msgid "Signed with a key you don't have ({id})"
+msgstr ""
+
+msgid "Signed by {signer} with an expired key"
+msgstr ""
+
+msgid "Signed by {signer} with a revoked key"
+msgstr ""
+
+msgid "Signed by {signer}; the signature has expired"
+msgstr ""
+
 msgid "This message hasn't been checked."
 msgstr "Ce message n'a pas été vérifié."
 
@@ -576,6 +627,66 @@ msgstr "En attente depuis {ago}"
 msgid "New message"
 msgstr "Nouveau message"
 
+msgid "GnuPG (gpg) is not installed, so this message cannot be read."
+msgstr ""
+
+msgid "Decrypted with your key."
+msgstr ""
+
+msgid "Encrypted to key {id}, which is not in your keyring."
+msgstr ""
+
+msgid "The encrypted block is damaged or not OpenPGP data."
+msgstr ""
+
+msgid "Signing key {id} is trusted in your keyring."
+msgstr ""
+
+msgid "Signing key {id} is only marginally trusted in your keyring."
+msgstr ""
+
+msgid "Signing key {id} is marked as not trusted in your keyring."
+msgstr ""
+
+msgid ""
+"Signing key {id} is in your keyring but not marked as trusted; check its "
+"fingerprint with the sender."
+msgstr ""
+
+#, fuzzy
+msgid "Signed with key {id}."
+msgstr "Signé par : {d}"
+
+msgid "Import the sender's public key to verify it."
+msgstr ""
+
+msgid "No key was found in that file."
+msgstr ""
+
+#, fuzzy
+msgid "Nothing to export."
+msgstr "Rien à annuler"
+
+msgid "gpg did not create the key."
+msgstr ""
+
+msgid "No key was found for that address."
+msgstr ""
+
+msgid "gpg could not sign the key."
+msgstr ""
+
+#, fuzzy
+msgid "gpg could not delete the key."
+msgstr "Impossible de supprimer le dossier : {e}"
+
+#, fuzzy
+msgid "gpg did not sign the message."
+msgstr "Modifier ce message"
+
+msgid "gpg did not encrypt the message."
+msgstr ""
+
 msgid "Open Vireo"
 msgstr "Ouvrir Vireo"
 
@@ -587,9 +698,6 @@ msgstr "Voir les {n} non lus…"
 
 msgid "Accounts"
 msgstr "Comptes"
-
-msgid "Settings"
-msgstr "Paramètres"
 
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr ""
@@ -643,6 +751,10 @@ msgstr ""
 msgid "Add Tag…"
 msgstr "Ajouter un alias…"
 
+#, fuzzy
+msgid "Search filters"
+msgstr "Joindre des fichiers"
+
 msgid "Filters"
 msgstr "Filtres"
 
@@ -657,6 +769,10 @@ msgstr ""
 
 msgid "Add Filter…"
 msgstr "Ajouter un filtre…"
+
+#, fuzzy
+msgid "Search senders"
+msgstr "Récupérer les logos des expéditeurs"
 
 msgid "Allowed Senders"
 msgstr "Expéditeurs autorisés"
@@ -805,6 +921,7 @@ msgstr "Mot de passe SMTP"
 msgid "Test Connection"
 msgstr "Tester la connexion"
 
+#. Rendered as Pango markup — a bare "&" breaks it.
 msgid "Appearance"
 msgstr "Apparence"
 
@@ -853,6 +970,19 @@ msgstr "Nouveau courrier instantané (IMAP Push)"
 msgid "Turn off for servers that stall on push connections."
 msgstr "Désactivez pour les serveurs qui bloquent sur les connexions Push."
 
+msgid "Empty Junk automatically"
+msgstr ""
+
+msgid "Delete junk mail older than this for good, checked at each sync."
+msgstr ""
+
+msgid "Empty Trash automatically"
+msgstr ""
+
+msgid ""
+"Delete mail in the Trash older than this for good, checked at each sync."
+msgstr ""
+
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
 
@@ -877,6 +1007,21 @@ msgstr "Corbeille"
 
 msgid "Junk"
 msgstr "Indésirables"
+
+#, fuzzy
+msgid "OpenPGP"
+msgstr "Ouvrir"
+
+msgid ""
+"The key that signs mail sent from this account and opens what is encrypted "
+"to it. Keys are managed under OpenPGP in the sidebar."
+msgstr ""
+
+msgid "Key"
+msgstr ""
+
+msgid "Automatic uses the key whose address matches."
+msgstr ""
 
 msgid "Signature"
 msgstr "Signature"
@@ -1009,6 +1154,17 @@ msgstr "Activer ce compte"
 msgid "Use this account in Vireo"
 msgstr "Utiliser ce compte dans Vireo"
 
+msgid "Automatic"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "After {n} day"
+msgid_plural "After {n} days"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid ", tagged {tag}"
 msgstr ""
 
@@ -1126,6 +1282,28 @@ msgstr "Tout enregistrer…"
 msgid "Save every attachment to a folder"
 msgstr "Enregistrer chaque pièce jointe dans un dossier"
 
+#, fuzzy
+msgid "Key imported"
+msgstr "Paramètres importés"
+
+msgid ""
+"The key is in your keyring now. Trust it under Settings, OpenPGP, once you "
+"have checked its fingerprint with its owner."
+msgstr ""
+
+msgid "Already in your keyring"
+msgstr ""
+
+msgid "That key was imported before."
+msgstr ""
+
+#, fuzzy
+msgid "Could not import the key"
+msgstr "Impossible d'importer le compte : {e}"
+
+msgid "Import OpenPGP key"
+msgstr ""
+
 msgid "Search by sender, subject, type, filename…"
 msgstr "Rechercher par expéditeur, objet, type, nom de fichier…"
 
@@ -1231,6 +1409,12 @@ msgstr "Enregistrer dans les brouillons"
 msgid "Send"
 msgstr "Envoyer"
 
+msgid "Encrypt with OpenPGP to every recipient's key"
+msgstr ""
+
+msgid "Sign with your OpenPGP key"
+msgstr ""
+
 msgid "Attach files"
 msgstr "Joindre des fichiers"
 
@@ -1260,6 +1444,19 @@ msgstr "Afficher Cc, Cci et Répondre à"
 
 msgid "Attach Files"
 msgstr "Joindre des fichiers"
+
+msgid "Cannot send with OpenPGP"
+msgstr ""
+
+msgid ""
+"There is no OpenPGP key of your own for {addr}. Generate one under Settings, "
+"OpenPGP, or choose a key in the account's settings."
+msgstr ""
+
+msgid ""
+"There is no OpenPGP key for {addr}. Ask them for their public key, or fetch "
+"it under Settings, OpenPGP."
+msgstr ""
 
 msgid "Contacts"
 msgstr "Contacts"
@@ -1381,6 +1578,13 @@ msgstr ""
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
 
+#, fuzzy
+msgid "Fetch the sender's key"
+msgstr "Récupérer les logos des expéditeurs"
+
+msgid "Trust this key…"
+msgstr ""
+
 msgid "A pass proves the address wasn't forged — not that the message is safe."
 msgstr ""
 "Une validation prouve que l'adresse n'a pas été falsifiée, mais ne garantit "
@@ -1427,6 +1631,29 @@ msgstr "Fermer la recherche"
 msgid "Loading…"
 msgstr "Chargement…"
 
+msgid "That key is no longer in your keyring."
+msgstr ""
+
+msgid "Trust this key?"
+msgstr ""
+
+msgid ""
+"Compare the fingerprint with the one {uid} gives you in person or over "
+"another channel. Trusting a key you have not checked lets an impostor's "
+"signature pass as theirs."
+msgstr ""
+
+msgid "Trust"
+msgstr ""
+
+msgid "Key trusted."
+msgstr ""
+
+msgid ""
+"Generate a key of your own first (Settings, OpenPGP): trusting a key means "
+"signing it with yours."
+msgstr ""
+
 msgid "Copied"
 msgstr ""
 
@@ -1456,6 +1683,12 @@ msgstr "Supprimer ce message"
 msgid "View source"
 msgstr "Afficher le code source"
 
+msgid "Back to my fonts and colours"
+msgstr ""
+
+msgid "Show the sender's fonts and colours"
+msgstr ""
+
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
 msgstr[0] "{n} destinataire"
@@ -1469,6 +1702,15 @@ msgstr "Afficher les destinataires"
 
 msgid "Save Image"
 msgstr "Enregistrer l'image"
+
+msgid "The sender's key was imported from the message."
+msgstr ""
+
+msgid "The sender's key was fetched and imported."
+msgstr ""
+
+msgid "The sender's key was already in your keyring."
+msgstr ""
 
 msgid "Load attachments from server"
 msgstr "Charger les pièces jointes depuis le serveur"
@@ -1485,6 +1727,217 @@ msgstr "Exporter les paramètres"
 
 msgid "Status bar ({n})"
 msgstr "Barre d'état ({n})"
+
+msgid "2 years"
+msgstr ""
+
+msgid "1 year"
+msgstr ""
+
+msgid "5 years"
+msgstr ""
+
+msgid "GnuPG"
+msgstr ""
+
+msgid ""
+"Vireo reads and writes the keyring of the GnuPG on this computer, the same "
+"one the gpg command and other mail programs use."
+msgstr ""
+
+#, fuzzy
+msgid "Your keys"
+msgstr "Votre nom"
+
+msgid ""
+"A key of your own signs what you send and opens what is encrypted to you. "
+"Send its public half to the people who should write to you encrypted."
+msgstr ""
+
+#, fuzzy
+msgid "Import…"
+msgstr "Importer le fichier…"
+
+#, fuzzy
+msgid "Generate…"
+msgstr "Général"
+
+msgid "Other people's keys"
+msgstr ""
+
+msgid ""
+"The keys you encrypt to and check signatures with. A key is trusted once you "
+"have vouched for it; check its fingerprint with its owner first."
+msgstr ""
+
+msgid "Fetch by address…"
+msgstr ""
+
+msgid ""
+"GnuPG {version} found. Vireo reads and writes its keyring, the same one the "
+"gpg command and other mail programs use."
+msgstr ""
+
+msgid ""
+"GnuPG was not found. Install the gnupg package to read encrypted mail and "
+"check signatures; the Flatpak build carries it."
+msgstr ""
+
+msgid "No key of your own yet. Generate one for your address."
+msgstr ""
+
+msgid "No keys from other people yet."
+msgstr ""
+
+msgid "Generating the key…"
+msgstr ""
+
+#, fuzzy
+msgid "Import Key"
+msgstr "Importer le fichier…"
+
+msgid "OpenPGP keys"
+msgstr ""
+
+#, fuzzy
+msgid "All files"
+msgstr "Tous les dossiers"
+
+#, fuzzy
+msgid "Could not import: {e}"
+msgstr "Impossible d'importer le compte : {e}"
+
+msgid "Export Public Key"
+msgstr ""
+
+msgid "Delete your key?"
+msgstr ""
+
+msgid ""
+"{uid} will be removed, secret half included. Mail encrypted to it can never "
+"be read again, unless you have a backup of the key."
+msgstr ""
+
+#, fuzzy
+msgid "Remove this key?"
+msgstr "Supprimer cet alias"
+
+msgid ""
+"{uid} will be removed from your keyring. It can be imported or fetched again "
+"later."
+msgstr ""
+
+#, fuzzy
+msgid "Could not delete: {e}"
+msgstr "Impossible de supprimer le dossier : {e}"
+
+msgid "Fetch a Key"
+msgstr ""
+
+msgid ""
+"Looks the address up where its provider publishes keys (WKD), then on the "
+"keyservers."
+msgstr ""
+
+msgid "Fetch"
+msgstr ""
+
+msgid "Looking for a key for {addr}…"
+msgstr ""
+
+msgid ""
+"Generate a key of your own first: trusting a key means signing it with yours."
+msgstr ""
+
+#, fuzzy
+msgid "Could not sign the key: {e}"
+msgstr "Impossible d'enregistrer le PDF : {error}"
+
+#, fuzzy
+msgid "Your key is ready."
+msgstr "Marquer comme lu"
+
+#, fuzzy
+msgid "Could not generate the key: {e}"
+msgstr "Impossible de supprimer le message : {e}"
+
+msgid "No key found: {e}"
+msgstr ""
+
+msgid "Generate a Key"
+msgstr ""
+
+msgid ""
+"A signing key with an encryption subkey, made by GnuPG and kept in its "
+"keyring. The passphrase is asked for when the key is used; the agent "
+"remembers it for a while."
+msgstr ""
+
+#, fuzzy
+msgid "Generate"
+msgstr "Général"
+
+#, fuzzy
+msgid "Address"
+msgstr "Carnet d'adresses"
+
+msgid "Expires"
+msgstr ""
+
+msgid "Passphrase"
+msgstr ""
+
+msgid "Confirm passphrase"
+msgstr ""
+
+msgid "The passphrases differ"
+msgstr ""
+
+msgid "Type the same passphrase twice."
+msgstr ""
+
+msgid "expires {date}"
+msgstr ""
+
+msgid "expired {date}"
+msgstr ""
+
+msgid "signs and encrypts"
+msgstr ""
+
+msgid "signs only: no encryption subkey"
+msgstr ""
+
+#, fuzzy
+msgid "{n} more address"
+msgid_plural "{n} more addresses"
+msgstr[0] "{n} message non lu"
+msgstr[1] "{n} messages non lus"
+
+msgid "Export public key…"
+msgstr ""
+
+#, fuzzy
+msgid "Delete this key"
+msgstr "Supprimer ce message"
+
+msgid "Trusted"
+msgstr ""
+
+msgid "Trust…"
+msgstr ""
+
+#, fuzzy
+msgid "Remove this key"
+msgstr "Supprimer cet alias"
+
+msgid "{n} key imported."
+msgid_plural "{n} keys imported."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "That key was already in your keyring."
+msgstr ""
 
 msgid "Vireo icon"
 msgstr "Icône Vireo"
@@ -1534,8 +1987,48 @@ msgstr "Toutes les 15 minutes"
 msgid "Every 30 minutes"
 msgstr "Toutes les 30 minutes"
 
+#, fuzzy
+msgid "Senders"
+msgstr "Envoyer"
+
 msgid "General"
 msgstr "Général"
+
+msgid "Sidebar"
+msgstr "Barre latérale"
+
+msgid "Message List"
+msgstr "Liste des messages"
+
+msgid "Reading"
+msgstr "Lecture"
+
+msgid "Composing"
+msgstr "Rédaction"
+
+msgid "Privacy"
+msgstr "Confidentialité"
+
+msgid "Date and Time"
+msgstr "Date et heure"
+
+msgid "System"
+msgstr ""
+
+msgid "Backup"
+msgstr "Sauvegarde"
+
+#, fuzzy
+msgid "Save the account?"
+msgstr "Activer ce compte"
+
+msgid ""
+"The account editor is open. Save what you changed, or discard it, before "
+"moving on."
+msgstr ""
+
+msgid "Discard"
+msgstr ""
 
 msgid "Check for new mail"
 msgstr " Vérifier s'il y a de nouveaux messages"
@@ -1566,8 +2059,24 @@ msgstr ""
 "Indiquer qui l'auteur et le sujet dans la notification. Désactivez cette "
 "option pour les masquer de l'écran de verrouillage."
 
-msgid "Sidebar"
-msgstr "Barre latérale"
+msgid "Style"
+msgstr "Style"
+
+msgid "The app itself. Message content has its own setting under Reading."
+msgstr ""
+"L'application elle-même. Le contenu des messages dispose de son propre "
+"réglage sous « Lecture »."
+
+msgid "App icon"
+msgstr "Icône de l'application"
+
+msgid "This window opens to"
+msgstr "Ouverture de la fenêtre sur"
+
+msgid "The view shown first when Settings is opened from the menu."
+msgstr ""
+"La vue affichée en premier lorsque les Paramètres sont ouverts depuis le "
+"menu."
 
 msgid "All Inboxes"
 msgstr "Toutes les boîtes"
@@ -1659,9 +2168,6 @@ msgstr ""
 "Lorsque la barre latérale est réduite à sa barre d'icônes, la survoler "
 "affiche la barre complète en superposition ; elle se replie peu après le "
 "retrait du pointeur."
-
-msgid "Message List"
-msgstr "Liste des messages"
 
 msgid "Sender avatars"
 msgstr "Avatars de l'expéditeur"
@@ -1785,9 +2291,6 @@ msgstr ""
 "Avertir avant de supprimer lorsqu'une conversation entière est sélectionnée, "
 "car tous les messages du fil seront supprimés."
 
-msgid "Reading"
-msgstr "Lecture"
-
 msgid ""
 "When an opened message counts as read. Conversations mark each message as it "
 "comes into view."
@@ -1801,6 +2304,30 @@ msgstr "Apparence du message"
 msgid "Theme for email content only, not the app itself."
 msgstr ""
 "Thème s'appliquant au contenu des e-mails uniquement, pas à l'application."
+
+msgid "Use my own font"
+msgstr ""
+
+msgid ""
+"Show every message in the font and size chosen below instead of the "
+"sender's. Headings keep their relative size; code stays monospaced."
+msgstr ""
+
+#, fuzzy
+msgid "Message font"
+msgstr "Liste des messages"
+
+msgid "The interface font unless another is chosen."
+msgstr ""
+
+msgid "Use my own colours"
+msgstr ""
+
+msgid ""
+"Ignore the text and background colours senders set, so every message reads "
+"in the same black or white on the reader's ground. Pictures are kept; links "
+"take the accent colour."
+msgstr ""
 
 msgid "Message card actions"
 msgstr "Actions sur la carte du message"
@@ -1831,9 +2358,6 @@ msgstr ""
 "Afficher à qui chaque message a été envoyé sous le nom de l'expéditeur, sans "
 "cliquer sur le bouton des destinataires. S'il n'y a qu'un destinataire, le "
 "bouton disparaît complètement."
-
-msgid "Composing"
-msgstr "Rédaction"
 
 msgid "Compose in the main window"
 msgstr "Rédiger dans la fenêtre principale"
@@ -1886,28 +2410,74 @@ msgstr ""
 "Mots enseignés au vérificateur d'orthographe. Le corps du message applique "
 "les modifications après un redémarrage."
 
-#. Rendered as Pango markup — a bare "&" breaks it.
-msgid "System &amp; Appearance"
-msgstr "Système &amp; apparence"
-
-msgid "Style"
-msgstr "Style"
-
-msgid "The app itself. Message content has its own setting under Reading."
+msgid ""
+"Vireo collects no telemetry and sends no analytics. Remote content (images, "
+"trackers) is blocked by default. Allow it per message, trust a sender to "
+"always load it, or turn on \"Always load remote content\" below."
 msgstr ""
-"L'application elle-même. Le contenu des messages dispose de son propre "
-"réglage sous « Lecture »."
+"Vireo ne collecte aucune télémétrie et n'envoie aucune analyse. Le contenu "
+"distant (images, trackers) est bloqué par défaut. Autorisez-le par message, "
+"faites confiance à un expéditeur pour le charger systématiquement, ou "
+"activez « Toujours charger le contenu distant » ci-dessous."
 
-msgid "App icon"
-msgstr "Icône de l'application"
+msgid "Always load remote content"
+msgstr "Toujours charger le contenu distant"
 
-msgid "This window opens to"
-msgstr "Ouverture de la fenêtre sur"
-
-msgid "The view shown first when Settings is opened from the menu."
+msgid ""
+"Show images and other remote content in every new message without asking. "
+"Off by default, since remote content can be used to track when and where you "
+"read a message."
 msgstr ""
-"La vue affichée en premier lorsque les Paramètres sont ouverts depuis le "
-"menu."
+"Afficher les images et autres contenus distants dans chaque nouveau message "
+"sans demander. Désactivé par défaut, car le contenu distant peut être "
+"utilisé pour savoir quand et où vous lisez un message."
+
+msgid "Warn when remote content is blocked"
+msgstr "Avertir lorsque le contenu distant est bloqué"
+
+msgid ""
+"Shows the banner offering to load it. Turning this off only hides the notice "
+"— remote content is still blocked just the same."
+msgstr ""
+"Affiche la bannière proposant de le charger. Désactiver cette option masque "
+"uniquement l'avertissement — le contenu distant reste tout autant bloqué."
+
+msgid "Use Gravatar when a contact has no photo"
+msgstr "Utiliser Gravatar quand un contact n'a pas de photo"
+
+msgid ""
+"Local GNOME Contacts photos are always preferred. Gravatar sends a hash of "
+"the sender's email."
+msgstr ""
+"Les photos locales de Contacts GNOME sont toujours prioritaires. Gravatar "
+"envoie une empreinte (hash) de l'adresse e-mail de l'expéditeur."
+
+msgid "Show sender logos"
+msgstr "Afficher les logos de l'expéditeur"
+
+msgid ""
+"Fills the sender's avatar with the brand's own site icon, fetched from the "
+"sender's domain. That domain learns your IP address, which is what blocking "
+"remote content otherwise avoids."
+msgstr ""
+"Remplace l'avatar de l'expéditeur par le favicon officiel de la marque, "
+"récupéré depuis son domaine. Ce domaine prend alors connaissance de votre "
+"adresse IP, ce que le blocage de contenu distant vise à éviter."
+
+msgid ""
+"By default dates follow the system's own arrangement — its field order, "
+"month names and clock. Choose a format here to use it whatever the system is "
+"set to."
+msgstr ""
+"Par défaut, les dates suivent la configuration du système (ordre des champs, "
+"noms des mois et horloge). Choisissez un format ici pour l'utiliser quelle "
+"que soit la configuration du système."
+
+msgid "Date format"
+msgstr "Format de date"
+
+msgid "Clock"
+msgstr "Horloge"
 
 msgid "Keep running in the background"
 msgstr "Maintenir l'exécution en arrière-plan"
@@ -1989,9 +2559,6 @@ msgid ""
 "bug report. Email addresses are shortened to their domain."
 msgstr ""
 
-msgid "Backup"
-msgstr "Sauvegarde"
-
 msgid ""
 "Accounts and preferences as one file. Passwords stay in the system keyring "
 "and are never exported."
@@ -2013,81 +2580,6 @@ msgstr ""
 "Remplace directement les comptes et préférences actuels. Ne supprimez pas "
 "vos comptes au préalable : leur suppression efface aussi leurs mots de passe "
 "du trousseau, qu'aucune sauvegarde ne contient."
-
-msgid "Date and Time"
-msgstr "Date et heure"
-
-msgid ""
-"By default dates follow the system's own arrangement — its field order, "
-"month names and clock. Choose a format here to use it whatever the system is "
-"set to."
-msgstr ""
-"Par défaut, les dates suivent la configuration du système (ordre des champs, "
-"noms des mois et horloge). Choisissez un format ici pour l'utiliser quelle "
-"que soit la configuration du système."
-
-msgid "Date format"
-msgstr "Format de date"
-
-msgid "Clock"
-msgstr "Horloge"
-
-msgid "Privacy"
-msgstr "Confidentialité"
-
-msgid ""
-"Vireo collects no telemetry and sends no analytics. Remote content (images, "
-"trackers) is blocked by default. Allow it per message, trust a sender to "
-"always load it, or turn on \"Always load remote content\" below."
-msgstr ""
-"Vireo ne collecte aucune télémétrie et n'envoie aucune analyse. Le contenu "
-"distant (images, trackers) est bloqué par défaut. Autorisez-le par message, "
-"faites confiance à un expéditeur pour le charger systématiquement, ou "
-"activez « Toujours charger le contenu distant » ci-dessous."
-
-msgid "Always load remote content"
-msgstr "Toujours charger le contenu distant"
-
-msgid ""
-"Show images and other remote content in every new message without asking. "
-"Off by default, since remote content can be used to track when and where you "
-"read a message."
-msgstr ""
-"Afficher les images et autres contenus distants dans chaque nouveau message "
-"sans demander. Désactivé par défaut, car le contenu distant peut être "
-"utilisé pour savoir quand et où vous lisez un message."
-
-msgid "Warn when remote content is blocked"
-msgstr "Avertir lorsque le contenu distant est bloqué"
-
-msgid ""
-"Shows the banner offering to load it. Turning this off only hides the notice "
-"— remote content is still blocked just the same."
-msgstr ""
-"Affiche la bannière proposant de le charger. Désactiver cette option masque "
-"uniquement l'avertissement — le contenu distant reste tout autant bloqué."
-
-msgid "Use Gravatar when a contact has no photo"
-msgstr "Utiliser Gravatar quand un contact n'a pas de photo"
-
-msgid ""
-"Local GNOME Contacts photos are always preferred. Gravatar sends a hash of "
-"the sender's email."
-msgstr ""
-"Les photos locales de Contacts GNOME sont toujours prioritaires. Gravatar "
-"envoie une empreinte (hash) de l'adresse e-mail de l'expéditeur."
-
-msgid "Show sender logos"
-msgstr "Afficher les logos de l'expéditeur"
-
-msgid ""
-"Fills the sender's avatar with the brand's own site icon, fetched from the "
-"sender's domain. That domain learns your IP address, which is what blocking "
-"remote content otherwise avoids."
-msgstr ""
-"Remplace l'avatar de l'expéditeur par le favicon officiel de la marque, "
-"récupéré depuis son domaine. Ce domaine prend alors connaissance de votre "
-"adresse IP, ce que le blocage de contenu distant vise à éviter."
 
 #, fuzzy
 msgid "Inside All Inboxes"
@@ -2597,6 +3089,13 @@ msgstr[1] "Téléchargement des pièces jointes… {n} restantes"
 msgid "Still could not send “{subject}”: {e}"
 msgstr "Impossible d'envoyer « {subject} » : {e}"
 
+msgid ""
+"no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
+msgstr ""
+
+msgid "no OpenPGP key for {addr}"
+msgstr ""
+
 msgid "Could not fetch mail: {e}"
 msgstr "Impossible de récupérer le courrier : {e}"
 
@@ -2688,6 +3187,12 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Accounts & Settings"
+#~ msgstr "Comptes et paramètres"
+
+#~ msgid "System &amp; Appearance"
+#~ msgstr "Système &amp; apparence"
 
 #~ msgid "Filtered folders under All Inboxes"
 #~ msgstr "Dossiers filtrés sous toutes les boîtes"

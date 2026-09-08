@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.24.0 — 2026-09-07
+## 1.24.0 — 2026-09-08
 
 The reader's own fonts and colours over the senders'.
 
@@ -76,7 +76,14 @@ The reader's own fonts and colours over the senders'.
   entity lettre puts on the wire; `micalg` from gpg's own digest), Encrypt
   sends `multipart/encrypted` to every recipient's key and your own, signed
   inside; a missing key of yours or theirs is named before anything leaves.
-  Drafts are kept as written; signing and encrypting happen at send.
+  Drafts are kept as written; signing and encrypting happen at send. A reply
+  to an encrypted message starts with Encrypt on. The README carries a
+  setup guide.
+- **Settings window details.** The window opens at a fixed 740px and no
+  longer remembers a resize; the app menu entry reads "Settings"; the
+  account editor keeps the window's close button in its own header, and
+  choosing another category while an editor is open asks to save, discard
+  or stay. The General category wears the puzzle-piece icon.
 
 ## 1.23.1 — 2026-09-07
 

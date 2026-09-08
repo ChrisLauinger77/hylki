@@ -47,6 +47,7 @@ trackers by default — no telemetry, no analytics.
 - **Printing** — print a message with its sender, recipients and date, with an in-app preview that also saves straight to PDF.
 - **Runs in the background** (optional) — closing the window keeps mail arriving; Vireo appears under *Background Apps* in the GNOME system menu, and can start at login without opening a window.
 - **Privacy-first reading** — remote content blocked by default, per-sender allow/block lists, and a per-message light/dark content theme.
+- **OpenPGP** — read encrypted and signed mail, sign and encrypt what you send, and manage keys from Settings, through the GnuPG already on your computer. See [OpenPGP](#openpgp-encrypted-and-signed-mail) below.
 - **GNOME-native** — adaptive three-pane layout, per-account colours and emoji avatars, light/dark following the system, optional GNOME Contacts.
 
 See **[RELEASE_NOTES.md](RELEASE_NOTES.md)** for the full list.
@@ -195,6 +196,98 @@ during the build and they're compiled in via `option_env!`:
 ```sh
 VIREO_GOOGLE_CLIENT_ID=... VIREO_GOOGLE_CLIENT_SECRET=... cargo build --release
 ```
+
+### OpenPGP (encrypted and signed mail)
+
+Vireo can read OpenPGP-encrypted mail, check signatures, and sign and encrypt
+what you send. It does this through **GnuPG** (`gpg`), the same program the
+terminal command and other mail clients use, so your keys live in one place
+(`~/.gnupg`) and every program on the computer sees the same keyring. Nothing
+here needs a terminal.
+
+**What you need**
+
+- The Flatpak build carries GnuPG and is set up already. A source or RPM
+  install needs the `gnupg2` package (on Fedora it is installed by default).
+- Vireo never stores a decrypted message on disk: an encrypted message is
+  decrypted for the reading pane each time you open it, and its body and
+  attachments are kept out of the cache.
+
+**1. Make a key for your address**
+
+Open *Settings → OpenPGP*. The top row says whether GnuPG was found. Under
+*Your keys*, click **Generate…**, pick the address the key is for, choose how
+long it lasts, and enter a passphrase twice. Vireo hands the passphrase to gpg
+over a pipe and does not keep it; from then on gpg asks for it when the key is
+used, and remembers it for a while (ten minutes by default, the normal
+gpg-agent behaviour). The key is a signing key with an encryption subkey, so it
+does both jobs.
+
+If you already have a key, click **Import…** instead and pick the key file.
+
+**2. Give people your public key**
+
+Click the export button on your key's row and save the `.asc` file, then send
+it to the people who should write to you encrypted, or upload it wherever your
+provider publishes keys. The file holds only the public half; the secret half
+never leaves your keyring.
+
+**3. Get other people's keys**
+
+Vireo needs a person's public key to encrypt to them and to check their
+signature. There are four ways to get one, none of which need a terminal:
+
+- A signed message from someone whose key you don't have shows an amber shield
+  beside their name. Click it and choose **Fetch the sender's key**. Vireo
+  looks in the message itself first (many clients attach the key in an
+  Autocrypt header), then asks the sender's provider (WKD), then the keyservers.
+- A message with a key file attached shows an **Import OpenPGP key** button on
+  that attachment.
+- Under *Settings → OpenPGP → Other people's keys*, **Fetch by address…**
+  looks a key up by email address, and **Import…** reads a key file.
+- A key someone sends you by any other route can be imported the same way.
+
+**4. Trust a key**
+
+An imported key checks signatures, but until you have vouched for it the
+shield stays amber and says the key is not trusted yet. Compare the key's
+fingerprint with the one its owner gives you in person, on their website or
+over another channel, then click **Trust…** on the key's row (or **Trust this
+key…** in the shield's popover). Vireo signs the key locally with your own,
+which is what turns the shield green. Trusting a key you have not checked
+lets an impostor's signature pass as theirs, so do check.
+
+**5. Send signed or encrypted mail**
+
+The composer has two buttons beside Send: **Sign** and **Encrypt**. Sign adds
+a signature others can check with your public key. Encrypt scrambles the
+message to every recipient's key and your own, and turns Sign on too. If a
+recipient has no key in your keyring, or your address has no key of its own,
+Vireo says so before anything is sent. Replying to an encrypted message starts
+with Encrypt on.
+
+Each account uses the key whose address matches. To use another key for an
+account, open the account in *Settings → Mail Accounts* and choose it under
+*OpenPGP*.
+
+**Reading the result**
+
+Beside a sender's name, a lock means the message was encrypted and a shield
+means it was signed. Green: everything checks out against a trusted key.
+Amber: a doubt, such as an unknown or untrusted key, or an expired one. Red:
+a failure, such as a signature that does not match or a message that could not
+be decrypted. Click the icon for the details.
+
+**If something goes wrong**
+
+- *GnuPG was not found*: install the `gnupg2` package.
+- *No passphrase prompt appears when you expect one*: gpg-agent remembers a
+  passphrase for a while after you type it. `gpg-connect-agent reloadagent /bye`
+  clears it, or shorten `default-cache-ttl` in `~/.gnupg/gpg-agent.conf`.
+- *Could not be decrypted*: the message was encrypted to a key you do not
+  have. Ask the sender to use the public key you exported in step 2.
+- *Nothing to encrypt with for an address*: that person's key is missing;
+  see step 3.
 
 ## Privacy
 
