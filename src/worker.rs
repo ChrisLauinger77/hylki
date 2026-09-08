@@ -2255,8 +2255,15 @@ async fn run_one_body_prefetch(
         return;
     }
     queue.pop_front();
-    if let Ok((body, check, has_attachments)) = load_body_retry(session, account, &path, uid).await
-    {
+    if let Ok(raw) = load_raw_retry(session, account, &path, uid).await {
+        // OpenPGP mail (#133) is left for an explicit open: nothing of it is
+        // cached or pushed ahead, and rendering it here would decrypt in the
+        // background — a passphrase prompt out of nowhere.
+        if crate::pgp::detect(&raw).is_some() {
+            emitted.insert((path, uid));
+            return;
+        }
+        let (body, check, has_attachments) = render_raw(&raw);
         if let Some(c) = cache {
             c.save_body(account_id, &path, uid, &body);
             c.save_sender_check(account_id, &path, uid, &check);
