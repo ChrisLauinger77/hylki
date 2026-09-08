@@ -96,6 +96,8 @@ pub struct ComposePrefill {
     pub references: String,
     /// When editing an existing draft, its origin (so saving/sending replaces it).
     pub draft_origin: Option<DraftOrigin>,
+    /// Start with Encrypt (and so Sign) on: a reply to an encrypted message (#133).
+    pub encrypt: bool,
     /// When editing a queued Outbox message, the row this replaces.
     pub outbox_origin: Option<u32>,
     /// For a reply: the original's To+Cc, so the composer can answer from the
@@ -378,6 +380,7 @@ impl Component for Compose {
         let draft_origin = prefill.draft_origin.clone();
         let outbox_origin = prefill.outbox_origin;
         let prefill_attachments = prefill.attachments.clone();
+        let prefill_encrypt = prefill.encrypt;
         let current_sig = accounts.get(selected).map(|a| a.signature.clone()).unwrap_or_default();
 
         let completion = gtk::Popover::new();
@@ -433,6 +436,10 @@ impl Component for Compose {
             encrypt: false,
         };
         let widgets = view_output!();
+        if prefill_encrypt && crate::pgp::available() {
+            // Through the buttons, so the toggles and the model agree.
+            widgets.encrypt_btn.set_active(true);
+        }
         widgets.editor_holder.append(&model.editor.widget);
 
         // The inline/window toggle: only reply/forward panes can toggle. Its icon

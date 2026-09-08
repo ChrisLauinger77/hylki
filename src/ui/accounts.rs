@@ -183,6 +183,8 @@ pub enum AccountsInput {
     SearchFilters(String),
     /// The senders page's search text changed (both lists).
     SearchSenders(String),
+    /// Leave the account editor without saving (the settings window moved on).
+    CloseEditor,
     /// The app's live folder lists per account email (for Special Folders).
     SetFolderChoices(std::collections::HashMap<String, Vec<(String, String)>>),
     AddAccount,
@@ -592,7 +594,10 @@ impl Component for AccountsWindow {
                     #[wrap(Some)]
                     set_child = &adw::ToolbarView {
                         add_top_bar = &adw::HeaderBar {
-                            set_show_end_title_buttons: false,
+                            // The window's close button lives here while the
+                            // editor is up (the shared header hides), so it
+                            // is never out of reach.
+                            set_show_end_title_buttons: true,
                             pack_end = &gtk::Button {
                                 set_label: &i18n("Save"),
                                 add_css_class: "suggested-action",
@@ -1142,6 +1147,11 @@ impl Component for AccountsWindow {
         match message {
             AccountsInput::ShowPage(id) => {
                 widgets.list_stack.set_visible_child_name(&id);
+            }
+            AccountsInput::CloseEditor => {
+                if widgets.nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+                    widgets.nav.pop();
+                }
             }
             AccountsInput::SearchFilters(text) => {
                 *self.filters_query.borrow_mut() = text.to_lowercase();

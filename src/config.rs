@@ -1962,7 +1962,7 @@ struct StateFile {
 }
 
 fn default_aux_height() -> i32 {
-    720
+    784
 }
 
 fn default_about_height() -> i32 {

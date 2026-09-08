@@ -212,6 +212,9 @@ pub struct Preferences {
     host_header: Option<adw::HeaderBar>,
     /// The OpenPGP page (#133), kept alive with the window.
     pgp_keys: Option<Controller<crate::ui::pgp_keys::PgpKeys>>,
+    /// The account editor is up in the accounts slot: leaving it for another
+    /// category asks about the unsaved changes first.
+    editor_open: bool,
 }
 
 /// One sidebar entry (#141): the stack child it shows, and whether that
@@ -400,6 +403,41 @@ impl Preferences {
             }
             i += 1;
         }
+    }
+
+    /// The sidebar moved away from an open account editor: save, discard,
+    /// or stay. Staying puts the selection back on Mail Accounts.
+    fn ask_to_leave_editor(&self, id: &str, sender: &ComponentSender<Self>) {
+        let parent = relm4::main_application().active_window();
+        let dialog = adw::MessageDialog::new(
+            parent.as_ref(),
+            Some(&i18n("Save the account?")),
+            Some(&i18n("The account editor is open. Save what you changed, or discard it, before moving on.")),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("discard", &i18n("Discard"));
+        dialog.add_response("save", &i18n("Save"));
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("save"));
+        dialog.set_close_response("cancel");
+        let s = sender.clone();
+        let accounts = self.accounts_sender.clone();
+        let id = id.to_string();
+        dialog.connect_response(None, move |_, resp| {
+            match resp {
+                "save" => {
+                    let _ = accounts.send(crate::ui::accounts::AccountsInput::Save);
+                    s.input(PrefInput::ShowPageById(id.clone()));
+                }
+                "discard" => {
+                    let _ = accounts.send(crate::ui::accounts::AccountsInput::CloseEditor);
+                    s.input(PrefInput::ShowPageById(id.clone()));
+                }
+                _ => s.input(PrefInput::ShowPageById("accounts".into())),
+            }
+        });
+        dialog.present();
     }
 
     /// Show a category: the accounts component's page, or one of ours.
@@ -1253,6 +1291,7 @@ impl Component for Preferences {
             accounts_sender: init.accounts_sender.clone(),
             host_header: None,
             pgp_keys: None,
+            editor_open: false,
         };
 
         let widgets = view_output!();
@@ -1833,9 +1872,16 @@ impl Component for Preferences {
             PrefInput::ShowAccounts(accounts) => {
                 self.select_row(if accounts { "accounts" } else { "general" });
             }
-            PrefInput::SelectPage(id) => self.show_page(&id),
+            PrefInput::SelectPage(id) => {
+                if self.editor_open && id != "accounts" {
+                    self.ask_to_leave_editor(&id, &sender);
+                } else {
+                    self.show_page(&id);
+                }
+            }
             PrefInput::ShowPageById(id) => self.select_row(&id),
             PrefInput::EditorOpen(open) => {
+                self.editor_open = open;
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);
                 }
