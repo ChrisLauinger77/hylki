@@ -187,8 +187,10 @@ impl MessageView {
         id: u32,
         rect: (f64, f64, f64, f64),
         page_width: f64,
+        sender: &ComponentSender<Self>,
     ) {
         let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
+        let popover = gtk::Popover::new();
         let widget_width = self.webview.width() as f64;
         let ratio = if page_width > 0.0 && widget_width > 0.0 {
             widget_width / page_width
@@ -219,6 +221,29 @@ impl MessageView {
                 notes.set_max_width_chars(44);
                 notes.add_css_class("dim-label");
                 content.append(&notes);
+            }
+            // The way out of the two doubts, without a terminal (#133).
+            let action = if pgp.key_missing() {
+                Some((i18n("Fetch the sender's key"), MessageViewInput::PgpFetchKey { account_id, id }))
+            } else if pgp.key_untrusted() {
+                Some((i18n("Trust this key…"), MessageViewInput::PgpTrustKey { account_id, id }))
+            } else {
+                None
+            };
+            if let Some((label, input)) = action {
+                let button = gtk::Button::with_label(&label);
+                button.set_halign(gtk::Align::Start);
+                button.add_css_class("pill");
+                let s = sender.clone();
+                let p = popover.clone();
+                let input = std::cell::RefCell::new(Some(input));
+                button.connect_clicked(move |_| {
+                    if let Some(i) = input.borrow_mut().take() {
+                        s.input(i);
+                    }
+                    p.popdown();
+                });
+                content.append(&button);
             }
             content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
         }
@@ -253,7 +278,6 @@ impl MessageView {
         footnote.add_css_class("caption");
         content.append(&footnote);
 
-        let popover = gtk::Popover::new();
         popover.set_child(Some(&content));
         popover.set_parent(&self.webview);
         popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(
@@ -331,6 +355,13 @@ pub enum MessageViewInput {
     /// The card's "sender's formatting" toggle: show that one message as its
     /// sender formatted it, or back under the reader's style.
     ToggleSenderStyle { account_id: u32, id: u32 },
+    /// The popover's "Fetch the sender's key" (#133): the Autocrypt key in
+    /// the message first, then WKD and the keyservers.
+    PgpFetchKey { account_id: u32, id: u32 },
+    /// The popover's "Trust this key": vouch for the signing key.
+    PgpTrustKey { account_id: u32, id: u32 },
+    /// A key action finished: what to say, and whether to re-verify.
+    PgpDone { account_id: u32, id: u32, result: Result<String, String> },
     /// The WebView finished loading the current document — reveal it.
     Rendered,
     /// The sender-authentication verdict for the message now on screen.
@@ -454,6 +485,10 @@ pub enum MessageViewOutput {
     ComposeTo(String),
     /// "Add to Contacts" picked on an address's right-click menu.
     AddContactAddr(String),
+    /// Fetch this message's body again (its OpenPGP verdict changed, #133).
+    ReloadBody(Box<Message>),
+    /// Something to tell the user in a toast.
+    Notice(String),
 }
 
 impl MessageView {
@@ -1198,7 +1233,83 @@ impl Component for MessageView {
             }
 
             MessageViewInput::SenderInfoAt { account_id, id, rect, page_width } => {
-                self.show_sender_popover(account_id, id, rect, page_width);
+                self.show_sender_popover(account_id, id, rect, page_width, &sender);
+            }
+            MessageViewInput::PgpFetchKey { account_id, id } => {
+                let Some(pgp) = self.member_checks.get(&(account_id, id)).and_then(|c| c.pgp.clone()) else {
+                    return;
+                };
+                let input = sender.input_sender().clone();
+                sender.oneshot_command(async move {
+                    let result = tokio::task::spawn_blocking(move || fetch_sender_key(&pgp))
+                        .await
+                        .unwrap_or_else(|_| Err("task failed".into()));
+                    let _ = input.send(MessageViewInput::PgpDone { account_id, id, result });
+                });
+            }
+            MessageViewInput::PgpTrustKey { account_id, id } => {
+                let Some(pgp) = self.member_checks.get(&(account_id, id)).and_then(|c| c.pgp.clone()) else {
+                    return;
+                };
+                let crate::models::PgpSignature::Good { signer, key_id, .. } = &pgp.signature else {
+                    return;
+                };
+                let gpg = crate::pgp::Gpg::system();
+                let Some(key) = crate::pgp::key_by_fingerprint(&gpg, key_id) else {
+                    let _ = sender.output(MessageViewOutput::Notice(i18n("That key is no longer in your keyring.")));
+                    return;
+                };
+                let parent = self.webview.root().and_downcast::<gtk::Window>();
+                let dialog = adw::MessageDialog::new(
+                    parent.as_ref(),
+                    Some(&i18n("Trust this key?")),
+                    Some(&i18n_f(
+                        "Compare the fingerprint with the one {uid} gives you in person or over another channel. \
+                         Trusting a key you have not checked lets an impostor's signature pass as theirs.",
+                        &[("uid", signer)],
+                    )),
+                );
+                let fpr_label = gtk::Label::new(Some(&key.fingerprint_display()));
+                fpr_label.add_css_class("monospace");
+                fpr_label.set_wrap(true);
+                fpr_label.set_selectable(true);
+                fpr_label.set_justify(gtk::Justification::Center);
+                dialog.set_extra_child(Some(&fpr_label));
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("trust", &i18n("Trust"));
+                dialog.set_response_appearance("trust", adw::ResponseAppearance::Suggested);
+                dialog.set_default_response(Some("cancel"));
+                let s = sender.clone();
+                let fpr = key.fingerprint.clone();
+                dialog.connect_response(None, move |_, resp| {
+                    if resp != "trust" {
+                        return;
+                    }
+                    let result = crate::pgp::trust_key(&crate::pgp::Gpg::system(), &fpr, None)
+                        .map(|()| i18n("Key trusted."))
+                        .map_err(|e| {
+                            if e.contains("secret key") || e.contains("default") {
+                                i18n("Generate a key of your own first (Settings, OpenPGP): trusting a key means signing it with yours.")
+                            } else {
+                                e
+                            }
+                        });
+                    s.input(MessageViewInput::PgpDone { account_id, id, result });
+                });
+                dialog.present();
+            }
+            MessageViewInput::PgpDone { account_id, id, result } => {
+                match result {
+                    Ok(text) => {
+                        let _ = sender.output(MessageViewOutput::Notice(text));
+                        if let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) {
+                            let _ = sender.output(MessageViewOutput::ReloadBody(Box::new(m.clone())));
+                        }
+                    }
+                    Err(e) => {
+                        let _ = sender.output(MessageViewOutput::Notice(e));
+                    }
+                }
             }
 
             MessageViewInput::Rendered => {
@@ -2782,6 +2893,28 @@ fn default_image_name(mime: &str) -> String {
         other => other.rsplit('/').next().unwrap_or("img"),
     };
     format!("image.{ext}")
+}
+
+/// Get the sender's key into the keyring (#133): the Autocrypt key the
+/// message carried first, then WKD and the keyservers by address and by the
+/// key id the signature named. Runs off the main thread (network).
+fn fetch_sender_key(pgp: &crate::models::PgpStatus) -> Result<String, String> {
+    let gpg = crate::pgp::Gpg::system();
+    if let Some(b64) = &pgp.autocrypt {
+        if let Some(bytes) = crate::oauth::base64_decode(b64) {
+            if let Ok(s) = crate::pgp::import_keys(&gpg, &bytes) {
+                if !s.fingerprints.is_empty() {
+                    return Ok(i18n("The sender's key was imported from the message."));
+                }
+            }
+        }
+    }
+    let summary = crate::pgp::fetch_key(&gpg, &pgp.sender_addr, pgp.signing_key_id())?;
+    Ok(if summary.imported > 0 {
+        i18n("The sender's key was fetched and imported.")
+    } else {
+        i18n("The sender's key was already in your keyring.")
+    })
 }
 
 /// One icon button on a conversation card's action line. The icon is the same

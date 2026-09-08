@@ -89,6 +89,9 @@ pub struct PrefInit {
     pub settings_open_accounts: bool,
     /// The accounts component's inbox, for the sidebar to pick its pages.
     pub accounts_sender: relm4::Sender<crate::ui::accounts::AccountsInput>,
+    /// (name, address) per account and alias, for the OpenPGP page's
+    /// key generator.
+    pub identities: Vec<(String, String)>,
 }
 
 
@@ -207,6 +210,8 @@ pub struct Preferences {
     /// The content header bar; hidden while the accounts editor subpage is
     /// open, whose own header takes over.
     host_header: Option<adw::HeaderBar>,
+    /// The OpenPGP page (#133), kept alive with the window.
+    pgp_keys: Option<Controller<crate::ui::pgp_keys::PgpKeys>>,
 }
 
 /// One sidebar entry (#141): the stack child it shows, and whether that
@@ -227,6 +232,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "tags", title: i18n_noop("Tags"), icon: "co.hyprlab.Vireo-tag-symbolic", accounts: true },
             SidePage { id: "filters", title: i18n_noop("Filters"), icon: "co.hyprlab.Vireo-filter-folder-symbolic", accounts: true },
             SidePage { id: "senders", title: i18n_noop("Senders"), icon: "co.hyprlab.Vireo-contact-new-symbolic", accounts: true },
+            SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "co.hyprlab.Vireo-channel-secure-symbolic", accounts: false },
         ],
     ),
     (
@@ -312,6 +318,8 @@ pub enum PrefInput {
     ShowAccounts(bool),
     /// A sidebar category was chosen (#141).
     SelectPage(String),
+    /// Select a category by id from outside (the app's showcase hook).
+    ShowPageById(String),
     /// The accounts editor subpage opened/closed — hide/show the shared
     /// header so the editor's own header takes over the window.
     EditorOpen(bool),
@@ -507,6 +515,10 @@ impl Component for Preferences {
 
                             #[name = "accounts_slot"]
                             add_named[Some("accounts")] = &adw::Bin {},
+
+                            // The OpenPGP key manager (#133), its own component.
+                            #[name = "pgp_slot"]
+                            add_named[Some("openpgp")] = &adw::Bin {},
 
                             add_named[Some("general")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
@@ -1240,6 +1252,7 @@ impl Component for Preferences {
             split: None,
             accounts_sender: init.accounts_sender.clone(),
             host_header: None,
+            pgp_keys: None,
         };
 
         let widgets = view_output!();
@@ -1578,6 +1591,11 @@ impl Component for Preferences {
             .set_selected(if init.settings_open_accounts { 1 } else { 0 });
 
         widgets.accounts_slot.set_child(Some(&init.accounts_panel));
+        let pgp = crate::ui::pgp_keys::PgpKeys::builder()
+            .launch(crate::ui::pgp_keys::PgpKeysInit { identities: init.identities.clone() })
+            .detach();
+        widgets.pgp_slot.set_child(Some(pgp.widget()));
+        model.pgp_keys = Some(pgp);
         // The sidebar (#141): a heading per section, a row per category.
         for (section, pages) in SIDE_PAGES {
             let heading = gtk::ListBoxRow::new();
@@ -1816,6 +1834,7 @@ impl Component for Preferences {
                 self.select_row(if accounts { "accounts" } else { "general" });
             }
             PrefInput::SelectPage(id) => self.show_page(&id),
+            PrefInput::ShowPageById(id) => self.select_row(&id),
             PrefInput::EditorOpen(open) => {
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);

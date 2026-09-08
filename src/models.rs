@@ -210,9 +210,10 @@ pub enum PgpTrust {
 }
 
 /// The verdict on an OpenPGP signature (#133).
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PgpSignature {
     /// Not signed (or nothing gpg could say about it).
+    #[default]
     None,
     Good { signer: String, key_id: String, trust: PgpTrust },
     /// The signature does not match the content.
@@ -227,19 +228,44 @@ pub enum PgpSignature {
 /// What OpenPGP made of a message (#133): encrypted or not, decrypted or
 /// not, and the signature's standing. Carried on the sender check so it
 /// reaches the reader and the cache by the same road.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PgpStatus {
     pub encrypted: bool,
     pub decrypted: bool,
     pub signature: PgpSignature,
     /// Supporting lines for the details popover.
     pub notes: Vec<String>,
+    /// The From address, for fetching the sender's key.
+    #[serde(default)]
+    pub sender_addr: String,
+    /// The sender's key from the message's Autocrypt header, base64, when
+    /// it carried one: the first place a missing key is looked for.
+    #[serde(default)]
+    pub autocrypt: Option<String>,
 }
 
 impl PgpStatus {
     /// Whether a signature was present at all.
     pub fn signed(&self) -> bool {
         !matches!(self.signature, PgpSignature::None)
+    }
+
+    /// The key id the signature named, whether or not the keyring has it.
+    pub fn signing_key_id(&self) -> Option<&str> {
+        match &self.signature {
+            PgpSignature::Good { key_id, .. } | PgpSignature::NoKey { key_id } => Some(key_id),
+            _ => None,
+        }
+    }
+
+    /// Whether the sender's key is missing from the keyring.
+    pub fn key_missing(&self) -> bool {
+        matches!(self.signature, PgpSignature::NoKey { .. })
+    }
+
+    /// Whether the signature is good but the key is not vouched for yet.
+    pub fn key_untrusted(&self) -> bool {
+        matches!(self.signature, PgpSignature::Good { trust, .. } if trust != PgpTrust::Full)
     }
 
     /// One line for the chip's tooltip and the popover heading.

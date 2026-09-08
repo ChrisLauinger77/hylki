@@ -149,6 +149,8 @@ pub enum AttachmentDrawerInput {
     ToggleSortOrder,
     /// Open an attachment in its default application.
     Open(usize),
+    /// Import an attached OpenPGP public key into the keyring (#133).
+    ImportKey(usize),
     /// Activate a cell/row (display order) — double-click, or Space/Enter on
     /// the highlighted one: preview images and PDFs in the lightbox, open
     /// anything else in its default app.
@@ -557,6 +559,21 @@ impl SimpleComponent for AttachmentDrawer {
                     open_bytes(&att.name, &att.data, self.window().as_ref());
                 }
             }
+            AttachmentDrawerInput::ImportKey(i) => {
+                if let Some(att) = self.item_at(i) {
+                    let (title, body) = match crate::pgp::import_keys(&crate::pgp::Gpg::system(), &att.data) {
+                        Ok(s) if s.imported > 0 => (
+                            i18n("Key imported"),
+                            i18n("The key is in your keyring now. Trust it under Settings, OpenPGP, once you have checked its fingerprint with its owner."),
+                        ),
+                        Ok(_) => (i18n("Already in your keyring"), i18n("That key was imported before.")),
+                        Err(e) => (i18n("Could not import the key"), e),
+                    };
+                    let dialog = adw::MessageDialog::new(self.window().as_ref(), Some(&title), Some(&body));
+                    dialog.add_response("ok", &i18n("OK"));
+                    dialog.present();
+                }
+            }
             AttachmentDrawerInput::Download(i) => {
                 if let Some(att) = self.item_at(i).cloned() {
                     self.save_attachment(&att);
@@ -956,6 +973,19 @@ impl AttachmentDrawer {
 
 /// Build one grid cell: a square thumbnail (image/PDF texture or type icon)
 /// with hover Download/Open actions and the filename beneath it.
+/// Whether an attachment is an OpenPGP public key: by its armour, or by a
+/// key file's usual name.
+fn is_key_attachment(att: &Attachment) -> bool {
+    let head = &att.data[..att.data.len().min(64)];
+    if head.starts_with(b"-----BEGIN PGP PUBLIC KEY BLOCK-----") {
+        return true;
+    }
+    let name = att.name.to_ascii_lowercase();
+    (name.ends_with(".asc") || name.ends_with(".gpg") || name.ends_with(".pgp") || name.ends_with(".key"))
+        && !head.starts_with(b"-----BEGIN PGP MESSAGE-----")
+        && !head.starts_with(b"-----BEGIN PGP SIGNATURE-----")
+}
+
 fn build_cell(
     index: usize,
     att: &Attachment,
@@ -1025,6 +1055,13 @@ fn build_cell(
     let s = sender.clone();
     open.connect_clicked(move |_| s.input(AttachmentDrawerInput::Open(index)));
     actions.append(&open);
+    // An attached public key (#133): one click puts it in the keyring.
+    if is_key_attachment(att) {
+        let import = action_btn("co.hyprlab.Vireo-channel-secure-symbolic", &i18n("Import OpenPGP key"));
+        let s = sender.clone();
+        import.connect_clicked(move |_| s.input(AttachmentDrawerInput::ImportKey(index)));
+        actions.append(&import);
+    }
     overlay.add_overlay(&actions);
 
     cell.append(&overlay);

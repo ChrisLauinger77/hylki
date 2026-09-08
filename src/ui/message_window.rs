@@ -93,6 +93,10 @@ pub enum MessageWindowInput {
     OpenAttachment(usize),
     SaveAllAttachments,
     // ---- from the embedded reader ----
+    /// Fetch a message's body again (its OpenPGP verdict changed, #133).
+    ReloadBody(Box<Message>),
+    /// A toast for the main window.
+    Notice(String),
     AllowSender(String),
     /// The message card's own Reply/Reply all/Forward button.
     /// An action chosen on one card — in a conversation window, possibly a
@@ -119,6 +123,10 @@ pub enum MessageWindowOutput {
     /// Save every attachment.
     SaveAllAttachments(Vec<Attachment>),
     /// Persist a remote-content allowlist entry.
+    /// Fetch a message's body again (its OpenPGP verdict changed, #133).
+    ReloadBody(Box<Message>),
+    /// A toast for the main window.
+    Notice(String),
     AllowSender(String),
     /// An email address in a card header was clicked — compose to it.
     ComposeTo(String),
@@ -277,6 +285,8 @@ impl Component for MessageWindow {
                 MessageViewOutput::MarkSeen { .. } => MessageWindowInput::Ignore,
                 MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
                 MessageViewOutput::ComposeTo(addr) => MessageWindowInput::ComposeTo(addr),
+                MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
+                MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),
                 MessageViewOutput::AddContactAddr(addr) => {
                     MessageWindowInput::AddContactAddr(addr)
                 }
@@ -444,6 +454,12 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::AllowSender(addr) => {
                 let _ = sender.output(MessageWindowOutput::AllowSender(addr));
+            }
+            MessageWindowInput::ReloadBody(m) => {
+                let _ = sender.output(MessageWindowOutput::ReloadBody(m));
+            }
+            MessageWindowInput::Notice(text) => {
+                let _ = sender.output(MessageWindowOutput::Notice(text));
             }
             MessageWindowInput::CardAction { action, message } => {
                 let _ = sender.output(MessageWindowOutput::Action { action, message });

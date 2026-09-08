@@ -760,6 +760,10 @@ pub enum AppMsg {
     SetOverrideFonts(bool),
     SetReaderFont(String),
     SetOverrideColors(bool),
+    /// Fetch a message's body again: its OpenPGP verdict changed (#133).
+    ReloadBody(Box<crate::models::Message>),
+    /// Select a settings category by id (the showcase hook).
+    ShowSettingsPage(String),
     ComposeTo(String),
     Reply,
     ReplyAll,
@@ -1668,6 +1672,8 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::SelectCards(keys) => AppMsg::SelectCards(keys),
                     MessageViewOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
                     MessageViewOutput::AddContactAddr(addr) => AppMsg::AddContactAddr(addr),
+                    MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
+                    MessageViewOutput::Notice(text) => AppMsg::Notice(text),
                 });
 
         // The drawer owns a Paned whose top pane is the reader body, so hand it
@@ -2802,6 +2808,13 @@ impl SimpleComponent for AppModel {
                         } else {
                             AppMsg::OpenPreferences
                         });
+                        // Any other value names a sidebar category (#141).
+                        if panel != "accounts" && panel != "prefs" {
+                            let s = s.clone();
+                            gtk::glib::timeout_add_seconds_local_once(1, move || {
+                                s.input(AppMsg::ShowSettingsPage(panel));
+                            });
+                        }
                     });
                 }
                 let main: gtk::Window = root.clone().upcast();
@@ -4666,6 +4679,16 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::ShowSettingsPage(id) => {
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::ShowPageById(id));
+                }
+            }
+            AppMsg::ReloadBody(m) => {
+                if let Some(path) = self.resolve_folder_path(&m) {
+                    self.send_to(m.account_id, MailRequest::LoadBody { message_id: m.id, path, uid: m.uid });
+                }
+            }
             AppMsg::SetOverrideFonts(on) => {
                 if self.override_fonts != on {
                     self.override_fonts = on;
@@ -8037,6 +8060,8 @@ impl AppModel {
                 MessageWindowOutput::OpenAttachment(att) => AppMsg::OpenAttachmentItem(att),
                 MessageWindowOutput::SaveAllAttachments(items) => AppMsg::SaveAttachmentItems(items),
                 MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
+                MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
+                MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
                 MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
                 MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
             });
@@ -9885,6 +9910,17 @@ impl AppModel {
             app_icon: self.app_icon.clone(),
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
             accounts_sender: accounts.sender().clone(),
+            identities: self
+                .config
+                .iter()
+                .filter(|a| a.enabled)
+                .flat_map(|a| {
+                    std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(|al| {
+                        let (name, addr) = crate::config::split_identity(&al.identity);
+                        (if name.is_empty() { a.name.clone() } else { name }, addr)
+                    }))
+                })
+                .collect(),
             start_on_accounts: on_accounts,
         };
         let prefs = Preferences::builder()

@@ -204,12 +204,29 @@ pub struct Unwrapped {
 /// message carries no OpenPGP structure at all.
 pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
     let shape = detect(raw)?;
+    let mut unwrapped = unwrap_shape(shape, raw, gpg);
+    unwrapped.status.sender_addr = from_address(raw);
+    unwrapped.status.autocrypt = autocrypt_key(raw).map(|k| crate::oauth::base64_encode(&k));
+    Some(unwrapped)
+}
+
+/// The From address of a raw message, lowercased ("" when it has none).
+fn from_address(raw: &[u8]) -> String {
+    use mail_parser::MessageParser;
+    MessageParser::default()
+        .parse(raw)
+        .and_then(|m| m.from().and_then(|f| f.first()).and_then(|a| a.address().map(|s| s.to_ascii_lowercase())))
+        .unwrap_or_default()
+}
+
+fn unwrap_shape(shape: Shape, _raw: &[u8], gpg: &Gpg) -> Unwrapped {
     if !available() {
         let status = PgpStatus {
             encrypted: shape.is_encrypted(),
             decrypted: false,
             signature: PgpSignature::None,
             notes: vec![i18n("GnuPG (gpg) is not installed, so this message cannot be read.")],
+            ..Default::default()
         };
         // A signed message is still readable without gpg.
         let inner = match &shape {
@@ -217,9 +234,9 @@ pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
             Shape::InlineSigned { text } => Some(text_entity(text)),
             _ => None,
         };
-        return Some(Unwrapped { inner, status });
+        return Unwrapped { inner, status };
     }
-    Some(match shape {
+    match shape {
         Shape::Encrypted { armored } | Shape::InlineEncrypted { armored } => {
             let out = run(gpg, &["--decrypt"], &armored, None);
             let outcome = parse_status(&out.status_lines);
@@ -243,7 +260,7 @@ pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
                     text_entity(&out.stdout)
                 }
             });
-            Unwrapped { inner, status: PgpStatus { encrypted: true, decrypted, signature, notes } }
+            Unwrapped { inner, status: PgpStatus { encrypted: true, decrypted, signature, notes, ..Default::default() } }
         }
         Shape::Signed { data, signature } => {
             let out = run(gpg, &["--verify"], &data, Some(&signature));
@@ -257,7 +274,7 @@ pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
             }
             Unwrapped {
                 inner: Some(data),
-                status: PgpStatus { encrypted: false, decrypted: false, signature, notes },
+                status: PgpStatus { encrypted: false, decrypted: false, signature, notes, ..Default::default() },
             }
         }
         Shape::InlineSigned { text } => {
@@ -270,10 +287,10 @@ pub fn unwrap_message(raw: &[u8], gpg: &Gpg) -> Option<Unwrapped> {
             let inner = if out.stdout.is_empty() { text_entity(&text) } else { text_entity(&out.stdout) };
             Unwrapped {
                 inner: Some(inner),
-                status: PgpStatus { encrypted: false, decrypted: false, signature, notes },
+                status: PgpStatus { encrypted: false, decrypted: false, signature, notes, ..Default::default() },
             }
         }
-    })
+    }
 }
 
 /// Whether decrypted bytes are a MIME entity (headers first) rather than
@@ -474,6 +491,386 @@ pub fn key_display(id: &str) -> String {
         .join(" ")
 }
 
+// ---------------------------------------------------------------------------
+// Key management (#133, second slice): what the settings page and the
+// reader's popover need, all of it gpg on the user's own keyring.
+
+/// How far the keyring vouches for a key (the validity column of
+/// `--with-colons`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyValidity {
+    Revoked,
+    Expired,
+    Unknown,
+    Never,
+    Marginal,
+    Full,
+    Ultimate,
+}
+
+impl KeyValidity {
+    fn from_colon(c: &str) -> KeyValidity {
+        match c.chars().next() {
+            Some('r') => KeyValidity::Revoked,
+            Some('e') => KeyValidity::Expired,
+            Some('n') => KeyValidity::Never,
+            Some('m') => KeyValidity::Marginal,
+            Some('f') => KeyValidity::Full,
+            Some('u') => KeyValidity::Ultimate,
+            _ => KeyValidity::Unknown,
+        }
+    }
+
+    /// Whether signatures by this key count as trusted.
+    pub fn trusted(self) -> bool {
+        matches!(self, KeyValidity::Full | KeyValidity::Ultimate)
+    }
+
+    pub fn label(self) -> String {
+        i18n(match self {
+            KeyValidity::Revoked => "Revoked",
+            KeyValidity::Expired => "Expired",
+            KeyValidity::Unknown => "Not trusted yet",
+            KeyValidity::Never => "Marked as not trusted",
+            KeyValidity::Marginal => "Marginally trusted",
+            KeyValidity::Full => "Trusted",
+            KeyValidity::Ultimate => "Your own key",
+        })
+    }
+}
+
+/// One key in the keyring.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyInfo {
+    pub fingerprint: String,
+    /// The long key id (the fingerprint's last sixteen digits).
+    pub key_id: String,
+    /// User ids, the primary first.
+    pub uids: Vec<String>,
+    /// Whether the secret half is in the keyring (one of the user's own).
+    pub secret: bool,
+    /// Whether the key (some subkey) can encrypt.
+    pub can_encrypt: bool,
+    /// Whether the key can sign.
+    pub can_sign: bool,
+    pub created: i64,
+    pub expires: Option<i64>,
+    pub validity: KeyValidity,
+    pub disabled: bool,
+}
+
+impl KeyInfo {
+    pub fn primary_uid(&self) -> &str {
+        self.uids.first().map(String::as_str).unwrap_or("")
+    }
+
+    /// The addresses in the user ids, lowercased.
+    pub fn emails(&self) -> Vec<String> {
+        self.uids
+            .iter()
+            .filter_map(|u| {
+                let (_, addr) = crate::config::split_identity(u);
+                let addr = addr.trim().to_ascii_lowercase();
+                (!addr.is_empty()).then_some(addr)
+            })
+            .collect()
+    }
+
+    pub fn matches_address(&self, addr: &str) -> bool {
+        let addr = addr.trim().to_ascii_lowercase();
+        self.emails().iter().any(|e| *e == addr)
+    }
+
+    /// Whether the key can still be used at all.
+    pub fn usable(&self) -> bool {
+        !self.disabled
+            && !matches!(self.validity, KeyValidity::Revoked | KeyValidity::Expired)
+            && self.expires.is_none_or(|e| e > now_secs())
+    }
+
+    /// The fingerprint in readable groups of four.
+    pub fn fingerprint_display(&self) -> String {
+        self.fingerprint
+            .as_bytes()
+            .chunks(4)
+            .map(|c| String::from_utf8_lossy(c).into_owned())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// The keys in the keyring: the user's own (`secret`) or everyone's.
+pub fn list_keys(gpg: &Gpg, secret: bool) -> Vec<KeyInfo> {
+    let list = if secret { "--list-secret-keys" } else { "--list-keys" };
+    let out = run(gpg, &["--with-colons", "--with-fingerprint", "--fixed-list-mode", list], b"", None);
+    parse_colons(&String::from_utf8_lossy(&out.stdout), secret)
+}
+
+/// Read `--with-colons` output (`doc/DETAILS`): a `pub`/`sec` record opens
+/// a key, its `fpr` names it, `uid` records follow, `sub`/`ssb` add
+/// capabilities.
+fn parse_colons(text: &str, secret: bool) -> Vec<KeyInfo> {
+    let mut keys: Vec<KeyInfo> = Vec::new();
+    let mut expect_fpr = false;
+    for line in text.lines() {
+        let f: Vec<&str> = line.split(':').collect();
+        match f.first().copied() {
+            Some("pub") | Some("sec") => {
+                let caps = f.get(11).copied().unwrap_or("");
+                keys.push(KeyInfo {
+                    fingerprint: String::new(),
+                    key_id: f.get(4).copied().unwrap_or("").to_string(),
+                    uids: Vec::new(),
+                    secret,
+                    can_encrypt: caps.contains(['e', 'E']),
+                    can_sign: caps.contains(['s', 'S']),
+                    created: f.get(5).and_then(|v| v.parse().ok()).unwrap_or(0),
+                    expires: f.get(6).and_then(|v| v.parse().ok()).filter(|e: &i64| *e > 0),
+                    validity: KeyValidity::from_colon(f.get(1).copied().unwrap_or("")),
+                    disabled: caps.contains('D'),
+                });
+                expect_fpr = true;
+            }
+            Some("fpr") if expect_fpr => {
+                if let Some(k) = keys.last_mut() {
+                    k.fingerprint = f.get(9).copied().unwrap_or("").to_string();
+                }
+                expect_fpr = false;
+            }
+            Some("uid") => {
+                if let Some(k) = keys.last_mut() {
+                    let uid = f.get(9).copied().unwrap_or("");
+                    // gpg writes the uid C-escaped (\x3a for ':').
+                    let uid = uid.replace("\\x3a", ":");
+                    let valid = f.get(1).copied().unwrap_or("");
+                    if !valid.starts_with('r') {
+                        k.uids.push(uid);
+                    }
+                }
+            }
+            Some("sub") | Some("ssb") => {
+                if let Some(k) = keys.last_mut() {
+                    let caps = f.get(11).copied().unwrap_or("");
+                    let expired = f.get(1).copied().unwrap_or("").starts_with(['e', 'r']);
+                    if !expired {
+                        k.can_encrypt |= caps.contains('e');
+                        k.can_sign |= caps.contains('s');
+                    }
+                }
+                expect_fpr = false;
+            }
+            _ => {}
+        }
+    }
+    keys.retain(|k| !k.fingerprint.is_empty());
+    keys
+}
+
+/// The user's own usable key for an address, if any.
+pub fn secret_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
+    list_keys(gpg, true)
+        .into_iter()
+        .find(|k| k.usable() && k.can_sign && k.matches_address(addr))
+}
+
+/// A usable public key that can encrypt to an address, if any.
+pub fn public_key_for(gpg: &Gpg, addr: &str) -> Option<KeyInfo> {
+    list_keys(gpg, false)
+        .into_iter()
+        .find(|k| k.usable() && k.can_encrypt && k.matches_address(addr))
+}
+
+/// The key with this fingerprint, if the keyring holds it.
+pub fn key_by_fingerprint(gpg: &Gpg, fpr: &str) -> Option<KeyInfo> {
+    let fpr = fpr.to_ascii_uppercase();
+    list_keys(gpg, false).into_iter().find(|k| k.fingerprint == fpr)
+}
+
+/// What an import did.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ImportSummary {
+    pub imported: u32,
+    pub unchanged: u32,
+    /// The fingerprints the import touched.
+    pub fingerprints: Vec<String>,
+}
+
+fn import_summary(out: &Run) -> ImportSummary {
+    let mut s = ImportSummary::default();
+    for line in &out.status_lines {
+        // IMPORT_OK <reason> <fingerprint>: reason 0 = unchanged, else new
+        // or updated.
+        if let Some(rest) = line.strip_prefix("IMPORT_OK ") {
+            let mut it = rest.split(' ');
+            let reason: u32 = it.next().and_then(|r| r.parse().ok()).unwrap_or(0);
+            if let Some(fpr) = it.next() {
+                s.fingerprints.push(fpr.to_string());
+            }
+            if reason == 0 {
+                s.unchanged += 1;
+            } else {
+                s.imported += 1;
+            }
+        }
+    }
+    s
+}
+
+/// Import keys (armoured or binary) into the keyring.
+pub fn import_keys(gpg: &Gpg, bytes: &[u8]) -> Result<ImportSummary, String> {
+    let out = run(gpg, &["--import"], bytes, None);
+    let s = import_summary(&out);
+    if s.fingerprints.is_empty() {
+        return Err(out.detail.unwrap_or_else(|| i18n("No key was found in that file.")));
+    }
+    Ok(s)
+}
+
+/// A key's public half, armoured, for sending to someone.
+pub fn export_public(gpg: &Gpg, fpr: &str) -> Result<Vec<u8>, String> {
+    let out = run(gpg, &["--armor", "--export", fpr], b"", None);
+    if out.stdout.is_empty() {
+        return Err(out.detail.unwrap_or_else(|| i18n("Nothing to export.")));
+    }
+    Ok(out.stdout)
+}
+
+/// Make a new key pair for an identity: a signing primary with an
+/// encryption subkey (`default default`, the pair the terminal command's
+/// bare `rsa4096` does NOT give), protected by `passphrase` (empty = none).
+/// The passphrase goes down a pipe, never a command line.
+pub fn generate_key(gpg: &Gpg, name: &str, email: &str, expire: &str, passphrase: &str) -> Result<String, String> {
+    let uid = if name.trim().is_empty() { email.trim().to_string() } else { format!("{} <{}>", name.trim(), email.trim()) };
+    let out = run(
+        gpg,
+        &["--pinentry-mode", "loopback", "--passphrase-fd", "0", "--quick-gen-key", &uid, "default", "default", expire],
+        format!("{passphrase}\n").as_bytes(),
+        None,
+    );
+    for line in &out.status_lines {
+        if let Some(rest) = line.strip_prefix("KEY_CREATED ") {
+            if let Some(fpr) = rest.split(' ').nth(1) {
+                return Ok(fpr.to_string());
+            }
+        }
+    }
+    Err(out.detail.unwrap_or_else(|| i18n("gpg did not create the key.")))
+}
+
+/// Look a key up by address (WKD, then the keyservers), and by key id
+/// when the message named one, importing what is found.
+pub fn fetch_key(gpg: &Gpg, addr: &str, key_id: Option<&str>) -> Result<ImportSummary, String> {
+    let mut total = ImportSummary::default();
+    let mut detail = None;
+    if !addr.trim().is_empty() {
+        let out = run(gpg, &["--auto-key-locate", "clear,wkd,keyserver", "--locate-external-keys", addr.trim()], b"", None);
+        let s = import_summary(&out);
+        total.imported += s.imported;
+        total.unchanged += s.unchanged;
+        total.fingerprints.extend(s.fingerprints);
+        detail = out.detail;
+    }
+    if total.fingerprints.is_empty() {
+        if let Some(id) = key_id.filter(|k| !k.is_empty()) {
+            let out = run(gpg, &["--recv-keys", id], b"", None);
+            let s = import_summary(&out);
+            total.imported += s.imported;
+            total.unchanged += s.unchanged;
+            total.fingerprints.extend(s.fingerprints);
+            if out.detail.is_some() {
+                detail = out.detail;
+            }
+        }
+    }
+    if total.fingerprints.is_empty() {
+        return Err(detail.unwrap_or_else(|| i18n("No key was found for that address.")));
+    }
+    Ok(total)
+}
+
+/// Vouch for a key: a local (non-exportable) signature with one of the
+/// user's own keys, which is what makes gpg call it trusted.
+pub fn trust_key(gpg: &Gpg, fpr: &str, signer: Option<&str>) -> Result<(), String> {
+    let mut args = vec!["--yes"];
+    if let Some(s) = signer {
+        args.extend(["--local-user", s]);
+    }
+    args.extend(["--quick-lsign-key", fpr]);
+    let out = run(gpg, &args, b"", None);
+    // gpg says nothing on success; a failure has a line.
+    let failed = out
+        .status_lines
+        .iter()
+        .any(|l| l.starts_with("FAILURE") || l.starts_with("INV_SGNR") || l.starts_with("NO_SECKEY"));
+    if failed {
+        return Err(out.detail.unwrap_or_else(|| i18n("gpg could not sign the key.")));
+    }
+    Ok(())
+}
+
+/// Remove a key from the keyring; the secret half too when it is the
+/// user's own.
+pub fn delete_key(gpg: &Gpg, fpr: &str, secret: bool) -> Result<(), String> {
+    let cmd = if secret { "--delete-secret-and-public-key" } else { "--delete-keys" };
+    let out = run(gpg, &["--yes", cmd, fpr], b"", None);
+    if key_by_fingerprint(gpg, fpr).is_some() {
+        return Err(out.detail.unwrap_or_else(|| i18n("gpg could not delete the key.")));
+    }
+    Ok(())
+}
+
+/// A detached, armoured signature over `data` by `local_user`.
+pub fn sign_detached(gpg: &Gpg, data: &[u8], local_user: &str) -> Result<Vec<u8>, String> {
+    let out = run(gpg, &["--armor", "--local-user", local_user, "--detach-sign"], data, None);
+    if out.stdout.is_empty() {
+        return Err(out.detail.unwrap_or_else(|| i18n("gpg did not sign the message.")));
+    }
+    Ok(out.stdout)
+}
+
+/// `data` encrypted (and, with `local_user`, signed) to every recipient
+/// address, armoured. The sender is a recipient too, so the Sent copy stays
+/// readable. Keys are used as found: a recipient's key that is in the
+/// keyring but not vouched for still encrypts, as Thunderbird does.
+pub fn encrypt(gpg: &Gpg, data: &[u8], recipients: &[String], local_user: Option<&str>) -> Result<Vec<u8>, String> {
+    let mut args: Vec<&str> = vec!["--armor", "--trust-model", "always", "--encrypt"];
+    if let Some(u) = local_user {
+        args.extend(["--sign", "--local-user", u]);
+    }
+    for r in recipients {
+        args.extend(["--recipient", r.as_str()]);
+    }
+    let out = run(gpg, &args, data, None);
+    if out.stdout.is_empty() {
+        return Err(out.detail.unwrap_or_else(|| i18n("gpg did not encrypt the message.")));
+    }
+    Ok(out.stdout)
+}
+
+/// The sender's key carried in an Autocrypt header (Level 1: `addr=…;
+/// keydata=<base64>`), decoded, if the message has one.
+pub fn autocrypt_key(raw: &[u8]) -> Option<Vec<u8>> {
+    use mail_parser::MessageParser;
+    let parsed = MessageParser::default().parse(raw)?;
+    let header = parsed.header_raw("Autocrypt")?;
+    let mut keydata = None;
+    for attr in header.split(';') {
+        let attr = attr.trim();
+        if let Some(v) = attr.strip_prefix("keydata=") {
+            keydata = Some(v.split_whitespace().collect::<String>());
+        }
+    }
+    let keydata = keydata?;
+    crate::oauth::base64_decode(&keydata).filter(|b| !b.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,6 +995,60 @@ Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; bound
         assert!(e.starts_with(b"Content-Type: text/plain"));
     }
 
+    #[test]
+    fn colon_listing_becomes_keys() {
+        let text = "\
+tru::1:1757000000:0:3:1:5\n\
+pub:u:255:22:7949BE459D0D7AF2:1750000000:0::u:::scESC::::::23::0:\n\
+fpr:::::::::79277AB4A01A00F9574FD84E7949BE459D0D7AF2:\n\
+uid:u::::1750000000::ABCDEF::jason@hyprlab.co <jason@hyprlab.co>::::::::::0:\n\
+sub:u:255:18:94D25AE427F6BE67:1750000000:0:::::e::::::23:\n\
+fpr:::::::::1111111111111111111111111194D25AE427F6BE67:\n\
+pub:-:4096:1:51300FD844417A2E:1757000000:1820000000::-:::scSC::::::23::0:\n\
+fpr:::::::::51300FD844417A2EF1828831DC8357B877CD8F05:\n\
+uid:-::::1757000000::ABCDEF::Jason Martin <jasonjmartin@me.com>::::::::::0:\n\
+uid:r::::1757000000::ABCDEF::Old Name <old@example.org>::::::::::0:\n";
+        let keys = parse_colons(text, false);
+        assert_eq!(keys.len(), 2);
+        let k = &keys[0];
+        assert_eq!(k.fingerprint, "79277AB4A01A00F9574FD84E7949BE459D0D7AF2");
+        assert_eq!(k.key_id, "7949BE459D0D7AF2");
+        assert!(k.can_encrypt && k.can_sign);
+        assert_eq!(k.validity, KeyValidity::Ultimate);
+        assert!(k.matches_address("Jason@Hyprlab.co"));
+        assert_eq!(k.fingerprint_display(), "7927 7AB4 A01A 00F9 574F D84E 7949 BE45 9D0D 7AF2");
+        let k = &keys[1];
+        assert!(!k.can_encrypt, "no encryption subkey");
+        assert_eq!(k.expires, Some(1820000000));
+        assert_eq!(k.validity, KeyValidity::Unknown);
+        assert_eq!(k.uids, vec!["Jason Martin <jasonjmartin@me.com>"], "revoked uid dropped");
+        assert_eq!(k.emails(), vec!["jasonjmartin@me.com"]);
+    }
+
+    #[test]
+    fn import_status_is_summarised() {
+        let out = Run {
+            status_lines: lines(&["IMPORT_OK 1 AAAA", "IMPORT_OK 0 BBBB", "IMPORT_RES 2 0 1 0 0 0 0 0 0 0 0 0 0 0 0"]),
+            ..Default::default()
+        };
+        let s = import_summary(&out);
+        assert_eq!(s.imported, 1);
+        assert_eq!(s.unchanged, 1);
+        assert_eq!(s.fingerprints, vec!["AAAA", "BBBB"]);
+    }
+
+    #[test]
+    fn autocrypt_header_yields_the_key() {
+        let key = b"\x98\x01\x02binarykey";
+        let b64 = crate::oauth::base64_encode(key);
+        let raw = format!(
+            "From: a@b.c\r\nAutocrypt: addr=a@b.c; prefer-encrypt=mutual;\r\n keydata={}\r\nContent-Type: text/plain\r\n\r\nhi\r\n",
+            b64
+        );
+        assert_eq!(autocrypt_key(raw.as_bytes()).as_deref(), Some(&key[..]));
+        assert_eq!(autocrypt_key(b"From: a@b.c\r\n\r\nhi"), None);
+    }
+
     /// The end-to-end path against a real gpg with a throwaway keyring:
     /// encrypt-and-sign a MIME entity, then watch it come back decrypted with
     /// the signature verified. Skipped where gpg is missing.
@@ -662,7 +1113,57 @@ Content-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; bound
         assert!(u.status.encrypted && !u.status.decrypted);
         assert!(u.inner.is_none());
 
-        let _ = std::process::Command::new("gpgconf").env("GNUPGHOME", &home).args(["--kill", "all"]).status();
-        let _ = std::fs::remove_dir_all(&home);
+        // Key management on the same keyring.
+        let mine = list_keys(&gpg, true);
+        assert_eq!(mine.len(), 1, "{mine:?}");
+        assert!(mine[0].can_encrypt && mine[0].secret);
+        assert!(secret_key_for(&gpg, "TEST@vireo.invalid").is_some());
+        assert!(public_key_for(&gpg, "test@vireo.invalid").is_some());
+        assert!(public_key_for(&gpg, "nobody@vireo.invalid").is_none());
+        let fpr = generate_key(&gpg, "Second Key", "second@vireo.invalid", "1y", "pw").expect("generated");
+        let second = key_by_fingerprint(&gpg, &fpr).expect("listed");
+        assert!(second.can_encrypt, "default default gives an encryption subkey: {second:?}");
+        assert!(second.expires.is_some());
+        let armored = export_public(&gpg, &fpr).expect("exported");
+        assert!(String::from_utf8_lossy(&armored).contains("BEGIN PGP PUBLIC KEY BLOCK"));
+        // Into a second, empty keyring: imported, untrusted, then vouched for.
+        let home2 = std::env::temp_dir().join(format!("vireo-gpg-test2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home2);
+        std::fs::create_dir_all(&home2).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&home2, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let gpg2 = Gpg { home: Some(home2.clone()) };
+        let s = import_keys(&gpg2, &armored).expect("imported");
+        assert_eq!(s.imported, 1);
+        assert_eq!(s.fingerprints, vec![fpr.clone()]);
+        assert_eq!(import_keys(&gpg2, &armored).unwrap().unchanged, 1);
+        assert!(import_keys(&gpg2, b"not a key").is_err());
+        assert_eq!(key_by_fingerprint(&gpg2, &fpr).unwrap().validity, KeyValidity::Unknown);
+        assert!(trust_key(&gpg2, &fpr, None).is_err(), "no key of one's own to sign with");
+        let own = generate_key(&gpg2, "", "me@vireo.invalid", "never", "").expect("own key");
+        trust_key(&gpg2, &fpr, Some(&own)).expect("signed");
+        assert!(key_by_fingerprint(&gpg2, &fpr).unwrap().validity.trusted());
+        // Encrypt to the imported key from the second keyring; the first opens it.
+        let ct = encrypt(&gpg2, b"Content-Type: text/plain\r\n\r\nfor second", &["second@vireo.invalid".into()], Some(&own)).expect("encrypted");
+        let mail = format!("From: me@vireo.invalid\r\nMIME-Version: 1.0\r\nContent-Type: multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"e\"\r\n\r\n--e\r\nContent-Type: application/pgp-encrypted\r\n\r\nVersion: 1\r\n--e\r\nContent-Type: application/octet-stream\r\n\r\n{}\r\n--e--\r\n", String::from_utf8_lossy(&ct));
+        // The second key has a passphrase, fed through the loopback for the test.
+        let gpg_pw = Gpg { home: Some(home.clone()) };
+        let out = run(&gpg_pw, &["--pinentry-mode", "loopback", "--passphrase", "pw", "--decrypt"], &ct, None);
+        assert!(String::from_utf8_lossy(&out.stdout).contains("for second"), "{:?}", out.status_lines);
+        let _ = mail;
+        let sig = sign_detached(&gpg2, b"data", &own).expect("signed");
+        assert!(String::from_utf8_lossy(&sig).contains("BEGIN PGP SIGNATURE"));
+        delete_key(&gpg2, &fpr, false).expect("deleted");
+        assert!(key_by_fingerprint(&gpg2, &fpr).is_none());
+        delete_key(&gpg2, &own, true).expect("deleted own");
+        assert!(list_keys(&gpg2, true).is_empty());
+
+        for h in [&home, &home2] {
+            let _ = std::process::Command::new("gpgconf").env("GNUPGHOME", h).args(["--kill", "all"]).status();
+            let _ = std::fs::remove_dir_all(h);
+        }
     }
 }

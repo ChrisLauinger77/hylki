@@ -11,6 +11,7 @@ pub mod message_list;
 pub mod message_view;
 pub mod message_window;
 pub mod notifications;
+pub mod pgp_keys;
 pub mod preferences;
 pub mod print_preview;
 pub mod rich_editor;
