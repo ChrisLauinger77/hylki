@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-06 15:45+0200\n"
+"PO-Revision-Date: 2026-09-08 19:37+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -110,7 +110,7 @@ msgid "Actions"
 msgstr "Actions"
 
 msgid "Tags"
-msgstr ""
+msgstr "Mots-clés"
 
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualiser ou appuyer longuement pour la barre d'état"
@@ -171,7 +171,7 @@ msgid "Undoing move…"
 msgstr "Annulation du déplacement…"
 
 msgid "No message with the ID {id} was found"
-msgstr ""
+msgstr "Aucun message portant l'identifiant {id} n'a été trouvé."
 
 msgid "No Drafts folder available for this account"
 msgstr "Aucun dossier Brouillons disponible pour ce compte"
@@ -191,13 +191,11 @@ msgstr "Paramètres exportés vers {display}"
 msgid "Export failed: {e}"
 msgstr "Échec de l'exportation : {e}"
 
-#, fuzzy
 msgid "Export Log"
-msgstr "Exporter les paramètres"
+msgstr "Exporter les logs"
 
-#, fuzzy
 msgid "Log exported to {display}"
-msgstr "Paramètres exportés vers {display}"
+msgstr "Journal exporté vers {display}"
 
 msgid "Import Settings"
 msgstr "Importer des paramètres"
@@ -280,9 +278,8 @@ msgstr "Retirer le drapeau"
 msgid "Print Preview"
 msgstr "Aperçu avant impression"
 
-#, fuzzy
 msgid "Move to Inbox"
-msgstr "Déplacer vers"
+msgstr "Déplacer vers la boîte de réception"
 
 msgid "Message Source"
 msgstr "Code source du message"
@@ -558,56 +555,56 @@ msgstr "Sur cet ordinateur"
 msgid "CardDAV Address Book"
 msgstr "Carnet d'adresses CardDAV"
 
-#, fuzzy
 msgid "Encrypted message"
-msgstr "{n} message non lu"
+msgstr "Message chiffré"
 
 msgid "Encrypted with OpenPGP; could not be decrypted"
-msgstr ""
+msgstr "Chiffré avec OpenPGP ; impossible à déchiffrer"
 
 msgid "Encrypted with OpenPGP"
-msgstr ""
+msgstr "Chiffré avec OpenPGP"
 
 msgid "Encrypted, and signed by {signer}"
-msgstr ""
+msgstr "Chiffré et signé par {signer}"
 
 msgid ""
 "Encrypted; the signature does not match, the message may have been altered"
 msgstr ""
+"Chiffré ; la signature ne correspond pas, le message a peut-être été modifié"
 
 msgid "Encrypted; signed with a key you don't have ({id})"
-msgstr ""
+msgstr "Chiffré ; signé avec une clé dont vous ne disposez pas ({id})"
 
 msgid "Encrypted, and signed by {signer} with an expired key"
-msgstr ""
+msgstr "Chiffré et signé par {signer} à l'aide d'une clé périmée"
 
 msgid "Encrypted, and signed by {signer} with a revoked key"
-msgstr ""
+msgstr "Chiffré et signé par {signer} à l'aide d'une clé révoquée"
 
 msgid "Encrypted, and signed by {signer}; the signature has expired"
-msgstr ""
+msgstr "Chiffré et signé par {signer} ; la signature a expiré"
 
 msgid "OpenPGP-signed; the signature could not be checked"
-msgstr ""
+msgstr "Signé avec OpenPGP ; la signature n'a pas pu être vérifiée"
 
-#, fuzzy
 msgid "Signed by {signer}"
-msgstr "Signé par : {d}"
+msgstr "Signé par {signer}"
 
 msgid "The OpenPGP signature does not match; the message may have been altered"
 msgstr ""
+"La signature OpenPGP ne correspond pas ; le message a peut-être été modifié."
 
 msgid "Signed with a key you don't have ({id})"
-msgstr ""
+msgstr "Signé avec une clé que vous ne possédez pas ({id})"
 
 msgid "Signed by {signer} with an expired key"
-msgstr ""
+msgstr "Signé par {signer} avec une clé périmée"
 
 msgid "Signed by {signer} with a revoked key"
-msgstr ""
+msgstr "Signé par {signer} avec une clé révoquée"
 
 msgid "Signed by {signer}; the signature has expired"
-msgstr ""
+msgstr "Signé par {signer} ; la signature a expiré"
 
 msgid "This message hasn't been checked."
 msgstr "Ce message n'a pas été vérifié."
@@ -628,64 +625,70 @@ msgid "New message"
 msgstr "Nouveau message"
 
 msgid "GnuPG (gpg) is not installed, so this message cannot be read."
-msgstr ""
+msgstr "GnuPG (gpg) n'est pas installé ; ce message ne peut donc pas être lu."
 
 msgid "Decrypted with your key."
-msgstr ""
+msgstr "Décrypté à l'aide de votre clé."
 
 msgid "Encrypted to key {id}, which is not in your keyring."
 msgstr ""
+"Chiffré avec la clé {id}, qui ne figure pas dans votre trousseau de clés."
 
 msgid "The encrypted block is damaged or not OpenPGP data."
-msgstr ""
+msgstr "Le bloc chiffré est endommagé ou ne contient pas de données OpenPGP."
 
 msgid "Signing key {id} is trusted in your keyring."
 msgstr ""
+"La clé de signature {id} est considérée comme fiable dans votre trousseau "
+"de clés."
 
 msgid "Signing key {id} is only marginally trusted in your keyring."
 msgstr ""
+"La clé de signature {id} ne bénéficie que d'un niveau de confiance très "
+"faible dans votre trousseau de clés."
 
 msgid "Signing key {id} is marked as not trusted in your keyring."
 msgstr ""
+"La clé de signature {id} est signalée comme non fiable dans votre trousseau "
+"de clés."
 
 msgid ""
 "Signing key {id} is in your keyring but not marked as trusted; check its "
 "fingerprint with the sender."
 msgstr ""
+"La clé de signature {id} se trouve dans votre trousseau de clés, mais n'est "
+"pas marquée comme fiable ; vérifiez son empreinte digitale auprès de "
+"l'expéditeur."
 
-#, fuzzy
 msgid "Signed with key {id}."
-msgstr "Signé par : {d}"
+msgstr "Signé avec la clé {id}."
 
 msgid "Import the sender's public key to verify it."
-msgstr ""
+msgstr "Importez la clé publique de l'expéditeur pour la vérifier."
 
 msgid "No key was found in that file."
-msgstr ""
+msgstr "Aucune clé n'a été trouvée dans ce fichier."
 
-#, fuzzy
 msgid "Nothing to export."
-msgstr "Rien à annuler"
+msgstr "Rien à exporter."
 
 msgid "gpg did not create the key."
-msgstr ""
+msgstr "gpg n'a pas créé la clé."
 
 msgid "No key was found for that address."
-msgstr ""
+msgstr "Aucune clé n'a été trouvée pour cette adresse."
 
 msgid "gpg could not sign the key."
-msgstr ""
+msgstr "gpg n'a pas pu signer la clé."
 
-#, fuzzy
 msgid "gpg could not delete the key."
-msgstr "Impossible de supprimer le dossier : {e}"
+msgstr "gpg n'a pas pu supprimer la clé."
 
-#, fuzzy
 msgid "gpg did not sign the message."
-msgstr "Modifier ce message"
+msgstr "gpg n'a pas signé le message."
 
 msgid "gpg did not encrypt the message."
-msgstr ""
+msgstr "gpg n'a pas chiffré le message."
 
 msgid "Open Vireo"
 msgstr "Ouvrir Vireo"
@@ -746,33 +749,34 @@ msgid ""
 "Label messages with one or more coloured tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same tags."
 msgstr ""
+"Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
+"étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
+"clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
+"étiquettes."
 
-#, fuzzy
 msgid "Add Tag…"
-msgstr "Ajouter un alias…"
+msgstr "Ajouter un tag…"
 
-#, fuzzy
 msgid "Search filters"
-msgstr "Joindre des fichiers"
+msgstr "Filtres de recherche"
 
 msgid "Filters"
 msgstr "Filtres"
 
-#, fuzzy
 msgid ""
 "File incoming mail into folders or tag it automatically, by sender, subject "
 "or recipients. Applied to each account's Inbox as Vireo syncs it."
 msgstr ""
-"Classez automatiquement les e-mails entrants dans des dossiers, par "
-"expéditeur, objet ou destinataires. Appliqué à la boîte de réception de "
-"chaque compte lors de la synchronisation par Vireo."
+"Classez les e-mails entrants dans des dossiers ou attribuez-leur "
+"automatiquement des balises, en fonction de l'expéditeur, de l'objet ou des "
+"destinataires. Cette fonctionnalité s'applique à la boîte de réception de "
+"chaque compte au fur et à mesure que Vireo la synchronise."
 
 msgid "Add Filter…"
 msgstr "Ajouter un filtre…"
 
-#, fuzzy
 msgid "Search senders"
-msgstr "Récupérer les logos des expéditeurs"
+msgstr "Rechercher les expéditeurs"
 
 msgid "Allowed Senders"
 msgstr "Expéditeurs autorisés"
@@ -971,17 +975,21 @@ msgid "Turn off for servers that stall on push connections."
 msgstr "Désactivez pour les serveurs qui bloquent sur les connexions Push."
 
 msgid "Empty Junk automatically"
-msgstr ""
+msgstr "Vider automatiquement le dossier des indesirables"
 
 msgid "Delete junk mail older than this for good, checked at each sync."
 msgstr ""
+"Supprimer définitivement les courriers indésirables plus anciens que cela, "
+"vérification à chaque synchronisation."
 
 msgid "Empty Trash automatically"
-msgstr ""
+msgstr "Vider automatiquement la corbeille"
 
 msgid ""
 "Delete mail in the Trash older than this for good, checked at each sync."
 msgstr ""
+"Supprimer définitivement les e-mails de la corbeille datant d'avant cette "
+"date, vérification à chaque synchronisation."
 
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
@@ -1008,20 +1016,22 @@ msgstr "Corbeille"
 msgid "Junk"
 msgstr "Indésirables"
 
-#, fuzzy
 msgid "OpenPGP"
-msgstr "Ouvrir"
+msgstr "OpenPGP"
 
 msgid ""
 "The key that signs mail sent from this account and opens what is encrypted "
 "to it. Keys are managed under OpenPGP in the sidebar."
 msgstr ""
+"La clé qui permet de signer les e-mails envoyés depuis ce compte et de "
+"déchiffrer ceux qui lui sont adressés. Les clés sont gérées via OpenPGP dans "
+"la barre latérale."
 
 msgid "Key"
-msgstr ""
+msgstr "Clé"
 
 msgid "Automatic uses the key whose address matches."
-msgstr ""
+msgstr "La fonction « Automatique » utilise la clé dont l'adresse correspond."
 
 msgid "Signature"
 msgstr "Signature"
@@ -1155,44 +1165,44 @@ msgid "Use this account in Vireo"
 msgstr "Utiliser ce compte dans Vireo"
 
 msgid "Automatic"
-msgstr ""
+msgstr "Automatique"
 
 msgid "Never"
-msgstr ""
+msgstr "Jamais"
 
 msgid "After {n} day"
 msgid_plural "After {n} days"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Au bout de {n} jour"
+msgstr[1] "Au bout de {n} jours"
 
 msgid ", tagged {tag}"
-msgstr ""
+msgstr ", marqué {tag}"
 
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
 
-#, fuzzy
 msgid "Remove tag"
-msgstr "Retirer le drapeau"
+msgstr "Supprimer la balise"
 
-#, fuzzy
 msgid "Edit Tag"
-msgstr "Modifier"
+msgstr "Modifier la balise"
 
-#, fuzzy
 msgid "Add Tag"
-msgstr "Ajouter une adresse e-mail"
+msgstr "Ajouter un tag"
 
 msgid "Keyword"
-msgstr ""
+msgstr "Mot-clé"
 
 msgid ""
 "How the tag is stored on the server: letters, digits and most punctuation, "
 "no spaces. Thunderbird's built-in tags are $label1 to $label5."
 msgstr ""
+"Comment le tag est-il stocké sur le serveur ? : lettres, chiffres et la "
+"plupart des signes de ponctuation, sans espaces. Les tags intégrés à "
+"Thunderbird sont $label1 à $label5."
 
 msgid "Colour"
-msgstr ""
+msgstr "Couleur"
 
 msgid "Custom colour…"
 msgstr ""
@@ -1204,7 +1214,7 @@ msgid "Edit Filter"
 msgstr "Modifier le filtre"
 
 msgid "Add Filter"
-msgstr ""
+msgstr "Ajouter un filtre"
 
 msgid "Where"
 msgstr "Champ"
@@ -1244,14 +1254,15 @@ msgstr "Déplacer vers"
 
 msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
 msgstr ""
+"Où classer les e-mails correspondants ; ou les laisser dans la boîte de "
+"réception et se contenter de les marquer"
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
 msgid "Leave in Inbox"
-msgstr ""
+msgstr "Laisser dans la boîte de réception"
 
-#, fuzzy
 msgid "Tag with"
-msgstr "commence par"
+msgstr "Ajouter le tag"
 
 msgid "None"
 msgstr "Aucun"
@@ -1288,27 +1299,28 @@ msgstr "Tout enregistrer…"
 msgid "Save every attachment to a folder"
 msgstr "Enregistrer chaque pièce jointe dans un dossier"
 
-#, fuzzy
 msgid "Key imported"
-msgstr "Paramètres importés"
+msgstr "Clé importée"
 
 msgid ""
 "The key is in your keyring now. Trust it under Settings, OpenPGP, once you "
 "have checked its fingerprint with its owner."
 msgstr ""
+"La clé se trouve désormais dans votre trousseau de clés. Ajoutez-la dans "
+"« Paramètres », puis « OpenPGP », après avoir vérifié son empreinte digitale "
+"auprès de son propriétaire."
 
 msgid "Already in your keyring"
-msgstr ""
+msgstr "Déjà dans votre trousseau de clés"
 
 msgid "That key was imported before."
-msgstr ""
+msgstr "Cette clé avait déjà été importée."
 
-#, fuzzy
 msgid "Could not import the key"
-msgstr "Impossible d'importer le compte : {e}"
+msgstr "Impossible d'importer la clé"
 
 msgid "Import OpenPGP key"
-msgstr ""
+msgstr "Importer une clé OpenPGP"
 
 msgid "Search by sender, subject, type, filename…"
 msgstr "Rechercher par expéditeur, objet, type, nom de fichier…"
@@ -1416,10 +1428,10 @@ msgid "Send"
 msgstr "Envoyer"
 
 msgid "Encrypt with OpenPGP to every recipient's key"
-msgstr ""
+msgstr "Chiffrer avec OpenPGP en utilisant la clé de chaque destinataire"
 
 msgid "Sign with your OpenPGP key"
-msgstr ""
+msgstr "Signez avec votre clé OpenPGP"
 
 msgid "Attach files"
 msgstr "Joindre des fichiers"
@@ -1452,17 +1464,22 @@ msgid "Attach Files"
 msgstr "Joindre des fichiers"
 
 msgid "Cannot send with OpenPGP"
-msgstr ""
+msgstr "Impossible d'envoyer avec OpenPGP"
 
 msgid ""
 "There is no OpenPGP key of your own for {addr}. Generate one under Settings, "
 "OpenPGP, or choose a key in the account's settings."
 msgstr ""
+"Il n'y a pas de clé OpenPGP associée à {addr}. Générez-en une dans "
+"« Paramètres », puis « OpenPGP », ou sélectionnez une clé dans les "
+"paramètres du compte."
 
 msgid ""
 "There is no OpenPGP key for {addr}. Ask them for their public key, or fetch "
 "it under Settings, OpenPGP."
 msgstr ""
+"Il n'y a pas de clé OpenPGP pour {addr}. Demandez-lui sa clé publique ou "
+"récupérez-la dans « Paramètres », « OpenPGP »."
 
 msgid "Contacts"
 msgstr "Contacts"
@@ -1579,17 +1596,16 @@ msgid "Mark All as Read"
 msgstr "Tout marquer comme lu"
 
 msgid "Mark All as Unread"
-msgstr ""
+msgstr "Marquer tout comme non lu"
 
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
 
-#, fuzzy
 msgid "Fetch the sender's key"
-msgstr "Récupérer les logos des expéditeurs"
+msgstr "Récupérer la clé de l'expéditeur"
 
 msgid "Trust this key…"
-msgstr ""
+msgstr "Faites confiance à cette clé…"
 
 msgid "A pass proves the address wasn't forged — not that the message is safe."
 msgstr ""
@@ -1638,30 +1654,36 @@ msgid "Loading…"
 msgstr "Chargement…"
 
 msgid "That key is no longer in your keyring."
-msgstr ""
+msgstr "Cette clé ne se trouve plus sur votre trousseau."
 
 msgid "Trust this key?"
-msgstr ""
+msgstr "Faites-vous confiance à cette clé ?"
 
 msgid ""
 "Compare the fingerprint with the one {uid} gives you in person or over "
 "another channel. Trusting a key you have not checked lets an impostor's "
 "signature pass as theirs."
 msgstr ""
+"Comparez l'empreinte digitale avec celle que {uid} vous fournit en personne "
+"ou par un autre moyen. Si vous faites confiance à une clé que vous n'avez "
+"pas vérifiée, vous risquez de valider la signature d'un imposteur comme s'il "
+"s'agissait de la sienne."
 
 msgid "Trust"
-msgstr ""
+msgstr "Confiance"
 
 msgid "Key trusted."
-msgstr ""
+msgstr "Clé de confiance."
 
 msgid ""
 "Generate a key of your own first (Settings, OpenPGP): trusting a key means "
 "signing it with yours."
 msgstr ""
+"Commencez par générer votre propre clé (Paramètres, OpenPGP) : faire "
+"confiance à une clé, c'est la signer avec la vôtre."
 
 msgid "Copied"
-msgstr ""
+msgstr "Copié"
 
 #. Same order as the reader toolbar and the list's
 #. Actions Palette, View Source closing the line.
@@ -1690,10 +1712,10 @@ msgid "View source"
 msgstr "Afficher le code source"
 
 msgid "Back to my fonts and colours"
-msgstr ""
+msgstr "Retour à mes polices et couleurs"
 
 msgid "Show the sender's fonts and colours"
-msgstr ""
+msgstr "Afficher les polices et les couleurs de l'expéditeur"
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -1710,13 +1732,13 @@ msgid "Save Image"
 msgstr "Enregistrer l'image"
 
 msgid "The sender's key was imported from the message."
-msgstr ""
+msgstr "La clé de l'expéditeur a été importée à partir du message."
 
 msgid "The sender's key was fetched and imported."
-msgstr ""
+msgstr "La clé de l'expéditeur a été récupérée et importée."
 
 msgid "The sender's key was already in your keyring."
-msgstr ""
+msgstr "La clé de l'expéditeur figurait déjà dans votre trousseau de clés."
 
 msgid "Load attachments from server"
 msgstr "Charger les pièces jointes depuis le serveur"
@@ -1727,223 +1749,233 @@ msgstr "Tout effacer"
 msgid "Collapse status bar"
 msgstr "Réduire la barre d'état"
 
-#, fuzzy
 msgid "Export log"
-msgstr "Exporter les paramètres"
+msgstr "Exporter les logs"
 
 msgid "Status bar ({n})"
 msgstr "Barre d'état ({n})"
 
 msgid "2 years"
-msgstr ""
+msgstr "2 ans"
 
 msgid "1 year"
-msgstr ""
+msgstr "1 an"
 
 msgid "5 years"
-msgstr ""
+msgstr "5 ans"
 
 msgid "GnuPG"
-msgstr ""
+msgstr "GnuPG"
 
 msgid ""
 "Vireo reads and writes the keyring of the GnuPG on this computer, the same "
 "one the gpg command and other mail programs use."
 msgstr ""
+"Vireo lit et écrit dans le trousseau de clés de GnuPG sur cet ordinateur, "
+"celui-là même utilisé par la commande gpg et d'autres programmes de "
+"messagerie."
 
-#, fuzzy
 msgid "Your keys"
-msgstr "Votre nom"
+msgstr "Vos clés"
 
 msgid ""
 "A key of your own signs what you send and opens what is encrypted to you. "
 "Send its public half to the people who should write to you encrypted."
 msgstr ""
+"Une clé qui vous permet de signer ce que vous envoyez et de déchiffrer les "
+"messages qui vous sont adressés. Envoyez sa partie publique aux personnes "
+"qui doivent vous écrire de manière chiffrée."
 
-#, fuzzy
 msgid "Import…"
-msgstr "Importer le fichier…"
+msgstr "Importer…"
 
-#, fuzzy
 msgid "Generate…"
-msgstr "Général"
+msgstr "Générer..."
 
 msgid "Other people's keys"
-msgstr ""
+msgstr "Les clés des autres"
 
 msgid ""
 "The keys you encrypt to and check signatures with. A key is trusted once you "
 "have vouched for it; check its fingerprint with its owner first."
 msgstr ""
+"Les clés que vous utilisez pour chiffrer et pour vérifier les signatures. "
+"Une clé est considérée comme fiable une fois que vous en avez certifié "
+"l'authenticité ; vérifiez d'abord son empreinte auprès de son propriétaire."
 
 msgid "Fetch by address…"
-msgstr ""
+msgstr "Récupérer par adresse…"
 
 msgid ""
 "GnuPG {version} found. Vireo reads and writes its keyring, the same one the "
 "gpg command and other mail programs use."
 msgstr ""
+"GnuPG {version} détecté. Vireo lit et écrit dans son trousseau de clés, le "
+"même que celui utilisé par la commande gpg et d'autres programmes de "
+"messagerie."
 
 msgid ""
 "GnuPG was not found. Install the gnupg package to read encrypted mail and "
 "check signatures; the Flatpak build carries it."
 msgstr ""
+"GnuPG est introuvable. Installez le paquet gnupg pour lire les e-mails "
+"chiffrés et vérifier les signatures ; la version Flatpak l'inclut."
 
 msgid "No key of your own yet. Generate one for your address."
-msgstr ""
+msgstr "Vous n'avez pas encore de clé. Générez-en une pour votre adresse."
 
 msgid "No keys from other people yet."
-msgstr ""
+msgstr "Je n'ai pas encore reçu de clés d'autres personnes."
 
 msgid "Generating the key…"
-msgstr ""
+msgstr "Génération de la clé…"
 
-#, fuzzy
 msgid "Import Key"
-msgstr "Importer le fichier…"
+msgstr "Importer la clé"
 
 msgid "OpenPGP keys"
-msgstr ""
+msgstr "Clés OpenPGP"
 
-#, fuzzy
 msgid "All files"
-msgstr "Tous les dossiers"
+msgstr "Tous les fichiers"
 
-#, fuzzy
 msgid "Could not import: {e}"
-msgstr "Impossible d'importer le compte : {e}"
+msgstr "Impossible d'importer: {e}"
 
 msgid "Export Public Key"
-msgstr ""
+msgstr "Exporter la clé publique"
 
 msgid "Delete your key?"
-msgstr ""
+msgstr "Supprimer votre clé ?"
 
 msgid ""
 "{uid} will be removed, secret half included. Mail encrypted to it can never "
 "be read again, unless you have a backup of the key."
 msgstr ""
+"{uid} sera supprimé, y compris la moitié secrète. Les e-mails cryptés qui "
+"lui sont adressés ne pourront plus jamais être lus, à moins que vous ne "
+"disposiez d'une sauvegarde de la clé."
 
-#, fuzzy
 msgid "Remove this key?"
-msgstr "Supprimer cet alias"
+msgstr "Supprimer cette clé ?"
 
 msgid ""
 "{uid} will be removed from your keyring. It can be imported or fetched again "
 "later."
 msgstr ""
+"{uid} sera supprimé de votre trousseau. Vous pourrez l'importer ou le "
+"récupérer ultérieurement."
 
-#, fuzzy
 msgid "Could not delete: {e}"
-msgstr "Impossible de supprimer le dossier : {e}"
+msgstr "Impossible de supprimer: {e}"
 
 msgid "Fetch a Key"
-msgstr ""
+msgstr "Aller chercher une clé"
 
 msgid ""
 "Looks the address up where its provider publishes keys (WKD), then on the "
 "keyservers."
 msgstr ""
+"Il recherche l'adresse à laquelle son fournisseur publie les clés (WKD), "
+"puis sur les serveurs de clés."
 
 msgid "Fetch"
-msgstr ""
+msgstr "Cherche"
 
 msgid "Looking for a key for {addr}…"
-msgstr ""
+msgstr "Recherche d'une clé pour {addr}…"
 
 msgid ""
 "Generate a key of your own first: trusting a key means signing it with yours."
 msgstr ""
+"Commencez par générer votre propre clé : pour valider une clé, il faut la "
+"signer avec la vôtre."
 
-#, fuzzy
 msgid "Could not sign the key: {e}"
-msgstr "Impossible d'enregistrer le PDF : {error}"
+msgstr "Impossible de signer la clé : {e}"
 
-#, fuzzy
 msgid "Your key is ready."
-msgstr "Marquer comme lu"
+msgstr "Votre clé est prête."
 
-#, fuzzy
 msgid "Could not generate the key: {e}"
-msgstr "Impossible de supprimer le message : {e}"
+msgstr "Impossible de générer la clé : {e}"
 
 msgid "No key found: {e}"
-msgstr ""
+msgstr "Clé introuvable : {e}"
 
 msgid "Generate a Key"
-msgstr ""
+msgstr "Générer une clé"
 
 msgid ""
 "A signing key with an encryption subkey, made by GnuPG and kept in its "
 "keyring. The passphrase is asked for when the key is used; the agent "
 "remembers it for a while."
 msgstr ""
+"Une clé de signature comportant une sous-clé de chiffrement, générée par "
+"GnuPG et conservée dans son trousseau de clés. La phrase de passe est "
+"demandée lors de l'utilisation de la clé ; l'agent la mémorise pendant un "
+"certain temps."
 
-#, fuzzy
 msgid "Generate"
-msgstr "Général"
+msgstr "Générer"
 
-#, fuzzy
 msgid "Address"
-msgstr "Carnet d'adresses"
+msgstr "Adresse"
 
 msgid "Expires"
-msgstr ""
+msgstr "Date d'expiration"
 
 msgid "Passphrase"
-msgstr ""
+msgstr "Passphrase"
 
 msgid "Confirm passphrase"
-msgstr ""
+msgstr "Confirmer la phrase secrète"
 
 msgid "The passphrases differ"
-msgstr ""
+msgstr "Les mots de passe diffèrent"
 
 msgid "Type the same passphrase twice."
-msgstr ""
+msgstr "Saisissez deux fois la même phrase de passe."
 
 msgid "expires {date}"
-msgstr ""
+msgstr "expire le {date}"
 
 msgid "expired {date}"
-msgstr ""
+msgstr "expiré le {date}"
 
 msgid "signs and encrypts"
-msgstr ""
+msgstr "signe et chiffre"
 
 msgid "signs only: no encryption subkey"
-msgstr ""
+msgstr "signatures uniquement : pas de sous-clé de chiffrement"
 
-#, fuzzy
 msgid "{n} more address"
 msgid_plural "{n} more addresses"
-msgstr[0] "{n} message non lu"
-msgstr[1] "{n} messages non lus"
-
-msgid "Export public key…"
-msgstr ""
-
-#, fuzzy
-msgid "Delete this key"
-msgstr "Supprimer ce message"
-
-msgid "Trusted"
-msgstr ""
-
-msgid "Trust…"
-msgstr ""
-
-#, fuzzy
-msgid "Remove this key"
-msgstr "Supprimer cet alias"
-
-msgid "{n} key imported."
-msgid_plural "{n} keys imported."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Export public key…"
+msgstr "Exporter la clé publique…"
+
+msgid "Delete this key"
+msgstr "Supprimer cette clé"
+
+msgid "Trusted"
+msgstr "De confiance"
+
+msgid "Trust…"
+msgstr "Faire confiance…"
+
+msgid "Remove this key"
+msgstr "Supprimer cette clé"
+
+msgid "{n} key imported."
+msgid_plural "{n} keys imported."
+msgstr[0] "Clé {n} importée."
+msgstr[1] "Clés {n} importées."
+
 msgid "That key was already in your keyring."
-msgstr ""
+msgstr "Cette clé se trouvait déjà sur ton trousseau."
 
 msgid "Vireo icon"
 msgstr "Icône Vireo"
@@ -1993,9 +2025,8 @@ msgstr "Toutes les 15 minutes"
 msgid "Every 30 minutes"
 msgstr "Toutes les 30 minutes"
 
-#, fuzzy
 msgid "Senders"
-msgstr "Envoyer"
+msgstr ""
 
 msgid "General"
 msgstr "Général"
@@ -2019,25 +2050,26 @@ msgid "Date and Time"
 msgstr "Date et heure"
 
 msgid "System"
-msgstr ""
+msgstr "Système"
 
 msgid "Backup"
 msgstr "Sauvegarde"
 
-#, fuzzy
 msgid "Save the account?"
-msgstr "Activer ce compte"
+msgstr "Enregistrer le compte ?"
 
 msgid ""
 "The account editor is open. Save what you changed, or discard it, before "
 "moving on."
 msgstr ""
+"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-"
+"les avant de continuer."
 
 msgid "Discard"
-msgstr ""
+msgstr "Ignorer"
 
 msgid "Check for new mail"
-msgstr " Vérifier s'il y a de nouveaux messages"
+msgstr "Vérifier s'il y a de nouveaux messages"
 
 msgid "Uses IMAP IDLE to receive messages the moment they arrive."
 msgstr "Utilise IMAP IDLE pour recevoir les messages dès qu'ils arrivent."
@@ -2104,36 +2136,35 @@ msgstr ""
 "Afficher la pastille des messages non lus à côté de Toutes les boîtes de "
 "recpetionlorsque la liste par compte est repliée."
 
-#, fuzzy
 msgid "Filtered Folders section"
-msgstr "Dossiers filtrés"
+msgstr "Section « Dossiers filtrés »"
 
-#, fuzzy
 msgid ""
 "List the folders your filter rules file into in a collapsible section. Each "
 "rule chooses whether its folder appears there; this switch hides the section "
 "altogether."
 msgstr ""
-"Répertoriez les dossiers dans lesquels votre fichier de règles de "
-"filtragedans une section repliable située dans Toutes les boîtes de "
-"réception.Chaque règle détermine si son dossier y apparaît ;ce bouton masque "
-"complètement la section."
+"Répertoriez les dossiers vers lesquels votre fichier de règles de filtrage "
+"redirige dans une section repliable. Chaque règle détermine si son dossier "
+"apparaît dans cette section ; ce bouton permet de masquer complètement la "
+"section."
 
-#, fuzzy
 msgid "Filtered Folders placement"
-msgstr "Dossiers filtrés"
+msgstr "Emplacement des dossiers filtrés"
 
 msgid ""
 "Inside All Inboxes, folding away with it, or in the scrolling sidebar above "
 "or below the accounts."
 msgstr ""
+"Dans toutes les boîtes de réception, repliées à côté, ou dans la barre "
+"latérale défilante située au-dessus ou en dessous des comptes."
 
-#, fuzzy
 msgid "Tags placement"
-msgstr "Emplacement des chevrons"
+msgstr "Emplacement des balises"
 
 msgid "Where the Tags section sits, with the same choices."
 msgstr ""
+"À l'endroit où se trouve la section « Balises », avec les mêmes options."
 
 msgid "Chevron placement"
 msgstr "Emplacement des chevrons"
@@ -2143,7 +2174,7 @@ msgid ""
 "chevrons sit on."
 msgstr ""
 "De quel côté des boîtes de réception et des lignes de compte se trouvent les "
-"«flèches » permettant de les développer ou de les réduire"
+"«flèches » permettant de les développer ou de les réduire."
 
 msgid "Attachments in the sidebar"
 msgstr "Pièces jointes dans la barre latérale"
@@ -2218,22 +2249,25 @@ msgstr ""
 "La palette ⋯ de la liste des messages s'ouvre automatiquement lorsque le "
 "pointeur s'arrête sur une ligne."
 
-#, fuzzy
 msgid "Swipe actions"
-msgstr "Actions"
+msgstr "Actions par glissement"
 
 msgid ""
 "Drag a message sideways with the mouse, or swipe it with two fingers on a "
 "trackpad, to archive or delete it."
 msgstr ""
+"Faites glisser un message sur le côté avec la souris, ou balayez-le avec "
+"deux doigts sur un pavé tactile, pour l'archiver ou le supprimer."
 
 msgid "Reverse swipe directions"
-msgstr ""
+msgstr "Inverser le sens du balayage"
 
 msgid ""
 "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
 "archive it. Turning this on swaps the two: left archives, right deletes."
 msgstr ""
+"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+"archive it. Turning this on swaps the two: left archives, right deletes."
 
 msgid "Actions Palette timeout"
 msgstr "Délai d'expiration de la palette d'actions"
@@ -2312,28 +2346,35 @@ msgstr ""
 "Thème s'appliquant au contenu des e-mails uniquement, pas à l'application."
 
 msgid "Use my own font"
-msgstr ""
+msgstr "Utiliser ma propre police"
 
 msgid ""
 "Show every message in the font and size chosen below instead of the "
 "sender's. Headings keep their relative size; code stays monospaced."
 msgstr ""
+"Afficher tous les messages avec la police et la taille choisies ci-dessous, "
+"au lieu de celles de l'expéditeur. Les titres conservent leur taille "
+"relative ; le code reste en police à espacement fixe."
 
-#, fuzzy
 msgid "Message font"
-msgstr "Liste des messages"
+msgstr "Police du message"
 
 msgid "The interface font unless another is chosen."
 msgstr ""
+"La police par défaut de l'interface, sauf si une autre est sélectionnée."
 
 msgid "Use my own colours"
-msgstr ""
+msgstr "Utiliser mes propres couleurs"
 
 msgid ""
 "Ignore the text and background colours senders set, so every message reads "
 "in the same black or white on the reader's ground. Pictures are kept; links "
 "take the accent colour."
 msgstr ""
+"Les couleurs du texte et de l'arrière-plan définies par les expéditeurs "
+"sont ignorées, de sorte que tous les messages s'affichent en noir ou en "
+"blanc sur l'écran du lecteur. Les images sont conservées ; les liens "
+"prennent la couleur d'accentuation."
 
 msgid "Message card actions"
 msgstr "Actions sur la carte du message"
@@ -2587,17 +2628,14 @@ msgstr ""
 "vos comptes au préalable : leur suppression efface aussi leurs mots de passe "
 "du trousseau, qu'aucune sauvegarde ne contient."
 
-#, fuzzy
 msgid "Inside All Inboxes"
-msgstr "Toutes les boîtes"
+msgstr "Dans toutes les boîtes de réception"
 
-#, fuzzy
 msgid "Above the accounts"
-msgstr "Activer ce compte"
+msgstr "Au-dessus des comptes"
 
-#, fuzzy
 msgid "Below the accounts"
-msgstr "Activer ce compte"
+msgstr "Sous les comptes"
 
 msgid "Left"
 msgstr "Gauche"
@@ -3014,10 +3052,11 @@ msgstr "Impossible de marquer le message : {e}"
 msgid ""
 "This server does not store tags, so Vireo keeps them on this computer only"
 msgstr ""
+"Ce serveur ne stocke pas les balises ; Vireo les conserve donc uniquement "
+"sur cet ordinateur."
 
-#, fuzzy
 msgid "Could not tag message: {e}"
-msgstr "Impossible de marquer le message : {e}"
+msgstr "Impossible d'ajouter un tag au message : {e}"
 
 msgid "Could not mark folder read: {e}"
 msgstr "Impossible de marquer le dossier comme lu : {e}"
@@ -3098,9 +3137,11 @@ msgstr "Impossible d'envoyer « {subject} » : {e}"
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
+"Vous ne disposez pas encore de clé OpenPGP pour {addr} ; générez-en une dans "
+"« Paramètres », « OpenPGP »"
 
 msgid "no OpenPGP key for {addr}"
-msgstr ""
+msgstr "Aucune clé OpenPGP pour {addr}"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Impossible de récupérer le courrier : {e}"
