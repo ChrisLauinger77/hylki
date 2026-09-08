@@ -507,6 +507,16 @@ mod swipe_surface_imp {
     }
 
     impl WidgetImpl for SwipeSurface {
+        // Height-for-width, like the content it wraps: the default for a
+        // custom widget is constant-size, under which GTK measured the row's
+        // height with no width at all — so a wrapping multi-line preview
+        // came out clipped to under two lines (regression since 1.23.0).
+        fn request_mode(&self) -> gtk::SizeRequestMode {
+            self.foreground()
+                .map(|c| c.request_mode())
+                .unwrap_or(gtk::SizeRequestMode::ConstantSize)
+        }
+
         // The background strip never dictates the row's size — only the
         // real content does; the strip is simply stretched to match it.
         fn measure(&self, orientation: gtk::Orientation, for_size: i32) -> (i32, i32, i32, i32) {
