@@ -2534,48 +2534,9 @@ impl MessageView {
         print_header_html(self.thread.first().or(self.current.as_ref()))
     }
 
-    /// The reader's two grounds for `dark`, resolved from the live libadwaita
-    /// theme instead of hard-coded values (issue #62): GROUND is the theme's
-    /// own view background, and PAGE shades it a step deeper so conversation
-    /// cards keep reading as cards under any theme variant. When the reader is
-    /// forcing a scheme the app isn't currently in, the theme can't answer for
-    /// that mode, so the stock GNOME values stand in.
-    #[allow(deprecated)] // lookup_color: named theme colours have no successor yet
+    /// The reader's two grounds for `dark` (see [`theme_grounds_for`]).
     fn theme_grounds(&self, dark: bool) -> (String, String, String) {
-        let style = self.webview.style_context();
-        if dark == adw::StyleManager::default().is_dark() {
-            if let Some(c) = style.lookup_color("view_bg_color") {
-                let hex = |r: f32, g: f32, b: f32| {
-                    format!(
-                        "#{:02x}{:02x}{:02x}",
-                        (r * 255.0).round() as u8,
-                        (g * 255.0).round() as u8,
-                        (b * 255.0).round() as u8,
-                    )
-                };
-                // The stock pairs' own ratios: #1e1e1e→#141414 and #fff→#f1f1f1.
-                let f = if dark { 0.667 } else { 0.945 };
-                let ground = hex(c.red(), c.green(), c.blue());
-                let page = hex(c.red() * f, c.green() * f, c.blue() * f);
-                // The window's own ground — what the GTK reader header (the
-                // subject block) sits on. A full-bleed single message paints
-                // its in-document header this colour so subject and header
-                // read as one surface.
-                let chrome = style
-                    .lookup_color("window_bg_color")
-                    .map(|w| hex(w.red(), w.green(), w.blue()))
-                    .unwrap_or_else(|| {
-                        (if dark { CHROME.1 } else { CHROME.0 }).to_string()
-                    });
-                return (ground, page, chrome);
-            }
-        }
-        let (g, p, c) = if dark {
-            (GROUND.1, PAGE.1, CHROME.1)
-        } else {
-            (GROUND.0, PAGE.0, CHROME.0)
-        };
-        (g.to_string(), p.to_string(), c.to_string())
+        theme_grounds_for(&self.webview, dark)
     }
 
     /// Paint the WebView canvas in the theme colour so unstyled bodies (and the
@@ -4088,6 +4049,49 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
 /// cards sit on the slightly deeper [`PAGE`], which is what makes them read as
 /// cards. The spinner and the cover behind the WebView use the same pair, so
 /// handing over to the document changes nothing on screen.
+/// The three grounds for `dark`, resolved from the live libadwaita theme
+/// instead of hard-coded values (issue #62): GROUND is the theme's own view
+/// background, PAGE shades it a step deeper so conversation cards (and the
+/// composer, #148) keep reading as a layer under any theme variant, and
+/// CHROME is the window's own ground. `widget` is only where the theme is
+/// read from. When the caller asks for a scheme the app isn't currently in,
+/// the theme can't answer for that mode, so the stock GNOME values stand in.
+#[allow(deprecated)] // lookup_color: named theme colours have no successor yet
+pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String, String, String) {
+    let style = widget.style_context();
+    if dark == adw::StyleManager::default().is_dark() {
+        if let Some(c) = style.lookup_color("view_bg_color") {
+            let hex = |r: f32, g: f32, b: f32| {
+                format!(
+                    "#{:02x}{:02x}{:02x}",
+                    (r * 255.0).round() as u8,
+                    (g * 255.0).round() as u8,
+                    (b * 255.0).round() as u8,
+                )
+            };
+            // The stock pairs' own ratios: #1e1e1e→#141414 and #fff→#f1f1f1.
+            let f = if dark { 0.667 } else { 0.945 };
+            let ground = hex(c.red(), c.green(), c.blue());
+            let page = hex(c.red() * f, c.green() * f, c.blue() * f);
+            // The window's own ground — what the GTK reader header (the
+            // subject block) sits on. A full-bleed single message paints
+            // its in-document header this colour so subject and header
+            // read as one surface.
+            let chrome = style
+                .lookup_color("window_bg_color")
+                .map(|w| hex(w.red(), w.green(), w.blue()))
+                .unwrap_or_else(|| (if dark { CHROME.1 } else { CHROME.0 }).to_string());
+            return (ground, page, chrome);
+        }
+    }
+    let (g, p, c) = if dark {
+        (GROUND.1, PAGE.1, CHROME.1)
+    } else {
+        (GROUND.0, PAGE.0, CHROME.0)
+    };
+    (g.to_string(), p.to_string(), c.to_string())
+}
+
 const GROUND: (&str, &str) = ("#ffffff", "#1e1e1e");
 const PAGE: (&str, &str) = ("#f1f1f1", "#141414");
 /// The window chrome's ground (stock GNOME `window_bg_color`): what the GTK

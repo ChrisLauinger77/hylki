@@ -3182,8 +3182,9 @@ impl AccountsWindow {
         let swatches = gtk::FlowBox::new();
         swatches.set_selection_mode(gtk::SelectionMode::None);
         swatches.set_homogeneous(true);
-        swatches.set_min_children_per_line(4);
-        swatches.set_max_children_per_line(8);
+        // Nine discs (the palette and the custom one) as two even rows.
+        swatches.set_min_children_per_line(5);
+        swatches.set_max_children_per_line(5);
         swatches.set_column_spacing(4);
         swatches.set_row_spacing(4);
         swatches.set_halign(gtk::Align::Start);
@@ -3209,6 +3210,76 @@ impl AccountsWindow {
                 if t.is_active() {
                     *chosen.borrow_mut() = color.clone();
                 }
+            });
+            swatches.insert(&toggle, -1);
+        }
+        // A ninth disc for any colour (#147): a hue wheel until one is picked,
+        // then the picked colour. Pressing it opens the GTK colour chooser;
+        // it stays a member of the toggle group so a palette pick clears it.
+        // A tag edited with a colour outside the palette opens on this disc.
+        {
+            let custom: Option<String> = edit
+                .as_ref()
+                .map(|(_, t)| t.color.clone())
+                .filter(|c| !TAG_COLORS.iter().any(|p| p.eq_ignore_ascii_case(c)));
+            let toggle = gtk::ToggleButton::new();
+            toggle.add_css_class("flat");
+            toggle.add_css_class("circular");
+            toggle.set_child(Some(&custom_swatch_widget(custom.as_deref())));
+            toggle.set_tooltip_text(Some(i18n("Custom colour…").as_str()));
+            if let Some(f) = &first {
+                toggle.set_group(Some(f));
+            }
+            toggle.set_active(custom.is_some());
+            let custom = std::rc::Rc::new(std::cell::RefCell::new(custom));
+            let chosen = chosen.clone();
+            let dialog = dialog.clone();
+            toggle.connect_clicked(move |t| {
+                let picker = gtk::ColorDialog::new();
+                picker.set_with_alpha(false);
+                picker.set_title(&i18n("Tag Colour"));
+                let initial = gtk::gdk::RGBA::parse(chosen.borrow().as_str())
+                    .unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
+                let t = t.clone();
+                let chosen = chosen.clone();
+                let custom = custom.clone();
+                picker.choose_rgba(
+                    Some(&dialog),
+                    Some(&initial),
+                    None::<&gtk::gio::Cancellable>,
+                    move |res| match res {
+                        Ok(rgba) => {
+                            let hex = format!(
+                                "#{:02x}{:02x}{:02x}",
+                                (rgba.red() * 255.0).round() as u8,
+                                (rgba.green() * 255.0).round() as u8,
+                                (rgba.blue() * 255.0).round() as u8,
+                            );
+                            t.set_child(Some(&custom_swatch_widget(Some(&hex))));
+                            *custom.borrow_mut() = Some(hex.clone());
+                            *chosen.borrow_mut() = hex;
+                            t.set_active(true);
+                        }
+                        Err(_) => {
+                            // Cancelled: back to whatever the choice was. A
+                            // palette colour lives in its own disc; a custom
+                            // one picked earlier stays on this disc.
+                            if custom.borrow().is_none() {
+                                let back = chosen.borrow().clone();
+                                let mut child = t.parent().and_then(|p| p.parent()).and_then(|b| b.first_child());
+                                while let Some(c) = child {
+                                    if let Some(tb) = c.first_child().and_downcast::<gtk::ToggleButton>() {
+                                        if tb.tooltip_text().is_some_and(|tip| tip.eq_ignore_ascii_case(&back)) {
+                                            tb.set_active(true);
+                                            break;
+                                        }
+                                    }
+                                    child = c.next_sibling();
+                                }
+                            }
+                        }
+                    },
+                );
             });
             swatches.insert(&toggle, -1);
         }
@@ -3453,3 +3524,43 @@ impl AccountsWindow {
     }
 }
 
+/// The tag dialog's "any colour" disc (#147): a hue wheel while no custom
+/// colour is chosen, the chosen colour as a filled disc once one is.
+fn custom_swatch_widget(color: Option<&str>) -> gtk::DrawingArea {
+    if let Some(c) = color {
+        return crate::ui::context_menu::swatch_widget(c, true);
+    }
+    let area = gtk::DrawingArea::new();
+    area.set_content_width(16);
+    area.set_content_height(16);
+    area.set_valign(gtk::Align::Center);
+    area.set_draw_func(|_, cr, w, h| {
+        let (cx, cy) = (w as f64 / 2.0, h as f64 / 2.0);
+        let steps = 12;
+        for i in 0..steps {
+            let a0 = i as f64 / steps as f64 * std::f64::consts::TAU;
+            let a1 = (i + 1) as f64 / steps as f64 * std::f64::consts::TAU;
+            let (r, g, b) = hue_rgb(i as f64 / steps as f64);
+            cr.set_source_rgb(r, g, b);
+            cr.move_to(cx, cy);
+            cr.arc(cx, cy, 6.0, a0 - 0.02, a1 + 0.02);
+            cr.close_path();
+            let _ = cr.fill();
+        }
+    });
+    area
+}
+
+/// A fully saturated colour at hue `h` (0..1) as RGB in 0..1.
+fn hue_rgb(h: f64) -> (f64, f64, f64) {
+    let h6 = h * 6.0;
+    let x = 1.0 - ((h6 % 2.0) - 1.0).abs();
+    match h6 as u32 {
+        0 => (1.0, x, 0.0),
+        1 => (x, 1.0, 0.0),
+        2 => (0.0, 1.0, x),
+        3 => (0.0, x, 1.0),
+        4 => (x, 0.0, 1.0),
+        _ => (1.0, 0.0, x),
+    }
+}

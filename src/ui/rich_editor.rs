@@ -176,8 +176,7 @@ impl RichEditor {
                 }
             });
         }
-        let dark = adw::StyleManager::default().is_dark();
-        webview.load_html(&document(initial_html, dark), Some("https://vireo.localhost/editor"));
+        webview.load_html(&document(initial_html, &webview), Some("https://vireo.localhost/editor"));
 
         // The stock editable menu's single "Paste" hides the plain/rich choice
         // behind the preference; the menu offers both, always, in its place.
@@ -338,9 +337,8 @@ impl RichEditor {
 
     /// Replace the editor contents with `content` (HTML).
     pub fn set_html(&self, content: &str) {
-        let dark = adw::StyleManager::default().is_dark();
         self.webview
-            .load_html(&document(content, dark), Some("https://vireo.localhost/editor"));
+            .load_html(&document(content, &self.webview), Some("https://vireo.localhost/editor"));
     }
 
     pub fn grab_focus(&self) {
@@ -1191,9 +1189,14 @@ const PASTE_SCRIPT: &str = r#"<script>
 })();
 </script>"#;
 
-/// The contentEditable HTML document, themed for light/dark.
-fn document(content: &str, dark: bool) -> String {
+/// The contentEditable HTML document, themed for light/dark. Its ground is
+/// the theme's own view background (#148), read through `webview`, so a
+/// custom GNOME theme reaches the editor as it does the reader — `Canvas`
+/// would be WebKit's stock shade whatever the theme says.
+fn document(content: &str, webview: &webkit6::WebView) -> String {
+    let dark = adw::StyleManager::default().is_dark();
     let scheme = if dark { "dark" } else { "light" };
+    let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
     let paste_rich = !crate::config::load_paste_plain();
     let script = format!(
         "<script>window.__vireoPasteRich={paste_rich};</script>{PASTE_SCRIPT}"
@@ -1205,7 +1208,7 @@ fn document(content: &str, dark: bool) -> String {
            :root{{color-scheme:{scheme};}}\
            html,body{{height:100%;box-sizing:border-box;}}\
            body{{margin:0;padding:20px;font:14px/1.55 system-ui,sans-serif;outline:none;\
-             background:Canvas;color:CanvasText;}}\
+             background:{ground};color:CanvasText;}}\
            /* Every image fits the writing width — pasted, dropped, or\
               quoted. The inline style on inserted images serves the\
               recipient; this rule is what the composer itself obeys,\

@@ -1550,7 +1550,7 @@ impl SimpleComponent for AppModel {
     ) -> ComponentParts<Self> {
         relm4::set_global_css(include_str!("styles.css"));
         register_icons();
-        install_scheme_css();
+        install_scheme_css(&root);
 
         let mut sidebar_state = config::load_sidebar_state();
         let icon_only = sidebar_state.icon_only;
@@ -2794,6 +2794,14 @@ impl SimpleComponent for AppModel {
                     let sb = model.sidebar.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
                         let _ = sb.send(SidebarInput::ToggleUnifiedFoldersExpand);
+                    });
+                }
+                // VIREO_SHOWCASE_REPLY opens the inline reply composer on the
+                // selected message, to check the composer's grounds (#148).
+                if std::env::var("VIREO_SHOWCASE_REPLY").is_ok() {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(4, move || {
+                        s.input(AppMsg::Reply);
                     });
                 }
                 // VIREO_SHOWCASE_SETTINGS=accounts|prefs opens the Settings
@@ -10013,6 +10021,21 @@ impl AppModel {
                 });
             }
         }
+        // VIREO_SHOWCASE_EDIT_TAG=<index> likewise opens that tag's editor
+        // (#147); an index past the end opens the Add Tag dialog.
+        if let Some(Ok(i)) = std::env::var("VIREO_SHOWCASE_EDIT_TAG").ok().map(|v| v.parse::<usize>()) {
+            if demo_mode() {
+                let a = accounts.sender().clone();
+                let n = self.tags.len();
+                gtk::glib::timeout_add_seconds_local_once(2, move || {
+                    let _ = a.send(if i < n {
+                        crate::ui::accounts::AccountsInput::EditTag(i)
+                    } else {
+                        crate::ui::accounts::AccountsInput::AddTag
+                    });
+                });
+            }
+        }
         self.accounts_win = Some(accounts);
         self.prefs = Some(prefs);
     }
@@ -11810,7 +11833,12 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
 ///   heavy on a light ground, so light mode runs 25% lighter.
 /// - The remote-content banner's shield: amber on dark, a deeper orange on
 ///   light where amber washes out.
-fn install_scheme_css() {
+/// - The composer's ground: the reader's deeper page shade, read from the
+///   live theme (#148) rather than the stock GNOME values, so a custom theme
+///   carries through to the composer like it does to the reader.
+///
+/// `window` is only where the theme's named colours are read from.
+fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     let provider = gtk::CssProvider::new();
     if let Some(display) = gtk::gdk::Display::default() {
         gtk::style_context_add_provider_for_display(
@@ -11819,14 +11847,15 @@ fn install_scheme_css() {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
         );
     }
+    let window = window.clone().upcast::<gtk::Widget>();
     let apply = move |provider: &gtk::CssProvider, dark: bool| {
         // The selection is the GNOME accent itself at full saturation, with
         // high-contrast white text — and it stays full whether or not the
         // list holds focus, so clicking into the reader never dims it.
         let shield = if dark { "#ffca28" } else { "#ff7800" };
         // The compose surface sits on the reader's deeper page ground — the
-        // same shade the threaded cards float on.
-        let page = if dark { "#141414" } else { "#f1f1f1" };
+        // same shade the threaded cards float on, as the theme defines it.
+        let (_, page, _) = crate::ui::message_view::theme_grounds_for(&window, dark);
         provider.load_from_string(&format!(
             ".message-listbox > row:selected .message-row, \
              .message-listbox > row.activatable:selected:hover .message-row, \
