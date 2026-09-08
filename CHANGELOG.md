@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.24.1 — 2026-09-08
+
+Three preview lines are three lines again, and a swipe slides flush.
+
+- **Multi-line previews clipped since 1.23.0.** The swipe surface wrapped
+  around every row (#135) never declared a size-request mode, so GTK took
+  it for constant-size and measured the row's height without a width; the
+  wrapping preview label answered for the wrong width, and "3 lines"
+  rendered as one full line and a clipped second. The surface now forwards
+  its content's height-for-width mode.
+- **Swipe to archive or delete slides the bare content over a full-width
+  strip.** While a row is being swiped its hover and selection pill is
+  suspended (the tint fades out, the rounding drops) so the content meets
+  the coloured strip flush, and the strip runs the list edge to edge: the
+  6px side inset moved from the list row onto the pill, so nothing in the
+  geometry changes and the list never shifts as a drag starts or settles.
+  A `swiping` row class is held from the first drag until the snap-back
+  animation lands.
+
 ## 1.24.0 — 2026-09-08
 
 The reader's own fonts and colours over the senders'.

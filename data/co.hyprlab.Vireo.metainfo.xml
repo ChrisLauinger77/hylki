@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.24.1" date="2026-09-08">
+      <description>
+        <p>Multi-line message previews show every line again (clipped since 1.23.0); swiping a row to archive or delete slides it flush over a strip that fills the full width of the list.</p>
+      </description>
+    </release>
     <release version="1.24.0" date="2026-09-08">
       <description>
         <p>Your own font and colours over every message; Junk and Trash that empty themselves; a settings window with a sidebar of categories and searchable lists; and OpenPGP end to end: read encrypted and signed mail, manage keys without a terminal, sign and encrypt what you send.</p>

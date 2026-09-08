@@ -2,6 +2,12 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.24.1
+
+**Message previews show every line again.** With the list set to two or three preview lines, the second line was cut through and the third missing, since 1.23.0. Every line shows now.
+
+**Swiping a message looks cleaner.** While you drag a row to archive or delete it, the row's rounded highlight goes away and the coloured strip under it fills the full width of the list, so the two meet without a seam. The list no longer moves while you drag.
+
 ## What's new in 1.24.0
 
 **Your own font and colours for every message.** Two switches in Settings under Reading. "Use my own font" shows every message in one font and size instead of whatever the sender chose: the interface font, or any font you pick under the switch. Headings stay larger than body text and code stays monospaced. "Use my own colours" ignores the sender's text and background colours, so each message reads as plain text on the reader's ground, with links in the accent colour; pictures are kept. Each message card has a toggle on its action line that shows that one message as its sender formatted it, and back. Both settings apply to printing as well. Requested by [@yioannides](https://github.com/yioannides) (#56).
