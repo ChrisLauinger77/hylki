@@ -1962,7 +1962,7 @@ struct StateFile {
 }
 
 fn default_aux_height() -> i32 {
-    784
+    816
 }
 
 fn default_about_height() -> i32 {
@@ -2161,7 +2161,15 @@ pub fn save_gallery_sort(sort: u32) {
 /// Auxiliary window heights (Preferences / Accounts / About): they open tall
 /// by default and remember the user's own vertical resize across restarts.
 pub fn load_prefs_height() -> i32 {
-    load_state().prefs_height.clamp(400, 4000)
+    let h = load_state().prefs_height;
+    // Every close writes the height back, so a state file from before the
+    // two-pane window (#141) carries the old default, 720, whether or not
+    // the user ever resized. That value reads as "never chosen" and gets
+    // the new default; any other height is the user's.
+    if h == 720 {
+        return default_aux_height();
+    }
+    h.clamp(400, 4000)
 }
 
 pub fn save_prefs_height(height: i32) {
