@@ -87,6 +87,8 @@ pub struct PrefInit {
     pub start_on_accounts: bool,
     /// The persisted "this window opens to" choice (true = Accounts).
     pub settings_open_accounts: bool,
+    /// The accounts component's inbox, for the sidebar to pick its pages.
+    pub accounts_sender: relm4::Sender<crate::ui::accounts::AccountsInput>,
 }
 
 
@@ -191,11 +193,61 @@ pub struct Preferences {
     /// Mirrors the list-palette switch, so the hover row under it can grey
     /// out when there is no palette to open.
     list_palette: bool,
-    /// The Accounts/Preferences panel stack, for tab switching from update().
-    panels_stack: Option<adw::ViewStack>,
-    /// The shared header bar (view switcher); hidden while the accounts
-    /// editor subpage is open, whose own header takes over.
+    /// The content stack (one child per category, plus the accounts panel
+    /// in its "accounts" slot), driven by the sidebar (#141).
+    panels_stack: Option<gtk::Stack>,
+    /// The sidebar list, for selecting a category from update().
+    side_list: Option<gtk::ListBox>,
+    /// The content pane's page, whose title names the chosen category.
+    content_page: Option<adw::NavigationPage>,
+    /// The split view, to bring the content forward when collapsed.
+    split: Option<adw::NavigationSplitView>,
+    /// The accounts component, told which of its pages the sidebar chose.
+    accounts_sender: relm4::Sender<crate::ui::accounts::AccountsInput>,
+    /// The content header bar; hidden while the accounts editor subpage is
+    /// open, whose own header takes over.
     host_header: Option<adw::HeaderBar>,
+}
+
+/// One sidebar entry (#141): the stack child it shows, and whether that
+/// child lives in the accounts component (whose own stack then switches).
+struct SidePage {
+    id: &'static str,
+    title: &'static str,
+    icon: &'static str,
+    accounts: bool,
+}
+
+/// The sidebar, section by section.
+const SIDE_PAGES: &[(&str, &[SidePage])] = &[
+    (
+        i18n_noop("Accounts"),
+        &[
+            SidePage { id: "accounts", title: i18n_noop("Mail Accounts"), icon: "co.hyprlab.Vireo-avatar-default-symbolic", accounts: true },
+            SidePage { id: "tags", title: i18n_noop("Tags"), icon: "co.hyprlab.Vireo-tag-symbolic", accounts: true },
+            SidePage { id: "filters", title: i18n_noop("Filters"), icon: "co.hyprlab.Vireo-filter-folder-symbolic", accounts: true },
+            SidePage { id: "senders", title: i18n_noop("Senders"), icon: "co.hyprlab.Vireo-contact-new-symbolic", accounts: true },
+        ],
+    ),
+    (
+        i18n_noop("Settings"),
+        &[
+            SidePage { id: "general", title: i18n_noop("General"), icon: "co.hyprlab.Vireo-preferences-system-symbolic", accounts: false },
+            SidePage { id: "appearance", title: i18n_noop("Appearance"), icon: "co.hyprlab.Vireo-preferences-desktop-appearance-symbolic", accounts: false },
+            SidePage { id: "sidebar", title: i18n_noop("Sidebar"), icon: "co.hyprlab.Vireo-sidebar-show-symbolic", accounts: false },
+            SidePage { id: "list", title: i18n_noop("Message List"), icon: "co.hyprlab.Vireo-view-list-bullet-symbolic", accounts: false },
+            SidePage { id: "reading", title: i18n_noop("Reading"), icon: "co.hyprlab.Vireo-mail-read-symbolic", accounts: false },
+            SidePage { id: "composing", title: i18n_noop("Composing"), icon: "co.hyprlab.Vireo-document-edit-symbolic", accounts: false },
+            SidePage { id: "privacy", title: i18n_noop("Privacy"), icon: "co.hyprlab.Vireo-security-high-symbolic", accounts: false },
+            SidePage { id: "datetime", title: i18n_noop("Date and Time"), icon: "co.hyprlab.Vireo-x-office-calendar-symbolic", accounts: false },
+            SidePage { id: "system", title: i18n_noop("System"), icon: "co.hyprlab.Vireo-applications-system-symbolic", accounts: false },
+            SidePage { id: "backup", title: i18n_noop("Backup"), icon: "co.hyprlab.Vireo-document-save-symbolic", accounts: false },
+        ],
+    ),
+];
+
+fn side_page(id: &str) -> Option<&'static SidePage> {
+    SIDE_PAGES.iter().flat_map(|(_, pages)| pages.iter()).find(|p| p.id == id)
 }
 
 #[derive(Debug)]
@@ -258,6 +310,8 @@ pub enum PrefInput {
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
     ShowAccounts(bool),
+    /// A sidebar category was chosen (#141).
+    SelectPage(String),
     /// The accounts editor subpage opened/closed — hide/show the shared
     /// header so the editor's own header takes over the window.
     EditorOpen(bool),
@@ -325,6 +379,45 @@ pub enum PrefOutput {
     Closed,
 }
 
+impl Preferences {
+    /// Select a sidebar row by page id; the selection handler shows it.
+    fn select_row(&self, id: &str) {
+        let Some(list) = &self.side_list else { return };
+        let name = format!("page:{id}");
+        let mut i = 0;
+        while let Some(row) = list.row_at_index(i) {
+            if row.widget_name() == name {
+                list.select_row(Some(&row));
+                return;
+            }
+            i += 1;
+        }
+    }
+
+    /// Show a category: the accounts component's page, or one of ours.
+    fn show_page(&self, id: &str) {
+        let Some(page) = side_page(id) else { return };
+        if let Some(stack) = &self.panels_stack {
+            if page.accounts {
+                stack.set_visible_child_name("accounts");
+                let _ = self
+                    .accounts_sender
+                    .send(crate::ui::accounts::AccountsInput::ShowPage(id.to_string()));
+            } else {
+                stack.set_visible_child_name(id);
+            }
+        }
+        if let Some(cp) = &self.content_page {
+            cp.set_title(&i18n(page.title));
+        }
+        if let Some(split) = &self.split {
+            if split.is_collapsed() {
+                split.set_show_content(true);
+            }
+        }
+    }
+}
+
 #[relm4::component(pub)]
 impl Component for Preferences {
     type Init = PrefInit;
@@ -335,7 +428,7 @@ impl Component for Preferences {
     view! {
         adw::Window {
             set_modal: false,
-            set_default_width: 564,
+            set_default_width: 920,
             // Remembered vertical size (tall by default) — resizing sticks
             // across restarts via the save on close below.
             set_default_height: crate::config::load_prefs_height(),
@@ -347,715 +440,783 @@ impl Component for Preferences {
                 gtk::glib::Propagation::Proceed
             },
 
-            // One window, two views: Accounts and Preferences, switched by a
-            // view switcher (GNOME HIG) in the shared header bar. The
-            // accounts panel (with its own sub-navigation) is built by the
-            // AccountsWindow component and handed in via PrefInit; while its
-            // editor subpage is open the shared header hides, so the editor's
-            // own back/Save header takes over the window.
+            // One window, two panes (#141): a sidebar of categories on the
+            // left, the chosen category's groups on the right. The account
+            // pages (accounts, tags, filters, senders) belong to the
+            // AccountsWindow component, handed in via PrefInit with its own
+            // sub-navigation for the account editor; while that editor is
+            // open the content header hides, so the editor's own back/Save
+            // header takes over. Narrow, the split collapses to one pane
+            // (breakpoint in init) and the sidebar becomes the first page.
             #[wrap(Some)]
-            set_content = &adw::ToolbarView {
-                #[name = "host_header"]
-                add_top_bar = &adw::HeaderBar {
+            #[name = "split"]
+            set_content = &adw::NavigationSplitView {
+                set_min_sidebar_width: 180.0,
+                set_max_sidebar_width: 250.0,
+                set_sidebar_width_fraction: 0.27,
+
+                #[wrap(Some)]
+                set_sidebar = &adw::NavigationPage {
+                    set_title: &i18n("Settings"),
+
                     #[wrap(Some)]
-                    #[name = "switcher"]
-                    set_title_widget = &adw::ViewSwitcher {
-                        set_policy: adw::ViewSwitcherPolicy::Wide,
+                    set_child = &adw::ToolbarView {
+                        add_top_bar = &adw::HeaderBar {
+                            set_show_end_title_buttons: false,
+                        },
+
+                        #[wrap(Some)]
+                        set_content = &gtk::ScrolledWindow {
+                            set_hscrollbar_policy: gtk::PolicyType::Never,
+
+                            #[wrap(Some)]
+                            #[name = "side_list"]
+                            set_child = &gtk::ListBox {
+                                add_css_class: "navigation-sidebar",
+                                add_css_class: "settings-side",
+                                set_selection_mode: gtk::SelectionMode::Single,
+                                connect_row_selected[sender] => move |_, row| {
+                                    if let Some(id) = row
+                                        .map(|r| r.widget_name().to_string())
+                                        .and_then(|n| n.strip_prefix("page:").map(str::to_string))
+                                    {
+                                        sender.input(PrefInput::SelectPage(id));
+                                    }
+                                },
+                            },
+                        },
                     },
                 },
 
                 #[wrap(Some)]
-                #[name = "panels_stack"]
-                set_content = &adw::ViewStack {
-                    #[name = "accounts_slot"]
-                    add_titled[Some("accounts"), &i18n("Accounts")] = &adw::Bin {},
+                #[name = "content_page"]
+                set_content = &adw::NavigationPage {
+                    set_title: &i18n("General"),
 
-                    #[name = "prefs_page"]
-                    add_titled[Some("preferences"), &i18n("Settings")] = &adw::PreferencesPage {
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("General"),
-
-                        #[name = "fetch_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Check for new mail"),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeFetchInterval(row.selected()));
-                            },
+                    #[wrap(Some)]
+                    set_child = &adw::ToolbarView {
+                        #[name = "host_header"]
+                        add_top_bar = &adw::HeaderBar {
+                            set_show_start_title_buttons: false,
                         },
 
-                        #[name = "push_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Instant new mail (IMAP push)"),
-                            set_subtitle: &i18n("Uses IMAP IDLE to receive messages the moment they arrive."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::TogglePush(row.is_active()));
+                        #[wrap(Some)]
+                        #[name = "panels_stack"]
+                        set_content = &gtk::Stack {
+                            set_transition_type: gtk::StackTransitionType::Crossfade,
+
+                            #[name = "accounts_slot"]
+                            add_named[Some("accounts")] = &adw::Bin {},
+
+                            add_named[Some("general")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("General"),
+
+                                    #[name = "fetch_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Check for new mail"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFetchInterval(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "push_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Instant new mail (IMAP push)"),
+                                        set_subtitle: &i18n("Uses IMAP IDLE to receive messages the moment they arrive."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::TogglePush(row.is_active()));
+                                        },
+                                    },
+                                },
+
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Notifications"),
+
+                                    #[name = "notifications_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Desktop notifications"),
+                                        set_subtitle: &i18n("Show system notifications for new mail and error alerts when Vireo isn't focused."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleNotifications(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "notification_content_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.notifications,
+                                        set_title: &i18n("Show sender and subject"),
+                                        set_subtitle: &i18n("Name who wrote and what about in the notification. Turn this off to keep both off the lock screen."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleNotificationContent(row.is_active()));
+                                        },
+                                    },
+                                },
                             },
-                        },
-                    },
 
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Notifications"),
+                            add_named[Some("appearance")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    // Rendered as Pango markup — a bare "&" breaks it.
+                                    set_title: &i18n("Appearance"),
 
-                        #[name = "notifications_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Desktop notifications"),
-                            set_subtitle: &i18n("Show system notifications for new mail and error alerts when Vireo isn't focused."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleNotifications(row.is_active()));
+                                    #[name = "app_theme_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Style"),
+                                        set_subtitle: &i18n("The app itself. Message content has its own \
+                                                       setting under Reading."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeAppTheme(row.selected()));
+                                        },
+                                    },
+
+                                    // The app-icon gallery; its content is built in init
+                                    // (a grid of textures the view! macro can't declare).
+                                    #[name = "app_icon_row"]
+                                    adw::PreferencesRow {
+                                        set_title: &i18n("App icon"),
+                                        set_activatable: false,
+                                        set_focusable: false,
+                                    },
+
+                                    #[name = "settings_open_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("This window opens to"),
+                                        set_subtitle: &i18n("The view shown first when Settings \
+                                                       is opened from the menu."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeSettingsOpen(row.selected()));
+                                        },
+                                    },
+
+                                },
                             },
-                        },
 
-                        #[name = "notification_content_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.notifications,
-                            set_title: &i18n("Show sender and subject"),
-                            set_subtitle: &i18n("Name who wrote and what about in the notification. Turn this off to keep both off the lock screen."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleNotificationContent(row.is_active()));
+                            add_named[Some("sidebar")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Sidebar"),
+
+                                    #[name = "show_unified_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("All Inboxes"),
+                                        set_subtitle: &i18n("A unified inbox combining every account, at the top \
+                                                       of the sidebar. Only shown with more than one \
+                                                       account."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleShowUnified(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_chip_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.show_unified,
+                                        set_title: &i18n("All Inboxes unread count"),
+                                        set_subtitle: &i18n("Show the combined unread chip next to All Inboxes \
+                                                       while its per-account list is folded up."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedChip(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_filtered_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Filtered Folders section"),
+                                        set_subtitle: &i18n("List the folders your filter rules file into in a \
+                                                       collapsible section. Each rule chooses whether its \
+                                                       folder appears there; this switch hides the section \
+                                                       altogether."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "filtered_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Filtered Folders placement"),
+                                        set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
+                                                       scrolling sidebar above or below the accounts."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "tags_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Tags placement"),
+                                        set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "chevron_side_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Chevron placement"),
+                                        set_subtitle: &i18n("Which side of All Inboxes and the account rows \
+                                                       their expand/collapse chevrons sit on."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeChevronSide(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "show_attachments_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Attachments in the sidebar"),
+                                        set_subtitle: &i18n("A shortcut for browsing every account's attachments, \
+                                                       pinned at the bottom of the sidebar."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAttachmentsRow(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "show_contacts_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Contacts in the sidebar"),
+                                        set_subtitle: &i18n("A shortcut that opens your contacts, pinned at the \
+                                                       bottom of the sidebar."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleContactsRow(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "sidebar_hover_expand_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Expand the sidebar on hover"),
+                                        set_subtitle: &i18n("Whenever the sidebar is collapsed to its icon rail, \
+                                                       hovering it floats the full sidebar out over the \
+                                                       panes; it folds back a moment after the pointer \
+                                                       leaves."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSidebarHoverExpand(row.is_active()));
+                                        },
+                                    },
+                                },
                             },
-                        },
-                    },
 
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Sidebar"),
+                            add_named[Some("list")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Message List"),
 
-                        #[name = "show_unified_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("All Inboxes"),
-                            set_subtitle: &i18n("A unified inbox combining every account, at the top \
-                                           of the sidebar. Only shown with more than one \
-                                           account."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleShowUnified(row.is_active()));
+                                    #[name = "avatars_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Sender avatars"),
+                                        set_subtitle: &i18n("The sender's avatar beside each message, in the list \
+                                                       and above the message. Turning it off gives the \
+                                                       sender and subject more room."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAvatars(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "preview_lines_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Preview lines"),
+                                        set_subtitle: &i18n("How much of each message to show under its subject. \
+                                                       Off also stops previews being downloaded."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangePreviewLines(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "list_palette_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Actions Palette in the message list"),
+                                        set_subtitle: &i18n("The \u{22ef} action row under each message summary. \
+                                                       Turning it off returns its space to the row; \
+                                                       messages are still acted on from their cards and \
+                                                       the right-click menu."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleListPalette(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "list_palette_hover_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.list_palette,
+                                        set_title: &i18n("Open the Actions Palette on hover"),
+                                        set_subtitle: &i18n("The message list's \u{22ef} palette slides open \
+                                                       by itself while the pointer rests on a row."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleListPaletteHover(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "swipe_enabled_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Swipe actions"),
+                                        set_subtitle: &i18n("Drag a message sideways with the mouse, or swipe it \
+                                                       with two fingers on a trackpad, to archive or delete it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSwipeEnabled(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "swipe_reversed_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.swipe_enabled,
+                                        set_title: &i18n("Reverse swipe directions"),
+                                        set_subtitle: &i18n("Swipe (mouse-drag or trackpad) a message left \
+                                                       to delete it and right to archive it. Turning this \
+                                                       on swaps the two: left archives, right deletes."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSwipeReversed(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "palette_collapse_row"]
+                                    adw::SpinRow {
+                                        set_title: &i18n("Actions Palette timeout"),
+                                        set_subtitle: &i18n("Seconds an actions palette stays open after the \
+                                                       cursor leaves it — the list's and the message \
+                                                       cards' alike."),
+                                        connect_value_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangePaletteCollapse(row.value() as u64));
+                                        },
+                                    },
+                                },
                             },
-                        },
 
-                        #[name = "unified_chip_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.show_unified,
-                            set_title: &i18n("All Inboxes unread count"),
-                            set_subtitle: &i18n("Show the combined unread chip next to All Inboxes \
-                                           while its per-account list is folded up."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleUnifiedChip(row.is_active()));
+                            add_named[Some("reading")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Conversations"),
+
+                                    #[name = "threading_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Group messages by conversation"),
+                                        set_subtitle: &i18n("Collapse replies into a single threaded conversation."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleThreading(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "thread_expansion_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.threading,
+                                        set_title: &i18n("Expandable conversations"),
+                                        set_subtitle: &i18n("Allow a conversation to expand/collapse its messages \
+                                                       in the list. When off, the row keeps its count chip \
+                                                       but the messages are displayed only as cards in the \
+                                                       reading pane."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleThreadExpansion(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "threads_expanded_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.threading && model.thread_expansion,
+                                        set_title: &i18n("Expand conversations by default"),
+                                        set_subtitle: &i18n("Show every message of a conversation in the list. \
+                                                       When off, conversations start collapsed to their \
+                                                       newest message."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleThreadsExpanded(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "thread_newest_first_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Newest message first"),
+                                        set_subtitle: &i18n("Show a conversation's latest message at the top of \
+                                                       the reading pane. Off reads oldest to newest, \
+                                                       downward."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleThreadNewestFirst(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "confirm_thread_delete_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Confirm conversation deletion"),
+                                        set_subtitle: &i18n("Warn before deleting when a whole conversation is \
+                                                       selected, since every message in the thread goes \
+                                                       with it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleConfirmThreadDelete(row.is_active()));
+                                        },
+                                    },
+                                },
+
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Reading"),
+
+                                    #[name = "read_mark_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Mark as read"),
+                                        set_subtitle: &i18n("When an opened message counts as read. \
+                                                       Conversations mark each message as it \
+                                                       comes into view."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeReadMark(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "message_theme_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Message appearance"),
+                                        set_subtitle: &i18n("Theme for email content only, not the app itself."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeMessageTheme(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "override_fonts_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Use my own font"),
+                                        set_subtitle: &i18n("Show every message in the font and size chosen \
+                                                       below instead of the sender's. Headings keep \
+                                                       their relative size; code stays monospaced."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleOverrideFonts(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "reader_font_row"]
+                                    adw::ActionRow {
+                                        set_title: &i18n("Message font"),
+                                        set_subtitle: &i18n("The interface font unless another is chosen."),
+                                        #[name = "reader_font_button"]
+                                        add_suffix = &gtk::FontDialogButton {
+                                            set_valign: gtk::Align::Center,
+                                            set_dialog: &gtk::FontDialog::new(),
+                                            set_level: gtk::FontLevel::Font,
+                                            set_use_font: true,
+                                            connect_font_desc_notify[sender] => move |button| {
+                                                let font = button
+                                                    .font_desc()
+                                                    .map(|d| d.to_string())
+                                                    .unwrap_or_default();
+                                                sender.input(PrefInput::ChangeReaderFont(font));
+                                            },
+                                        },
+                                    },
+
+                                    #[name = "override_colors_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Use my own colours"),
+                                        set_subtitle: &i18n("Ignore the text and background colours senders \
+                                                       set, so every message reads in the same black or \
+                                                       white on the reader's ground. Pictures are kept; \
+                                                       links take the accent colour."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleOverrideColors(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "card_actions_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Message card actions"),
+                                        set_subtitle: &i18n("How each message's action icons show in the \
+                                                       reader, single or threaded."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeCardActionsMode(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "single_message_card_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Single messages as cards"),
+                                        set_subtitle: &i18n("Show a lone message as an inset card with the same \
+                                                       border as a conversation's messages. Off fills the \
+                                                       pane edge to edge."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSingleMessageCard(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "always_show_recipients_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Always show recipients"),
+                                        set_subtitle: &i18n("Show who each message went to under its sender, \
+                                                       without clicking the recipients chip. With one \
+                                                       recipient the chip is dropped entirely."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAlwaysShowRecipients(row.is_active()));
+                                        },
+                                    },
+                                },
                             },
-                        },
 
-                        #[name = "unified_filtered_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Filtered Folders section"),
-                            set_subtitle: &i18n("List the folders your filter rules file into in a \
-                                           collapsible section. Each rule chooses whether its \
-                                           folder appears there; this switch hides the section \
-                                           altogether."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
+                            add_named[Some("composing")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Composing"),
+
+                                    #[name = "compose_inline_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Compose in the main window"),
+                                        set_subtitle: &i18n("New message slides down over the reading pane, \
+                                                       like a reply — pop it out to a window from its \
+                                                       header. Off = open a separate window directly."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleComposeInline(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "paste_plain_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Paste as plain text"),
+                                        set_subtitle: &i18n("Pasting into a message strips the \
+                                                       clipboard's formatting. Off, a paste \
+                                                       keeps its formatting. Right-clicking \
+                                                       the editor always offers both."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::TogglePastePlain(row.is_active()));
+                                        },
+                                    },
+                                },
+
+                                #[name = "spelling_group"]
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Spelling"),
+                                    // The description is filled in at init with the
+                                    // dictionaries the app can actually see — checking a
+                                    // language without one silently checks nothing, so
+                                    // honesty about what is installed beats silence.
+
+                                    #[name = "spellcheck_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Check spelling as you type"),
+                                        set_subtitle: &i18n("Misspelled words in the message body \
+                                                       are underlined; right-click a word \
+                                                       for corrections."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSpellcheck(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "spell_lang_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Language"),
+                                        set_subtitle: &i18n("Dictionaries the app can see"),
+                                    },
+
+                                    // Words the user taught the checker ("Learn Spelling"
+                                    // in the composer, or added right here). Populated
+                                    // and maintained imperatively in init.
+                                    #[name = "spell_words_row"]
+                                    adw::ExpanderRow {
+                                        set_title: &i18n("Added words"),
+                                        set_subtitle: &i18n("Words the spell checker was taught. \
+                                                       The message body applies changes \
+                                                       after a restart."),
+                                    },
+                                },
                             },
-                        },
 
-                        #[name = "filtered_placement_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Filtered Folders placement"),
-                            set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
-                                           scrolling sidebar above or below the accounts."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
+                            add_named[Some("privacy")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Privacy"),
+                                    set_description: Some(
+                                        i18n("Vireo collects no telemetry and sends no analytics. Remote \
+                                         content (images, trackers) is blocked by default. Allow it per \
+                                         message, trust a sender to always load it, or turn on \"Always \
+                                         load remote content\" below.").as_str()
+                                    ),
+
+                                    #[name = "auto_remote_content_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Always load remote content"),
+                                        set_subtitle: &i18n("Show images and other remote content in every new \
+                                                       message without asking. Off by default, since \
+                                                       remote content can be used to track when and where \
+                                                       you read a message."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAutoRemoteContent(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "show_remote_banner_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Warn when remote content is blocked"),
+                                        set_subtitle: &i18n("Shows the banner offering to load it. Turning this \
+                                                       off only hides the notice — remote content is still \
+                                                       blocked just the same."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleShowRemoteBanner(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "gravatar_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Use Gravatar when a contact has no photo"),
+                                        set_subtitle: &i18n("Local GNOME Contacts photos are always preferred. \
+                                                       Gravatar sends a hash of the sender's email."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleGravatar(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "sender_logos_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Show sender logos"),
+                                        set_subtitle: &i18n("Fills the sender's avatar with the brand's own site \
+                                                       icon, fetched from the sender's domain. That domain \
+                                                       learns your IP address, which is what blocking \
+                                                       remote content otherwise avoids."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSenderLogos(row.is_active()));
+                                        },
+                                    },
+
+                                },
                             },
-                        },
 
-                        #[name = "tags_placement_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Tags placement"),
-                            set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
+                            add_named[Some("datetime")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Date and Time"),
+                                    set_description: Some(
+                                        i18n("By default dates follow the system's own arrangement — its \
+                                         field order, month names and clock. Choose a format here to \
+                                         use it whatever the system is set to.").as_str()
+                                    ),
+
+                                    #[name = "date_style_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Date format"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeDateStyle(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "clock_style_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Clock"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeClockStyle(row.selected()));
+                                        },
+                                    },
+                                },
                             },
-                        },
 
-                        #[name = "chevron_side_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Chevron placement"),
-                            set_subtitle: &i18n("Which side of All Inboxes and the account rows \
-                                           their expand/collapse chevrons sit on."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeChevronSide(row.selected()));
+                            add_named[Some("system")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("System"),
+
+                                    #[name = "background_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Keep running in the background"),
+                                        set_subtitle: &i18n("Closing the window hides it instead of quitting, so new \
+                                                       mail still arrives. Vireo then appears under Background \
+                                                       Apps in the system menu, where it can be quit."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRunInBackground(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "autostart_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Start at login"),
+                                        set_subtitle: &i18n("Start checking for mail when you log in. Vireo starts \
+                                                       without a window and waits in the system menu."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAutostart(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "tray_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Show a tray icon"),
+                                        set_subtitle: &i18n("An icon in the system tray, with a red dot while any \
+                                                       inbox has unread mail. Click it to open Vireo. GNOME \
+                                                       needs the AppIndicator extension; other desktops show \
+                                                       it as they are."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleTray(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "tray_icon_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Tray icon"),
+                                        set_subtitle: &i18n("The Vireo icon, or a plain envelope in white or black \
+                                                       to match the panel."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeTrayIcon(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "tray_mail_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Unread mail in the tray menu"),
+                                        set_subtitle: &i18n("List the newest unread inbox messages in the icon's \
+                                                       menu; click one to open it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleTrayMail(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "single_key_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Single-key shortcuts"),
+                                        set_subtitle: &i18n("Act on mail with one key and no modifier — j/k to move, \
+                                                       r to reply, a to archive. Press Ctrl+? for the full list."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSingleKey(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "console_mode_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Console mode"),
+                                        set_subtitle: &i18n("A verbose live console in the status bar showing \
+                                                       everything Vireo is doing under the hood."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleConsoleMode(row.is_active()));
+                                        },
+                                    },
+
+                                    adw::ActionRow {
+                                        set_title: &i18n("Export log"),
+                                        set_subtitle: &i18n("Save everything the console has recorded since Vireo \
+                                                       started, to attach to a bug report. Email addresses \
+                                                       are shortened to their domain."),
+                                        set_activatable: true,
+                                        connect_activated => PrefInput::ExportLog,
+                                        add_suffix = &gtk::Image {
+                                            set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
+                                        },
+                                    },
+                                },
                             },
-                        },
 
-                        #[name = "show_attachments_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Attachments in the sidebar"),
-                            set_subtitle: &i18n("A shortcut for browsing every account's attachments, \
-                                           pinned at the bottom of the sidebar."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleAttachmentsRow(row.is_active()));
-                            },
-                        },
+                            add_named[Some("backup")] = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Backup"),
+                                    set_description: Some(
+                                        i18n("Accounts and preferences as one file. Passwords stay in the \
+                                         system keyring and are never exported.").as_str()
+                                    ),
 
-                        #[name = "show_contacts_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Contacts in the sidebar"),
-                            set_subtitle: &i18n("A shortcut that opens your contacts, pinned at the \
-                                           bottom of the sidebar."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleContactsRow(row.is_active()));
-                            },
-                        },
+                                    adw::ActionRow {
+                                        set_title: &i18n("Export settings"),
+                                        set_activatable: true,
+                                        connect_activated => PrefInput::ExportSettings,
+                                        add_suffix = &gtk::Image {
+                                            set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
+                                        },
+                                    },
 
-                        #[name = "sidebar_hover_expand_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Expand the sidebar on hover"),
-                            set_subtitle: &i18n("Whenever the sidebar is collapsed to its icon rail, \
-                                           hovering it floats the full sidebar out over the \
-                                           panes; it folds back a moment after the pointer \
-                                           leaves."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSidebarHoverExpand(row.is_active()));
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Message List"),
-
-                        #[name = "avatars_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Sender avatars"),
-                            set_subtitle: &i18n("The sender's avatar beside each message, in the list \
-                                           and above the message. Turning it off gives the \
-                                           sender and subject more room."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleAvatars(row.is_active()));
-                            },
-                        },
-
-                        #[name = "preview_lines_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Preview lines"),
-                            set_subtitle: &i18n("How much of each message to show under its subject. \
-                                           Off also stops previews being downloaded."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangePreviewLines(row.selected()));
-                            },
-                        },
-
-                        #[name = "list_palette_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Actions Palette in the message list"),
-                            set_subtitle: &i18n("The \u{22ef} action row under each message summary. \
-                                           Turning it off returns its space to the row; \
-                                           messages are still acted on from their cards and \
-                                           the right-click menu."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleListPalette(row.is_active()));
-                            },
-                        },
-
-                        #[name = "list_palette_hover_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.list_palette,
-                            set_title: &i18n("Open the Actions Palette on hover"),
-                            set_subtitle: &i18n("The message list's \u{22ef} palette slides open \
-                                           by itself while the pointer rests on a row."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleListPaletteHover(row.is_active()));
-                            },
-                        },
-
-                        #[name = "swipe_enabled_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Swipe actions"),
-                            set_subtitle: &i18n("Drag a message sideways with the mouse, or swipe it \
-                                           with two fingers on a trackpad, to archive or delete it."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSwipeEnabled(row.is_active()));
-                            },
-                        },
-
-                        #[name = "swipe_reversed_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.swipe_enabled,
-                            set_title: &i18n("Reverse swipe directions"),
-                            set_subtitle: &i18n("Swipe (mouse-drag or trackpad) a message left \
-                                           to delete it and right to archive it. Turning this \
-                                           on swaps the two: left archives, right deletes."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSwipeReversed(row.is_active()));
-                            },
-                        },
-
-                        #[name = "palette_collapse_row"]
-                        adw::SpinRow {
-                            set_title: &i18n("Actions Palette timeout"),
-                            set_subtitle: &i18n("Seconds an actions palette stays open after the \
-                                           cursor leaves it — the list's and the message \
-                                           cards' alike."),
-                            connect_value_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangePaletteCollapse(row.value() as u64));
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Conversations"),
-
-                        #[name = "threading_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Group messages by conversation"),
-                            set_subtitle: &i18n("Collapse replies into a single threaded conversation."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleThreading(row.is_active()));
-                            },
-                        },
-
-                        #[name = "thread_expansion_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.threading,
-                            set_title: &i18n("Expandable conversations"),
-                            set_subtitle: &i18n("Allow a conversation to expand/collapse its messages \
-                                           in the list. When off, the row keeps its count chip \
-                                           but the messages are displayed only as cards in the \
-                                           reading pane."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleThreadExpansion(row.is_active()));
-                            },
-                        },
-
-                        #[name = "threads_expanded_row"]
-                        adw::SwitchRow {
-                            #[watch]
-                            set_sensitive: model.threading && model.thread_expansion,
-                            set_title: &i18n("Expand conversations by default"),
-                            set_subtitle: &i18n("Show every message of a conversation in the list. \
-                                           When off, conversations start collapsed to their \
-                                           newest message."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleThreadsExpanded(row.is_active()));
-                            },
-                        },
-
-                        #[name = "thread_newest_first_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Newest message first"),
-                            set_subtitle: &i18n("Show a conversation's latest message at the top of \
-                                           the reading pane. Off reads oldest to newest, \
-                                           downward."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleThreadNewestFirst(row.is_active()));
-                            },
-                        },
-
-                        #[name = "confirm_thread_delete_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Confirm conversation deletion"),
-                            set_subtitle: &i18n("Warn before deleting when a whole conversation is \
-                                           selected, since every message in the thread goes \
-                                           with it."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleConfirmThreadDelete(row.is_active()));
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Reading"),
-
-                        #[name = "read_mark_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Mark as read"),
-                            set_subtitle: &i18n("When an opened message counts as read. \
-                                           Conversations mark each message as it \
-                                           comes into view."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeReadMark(row.selected()));
-                            },
-                        },
-
-                        #[name = "message_theme_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Message appearance"),
-                            set_subtitle: &i18n("Theme for email content only, not the app itself."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeMessageTheme(row.selected()));
-                            },
-                        },
-
-                        #[name = "override_fonts_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Use my own font"),
-                            set_subtitle: &i18n("Show every message in the font and size chosen \
-                                           below instead of the sender's. Headings keep \
-                                           their relative size; code stays monospaced."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleOverrideFonts(row.is_active()));
-                            },
-                        },
-
-                        #[name = "reader_font_row"]
-                        adw::ActionRow {
-                            set_title: &i18n("Message font"),
-                            set_subtitle: &i18n("The interface font unless another is chosen."),
-                            #[name = "reader_font_button"]
-                            add_suffix = &gtk::FontDialogButton {
-                                set_valign: gtk::Align::Center,
-                                set_dialog: &gtk::FontDialog::new(),
-                                set_level: gtk::FontLevel::Font,
-                                set_use_font: true,
-                                connect_font_desc_notify[sender] => move |button| {
-                                    let font = button
-                                        .font_desc()
-                                        .map(|d| d.to_string())
-                                        .unwrap_or_default();
-                                    sender.input(PrefInput::ChangeReaderFont(font));
+                                    adw::ActionRow {
+                                        set_title: &i18n("Import settings"),
+                                        set_subtitle: &i18n("Replaces the current accounts and preferences in \
+                                                       place. Don't remove accounts first: removal also \
+                                                       deletes their keyring passwords, which no backup \
+                                                       carries."),
+                                        set_activatable: true,
+                                        connect_activated => PrefInput::ImportSettings,
+                                        add_suffix = &gtk::Image {
+                                            set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
+                                        },
+                                    },
                                 },
                             },
                         },
-
-                        #[name = "override_colors_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Use my own colours"),
-                            set_subtitle: &i18n("Ignore the text and background colours senders \
-                                           set, so every message reads in the same black or \
-                                           white on the reader's ground. Pictures are kept; \
-                                           links take the accent colour."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleOverrideColors(row.is_active()));
-                            },
-                        },
-
-                        #[name = "card_actions_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Message card actions"),
-                            set_subtitle: &i18n("How each message's action icons show in the \
-                                           reader, single or threaded."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeCardActionsMode(row.selected()));
-                            },
-                        },
-
-                        #[name = "single_message_card_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Single messages as cards"),
-                            set_subtitle: &i18n("Show a lone message as an inset card with the same \
-                                           border as a conversation's messages. Off fills the \
-                                           pane edge to edge."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSingleMessageCard(row.is_active()));
-                            },
-                        },
-
-                        #[name = "always_show_recipients_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Always show recipients"),
-                            set_subtitle: &i18n("Show who each message went to under its sender, \
-                                           without clicking the recipients chip. With one \
-                                           recipient the chip is dropped entirely."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleAlwaysShowRecipients(row.is_active()));
-                            },
-                        },
                     },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Composing"),
-
-                        #[name = "compose_inline_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Compose in the main window"),
-                            set_subtitle: &i18n("New message slides down over the reading pane, \
-                                           like a reply — pop it out to a window from its \
-                                           header. Off = open a separate window directly."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleComposeInline(row.is_active()));
-                            },
-                        },
-
-                        #[name = "paste_plain_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Paste as plain text"),
-                            set_subtitle: &i18n("Pasting into a message strips the \
-                                           clipboard's formatting. Off, a paste \
-                                           keeps its formatting. Right-clicking \
-                                           the editor always offers both."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::TogglePastePlain(row.is_active()));
-                            },
-                        },
-                    },
-
-                    #[name = "spelling_group"]
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Spelling"),
-                        // The description is filled in at init with the
-                        // dictionaries the app can actually see — checking a
-                        // language without one silently checks nothing, so
-                        // honesty about what is installed beats silence.
-
-                        #[name = "spellcheck_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Check spelling as you type"),
-                            set_subtitle: &i18n("Misspelled words in the message body \
-                                           are underlined; right-click a word \
-                                           for corrections."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSpellcheck(row.is_active()));
-                            },
-                        },
-
-                        #[name = "spell_lang_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Language"),
-                            set_subtitle: &i18n("Dictionaries the app can see"),
-                        },
-
-                        // Words the user taught the checker ("Learn Spelling"
-                        // in the composer, or added right here). Populated
-                        // and maintained imperatively in init.
-                        #[name = "spell_words_row"]
-                        adw::ExpanderRow {
-                            set_title: &i18n("Added words"),
-                            set_subtitle: &i18n("Words the spell checker was taught. \
-                                           The message body applies changes \
-                                           after a restart."),
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        // Rendered as Pango markup — a bare "&" breaks it.
-                        set_title: &i18n("System &amp; Appearance"),
-
-                        #[name = "app_theme_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Style"),
-                            set_subtitle: &i18n("The app itself. Message content has its own \
-                                           setting under Reading."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeAppTheme(row.selected()));
-                            },
-                        },
-
-                        // The app-icon gallery; its content is built in init
-                        // (a grid of textures the view! macro can't declare).
-                        #[name = "app_icon_row"]
-                        adw::PreferencesRow {
-                            set_title: &i18n("App icon"),
-                            set_activatable: false,
-                            set_focusable: false,
-                        },
-
-                        #[name = "settings_open_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("This window opens to"),
-                            set_subtitle: &i18n("The view shown first when Settings \
-                                           is opened from the menu."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeSettingsOpen(row.selected()));
-                            },
-                        },
-
-                        #[name = "background_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Keep running in the background"),
-                            set_subtitle: &i18n("Closing the window hides it instead of quitting, so new \
-                                           mail still arrives. Vireo then appears under Background \
-                                           Apps in the system menu, where it can be quit."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleRunInBackground(row.is_active()));
-                            },
-                        },
-
-                        #[name = "autostart_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Start at login"),
-                            set_subtitle: &i18n("Start checking for mail when you log in. Vireo starts \
-                                           without a window and waits in the system menu."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleAutostart(row.is_active()));
-                            },
-                        },
-
-                        #[name = "tray_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Show a tray icon"),
-                            set_subtitle: &i18n("An icon in the system tray, with a red dot while any \
-                                           inbox has unread mail. Click it to open Vireo. GNOME \
-                                           needs the AppIndicator extension; other desktops show \
-                                           it as they are."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleTray(row.is_active()));
-                            },
-                        },
-
-                        #[name = "tray_icon_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Tray icon"),
-                            set_subtitle: &i18n("The Vireo icon, or a plain envelope in white or black \
-                                           to match the panel."),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeTrayIcon(row.selected()));
-                            },
-                        },
-
-                        #[name = "tray_mail_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Unread mail in the tray menu"),
-                            set_subtitle: &i18n("List the newest unread inbox messages in the icon's \
-                                           menu; click one to open it."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleTrayMail(row.is_active()));
-                            },
-                        },
-
-                        #[name = "single_key_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Single-key shortcuts"),
-                            set_subtitle: &i18n("Act on mail with one key and no modifier — j/k to move, \
-                                           r to reply, a to archive. Press Ctrl+? for the full list."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSingleKey(row.is_active()));
-                            },
-                        },
-
-                        #[name = "console_mode_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Console mode"),
-                            set_subtitle: &i18n("A verbose live console in the status bar showing \
-                                           everything Vireo is doing under the hood."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleConsoleMode(row.is_active()));
-                            },
-                        },
-
-                        adw::ActionRow {
-                            set_title: &i18n("Export log"),
-                            set_subtitle: &i18n("Save everything the console has recorded since Vireo \
-                                           started, to attach to a bug report. Email addresses \
-                                           are shortened to their domain."),
-                            set_activatable: true,
-                            connect_activated => PrefInput::ExportLog,
-                            add_suffix = &gtk::Image {
-                                set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Backup"),
-                        set_description: Some(
-                            i18n("Accounts and preferences as one file. Passwords stay in the \
-                             system keyring and are never exported.").as_str()
-                        ),
-
-                        adw::ActionRow {
-                            set_title: &i18n("Export settings"),
-                            set_activatable: true,
-                            connect_activated => PrefInput::ExportSettings,
-                            add_suffix = &gtk::Image {
-                                set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
-                            },
-                        },
-
-                        adw::ActionRow {
-                            set_title: &i18n("Import settings"),
-                            set_subtitle: &i18n("Replaces the current accounts and preferences in \
-                                           place. Don't remove accounts first: removal also \
-                                           deletes their keyring passwords, which no backup \
-                                           carries."),
-                            set_activatable: true,
-                            connect_activated => PrefInput::ImportSettings,
-                            add_suffix = &gtk::Image {
-                                set_icon_name: Some("co.hyprlab.Vireo-go-next-symbolic"),
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Date and Time"),
-                        set_description: Some(
-                            i18n("By default dates follow the system's own arrangement — its \
-                             field order, month names and clock. Choose a format here to \
-                             use it whatever the system is set to.").as_str()
-                        ),
-
-                        #[name = "date_style_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Date format"),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeDateStyle(row.selected()));
-                            },
-                        },
-
-                        #[name = "clock_style_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("Clock"),
-                            connect_selected_notify[sender] => move |row| {
-                                sender.input(PrefInput::ChangeClockStyle(row.selected()));
-                            },
-                        },
-                    },
-
-                    add = &adw::PreferencesGroup {
-                        set_title: &i18n("Privacy"),
-                        set_description: Some(
-                            i18n("Vireo collects no telemetry and sends no analytics. Remote \
-                             content (images, trackers) is blocked by default. Allow it per \
-                             message, trust a sender to always load it, or turn on \"Always \
-                             load remote content\" below.").as_str()
-                        ),
-
-                        #[name = "auto_remote_content_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Always load remote content"),
-                            set_subtitle: &i18n("Show images and other remote content in every new \
-                                           message without asking. Off by default, since \
-                                           remote content can be used to track when and where \
-                                           you read a message."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleAutoRemoteContent(row.is_active()));
-                            },
-                        },
-
-                        #[name = "show_remote_banner_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Warn when remote content is blocked"),
-                            set_subtitle: &i18n("Shows the banner offering to load it. Turning this \
-                                           off only hides the notice — remote content is still \
-                                           blocked just the same."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleShowRemoteBanner(row.is_active()));
-                            },
-                        },
-
-                        #[name = "gravatar_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Use Gravatar when a contact has no photo"),
-                            set_subtitle: &i18n("Local GNOME Contacts photos are always preferred. \
-                                           Gravatar sends a hash of the sender's email."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleGravatar(row.is_active()));
-                            },
-                        },
-
-                        #[name = "sender_logos_row"]
-                        adw::SwitchRow {
-                            set_title: &i18n("Show sender logos"),
-                            set_subtitle: &i18n("Fills the sender's avatar with the brand's own site \
-                                           icon, fetched from the sender's domain. That domain \
-                                           learns your IP address, which is what blocking \
-                                           remote content otherwise avoids."),
-                            connect_active_notify[sender] => move |row| {
-                                sender.input(PrefInput::ToggleSenderLogos(row.is_active()));
-                            },
-                        },
-
-                    },
-
-                },
                 },
             },
         }
@@ -1074,6 +1235,10 @@ impl Component for Preferences {
             thread_expansion: init.thread_expansion,
             list_palette: init.list_palette,
             panels_stack: None,
+            side_list: None,
+            content_page: None,
+            split: None,
+            accounts_sender: init.accounts_sender.clone(),
             host_header: None,
         };
 
@@ -1412,24 +1577,44 @@ impl Component for Preferences {
             .settings_open_row
             .set_selected(if init.settings_open_accounts { 1 } else { 0 });
 
-        // The view switcher drives the panel stack; the pages carry icons so
-        // the switcher shows the standard icon-and-label tabs.
-        widgets.switcher.set_stack(Some(&widgets.panels_stack));
         widgets.accounts_slot.set_child(Some(&init.accounts_panel));
-        widgets
-            .panels_stack
-            .page(&widgets.accounts_slot)
-            .set_icon_name(Some("co.hyprlab.Vireo-avatar-default-symbolic"));
-        widgets
-            .panels_stack
-            .page(&widgets.prefs_page)
-            .set_icon_name(Some("co.hyprlab.Vireo-applications-system-symbolic"));
-        widgets.panels_stack.set_visible_child_name(if init.start_on_accounts {
-            "accounts"
-        } else {
-            "preferences"
-        });
+        // The sidebar (#141): a heading per section, a row per category.
+        for (section, pages) in SIDE_PAGES {
+            let heading = gtk::ListBoxRow::new();
+            heading.set_selectable(false);
+            heading.set_activatable(false);
+            heading.add_css_class("settings-side-heading");
+            let label = gtk::Label::new(Some(&i18n(section)));
+            label.set_xalign(0.0);
+            label.add_css_class("caption-heading");
+            label.add_css_class("dim-label");
+            heading.set_child(Some(&label));
+            widgets.side_list.append(&heading);
+            for page in pages.iter() {
+                let row = gtk::ListBoxRow::new();
+                row.set_widget_name(&format!("page:{}", page.id));
+                let line = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+                line.append(&gtk::Image::from_icon_name(page.icon));
+                let label = gtk::Label::new(Some(&i18n(page.title)));
+                label.set_xalign(0.0);
+                line.append(&label);
+                row.set_child(Some(&line));
+                widgets.side_list.append(&row);
+            }
+        }
+        // One pane under 640sp: the sidebar first, a category on top of it.
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            640.0,
+            adw::LengthUnit::Sp,
+        ));
+        narrow.add_setter(&widgets.split, "collapsed", Some(&true.to_value()));
+        root.add_breakpoint(narrow);
         model.panels_stack = Some(widgets.panels_stack.clone());
+        model.side_list = Some(widgets.side_list.clone());
+        model.content_page = Some(widgets.content_page.clone());
+        model.split = Some(widgets.split.clone());
+        model.select_row(if init.start_on_accounts { "accounts" } else { "general" });
         model.host_header = Some(widgets.host_header.clone());
 
         ComponentParts { model, widgets }
@@ -1628,10 +1813,9 @@ impl Component for Preferences {
                 let _ = sender.output(PrefOutput::SetSettingsOpenAccounts(index == 1));
             }
             PrefInput::ShowAccounts(accounts) => {
-                if let Some(stack) = &self.panels_stack {
-                    stack.set_visible_child_name(if accounts { "accounts" } else { "preferences" });
-                }
+                self.select_row(if accounts { "accounts" } else { "general" });
             }
+            PrefInput::SelectPage(id) => self.show_page(&id),
             PrefInput::EditorOpen(open) => {
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);

@@ -9884,6 +9884,7 @@ impl AppModel {
             tray_mail: self.tray_mail,
             app_icon: self.app_icon.clone(),
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
+            accounts_sender: accounts.sender().clone(),
             start_on_accounts: on_accounts,
         };
         let prefs = Preferences::builder()

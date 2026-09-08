@@ -31,6 +31,17 @@ The reader's own fonts and colours over the senders'.
   folders, so the choice does nothing there. Failures are logged and
   retried at the next sync. Stored per account as `empty_junk_days` and
   `empty_trash_days`.
+- **Settings in two panes** (#141, requested by @typedev). The settings
+  window is a sidebar of categories beside the chosen category's groups,
+  in place of the two long scrolling tabs. Under Accounts: Mail Accounts,
+  Tags, Filters, Senders (the allowed and blocked lists); under Settings:
+  General (with notifications), Appearance, Sidebar, Message List, Reading
+  (with conversations), Composing (with spelling), Privacy, Date and Time,
+  System, Backup. The Filters and Senders pages carry a search box that
+  narrows their lists as you type, so a long allow list or rule set is no
+  longer a scroll. The window opens wider to make room; under 640sp the
+  panes collapse to one, the sidebar first. The account editor still opens
+  over the content pane with its own back and Save header.
 - **OpenPGP, first slice: reading** (#133, requested by @greedykangaroo01).
   Vireo now decrypts and verifies incoming OpenPGP mail through the user's
   own GnuPG: `gpg` on the path, the keyring in `~/.gnupg`, the agent and its

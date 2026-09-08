@@ -8,6 +8,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **Junk and Trash empty themselves.** In each account's settings, under Syncing, choose to delete junk mail or trashed mail for good after 7, 14 or 30 days. Vireo checks at each sync and removes what has passed the age, counted from the day the message arrived. Off unless you turn it on. Requested by [@typedev](https://github.com/typedev) (#140).
 
+**Settings with a sidebar.** The settings window now has categories down the left and the chosen category's options on the right, instead of two long scrolling tabs. Accounts, tags, filters and the sender lists each have a page of their own, and the Filters and Senders pages have a search box for long lists. Requested by [@typedev](https://github.com/typedev) (#141).
+
 **OpenPGP: encrypted and signed mail can be read.** If you use GnuPG, Vireo now decrypts messages sent to your key and checks signatures, using your own keyring and asking for the passphrase the way gpg always does. A lock or shield beside the sender shows the result; click it for the details. Decrypted text is never stored on disk. Sending encrypted or signed mail comes in a later release. Requested by [@greedykangaroo01](https://github.com/greedykangaroo01) (#133).
 
 ## What's new in 1.23.1
