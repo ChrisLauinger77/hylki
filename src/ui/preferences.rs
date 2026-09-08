@@ -475,13 +475,12 @@ impl Component for Preferences {
         adw::Window {
             set_modal: false,
             set_default_width: 920,
-            // Remembered vertical size (tall by default) — resizing sticks
-            // across restarts via the save on close below.
-            set_default_height: crate::config::load_prefs_height(),
+            // The same size every time: the two-pane layout (#141) fits its
+            // sidebar at this height, and nothing is remembered from a resize.
+            set_default_height: 752,
             set_title: Some(i18n("Settings").as_str()),
 
-            connect_close_request[sender] => move |w| {
-                crate::config::save_prefs_height(w.height());
+            connect_close_request[sender] => move |_| {
                 let _ = sender.output(PrefOutput::Closed);
                 gtk::glib::Propagation::Proceed
             },
