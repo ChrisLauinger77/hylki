@@ -1194,6 +1194,12 @@ msgstr ""
 msgid "Colour"
 msgstr ""
 
+msgid "Custom colour…"
+msgstr ""
+
+msgid "Tag Colour"
+msgstr ""
+
 msgid "Edit Filter"
 msgstr "Modifier le filtre"
 

@@ -2,6 +2,12 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.24.2
+
+**Any colour for a tag.** The tag dialog has a ninth colour disc after the eight palette colours. It opens the GTK colour chooser, and the picked colour shows on the disc and everywhere the tag appears. Requested by [@yioannides](https://github.com/yioannides) (#147).
+
+**The composer matches your theme.** The composer's background and the editor's writing area were fixed GNOME shades, so under a custom GTK theme they stood out from the rest of the window. They now take their colours from the theme like the reader does, and follow a switch between light and dark while the composer is open. Reported by [@yioannides](https://github.com/yioannides) (#148).
+
 ## What's new in 1.24.1
 
 **Message previews show every line again.** With the list set to two or three preview lines, the second line was cut through and the third missing, since 1.23.0. Every line shows now.

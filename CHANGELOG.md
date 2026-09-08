@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.24.2 — 2026-09-08
+
+Any colour for a tag, and a composer that follows the theme.
+
+- **Custom tag colours** (#147, requested by @yioannides). The tag dialog
+  has a ninth disc after the eight palette colours: a hue wheel until a
+  colour is picked, then that colour. Pressing it opens the GTK colour
+  chooser (no alpha); the pick is stored as `#rrggbb` in `tags.toml` like
+  a palette colour, so chips, sidebar dots and tints need nothing new. A
+  tag whose colour is not in the palette opens on that disc. The discs lay
+  out as two rows of five and four.
+- **The composer takes its grounds from the theme** (#148, reported by
+  @yioannides). The composer pane's background was the stock GNOME page
+  shade (`#141414`/`#f1f1f1`) and the editor painted WebKit's `Canvas`,
+  whatever the theme said, so under a custom GTK theme the composer stood
+  out from the reader. The reader's theme-ground resolution (issue #62) is
+  now a shared `theme_grounds_for()`; the scheme CSS takes the page ground
+  from it and the editor document the view ground. A live light/dark flip
+  re-resolves both: the CSS lookup runs on the next main-loop pass (named
+  colours are re-resolved after the dark-notify signal, not before it, so
+  an immediate lookup answered for the scheme just left), and the open
+  editor document is re-grounded through a style-manager handler the
+  editor disconnects when it goes.
+- Showcase hooks for captures: `VIREO_SHOWCASE_REPLY` opens the inline
+  reply composer, `VIREO_SHOWCASE_FLIP=dark|light` flips the app theme at
+  6 s, `VIREO_SHOWCASE_EDIT_TAG=<index>` opens a tag's editor (past the
+  end: Add Tag).
+
 ## 1.24.1 — 2026-09-08
 
 Three preview lines are three lines again, and a swipe slides flush.
