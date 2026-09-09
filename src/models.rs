@@ -53,6 +53,8 @@ pub struct Folder {
     /// this mirrors `name`.
     pub path: String,
     pub kind: FolderKind,
+    /// The sidebar chip's number: unread mail, except Drafts, where it is
+    /// how many drafts there are (see `worker::chip_counts_all`).
     pub unread: u32,
 }
 

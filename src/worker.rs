@@ -1189,7 +1189,8 @@ async fn run_imap(
                         // Refresh the true unread count (catches new mail and
                         // reads from other clients beyond the loaded window).
                         if let Some(sess) = session.as_mut() {
-                            if let Some(unread) = selected_unseen(sess).await {
+                            let kind = cached_folder_kind(cache.as_ref(), account_id, &path);
+                            if let Some(unread) = selected_chip_count(sess, kind).await {
                                 emit(WorkerEvent::FolderUnread { folder_id, unread });
                             }
                         }
@@ -2394,7 +2395,8 @@ async fn idle_wait(
                     // new mail lands in a background (unfocused) inbox — it would
                     // take an explicit reload / "All Inboxes" refresh to appear.
                     if let Some(sess) = session.as_mut() {
-                        if let Some(unread) = selected_unseen(sess).await {
+                        let kind = cached_folder_kind(cache, account_id, path);
+                        if let Some(unread) = selected_chip_count(sess, kind).await {
                             emit(WorkerEvent::FolderUnread { folder_id, unread });
                         }
                     }
@@ -4607,8 +4609,8 @@ async fn list_folders(
     // Ask the server for each folder's true unread count. STATUS is cheap and
     // downloads no message content, so this stays fast even for huge mailboxes.
     for f in folders.iter_mut() {
-        if let Ok(mb) = box_status(session, &f.path, "(UNSEEN)").await {
-            f.unread = mb.unseen.unwrap_or(0);
+        if let Ok(mb) = box_status(session, &f.path, "(UNSEEN MESSAGES)").await {
+            f.unread = if chip_counts_all(f.kind) { mb.exists } else { mb.unseen.unwrap_or(0) };
         }
     }
 
@@ -4871,7 +4873,7 @@ async fn refresh_unread_counts(
             tracing::debug!("sweep: cannot examine {}", f.path);
             continue;
         };
-        let Some(unread) = selected_unseen(session).await else {
+        let Some(unread) = selected_chip_count(session, Some(f.kind)).await else {
             continue;
         };
         emit(WorkerEvent::FolderUnread { folder_id: f.id, unread });
@@ -4891,6 +4893,38 @@ async fn refresh_unread_counts(
         );
     }
     changed
+}
+
+/// Whether a folder's sidebar chip counts every message rather than unread
+/// ones. Drafts: a draft is never unread, and the chip is there to say how
+/// many are waiting to be finished.
+pub fn chip_counts_all(kind: FolderKind) -> bool {
+    kind == FolderKind::Drafts
+}
+
+/// The chip number for a folder whose messages are all in hand.
+fn chip_count_of(kind: FolderKind, messages: &[Message]) -> u32 {
+    if chip_counts_all(kind) {
+        messages.len() as u32
+    } else {
+        messages.iter().filter(|m| m.unread).count() as u32
+    }
+}
+
+/// The chip number for the currently-selected mailbox: unseen, or every
+/// message for a kind that counts them all. `None` for an unknown kind
+/// counts unseen.
+async fn selected_chip_count(session: &mut ImapSession, kind: Option<FolderKind>) -> Option<u32> {
+    if kind.is_some_and(chip_counts_all) {
+        search_uids(session, "ALL").await.ok().map(|uids| uids.len() as u32)
+    } else {
+        selected_unseen(session).await
+    }
+}
+
+/// A folder's kind as the cache last saw it, by path.
+fn cached_folder_kind(cache: Option<&Cache>, account_id: u32, path: &str) -> Option<FolderKind> {
+    cache?.load_folders(account_id).into_iter().find(|f| f.path == path).map(|f| f.kind)
 }
 
 /// Count unseen messages in the currently-selected mailbox via SEARCH (safe on
@@ -7731,7 +7765,8 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
         }
     }
 
-    const SELECT: &str = "$select=id,displayName,childFolderCount,unreadItemCount";
+    const SELECT: &str =
+        "$select=id,displayName,childFolderCount,unreadItemCount,totalItemCount";
     let roots = graph_paged(
         token,
         &format!("{GRAPH_BASE}/me/mailFolders?$top=100&{SELECT}"),
@@ -7765,7 +7800,10 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
                 name,
                 path,
                 kind,
-                unread: v["unreadItemCount"].as_i64().unwrap_or(0).max(0) as u32,
+                unread: {
+                    let field = if chip_counts_all(kind) { "totalItemCount" } else { "unreadItemCount" };
+                    v[field].as_i64().unwrap_or(0).max(0) as u32
+                },
             },
         });
     }
@@ -7880,6 +7918,16 @@ struct GraphState {
 }
 
 impl GraphState {
+    /// The chip number for a folder just loaded: every draft in Drafts,
+    /// unread mail elsewhere.
+    fn chip_count(&self, folder_id: u32, messages: &[Message]) -> u32 {
+        let kind = match &self.drafts {
+            Some((id, _)) if *id == folder_id => FolderKind::Drafts,
+            _ => FolderKind::Custom,
+        };
+        chip_count_of(kind, messages)
+    }
+
     fn adopt_folders(&mut self, list: &[GraphFolder]) {
         self.folders = list
             .iter()
@@ -7997,7 +8045,7 @@ async fn run_graph(
                 .await
                 {
                     Ok(messages) => {
-                        let unread = messages.iter().filter(|m| m.unread).count() as u32;
+                        let unread = state.chip_count(folder_id, &messages);
                         emit(WorkerEvent::Messages { folder_id, messages });
                         emit(WorkerEvent::FolderUnread { folder_id, unread });
                         // Graph loads the whole folder in one pass — there is no
@@ -8278,7 +8326,7 @@ async fn run_graph(
                             )
                             .await
                             {
-                                let unread = messages.iter().filter(|m| m.unread).count() as u32;
+                                let unread = state.chip_count(dest_folder_id, &messages);
                                 emit(WorkerEvent::Messages {
                                     folder_id: dest_folder_id,
                                     messages,

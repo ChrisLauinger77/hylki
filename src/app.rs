@@ -10603,7 +10603,9 @@ impl AppModel {
         if let Some(msgs) = self.message_cache.get_mut(&(m.account_id, m.folder_id)) {
             msgs.retain(|x| x.uid != m.uid);
         }
-        if m.unread {
+        // The Drafts chip counts every draft, so leaving that folder always
+        // drops it by one; elsewhere only unread mail is counted.
+        if m.unread || self.is_drafts_folder(m.account_id, m.folder_id) {
             if let Some(n) = self.folder_unread.get_mut(&(m.account_id, m.folder_id)) {
                 *n = n.saturating_sub(1);
             }
