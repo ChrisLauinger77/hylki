@@ -334,6 +334,8 @@ pub enum CtxAction {
     DeleteFolder { account_id: u32, name: String, path: String },
     /// Rename a custom folder (its leaf name; children follow via RENAME).
     RenameFolder { account_id: u32, name: String, path: String },
+    /// Erase everything in Trash or Junk (#152).
+    EmptyFolder { account_id: u32, folder_id: u32, name: String, path: String },
 }
 
 #[relm4::component(pub)]
@@ -2824,6 +2826,20 @@ fn attach_folder_context_menu(
                 }));
                 items.push((i18n_noop("Delete Folder…"), CtxAction::DeleteFolder {
                     account_id: id,
+                    name: f.name.clone(),
+                    path: f.path.clone(),
+                }));
+            }
+            // Trash and Junk can be emptied outright (#152).
+            let empty_label = match f.kind {
+                FolderKind::Trash => Some(i18n_noop("Empty Trash…")),
+                FolderKind::Junk => Some(i18n_noop("Empty Junk…")),
+                _ => None,
+            };
+            if let Some(label) = empty_label {
+                items.push((label, CtxAction::EmptyFolder {
+                    account_id: id,
+                    folder_id: f.id,
                     name: f.name.clone(),
                     path: f.path.clone(),
                 }));

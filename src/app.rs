@@ -590,6 +590,8 @@ pub enum AppMsg {
     RenameFolderTo { account_id: u32, path: String, new_name: String },
     /// Delete a custom folder (its contents are moved to Trash first).
     DeleteFolder { account_id: u32, path: String },
+    /// Erase everything in a Trash or Junk folder (#152).
+    EmptyFolder { account_id: u32, folder_id: u32, path: String },
     AccountsReordered(Vec<String>),
     /// `solo` marks a reply the user picked out of a conversation on screen:
     /// show that message alone and don't go looking for its siblings.
@@ -3413,6 +3415,9 @@ impl SimpleComponent for AppModel {
                 CtxAction::RenameFolder { account_id, name, path } => {
                     self.prompt_rename_folder(account_id, name, path, &sender);
                 }
+                CtxAction::EmptyFolder { account_id, folder_id, name, path } => {
+                    self.confirm_empty_folder(account_id, folder_id, name, path, &sender);
+                }
             },
 
             AppMsg::DropMoveMessages { dest_account, dest, items } => {
@@ -3460,6 +3465,21 @@ impl SimpleComponent for AppModel {
 
             AppMsg::RenameFolderTo { account_id, path, new_name } => {
                 self.rename_folder_to(account_id, path, new_name);
+            }
+
+            AppMsg::EmptyFolder { account_id, folder_id, path } => {
+                // Gone locally at once; the worker's empty message list and
+                // zero count confirm it, or an error says why not.
+                self.message_cache.remove(&(account_id, folder_id));
+                self.folder_unread.insert((account_id, folder_id), 0);
+                if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id) {
+                    self.current = None;
+                    self.current_thread.clear();
+                    self.show_message(None, false);
+                    self.message_list.emit(MessageListInput::SetLoading);
+                }
+                self.push_unread_counts();
+                self.send_to(account_id, MailRequest::EmptyFolder { folder_id, path });
             }
 
             AppMsg::DeleteFolder { account_id, path } => {
@@ -9568,6 +9588,34 @@ impl AppModel {
                     account_id,
                     path: path.clone(),
                 });
+            }
+        });
+        dialog.present();
+    }
+
+    /// Empty Trash / Empty Junk (#152): there is no undo, so always ask.
+    fn confirm_empty_folder(
+        &self,
+        account_id: u32,
+        folder_id: u32,
+        name: String,
+        path: String,
+        sender: &ComponentSender<Self>,
+    ) {
+        let dialog = adw::MessageDialog::new(
+            Some(&self.window),
+            Some(&i18n_f("Empty “{name}”?", &[("name", &name)])),
+            Some(i18n("Every message in it will be erased from the server. This can’t be undone.").as_str()),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("empty", &i18n("Empty"));
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        dialog.set_response_appearance("empty", adw::ResponseAppearance::Destructive);
+        let s = sender.clone();
+        dialog.connect_response(None, move |_, resp| {
+            if resp == "empty" {
+                s.input(AppMsg::EmptyFolder { account_id, folder_id, path: path.clone() });
             }
         });
         dialog.present();

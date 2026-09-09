@@ -213,6 +213,8 @@ pub enum MailRequest {
     /// Permanently erase messages from `path` (flag `\Deleted` + EXPUNGE), used
     /// when "delete" is asked for in Trash, where there is nowhere left to move to.
     PurgeMessages { path: String, uids: Vec<u32> },
+    /// Erase every message in a folder (Empty Trash / Empty Junk, #152).
+    EmptyFolder { folder_id: u32, path: String },
     /// Create a new mailbox (folder) at `path`.
     CreateFolder { path: String },
     /// Undo a move: find the messages (by Message-ID header — their UIDs
@@ -1659,6 +1661,40 @@ async fn run_imap(
                 }
                 // Always signal completion so the UI's bulk spinner clears.
                 emit(WorkerEvent::BulkComplete);
+            }
+
+            MailRequest::EmptyFolder { folder_id, path } => {
+                let sess = session.as_mut().unwrap();
+                let found = match sel(sess, &path).await {
+                    Ok(_) => search_uids(sess, "ALL").await,
+                    Err(e) => Err(e),
+                };
+                let result = match found {
+                    Ok(set) => {
+                        let uids: Vec<u32> = set.into_iter().collect();
+                        purge_messages(sess, &path, &uids).await.map(|()| uids)
+                    }
+                    Err(e) => Err(e),
+                };
+                match result {
+                    Ok(uids) => {
+                        if let Some(c) = cache.as_ref() {
+                            for uid in &uids {
+                                c.delete_message(account_id, &path, *uid);
+                            }
+                        }
+                        tracing::info!("emptied {path}: {} message(s) erased", uids.len());
+                        emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
+                        emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                    }
+                    Err(e) => {
+                        emit(WorkerEvent::Error {
+                            text: i18n_f("Could not empty the folder: {e}", &[("e", &e.to_string())]),
+                            connectivity: false,
+                        });
+                        lost = true;
+                    }
+                }
             }
 
             MailRequest::CreateFolder { path } => {
@@ -6726,6 +6762,8 @@ async fn run_pop3(
                     }),
                 }
             }
+            // POP3 shows only its Inbox; there is no Trash or Junk to empty.
+            MailRequest::EmptyFolder { .. } => {}
             MailRequest::MoveMessages { uids, .. } | MailRequest::PurgeMessages { uids, .. } => {
                 for uid in uids {
                     if pop3_delete(&account, uid).await.is_ok() {
@@ -6980,6 +7018,11 @@ async fn run_mock(
             | MailRequest::DeleteOutbox { .. }
             | MailRequest::RefreshUnread
             | MailRequest::Reconnect => {}
+            // The demo's folders are fixed, but an emptied one reads as empty.
+            MailRequest::EmptyFolder { folder_id, .. } => {
+                emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
+                emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+            }
             // The demo backend sends nothing, so its Outbox is always empty.
             MailRequest::LoadOutbox => emit(WorkerEvent::Outbox { items: Vec::new() }),
             // Signal completion so the demo's bulk spinner clears.
@@ -8283,26 +8326,28 @@ async fn run_graph(
             }
 
             MailRequest::PurgeMessages { path, uids } => {
-                for uid in uids {
-                    let deleted = match graph_resolve(&account, &mut state, &path, uid, &emit).await
-                    {
-                        Some((token, gid)) => {
-                            let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-                            tokio::task::spawn_blocking(move || graph_delete_req(&token, &url))
-                                .await
-                                .unwrap_or_else(|_| Err("task failed".into()))
-                                .is_ok()
-                        }
-                        None => false,
-                    };
-                    if deleted {
-                        state.uids.remove(&uid);
-                        if let Some(c) = cache.as_ref() {
-                            c.delete_message(account_id, &path, uid);
-                        }
-                    }
-                }
+                graph_purge_uids(&account, account_id, &mut state, &path, uids, cache.as_ref(), &emit).await;
                 emit(WorkerEvent::BulkComplete);
+            }
+
+            MailRequest::EmptyFolder { folder_id, path } => {
+                // No bulk endpoint for an arbitrary folder: list it, then
+                // delete each message the way a purge does.
+                let Some(token) = graph_token(&account, &emit).await else { continue };
+                match graph_load_folder(&token, account_id, folder_id, &path, cache.as_ref(), &mut state).await {
+                    Ok(messages) => {
+                        let uids: Vec<u32> = messages.iter().map(|m| m.uid).collect();
+                        let n = uids.len();
+                        graph_purge_uids(&account, account_id, &mut state, &path, uids, cache.as_ref(), &emit).await;
+                        tracing::info!("emptied {path}: {n} message(s) erased");
+                        emit(WorkerEvent::Messages { folder_id, messages: Vec::new() });
+                        emit(WorkerEvent::FolderUnread { folder_id, unread: 0 });
+                    }
+                    Err(e) => emit(WorkerEvent::Error {
+                        text: i18n_f("Could not empty the folder: {e}", &[("e", &e.to_string())]),
+                        connectivity: false,
+                    }),
+                }
             }
 
             MailRequest::UndoMove { path, dest, dest_folder_id, message_ids } => {
@@ -8691,6 +8736,37 @@ async fn graph_refresh_unread(
     emit(WorkerEvent::Folders(folders));
     for (folder_id, unread) in counts {
         emit(WorkerEvent::FolderUnread { folder_id, unread });
+    }
+}
+
+/// Delete messages for good, one Graph request each; the cache and the uid
+/// map forget every one that went.
+async fn graph_purge_uids(
+    account: &AccountConfig,
+    account_id: u32,
+    state: &mut GraphState,
+    path: &str,
+    uids: Vec<u32>,
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    for uid in uids {
+        let deleted = match graph_resolve(account, state, path, uid, emit).await {
+            Some((token, gid)) => {
+                let url = format!("{GRAPH_BASE}/me/messages/{gid}");
+                tokio::task::spawn_blocking(move || graph_delete_req(&token, &url))
+                    .await
+                    .unwrap_or_else(|_| Err("task failed".into()))
+                    .is_ok()
+            }
+            None => false,
+        };
+        if deleted {
+            state.uids.remove(&uid);
+            if let Some(c) = cache {
+                c.delete_message(account_id, path, uid);
+            }
+        }
     }
 }
 
