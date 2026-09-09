@@ -1813,7 +1813,7 @@ async fn run_imap(
                 // A draft is kept as written: signing and encrypting happen
                 // at send time (#133).
                 let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
-                match build_email(&account, &message) {
+                match build_draft(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
                         let append_res = {
@@ -3182,10 +3182,29 @@ fn mailbox(name: &str, addr: &str) -> Result<Mailbox, SmtpError> {
     }
 }
 
-/// Send the message and return its raw RFC 822 bytes (for saving to Sent).
-/// Build the RFC 822 email (headers + MIME body) from a composed message. Shared
-/// by SMTP sending and by saving to Drafts (no network).
+/// Build the RFC 822 email (headers + MIME body) from a composed message, for
+/// sending: the SMTP envelope is derived from To/Cc/Bcc, so a message with no
+/// recipient is refused here as well as in the composer.
 fn build_email(account: &AccountConfig, msg: &OutgoingMessage) -> Result<LettreMessage, SmtpError> {
+    build_message(account, msg, false)
+}
+
+/// Build the same bytes for the Drafts folder. A draft is often saved before
+/// any address is typed (the composer saves on the way out whenever the body
+/// was edited), and lettre refuses to build a message whose envelope has no
+/// destination — "missing destination address, invalid envelope". The
+/// envelope is only ever used by SMTP, and a draft is appended as raw bytes,
+/// so a recipient-less draft gets an explicit envelope naming the sender,
+/// which never reaches the formatted headers.
+fn build_draft(account: &AccountConfig, msg: &OutgoingMessage) -> Result<LettreMessage, SmtpError> {
+    build_message(account, msg, true)
+}
+
+fn build_message(
+    account: &AccountConfig,
+    msg: &OutgoingMessage,
+    draft: bool,
+) -> Result<LettreMessage, SmtpError> {
     // A send-as alias replaces the From header (and, if the alias has its own
     // SMTP, the transport — see `send_raw_smtp`); the Sent copy and everything
     // else about the send stays the account's (#34).
@@ -3196,15 +3215,27 @@ fn build_email(account: &AccountConfig, msg: &OutgoingMessage) -> Result<LettreM
         },
         None => (mailbox(&account.name, &account.email)?, account.email.clone()),
     };
+    let sender_address = from.email.clone();
     let mut builder = LettreMessage::builder().from(from);
+    let mut recipients = 0;
     for (name, addr) in parse_recipients(&msg.to) {
         builder = builder.to(mailbox(&name, &addr)?);
+        recipients += 1;
     }
     for (name, addr) in parse_recipients(&msg.cc) {
         builder = builder.cc(mailbox(&name, &addr)?);
+        recipients += 1;
     }
     for (name, addr) in parse_recipients(&msg.bcc) {
         builder = builder.bcc(mailbox(&name, &addr)?);
+        recipients += 1;
+    }
+    if draft && recipients == 0 {
+        let envelope = lettre::address::Envelope::new(
+            Some(sender_address.clone()),
+            vec![sender_address],
+        )?;
+        builder = builder.envelope(envelope);
     }
     // Our own Message-ID, in the account's own domain. Without one the SMTP
     // server assigns it on the way out — so the copy filed in Sent has no id at
@@ -8363,7 +8394,7 @@ async fn run_graph(
             MailRequest::SaveDraft { message, folder_id, path } => {
                 emit(WorkerEvent::Status(i18n("Saving draft…")));
                 let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
-                let saved = match build_email(&account, &message) {
+                let saved = match build_draft(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
                         match graph_token(&account, &emit).await {
@@ -8975,6 +9006,25 @@ mod tests {
             sign: false,
             encrypt: false,
         }
+    }
+
+    /// A draft saved before any address is typed: the bytes build without a
+    /// To header, and the send path still refuses the same message.
+    #[test]
+    fn recipient_less_draft_builds_but_send_does_not() {
+        let account = sample_account();
+        let mut msg = sample_outgoing();
+        msg.body = "half-written".into();
+        let raw = build_draft(&account, &msg).expect("draft builds").formatted();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(!text.contains("\r\nTo:"), "no To header: {text}");
+        assert!(text.contains("half-written"), "{text}");
+        let err = build_email(&account, &msg).expect_err("send needs a recipient").to_string();
+        assert!(err.contains("missing destination"), "{err}");
+        // With a recipient the draft is built the ordinary way.
+        msg.to = "Peer <peer@vireo.invalid>".into();
+        let raw = build_draft(&account, &msg).expect("builds").formatted();
+        assert!(String::from_utf8_lossy(&raw).contains("peer@vireo.invalid"));
     }
 
     /// OpenPGP sending (#133), end to end against a real gpg in a throwaway
