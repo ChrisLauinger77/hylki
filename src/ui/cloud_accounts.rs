@@ -230,8 +230,10 @@ fn edit_dialog(
     // The kind is chosen when the account is made; afterwards the
     // sign-in and the keyring entry belong to it.
     kind.set_sensitive(index.is_none());
+    // What the account is called in the list; optional, the server or
+    // service stands in when empty. Titled per kind with an example, so
+    // it does not read as asking for the user's own name.
     let name = adw::EntryRow::new();
-    name.set_title(&i18n("Name"));
     name.set_text(&account.name);
     let url = adw::EntryRow::new();
     url.set_title(&i18n("Server URL"));
@@ -321,7 +323,8 @@ fn edit_dialog(
 
     // The fields each kind wants.
     let apply_kind = {
-        let (url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect) = (
+        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect) = (
+            name.clone(),
             url.clone(),
             user.clone(),
             pass.clone(),
@@ -346,18 +349,21 @@ fn edit_dialog(
             seafile_hint.set_visible(k == CloudKind::Seafile);
             match k {
                 CloudKind::Nextcloud => {
+                    name.set_title(&i18n("Account name, such as Work Nextcloud (optional)"));
                     user.set_title(&i18n("User name"));
                     pass.set_title(&if editing { i18n("App password (leave empty to keep)") } else { i18n("App password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
                     check.set_label(&i18n("Check Connection"));
                 }
                 CloudKind::Seafile => {
+                    name.set_title(&i18n("Account name, such as Team Seafile (optional)"));
                     user.set_title(&i18n("E-mail"));
                     pass.set_title(&if editing { i18n("Password (leave empty to keep)") } else { i18n("Password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
                     check.set_label(&i18n("Check Connection"));
                 }
                 CloudKind::Dropbox => {
+                    name.set_title(&i18n("Account name, such as Personal Dropbox (optional)"));
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Dropbox allows link passwords and expiry dates on paid plans only."));
                     check.set_label(&i18n("Connect with Dropbox…"));
                     app_key_hint.set_label(&i18n_f(
