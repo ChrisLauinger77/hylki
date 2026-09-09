@@ -146,6 +146,9 @@ impl RichEditor {
         // mid-word spelling verdict (see the paste script's caretWord).
         let ucm = webkit6::UserContentManager::new();
         ucm.register_script_message_handler("vireoSpell", None);
+        // The block state under the caret (quote, bulleted or numbered list)
+        // comes out through this one, to light the matching toolbar button.
+        ucm.register_script_message_handler("vireoFormat", None);
         let webview = webkit6::WebView::builder()
             .web_context(&super::message_view::shared_web_context())
             .user_content_manager(&ucm)
@@ -355,7 +358,20 @@ impl RichEditor {
             webview.add_controller(drop);
         }
 
-        let toolbar = build_toolbar(&webview);
+        let (toolbar, block_buttons) = build_toolbar(&webview);
+        // `fmtState` in PASTE_SCRIPT posts a string of the block kinds the
+        // caret sits in: `q` quote, `u` bulleted list, `o` numbered list.
+        // A set toggle also means a click on it leaves that block instead of
+        // opening another (issue #137, EmmanuelP's follow-up).
+        ucm.connect_script_message_received(Some("vireoFormat"), move |_, value| {
+            let state = value.to_str().to_string();
+            for (key, button) in &block_buttons {
+                let on = state.contains(*key);
+                if button.is_active() != on {
+                    button.set_active(on);
+                }
+            }
+        });
 
         let frame = gtk::Frame::new(None);
         frame.set_vexpand(true);
@@ -719,34 +735,52 @@ fn read_image_for_insert(
     Some((crate::oauth::base64_encode(&data), mime))
 }
 
-fn build_toolbar(webview: &webkit6::WebView) -> gtk::Box {
+/// The format bar, plus the block-kind toggles keyed the way `fmtState` in
+/// PASTE_SCRIPT reports them (`q` quote, `u` bulleted list, `o` numbered
+/// list), so the state handler can light the right one.
+fn build_toolbar(webview: &webkit6::WebView) -> (gtk::Box, Vec<(char, gtk::ToggleButton)>) {
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     bar.add_css_class("toolbar");
     bar.add_css_class("format-bar");
 
-    // (icon, tooltip, execCommand snippet)
-    let commands: &[(&str, &str, &str)] = &[
-        ("co.hyprlab.Vireo-format-text-bold-symbolic", i18n_noop("Bold"), "document.execCommand('bold')"),
-        ("co.hyprlab.Vireo-format-text-italic-symbolic", i18n_noop("Italic"), "document.execCommand('italic')"),
-        ("co.hyprlab.Vireo-format-text-underline-symbolic", i18n_noop("Underline"), "document.execCommand('underline')"),
-        ("co.hyprlab.Vireo-format-text-strikethrough-symbolic", i18n_noop("Strikethrough"), "document.execCommand('strikeThrough')"),
-        ("SEP", "", ""),
-        ("co.hyprlab.Vireo-view-list-bullet-symbolic", i18n_noop("Bulleted list"), "document.execCommand('insertUnorderedList')"),
-        ("co.hyprlab.Vireo-view-list-ordered-symbolic", i18n_noop("Numbered list"), "document.execCommand('insertOrderedList')"),
+    // (icon, tooltip, execCommand snippet, block-state key). The three block
+    // commands are toggles: the document reports whether the caret is inside
+    // one, and each command both opens and leaves its block (the lists
+    // through execCommand's own toggling, the quote through __vireoQuote).
+    let commands: &[(&str, &str, &str, Option<char>)] = &[
+        ("co.hyprlab.Vireo-format-text-bold-symbolic", i18n_noop("Bold"), "document.execCommand('bold')", None),
+        ("co.hyprlab.Vireo-format-text-italic-symbolic", i18n_noop("Italic"), "document.execCommand('italic')", None),
+        ("co.hyprlab.Vireo-format-text-underline-symbolic", i18n_noop("Underline"), "document.execCommand('underline')", None),
+        ("co.hyprlab.Vireo-format-text-strikethrough-symbolic", i18n_noop("Strikethrough"), "document.execCommand('strikeThrough')", None),
+        ("SEP", "", "", None),
+        ("co.hyprlab.Vireo-view-list-bullet-symbolic", i18n_noop("Bulleted list"), "document.execCommand('insertUnorderedList')", Some('u')),
+        ("co.hyprlab.Vireo-view-list-ordered-symbolic", i18n_noop("Numbered list"), "document.execCommand('insertOrderedList')", Some('o')),
         // Adwaita has no blockquote glyph; the indent icon reads as "quote".
-        ("co.hyprlab.Vireo-format-indent-more-symbolic", i18n_noop("Quote"), "document.execCommand('formatBlock',false,'blockquote')"),
+        ("co.hyprlab.Vireo-format-indent-more-symbolic", i18n_noop("Quote"), "window.__vireoQuote()", Some('q')),
         // `LINK` is a sentinel command (handled specially); the icon is real.
-        ("co.hyprlab.Vireo-insert-link-symbolic", i18n_noop("Insert link"), "LINK"),
-        ("SEP", "", ""),
-        ("co.hyprlab.Vireo-edit-clear-symbolic", i18n_noop("Clear formatting"), "document.execCommand('removeFormat')"),
+        ("co.hyprlab.Vireo-insert-link-symbolic", i18n_noop("Insert link"), "LINK", None),
+        ("SEP", "", "", None),
+        ("co.hyprlab.Vireo-edit-clear-symbolic", i18n_noop("Clear formatting"), "document.execCommand('removeFormat')", None),
     ];
 
-    for (icon, tip, cmd) in commands {
+    let mut toggles = Vec::new();
+    for (icon, tip, cmd, key) in commands {
         if *icon == "SEP" {
             bar.append(&gtk::Separator::new(gtk::Orientation::Vertical));
             continue;
         }
-        let btn = gtk::Button::from_icon_name(icon);
+        let btn: gtk::Button = match key {
+            // A toggle shows the pressed look while the caret is in its
+            // block. The click flips it at once and the document's next
+            // state report settles it, so it never sticks wrong.
+            Some(k) => {
+                let t = gtk::ToggleButton::new();
+                t.set_icon_name(icon);
+                toggles.push((*k, t.clone()));
+                t.upcast()
+            }
+            None => gtk::Button::from_icon_name(icon),
+        };
         btn.set_tooltip_text(Some(i18n(tip).as_str()));
         // Don't take focus, so the editor keeps its selection.
         btn.set_can_focus(false);
@@ -761,7 +795,7 @@ fn build_toolbar(webview: &webkit6::WebView) -> gtk::Box {
         }
         bar.append(&btn);
     }
-    bar
+    (bar, toggles)
 }
 
 /// Prompt for a URL and turn the current selection into a link.
@@ -930,6 +964,41 @@ const PASTE_SCRIPT: &str = r#"<script>
     if(bad && spellRange && spellRange.startContainer.isConnected){
       spellHl.add(spellRange);
     }
+  };
+  /* Which blocks the caret sits in, for the toolbar toggles: `q` quote,
+     `u` bulleted list, `o` numbered list. Posted only when it changes. */
+  var lastFmt = null;
+  function caretBlock(){
+    var sel = getSelection();
+    var n = sel.rangeCount ? sel.anchorNode : null;
+    return n && n.nodeType === 3 ? n.parentNode : n;
+  }
+  function fmtState(){
+    var el = caretBlock();
+    var q = !!(el && el.closest && el.closest('blockquote'));
+    var ul = false, ol = false;
+    try{
+      ul = document.queryCommandState('insertUnorderedList');
+      ol = document.queryCommandState('insertOrderedList');
+    }catch(_){}
+    var s = (q ? 'q' : '') + (ul ? 'u' : '') + (ol ? 'o' : '');
+    if(s === lastFmt) return;
+    lastFmt = s;
+    try{ window.webkit.messageHandlers.vireoFormat.postMessage(s); }catch(_){}
+  }
+  document.addEventListener('selectionchange', fmtState);
+  document.addEventListener('input', fmtState);
+  /* The Quote button is a toggle (#137): inside a quote it steps the
+     caret's paragraph out one level, the same move as Enter twice; anywhere
+     else it quotes the paragraph. The list buttons toggle on their own. */
+  window.__vireoQuote = function(){
+    var el = caretBlock();
+    if(el && el.closest && el.closest('blockquote')){
+      document.execCommand('outdent');
+    }else{
+      document.execCommand('formatBlock', false, 'blockquote');
+    }
+    fmtState();
   };
   /* Enter twice inside a quote leaves it (#137), the way a list ends: the
      first Enter opens an empty line in the quote, the second takes that
