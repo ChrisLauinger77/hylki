@@ -170,6 +170,8 @@ pub struct Compose {
 #[derive(Debug)]
 pub enum ComposeInput {
     Send,
+    /// Move the draft being edited to Trash and close without saving.
+    DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
     ToggleSign(bool),
     /// The OpenPGP Encrypt toggle; encrypting turns signing on too.
@@ -211,6 +213,9 @@ pub enum ComposeOutput {
     Send(Box<OutgoingMessage>),
     /// Save the message to the Drafts folder (no send).
     SaveDraft(Box<OutgoingMessage>),
+    /// Delete the draft this composer was opened from, and close it. The app
+    /// moves the draft to Trash (undoable, like deleting it from the list).
+    DeleteDraft { id: u32, origin: DraftOrigin },
     /// Ask the app to promote/demote this pane (inline ↔ window). Carries the id.
     ToggleWindow(u32),
     /// This pane is done (cancelled / sent / draft-saved / superseded). Carries
@@ -248,6 +253,15 @@ impl Component for Compose {
                         set_label: &i18n("Save Draft"),
                         set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
                         connect_clicked => ComposeInput::SaveDraft,
+                    },
+                    // Only while editing an existing draft: the message is
+                    // moved to Trash, not saved, and the editor closes.
+                    pack_start = &gtk::Button {
+                        set_label: &i18n("Delete Draft"),
+                        set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
+                        #[watch]
+                        set_visible: model.draft_origin.is_some(),
+                        connect_clicked => ComposeInput::DeleteDraft,
                     },
                     pack_end = &gtk::Button {
                         set_label: &i18n("Send"),
@@ -655,6 +669,13 @@ impl Component for Compose {
         match message {
             ComposeInput::Cancel => {
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
+            }
+
+            ComposeInput::DeleteDraft => {
+                if let Some(origin) = self.draft_origin.clone() {
+                    let _ = sender
+                        .output(ComposeOutput::DeleteDraft { id: self.compose_id, origin });
+                }
             }
 
             ComposeInput::ToggleWindowed => {

@@ -793,6 +793,9 @@ pub enum AppMsg {
     /// pre-downloaded — fetch them from the server now.
     SendMessage(Box<OutgoingMessage>),
     SaveDraftMessage(Box<OutgoingMessage>),
+    /// The composer's Delete Draft: trash the draft it was opened from and
+    /// close that composer without saving.
+    DeleteDraft { id: u32, origin: crate::models::DraftOrigin },
     DraftSaved,
     /// A composer (id) finished — tear down its host (window or inline revealer).
     ComposeClosed(u32),
@@ -4945,6 +4948,38 @@ impl SimpleComponent for AppModel {
                 self.send_to(account_id, MailRequest::SaveDraft { message: out, folder_id, path });
             }
 
+            AppMsg::DeleteDraft { id, origin } => {
+                // The same move the list's trash button makes for a draft, so
+                // it is undoable and the Drafts list updates in place. A draft
+                // the list no longer holds (a stale window) is erased by uid.
+                let cached = self
+                    .message_cache
+                    .get(&(origin.account_id, origin.folder_id))
+                    .and_then(|msgs| msgs.iter().find(|m| m.uid == origin.uid).cloned());
+                match cached {
+                    Some(m) => self.move_to(m, FolderKind::Trash),
+                    None => {
+                        self.send_to(
+                            origin.account_id,
+                            MailRequest::PurgeMessages {
+                                path: origin.path.clone(),
+                                uids: vec![origin.uid],
+                            },
+                        );
+                        self.send_to(
+                            origin.account_id,
+                            MailRequest::LoadMessages {
+                                folder_id: origin.folder_id,
+                                path: origin.path,
+                            },
+                        );
+                    }
+                }
+                self.pending_draft = None;
+                self.close_compose(id);
+                self.message_list.emit(MessageListInput::ReclaimFocus);
+            }
+
             AppMsg::DraftSaved => {
                 // The Drafts folder reload already reflects the saved draft; the
                 // compose window has closed. No notification (mirrors silent send).
@@ -8437,6 +8472,7 @@ impl AppModel {
             .forward(sender.input_sender(), |out| match out {
                 ComposeOutput::Send(msg) => AppMsg::SendMessage(msg),
                 ComposeOutput::SaveDraft(msg) => AppMsg::SaveDraftMessage(msg),
+                ComposeOutput::DeleteDraft { id, origin } => AppMsg::DeleteDraft { id, origin },
                 ComposeOutput::ToggleWindow(id) => AppMsg::ComposeToggleWindow(id),
                 ComposeOutput::Close(id) => AppMsg::ComposeClosed(id),
             })
