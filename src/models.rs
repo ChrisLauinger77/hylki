@@ -366,6 +366,8 @@ pub struct OutboxItem {
     pub attempts: u32,
     /// Why the last attempt failed, shown in the list.
     pub last_error: String,
+    /// Send Later (#145): unix seconds it is due; `None` goes as soon as it can.
+    pub send_at: Option<i64>,
 }
 
 impl OutboxItem {
@@ -418,7 +420,13 @@ impl OutboxItem {
             // is stopping it, falling back to the body when nothing has failed
             // yet (a message queued while offline never got an error).
             preview: {
-                let waiting = Self::waiting_label(self.queued_at);
+                // A scheduled message says when it goes, until it is due.
+                let waiting = match self.send_at {
+                    Some(at) if at > crate::datefmt::now() => {
+                        i18n_f("Scheduled for {when}", &[("when", &crate::datefmt::date_time(at))])
+                    }
+                    _ => Self::waiting_label(self.queued_at),
+                };
                 let attempts = match self.attempts {
                     0 | 1 => String::new(),
                     n => format!(" · {n} attempts"),
@@ -436,7 +444,7 @@ impl OutboxItem {
             },
             body: String::new(),
             date: String::new(),
-            timestamp: self.queued_at,
+            timestamp: self.send_at.unwrap_or(self.queued_at),
             // Never dimmed as read: it is still waiting to go out.
             unread: true,
             starred: false,
@@ -630,6 +638,7 @@ mod tests {
             sent_path: None,
             queued_at: 0,
             attempts: 1,
+            send_at: None,
             last_error: String::new(),
         }
     }

@@ -300,6 +300,9 @@ pub struct OutgoingMessage {
     /// Encrypt to every recipient's key (and the sender's): multipart/encrypted,
     /// signed inside when `sign` is set too.
     pub encrypt: bool,
+    /// Send Later (#145): unix seconds to send at. `None` sends now. A time
+    /// already past sends now too.
+    pub send_at: Option<i64>,
 }
 
 /// An event pushed from the worker back to the UI.
@@ -1739,6 +1742,33 @@ async fn run_imap(
                 }
             }
 
+            // Send Later (#145): into the Outbox until its time.
+            MailRequest::Send { message, sent_path }
+                if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
+            {
+                let at = message.send_at.unwrap_or_default();
+                schedule_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit);
+                // The draft it was opened from is superseded by the queued copy.
+                if let Some(o) = message.draft_origin.clone() {
+                    if o.account_id == account_id {
+                        if let Some(sess) = session.as_mut() {
+                            let _ = delete_draft(sess, &o.path, o.uid).await;
+                        }
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_message(account_id, &o.path, o.uid);
+                        }
+                        if let Ok(messages) = load_messages_retry(
+                            account_id, &mut session, &account, o.folder_id, &o.path,
+                            &mut use_envelope, cache.as_ref(),
+                        )
+                        .await
+                        {
+                            emit(WorkerEvent::Messages { folder_id: o.folder_id, messages });
+                        }
+                    }
+                }
+            }
+
             MailRequest::Send { message, sent_path } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 match send_smtp(&account, &message).await {
@@ -2941,6 +2971,51 @@ fn queue_failed_send(
     sent_path: Option<&str>,
     error: &str,
 ) -> bool {
+    queue_outbox_message(cache, account_id, account, msg, sent_path, error, None)
+}
+
+/// Send Later (#145): park the message in the Outbox until `at`. The bytes are
+/// built now, like a failed send's, so the attachments are read while they
+/// exist; the app's clock sends it when the time comes, or the next launch
+/// does if Vireo was not running then. Replaces the queued row it was edited
+/// from, and drops the draft it was opened from (the caller handles the
+/// server-side copy).
+fn schedule_send(
+    cache: Option<&Cache>,
+    account_id: u32,
+    account: &AccountConfig,
+    msg: &OutgoingMessage,
+    sent_path: Option<&str>,
+    at: i64,
+    emit: &impl Fn(WorkerEvent),
+) {
+    let queued = queue_outbox_message(cache, account_id, account, msg, sent_path, "", Some(at));
+    if queued {
+        if let (Some(old), Some(c)) = (msg.outbox_origin, cache) {
+            c.delete_outbox(old);
+        }
+        emit(WorkerEvent::Notice(i18n_f(
+            "“{subject}” will be sent {when}",
+            &[("subject", &msg.subject), ("when", &crate::datefmt::date_time(at))],
+        )));
+    } else {
+        emit(WorkerEvent::Error {
+            text: i18n("Could not schedule the message: there is no local store to keep it in."),
+            connectivity: false,
+        });
+    }
+    emit_outbox(cache, account_id, emit);
+}
+
+fn queue_outbox_message(
+    cache: Option<&Cache>,
+    account_id: u32,
+    account: &AccountConfig,
+    msg: &OutgoingMessage,
+    sent_path: Option<&str>,
+    error: &str,
+    send_at: Option<i64>,
+) -> bool {
     let Some(cache) = cache else {
         return false;
     };
@@ -2974,6 +3049,7 @@ fn queue_failed_send(
             &raw,
             sent_path,
             error,
+            send_at,
         )
         .is_some()
 }
@@ -2993,10 +3069,16 @@ async fn flush_outbox(
     loud: bool,
 ) {
     let Some(cache) = cache else { return };
+    // A scheduled message waits for its time; asking for it by id (Send Now,
+    // or the app's clock) sends it regardless.
+    let now = crate::datefmt::now();
     let items: Vec<crate::models::OutboxItem> = cache
         .outbox_items(account_id)
         .into_iter()
-        .filter(|item| id.is_none_or(|wanted| wanted == item.id))
+        .filter(|item| match id {
+            Some(wanted) => wanted == item.id,
+            None => item.send_at.is_none_or(|t| t <= now),
+        })
         .collect();
     if items.is_empty() {
         return;
@@ -8562,6 +8644,27 @@ async fn run_graph(
             }
 
             // `sent_path` is unused: Graph's sendMail files the Sent copy itself.
+            // Send Later (#145): into the Outbox until its time.
+            MailRequest::Send { message, sent_path: _ }
+                if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
+            {
+                let at = message.send_at.unwrap_or_default();
+                schedule_send(cache.as_ref(), account_id, &account, &message, None, at, &emit);
+                if let Some(o) = message.draft_origin.clone() {
+                    if o.account_id == account_id {
+                        if let Some((tok, gid)) =
+                            graph_resolve(&account, &mut state, &o.path, o.uid, &emit).await
+                        {
+                            let url = format!("{GRAPH_BASE}/me/messages/{gid}");
+                            let _ = tokio::task::spawn_blocking(move || graph_delete_req(&tok, &url)).await;
+                        }
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_message(account_id, &o.path, o.uid);
+                        }
+                    }
+                }
+            }
+
             MailRequest::Send { message, sent_path: _ } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 match graph_send_message(&account, &message, &emit).await {
@@ -9028,10 +9131,14 @@ async fn graph_flush_outbox(
     emit: &impl Fn(WorkerEvent),
 ) {
     let Some(cache) = cache else { return };
+    let now = crate::datefmt::now();
     let items: Vec<crate::models::OutboxItem> = cache
         .outbox_items(account_id)
         .into_iter()
-        .filter(|item| id.is_none_or(|wanted| wanted == item.id))
+        .filter(|item| match id {
+            Some(wanted) => wanted == item.id,
+            None => item.send_at.is_none_or(|t| t <= now),
+        })
         .collect();
     if items.is_empty() {
         return;
@@ -9129,6 +9236,7 @@ mod tests {
             outbox_origin: None,
             sign: false,
             encrypt: false,
+            send_at: None,
         }
     }
 
@@ -9331,6 +9439,7 @@ mod tests {
             queued_at: 0,
             attempts: 1,
             last_error: String::new(),
+            send_at: None,
         }
     }
 

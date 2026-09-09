@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS outbox (
     sent_path   TEXT,
     queued_at   INTEGER NOT NULL,
     attempts    INTEGER NOT NULL DEFAULT 0,
-    last_error  TEXT    NOT NULL DEFAULT ''
+    last_error  TEXT    NOT NULL DEFAULT '',
+    send_at     INTEGER
 );
 CREATE TABLE IF NOT EXISTS attachments_checked (
     account_id  INTEGER NOT NULL,
@@ -271,6 +272,8 @@ impl Cache {
         // dropping the index, which would cost every user a full re-sync; the
         // error when it is already there is the expected outcome, not a problem.
         let _ = conn.execute("ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''", []);
+        // Send Later (#145): when a queued message is due; NULL sends at once.
+        let _ = conn.execute("ALTER TABLE outbox ADD COLUMN send_at INTEGER", []);
         // Same in-place treatment for `reply_to` (added later still): existing
         // rows carry an empty value until their folder's recent window
         // re-syncs, and Reply falls back to the sender until then.
@@ -1087,6 +1090,7 @@ impl Cache {
         raw: &[u8],
         sent_path: Option<&str>,
         error: &str,
+        send_at: Option<i64>,
     ) -> Option<u32> {
         let queued_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1094,7 +1098,9 @@ impl Cache {
             .unwrap_or(0);
         self.conn
             .execute(
-                "INSERT INTO outbox(account_id, from_addr, rcpts, recipients, subject,                  preview, raw, sent_path, queued_at, attempts, last_error)                  VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10)",
+                "INSERT INTO outbox(account_id, from_addr, rcpts, recipients, subject, \
+                 preview, raw, sent_path, queued_at, attempts, last_error, send_at) \
+                 VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?11)",
                 params![
                     account_id,
                     from_addr,
@@ -1106,6 +1112,7 @@ impl Cache {
                     sent_path,
                     queued_at,
                     error,
+                    send_at,
                 ],
             )
             .map_err(|e| tracing::warn!("could not queue the message: {e}"))
@@ -1116,7 +1123,9 @@ impl Cache {
     /// Everything waiting for this account, oldest first (the order it is sent in).
     pub fn outbox_items(&self, account_id: u32) -> Vec<crate::models::OutboxItem> {
         let mut stmt = match self.conn.prepare(
-            "SELECT id, account_id, from_addr, rcpts, recipients, subject, preview, raw,              sent_path, queued_at, attempts, last_error FROM outbox              WHERE account_id = ?1 ORDER BY queued_at, id",
+            "SELECT id, account_id, from_addr, rcpts, recipients, subject, preview, raw, \
+             sent_path, queued_at, attempts, last_error, send_at FROM outbox \
+             WHERE account_id = ?1 ORDER BY queued_at, id",
         ) {
             Ok(s) => s,
             Err(e) => {
@@ -1139,6 +1148,7 @@ impl Cache {
                 queued_at: r.get(9)?,
                 attempts: r.get::<_, i64>(10)? as u32,
                 last_error: r.get(11)?,
+                send_at: r.get(12)?,
             })
         });
         match rows {
@@ -1504,6 +1514,7 @@ mod tests {
                 b"From: me\r\n\r\nbody",
                 Some("Sent"),
                 "connection refused",
+                None,
             )
             .expect("queued");
 
@@ -1533,6 +1544,25 @@ mod tests {
 
         c.delete_outbox(id);
         assert!(c.outbox_items(1).is_empty());
+    }
+
+    /// Send Later (#145): the scheduled time survives the round trip, and a
+    /// message queued to go now has none.
+    #[test]
+    fn outbox_keeps_a_scheduled_time() {
+        let c = Cache::in_memory();
+        let rcpts = vec!["ada@example.com".to_string()];
+        let later = c
+            .queue_outbox(1, "me@example.com", &rcpts, "ada", "Later", "", b"raw", None, "", Some(1_900_000_000))
+            .expect("queued");
+        let now = c
+            .queue_outbox(1, "me@example.com", &rcpts, "ada", "Now", "", b"raw", None, "", None)
+            .expect("queued");
+        let items = c.outbox_items(1);
+        let by = |id: u32| items.iter().find(|i| i.id == id).expect("listed");
+        assert_eq!(by(later).send_at, Some(1_900_000_000));
+        assert_eq!(by(now).send_at, None);
+        assert!(by(later).as_message().preview.starts_with("Scheduled for "), "{}", by(later).as_message().preview);
     }
 
     #[test]

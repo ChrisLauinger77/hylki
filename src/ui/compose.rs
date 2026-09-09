@@ -7,7 +7,7 @@ use crate::contacts::Suggestion;
 use crate::models::DraftOrigin;
 use crate::ui::rich_editor::{self, RichEditor};
 use crate::worker::OutgoingMessage;
-use crate::i18n::i18n;
+use crate::i18n::{i18n, i18n_f};
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +103,9 @@ pub struct ComposePrefill {
     /// For a reply: the original's To+Cc, so the composer can answer from the
     /// alias the mail was addressed to (#34). Empty otherwise.
     pub reply_addressed_to: String,
+    /// Send Later (#145): a queued message's scheduled time, kept while it is
+    /// edited so Send re-queues it for the same moment.
+    pub send_at: Option<i64>,
 }
 
 /// Everything the compose pane needs to open.
@@ -165,11 +168,19 @@ pub struct Compose {
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
+    /// Send Later (#145): when set, Send queues the message for this time.
+    send_at: Option<i64>,
 }
 
 #[derive(Debug)]
 pub enum ComposeInput {
     Send,
+    /// Send Later (#145): queue for this unix time, then send as usual.
+    SendAt(i64),
+    /// Open the date-and-time picker.
+    PickSendTime,
+    /// Forget the scheduled time: Send goes out at once again.
+    ClearSendAt,
     /// Move the draft being edited to Trash and close without saving.
     DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
@@ -263,10 +274,78 @@ impl Component for Compose {
                         set_visible: model.draft_origin.is_some(),
                         connect_clicked => ComposeInput::DeleteDraft,
                     },
-                    pack_end = &gtk::Button {
-                        set_label: &i18n("Send"),
-                        add_css_class: "suggested-action",
-                        connect_clicked => ComposeInput::Send,
+                    // Send, with Send Later beside it (#145): presets, or a
+                    // date and time of your own.
+                    pack_end = &gtk::Box {
+                        add_css_class: "linked",
+                        gtk::Button {
+                            #[watch]
+                            set_label: &if model.send_at.is_some() { i18n("Schedule") } else { i18n("Send") },
+                            add_css_class: "suggested-action",
+                            connect_clicked => ComposeInput::Send,
+                        },
+                        gtk::MenuButton {
+                            set_icon_name: "co.hyprlab.Vireo-pan-down-symbolic",
+                            add_css_class: "suggested-action",
+                            set_tooltip_text: Some(i18n("Send later").as_str()),
+                            set_can_focus: false,
+                            #[wrap(Some)]
+                            set_popover = &gtk::Popover {
+                                gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_spacing: 2,
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        set_halign: gtk::Align::Fill,
+                                        #[wrap(Some)]
+                                        set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
+                                        connect_clicked[sender] => move |b| {
+                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                            sender.input(ComposeInput::ClearSendAt);
+                                            sender.input(ComposeInput::Send);
+                                        },
+                                    },
+                                    gtk::Separator {},
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        #[wrap(Some)]
+                                        set_child = &gtk::Label { set_label: &i18n("Tomorrow morning (8:00)"), set_halign: gtk::Align::Start },
+                                        connect_clicked[sender] => move |b| {
+                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                            sender.input(ComposeInput::SendAt(preset_time(1, 8)));
+                                        },
+                                    },
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        #[wrap(Some)]
+                                        set_child = &gtk::Label { set_label: &i18n("Tomorrow afternoon (13:00)"), set_halign: gtk::Align::Start },
+                                        connect_clicked[sender] => move |b| {
+                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                            sender.input(ComposeInput::SendAt(preset_time(1, 13)));
+                                        },
+                                    },
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        #[wrap(Some)]
+                                        set_child = &gtk::Label { set_label: &i18n("Monday morning (8:00)"), set_halign: gtk::Align::Start },
+                                        connect_clicked[sender] => move |b| {
+                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                            sender.input(ComposeInput::SendAt(next_monday(8)));
+                                        },
+                                    },
+                                    gtk::Separator {},
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        #[wrap(Some)]
+                                        set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
+                                        connect_clicked[sender] => move |b| {
+                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                            sender.input(ComposeInput::PickSendTime);
+                                        },
+                                    },
+                                },
+                            },
+                        },
                     },
                     // OpenPGP (#133): only offered where a gpg exists.
                     #[name = "encrypt_btn"]
@@ -303,6 +382,31 @@ impl Component for Compose {
                     pack_end = &gtk::Button {
                         set_tooltip_text: Some(i18n("Open in window").as_str()),
                         connect_clicked => ComposeInput::ToggleWindowed,
+                    },
+                },
+                // Send Later (#145): says when a scheduled message goes, with a
+                // way back to sending at once.
+                add_top_bar = &gtk::Box {
+                    add_css_class: "schedule-bar",
+                    set_spacing: 8,
+                    set_margin_start: 12,
+                    set_margin_end: 12,
+                    set_margin_top: 4,
+                    set_margin_bottom: 4,
+                    #[watch]
+                    set_visible: model.send_at.is_some(),
+                    gtk::Image { set_icon_name: Some("co.hyprlab.Vireo-alarm-symbolic") },
+                    gtk::Label {
+                        set_hexpand: true,
+                        set_halign: gtk::Align::Start,
+                        set_ellipsize: gtk::pango::EllipsizeMode::End,
+                        #[watch]
+                        set_label: &model.send_at.map(|t| i18n_f("Scheduled for {when}", &[("when", &crate::datefmt::date_time(t))])).unwrap_or_default(),
+                    },
+                    gtk::Button {
+                        add_css_class: "flat",
+                        set_label: &i18n("Send now instead"),
+                        connect_clicked => ComposeInput::ClearSendAt,
                     },
                 },
 
@@ -395,6 +499,7 @@ impl Component for Compose {
         let outbox_origin = prefill.outbox_origin;
         let prefill_attachments = prefill.attachments.clone();
         let prefill_encrypt = prefill.encrypt;
+        let send_at = prefill.send_at;
         let current_sig = accounts.get(selected).map(|a| a.signature.clone()).unwrap_or_default();
 
         let completion = gtk::Popover::new();
@@ -448,6 +553,7 @@ impl Component for Compose {
             fields_dirty: false,
             sign: false,
             encrypt: false,
+            send_at,
         };
         let widgets = view_output!();
         if prefill_encrypt && crate::pgp::available() {
@@ -669,6 +775,20 @@ impl Component for Compose {
         match message {
             ComposeInput::Cancel => {
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
+            }
+
+            ComposeInput::SendAt(at) => {
+                self.send_at = Some(at);
+                sender.input(ComposeInput::Send);
+            }
+
+            ComposeInput::ClearSendAt => {
+                self.send_at = None;
+            }
+
+            ComposeInput::PickSendTime => {
+                let parent = root.root().and_downcast::<gtk::Window>();
+                pick_send_time(parent.as_ref(), self.send_at, sender.input_sender().clone());
             }
 
             ComposeInput::DeleteDraft => {
@@ -992,6 +1112,7 @@ impl Compose {
             outbox_origin: self.outbox_origin,
             sign: self.sign,
             encrypt: self.encrypt,
+            send_at: self.send_at,
         }
     }
 
@@ -1202,4 +1323,90 @@ fn pgp_send_check(from: &str, chosen_key: Option<&str>, fields: &[&str], encrypt
         }
     }
     Ok(())
+}
+
+
+/// Send Later presets (#145): `days` from today at `hour`:00, local time.
+fn preset_time(days: i64, hour: u32) -> i64 {
+    use chrono::{Duration, Local, TimeZone};
+    let day = (Local::now() + Duration::days(days)).date_naive();
+    let ndt = day.and_hms_opt(hour, 0, 0).unwrap_or_default();
+    Local.from_local_datetime(&ndt).single().map(|t| t.timestamp()).unwrap_or_else(crate::datefmt::now)
+}
+
+/// The coming Monday at `hour`:00 local time (a Monday today means next week's).
+fn next_monday(hour: u32) -> i64 {
+    use chrono::Datelike;
+    let today = chrono::Local::now().weekday().num_days_from_monday() as i64;
+    let ahead = (7 - today) % 7;
+    preset_time(if ahead == 0 { 7 } else { ahead }, hour)
+}
+
+/// The Send Later picker (#145): a calendar and an hour/minute pair, starting
+/// from the scheduled time if there is one, else the next full hour. A time
+/// already past is refused rather than queued to go at once by surprise.
+fn pick_send_time(parent: Option<&gtk::Window>, current: Option<i64>, sender: relm4::Sender<ComposeInput>) {
+    use chrono::{Datelike, Local, TimeZone, Timelike};
+    let start = match current {
+        Some(t) => Local.timestamp_opt(t, 0).single().unwrap_or_else(Local::now),
+        None => {
+            let n = Local::now() + chrono::Duration::hours(1);
+            n.with_minute(0).and_then(|n| n.with_second(0)).unwrap_or(n)
+        }
+    };
+    let dialog = adw::MessageDialog::new(parent, Some(i18n("Send later").as_str()), None);
+    dialog.add_response("cancel", &i18n("Cancel"));
+    dialog.add_response("ok", &i18n("Schedule"));
+    dialog.set_default_response(Some("ok"));
+    dialog.set_close_response("cancel");
+    dialog.set_response_appearance("ok", adw::ResponseAppearance::Suggested);
+    let bx = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let calendar = gtk::Calendar::new();
+    calendar.set_year(start.year());
+    calendar.set_month(start.month0() as i32);
+    calendar.set_day(start.day() as i32);
+    bx.append(&calendar);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    row.set_halign(gtk::Align::Center);
+    let hour = gtk::SpinButton::with_range(0.0, 23.0, 1.0);
+    hour.set_value(start.hour() as f64);
+    hour.set_orientation(gtk::Orientation::Vertical);
+    hour.set_wrap(true);
+    let minute = gtk::SpinButton::with_range(0.0, 55.0, 5.0);
+    minute.set_value((start.minute() / 5 * 5) as f64);
+    minute.set_orientation(gtk::Orientation::Vertical);
+    minute.set_wrap(true);
+    row.append(&hour);
+    row.append(&gtk::Label::new(Some(":")));
+    row.append(&minute);
+    bx.append(&row);
+    dialog.set_extra_child(Some(&bx));
+    let chosen = move || -> Option<i64> {
+        let d = calendar.date();
+        let ndt = chrono::NaiveDate::from_ymd_opt(d.year(), d.month() as u32, d.day_of_month() as u32)?
+            .and_hms_opt(hour.value_as_int() as u32, minute.value_as_int() as u32, 0)?;
+        Local.from_local_datetime(&ndt).single().map(|t| t.timestamp())
+    };
+    dialog.connect_response(None, move |dlg, resp| {
+        if resp != "ok" {
+            return;
+        }
+        match chosen() {
+            Some(t) if t > crate::datefmt::now() => {
+                let _ = sender.send(ComposeInput::SendAt(t));
+            }
+            _ => {
+                // An explicit time in the past is a slip, not a request to
+                // send at once.
+                let d = adw::MessageDialog::new(
+                    dlg.transient_for().as_ref(),
+                    Some(i18n("That time has passed").as_str()),
+                    Some(i18n("Choose a time later than now.").as_str()),
+                );
+                d.add_response("ok", &i18n("OK"));
+                d.present();
+            }
+        }
+    });
+    dialog.present();
 }

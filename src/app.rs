@@ -544,6 +544,8 @@ pub enum AppMsg {
     SendCurrentOutbox,
     /// Try to send everything waiting, across accounts.
     RetryAllOutbox,
+    /// Send Later (#145): the half-minute clock that sends due queued mail.
+    SendDueScheduled,
     /// Cached gallery attachments for an account inbox arrived.
     GalleryItems { account_id: u32, items: Vec<crate::models::GalleryItem> },
     /// Gallery "Go to Message" — open the attachment's source message.
@@ -2969,6 +2971,18 @@ impl SimpleComponent for AppModel {
             sender.input(AppMsg::OpenWithFiles(paths));
         }
 
+        // Send Later (#145): the app's clock. Every half minute, any queued
+        // message whose time has come is flushed by id, which sends it even
+        // though the ordinary flush leaves scheduled mail alone. One try per
+        // scheduling: a failure shows in the Outbox with Send Now to retry,
+        // rather than a loud attempt every tick.
+        {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local(30, move || {
+                s.input(AppMsg::SendDueScheduled);
+                gtk::glib::ControlFlow::Continue
+            });
+        }
         ComponentParts { model, widgets }
     }
 
@@ -3014,6 +3028,23 @@ impl SimpleComponent for AppModel {
             AppMsg::SendCurrentOutbox => {
                 if let Some(m) = self.current.clone() {
                     self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) });
+                }
+            }
+
+            AppMsg::SendDueScheduled => {
+                let now = crate::datefmt::now();
+                let due: Vec<(u32, u32)> = self
+                    .outbox_by_account
+                    .iter()
+                    .flat_map(|(account_id, items)| {
+                        items
+                            .iter()
+                            .filter(|i| i.send_at.is_some_and(|t| t <= now) && i.attempts <= 1)
+                            .map(move |i| (*account_id, i.id))
+                    })
+                    .collect();
+                for (account_id, id) in due {
+                    self.send_to(account_id, MailRequest::FlushOutbox { id: Some(id) });
                 }
             }
 
@@ -8324,6 +8355,7 @@ impl AppModel {
             encrypt: false,
             outbox_origin: Some(id),
             reply_addressed_to: String::new(),
+            send_at: item.send_at,
         };
         // The Outbox stays the folder on screen: its list is still what's listed,
         // so its toolbar has to stay too. Leaving it would strand the user in a
