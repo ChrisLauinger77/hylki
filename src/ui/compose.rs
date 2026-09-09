@@ -304,11 +304,17 @@ impl Component for Compose {
                     // date and time of your own.
                     pack_end = &gtk::Box {
                         add_css_class: "linked",
+                        add_css_class: "send-split",
                         gtk::Button {
                             #[watch]
                             set_label: &if model.send_at.is_some() { i18n("Schedule") } else { i18n("Send") },
                             add_css_class: "suggested-action",
                             connect_clicked => ComposeInput::Send,
+                        },
+                        // A floating divider, not a seam: the box paints the
+                        // accent behind it so the two read as one control.
+                        gtk::Separator {
+                            set_orientation: gtk::Orientation::Vertical,
                         },
                         gtk::MenuButton {
                             set_icon_name: "co.hyprlab.Vireo-pan-down-symbolic",
@@ -399,7 +405,7 @@ impl Component for Compose {
                     },
                     // Cloud attachments (#144): only with an account set up.
                     pack_end = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Vireo-folder-remote-symbolic",
+                        set_icon_name: "co.hyprlab.Vireo-cloud-symbolic",
                         set_tooltip_text: Some(i18n("Upload to cloud storage and share a link").as_str()),
                         #[watch]
                         set_visible: !model.cloud_accounts.is_empty(),
@@ -1458,7 +1464,7 @@ impl Compose {
             chip.add_css_class("cloud-chip");
             chip.set_halign(gtk::Align::Start);
             chip.set_tooltip_text(Some(&link.url));
-            chip.append(&gtk::Image::from_icon_name("co.hyprlab.Vireo-folder-remote-symbolic"));
+            chip.append(&gtk::Image::from_icon_name("co.hyprlab.Vireo-cloud-symbolic"));
             let lbl = gtk::Label::new(Some(&i18n_f("{name} (link)", &[("name", &link.name)])));
             lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
             lbl.set_max_width_chars(26);

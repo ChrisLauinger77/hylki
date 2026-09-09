@@ -42,6 +42,7 @@ impl SimpleComponent for CloudAccounts {
                     set_header_suffix = &gtk::Button {
                         set_label: &i18n("Add Account…"),
                         set_valign: gtk::Align::Center,
+                        set_margin_start: 24,
                         connect_clicked => CloudAccountsInput::Add,
                     },
                     #[name = "list"]
@@ -137,7 +138,7 @@ impl CloudAccounts {
                 sub.push_str(&format!(" · {}", i18n("password-protected")));
             }
             row.set_subtitle(&sub);
-            row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Vireo-folder-remote-symbolic"));
+            row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Vireo-cloud-symbolic"));
             let edit = gtk::Button::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
             edit.add_css_class("flat");
             edit.set_valign(gtk::Align::Center);
