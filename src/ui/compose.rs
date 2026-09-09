@@ -922,10 +922,16 @@ impl Component for Compose {
                             name = html_escape(&share.name),
                             caption = html_escape(&caption),
                         );
+                        // Into the body where the user's own text ends: above
+                        // the signature, and above a quoted original in a
+                        // reply, so the link reads as part of the message.
                         self.editor.run_js(&format!(
                             "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
-                             var p=d.firstChild;var sig=document.querySelector('.vireo-signature');\
-                             if(sig&&sig.parentNode===document.body)document.body.insertBefore(p,sig);else document.body.appendChild(p);\
+                             var p=d.firstChild;var b=document.body;\
+                             var first=null;var cands=b.querySelectorAll('.vireo-sig,.vireo-quote-attr,blockquote');\
+                             for(var i=0;i<cands.length;i++){{var t=cands[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
+                             if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}}\
+                             if(first)b.insertBefore(p,first);else b.appendChild(p);\
                              document.dispatchEvent(new Event('input'));}})()",
                             js_escape(&html)
                         ));
