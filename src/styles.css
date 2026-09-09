@@ -1643,6 +1643,21 @@ textview.console-view text selection {
   padding-right: 6px;
   min-width: 0;
 }
+/* The dropdown's inner button paints the same accent as Send: a
+   menubutton's child button otherwise takes its own, lighter, fill. */
+.send-split > menubutton > button {
+  background-color: @accent_bg_color;
+  background-image: none;
+  color: @accent_fg_color;
+  box-shadow: none;
+}
+.send-split > menubutton > button:hover {
+  background-image: image(alpha(currentColor, 0.1));
+}
+.send-split > menubutton > button:active,
+.send-split > menubutton > button:checked {
+  background-image: image(alpha(currentColor, 0.2));
+}
 .send-split > separator {
   background-color: alpha(@accent_fg_color, 0.5);
   min-width: 1px;
