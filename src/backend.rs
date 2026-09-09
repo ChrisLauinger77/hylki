@@ -54,7 +54,10 @@ impl MockBackend {
             },
         ];
 
-        // Folder ids: 1–7 for account 1, 11–17 for account 2. Inbox ids 1 and 11.
+        // Folder ids: 1–8 for account 1, 11–18 for account 2, 21–28 for
+        // account 3. Inbox ids 1, 11 and 21. The eighth of each is a custom
+        // folder fed by a demo filter rule (see app.rs's demo_filters), so
+        // the sidebar's Filtered Folders section has rows to show.
         let folders = vec![
             folder(1, 1, "Inbox", FolderKind::Inbox, 6),
             folder(2, 1, "Starred", FolderKind::Starred, 0),
@@ -63,6 +66,7 @@ impl MockBackend {
             folder(5, 1, "Archive", FolderKind::Archive, 0),
             folder(6, 1, "Junk", FolderKind::Junk, 2),
             folder(7, 1, "Trash", FolderKind::Trash, 0),
+            folder(8, 1, "Newsletters", FolderKind::Custom, 2),
             folder(11, 2, "Inbox", FolderKind::Inbox, 12),
             folder(12, 2, "Starred", FolderKind::Starred, 0),
             folder(13, 2, "Sent", FolderKind::Sent, 0),
@@ -70,6 +74,7 @@ impl MockBackend {
             folder(15, 2, "Archive", FolderKind::Archive, 0),
             folder(16, 2, "Junk", FolderKind::Junk, 0),
             folder(17, 2, "Trash", FolderKind::Trash, 0),
+            folder(18, 2, "Invoices", FolderKind::Custom, 1),
             folder(21, 3, "Inbox", FolderKind::Inbox, 3),
             folder(22, 3, "Starred", FolderKind::Starred, 0),
             folder(23, 3, "Sent", FolderKind::Sent, 0),
@@ -77,6 +82,7 @@ impl MockBackend {
             folder(25, 3, "Archive", FolderKind::Archive, 0),
             folder(26, 3, "Junk", FolderKind::Junk, 1),
             folder(27, 3, "Trash", FolderKind::Trash, 0),
+            folder(28, 3, "Orders", FolderKind::Custom, 1),
         ];
 
         Self {
@@ -313,6 +319,45 @@ fn sample_messages() -> Vec<Message> {
             preview: "Your bike is ready! We replaced the chain, trued the rear wheel, and bled the rear brake. Total comes to…",
             body: "Your bike is ready!\n\nWork done:\n  • New chain\n  • Trued rear wheel\n  • Rear brake bleed\n\nTotal: $86.40 — payable at pickup.\n\nRidgeline Cycles",
             date: "Thu", unread: false, starred: false, keywords: &[], has_attachment: true, in_reply_to: None },
+
+        // ---- Filtered folders: mail the demo's filter rules filed away. Each
+        // rule matches only what sits here (nothing in an inbox), since the
+        // mock backend never moves anything. Unread counts match the folders. ----
+        Spec { id: 17, account_id: 1, folder_id: 8, from_name: "Design Systems Weekly", from_addr: "hello@designsystems.substack.com", to: ME,
+            subject: "Issue 84: tokens that survive a rebrand",
+            preview: "This week: how three teams versioned their colour tokens through a rebrand without touching a component, plus…",
+            body: "This week:\n\n  • Tokens that survive a rebrand: three teams, three approaches\n  • A11y contrast audits you can automate\n  • Reader question: when is a component too small to ship?\n\nRead the full issue online.\n\n— Design Systems Weekly",
+            date: "7:40 AM", unread: true, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
+        Spec { id: 18, account_id: 1, folder_id: 8, from_name: "The Pragmatic Engineer", from_addr: "pragmaticengineer@substack.com", to: ME,
+            subject: "The Pulse: what changed in developer tooling this quarter",
+            preview: "A roundup of the quarter's tooling shifts: the editors gaining ground, the CI providers losing it, and why…",
+            body: "The Pulse\n\nA roundup of the quarter's tooling shifts: the editors gaining ground, the CI providers losing it, and why build times are back on everyone's roadmap.\n\nAlso this week: two engineering-culture pieces worth your time.\n\n— Gergely",
+            date: "Yesterday", unread: true, starred: false, keywords: &["To_Do"], has_attachment: false, in_reply_to: None },
+        Spec { id: 19, account_id: 1, folder_id: 8, from_name: "Frontend Focus", from_addr: "frontendfocus@substack.com", to: ME,
+            subject: "#412: container queries, everywhere at last",
+            preview: "Container queries now ship in every major engine. Here is what that unlocks, with a few layouts that were…",
+            body: "Container queries now ship in every major engine. Here is what that unlocks, with a few layouts that were awkward or impossible before.\n\nPlus: a CSS reset worth revisiting, and a small library for view transitions.\n\n— Frontend Focus",
+            date: "Mon", unread: false, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
+        Spec { id: 34, account_id: 2, folder_id: 18, from_name: "Hetzner", from_addr: "billing@hetzner.com", to: LAB,
+            subject: "Invoice R0034215 for September",
+            preview: "Your invoice for the current billing period is attached. The amount will be debited from your account in…",
+            body: "Dear customer,\n\nYour invoice for the current billing period is attached.\n\n  Invoice: R0034215\n  Amount: €23.80\n\nThe amount will be debited from your account in 7 days.\n\nHetzner Online",
+            date: "6:15 AM", unread: true, starred: false, keywords: &[], has_attachment: true, in_reply_to: None },
+        Spec { id: 35, account_id: 2, folder_id: 18, from_name: "Fastly", from_addr: "billing@fastly.com", to: LAB,
+            subject: "Your Fastly invoice is ready",
+            preview: "The invoice for last month's usage is now available in your account. Total: $12.04. No action is needed if…",
+            body: "The invoice for last month's usage is now available in your account.\n\n  Total: $12.04\n\nNo action is needed if you pay by card on file.\n\nFastly Billing",
+            date: "Fri", unread: false, starred: false, keywords: &["Work"], has_attachment: true, in_reply_to: None },
+        Spec { id: 44, account_id: 3, folder_id: 28, from_name: "Backcountry Outfitters", from_addr: "orders@backcountryoutfitters.com", to: PERSONAL,
+            subject: "Order #48213 has shipped",
+            preview: "Good news, your order is on its way. Track your package: it should arrive by Thursday. Items in this shipment…",
+            body: "Good news, your order is on its way.\n\n  Order #48213\n  Arrives: Thursday\n\nItems in this shipment:\n  • Merino base layer (M)\n  • Trail gaiters\n\nBackcountry Outfitters",
+            date: "8:52 AM", unread: true, starred: false, keywords: &["Personal"], has_attachment: false, in_reply_to: None },
+        Spec { id: 45, account_id: 3, folder_id: 28, from_name: "Bookshop.org", from_addr: "orders@bookshop.org", to: PERSONAL,
+            subject: "Your order is confirmed",
+            preview: "Thanks for supporting Central Books! Your order of 2 items is confirmed and will ship within 2 business days…",
+            body: "Thanks for supporting Central Books!\n\nYour order of 2 items is confirmed and will ship within 2 business days.\n\n  • The Design of Everyday Things\n  • A Philosophy of Software Design\n\nBookshop.org",
+            date: "Tue", unread: false, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
     ];
     specs.iter().map(build).collect()
 }

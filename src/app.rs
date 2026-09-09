@@ -1604,6 +1604,9 @@ impl SimpleComponent for AppModel {
         let folders_expanded = sidebar_state.folders_expanded;
         let tree_collapsed = sidebar_state.tree_collapsed;
 
+        // Whether this run serves the built-in sample data (see spawn_workers):
+        // decided after the GOA reconcile, which can add accounts.
+        let demo_data = demo_mode() && config.is_empty();
         let show_attachments = config::load_show_attachments();
         let show_contacts = config::load_show_contacts();
         let sidebar = Sidebar::builder()
@@ -1950,8 +1953,17 @@ impl SimpleComponent for AppModel {
             chevrons_left: config::load_chevrons_left(),
             console_mode: config::load_console_mode(),
             read_mark: config::load_read_mark(),
-            filters: config::load_filters(),
-            tags: config::load_tags(),
+            // The demo (no accounts of its own) ships with tags and filter
+            // rules, so its sidebar shows the Tags and Filtered Folders
+            // sections; a staged tags.toml / filters.toml still wins.
+            filters: {
+                let filters = config::load_filters();
+                if filters.is_empty() && demo_data { demo_filters() } else { filters }
+            },
+            tags: {
+                let tags = config::load_tags();
+                if tags.is_empty() && demo_data { demo_tags() } else { tags }
+            },
             tag_view: None,
             tag_provider: gtk::CssProvider::new(),
             cache: crate::cache::Cache::open().ok(),
@@ -9805,6 +9817,19 @@ impl AppModel {
                 }
             }
         }
+        // The demo's mail never reaches the database, so its tag view reads
+        // the folders loaded so far instead.
+        if out.is_empty() && demo_mode() && self.config.is_empty() {
+            for ((account_id, folder_id), messages) in &self.message_cache {
+                if matches!(
+                    self.folder_kind(*account_id, *folder_id),
+                    Some(FolderKind::Trash | FolderKind::Junk)
+                ) {
+                    continue;
+                }
+                out.extend(messages.iter().filter(|m| m.has_keyword(kw)).cloned());
+            }
+        }
         let inbox_first = |m: &Message| {
             self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox)
         };
@@ -11512,6 +11537,45 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         mk("Jason M.", "jason@vireo.hyprlab.co", "#3584e4", "🚀"),
         mk("Hyprlab", "hello@hyprlab.dev", "#2ec27e", "🦀"),
         mk("Jason (Personal)", "jason.m@fastmail.com", "#9141ac", "🌿"),
+    ]
+}
+
+/// The demo's tags (#71): the keywords its sample messages carry, so the
+/// Tags section has rows and the row chips have colours.
+fn demo_tags() -> Vec<config::Tag> {
+    let mk = |name: &str, keyword: &str, color: &str| config::Tag {
+        name: name.into(),
+        keyword: keyword.into(),
+        color: color.into(),
+    };
+    vec![
+        mk("Work", "Work", "#1c71d8"),
+        mk("To Do", "To_Do", "#e66100"),
+        mk("Personal", "Personal", "#2ec27e"),
+    ]
+}
+
+/// The demo's filter rules, one per account, each filing into that
+/// account's custom folder (backend.rs) and listed under All Inboxes. Their
+/// matches are chosen to hit only the mail already in those folders: the
+/// mock backend never moves anything, so a rule catching inbox mail would
+/// only make it vanish from the list.
+fn demo_filters() -> Vec<config::FilterRule> {
+    use config::{FilterField, FilterMatch, FilterRule};
+    let mk = |email: &str, field: FilterField, matcher: FilterMatch, value: &str, dest: &str| FilterRule {
+        account_email: email.into(),
+        field,
+        matcher,
+        value: value.into(),
+        dest_path: dest.into(),
+        tag: String::new(),
+        count_unread: true,
+        show_in_unified: true,
+    };
+    vec![
+        mk("jason@vireo.hyprlab.co", FilterField::FromAddress, FilterMatch::EndsWith, "substack.com", "Newsletters"),
+        mk("hello@hyprlab.dev", FilterField::Subject, FilterMatch::Contains, "invoice", "Invoices"),
+        mk("jason.m@fastmail.com", FilterField::Subject, FilterMatch::Contains, "order", "Orders"),
     ]
 }
 
