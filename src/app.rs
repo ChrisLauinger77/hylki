@@ -502,7 +502,9 @@ pub struct AppModel {
     /// bring the messages back (found by Message-ID where the move put them).
     undo_stack: Vec<UndoEntry>,
     /// A draft awaiting its body before opening in the compose editor.
-    pending_draft: Option<Message>,
+    /// A draft whose body is being fetched before its editor opens, and
+    /// whether that editor goes in the reading pane (true) or a window.
+    pending_draft: Option<(Message, bool)>,
     /// Outstanding bulk MoveMessages requests awaiting a worker `BulkComplete`.
     /// Outstanding server-side bulk operations; while > 0 the refresh spinner
     /// spins and the status bar narrates.
@@ -765,6 +767,9 @@ pub enum AppMsg {
     /// Select a settings category by id (the showcase hook).
     ShowSettingsPage(String),
     ComposeTo(String),
+    /// Showcase only (VIREO_SHOWCASE_FOLDER): switch to the first account's
+    /// folder of this kind, so a capture can start from Drafts, Sent, etc.
+    ShowcaseFolder(FolderKind),
     Reply,
     ReplyAll,
     Forward,
@@ -2800,6 +2805,25 @@ impl SimpleComponent for AppModel {
                 // selected message, to check the composer's grounds (#148).
                 // VIREO_SHOWCASE_FLIP=dark|light then switches the app theme
                 // at 6 s, to check a live flip re-resolves those grounds.
+                // VIREO_SHOWCASE_FOLDER=drafts|sent|archive|junk|trash switches
+                // to that folder at 2 s, before the staging's 3 s selection
+                // moves onto its first row.
+                if let Ok(kind) = std::env::var("VIREO_SHOWCASE_FOLDER") {
+                    let kind = match kind.as_str() {
+                        "drafts" => Some(FolderKind::Drafts),
+                        "sent" => Some(FolderKind::Sent),
+                        "archive" => Some(FolderKind::Archive),
+                        "junk" => Some(FolderKind::Junk),
+                        "trash" => Some(FolderKind::Trash),
+                        _ => None,
+                    };
+                    if let Some(kind) = kind {
+                        let s = sender.clone();
+                        gtk::glib::timeout_add_seconds_local_once(2, move || {
+                            s.input(AppMsg::ShowcaseFolder(kind));
+                        });
+                    }
+                }
                 if std::env::var("VIREO_SHOWCASE_REPLY").is_ok() {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
@@ -3499,9 +3523,10 @@ impl SimpleComponent for AppModel {
                     self.show_outbox_message(&item);
                     return;
                 }
-                // Clicking a draft opens it in the compose editor, not the reader.
+                // Selecting a draft opens it in the compose editor, in the
+                // reading pane where the message would otherwise show.
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
-                    self.open_draft(m, &sender);
+                    self.open_draft(m, true, &sender);
                     return;
                 }
                 self.attachments.clear();
@@ -3666,7 +3691,7 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenMessageWindow { message: m, thread } => {
                 // Drafts open in the editor rather than a read-only window.
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
-                    self.open_draft(m, &sender);
+                    self.open_draft(m, false, &sender);
                 } else {
                     // Popouts follow the reading pane's display order (#70).
                     let mut thread = thread;
@@ -3954,6 +3979,18 @@ impl SimpleComponent for AppModel {
                 // was selected. Have each account re-check them all.
                 for w in self.workers.values() {
                     let _ = w.send(MailRequest::RefreshUnread);
+                }
+            }
+
+            AppMsg::ShowcaseFolder(kind) => {
+                let account = self.active_account();
+                let found = self
+                    .folders
+                    .get(&account)
+                    .and_then(|fs| fs.iter().find(|f| f.kind == kind))
+                    .map(|f| (f.id, f.name.clone(), f.path.clone()));
+                if let Some((id, name, path)) = found {
+                    self.select_folder(account, id, name, path);
                 }
             }
 
@@ -5824,12 +5861,12 @@ impl SimpleComponent for AppModel {
                 self.body_cache
                     .insert((account_id, message_id), body.clone());
                 // If this body was fetched to open a draft, open the editor now.
-                if let Some(pd) = self.pending_draft.take() {
+                if let Some((pd, inline)) = self.pending_draft.take() {
                     if pd.account_id == account_id && pd.id == message_id {
-                        self.compose_from_draft(pd, body, &sender);
+                        self.compose_from_draft(pd, body, inline, &sender);
                         return;
                     }
-                    self.pending_draft = Some(pd);
+                    self.pending_draft = Some((pd, inline));
                 }
                 // A UID is unique only within its folder, and the background
                 // prefetch pushes bodies from every folder it syncs. Matching on
@@ -8141,14 +8178,16 @@ impl AppModel {
 
     /// Open a draft for editing: reuse a cached body if we have one, otherwise
     /// fetch it and open the editor once it arrives (see the `Body` handler).
-    fn open_draft(&mut self, m: Message, sender: &ComponentSender<Self>) {
+    /// `inline` puts the editor in the reading pane (a selected draft);
+    /// otherwise it gets a window (a draft opened by double-click or Enter).
+    fn open_draft(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
         let body = if !m.body.is_empty() {
             Some(m.body.clone())
         } else {
             self.body_cache.get(&(m.account_id, m.id)).cloned()
         };
         match body {
-            Some(html) => self.compose_from_draft(m, html, sender),
+            Some(html) => self.compose_from_draft(m, html, inline, sender),
             None => {
                 if let Some(path) = self.resolve_folder_path(&m) {
                     self.send_to(
@@ -8156,7 +8195,7 @@ impl AppModel {
                         MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
                     );
                 }
-                self.pending_draft = Some(m);
+                self.pending_draft = Some((m, inline));
             }
         }
     }
@@ -8238,8 +8277,17 @@ impl AppModel {
     }
 
     /// Open the compose editor pre-filled from a draft, remembering its origin so
-    /// saving/sending replaces it.
-    fn compose_from_draft(&mut self, m: Message, body_html: String, sender: &ComponentSender<Self>) {
+    /// saving/sending replaces it. Inline, the editor covers the reading pane
+    /// the way a new message does, with the pane cleared beneath it: the draft
+    /// is what is selected, so nothing older should reappear when the editor
+    /// closes.
+    fn compose_from_draft(
+        &mut self,
+        m: Message,
+        body_html: String,
+        inline: bool,
+        sender: &ComponentSender<Self>,
+    ) {
         let path = self.resolve_folder_path(&m).unwrap_or_default();
         let prefill = ComposePrefill {
             to: m.to.clone(),
@@ -8254,7 +8302,17 @@ impl AppModel {
             }),
             ..Default::default()
         };
-        self.open_compose(m.account_id, prefill, sender);
+        if inline {
+            self.attachments.clear();
+            self.attachments_loading = false;
+            self.sync_attachment_drawer();
+            self.current = None;
+            self.current_thread.clear();
+            self.show_message(None, false);
+            self.open_inline_reply(m.account_id, prefill, None, sender);
+        } else {
+            self.open_compose(m.account_id, prefill, sender);
+        }
     }
 
     /// Assemble the `ComposeInit` for a composer (from-accounts + signatures,
