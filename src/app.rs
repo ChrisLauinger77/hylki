@@ -452,6 +452,7 @@ pub struct AppModel {
     swipe_reversed: bool,
     /// "New message" composes inline over the reading pane (vs a window).
     compose_inline: bool,
+    reply_fields: bool,
     paste_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
@@ -707,6 +708,8 @@ pub enum AppMsg {
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
+    /// Reply panel shows its From/To/Subject rows from the start (#154).
+    SetReplyFields(bool),
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
@@ -1964,6 +1967,7 @@ impl SimpleComponent for AppModel {
             swipe_enabled: config::load_swipe_enabled(),
             swipe_reversed: config::load_swipe_reversed(),
             compose_inline: config::load_compose_inline(),
+            reply_fields: config::load_reply_fields(),
             paste_plain: config::load_paste_plain(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
@@ -4752,6 +4756,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetReplyFields(on) => {
+                if self.reply_fields != on {
+                    self.reply_fields = on;
+                    self.save_settings();
+                }
+            }
+
             AppMsg::SetPastePlain(on) => {
                 if self.paste_plain != on {
                     self.paste_plain = on;
@@ -6447,6 +6458,7 @@ impl AppModel {
             self.swipe_enabled,
             self.swipe_reversed,
             self.compose_inline,
+            self.reply_fields,
             self.paste_plain,
             self.spellcheck,
             self.spellcheck_langs.clone(),
@@ -10094,6 +10106,7 @@ impl AppModel {
             swipe_enabled: self.swipe_enabled,
             swipe_reversed: self.swipe_reversed,
             compose_inline: self.compose_inline,
+            reply_fields: self.reply_fields,
             paste_plain: self.paste_plain,
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),
@@ -10149,6 +10162,7 @@ impl AppModel {
                 PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
+                PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
                 PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
                 PrefOutput::SetSpellcheckLangs(l) => AppMsg::SetSpellcheckLangs(l),

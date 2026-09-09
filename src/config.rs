@@ -822,6 +822,14 @@ struct PrivacyFile {
     /// reply) rather than in its own window.
     #[serde(default = "default_compose_inline")]
     compose_inline: bool,
+    /// Whether the inline reply panel shows its From, To and Subject rows
+    /// from the start (#154); off, a button in its header reveals them.
+    #[serde(default)]
+    reply_fields: bool,
+    /// The inset-card default for lone messages (#57, #153) was applied
+    /// once to installs that predate it. Set on the first load that did so.
+    #[serde(default)]
+    single_card_default_applied: bool,
     /// Whether pasting into the composer strips the clipboard's formatting
     /// (the default). Off, a paste keeps its formatting. The editor's context
     /// menu always offers both, whichever way this is set.
@@ -1060,6 +1068,8 @@ impl Default for PrivacyFile {
             swipe_enabled: default_swipe_enabled(),
             swipe_reversed: false,
             compose_inline: default_compose_inline(),
+            reply_fields: false,
+            single_card_default_applied: false,
             paste_plain: default_paste_plain(),
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
@@ -1084,10 +1094,27 @@ fn load_privacy() -> PrivacyFile {
     let Some(path) = privacy_path() else {
         return PrivacyFile::default();
     };
-    let Ok(text) = std::fs::read_to_string(path) else {
+    let Ok(text) = std::fs::read_to_string(&path) else {
         return PrivacyFile::default();
     };
-    toml::from_str::<PrivacyFile>(&text).unwrap_or_default()
+    let mut file = toml::from_str::<PrivacyFile>(&text).unwrap_or_default();
+    // The inset card for a lone message became the default on 2026-08-31
+    // for new installs only: every save writes every key, so an install
+    // from before then stayed on the full-bleed view without ever choosing
+    // it (#153). Apply the default once and remember that it was.
+    if !file.single_card_default_applied {
+        file.single_card_default_applied = true;
+        file.single_message_card = true;
+        if let Ok(toml) = toml::to_string_pretty(&file) {
+            let _ = write_private(&path, &toml);
+        }
+    }
+    file
+}
+
+/// Whether the inline reply panel shows From, To and Subject from the start (#154).
+pub fn load_reply_fields() -> bool {
+    load_privacy().reply_fields
 }
 
 /// Senders whose messages may auto-load remote content. Stored lowercased.
@@ -1691,6 +1718,7 @@ pub fn save_privacy(
     swipe_enabled: bool,
     swipe_reversed: bool,
     compose_inline: bool,
+    reply_fields: bool,
     paste_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
@@ -1754,8 +1782,11 @@ pub fn save_privacy(
         swipe_enabled,
         swipe_reversed,
         compose_inline,
+        reply_fields,
         paste_plain,
         spellcheck,
+        // Every save is after the first load, which applied it.
+        single_card_default_applied: true,
         spellcheck_langs,
         preview_lines,
         single_key_shortcuts,

@@ -47,6 +47,7 @@ pub struct PrefInit {
     pub swipe_reversed: bool,
     /// "New message" composes inline over the reading pane (vs a window).
     pub compose_inline: bool,
+    pub reply_fields: bool,
     pub paste_plain: bool,
     pub spellcheck: bool,
     pub spellcheck_langs: String,
@@ -284,6 +285,7 @@ pub enum PrefInput {
     ToggleSwipeEnabled(bool),
     ToggleSwipeReversed(bool),
     ToggleComposeInline(bool),
+    ToggleReplyFields(bool),
     TogglePastePlain(bool),
     ToggleSpellcheck(bool),
     SpellLangsEdited(String),
@@ -353,6 +355,7 @@ pub enum PrefOutput {
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
+    SetReplyFields(bool),
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
@@ -1013,6 +1016,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "reply_fields_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Show From, To and Subject in the reply panel"),
+                                        set_subtitle: &i18n("The inline reply opens with its address and subject rows \
+                                                       showing. Off, they stay folded away behind a button in \
+                                                       the panel's header."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleReplyFields(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "paste_plain_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Paste as plain text"),
@@ -1492,6 +1506,7 @@ impl Component for Preferences {
         widgets.swipe_enabled_row.set_active(init.swipe_enabled);
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
+        widgets.reply_fields_row.set_active(init.reply_fields);
         widgets.paste_plain_row.set_active(init.paste_plain);
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language dropdown offers exactly what checking can use: the
@@ -1758,6 +1773,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleSwipeReversed(on) => {
                 let _ = sender.output(PrefOutput::SetSwipeReversed(on));
+            }
+            PrefInput::ToggleReplyFields(on) => {
+                let _ = sender.output(PrefOutput::SetReplyFields(on));
             }
             PrefInput::ToggleComposeInline(on) => {
                 let _ = sender.output(PrefOutput::SetComposeInline(on));

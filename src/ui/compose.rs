@@ -162,6 +162,9 @@ pub struct Compose {
     /// Whether this composer offers the inline/window toggle at all.
     can_toggle: bool,
     compact: bool,
+    /// A compact reply's field rows, revealed by the header button (#154)
+    /// or from the start by the preference.
+    fields_shown: bool,
     /// A recipient/subject field was edited since open (body edits are tracked
     /// separately by the editor itself). Used for save-if-dirty.
     fields_dirty: bool,
@@ -197,6 +200,8 @@ pub enum ComposeInput {
     PickSendTime,
     /// Forget the scheduled time: Send goes out at once again.
     ClearSendAt,
+    /// A compact reply shows or hides its From/To/Subject rows (#154).
+    ShowFields(bool),
     /// Cloud attachments (#144): pick files to upload and share.
     CloudAttach,
     /// Files picked; ask which account and how, then upload.
@@ -425,6 +430,19 @@ impl Component for Compose {
                         set_tooltip_text: Some(i18n("Open in window").as_str()),
                         connect_clicked => ComposeInput::ToggleWindowed,
                     },
+                    // The compact reply's From/To/Subject rows (#154): folded
+                    // away by default, one press brings them back.
+                    #[name = "fields_btn"]
+                    pack_end = &gtk::ToggleButton {
+                        set_icon_name: "co.hyprlab.Vireo-view-list-bullet-symbolic",
+                        set_tooltip_text: Some(i18n("Show From, To and Subject").as_str()),
+                        set_can_focus: false,
+                        #[watch]
+                        set_visible: model.compact && !model.windowed,
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::ShowFields(b.is_active()));
+                        },
+                    },
                 },
                 // Send Later (#145): says when a scheduled message goes, with a
                 // way back to sending at once.
@@ -617,6 +635,7 @@ impl Component for Compose {
             // A compact (fields-hidden) pane only makes sense once it is
             // addressed: replies arrive with To filled, forwards do not.
             compact: compact && !prefill.to.trim().is_empty(),
+            fields_shown: crate::config::load_reply_fields(),
             fields_dirty: false,
             sign: false,
             encrypt: false,
@@ -655,7 +674,8 @@ impl Component for Compose {
         // return when the composer pops out to a window. Never for a pane
         // that arrives unaddressed — a forward — which needs its To row
         // (#139).
-        widgets.fields_list.set_visible(!model.compact);
+        widgets.fields_list.set_visible(!model.compact || model.fields_shown);
+        widgets.fields_btn.set_active(model.fields_shown);
         {
             let more = gtk::Button::with_label(&i18n("More"));
             more.add_css_class("flat");
@@ -857,6 +877,11 @@ impl Component for Compose {
                 self.send_at = None;
             }
 
+            ComposeInput::ShowFields(on) => {
+                self.fields_shown = on;
+                widgets.fields_list.set_visible(!(self.compact && !self.windowed) || on);
+            }
+
             ComposeInput::CloudAttach => {
                 let dialog = gtk::FileDialog::new();
                 dialog.set_title(&i18n("Upload to Cloud Storage"));
@@ -1000,7 +1025,7 @@ impl Component for Compose {
                 size_for_host(root, &widgets.header, &widgets.editor_holder, windowed);
                 // A compact reply grows its field rows back in a window (and
                 // sheds them again if it returns inline).
-                widgets.fields_list.set_visible(!(self.compact && !windowed));
+                widgets.fields_list.set_visible(!(self.compact && !windowed) || self.fields_shown);
             }
 
             ComposeInput::FocusEditor => self.editor.grab_focus(),
