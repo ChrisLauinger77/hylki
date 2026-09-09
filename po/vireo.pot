@@ -1321,6 +1321,12 @@ msgstr ""
 msgid "Save to Drafts"
 msgstr ""
 
+msgid "Delete Draft"
+msgstr ""
+
+msgid "Move this draft to Trash"
+msgstr ""
+
 msgid "Send"
 msgstr ""
 
