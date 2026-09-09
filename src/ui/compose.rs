@@ -434,7 +434,7 @@ impl Component for Compose {
                     // away by default, one press brings them back.
                     #[name = "fields_btn"]
                     pack_end = &gtk::ToggleButton {
-                        set_icon_name: "co.hyprlab.Vireo-view-list-bullet-symbolic",
+                        set_icon_name: "co.hyprlab.Vireo-view-reveal-symbolic",
                         set_tooltip_text: Some(i18n("Show From, To and Subject").as_str()),
                         set_can_focus: false,
                         #[watch]
