@@ -105,6 +105,13 @@ pub struct RowInit {
 /// A full swipe (#swipe): also `AdwSwipeable`'s reported `distance`, the px
 /// one full drag (progress ±1.0) spans.
 const SWIPE_MAX: f64 = 120.0;
+
+/// How far a thread member's node dot reaches left of the row's content box
+/// (`.thread-node`: 8px wide, pulled 5px out by its negative margin, plus a
+/// 2px masking ring), where it sits centred on the group's rail. The last
+/// reply's rail stub reaches 2px the same way. The swipe surface's clip
+/// leaves this much room on the left, or both come out cut in half.
+const THREAD_NODE_REACH: f32 = 8.0;
 /// Distance past which the indicator reads as "armed" (full colour) — purely
 /// a visual cue; `AdwSwipeTracker` makes the real commit decision on
 /// release, factoring in velocity too.
@@ -544,11 +551,14 @@ mod swipe_surface_imp {
         // own until hovered or selected, so an opaque foreground can't be
         // relied on to hide the strip the rest of the time. Also supplies
         // the clip the default snapshot lacks for `foreground`, so a drag
-        // can't paint over the row above or below.
+        // can't paint over the row above or below. The clip starts
+        // THREAD_NODE_REACH left of the box: a thread member's node dot and
+        // rail stub deliberately hang out there, onto the rail.
         fn snapshot(&self, snapshot: &gtk::Snapshot) {
             let obj = self.obj();
             let (w, h) = (obj.width() as f32, obj.height() as f32);
-            snapshot.push_clip(&gtk::graphene::Rect::new(0.0, 0.0, w, h));
+            let reach = super::THREAD_NODE_REACH;
+            snapshot.push_clip(&gtk::graphene::Rect::new(-reach, 0.0, w + reach, h));
 
             let offset = self.visual_offset();
             if let (Some(bg), true) = (self.background(), offset != 0.0) {
