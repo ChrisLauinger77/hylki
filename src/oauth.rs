@@ -358,9 +358,7 @@ pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
     // any loopback port.
     let dropbox = settings.token_url.contains("dropboxapi.com");
     let listener = if dropbox {
-        TcpListener::bind(("127.0.0.1", DROPBOX_REDIRECT_PORT)).map_err(|e| {
-            format!("could not listen on localhost port {DROPBOX_REDIRECT_PORT} for the sign-in redirect: {e}")
-        })?
+        bind_fixed_port(DROPBOX_REDIRECT_PORT)?
     } else {
         TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?
     };
@@ -454,6 +452,35 @@ pub fn refresh_access_token(settings: &OAuthSettings, refresh_token: &str) -> Re
     Ok(token.access_token)
 }
 
+/// Listen on a fixed loopback port. An earlier sign-in of ours still
+/// waiting there (the wait lasts five minutes, and its dialog may be long
+/// gone) is told to stop with a `cancel` request, and the bind is tried
+/// again.
+fn bind_fixed_port(port: u16) -> Result<TcpListener, String> {
+    let mut last = None;
+    for _ in 0..8 {
+        match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(l) => return Ok(l),
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+                if let Ok(mut s) = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(2)) {
+                    let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
+                    let _ = s.write_all(b"GET /?cancel=1 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+                    let mut sink = [0u8; 512];
+                    let _ = s.read(&mut sink);
+                }
+                last = Some(e);
+                std::thread::sleep(Duration::from_millis(250));
+            }
+            Err(e) => return Err(format!("could not listen on localhost port {port} for the sign-in redirect: {e}")),
+        }
+    }
+    Err(format!(
+        "could not listen on localhost port {port} for the sign-in redirect: {}. Another program is using it.",
+        last.map(|e| e.to_string()).unwrap_or_default()
+    ))
+}
+
 /// Accept the browser redirect and return the authorization code, validating the
 /// anti-CSRF state. Times out after 5 minutes.
 fn wait_for_code(listener: &TcpListener, expected_state: &str) -> Result<String, String> {
@@ -467,6 +494,11 @@ fn wait_for_code(listener: &TcpListener, expected_state: &str) -> Result<String,
                 let n = stream.read(&mut buf).map_err(|e| e.to_string())?;
                 let req = String::from_utf8_lossy(&buf[..n]);
                 let line = req.lines().next().unwrap_or("");
+                // A newer sign-in of ours taking the port over.
+                if line.starts_with("GET /?cancel=1 ") {
+                    let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    return Err("this sign-in was replaced by a newer one".into());
+                }
                 let (code, state) = parse_redirect(line);
 
                 let body = success_page();
@@ -577,7 +609,27 @@ fn pct_decode(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::pkce_challenge;
+    use super::*;
+
+    #[test]
+    fn a_stale_waiter_gives_up_the_fixed_port() {
+        // Something of ours on the port, waiting like wait_for_code does:
+        // one request ends it.
+        let old = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = old.local_addr().unwrap().port();
+        let waiter = std::thread::spawn(move || {
+            let (mut s, _) = old.accept().unwrap();
+            let mut buf = [0u8; 256];
+            let n = s.read(&mut buf).unwrap();
+            let line = String::from_utf8_lossy(&buf[..n]).lines().next().unwrap_or("").to_string();
+            let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+            drop(old);
+            line
+        });
+        let fresh = bind_fixed_port(port).expect("takes the port over");
+        assert_eq!(fresh.local_addr().unwrap().port(), port);
+        assert!(waiter.join().unwrap().starts_with("GET /?cancel=1 "));
+    }
 
     #[test]
     fn the_pkce_challenge_matches_the_rfc_7636_vector() {
