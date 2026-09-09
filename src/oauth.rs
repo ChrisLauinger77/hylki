@@ -101,8 +101,7 @@ const SUCCESS_TEMPLATE: &str = r##"<!doctype html>
   @keyframes rise { from { opacity:0; transform:translateY(14px) scale(.98); } }
   .hero { position:relative; width:92px; margin:0 auto 22px;
           animation:pop .5s .12s cubic-bezier(.2,1.4,.4,1) both; }
-  .hero img { width:92px; height:92px; border-radius:22px; display:block;
-              box-shadow:0 16px 40px rgba(0,0,0,.4); }
+  .hero img { width:92px; height:92px; display:block; }
   @keyframes pop { from { transform:scale(.4); opacity:0; } }
   .check { position:absolute; right:-5px; bottom:-5px; width:33px; height:33px; border-radius:50%;
            display:grid; place-items:center;
