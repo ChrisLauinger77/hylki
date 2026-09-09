@@ -214,10 +214,14 @@ them with a generated download password, shown to you to pass on separately.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
   app password (made under *Security* in the server's personal settings).
   Uploads go over WebDAV; links come from the files-sharing API.
-- **Seafile** — the server URL, your e-mail and either your password or an
-  API token (the token is the way past two-factor sign-in; the server's
-  settings page shows it). Uploads go into a library (made when missing,
-  "Vireo" by default) and a folder inside it.
+- **Seafile** — the server URL, your e-mail and your password. If the
+  account uses two-step verification, also enter the current code from your
+  authenticator app: Vireo signs in with it once, gets an API token from the
+  server and keeps that in the keyring instead of the password (Seafile's
+  web interface shows no such token itself; one obtained another way, say
+  from the `api2/auth-token/` endpoint, can be pasted in the password
+  field). Uploads go into a library (made when missing, "Vireo" by default)
+  and a folder inside it.
 - **Dropbox** — sign in through your browser. Dropbox only lets a registered
   app sign in, so make one for yourself; it takes a minute and stays private:
   1. Open [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps)

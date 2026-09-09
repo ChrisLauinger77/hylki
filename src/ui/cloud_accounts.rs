@@ -37,6 +37,8 @@ pub enum CloudAccountsInput {
     /// The editor's Save: `index` is the row being replaced, or none for a
     /// new account. The password is stored only when given.
     Save { index: Option<usize>, account: CloudAccount, password: String },
+    /// A sign-in the editor finished after closing went wrong.
+    Failed(String),
 }
 
 #[relm4::component(pub)]
@@ -126,6 +128,7 @@ impl SimpleComponent for CloudAccounts {
                     self.toast(&i18n_f("Removed {name}", &[("name", &a.name)]));
                 }
             }
+            CloudAccountsInput::Failed(e) => self.toast(&e),
             CloudAccountsInput::Save { index, account, password } => {
                 if !password.is_empty() {
                     if let Err(e) = crate::config::store_cloud_password(&account.key(), &password) {
@@ -236,6 +239,19 @@ fn edit_dialog(
     let user = adw::EntryRow::new();
     user.set_text(&account.user);
     let pass = adw::PasswordEntryRow::new();
+    let code = adw::EntryRow::new();
+    code.set_title(&i18n("Two-step verification code, if the account uses it"));
+    code.set_input_purpose(gtk::InputPurpose::Digits);
+    let seafile_hint = gtk::Label::new(Some(&i18n(
+        "Sign in with your Seafile password. If the account uses two-step verification, also enter the current code from your authenticator app: Vireo turns it into an API token once and keeps that instead of the password. A token obtained another way can be pasted in the password field.",
+    )));
+    seafile_hint.set_wrap(true);
+    seafile_hint.set_xalign(0.0);
+    seafile_hint.add_css_class("dim-label");
+    seafile_hint.add_css_class("caption");
+    seafile_hint.set_margin_top(6);
+    seafile_hint.set_margin_start(12);
+    seafile_hint.set_margin_end(12);
     let app_key = adw::EntryRow::new();
     app_key.set_title(&i18n("Dropbox app key"));
     app_key.set_text(&account.client_id);
@@ -266,6 +282,7 @@ fn edit_dialog(
     group.add(&url);
     group.add(&user);
     group.add(&pass);
+    group.add(&code);
     group.add(&app_key);
     group.add(&library);
     group.add(&folder);
@@ -288,11 +305,13 @@ fn edit_dialog(
     bx.set_width_request(420);
     bx.append(&group);
     bx.append(&app_key_hint);
+    bx.append(&seafile_hint);
     bx.append(&check_box);
     dialog.set_extra_child(Some(&bx));
 
-    // The Dropbox sign-in leaves its refresh token (and the account's
-    // e-mail and name) here until Save.
+    // A sign-in that made a secret of its own leaves it here until Save:
+    // the Dropbox refresh token (with the account's e-mail and name), or
+    // the Seafile API token from a two-step sign-in.
     let dropbox_login: Rc<RefCell<Option<(String, String, String)>>> = Rc::new(RefCell::new(None));
 
     let selected_kind = {
@@ -302,10 +321,12 @@ fn edit_dialog(
 
     // The fields each kind wants.
     let apply_kind = {
-        let (url, user, pass, app_key, app_key_hint, library, check, protect) = (
+        let (url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect) = (
             url.clone(),
             user.clone(),
             pass.clone(),
+            code.clone(),
+            seafile_hint.clone(),
             app_key.clone(),
             app_key_hint.clone(),
             library.clone(),
@@ -321,6 +342,8 @@ fn edit_dialog(
             app_key.set_visible(dropbox);
             app_key_hint.set_visible(dropbox);
             library.set_visible(k == CloudKind::Seafile);
+            code.set_visible(k == CloudKind::Seafile);
+            seafile_hint.set_visible(k == CloudKind::Seafile);
             match k {
                 CloudKind::Nextcloud => {
                     user.set_title(&i18n("User name"));
@@ -330,11 +353,7 @@ fn edit_dialog(
                 }
                 CloudKind::Seafile => {
                     user.set_title(&i18n("E-mail"));
-                    pass.set_title(&if editing {
-                        i18n("Password or API token (leave empty to keep)")
-                    } else {
-                        i18n("Password or API token")
-                    });
+                    pass.set_title(&if editing { i18n("Password (leave empty to keep)") } else { i18n("Password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
                     check.set_label(&i18n("Check Connection"));
                 }
@@ -414,11 +433,14 @@ fn edit_dialog(
         let existing = account.clone();
         let dropbox_login = dropbox_login.clone();
         let name = name.clone();
+        let code = code.clone();
+        let selected_kind = selected_kind.clone();
         check.connect_clicked(move |b| {
             let a = read();
             enum Job {
                 Verify(CloudAccount, String),
                 Dropbox(CloudAccount),
+                SeafileCode(CloudAccount, String, String),
             }
             let job = if a.kind == CloudKind::Dropbox {
                 if cloud::dropbox_client_id(&a).is_empty() {
@@ -434,14 +456,19 @@ fn edit_dialog(
                 };
                 if a.url.is_empty() || a.user.is_empty() || pw.is_empty() {
                     status.set_label(&if a.kind == CloudKind::Seafile {
-                        i18n("Fill in the server URL, e-mail and password or API token first.")
+                        i18n("Fill in the server URL, e-mail and password first.")
                     } else {
                         i18n("Fill in the server URL, user name and app password first.")
                     });
                     return;
                 }
                 status.set_label(&i18n("Signing in…"));
-                Job::Verify(a, pw)
+                let otp = code.text().trim().to_string();
+                if a.kind == CloudKind::Seafile && !otp.is_empty() {
+                    Job::SeafileCode(a, pw, otp)
+                } else {
+                    Job::Verify(a, pw)
+                }
             };
             b.set_sensitive(false);
             let (tx, rx) = std::sync::mpsc::channel::<Result<(String, Option<(String, String, String)>), String>>();
@@ -450,6 +477,8 @@ fn edit_dialog(
                     Job::Verify(a, pw) => cloud::verify(&a, &pw).map(|who| (who, None)),
                     Job::Dropbox(a) => cloud::dropbox_connect(&a)
                         .map(|(refresh, email, who)| (format!("{who} ({email})"), Some((refresh, email, who)))),
+                    Job::SeafileCode(a, pw, otp) => cloud::seafile_login_with_code(&a, &pw, &otp)
+                        .map(|(token, who)| (who.clone(), Some((token, a.user.clone(), who)))),
                 };
                 let _ = tx.send(r);
             });
@@ -457,11 +486,12 @@ fn edit_dialog(
             let b = b.clone();
             let dropbox_login = dropbox_login.clone();
             let name = name.clone();
+            let selected_kind_now = selected_kind.clone();
             gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || match rx.try_recv() {
                 Ok(Ok((who, login))) => {
                     status.set_label(&i18n_f("Signed in as {who}.", &[("who", &who)]));
                     if let Some(l) = login {
-                        if name.text().trim().is_empty() {
+                        if name.text().trim().is_empty() && selected_kind_now() == CloudKind::Dropbox {
                             name.set_text("Dropbox");
                         }
                         *dropbox_login.borrow_mut() = Some(l);
@@ -500,7 +530,25 @@ fn edit_dialog(
             if a.url.is_empty() || a.user.is_empty() {
                 return;
             }
-            pass.text().to_string()
+            let otp = code.text().trim().to_string();
+            match dropbox_login.borrow().as_ref() {
+                // The token a two-step sign-in made.
+                Some((token, _, _)) if a.kind == CloudKind::Seafile => token.clone(),
+                // A code typed but never checked: exchange it now, and
+                // save once the token is here.
+                _ if a.kind == CloudKind::Seafile && !otp.is_empty() && !pass.text().is_empty() => {
+                    let pw = pass.text().to_string();
+                    let sender = sender.clone();
+                    std::thread::spawn(move || {
+                        let _ = sender.send(match cloud::seafile_login_with_code(&a, &pw, &otp) {
+                            Ok((token, _)) => CloudAccountsInput::Save { index, account: a, password: token },
+                            Err(e) => CloudAccountsInput::Failed(e),
+                        });
+                    });
+                    return;
+                }
+                _ => pass.text().to_string(),
+            }
         };
         let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: secret });
     });

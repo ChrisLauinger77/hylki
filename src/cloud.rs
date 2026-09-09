@@ -662,9 +662,35 @@ fn seafile_err(what: &str, e: ureq::Error) -> String {
     }
 }
 
+/// Sign in with the password and a two-step verification code, once:
+/// the token that comes back is what the keyring keeps from then on, as
+/// the password alone would not get past the code at upload time.
+/// Answers with the token and the account's display name.
+pub fn seafile_login_with_code(account: &CloudAccount, password: &str, code: &str) -> Result<(String, String), String> {
+    let url = format!("{}/api2/auth-token/", account.base());
+    let v: serde_json::Value = ureq::post(&url)
+        .set("X-SEAFILE-OTP", code.trim())
+        .timeout(Duration::from_secs(30))
+        .send_form(&[("username", account.user.trim()), ("password", password)])
+        .map_err(|e| match e {
+            ureq::Error::Status(400, resp) => {
+                format!("Could not sign in: {}", short_error(&resp.into_string().unwrap_or_default()))
+            }
+            e => seafile_err("Could not sign in", e),
+        })?
+        .into_json()
+        .map_err(|e| format!("Could not read the server's answer: {e}"))?;
+    let token = v["token"].as_str().unwrap_or("").to_string();
+    if token.is_empty() {
+        return Err("Could not sign in: the server gave no token.".to_string());
+    }
+    let who = seafile_whoami(account, &token)?;
+    Ok((token, who))
+}
+
 /// The API token for the account: the secret is the password, turned
-/// into a token by the auth-token endpoint, or already a token (pasted
-/// from the server's settings, the way past two-factor sign-in).
+/// into a token by the auth-token endpoint, or already a token (from a
+/// two-step sign-in, or obtained another way and pasted).
 fn seafile_token(account: &CloudAccount, secret: &str) -> Result<String, String> {
     let url = format!("{}/api2/auth-token/", account.base());
     let login = ureq::post(&url)
@@ -681,7 +707,7 @@ fn seafile_token(account: &CloudAccount, secret: &str) -> Result<String, String>
         Err(ureq::Error::Status(400, resp)) => {
             let text = resp.into_string().unwrap_or_default();
             if text.to_ascii_lowercase().contains("otp") || text.contains("two") {
-                "Could not sign in: the account uses two-factor sign-in. Paste an API token from the server's settings instead of the password.".to_string()
+                "Could not sign in: the account uses two-step verification. Enter the current code from your authenticator app in the account's settings and press Check Connection.".to_string()
             } else {
                 format!("Could not sign in: {}", short_error(&text))
             }
