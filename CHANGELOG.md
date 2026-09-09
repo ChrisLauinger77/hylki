@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.25.1 — 2026-09-09
+
+French translation catch-up and a message-list drawing fix.
+
+- **French translation updated** (PR #156 by @frenchy82). `po/fr.po` now
+  has all 949 strings translated (was 889, with 25 fuzzy and 35
+  untranslated), covering Send Later, cloud attachments, Empty Trash and
+  Empty Junk, drafts and the reply panel fields. The fuzzy matches left by
+  the 1.25.0 template merge are resolved, and a few existing strings lost a
+  stray trailing period or gained sentence case to match the source.
+- **Thread node dots and the last reply's rail stub are whole again.** The
+  swipe surface added in 1.23.0 clips the row to its own box, but a thread
+  member's node dot and the last reply's rail stub reach a few pixels left
+  of it to sit on the group's rail, so both came out cut in half. The clip
+  now starts that reach further left.
+- **Demo content.** The demo (`VIREO_DEMO`) ships three tags and one
+  filter rule per account, filing into Newsletters, Invoices and Orders
+  folders with their own sample mail, and the Q3 roadmap thread runs five
+  messages deep, so screenshots show the Tags and Filtered Folders sections
+  and an expanded thread without staging. The README screenshot is
+  refreshed.
+
 ## 1.25.0 — 2026-09-09
 
 Send Later, cloud attachments, and a round of composer and drafts work.

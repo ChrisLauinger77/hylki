@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.25.1" date="2026-09-09">
+      <description>
+        <p>French translation completed for the 1.25.0 features; thread node dots in the message list are drawn whole again; richer demo content.</p>
+      </description>
+    </release>
     <release version="1.25.0" date="2026-09-09">
       <description>
         <p>Send Later with presets and a date-time picker; cloud attachments via Nextcloud, ownCloud or OpenCloud share links; Empty Trash and Empty Junk; From/To/Subject in the reply panel; drafts open in the reading pane with a Delete Draft button; quote folding keeps interleaved replies; French translation update.</p>
