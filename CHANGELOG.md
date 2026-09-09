@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.24.3 — 2026-09-08
+
+French translation catch-up.
+
+- **French translation updated** (PR #149 by @frenchy82). `po/fr.po` now
+  has 884 of 889 strings translated (was 708, with 50 fuzzy and 131
+  untranslated), covering the OpenPGP pages and banners, tags, automatic
+  Junk/Trash emptying, the reader font and colour overrides, swipe actions
+  and the two-pane settings window. Landed with mechanical fixes: 51
+  translations had a stray leading space, the `{signer}` placeholder was
+  missing from the encrypted-and-signed banner, two wrong fuzzy matches
+  (`Senders`, `{n} more address`) were cleared, and two typos corrected.
+  Still untranslated: `Senders`, `{n} more address`, `Custom colour…`,
+  `Tag Colour` and the export-log description.
+
 ## 1.24.2 — 2026-09-08
 
 Any colour for a tag, and a composer that follows the theme.

@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.24.3" date="2026-09-08">
+      <description>
+        <p>French translation updated to cover the 1.23 and 1.24 features.</p>
+      </description>
+    </release>
     <release version="1.24.2" date="2026-09-08">
       <description>
         <p>Tags can take any colour from the GTK colour chooser; the composer's background and editor follow the GTK theme and a live light/dark switch.</p>
