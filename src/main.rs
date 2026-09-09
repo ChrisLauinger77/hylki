@@ -6,6 +6,7 @@ mod background;
 mod avatar;
 mod backend;
 mod cache;
+mod cloud;
 mod color;
 mod config;
 mod console_log;

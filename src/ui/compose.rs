@@ -5,7 +5,7 @@ use relm4::prelude::*;
 
 use crate::contacts::Suggestion;
 use crate::models::DraftOrigin;
-use crate::ui::rich_editor::{self, RichEditor};
+use crate::ui::rich_editor::{self, RichEditor, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f};
 
@@ -170,6 +170,22 @@ pub struct Compose {
     encrypt: bool,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
+    /// Cloud attachments (#144): the accounts files can be uploaded to, the
+    /// links already placed in the body, and how many uploads are running.
+    cloud_accounts: Vec<crate::cloud::CloudAccount>,
+    cloud_links: Vec<CloudLink>,
+    cloud_busy: u32,
+    /// Download passwords made for this message's links, to pass on
+    /// separately: (file name, password).
+    cloud_passwords: Vec<(String, String)>,
+}
+
+/// A share link placed in the body (#144), by the id of its paragraph.
+#[derive(Clone, Debug)]
+struct CloudLink {
+    id: String,
+    name: String,
+    url: String,
 }
 
 #[derive(Debug)]
@@ -181,6 +197,16 @@ pub enum ComposeInput {
     PickSendTime,
     /// Forget the scheduled time: Send goes out at once again.
     ClearSendAt,
+    /// Cloud attachments (#144): pick files to upload and share.
+    CloudAttach,
+    /// Files picked; ask which account and how, then upload.
+    CloudPicked(Vec<std::path::PathBuf>),
+    CloudUpload { paths: Vec<std::path::PathBuf>, account: crate::cloud::CloudAccount },
+    /// One upload finished (in a thread): the link, or why not.
+    CloudUploaded { name: String, result: Result<crate::cloud::ShareResult, String> },
+    /// Take a link back out of the body.
+    RemoveCloudLink(usize),
+    CopyCloudPasswords,
     /// Move the draft being edited to Trash and close without saving.
     DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
@@ -371,6 +397,16 @@ impl Component for Compose {
                         set_tooltip_text: Some(i18n("Attach files").as_str()),
                         connect_clicked => ComposeInput::AttachFiles,
                     },
+                    // Cloud attachments (#144): only with an account set up.
+                    pack_end = &gtk::Button {
+                        set_icon_name: "co.hyprlab.Vireo-folder-remote-symbolic",
+                        set_tooltip_text: Some(i18n("Upload to cloud storage and share a link").as_str()),
+                        #[watch]
+                        set_visible: !model.cloud_accounts.is_empty(),
+                        #[watch]
+                        set_sensitive: model.cloud_busy == 0,
+                        connect_clicked => ComposeInput::CloudAttach,
+                    },
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-x-office-address-book-symbolic",
                         set_tooltip_text: Some(i18n("Open Contacts").as_str()),
@@ -407,6 +443,31 @@ impl Component for Compose {
                         add_css_class: "flat",
                         set_label: &i18n("Send now instead"),
                         connect_clicked => ComposeInput::ClearSendAt,
+                    },
+                },
+                // Cloud attachments (#144): the download passwords, which
+                // stay out of the message and go to the recipient some other way.
+                add_top_bar = &gtk::Box {
+                    set_spacing: 8,
+                    set_margin_start: 12,
+                    set_margin_end: 12,
+                    set_margin_top: 4,
+                    set_margin_bottom: 4,
+                    #[watch]
+                    set_visible: !model.cloud_passwords.is_empty(),
+                    gtk::Image { set_icon_name: Some("co.hyprlab.Vireo-dialog-password-symbolic") },
+                    gtk::Label {
+                        set_hexpand: true,
+                        set_halign: gtk::Align::Start,
+                        set_wrap: true,
+                        set_selectable: true,
+                        #[watch]
+                        set_label: &model.cloud_passwords.iter().map(|(n, p)| i18n_f("Download password for {name}: {password}", &[("name", n), ("password", p)])).collect::<Vec<_>>().join("\n"),
+                    },
+                    gtk::Button {
+                        add_css_class: "flat",
+                        set_label: &i18n("Copy"),
+                        connect_clicked => ComposeInput::CopyCloudPasswords,
                     },
                 },
 
@@ -554,6 +615,10 @@ impl Component for Compose {
             sign: false,
             encrypt: false,
             send_at,
+            cloud_accounts: crate::cloud::load_accounts(),
+            cloud_links: Vec::new(),
+            cloud_busy: 0,
+            cloud_passwords: Vec::new(),
         };
         let widgets = view_output!();
         if prefill_encrypt && crate::pgp::available() {
@@ -784,6 +849,121 @@ impl Component for Compose {
 
             ComposeInput::ClearSendAt => {
                 self.send_at = None;
+            }
+
+            ComposeInput::CloudAttach => {
+                let dialog = gtk::FileDialog::new();
+                dialog.set_title(&i18n("Upload to Cloud Storage"));
+                let parent = root.root().and_downcast::<gtk::Window>();
+                let s = sender.input_sender().clone();
+                dialog.open_multiple(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+                    if let Ok(model) = res {
+                        let paths: Vec<_> = (0..model.n_items())
+                            .filter_map(|i| model.item(i).and_downcast::<gtk::gio::File>()?.path())
+                            .collect();
+                        if !paths.is_empty() {
+                            let _ = s.send(ComposeInput::CloudPicked(paths));
+                        }
+                    }
+                });
+            }
+
+            ComposeInput::CloudPicked(paths) => {
+                let parent = root.root().and_downcast::<gtk::Window>();
+                cloud_upload_dialog(parent.as_ref(), &self.cloud_accounts, paths, sender.input_sender().clone());
+            }
+
+            ComposeInput::CloudUpload { paths, account } => {
+                let Some(password) = crate::config::load_cloud_password(&account.key()) else {
+                    let parent = root.root().and_downcast::<gtk::Window>();
+                    let d = adw::MessageDialog::new(
+                        parent.as_ref(),
+                        Some(i18n("No app password").as_str()),
+                        Some(i18n_f("The app password for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", &account.name)]).as_str()),
+                    );
+                    d.add_response("ok", &i18n("OK"));
+                    d.present();
+                    return;
+                };
+                for path in paths {
+                    let name = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    self.cloud_busy += 1;
+                    self.rebuild_attachments(&widgets.attach_box, &sender);
+                    let s = sender.input_sender().clone();
+                    let (a, pw) = (account.clone(), password.clone());
+                    std::thread::spawn(move || {
+                        let result = crate::cloud::upload_and_share(&a, &pw, &path);
+                        let _ = s.send(ComposeInput::CloudUploaded { name, result });
+                    });
+                }
+            }
+
+            ComposeInput::CloudUploaded { name, result } => {
+                self.cloud_busy = self.cloud_busy.saturating_sub(1);
+                match result {
+                    Ok(share) => {
+                        let id = format!("vireo-cloud-{}", crate::rng::token(8).unwrap_or_else(|_| share.size.to_string()));
+                        let mut caption = crate::cloud::human_size(share.size);
+                        if let Some(d) = &share.expires {
+                            caption.push_str(&format!(", {}", i18n_f("link expires {date}", &[("date", d)])));
+                        }
+                        if share.password.is_some() {
+                            caption.push_str(&format!(", {}", i18n("password-protected")));
+                        }
+                        let html = format!(
+                            "<p id=\"{id}\" data-vireo-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
+                            url = html_escape(&share.url),
+                            name = html_escape(&share.name),
+                            caption = html_escape(&caption),
+                        );
+                        self.editor.run_js(&format!(
+                            "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
+                             var p=d.firstChild;var sig=document.querySelector('.vireo-signature');\
+                             if(sig&&sig.parentNode===document.body)document.body.insertBefore(p,sig);else document.body.appendChild(p);\
+                             document.dispatchEvent(new Event('input'));}})()",
+                            js_escape(&html)
+                        ));
+                        if let Some(p) = share.password.clone() {
+                            self.cloud_passwords.push((share.name.clone(), p));
+                        }
+                        self.cloud_links.push(CloudLink { id, name: share.name, url: share.url });
+                    }
+                    Err(e) => {
+                        let parent = root.root().and_downcast::<gtk::Window>();
+                        let d = adw::MessageDialog::new(
+                            parent.as_ref(),
+                            Some(i18n_f("Could not upload {name}", &[("name", &name)]).as_str()),
+                            Some(&e),
+                        );
+                        d.add_response("ok", &i18n("OK"));
+                        d.present();
+                    }
+                }
+                self.rebuild_attachments(&widgets.attach_box, &sender);
+            }
+
+            ComposeInput::RemoveCloudLink(i) => {
+                if i < self.cloud_links.len() {
+                    let link = self.cloud_links.remove(i);
+                    self.cloud_passwords.retain(|(n, _)| *n != link.name);
+                    self.editor.run_js(&format!(
+                        "(function(){{var p=document.getElementById('{}');if(p)p.remove();document.dispatchEvent(new Event('input'));}})()",
+                        js_escape(&link.id)
+                    ));
+                    self.rebuild_attachments(&widgets.attach_box, &sender);
+                }
+            }
+
+            ComposeInput::CopyCloudPasswords => {
+                let text = self
+                    .cloud_passwords
+                    .iter()
+                    .map(|(n, p)| format!("{n}: {p}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if let Some(display) = gtk::gdk::Display::default() {
+                    display.clipboard().set_text(&text);
+                }
             }
 
             ComposeInput::PickSendTime => {
@@ -1269,8 +1449,99 @@ impl Compose {
                 cell.set_focusable(false);
             }
         }
-        flow.set_visible(!self.attachments.is_empty());
+        // Cloud links (#144) sit with the attachments but read as links: a
+        // cloud icon, the name, and a remove that also takes the paragraph
+        // out of the body. Uploads in flight show a spinner chip.
+        for (i, link) in self.cloud_links.iter().enumerate() {
+            let chip = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+            chip.add_css_class("attach-chip");
+            chip.add_css_class("cloud-chip");
+            chip.set_halign(gtk::Align::Start);
+            chip.set_tooltip_text(Some(&link.url));
+            chip.append(&gtk::Image::from_icon_name("co.hyprlab.Vireo-folder-remote-symbolic"));
+            let lbl = gtk::Label::new(Some(&i18n_f("{name} (link)", &[("name", &link.name)])));
+            lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+            lbl.set_max_width_chars(26);
+            chip.append(&lbl);
+            let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-window-close-symbolic");
+            rm.add_css_class("flat");
+            rm.set_valign(gtk::Align::Center);
+            let s = sender.input_sender().clone();
+            rm.connect_clicked(move |_| {
+                let _ = s.send(ComposeInput::RemoveCloudLink(i));
+            });
+            chip.append(&rm);
+            flow.append(&chip);
+            if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
+                cell.set_halign(gtk::Align::Start);
+                cell.set_can_focus(false);
+                cell.set_focusable(false);
+            }
+        }
+        for _ in 0..self.cloud_busy {
+            let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            chip.add_css_class("attach-chip");
+            chip.set_halign(gtk::Align::Start);
+            let spin = gtk::Spinner::new();
+            spin.start();
+            chip.append(&spin);
+            chip.append(&gtk::Label::new(Some(&i18n("Uploading…"))));
+            flow.append(&chip);
+            if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
+                cell.set_halign(gtk::Align::Start);
+                cell.set_can_focus(false);
+            }
+        }
+        flow.set_visible(!self.attachments.is_empty() || !self.cloud_links.is_empty() || self.cloud_busy > 0);
     }
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// Which account to upload to, and a reminder of how its links are made.
+/// One account skips the question.
+fn cloud_upload_dialog(
+    parent: Option<&gtk::Window>,
+    accounts: &[crate::cloud::CloudAccount],
+    paths: Vec<std::path::PathBuf>,
+    sender: relm4::Sender<ComposeInput>,
+) {
+    if accounts.len() == 1 {
+        let _ = sender.send(ComposeInput::CloudUpload { paths, account: accounts[0].clone() });
+        return;
+    }
+    let n = paths.len();
+    let dialog = adw::MessageDialog::new(
+        parent,
+        Some(i18n("Upload to Cloud Storage").as_str()),
+        Some(crate::i18n::ni18n_f("Upload {n} file and put its share link in the message.", "Upload {n} files and put their share links in the message.", n as u32, &[("n", &n.to_string())]).as_str()),
+    );
+    dialog.add_response("cancel", &i18n("Cancel"));
+    dialog.add_response("upload", &i18n("Upload"));
+    dialog.set_default_response(Some("upload"));
+    dialog.set_close_response("cancel");
+    dialog.set_response_appearance("upload", adw::ResponseAppearance::Suggested);
+    let names: Vec<String> = accounts.iter().map(|a| if a.name.trim().is_empty() { a.base() } else { a.name.clone() }).collect();
+    let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
+    let combo = adw::ComboRow::new();
+    combo.set_title(&i18n("Account"));
+    combo.set_model(Some(&gtk::StringList::new(&name_refs)));
+    let group = adw::PreferencesGroup::new();
+    group.add(&combo);
+    dialog.set_extra_child(Some(&group));
+    let accounts = accounts.to_vec();
+    let paths = std::cell::RefCell::new(Some(paths));
+    dialog.connect_response(None, move |_, resp| {
+        if resp != "upload" {
+            return;
+        }
+        if let (Some(paths), Some(account)) = (paths.borrow_mut().take(), accounts.get(combo.selected() as usize)) {
+            let _ = sender.send(ComposeInput::CloudUpload { paths, account: account.clone() });
+        }
+    });
+    dialog.present();
 }
 
 /// The GtkText embedded somewhere inside a composite row — where Pango

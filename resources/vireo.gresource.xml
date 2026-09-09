@@ -12,6 +12,7 @@
     <file>icons/scalable/actions/co.hyprlab.Vireo-channel-secure-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-code-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-contact-new-symbolic.svg</file>
+    <file>icons/scalable/actions/co.hyprlab.Vireo-dialog-password-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-dialog-warning-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-document-edit-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-document-open-recent-symbolic.svg</file>
@@ -21,6 +22,7 @@
     <file>icons/scalable/actions/co.hyprlab.Vireo-edit-copy-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-filter-folder-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-folder-download-symbolic.svg</file>
+    <file>icons/scalable/actions/co.hyprlab.Vireo-folder-remote-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-folder-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-format-indent-more-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-format-text-bold-symbolic.svg</file>

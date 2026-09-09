@@ -487,6 +487,27 @@ pub fn store_password(email: &str, password: &str) -> keyring::Result<()> {
     keyring_entry(email)?.set_password(password)
 }
 
+/// Cloud attachments (#144): an account's app password, by `CloudAccount::key`.
+pub fn store_cloud_password(key: &str, password: &str) -> keyring::Result<()> {
+    keyring_entry(key)?.set_password(password)
+}
+
+pub fn load_cloud_password(key: &str) -> Option<String> {
+    load_key(key)
+}
+
+pub fn delete_cloud_password(key: &str) {
+    if let Ok(e) = keyring_entry(key) {
+        let _ = e.delete_credential();
+    }
+}
+
+/// Write a settings file readable by the owner only (for modules outside
+/// this one that keep their own file, like `cloud.toml`).
+pub fn write_private_file(path: &std::path::Path, contents: &str) -> std::io::Result<()> {
+    write_private(path, contents)
+}
+
 pub fn load_password(email: &str) -> Option<String> {
     load_key(email)
 }

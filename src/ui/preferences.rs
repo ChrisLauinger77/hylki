@@ -212,6 +212,8 @@ pub struct Preferences {
     host_header: Option<adw::HeaderBar>,
     /// The OpenPGP page (#133), kept alive with the window.
     pgp_keys: Option<Controller<crate::ui::pgp_keys::PgpKeys>>,
+    /// The Cloud Storage page (#144), likewise.
+    cloud: Option<Controller<crate::ui::cloud_accounts::CloudAccounts>>,
     /// The account editor is up in the accounts slot: leaving it for another
     /// category asks about the unsaved changes first.
     editor_open: bool,
@@ -236,6 +238,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "filters", title: i18n_noop("Filters"), icon: "co.hyprlab.Vireo-filter-folder-symbolic", accounts: true },
             SidePage { id: "senders", title: i18n_noop("Senders"), icon: "co.hyprlab.Vireo-contact-new-symbolic", accounts: true },
             SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "co.hyprlab.Vireo-channel-secure-symbolic", accounts: false },
+            SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "co.hyprlab.Vireo-folder-remote-symbolic", accounts: false },
         ],
     ),
     (
@@ -556,6 +559,10 @@ impl Component for Preferences {
                             // The OpenPGP key manager (#133), its own component.
                             #[name = "pgp_slot"]
                             add_named[Some("openpgp")] = &adw::Bin {},
+
+                            // Cloud attachment accounts (#144), its own component.
+                            #[name = "cloud_slot"]
+                            add_named[Some("cloud")] = &adw::Bin {},
 
                             add_named[Some("general")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
@@ -1290,6 +1297,7 @@ impl Component for Preferences {
             accounts_sender: init.accounts_sender.clone(),
             host_header: None,
             pgp_keys: None,
+            cloud: None,
             editor_open: false,
         };
 
@@ -1634,6 +1642,9 @@ impl Component for Preferences {
             .detach();
         widgets.pgp_slot.set_child(Some(pgp.widget()));
         model.pgp_keys = Some(pgp);
+        let cloud = crate::ui::cloud_accounts::CloudAccounts::builder().launch(()).detach();
+        widgets.cloud_slot.set_child(Some(cloud.widget()));
+        model.cloud = Some(cloud);
         // The sidebar (#141): a heading per section, a row per category.
         for (section, pages) in SIDE_PAGES {
             let heading = gtk::ListBoxRow::new();
