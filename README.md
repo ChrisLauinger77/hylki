@@ -42,6 +42,8 @@ trackers by default — no telemetry, no analytics.
 - **Two-way sync** — deletions and moves from your phone or another client sync back automatically (IMAP IDLE + reconciliation).
 - **Conversation threading**, compose/reply/forward with HTML signatures, editable drafts, and full folder management.
 - **Outbox** — a send that fails is kept and retried when the connection returns, not lost; queued messages can be edited, sent by hand or discarded.
+- **Send later** — schedule a message for tomorrow morning, Monday, or any date and time; it waits in the Outbox, editable, until then.
+- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a share link in the message, with an optional expiry and download password.
 - **Message previews** — the first one to three lines of each message under its subject in the list (or off).
 - **Single-key shortcuts** — Gmail-style `j`/`k`, `r`, `a`, `d` and friends, without a modifier (see below).
 - **Printing** — print a message with its sender, recipients and date, with an in-app preview that also saves straight to PDF.
@@ -390,8 +392,13 @@ feedback — reader, composer and GNOME-HIG suggestions, and a string of sharp
 bug reports — that shaped the 1.15 releases; to
 [**7system7**](https://github.com/7system7) for the HTML-signature and `mid:`
 link requests and [**EmmanuelP**](https://github.com/EmmanuelP) for tracking
-down the deletes that failed on Zimbra, both in 1.22; and to everyone who
-files issues and ideas.
+down the deletes that failed on Zimbra, both in 1.22; to
+[**7system7**](https://github.com/7system7) again for Send Later and cloud
+attachments, [**yioannides**](https://github.com/yioannides) for Empty Trash,
+the reply-panel fields and the single-message card, and
+[**EmmanuelP**](https://github.com/EmmanuelP) for the quote-folding and
+Quote-button reports, all in 1.25; and to everyone who files issues and
+ideas.
 
 Pull requests are welcome. There's no CLA — by opening one you agree your
 contribution ships under the [AGPL-3.0-or-later](LICENSE), and it may be adapted

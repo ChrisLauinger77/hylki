@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.25.0 — 2026-09-09
+
+Send Later, cloud attachments, and a round of composer and drafts work.
+
+- **Send Later** (#145, requested by @7system7). A dropdown beside Send
+  offers Send now, tomorrow morning (8:00), tomorrow afternoon (13:00),
+  Monday morning (8:00), or a date and time from a calendar and hour/minute
+  picker. A scheduled message is built at once (attachments included) and
+  parked in the Outbox with its time, where it reads "Scheduled for …" and
+  can be edited (the editor shows the time, with "Send now instead"), sent
+  now, or deleted. The app checks every half minute and flushes what is due
+  by id, so the ordinary Outbox flush leaves scheduled mail alone; a message
+  whose time passed while Vireo was closed goes at the next launch. IMAP and
+  Graph accounts alike. `OutgoingMessage.send_at`; the `outbox` table gains
+  `send_at` (added in place on existing databases). The Send button and the
+  dropdown join as one accent control with an inset divider.
+- **Cloud attachments** (#144, requested by @7system7). Settings → Cloud
+  Storage holds Nextcloud, ownCloud and OpenCloud accounts (URL, user, app
+  password in the keyring, upload folder, link expiry in days, optional
+  download password) with a connection check. With an account set up, the
+  composer's header has an upload button beside Attach: files go up over
+  WebDAV into the account's folder (a taken name gets the time appended),
+  each is shared by public link through the OCS files-sharing API with the
+  account's expiry and password, and a line with the link, the size and
+  those terms lands in the body above the signature and any quoted
+  original. Links show as "(link)" chips beside the attachments; removing
+  one removes the line. Download passwords stay out of the message and
+  show in a bar with Copy. `src/cloud.rs`, `src/ui/cloud_accounts.rs`,
+  `cloud.toml`.
+- **Empty Trash and Empty Junk** (#152, requested by @yioannides) in the
+  sidebar's folder menu, after a confirmation: IMAP searches the folder and
+  expunges every uid, Graph lists it and deletes each message; the list and
+  chip clear at once. `MailRequest::EmptyFolder`.
+- **Reply panel fields** (#154, requested by @yioannides). The inline
+  reply's header has a chevron that unfolds its From, To and Subject rows in
+  place; the Composing preference "Show From, To and Subject in the reply
+  panel" opens every reply with them showing.
+- **Lone messages as inset cards** (#153, @yioannides). The card view has
+  been the default since 1.18.x, but only for new installs: every settings
+  save writes every key, so older installs stayed full-bleed without
+  choosing it. The default is applied once (`single_card_default_applied`
+  in privacy.toml); the Reading preference still turns it off.
+- **Quote folding keeps interleaved replies** (#150, reported by
+  @EmmanuelP). The ••• fold hid everything from the first quote to the end
+  of the body, which took a reply written below a quote with it. A quote is
+  now folded only when what follows the quote run is nothing, a signature
+  (`--`/`__` delimiter line or a signature-class element) or a
+  mailing-list footer; anything else means an interleaved reply and the
+  message shows in full. Outlook's reply header and Vireo's own attribution
+  line still fold everything after them. `tools/test-quote-fold.py` runs
+  the reader script in a real WebKitGTK view over a dozen body shapes.
+- **Quote, bulleted and numbered list buttons are toggles** (#137
+  follow-up, @EmmanuelP). Clicking Quote inside a quote steps the paragraph
+  out one level, the same move as Enter twice; the three buttons show the
+  pressed look while the caret sits in their block, from a `vireoFormat`
+  script message on every selection change.
+- **Drafts.** A draft with no recipient yet can be saved (it failed with
+  lettre's "missing destination address": drafts now build through
+  `build_draft`, which gives a recipient-less message an explicit envelope
+  that never reaches the bytes). Selecting a draft opens it in the reading
+  pane's composer (double-click or Enter still open a window). The composer
+  has a Delete Draft button while editing a draft, which moves it to Trash
+  with undo. The Drafts chip counts every draft (IMAP `STATUS (UNSEEN
+  MESSAGES)`, `SEARCH ALL` on recount, Graph `totalItemCount`).
+- **French translation** (#151, @frenchy82): the last strings from 1.24,
+  plus accent and wording fixes. New strings from this release are open.
+- Showcase hooks: `VIREO_SHOWCASE_FOLDER=drafts|sent|archive|junk|trash`
+  switches the demo to that folder; `VIREO_SHOWCASE_SETTINGS=<page id>`
+  opens any Settings category.
+
 ## 1.24.3 — 2026-09-08
 
 French translation catch-up.

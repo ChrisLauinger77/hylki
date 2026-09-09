@@ -342,6 +342,16 @@ msgstr ""
 msgid "Its messages are moved to Trash and the folder is removed."
 msgstr ""
 
+msgid "Empty “{name}”?"
+msgstr ""
+
+msgid ""
+"Every message in it will be erased from the server. This can’t be undone."
+msgstr ""
+
+msgid "Empty"
+msgstr ""
+
 msgid "No Junk folder available for this account"
 msgstr ""
 
@@ -588,6 +598,9 @@ msgid "{n} days ago"
 msgstr ""
 
 msgid "Waiting since {ago}"
+msgstr ""
+
+msgid "Scheduled for {when}"
 msgstr ""
 
 msgid "New message"
@@ -1309,6 +1322,80 @@ msgstr ""
 msgid "Response"
 msgstr ""
 
+msgid "Cloud storage"
+msgstr ""
+
+msgid ""
+"Upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a "
+"share link in the message instead of an attachment. Sign in with an app "
+"password, made under Security in the server's personal settings."
+msgstr ""
+
+msgid "Add Account…"
+msgstr ""
+
+msgid "No cloud accounts yet."
+msgstr ""
+
+msgid "Removed {name}"
+msgstr ""
+
+msgid "Could not store the app password in the keyring: {e}"
+msgstr ""
+
+msgid "links expire after {n} days"
+msgstr ""
+
+msgid "password-protected"
+msgstr ""
+
+msgid "Edit Cloud Account"
+msgstr ""
+
+msgid "Add Cloud Account"
+msgstr ""
+
+msgid "Server URL"
+msgstr ""
+
+msgid "User name"
+msgstr ""
+
+msgid "App password (leave empty to keep)"
+msgstr ""
+
+msgid "App password"
+msgstr ""
+
+msgid "Upload folder"
+msgstr ""
+
+msgid "Links expire after"
+msgstr ""
+
+msgid "Days; 0 keeps the link"
+msgstr ""
+
+msgid "Protect links with a password"
+msgstr ""
+
+msgid ""
+"A download password is made for each file and shown to you, to pass on "
+"separately"
+msgstr ""
+
+msgid "Check Connection"
+msgstr ""
+
+msgid "Fill in the server URL, user name and app password first."
+msgstr ""
+
+msgid "Signing in…"
+msgstr ""
+
+msgid "Signed in as {who}."
+msgstr ""
+
 msgid "Collapse into reader"
 msgstr ""
 
@@ -1327,7 +1414,28 @@ msgstr ""
 msgid "Move this draft to Trash"
 msgstr ""
 
+msgid "Schedule"
+msgstr ""
+
 msgid "Send"
+msgstr ""
+
+msgid "Send later"
+msgstr ""
+
+msgid "Send now"
+msgstr ""
+
+msgid "Tomorrow morning (8:00)"
+msgstr ""
+
+msgid "Tomorrow afternoon (13:00)"
+msgstr ""
+
+msgid "Monday morning (8:00)"
+msgstr ""
+
+msgid "Pick a date and time…"
 msgstr ""
 
 msgid "Encrypt with OpenPGP to every recipient's key"
@@ -1339,7 +1447,22 @@ msgstr ""
 msgid "Attach files"
 msgstr ""
 
+msgid "Upload to cloud storage and share a link"
+msgstr ""
+
 msgid "Open Contacts"
+msgstr ""
+
+msgid "Show From, To and Subject"
+msgstr ""
+
+msgid "Send now instead"
+msgstr ""
+
+msgid "Download password for {name}: {password}"
+msgstr ""
+
+msgid "Copy"
 msgstr ""
 
 msgid "From"
@@ -1363,10 +1486,41 @@ msgstr ""
 msgid "Show Cc, Bcc and Reply-To"
 msgstr ""
 
+msgid "Upload to Cloud Storage"
+msgstr ""
+
+msgid "No app password"
+msgstr ""
+
+msgid ""
+"The app password for {name} is not in the keyring. Open Settings, Cloud "
+"Storage, and enter it again."
+msgstr ""
+
+msgid "link expires {date}"
+msgstr ""
+
+msgid "Could not upload {name}"
+msgstr ""
+
 msgid "Attach Files"
 msgstr ""
 
 msgid "Cannot send with OpenPGP"
+msgstr ""
+
+msgid "{name} (link)"
+msgstr ""
+
+msgid "Uploading…"
+msgstr ""
+
+msgid "Upload {n} file and put its share link in the message."
+msgid_plural "Upload {n} files and put their share links in the message."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Upload"
 msgstr ""
 
 msgid ""
@@ -1377,6 +1531,12 @@ msgstr ""
 msgid ""
 "There is no OpenPGP key for {addr}. Ask them for their public key, or fetch "
 "it under Settings, OpenPGP."
+msgstr ""
+
+msgid "That time has passed"
+msgstr ""
+
+msgid "Choose a time later than now."
 msgstr ""
 
 msgid "Contacts"
@@ -1889,6 +2049,9 @@ msgstr ""
 msgid "Senders"
 msgstr ""
 
+msgid "Cloud Storage"
+msgstr ""
+
 msgid "General"
 msgstr ""
 
@@ -2199,6 +2362,14 @@ msgstr ""
 msgid ""
 "New message slides down over the reading pane, like a reply — pop it out to "
 "a window from its header. Off = open a separate window directly."
+msgstr ""
+
+msgid "Show From, To and Subject in the reply panel"
+msgstr ""
+
+msgid ""
+"The inline reply opens with its address and subject rows showing. Off, they "
+"stay folded away behind a button in the panel's header."
 msgstr ""
 
 msgid "Paste as plain text"
@@ -2544,6 +2715,12 @@ msgstr ""
 msgid "Delete Folder…"
 msgstr ""
 
+msgid "Empty Trash…"
+msgstr ""
+
+msgid "Empty Junk…"
+msgstr ""
+
 msgid "Welcome to Vireo"
 msgstr ""
 
@@ -2795,6 +2972,9 @@ msgstr[1] ""
 msgid "Could not delete permanently: {e}"
 msgstr ""
 
+msgid "Could not empty the folder: {e}"
+msgstr ""
+
 msgid "Could not create folder: {e}"
 msgstr ""
 
@@ -2837,6 +3017,12 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "“{subject}” will be sent {when}"
+msgstr ""
+
+msgid "Could not schedule the message: there is no local store to keep it in."
+msgstr ""
 
 msgid "Still could not send “{subject}”: {e}"
 msgstr ""

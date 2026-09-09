@@ -365,6 +365,19 @@ msgid "Its messages are moved to Trash and the folder is removed."
 msgstr ""
 "Ses messages seront déplacés vers la Corbeille et le dossier sera supprimé."
 
+msgid "Empty “{name}”?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in it will be erased from the server. This can’t be undone."
+msgstr ""
+"Ce message est déjà dans la Corbeille, il sera donc effacé du serveur. Cette "
+"action est irréversible."
+
+msgid "Empty"
+msgstr ""
+
 msgid "No Junk folder available for this account"
 msgstr "Aucun dossier Indésirables disponible pour ce compte"
 
@@ -620,6 +633,9 @@ msgstr "Il y a {n} jours"
 
 msgid "Waiting since {ago}"
 msgstr "En attente depuis {ago}"
+
+msgid "Scheduled for {when}"
+msgstr ""
 
 msgid "New message"
 msgstr "Nouveau message"
@@ -1412,6 +1428,93 @@ msgstr "Le fichier n'a pas pu être ouvert"
 msgid "Response"
 msgstr "Réponse"
 
+msgid "Cloud storage"
+msgstr ""
+
+msgid ""
+"Upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a "
+"share link in the message instead of an attachment. Sign in with an app "
+"password, made under Security in the server's personal settings."
+msgstr ""
+
+#, fuzzy
+msgid "Add Account…"
+msgstr "Ajouter un compte"
+
+#, fuzzy
+msgid "No cloud accounts yet."
+msgstr "Aucun compte pour le moment"
+
+#, fuzzy
+msgid "Removed {name}"
+msgstr "Supprimer la balise"
+
+#, fuzzy
+msgid "Could not store the app password in the keyring: {e}"
+msgstr "Impossible de signer la clé : {e}"
+
+#, fuzzy
+msgid "links expire after {n} days"
+msgstr "Au bout de {n} jour"
+
+msgid "password-protected"
+msgstr ""
+
+#, fuzzy
+msgid "Edit Cloud Account"
+msgstr "Ajouter un compte"
+
+#, fuzzy
+msgid "Add Cloud Account"
+msgstr "Ajouter un compte"
+
+msgid "Server URL"
+msgstr ""
+
+#, fuzzy
+msgid "User name"
+msgstr "Nom d'utilisateur"
+
+msgid "App password (leave empty to keep)"
+msgstr ""
+
+#, fuzzy
+msgid "App password"
+msgstr "Mot de passe SMTP"
+
+#, fuzzy
+msgid "Upload folder"
+msgstr "Tous les dossiers"
+
+#, fuzzy
+msgid "Links expire after"
+msgstr "expire le {date}"
+
+msgid "Days; 0 keeps the link"
+msgstr ""
+
+msgid "Protect links with a password"
+msgstr ""
+
+msgid ""
+"A download password is made for each file and shown to you, to pass on "
+"separately"
+msgstr ""
+
+#, fuzzy
+msgid "Check Connection"
+msgstr "Tester la connexion"
+
+msgid "Fill in the server URL, user name and app password first."
+msgstr ""
+
+msgid "Signing in…"
+msgstr ""
+
+#, fuzzy
+msgid "Signed in as {who}."
+msgstr "Signé avec la clé {id}."
+
 msgid "Collapse into reader"
 msgstr "Réduire dans le lecteur"
 
@@ -1430,8 +1533,32 @@ msgstr ""
 msgid "Move this draft to Trash"
 msgstr ""
 
+msgid "Schedule"
+msgstr ""
+
 msgid "Send"
 msgstr "Envoyer"
+
+#, fuzzy
+msgid "Send later"
+msgstr "Expéditeurs"
+
+#, fuzzy
+msgid "Send now"
+msgstr "Envoyer maintenant"
+
+msgid "Tomorrow morning (8:00)"
+msgstr ""
+
+msgid "Tomorrow afternoon (13:00)"
+msgstr ""
+
+msgid "Monday morning (8:00)"
+msgstr ""
+
+#, fuzzy
+msgid "Pick a date and time…"
+msgstr "Date et heure"
 
 msgid "Encrypt with OpenPGP to every recipient's key"
 msgstr "Chiffrer avec OpenPGP en utilisant la clé de chaque destinataire"
@@ -1442,8 +1569,25 @@ msgstr "Signez avec votre clé OpenPGP"
 msgid "Attach files"
 msgstr "Joindre des fichiers"
 
+msgid "Upload to cloud storage and share a link"
+msgstr ""
+
 msgid "Open Contacts"
 msgstr "Ouvrir les contacts"
+
+#, fuzzy
+msgid "Show From, To and Subject"
+msgstr "Afficher l'expéditeur et l'objet"
+
+#, fuzzy
+msgid "Send now instead"
+msgstr "Envoyer plutôt en pièce jointe"
+
+msgid "Download password for {name}: {password}"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
 
 msgid "From"
 msgstr "De"
@@ -1466,11 +1610,46 @@ msgstr "Plus"
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Afficher Cc, Cci et Répondre à"
 
+msgid "Upload to Cloud Storage"
+msgstr ""
+
+#, fuzzy
+msgid "No app password"
+msgstr "Mot de passe SMTP"
+
+msgid ""
+"The app password for {name} is not in the keyring. Open Settings, Cloud "
+"Storage, and enter it again."
+msgstr ""
+
+#, fuzzy
+msgid "link expires {date}"
+msgstr "expire le {date}"
+
+#, fuzzy
+msgid "Could not upload {name}"
+msgstr "Impossible de charger {path} : {e}"
+
 msgid "Attach Files"
 msgstr "Joindre des fichiers"
 
 msgid "Cannot send with OpenPGP"
 msgstr "Impossible d'envoyer avec OpenPGP"
+
+msgid "{name} (link)"
+msgstr ""
+
+#, fuzzy
+msgid "Uploading…"
+msgstr "Chargement…"
+
+msgid "Upload {n} file and put its share link in the message."
+msgid_plural "Upload {n} files and put their share links in the message."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Upload"
+msgstr ""
 
 msgid ""
 "There is no OpenPGP key of your own for {addr}. Generate one under Settings, "
@@ -1486,6 +1665,13 @@ msgid ""
 msgstr ""
 "Il n'y a pas de clé OpenPGP pour {addr}. Demandez-lui sa clé publique ou "
 "récupérez-la dans « Paramètres », « OpenPGP »."
+
+msgid "That time has passed"
+msgstr ""
+
+#, fuzzy
+msgid "Choose a time later than now."
+msgstr "Rédiger dans la fenêtre principale"
 
 msgid "Contacts"
 msgstr "Contacts"
@@ -2034,6 +2220,9 @@ msgstr "Toutes les 30 minutes"
 msgid "Senders"
 msgstr "Expéditeurs"
 
+msgid "Cloud Storage"
+msgstr ""
+
 msgid "General"
 msgstr "Général"
 
@@ -2423,6 +2612,14 @@ msgstr ""
 "Un nouveau message s'affiche en bas de la fenêtre de lecture, comme une "
 "réponse — détachez-le dans une fenêtre distincte depuis son en-tête. "
 "Désactivé = ouvre directement une fenêtre séparée."
+
+msgid "Show From, To and Subject in the reply panel"
+msgstr ""
+
+msgid ""
+"The inline reply opens with its address and subject rows showing. Off, they "
+"stay folded away behind a button in the panel's header."
+msgstr ""
 
 msgid "Paste as plain text"
 msgstr "Coller comme texte brut"
@@ -2819,6 +3016,12 @@ msgstr "Renommer le dossier…"
 msgid "Delete Folder…"
 msgstr "Supprimer le dossier…"
 
+msgid "Empty Trash…"
+msgstr ""
+
+msgid "Empty Junk…"
+msgstr ""
+
 msgid "Welcome to Vireo"
 msgstr "Bienvenue dans Vireo"
 
@@ -3096,6 +3299,10 @@ msgstr[1] "Déplacement annulé — {n} messages restaurés"
 msgid "Could not delete permanently: {e}"
 msgstr "Impossible de supprimer définitivement : {e}"
 
+#, fuzzy
+msgid "Could not empty the folder: {e}"
+msgstr "Impossible de créer le dossier : {e}"
+
 msgid "Could not create folder: {e}"
 msgstr "Impossible de créer le dossier : {e}"
 
@@ -3140,6 +3347,12 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Téléchargement des pièces jointes… {n} restante"
 msgstr[1] "Téléchargement des pièces jointes… {n} restantes"
+
+msgid "“{subject}” will be sent {when}"
+msgstr ""
+
+msgid "Could not schedule the message: there is no local store to keep it in."
+msgstr ""
 
 msgid "Still could not send “{subject}”: {e}"
 msgstr "Impossible d'envoyer « {subject} » : {e}"

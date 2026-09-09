@@ -2,6 +2,26 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.25.0
+
+**Send later.** The Send button has a dropdown: tomorrow morning, tomorrow afternoon, Monday morning, or a date and time of your own. A scheduled message waits in the Outbox, where it says when it will go and can be edited, sent now or deleted. Vireo sends it at the time, also while running in the background; if Vireo was closed then, it goes at the next launch. Requested by [@7system7](https://github.com/7system7) (#145).
+
+**Cloud attachments.** Set up a Nextcloud, ownCloud or OpenCloud account under Settings, Cloud Storage, and the composer gains an upload button beside Attach. The file goes to your server and a share link, with the size and any expiry, is placed in the message above your signature. Links can expire after a number of days and be protected with a download password, which is shown to you to pass on separately. Requested by [@7system7](https://github.com/7system7) (#144).
+
+**Empty Trash, Empty Junk.** Right-click Trash or Junk in the sidebar to erase everything in it, after a confirmation. Requested by [@yioannides](https://github.com/yioannides) (#152).
+
+**From, To and Subject in the reply panel.** A chevron in the inline reply's header unfolds its address and subject rows in place, and a Composing preference opens every reply with them showing. Requested by [@yioannides](https://github.com/yioannides) (#154).
+
+**Single messages as cards, for everyone.** A lone message now shows as an inset card like a conversation's messages on installs from before that became the default; the Reading preference still switches it off. Raised by [@yioannides](https://github.com/yioannides) (#153).
+
+**Quoted text folds less eagerly.** A reply written below or between quoted passages no longer disappears behind the ••• along with the quote: the fold only hides a quote that ends the message, allowing for a signature. Reported by [@EmmanuelP](https://github.com/EmmanuelP) (#150).
+
+**Quote and list buttons toggle.** In the composer, the Quote button leaves a quote when you are in one, and the Quote, bulleted and numbered list buttons show when the cursor is in their block. Suggested by [@EmmanuelP](https://github.com/EmmanuelP) (#137).
+
+**Drafts.** Selecting a draft opens it in the reading pane's composer, which has a Delete Draft button. A draft with no recipient yet saves properly. The Drafts folder shows how many drafts it holds.
+
+**French** updated by [@frenchy82](https://github.com/frenchy82) (#151).
+
 ## What's new in 1.24.3
 
 **French translation updated.** Almost every string added in 1.23 and 1.24 is now translated, including the OpenPGP pages, tags, automatic Junk and Trash emptying, the reader font and colour settings and the new settings window. Translation by [@frenchy82](https://github.com/frenchy82) (#149).

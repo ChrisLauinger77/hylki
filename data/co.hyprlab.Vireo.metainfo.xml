@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.25.0" date="2026-09-09">
+      <description>
+        <p>Send Later with presets and a date-time picker; cloud attachments via Nextcloud, ownCloud or OpenCloud share links; Empty Trash and Empty Junk; From/To/Subject in the reply panel; drafts open in the reading pane with a Delete Draft button; quote folding keeps interleaved replies; French translation update.</p>
+      </description>
+    </release>
     <release version="1.24.3" date="2026-09-08">
       <description>
         <p>French translation updated to cover the 1.23 and 1.24 features.</p>
