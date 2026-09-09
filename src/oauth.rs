@@ -45,6 +45,19 @@ const GOOGLE_CLIENT_SECRET: &str = match option_env!("VIREO_GOOGLE_CLIENT_SECRET
 // API (issue #36); a user-supplied client via env/oauth.toml still works.
 const MICROSOFT_CLIENT_ID: &str = "";
 const MICROSOFT_CLIENT_SECRET: &str = "";
+// Dropbox (cloud attachments, #144): a public client with PKCE, so an app
+// key alone is enough. A build can bundle one via `VIREO_DROPBOX_CLIENT_ID`;
+// otherwise the user makes an app in the Dropbox App Console and types its
+// key into the account's settings.
+const DROPBOX_CLIENT_ID: &str = match option_env!("VIREO_DROPBOX_CLIENT_ID") {
+    Some(v) => v,
+    None => "",
+};
+
+/// Dropbox matches loopback redirect URIs exactly, port included, so the
+/// listener for its sign-in is on this fixed port and the app's registered
+/// redirect URI is `http://localhost:41597/`.
+pub const DROPBOX_REDIRECT_PORT: u16 = 41597;
 
 /// The Vireo app icon, embedded so the success page needs no external resources.
 const ICON_PNG: &[u8] = include_bytes!("../data/icons/hicolor/256x256/apps/co.hyprlab.Vireo.png");
@@ -243,6 +256,7 @@ pub fn provider_credentials(provider: &str) -> (String, String) {
             MICROSOFT_CLIENT_SECRET,
             false,
         ),
+        "dropbox" => ("VIREO_DROPBOX_CLIENT_ID", "VIREO_DROPBOX_CLIENT_SECRET", DROPBOX_CLIENT_ID, "", false),
         _ => ("", "", "", "", true),
     };
 
@@ -271,6 +285,8 @@ struct OAuthFile {
     google: Option<FileCreds>,
     #[serde(default)]
     microsoft: Option<FileCreds>,
+    #[serde(default)]
+    dropbox: Option<FileCreds>,
 }
 
 #[derive(Deserialize, Default)]
@@ -288,6 +304,7 @@ fn creds_from_file(provider: &str) -> Option<(String, String)> {
     let creds = match provider {
         "google" => file.google,
         "microsoft" => file.microsoft,
+        "dropbox" => file.dropbox,
         _ => None,
     }?;
     Some((creds.client_id, creds.client_secret))
@@ -336,18 +353,34 @@ fn open_uri_portal(uri: &str) -> Result<(), Box<dyn std::error::Error>> {
 /// Run the interactive authorization-code + PKCE flow (blocking — call off the
 /// UI thread). Opens the browser and waits for the loopback redirect.
 pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
-    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    // Dropbox matches the redirect URI exactly, port and all, so its
+    // listener sits on a fixed port the app registers; the others accept
+    // any loopback port.
+    let dropbox = settings.token_url.contains("dropboxapi.com");
+    let listener = if dropbox {
+        TcpListener::bind(("127.0.0.1", DROPBOX_REDIRECT_PORT)).map_err(|e| {
+            format!("could not listen on localhost port {DROPBOX_REDIRECT_PORT} for the sign-in redirect: {e}")
+        })?
+    } else {
+        TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?
+    };
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     // Microsoft (Entra) only ignores the port when matching *localhost* loopback
     // redirects — a random-port 127.0.0.1 URI would need the exact port registered,
     // which we can't do. Google (and others) accept the 127.0.0.1 literal. The
     // listener is on 127.0.0.1 either way; browsers resolve localhost to it.
-    let host = if settings.token_url.contains("microsoftonline") {
+    let host = if settings.token_url.contains("microsoftonline") || dropbox {
         "localhost"
     } else {
         "127.0.0.1"
     };
     let redirect = format!("http://{host}:{port}/");
+    // What asks for a refresh token: Dropbox has its own parameter for it.
+    let offline = if dropbox {
+        "&token_access_type=offline"
+    } else {
+        "&access_type=offline&prompt=consent"
+    };
 
     // PKCE S256 (RFC 7636 §4.2). With `plain` the challenge *is* the verifier, so
     // anyone who gets to read the authorization URL — browser history, an
@@ -360,8 +393,7 @@ pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
     let challenge = pkce_challenge(&verifier);
     let auth_url = format!(
         "{base}?response_type=code&client_id={cid}&redirect_uri={redir}&scope={scope}\
-         &code_challenge={chal}&code_challenge_method=S256&state={state}\
-         &access_type=offline&prompt=consent",
+         &code_challenge={chal}&code_challenge_method=S256&state={state}{offline}",
         base = settings.auth_url,
         cid = pct(&settings.client_id),
         redir = pct(&redirect),

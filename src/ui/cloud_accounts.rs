@@ -1,12 +1,25 @@
-//! Settings → Cloud Storage (#144): the Nextcloud-style accounts that
-//! "Upload to cloud" in the composer can put files on. Each row is an
-//! account; the editor is a dialog with a connection check.
+//! Settings → Cloud Storage (#144): the Nextcloud, Dropbox and Seafile
+//! accounts that "Upload to cloud" in the composer can put files on. Each
+//! row is an account; the editor is a dialog whose fields follow the kind,
+//! with a connection check (a browser sign-in, for Dropbox).
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::cloud::{self, CloudAccount};
+use crate::cloud::{self, CloudAccount, CloudKind};
 use crate::i18n::{i18n, i18n_f};
+
+/// How a kind is named in the editor and the list.
+pub fn kind_label(kind: CloudKind) -> String {
+    match kind {
+        CloudKind::Nextcloud => i18n("Nextcloud, ownCloud or OpenCloud"),
+        CloudKind::Dropbox => i18n("Dropbox"),
+        CloudKind::Seafile => i18n("Seafile"),
+    }
+}
 
 pub struct CloudAccounts {
     accounts: Vec<CloudAccount>,
@@ -17,6 +30,8 @@ pub struct CloudAccounts {
 #[derive(Debug)]
 pub enum CloudAccountsInput {
     Add,
+    /// The editor for a new account of that kind.
+    AddOf(CloudKind),
     Edit(usize),
     Remove(usize),
     /// The editor's Save: `index` is the row being replaced, or none for a
@@ -37,7 +52,7 @@ impl SimpleComponent for CloudAccounts {
             set_child = &adw::PreferencesPage {
                 add = &adw::PreferencesGroup {
                     set_title: &i18n("Cloud storage"),
-                    set_description: Some(&i18n("Upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a share link in the message instead of an attachment. Sign in with an app password, made under Security in the server's personal settings.")),
+                    set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
                     #[wrap(Some)]
                     set_header_suffix = &gtk::Button {
                         set_label: &i18n("Add Account…"),
@@ -70,13 +85,32 @@ impl SimpleComponent for CloudAccounts {
         };
         model.rebuild(&sender);
         widgets.empty.set_visible(model.accounts.is_empty());
+        // VIREO_SHOWCASE_EDIT_CLOUD=<index> opens that account's editor
+        // for a capture (demo only); "add", "add:dropbox" or
+        // "add:seafile" opens the Add dialog on that kind.
+        if let Ok(what) = std::env::var("VIREO_SHOWCASE_EDIT_CLOUD") {
+            if std::env::var_os("VIREO_DEMO").is_some() {
+                let s = sender.input_sender().clone();
+                gtk::glib::timeout_add_seconds_local_once(2, move || {
+                    let _ = s.send(match what.as_str() {
+                        "add" | "add:nextcloud" => CloudAccountsInput::AddOf(CloudKind::Nextcloud),
+                        "add:dropbox" => CloudAccountsInput::AddOf(CloudKind::Dropbox),
+                        "add:seafile" => CloudAccountsInput::AddOf(CloudKind::Seafile),
+                        i => CloudAccountsInput::Edit(i.parse().unwrap_or(0)),
+                    });
+                });
+            }
+        }
         ComponentParts { model, widgets }
     }
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>) {
         match message {
-            CloudAccountsInput::Add => {
-                edit_dialog(self.list.root().and_downcast::<gtk::Window>().as_ref(), None, CloudAccount::empty(), sender.input_sender().clone());
+            CloudAccountsInput::Add => sender.input(CloudAccountsInput::AddOf(CloudKind::Nextcloud)),
+            CloudAccountsInput::AddOf(kind) => {
+                let mut a = CloudAccount::empty();
+                a.kind = kind;
+                edit_dialog(self.list.root().and_downcast::<gtk::Window>().as_ref(), None, a, sender.input_sender().clone());
             }
             CloudAccountsInput::Edit(i) => {
                 if let Some(a) = self.accounts.get(i).cloned() {
@@ -95,7 +129,7 @@ impl SimpleComponent for CloudAccounts {
             CloudAccountsInput::Save { index, account, password } => {
                 if !password.is_empty() {
                     if let Err(e) = crate::config::store_cloud_password(&account.key(), &password) {
-                        self.toast(&i18n_f("Could not store the app password in the keyring: {e}", &[("e", &e.to_string())]));
+                        self.toast(&i18n_f("Could not store the sign-in in the keyring: {e}", &[("e", &e.to_string())]));
                     }
                 }
                 match index {
@@ -129,8 +163,8 @@ impl CloudAccounts {
         }
         for (i, a) in self.accounts.iter().enumerate() {
             let row = adw::ActionRow::new();
-            row.set_title(&if a.name.trim().is_empty() { a.base() } else { a.name.clone() });
-            let mut sub = format!("{} · {}", a.base(), a.user);
+            row.set_title(&if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() });
+            let mut sub = format!("{} · {}", a.where_shown(), a.user);
             if a.expire_days > 0 {
                 sub.push_str(&format!(" · {}", i18n_f("links expire after {n} days", &[("n", &a.expire_days.to_string())])));
             }
@@ -166,8 +200,9 @@ impl CloudAccounts {
     }
 }
 
-/// The account editor: fields, a connection check that signs in with what
-/// is typed, and Save.
+/// The account editor: a kind, the fields that kind needs, a connection
+/// check that signs in with what is typed (a browser sign-in, for
+/// Dropbox), and Save.
 fn edit_dialog(
     parent: Option<&gtk::Window>,
     index: Option<usize>,
@@ -183,6 +218,15 @@ fn edit_dialog(
     dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
 
     let group = adw::PreferencesGroup::new();
+    let kinds: Vec<String> = CloudKind::ALL.iter().map(|k| kind_label(*k)).collect();
+    let kind_refs: Vec<&str> = kinds.iter().map(String::as_str).collect();
+    let kind = adw::ComboRow::new();
+    kind.set_title(&i18n("Service"));
+    kind.set_model(Some(&gtk::StringList::new(&kind_refs)));
+    kind.set_selected(CloudKind::ALL.iter().position(|k| *k == account.kind).unwrap_or(0) as u32);
+    // The kind is chosen when the account is made; afterwards the
+    // sign-in and the keyring entry belong to it.
+    kind.set_sensitive(index.is_none());
     let name = adw::EntryRow::new();
     name.set_title(&i18n("Name"));
     name.set_text(&account.name);
@@ -190,10 +234,22 @@ fn edit_dialog(
     url.set_title(&i18n("Server URL"));
     url.set_text(&account.url);
     let user = adw::EntryRow::new();
-    user.set_title(&i18n("User name"));
     user.set_text(&account.user);
     let pass = adw::PasswordEntryRow::new();
-    pass.set_title(&if index.is_some() { i18n("App password (leave empty to keep)") } else { i18n("App password") });
+    let app_key = adw::EntryRow::new();
+    app_key.set_title(&i18n("Dropbox app key"));
+    app_key.set_text(&account.client_id);
+    let app_key_hint = gtk::Label::new(None);
+    app_key_hint.set_wrap(true);
+    app_key_hint.set_xalign(0.0);
+    app_key_hint.add_css_class("dim-label");
+    app_key_hint.add_css_class("caption");
+    app_key_hint.set_margin_top(6);
+    app_key_hint.set_margin_start(12);
+    app_key_hint.set_margin_end(12);
+    let library = adw::EntryRow::new();
+    library.set_title(&i18n("Library"));
+    library.set_text(&account.library);
     let folder = adw::EntryRow::new();
     folder.set_title(&i18n("Upload folder"));
     folder.set_text(&account.folder);
@@ -205,10 +261,13 @@ fn edit_dialog(
     protect.set_title(&i18n("Protect links with a password"));
     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
     protect.set_active(account.password);
-    for w in [&name, &url, &user] {
-        group.add(w);
-    }
+    group.add(&kind);
+    group.add(&name);
+    group.add(&url);
+    group.add(&user);
     group.add(&pass);
+    group.add(&app_key);
+    group.add(&library);
     group.add(&folder);
     group.add(&expire);
     group.add(&protect);
@@ -216,6 +275,7 @@ fn edit_dialog(
     let check_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     check_box.set_margin_top(8);
     let check = gtk::Button::with_label(&i18n("Check Connection"));
+    check.set_valign(gtk::Align::Start);
     let status = gtk::Label::new(None);
     status.set_wrap(true);
     status.set_xalign(0.0);
@@ -227,48 +287,178 @@ fn edit_dialog(
     let bx = gtk::Box::new(gtk::Orientation::Vertical, 0);
     bx.set_width_request(420);
     bx.append(&group);
+    bx.append(&app_key_hint);
     bx.append(&check_box);
     dialog.set_extra_child(Some(&bx));
 
-    let read = {
-        let (name, url, user, folder, expire, protect) =
-            (name.clone(), url.clone(), user.clone(), folder.clone(), expire.clone(), protect.clone());
-        move || CloudAccount {
-            name: name.text().trim().to_string(),
-            url: url.text().trim().to_string(),
-            user: user.text().trim().to_string(),
-            folder: folder.text().trim().to_string(),
-            expire_days: expire.value() as u32,
-            password: protect.is_active(),
+    // The Dropbox sign-in leaves its refresh token (and the account's
+    // e-mail and name) here until Save.
+    let dropbox_login: Rc<RefCell<Option<(String, String, String)>>> = Rc::new(RefCell::new(None));
+
+    let selected_kind = {
+        let kind = kind.clone();
+        move || CloudKind::ALL.get(kind.selected() as usize).copied().unwrap_or_default()
+    };
+
+    // The fields each kind wants.
+    let apply_kind = {
+        let (url, user, pass, app_key, app_key_hint, library, check, protect) = (
+            url.clone(),
+            user.clone(),
+            pass.clone(),
+            app_key.clone(),
+            app_key_hint.clone(),
+            library.clone(),
+            check.clone(),
+            protect.clone(),
+        );
+        let editing = index.is_some();
+        move |k: CloudKind| {
+            let dropbox = k == CloudKind::Dropbox;
+            url.set_visible(!dropbox);
+            user.set_visible(!dropbox);
+            pass.set_visible(!dropbox);
+            app_key.set_visible(dropbox);
+            app_key_hint.set_visible(dropbox);
+            library.set_visible(k == CloudKind::Seafile);
+            match k {
+                CloudKind::Nextcloud => {
+                    user.set_title(&i18n("User name"));
+                    pass.set_title(&if editing { i18n("App password (leave empty to keep)") } else { i18n("App password") });
+                    protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
+                    check.set_label(&i18n("Check Connection"));
+                }
+                CloudKind::Seafile => {
+                    user.set_title(&i18n("E-mail"));
+                    pass.set_title(&if editing {
+                        i18n("Password or API token (leave empty to keep)")
+                    } else {
+                        i18n("Password or API token")
+                    });
+                    protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
+                    check.set_label(&i18n("Check Connection"));
+                }
+                CloudKind::Dropbox => {
+                    protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Dropbox allows link passwords and expiry dates on paid plans only."));
+                    check.set_label(&i18n("Connect with Dropbox…"));
+                    app_key_hint.set_label(&i18n_f(
+                        "Make an app at dropbox.com/developers (scoped access, permissions account_info.read, files.content.write and sharing.write) with the redirect URI {uri}, and enter its app key. Leave it empty to use the app key this build was made with, when it has one.",
+                        &[("uri", &format!("http://localhost:{}/", crate::oauth::DROPBOX_REDIRECT_PORT))],
+                    ));
+                }
+            }
         }
     };
+    apply_kind(account.kind);
+    {
+        let apply_kind = apply_kind.clone();
+        let status = status.clone();
+        let selected_kind = selected_kind.clone();
+        kind.connect_selected_notify(move |_| {
+            apply_kind(selected_kind());
+            status.set_label("");
+        });
+    }
+
+    let read = {
+        let (name, url, user, app_key, library, folder, expire, protect) = (
+            name.clone(),
+            url.clone(),
+            user.clone(),
+            app_key.clone(),
+            library.clone(),
+            folder.clone(),
+            expire.clone(),
+            protect.clone(),
+        );
+        let selected_kind = selected_kind.clone();
+        let dropbox_login = dropbox_login.clone();
+        let existing = account.clone();
+        move || {
+            let kind = selected_kind();
+            let user = match (kind, dropbox_login.borrow().as_ref()) {
+                (CloudKind::Dropbox, Some((_, email, _))) => email.clone(),
+                (CloudKind::Dropbox, None) if existing.kind == CloudKind::Dropbox => existing.user.clone(),
+                (CloudKind::Dropbox, None) => String::new(),
+                _ => user.text().trim().to_string(),
+            };
+            CloudAccount {
+                name: name.text().trim().to_string(),
+                kind,
+                url: url.text().trim().to_string(),
+                user,
+                folder: folder.text().trim().to_string(),
+                library: library.text().trim().to_string(),
+                client_id: app_key.text().trim().to_string(),
+                expire_days: expire.value() as u32,
+                password: protect.is_active(),
+            }
+        }
+    };
+
+    if account.kind == CloudKind::Dropbox && !account.user.is_empty() {
+        status.set_label(&i18n_f("Connected as {who}.", &[("who", &account.user)]));
+    }
 
     {
         let read = read.clone();
         let pass = pass.clone();
         let status = status.clone();
         let existing = account.clone();
+        let dropbox_login = dropbox_login.clone();
+        let name = name.clone();
         check.connect_clicked(move |b| {
             let a = read();
-            let pw = match pass.text().to_string() {
-                p if !p.is_empty() => p,
-                _ => crate::config::load_cloud_password(&existing.key()).unwrap_or_default(),
-            };
-            if a.url.is_empty() || a.user.is_empty() || pw.is_empty() {
-                status.set_label(&i18n("Fill in the server URL, user name and app password first."));
-                return;
+            enum Job {
+                Verify(CloudAccount, String),
+                Dropbox(CloudAccount),
             }
+            let job = if a.kind == CloudKind::Dropbox {
+                if cloud::dropbox_client_id(&a).is_empty() {
+                    status.set_label(&i18n("Enter the app key of a Dropbox app first."));
+                    return;
+                }
+                status.set_label(&i18n("Waiting for the sign-in in your browser…"));
+                Job::Dropbox(a)
+            } else {
+                let pw = match pass.text().to_string() {
+                    p if !p.is_empty() => p,
+                    _ => crate::config::load_cloud_password(&existing.key()).unwrap_or_default(),
+                };
+                if a.url.is_empty() || a.user.is_empty() || pw.is_empty() {
+                    status.set_label(&if a.kind == CloudKind::Seafile {
+                        i18n("Fill in the server URL, e-mail and password or API token first.")
+                    } else {
+                        i18n("Fill in the server URL, user name and app password first.")
+                    });
+                    return;
+                }
+                status.set_label(&i18n("Signing in…"));
+                Job::Verify(a, pw)
+            };
             b.set_sensitive(false);
-            status.set_label(&i18n("Signing in…"));
-            let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
+            let (tx, rx) = std::sync::mpsc::channel::<Result<(String, Option<(String, String, String)>), String>>();
             std::thread::spawn(move || {
-                let _ = tx.send(cloud::verify(&a, &pw));
+                let r = match job {
+                    Job::Verify(a, pw) => cloud::verify(&a, &pw).map(|who| (who, None)),
+                    Job::Dropbox(a) => cloud::dropbox_connect(&a)
+                        .map(|(refresh, email, who)| (format!("{who} ({email})"), Some((refresh, email, who)))),
+                };
+                let _ = tx.send(r);
             });
             let status = status.clone();
             let b = b.clone();
+            let dropbox_login = dropbox_login.clone();
+            let name = name.clone();
             gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || match rx.try_recv() {
-                Ok(Ok(who)) => {
+                Ok(Ok((who, login))) => {
                     status.set_label(&i18n_f("Signed in as {who}.", &[("who", &who)]));
+                    if let Some(l) = login {
+                        if name.text().trim().is_empty() {
+                            name.set_text("Dropbox");
+                        }
+                        *dropbox_login.borrow_mut() = Some(l);
+                    }
                     b.set_sensitive(true);
                     gtk::glib::ControlFlow::Break
                 }
@@ -291,10 +481,21 @@ fn edit_dialog(
             return;
         }
         let a = read();
-        if a.url.is_empty() || a.user.is_empty() {
-            return;
-        }
-        let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: pass.text().to_string() });
+        let secret = if a.kind == CloudKind::Dropbox {
+            // Without a sign-in there is nothing to save; a re-opened
+            // account keeps its token when none was made anew.
+            match dropbox_login.borrow().as_ref() {
+                Some((refresh, _, _)) => refresh.clone(),
+                None if !a.user.is_empty() => String::new(),
+                None => return,
+            }
+        } else {
+            if a.url.is_empty() || a.user.is_empty() {
+                return;
+            }
+            pass.text().to_string()
+        };
+        let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: secret });
     });
     dialog.present();
 }

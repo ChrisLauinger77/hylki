@@ -43,7 +43,7 @@ trackers by default — no telemetry, no analytics.
 - **Conversation threading**, compose/reply/forward with HTML signatures, editable drafts, and full folder management.
 - **Outbox** — a send that fails is kept and retried when the connection returns, not lost; queued messages can be edited, sent by hand or discarded.
 - **Send later** — schedule a message for tomorrow morning, Monday, or any date and time; it waits in the Outbox, editable, until then.
-- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a share link in the message, with an optional expiry and download password.
+- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud, OpenCloud or Seafile server, or to Dropbox, and put a share link in the message, with an optional expiry and download password.
 - **Message previews** — the first one to three lines of each message under its subject in the list (or off).
 - **Single-key shortcuts** — Gmail-style `j`/`k`, `r`, `a`, `d` and friends, without a modifier (see below).
 - **Printing** — print a message with its sender, recipients and date, with an in-app preview that also saves straight to PDF.
@@ -187,10 +187,14 @@ client_secret = "your-client-secret"
 
 [microsoft]
 client_id = "your-azure-application-client-id"  # public client, no secret
+
+[dropbox]
+client_id = "your-dropbox-app-key"  # public client, no secret
 ```
 
-or via the `VIREO_GOOGLE_CLIENT_ID` / `VIREO_GOOGLE_CLIENT_SECRET` and
-`VIREO_MICROSOFT_CLIENT_ID` / `VIREO_MICROSOFT_CLIENT_SECRET` environment variables.
+or via the `VIREO_GOOGLE_CLIENT_ID` / `VIREO_GOOGLE_CLIENT_SECRET`,
+`VIREO_MICROSOFT_CLIENT_ID` / `VIREO_MICROSOFT_CLIENT_SECRET` and
+`VIREO_DROPBOX_CLIENT_ID` environment variables.
 
 **Bundling a Google client at build time** (for maintainers) — set the env vars
 during the build and they're compiled in via `option_env!`:
@@ -198,6 +202,33 @@ during the build and they're compiled in via `option_env!`:
 ```sh
 VIREO_GOOGLE_CLIENT_ID=... VIREO_GOOGLE_CLIENT_SECRET=... cargo build --release
 ```
+
+### Cloud attachments (Nextcloud, Dropbox, Seafile)
+
+Settings → Cloud Storage holds the accounts the composer's upload button can
+put files on. A file goes to the account's upload folder and a share link,
+with the size and any expiry, is placed in the message above your signature.
+Every kind of account can expire links after a number of days and protect
+them with a generated download password, shown to you to pass on separately.
+
+- **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
+  app password (made under *Security* in the server's personal settings).
+  Uploads go over WebDAV; links come from the files-sharing API.
+- **Seafile** — the server URL, your e-mail and either your password or an
+  API token (the token is the way past two-factor sign-in; the server's
+  settings page shows it). Uploads go into a library (made when missing,
+  "Vireo" by default) and a folder inside it.
+- **Dropbox** — sign in through your browser. Dropbox only allows that
+  through a registered app, so make one at
+  [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps):
+  *Scoped access*, *Full Dropbox* or *App folder* as you like, the
+  permissions `account_info.read`, `files.content.write` and `sharing.write`
+  under the *Permissions* tab, and the redirect URI `http://localhost:41597/`
+  under *OAuth 2*. Enter the app key in the account's settings and press
+  *Connect with Dropbox*. A build can carry an app key of its own (the
+  `[dropbox]` entry in `oauth.toml`, or `VIREO_DROPBOX_CLIENT_ID` at build
+  time), in which case the field can stay empty. Link passwords and expiry
+  dates are a paid Dropbox feature; on a Basic plan leave both off.
 
 ### OpenPGP (encrypted and signed mail)
 

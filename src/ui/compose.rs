@@ -910,8 +910,8 @@ impl Component for Compose {
                     let parent = root.root().and_downcast::<gtk::Window>();
                     let d = adw::MessageDialog::new(
                         parent.as_ref(),
-                        Some(i18n("No app password").as_str()),
-                        Some(i18n_f("The app password for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", &account.name)]).as_str()),
+                        Some(i18n("Not signed in").as_str()),
+                        Some(i18n_f("The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, and enter it again.", &[("name", &account.name)]).as_str()),
                     );
                     d.add_response("ok", &i18n("OK"));
                     d.present();
@@ -1561,7 +1561,7 @@ fn cloud_upload_dialog(
     dialog.set_default_response(Some("upload"));
     dialog.set_close_response("cancel");
     dialog.set_response_appearance("upload", adw::ResponseAppearance::Suggested);
-    let names: Vec<String> = accounts.iter().map(|a| if a.name.trim().is_empty() { a.base() } else { a.name.clone() }).collect();
+    let names: Vec<String> = accounts.iter().map(|a| if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() }).collect();
     let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
     let combo = adw::ComboRow::new();
     combo.set_title(&i18n("Account"));

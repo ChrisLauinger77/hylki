@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **Dropbox and Seafile as cloud storage** (#144 follow-up). Settings →
+  Cloud Storage now starts with a Service choice: Nextcloud, ownCloud or
+  OpenCloud as before, Dropbox, or Seafile. Dropbox signs in through the
+  browser (OAuth with PKCE against the app key typed in, or one the build
+  carries via `oauth.toml` `[dropbox]` / `VIREO_DROPBOX_CLIENT_ID`; the
+  listener sits on the fixed port 41597 because Dropbox matches redirect
+  URIs exactly), keeps the refresh token in the keyring under
+  `cloud:dropbox|<e-mail>`, uploads through `files/upload` or an upload
+  session over 150 MB (autorename on a taken name, folders made on the
+  way), and shares with `create_shared_link_with_settings`; a link password
+  or expiry on a Basic plan is reported as such rather than silently
+  dropped. Seafile signs in with the account password (turned into an API
+  token by `api2/auth-token/`) or a pasted API token, which is also the
+  way past two-factor sign-in; uploads go into a library (found by name,
+  made when missing) and a folder inside it through the upload-link
+  endpoint as a streamed multipart body, and `api/v2.1/share-links/` makes
+  the link with the password and `expire_days`. The composer, the chips and
+  the download-password bar are unchanged. Old `cloud.toml` entries read as
+  Nextcloud. **Neither service has been tried against a live account.**
+
 ## 1.25.1 — 2026-09-09
 
 French translation catch-up and a message-list drawing fix.
