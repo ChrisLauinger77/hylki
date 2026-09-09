@@ -483,7 +483,7 @@ impl Component for Preferences {
             set_default_width: 920,
             // The same size every time: the two-pane layout (#141) fits its
             // sidebar at this height, and nothing is remembered from a resize.
-            set_default_height: 740,
+            set_default_height: 772,
             set_title: Some(i18n("Settings").as_str()),
 
             connect_close_request[sender] => move |_| {
