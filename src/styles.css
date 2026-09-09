@@ -1671,3 +1671,12 @@ textview.console-view text selection {
 .send-split > menubutton {
   margin-left: 0;
 }
+
+/* The reply panel's fields disclosure (#154): a chevron that turns over as
+   the From/To/Subject rows unfold, like any expander. */
+.fields-chevron image {
+  transition: -gtk-icon-transform 200ms ease;
+}
+.fields-chevron:checked image {
+  -gtk-icon-transform: rotate(180deg);
+}
