@@ -342,7 +342,14 @@ fn edit_dialog(
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Dropbox allows link passwords and expiry dates on paid plans only."));
                     check.set_label(&i18n("Connect with Dropbox…"));
                     app_key_hint.set_label(&i18n_f(
-                        "Make an app at dropbox.com/developers (scoped access, permissions account_info.read, files.content.write and sharing.write) with the redirect URI {uri}, and enter its app key. Leave it empty to use the app key this build was made with, when it has one.",
+                        "Dropbox only lets an app sign in when it is registered, so make one for yourself (it takes a minute and stays private):\n\
+                         1. Open dropbox.com/developers/apps, signed in to your Dropbox, and press Create app.\n\
+                         2. Choose Scoped access, then App folder (Vireo sees only its own folder under Apps) or Full Dropbox (uploads go to the folder named above).\n\
+                         3. Give the app a name that no one else has used, such as Vireo for your name, and press Create app.\n\
+                         4. On the Permissions tab, tick account_info.read, files.content.write and sharing.write, then press Submit.\n\
+                         5. On the Settings tab, under OAuth 2, add the redirect URI {uri} and press Add.\n\
+                         6. Copy the App key from the top of the Settings tab into the field above.\n\
+                         The app may stay in Development status; that allows your own account. Leave the field empty to use the app key this build was made with, when it has one.",
                         &[("uri", &format!("http://localhost:{}/", crate::oauth::DROPBOX_REDIRECT_PORT))],
                     ));
                 }

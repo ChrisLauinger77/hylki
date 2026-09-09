@@ -218,17 +218,31 @@ them with a generated download password, shown to you to pass on separately.
   API token (the token is the way past two-factor sign-in; the server's
   settings page shows it). Uploads go into a library (made when missing,
   "Vireo" by default) and a folder inside it.
-- **Dropbox** — sign in through your browser. Dropbox only allows that
-  through a registered app, so make one at
-  [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps):
-  *Scoped access*, *Full Dropbox* or *App folder* as you like, the
-  permissions `account_info.read`, `files.content.write` and `sharing.write`
-  under the *Permissions* tab, and the redirect URI `http://localhost:41597/`
-  under *OAuth 2*. Enter the app key in the account's settings and press
-  *Connect with Dropbox*. A build can carry an app key of its own (the
-  `[dropbox]` entry in `oauth.toml`, or `VIREO_DROPBOX_CLIENT_ID` at build
-  time), in which case the field can stay empty. Link passwords and expiry
-  dates are a paid Dropbox feature; on a Basic plan leave both off.
+- **Dropbox** — sign in through your browser. Dropbox only lets a registered
+  app sign in, so make one for yourself; it takes a minute and stays private:
+  1. Open [dropbox.com/developers/apps](https://www.dropbox.com/developers/apps)
+     signed in to your Dropbox and press **Create app**.
+  2. Choose **Scoped access**, then the access type: **App folder** gives
+     Vireo its own folder under *Apps* and nothing else, **Full Dropbox** puts
+     uploads in the folder named in the account's settings.
+  3. Give the app a name no one else has used ("Vireo for Jane", say) and
+     press **Create app**.
+  4. On the **Permissions** tab tick `account_info.read`,
+     `files.content.write` and `sharing.write`, then press **Submit**.
+  5. On the **Settings** tab, under *OAuth 2 → Redirect URIs*, enter
+     `http://localhost:41597/` and press **Add**. The port is fixed because
+     Dropbox matches redirect URIs exactly.
+  6. Copy the **App key** from the top of the Settings tab.
+
+  In Vireo, add a Dropbox account under Settings → Cloud Storage, paste the
+  app key and press **Connect with Dropbox**; the browser opens, you approve
+  the app, and the account's e-mail appears in the dialog. The app can stay
+  in *Development* status, which allows your own account (Dropbox asks for a
+  production review only past a few hundred users). A build can carry an app
+  key of its own (the `[dropbox]` entry in `oauth.toml`, or
+  `VIREO_DROPBOX_CLIENT_ID` at build time), in which case the field can stay
+  empty. Link passwords and expiry dates are a paid Dropbox feature; on a
+  Basic plan leave both off, or the share step reports it.
 
 ### OpenPGP (encrypted and signed mail)
 
