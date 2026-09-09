@@ -4991,6 +4991,35 @@ impl SimpleComponent for AppModel {
 
             AppMsg::SendMessage(out) => {
                 let account_id = out.from_account_id;
+                // Remember who this went to, now, whatever route it takes
+                // from here (straight out, the Outbox, Send Later): the next
+                // composer suggests them, and so do the ones already open.
+                let recipients: Vec<(String, String)> = [&out.to, &out.cc, &out.bcc]
+                    .into_iter()
+                    .flat_map(|f| crate::worker::parse_recipients(f))
+                    .collect();
+                if let Some(c) = self.cache.as_ref() {
+                    c.record_addresses(&recipients);
+                }
+                let own: HashSet<String> = self.config.iter().map(|c| c.email.to_lowercase()).collect();
+                let fresh: Vec<crate::contacts::Suggestion> = recipients
+                    .into_iter()
+                    .filter(|(_, e)| e.contains('@') && !own.contains(&e.to_lowercase()))
+                    .map(|(name, email)| crate::contacts::Suggestion {
+                        name: if name.is_empty() { email.clone() } else { name },
+                        email,
+                        from_contacts: false,
+                        score: 1,
+                    })
+                    .collect();
+                if !fresh.is_empty() {
+                    for host in &self.composers {
+                        host.controller.emit(ComposeInput::AddSuggestions(fresh.clone()));
+                    }
+                    if let Some(rc) = &self.reader_compose {
+                        rc.controller.emit(ComposeInput::AddSuggestions(fresh.clone()));
+                    }
+                }
                 let sent_path = self
                     .folders
                     .get(&account_id)

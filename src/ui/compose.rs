@@ -242,6 +242,9 @@ pub enum ComposeInput {
     OpenContacts,
     /// The given recipient field changed — refresh autocomplete.
     Suggest(Field),
+    /// Addresses just sent to from another composer: into this one's
+    /// suggestions at once, without waiting for a reopen.
+    AddSuggestions(Vec<Suggestion>),
     /// Arrow-key move of the autocomplete highlight (+1 down, -1 up).
     CompletionMove(i32),
     /// Accept the highlighted suggestion into the active field.
@@ -1148,6 +1151,21 @@ impl Component for Compose {
                     Field::Bcc => &widgets.bcc_row,
                 };
                 self.show_completion(field, row);
+            }
+
+            ComposeInput::AddSuggestions(new) => {
+                for n in new {
+                    let key = n.email.to_lowercase();
+                    match self.suggestions.iter_mut().find(|s| s.email.to_lowercase() == key) {
+                        Some(s) => {
+                            s.score += 1;
+                            if s.name.trim().is_empty() || s.name == s.email {
+                                s.name = n.name;
+                            }
+                        }
+                        None => self.suggestions.push(n),
+                    }
+                }
             }
 
             ComposeInput::CompletionMove(delta) => {

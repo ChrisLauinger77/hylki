@@ -1057,19 +1057,23 @@ impl Cache {
     }
 
     /// Record recipients the user has sent to, so they autocomplete even before
-    /// the Sent folder syncs. Each send bumps the address's frequency.
+    /// the Sent folder syncs. Each send bumps the address's frequency. The app
+    /// records at the moment of sending, whatever route the message then
+    /// takes (straight out, the Outbox, Send Later).
     pub fn record_addresses(&self, entries: &[(String, String)]) {
         for (name, email) in entries {
             let email = email.trim().to_lowercase();
             if email.is_empty() || !email.contains('@') {
                 continue;
             }
-            let _ = self.conn.execute(
+            if let Err(e) = self.conn.execute(
                 "INSERT INTO addresses(email, name, count) VALUES(?1, ?2, 1) \
                  ON CONFLICT(email) DO UPDATE SET count = count + 1, \
                    name = CASE WHEN excluded.name <> '' THEN excluded.name ELSE addresses.name END",
                 params![email, name.trim()],
-            );
+            ) {
+                tracing::warn!("could not record recipient {email}: {e}");
+            }
         }
     }
 

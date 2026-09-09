@@ -1774,7 +1774,6 @@ async fn run_imap(
                 match send_smtp(&account, &message).await {
                     Ok(raw) => {
                         emit(WorkerEvent::Status(String::new()));
-                        record_sent_addresses(cache.as_ref(), &message);
                         // Save a copy to the Sent folder; sending still counts as
                         // success even if this part fails.
                         if let Some(path) = sent_path {
@@ -3251,20 +3250,8 @@ fn outbox_envelope(item: &crate::models::OutboxItem) -> Option<lettre::address::
     lettre::address::Envelope::new(from, to).ok()
 }
 
-/// Record a sent message's recipients so they autocomplete in future composes.
-fn record_sent_addresses(cache: Option<&Cache>, msg: &OutgoingMessage) {
-    let Some(cache) = cache else {
-        return;
-    };
-    let mut entries = Vec::new();
-    for list in [&msg.to, &msg.cc, &msg.bcc] {
-        entries.extend(parse_recipients(list));
-    }
-    cache.record_addresses(&entries);
-}
-
 /// Parse a recipient field ("Name <a@b>, c@d") into (name, email) pairs.
-fn parse_recipients(s: &str) -> Vec<(String, String)> {
+pub fn parse_recipients(s: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
     for part in s.split(',') {
         let part = part.trim();
@@ -6871,7 +6858,6 @@ async fn run_pop3(
 
             MailRequest::Send { message, .. } => match send_smtp(&account, &message).await {
                 Ok(_) => {
-                    record_sent_addresses(cache.as_ref(), &message);
                     if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
                         c.delete_outbox(queued);
                         emit_outbox(cache.as_ref(), account_id, &emit);
@@ -8670,7 +8656,6 @@ async fn run_graph(
                 match graph_send_message(&account, &message, &emit).await {
                     Ok(()) => {
                         emit(WorkerEvent::Status(String::new()));
-                        record_sent_addresses(cache.as_ref(), &message);
                         // If sending an edited draft, remove the obsolete draft.
                         if let Some(o) = message.draft_origin.clone() {
                             if o.account_id == account_id {
