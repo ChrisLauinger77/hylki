@@ -2971,6 +2971,28 @@ impl SimpleComponent for AppModel {
                         });
                     });
                 }
+                // VIREO_SHOWCASE_UNIFIED=sent|starred|drafts opens that unified
+                // row at 3s, All Inboxes at 6s and the row again at 9s, so the
+                // timing logs show a cold and a warm open.
+                if let Ok(which) = std::env::var("VIREO_SHOWCASE_UNIFIED") {
+                    let kind = match which.as_str() {
+                        "starred" => FolderKind::Starred,
+                        "drafts" => FolderKind::Drafts,
+                        _ => FolderKind::Sent,
+                    };
+                    let sb = model.sidebar.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        let _ = sb.send(SidebarInput::UnifiedKindRowSelected(kind));
+                    });
+                    let sb = model.sidebar.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        let _ = sb.send(SidebarInput::SelectUnifiedRow);
+                    });
+                    let sb = model.sidebar.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(9, move || {
+                        let _ = sb.send(SidebarInput::UnifiedKindRowSelected(kind));
+                    });
+                }
                 // VIREO_SHOWCASE_FOLD_FILTERED folds All Inboxes' Filtered
                 // Folders section, to check its folded header.
                 if std::env::var("VIREO_SHOWCASE_FOLD_FILTERED").is_ok() {
@@ -3286,6 +3308,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::UnifiedSelected(kind) => {
+                let t_open = std::time::Instant::now();
                 self.close_sidebar_peek();
                 self.leave_gallery();
                 self.showing_contacts = false;
@@ -3368,6 +3391,11 @@ impl SimpleComponent for AppModel {
                     self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                 }
                 self.push_index_complete();
+                tracing::info!(
+                    "unified {kind:?}: opened in {:?} with {} cached messages",
+                    t_open.elapsed(),
+                    self.unified_by_account.values().map(Vec::len).sum::<usize>()
+                );
             }
 
             AppMsg::FolderSelected { account_id, folder_id, name, path } => {
@@ -10274,9 +10302,11 @@ impl AppModel {
     /// slices arrive independently (cache seed, then each account's load), so the
     /// whole merged list is re-emitted each time one of them changes.
     fn emit_unified(&self) {
+        let t = std::time::Instant::now();
         let mut merged: Vec<Message> =
             self.unified_by_account.values().flatten().cloned().collect();
         merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        tracing::debug!("unified: merged {} messages in {:?}", merged.len(), t.elapsed());
         self.message_list.emit(MessageListInput::SetMessages { messages: merged });
     }
 

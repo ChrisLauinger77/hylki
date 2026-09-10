@@ -377,5 +377,42 @@ fn sample_messages() -> Vec<Message> {
             body: "Thanks for supporting Central Books!\n\nYour order of 2 items is confirmed and will ship within 2 business days.\n\n  • The Design of Everyday Things\n  • A Philosophy of Software Design\n\nBookshop.org",
             date: "Tue", unread: false, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
     ];
-    specs.iter().map(build).collect()
+    let mut out: Vec<Message> = specs.iter().map(build).collect();
+    // VIREO_DEMO_BULK=N pads every account's Inbox and Sent with N more
+    // messages, to exercise the list at a real mailbox's size.
+    if let Some(n) = std::env::var("VIREO_DEMO_BULK").ok().and_then(|v| v.parse::<u32>().ok()) {
+        let base = out.iter().map(|m| m.timestamp).max().unwrap_or(1_700_000_000);
+        let mut id = 100_000u32;
+        for (account_id, folders) in [(1u32, [1u32, 3u32]), (2, [11, 13]), (3, [21, 23])] {
+            for folder_id in folders {
+                for i in 0..n {
+                    id += 1;
+                    let sent = folder_id % 10 == 3;
+                    out.push(Message {
+                        id,
+                        account_id,
+                        folder_id,
+                        uid: id,
+                        from_name: if sent { "Jason M.".into() } else { format!("Sender {}", i % 97) },
+                        from_addr: if sent { ME.into() } else { format!("sender{}@example.com", i % 97) },
+                        reply_to: String::new(),
+                        to: if sent { format!("person{}@example.com", i % 53) } else { ME.into() },
+                        cc: String::new(),
+                        subject: format!("Bulk message {i} in folder {folder_id}"),
+                        preview: "A generated message that stands in for real mail, so a list of thousands can be measured.".into(),
+                        body: String::new(),
+                        date: "Mon".into(),
+                        timestamp: base - 3600 * (i as i64 + 1) - account_id as i64,
+                        unread: !sent && i % 7 == 0,
+                        starred: i % 41 == 0,
+                        keywords: Vec::new(),
+                        has_attachment: false,
+                        message_id: format!("<bulk-{id}@vireo.local>"),
+                        references: String::new(),
+                    });
+                }
+            }
+        }
+    }
+    out
 }
