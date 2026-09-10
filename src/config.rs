@@ -852,6 +852,13 @@ struct PrivacyFile {
     /// full sidebar out over the panes without needing the expand button.
     #[serde(default)]
     sidebar_hover_expand: bool,
+    /// Icon rail: a dot for unread mail in place of the count.
+    #[serde(default)]
+    rail_dots: bool,
+    /// Icon rail: the sections folded up by themselves when the sidebar
+    /// collapses, one switch each.
+    #[serde(default)]
+    rail_fold: RailFold,
     /// The app chrome's theme: follow the system, or force light/dark.
     #[serde(default)]
     app_theme: AppTheme,
@@ -1081,6 +1088,8 @@ impl Default for PrivacyFile {
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
+            rail_dots: false,
+            rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
             preview_lines: default_preview_lines(),
             single_key_shortcuts: false,
@@ -1674,6 +1683,54 @@ pub fn load_sidebar_hover_expand() -> bool {
     load_privacy().sidebar_hover_expand
 }
 
+pub fn load_rail_dots() -> bool {
+    load_privacy().rail_dots
+}
+
+pub fn load_rail_fold() -> RailFold {
+    load_privacy().rail_fold
+}
+
+/// Which sidebar sections fold up by themselves when the sidebar collapses
+/// to its icon rail (Settings → Sidebar → Icon rail), and open again when it
+/// expands. Each has its own switch so the rail is just the way the user
+/// wants it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RailFold {
+    /// Every expanded account's folder list.
+    #[serde(default)]
+    pub accounts: bool,
+    /// The per-account inbox list under All Inboxes.
+    #[serde(default)]
+    pub all_inboxes: bool,
+    /// The Filtered Folders section.
+    #[serde(default)]
+    pub filtered: bool,
+    /// The Tags section.
+    #[serde(default)]
+    pub tags: bool,
+}
+
+impl RailFold {
+    /// Every section.
+    pub const ALL: RailFold =
+        RailFold { accounts: true, all_inboxes: true, filtered: true, tags: true };
+
+    /// The switches on here that were off in `before`.
+    pub fn gained_since(self, before: RailFold) -> RailFold {
+        RailFold {
+            accounts: self.accounts && !before.accounts,
+            all_inboxes: self.all_inboxes && !before.all_inboxes,
+            filtered: self.filtered && !before.filtered,
+            tags: self.tags && !before.tags,
+        }
+    }
+
+    pub fn any(self) -> bool {
+        self.accounts || self.all_inboxes || self.filtered || self.tags
+    }
+}
+
 pub fn load_app_theme() -> AppTheme {
     load_privacy().app_theme
 }
@@ -1770,6 +1827,8 @@ pub fn save_privacy(
     tray_mail: bool,
     show_remote_banner: bool,
     sidebar_hover_expand: bool,
+    rail_dots: bool,
+    rail_fold: RailFold,
     app_theme: AppTheme,
     show_unified: bool,
     unified_chip: bool,
@@ -1837,6 +1896,8 @@ pub fn save_privacy(
         tray_mail,
         show_remote_banner,
         sidebar_hover_expand,
+        rail_dots,
+        rail_fold,
         app_theme,
         show_unified,
         unified_chip,

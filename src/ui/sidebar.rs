@@ -92,6 +92,18 @@ pub struct Sidebar {
     /// Whether the disclosure chevrons LEAD their rows (Settings: Chevron
     /// placement). Off restores the classic trailing position.
     chevrons_left: bool,
+    /// Icon rail: a dot for unread mail in place of the count.
+    rail_dots: bool,
+    /// Icon rail: the sections that fold up by themselves when the sidebar
+    /// collapses (Settings → Sidebar → Icon rail).
+    rail_fold: crate::config::RailFold,
+    /// What the rail's fold-up closed, to open again when the sidebar
+    /// expands.
+    rail_restore: RailRestore,
+    /// Accounts the rail's fold-up has already decided on this time round.
+    /// Accounts arrive one by one at startup, so each SetContents folds the
+    /// newcomers — and leaves alone the ones the user reopened by hand.
+    rail_seen: std::collections::HashSet<u32>,
     /// Per-account widgets, rebuilt on each SetContents.
     revealers: HashMap<u32, gtk::Revealer>,
     chevrons: HashMap<u32, gtk::Image>,
@@ -198,6 +210,8 @@ pub enum SidebarInput {
         show_unified: bool,
         unified_chip: bool,
         chevrons_left: bool,
+        rail_dots: bool,
+        rail_fold: crate::config::RailFold,
         unified_unread: u32,
         /// Filter-rule folders to list inside All Inboxes (already
         /// narrowed to the rules that opt in and the Settings switch).
@@ -421,6 +435,10 @@ impl Component for Sidebar {
             show_unified: false,
             show_unified_chip: true,
             chevrons_left: false,
+            rail_dots: false,
+            rail_fold: crate::config::RailFold::default(),
+            rail_restore: RailRestore::default(),
+            rail_seen: std::collections::HashSet::new(),
             revealers: HashMap::new(),
             chevrons: HashMap::new(),
             folder_lists: HashMap::new(),
@@ -505,17 +523,27 @@ impl Component for Sidebar {
                 show_unified,
                 unified_chip,
                 chevrons_left,
+                rail_dots,
+                rail_fold,
                 unified_unread,
                 unified_folders,
                 tags,
                 filtered_placement,
                 tags_placement,
             } => {
+                let first_contents = self.sections.is_empty();
                 // Order each account's folders essential-first, then custom, so
                 // the essential/custom split lines up with row indices (the main
                 // list holds indices 0..E, the custom list E..).
                 for s in &mut sections {
                     s.folders.sort_by_key(|f| f.kind == FolderKind::Custom);
+                    // An account the rail folded up stays folded: the app
+                    // may have built these contents before it processed
+                    // that fold's toggle. The user's own reopening takes
+                    // the account off the list (ToggleCollapseLocal).
+                    if self.rail_restore.accounts.contains(&s.account.id) {
+                        s.collapsed = true;
+                    }
                 }
                 // Seed the tree's collapsed nodes from the persisted state;
                 // later chevron clicks flip the local copy.
@@ -529,6 +557,26 @@ impl Component for Sidebar {
                 self.show_unified = show_unified;
                 self.show_unified_chip = unified_chip;
                 self.chevrons_left = chevrons_left;
+                self.rail_dots = rail_dots;
+                // The fold-ups the rail owes: the sections on the first
+                // contents (the app may start collapsed), afterwards only the
+                // switches just turned on — a sync must not re-fold what the
+                // user opened by hand in the rail. Accounts are folded as
+                // they appear (`rail_seen` guards the ones already decided
+                // on). A switch turned off while the rail is up gives its
+                // section back.
+                let turned_on = rail_fold.gained_since(self.rail_fold);
+                let turned_off = self.rail_fold.gained_since(rail_fold);
+                self.rail_fold = rail_fold;
+                if self.collapsed {
+                    if turned_on.accounts {
+                        self.rail_seen.clear();
+                    }
+                    let sections_due = if first_contents { rail_fold } else { turned_on };
+                    let which = crate::config::RailFold { accounts: rail_fold.accounts, ..sections_due };
+                    self.fold_for_rail(&sender, which);
+                    self.unfold_after_rail(&sender, turned_off);
+                }
                 self.unified_unread = unified_unread;
                 self.unified_folders = unified_folders;
                 self.unified_folders_unread =
@@ -900,6 +948,7 @@ impl Component for Sidebar {
                 // persisted preference.
                 if self.collapsed != collapsed {
                     self.collapsed = collapsed;
+                    self.rail_fold_step(&sender);
                     self.rebuild_normal(
                         &widgets.pinned_box,
                         &widgets.normal_box,
@@ -912,6 +961,7 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleCollapsed => {
                 self.collapsed = !self.collapsed;
+                self.rail_fold_step(&sender);
                 self.rebuild_normal(
                     &widgets.pinned_box,
                     &widgets.normal_box,
@@ -931,6 +981,10 @@ impl Component for Sidebar {
                     }
                     if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                         s.collapsed = !expanded;
+                    }
+                    if expanded {
+                        // Opened by hand: the rail's fold-up lets go of it.
+                        self.rail_restore.accounts.retain(|&a| a != id);
                     }
                     // The Inbox chip lives inside the folder list we just hid/shown,
                     // so mirror it onto the avatar: visible only while collapsed.
@@ -1166,6 +1220,16 @@ impl Sidebar {
             pinned.remove_css_class("rail-collapsed");
             container.remove_css_class("rail-collapsed");
             footer.remove_css_class("rail-collapsed");
+        }
+        // Unread dots in place of counts (Settings → Sidebar → Icon rail):
+        // a style on the rail's containers, so every mini chip built below
+        // shrinks to a dot without each builder knowing.
+        for w in [pinned, container, footer] {
+            if self.collapsed && self.rail_dots {
+                w.add_css_class("rail-dots");
+            } else {
+                w.remove_css_class("rail-dots");
+            }
         }
         self.revealers.clear();
         self.chevrons.clear();
@@ -2876,6 +2940,89 @@ fn path_is_under(child: &str, parent: &str) -> bool {
     child.len() > parent.len() + 1
         && child.starts_with(parent)
         && matches!(child.as_bytes()[parent.len()], b'/' | b'.' | b'\\')
+}
+
+/// What the icon rail's automatic fold-up closed (Settings → Sidebar → Icon
+/// rail), so expanding the sidebar opens exactly those again — not sections
+/// the user had folded up themselves.
+#[derive(Debug, Default)]
+struct RailRestore {
+    accounts: Vec<u32>,
+    all_inboxes: bool,
+    filtered: bool,
+    tags: bool,
+}
+
+impl Sidebar {
+    /// The rail's automatic fold-up on collapse, and its undoing on expand.
+    /// Runs before the rebuild that follows a collapse change, which draws
+    /// the sections from the state set here.
+    fn rail_fold_step(&mut self, sender: &ComponentSender<Self>) {
+        if self.collapsed {
+            self.fold_for_rail(sender, self.rail_fold);
+        } else {
+            self.unfold_after_rail(sender, crate::config::RailFold::ALL);
+        }
+    }
+
+    /// Fold up the sections `which` names that are open, remembering each so
+    /// [`Self::unfold_after_rail`] can open it again. Accounts go through the
+    /// same output as the user's own toggle so the app records the state.
+    fn fold_for_rail(&mut self, sender: &ComponentSender<Self>, which: crate::config::RailFold) {
+        if !which.any() {
+            return;
+        }
+        if which.all_inboxes && self.unified_expanded {
+            self.unified_expanded = false;
+            self.rail_restore.all_inboxes = true;
+        }
+        if which.filtered && self.unified_folders_expanded {
+            self.unified_folders_expanded = false;
+            self.rail_restore.filtered = true;
+        }
+        if which.tags && self.tags_expanded {
+            self.tags_expanded = false;
+            self.rail_restore.tags = true;
+        }
+        if which.accounts {
+            for s in self
+                .sections
+                .iter_mut()
+                .filter(|s| !s.collapsed && !self.rail_seen.contains(&s.account.id))
+            {
+                s.collapsed = true;
+                self.rail_restore.accounts.push(s.account.id);
+                let _ = sender.output(SidebarOutput::ToggleCollapse(s.account.id));
+            }
+            self.rail_seen.extend(self.sections.iter().map(|s| s.account.id));
+        }
+    }
+
+    /// Open again what the fold-up closed, for the sections `which` names.
+    fn unfold_after_rail(&mut self, sender: &ComponentSender<Self>, which: crate::config::RailFold) {
+        if !which.any() {
+            return;
+        }
+        if which.all_inboxes && std::mem::take(&mut self.rail_restore.all_inboxes) {
+            self.unified_expanded = true;
+        }
+        if which.filtered && std::mem::take(&mut self.rail_restore.filtered) {
+            self.unified_folders_expanded = true;
+        }
+        if which.tags && std::mem::take(&mut self.rail_restore.tags) {
+            self.tags_expanded = true;
+        }
+        if which.accounts {
+            self.rail_seen.clear();
+            for id in std::mem::take(&mut self.rail_restore.accounts) {
+                // Still folded: the user may have opened it in the rail.
+                if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id && s.collapsed) {
+                    s.collapsed = false;
+                    let _ = sender.output(SidebarOutput::ToggleCollapse(id));
+                }
+            }
+        }
+    }
 }
 
 /// Whether a folder row is hidden because some ancestor node is collapsed.

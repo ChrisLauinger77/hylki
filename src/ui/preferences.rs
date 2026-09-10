@@ -75,6 +75,8 @@ pub struct PrefInit {
     pub console_mode: bool,
     pub read_mark: crate::config::ReadMark,
     pub sidebar_hover_expand: bool,
+    pub rail_dots: bool,
+    pub rail_fold: crate::config::RailFold,
     pub preview_lines: u32,
     pub single_key_shortcuts: bool,
     pub run_in_background: bool,
@@ -192,6 +194,9 @@ pub struct Preferences {
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
     show_unified: bool,
+    /// The icon rail's fold-up switches, kept whole so each toggle can hand
+    /// the app the full set.
+    rail_fold: crate::config::RailFold,
     /// Whether swipe actions are on (the reverse switch follows it).
     swipe_enabled: bool,
     /// Mirrors the threading switch, so the "threaded message list" row below
@@ -316,6 +321,11 @@ pub enum PrefInput {
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
     ToggleSidebarHoverExpand(bool),
+    ToggleRailDots(bool),
+    ToggleRailFoldAccounts(bool),
+    ToggleRailFoldAllInboxes(bool),
+    ToggleRailFoldFiltered(bool),
+    ToggleRailFoldTags(bool),
     ChangePreviewLines(u32),
     ToggleSingleKey(bool),
     ToggleConsoleMode(bool),
@@ -396,6 +406,8 @@ pub enum PrefOutput {
     ExportLog,
     ImportSettings,
     SetSidebarHoverExpand(bool),
+    SetRailDots(bool),
+    SetRailFold(crate::config::RailFold),
     SetAppTheme(AppTheme),
     /// The "this window opens to" choice changed (true = Accounts).
     SetSettingsOpenAccounts(bool),
@@ -782,6 +794,65 @@ impl Component for Preferences {
                                                        leaves."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSidebarHoverExpand(row.is_active()));
+                                        },
+                                    },
+                                },
+
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Icon rail"),
+                                    set_description: Some(
+                                        &i18n("The sidebar collapsed to icons, by its button or in a \
+                                               narrow window."),
+                                    ),
+
+                                    #[name = "rail_dots_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Unread dots instead of counts"),
+                                        set_subtitle: &i18n("Mark folders and accounts that have unread mail with \
+                                                       a dot in the accent colour rather than the number \
+                                                       of messages. The count stays in the tooltip."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailDots(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_accounts_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up accounts"),
+                                        set_subtitle: &i18n("Collapse every expanded account when the sidebar \
+                                                       becomes the icon rail; they open again when it \
+                                                       expands."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldAccounts(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_all_inboxes_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up All Inboxes"),
+                                        set_subtitle: &i18n("Collapse the per-account inbox list under All \
+                                                       Inboxes in the icon rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_filtered_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up Filtered Folders"),
+                                        set_subtitle: &i18n("Collapse the Filtered Folders section in the icon \
+                                                       rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldFiltered(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_tags_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up Tags"),
+                                        set_subtitle: &i18n("Collapse the Tags section in the icon rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldTags(row.is_active()));
                                         },
                                     },
                                 },
@@ -1347,6 +1418,7 @@ impl Component for Preferences {
         let mut model = Preferences {
             notifications: init.notifications,
             show_unified: init.show_unified,
+            rail_fold: init.rail_fold,
             swipe_enabled: init.swipe_enabled,
             threading: init.threading,
             thread_expansion: init.thread_expansion,
@@ -1444,6 +1516,11 @@ impl Component for Preferences {
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
+        widgets.rail_dots_row.set_active(init.rail_dots);
+        widgets.rail_fold_accounts_row.set_active(init.rail_fold.accounts);
+        widgets.rail_fold_all_inboxes_row.set_active(init.rail_fold.all_inboxes);
+        widgets.rail_fold_filtered_row.set_active(init.rail_fold.filtered);
+        widgets.rail_fold_tags_row.set_active(init.rail_fold.tags);
         let preview_labels_owned = [i18n("Off"), i18n("1 line"), i18n("2 lines"), i18n("3 lines")];
         let preview_labels: Vec<&str> = preview_labels_owned.iter().map(String::as_str).collect();
         widgets
@@ -1924,6 +2001,25 @@ impl Component for Preferences {
             }
             PrefInput::ToggleSidebarHoverExpand(on) => {
                 let _ = sender.output(PrefOutput::SetSidebarHoverExpand(on));
+            }
+            PrefInput::ToggleRailDots(on) => {
+                let _ = sender.output(PrefOutput::SetRailDots(on));
+            }
+            PrefInput::ToggleRailFoldAccounts(on) => {
+                self.rail_fold.accounts = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldAllInboxes(on) => {
+                self.rail_fold.all_inboxes = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldFiltered(on) => {
+                self.rail_fold.filtered = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldTags(on) => {
+                self.rail_fold.tags = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
             }
             PrefInput::ToggleSingleKey(on) => {
                 let _ = sender.output(PrefOutput::SetSingleKey(on));

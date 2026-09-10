@@ -291,6 +291,11 @@ pub struct AppModel {
     rail_snapshot: std::rc::Rc<std::cell::RefCell<Option<gtk::gdk::Paintable>>>,
     /// Preference: hovering the icon rail opens the peek by itself.
     sidebar_hover_expand: bool,
+    /// Preference: the icon rail marks unread mail with a dot, not a count.
+    rail_dots: bool,
+    /// Preference: the sections the icon rail folds up when the sidebar
+    /// collapses.
+    rail_fold: config::RailFold,
     /// The app chrome's theme preference (follow system / light / dark).
     app_theme: config::AppTheme,
     /// Held so the in-flight collapse/expand width animation isn't dropped.
@@ -744,6 +749,10 @@ pub enum AppMsg {
     ListCount(String),
     /// Preference: hovering the narrow-window rail floats the sidebar out.
     SetSidebarHoverExpand(bool),
+    /// Preference: the icon rail shows unread dots rather than counts.
+    SetRailDots(bool),
+    /// Preference: which sections the icon rail folds up on collapse.
+    SetRailFold(config::RailFold),
     /// Preference: the app chrome's theme (follow system / light / dark).
     SetAppTheme(config::AppTheme),
     /// The cursor entered the sidebar pane — open the hover peek (rail +
@@ -1910,6 +1919,8 @@ impl SimpleComponent for AppModel {
             peek_rail_ghost: None,
             rail_snapshot: std::rc::Rc::new(std::cell::RefCell::new(None)),
             sidebar_hover_expand: config::load_sidebar_hover_expand(),
+            rail_dots: config::load_rail_dots(),
+            rail_fold: config::load_rail_fold(),
             app_theme: config::load_app_theme(),
             current: None,
             allowed_senders: config::load_allowed_senders(),
@@ -3407,6 +3418,24 @@ impl SimpleComponent for AppModel {
                 if self.sidebar_hover_expand != on {
                     self.sidebar_hover_expand = on;
                     self.save_settings();
+                }
+            }
+
+            AppMsg::SetRailDots(on) => {
+                if self.rail_dots != on {
+                    self.rail_dots = on;
+                    self.save_settings();
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::SetRailFold(fold) => {
+                if self.rail_fold != fold {
+                    self.rail_fold = fold;
+                    self.save_settings();
+                    // The sidebar folds (or reopens) the sections concerned
+                    // itself if the rail is up.
+                    self.rebuild_sidebar();
                 }
             }
 
@@ -6546,6 +6575,8 @@ impl AppModel {
             self.tray_mail,
             self.show_remote_banner,
             self.sidebar_hover_expand,
+            self.rail_dots,
+            self.rail_fold,
             self.app_theme,
             self.show_unified_pref,
             self.unified_chip,
@@ -7740,6 +7771,8 @@ impl AppModel {
             show_unified,
             unified_chip: self.unified_chip,
             chevrons_left: self.chevrons_left,
+            rail_dots: self.rail_dots,
+            rail_fold: self.rail_fold,
             unified_unread,
             unified_folders,
             tags: self.tags.clone(),
@@ -10284,6 +10317,8 @@ impl AppModel {
             read_mark: self.read_mark,
             settings_open_accounts: self.settings_open_accounts,
             sidebar_hover_expand: self.sidebar_hover_expand,
+            rail_dots: self.rail_dots,
+            rail_fold: self.rail_fold,
             card_actions_hover: self.card_actions_hover,
             card_actions_auto: self.card_actions_auto,
             list_palette: self.list_palette,
@@ -10377,6 +10412,8 @@ impl AppModel {
                 PrefOutput::SetSidebarHoverExpand(on) => {
                     AppMsg::SetSidebarHoverExpand(on)
                 }
+                PrefOutput::SetRailDots(on) => AppMsg::SetRailDots(on),
+                PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
                 PrefOutput::SetSettingsOpenAccounts(on) => {
                     AppMsg::SetSettingsOpenAccounts(on)
