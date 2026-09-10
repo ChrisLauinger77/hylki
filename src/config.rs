@@ -852,6 +852,10 @@ struct PrivacyFile {
     /// full sidebar out over the panes without needing the expand button.
     #[serde(default)]
     sidebar_hover_expand: bool,
+    /// Reopen with the sidebar as it was left: full or icon rail, which
+    /// accounts and sections are open. Off starts every launch afresh.
+    #[serde(default = "default_on")]
+    remember_sidebar: bool,
     /// Icon rail: a dot for unread mail in place of the count. On by
     /// default, as are the fold-ups below.
     #[serde(default = "default_on")]
@@ -1089,6 +1093,7 @@ impl Default for PrivacyFile {
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
+            remember_sidebar: true,
             rail_dots: true,
             rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
@@ -1684,6 +1689,10 @@ pub fn load_sidebar_hover_expand() -> bool {
     load_privacy().sidebar_hover_expand
 }
 
+pub fn load_remember_sidebar() -> bool {
+    load_privacy().remember_sidebar
+}
+
 pub fn load_rail_dots() -> bool {
     load_privacy().rail_dots
 }
@@ -1838,6 +1847,7 @@ pub fn save_privacy(
     tray_mail: bool,
     show_remote_banner: bool,
     sidebar_hover_expand: bool,
+    remember_sidebar: bool,
     rail_dots: bool,
     rail_fold: RailFold,
     app_theme: AppTheme,
@@ -1907,6 +1917,7 @@ pub fn save_privacy(
         tray_mail,
         show_remote_banner,
         sidebar_hover_expand,
+        remember_sidebar,
         rail_dots,
         rail_fold,
         app_theme,
@@ -1950,6 +1961,14 @@ struct SidebarFile {
     /// Collapsed folder-tree nodes, as "email\tpath" entries.
     #[serde(default)]
     tree_collapsed: Vec<String>,
+    /// The three sections' open state; open when the file predates them,
+    /// which is how they always started.
+    #[serde(default = "default_on")]
+    unified_expanded: bool,
+    #[serde(default = "default_on")]
+    filtered_expanded: bool,
+    #[serde(default = "default_on")]
+    tags_expanded: bool,
 }
 
 fn sidebar_path() -> Option<PathBuf> {
@@ -1969,6 +1988,12 @@ pub struct SidebarState {
     pub icon_only: bool,
     /// Collapsed folder-tree nodes, as "email\tpath" entries.
     pub tree_collapsed: Vec<String>,
+    /// Whether the per-account inbox list under All Inboxes is open.
+    pub unified_expanded: bool,
+    /// Whether the Filtered Folders section is open.
+    pub filtered_expanded: bool,
+    /// Whether the Tags section is open.
+    pub tags_expanded: bool,
 }
 
 pub fn load_sidebar_state() -> SidebarState {
@@ -1985,6 +2010,9 @@ pub fn load_sidebar_state() -> SidebarState {
             folders_expanded: s.folders_expanded,
             icon_only: s.icon_only,
             tree_collapsed: s.tree_collapsed,
+            unified_expanded: s.unified_expanded,
+            filtered_expanded: s.filtered_expanded,
+            tags_expanded: s.tags_expanded,
         })
         .unwrap_or_default()
 }
@@ -2002,6 +2030,9 @@ pub fn save_sidebar_state(state: &SidebarState) {
         folders_expanded: state.folders_expanded.clone(),
         icon_only: state.icon_only,
         tree_collapsed: state.tree_collapsed.clone(),
+        unified_expanded: state.unified_expanded,
+        filtered_expanded: state.filtered_expanded,
+        tags_expanded: state.tags_expanded,
     };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {

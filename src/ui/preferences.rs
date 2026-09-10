@@ -75,6 +75,7 @@ pub struct PrefInit {
     pub console_mode: bool,
     pub read_mark: crate::config::ReadMark,
     pub sidebar_hover_expand: bool,
+    pub remember_sidebar: bool,
     pub rail_dots: bool,
     pub rail_fold: crate::config::RailFold,
     pub preview_lines: u32,
@@ -321,6 +322,7 @@ pub enum PrefInput {
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
     ToggleSidebarHoverExpand(bool),
+    ToggleRememberSidebar(bool),
     ToggleRailDots(bool),
     ToggleRailFoldAccounts(bool),
     ToggleRailFoldAllInboxes(bool),
@@ -406,6 +408,7 @@ pub enum PrefOutput {
     ExportLog,
     ImportSettings,
     SetSidebarHoverExpand(bool),
+    SetRememberSidebar(bool),
     SetRailDots(bool),
     SetRailFold(crate::config::RailFold),
     SetAppTheme(AppTheme),
@@ -794,6 +797,18 @@ impl Component for Preferences {
                                                        leaves."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSidebarHoverExpand(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "remember_sidebar_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Remember the sidebar layout"),
+                                        set_subtitle: &i18n("Reopen with the sidebar as you left it: full or \
+                                                       icon rail, and which accounts, folders and sections \
+                                                       are open. Off starts every launch with the full \
+                                                       sidebar and everything open."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRememberSidebar(row.is_active()));
                                         },
                                     },
                                 },
@@ -1516,6 +1531,7 @@ impl Component for Preferences {
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
+        widgets.remember_sidebar_row.set_active(init.remember_sidebar);
         widgets.rail_dots_row.set_active(init.rail_dots);
         widgets.rail_fold_accounts_row.set_active(init.rail_fold.accounts);
         widgets.rail_fold_all_inboxes_row.set_active(init.rail_fold.all_inboxes);
@@ -2001,6 +2017,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleSidebarHoverExpand(on) => {
                 let _ = sender.output(PrefOutput::SetSidebarHoverExpand(on));
+            }
+            PrefInput::ToggleRememberSidebar(on) => {
+                let _ = sender.output(PrefOutput::SetRememberSidebar(on));
             }
             PrefInput::ToggleRailDots(on) => {
                 let _ = sender.output(PrefOutput::SetRailDots(on));

@@ -291,6 +291,13 @@ pub struct AppModel {
     rail_snapshot: std::rc::Rc<std::cell::RefCell<Option<gtk::gdk::Paintable>>>,
     /// Preference: hovering the icon rail opens the peek by itself.
     sidebar_hover_expand: bool,
+    /// Preference: the sidebar reopens as it was left.
+    remember_sidebar: bool,
+    /// The three sections' open state, as the sidebar last reported it,
+    /// persisted with the rest of the sidebar layout.
+    unified_expanded: bool,
+    filtered_expanded: bool,
+    tags_expanded: bool,
     /// Preference: the icon rail marks unread mail with a dot, not a count.
     rail_dots: bool,
     /// Preference: the sections the icon rail folds up when the sidebar
@@ -749,6 +756,11 @@ pub enum AppMsg {
     ListCount(String),
     /// Preference: hovering the narrow-window rail floats the sidebar out.
     SetSidebarHoverExpand(bool),
+    /// Preference: the sidebar reopens as it was left.
+    SetRememberSidebar(bool),
+    /// The sidebar's All Inboxes / Filtered Folders / Tags sections were
+    /// opened or folded — record it with the layout.
+    SidebarSectionsOpen { all_inboxes: bool, filtered: bool, tags: bool },
     /// Preference: the icon rail shows unread dots rather than counts.
     SetRailDots(bool),
     /// Preference: which sections the icon rail folds up on collapse.
@@ -1589,7 +1601,23 @@ impl SimpleComponent for AppModel {
         install_scheme_css(&root);
 
         let mut sidebar_state = config::load_sidebar_state();
+        // Settings → Sidebar → "Remember the sidebar layout": off starts
+        // every launch with the full sidebar, every account open and the
+        // sections as they first come, keeping only the account order.
+        let remember_sidebar = config::load_remember_sidebar();
+        if !remember_sidebar {
+            sidebar_state = config::SidebarState {
+                order: sidebar_state.order,
+                unified_expanded: true,
+                filtered_expanded: true,
+                tags_expanded: true,
+                ..Default::default()
+            };
+        }
         let icon_only = sidebar_state.icon_only;
+        let unified_expanded = sidebar_state.unified_expanded;
+        let filtered_expanded = sidebar_state.filtered_expanded;
+        let tags_expanded = sidebar_state.tags_expanded;
 
         // Load accounts, then reconcile against GNOME Online Accounts: drop any
         // imported account GOA no longer has, pause any whose Mail service is
@@ -1633,6 +1661,9 @@ impl SimpleComponent for AppModel {
         let sidebar = Sidebar::builder()
             .launch(SidebarInit {
                 collapsed: icon_only,
+                unified_expanded,
+                filtered_expanded,
+                tags_expanded,
                 show_attachments,
                 show_contacts,
             })
@@ -1651,6 +1682,9 @@ impl SimpleComponent for AppModel {
                 SidebarOutput::ToggleCollapse(id) => AppMsg::ToggleCollapse(id),
                 SidebarOutput::ToggleCustomFolders(id) => AppMsg::ToggleCustomFolders(id),
                 SidebarOutput::CollapsedChanged(collapsed) => AppMsg::SidebarCollapsed(collapsed),
+                SidebarOutput::SectionsOpen { all_inboxes, filtered, tags } => {
+                    AppMsg::SidebarSectionsOpen { all_inboxes, filtered, tags }
+                }
                 SidebarOutput::FolderNodeCollapsed { account_id, path, collapsed } => {
                     AppMsg::FolderNodeCollapsed { account_id, path, collapsed }
                 }
@@ -1919,6 +1953,10 @@ impl SimpleComponent for AppModel {
             peek_rail_ghost: None,
             rail_snapshot: std::rc::Rc::new(std::cell::RefCell::new(None)),
             sidebar_hover_expand: config::load_sidebar_hover_expand(),
+            remember_sidebar,
+            unified_expanded,
+            filtered_expanded,
+            tags_expanded,
             rail_dots: config::load_rail_dots(),
             rail_fold: config::load_rail_fold(),
             app_theme: config::load_app_theme(),
@@ -3418,6 +3456,24 @@ impl SimpleComponent for AppModel {
                 if self.sidebar_hover_expand != on {
                     self.sidebar_hover_expand = on;
                     self.save_settings();
+                }
+            }
+
+            AppMsg::SetRememberSidebar(on) => {
+                if self.remember_sidebar != on {
+                    self.remember_sidebar = on;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SidebarSectionsOpen { all_inboxes, filtered, tags } => {
+                if (self.unified_expanded, self.filtered_expanded, self.tags_expanded)
+                    != (all_inboxes, filtered, tags)
+                {
+                    self.unified_expanded = all_inboxes;
+                    self.filtered_expanded = filtered;
+                    self.tags_expanded = tags;
+                    self.save_sidebar_state();
                 }
             }
 
@@ -6575,6 +6631,7 @@ impl AppModel {
             self.tray_mail,
             self.show_remote_banner,
             self.sidebar_hover_expand,
+            self.remember_sidebar,
             self.rail_dots,
             self.rail_fold,
             self.app_theme,
@@ -7253,6 +7310,9 @@ impl AppModel {
             folders_expanded: self.folders_expanded.clone(),
             icon_only: self.sidebar_collapsed,
             tree_collapsed: self.tree_collapsed.clone(),
+            unified_expanded: self.unified_expanded,
+            filtered_expanded: self.filtered_expanded,
+            tags_expanded: self.tags_expanded,
         });
     }
 
@@ -10317,6 +10377,7 @@ impl AppModel {
             read_mark: self.read_mark,
             settings_open_accounts: self.settings_open_accounts,
             sidebar_hover_expand: self.sidebar_hover_expand,
+            remember_sidebar: self.remember_sidebar,
             rail_dots: self.rail_dots,
             rail_fold: self.rail_fold,
             card_actions_hover: self.card_actions_hover,
@@ -10412,6 +10473,7 @@ impl AppModel {
                 PrefOutput::SetSidebarHoverExpand(on) => {
                     AppMsg::SetSidebarHoverExpand(on)
                 }
+                PrefOutput::SetRememberSidebar(on) => AppMsg::SetRememberSidebar(on),
                 PrefOutput::SetRailDots(on) => AppMsg::SetRailDots(on),
                 PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),

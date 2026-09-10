@@ -55,6 +55,11 @@ pub struct SectionData {
 pub struct SidebarInit {
     /// Icon-only mode: hide all text, show just icons and account pills.
     pub collapsed: bool,
+    /// The three sections' open state as last left (persisted with the
+    /// sidebar layout).
+    pub unified_expanded: bool,
+    pub filtered_expanded: bool,
+    pub tags_expanded: bool,
     /// Whether the "Attachments" row is shown.
     pub show_attachments: bool,
     /// Whether the "Contacts" row is shown.
@@ -100,6 +105,10 @@ pub struct Sidebar {
     /// What the rail's fold-up closed, to open again when the sidebar
     /// expands.
     rail_restore: RailRestore,
+    /// Whether the rail came up by collapsing in this session (as against
+    /// being restored at startup). Only then are accounts arriving later
+    /// folded too: a restored rail shows what was saved.
+    rail_armed: bool,
     /// Accounts the rail's fold-up has already decided on this time round.
     /// Accounts arrive one by one at startup, so each SetContents folds the
     /// newcomers — and leaves alone the ones the user reopened by hand.
@@ -286,6 +295,9 @@ pub enum SidebarInput {
 
 #[derive(Debug)]
 pub enum SidebarOutput {
+    /// The All Inboxes / Filtered Folders / Tags sections' open state
+    /// changed (a click, or the rail's fold-up) — for persistence.
+    SectionsOpen { all_inboxes: bool, filtered: bool, tags: bool },
     /// The "New message" row at the top of the sidebar.
     ComposeRequested,
     /// The refresh button beside it.
@@ -438,6 +450,7 @@ impl Component for Sidebar {
             rail_dots: false,
             rail_fold: crate::config::RailFold::default(),
             rail_restore: RailRestore::default(),
+            rail_armed: false,
             rail_seen: std::collections::HashSet::new(),
             revealers: HashMap::new(),
             chevrons: HashMap::new(),
@@ -468,14 +481,14 @@ impl Component for Sidebar {
             unified_unread: 0,
             folder_badges: HashMap::new(),
             unified_badge: None,
-            unified_expanded: true,
+            unified_expanded: init.unified_expanded,
             unified_revealer: None,
             unified_chevron: None,
             unified_inbox_list: None,
             unified_inboxes: Vec::new(),
             unified_inbox_badges: HashMap::new(),
             unified_folders: Vec::new(),
-            unified_folders_expanded: true,
+            unified_folders_expanded: init.filtered_expanded,
             unified_folders_revealer: None,
             unified_folders_chevron: None,
             unified_folders_toggle: None,
@@ -485,7 +498,7 @@ impl Component for Sidebar {
             unified_folders_unread: 0,
             account_circle_badges: HashMap::new(),
             tags: Vec::new(),
-            tags_expanded: true,
+            tags_expanded: init.tags_expanded,
             tags_revealer: None,
             tags_chevron: None,
             tags_toggle: None,
@@ -531,7 +544,6 @@ impl Component for Sidebar {
                 filtered_placement,
                 tags_placement,
             } => {
-                let first_contents = self.sections.is_empty();
                 // Order each account's folders essential-first, then custom, so
                 // the essential/custom split lines up with row indices (the main
                 // list holds indices 0..E, the custom list E..).
@@ -558,13 +570,13 @@ impl Component for Sidebar {
                 self.show_unified_chip = unified_chip;
                 self.chevrons_left = chevrons_left;
                 self.rail_dots = rail_dots;
-                // The fold-ups the rail owes: the sections on the first
-                // contents (the app may start collapsed), afterwards only the
-                // switches just turned on — a sync must not re-fold what the
-                // user opened by hand in the rail. Accounts are folded as
-                // they appear (`rail_seen` guards the ones already decided
-                // on). A switch turned off while the rail is up gives its
-                // section back.
+                // The fold-ups the rail owes while it is up: the switches
+                // just turned on, and — once the rail came up by collapsing
+                // in this session — accounts arriving since (`rail_seen`
+                // guards the ones already decided on, so a sync never
+                // re-folds what the user opened by hand). A restored rail
+                // folds nothing: what was saved is what shows. A switch
+                // turned off while the rail is up gives its section back.
                 let turned_on = rail_fold.gained_since(self.rail_fold);
                 let turned_off = self.rail_fold.gained_since(rail_fold);
                 self.rail_fold = rail_fold;
@@ -572,8 +584,10 @@ impl Component for Sidebar {
                     if turned_on.accounts {
                         self.rail_seen.clear();
                     }
-                    let sections_due = if first_contents { rail_fold } else { turned_on };
-                    let which = crate::config::RailFold { accounts: rail_fold.accounts, ..sections_due };
+                    let which = crate::config::RailFold {
+                        accounts: turned_on.accounts || (rail_fold.accounts && self.rail_armed),
+                        ..turned_on
+                    };
                     self.fold_for_rail(&sender, which);
                     self.unfold_after_rail(&sender, turned_off);
                 }
@@ -714,6 +728,7 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleUnifiedExpand => {
                 self.unified_expanded = !self.unified_expanded;
+                self.report_sections(&sender);
                 if let Some(rev) = &self.unified_revealer {
                     rev.set_reveal_child(self.unified_expanded);
                 }
@@ -760,6 +775,7 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleTagsExpand => {
                 self.tags_expanded = !self.tags_expanded;
+                self.report_sections(&sender);
                 if let Some(rev) = &self.tags_revealer {
                     rev.set_reveal_child(self.tags_expanded);
                 }
@@ -773,6 +789,7 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleUnifiedFoldersExpand => {
                 self.unified_folders_expanded = !self.unified_folders_expanded;
+                self.report_sections(&sender);
                 if let Some(rev) = &self.unified_folders_revealer {
                     rev.set_reveal_child(self.unified_folders_expanded);
                 }
@@ -2961,6 +2978,7 @@ impl Sidebar {
     /// Runs before the rebuild that follows a collapse change, which draws
     /// the sections from the state set here.
     fn rail_fold_step(&mut self, sender: &ComponentSender<Self>) {
+        self.rail_armed = self.collapsed;
         if self.collapsed {
             self.fold_for_rail(sender, self.rail_fold);
         } else {
@@ -2999,6 +3017,16 @@ impl Sidebar {
             }
             self.rail_seen.extend(self.sections.iter().map(|s| s.account.id));
         }
+        self.report_sections(sender);
+    }
+
+    /// Tell the app how the three sections stand, for the saved layout.
+    fn report_sections(&self, sender: &ComponentSender<Self>) {
+        let _ = sender.output(SidebarOutput::SectionsOpen {
+            all_inboxes: self.unified_expanded,
+            filtered: self.unified_folders_expanded,
+            tags: self.tags_expanded,
+        });
     }
 
     /// Open again what the fold-up closed, for the sections `which` names.
@@ -3025,6 +3053,7 @@ impl Sidebar {
                 }
             }
         }
+        self.report_sections(sender);
     }
 }
 
