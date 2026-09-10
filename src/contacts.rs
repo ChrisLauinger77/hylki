@@ -27,6 +27,10 @@ pub struct Suggestion {
     pub from_contacts: bool,
     /// How often this address appears in mail history (0 for contacts-only).
     pub score: u32,
+    /// One of the user's own account addresses: offered, since people do
+    /// mail themselves, but ranked after everyone else so it does not sit
+    /// on top of every list (it is on nearly every message received).
+    pub own: bool,
 }
 
 impl Suggestion {
@@ -47,16 +51,17 @@ impl Suggestion {
 }
 
 /// Combined, de-duplicated recipient suggestions from Contacts and mail history
-/// (addresses sent to / received from), excluding the user's own `exclude`
-/// addresses. History frequency becomes each suggestion's `score` so frequently
-/// used addresses — contact or not — can rank ahead.
-pub fn suggestions(exclude: &[String]) -> Vec<Suggestion> {
-    let exclude: HashSet<String> = exclude.iter().map(|e| e.to_lowercase()).collect();
+/// (addresses sent to / received from). History frequency becomes each
+/// suggestion's `score` so frequently used addresses — contact or not — can
+/// rank ahead. The user's `own` (name, email) account addresses are in the
+/// list too, flagged and with no score, so they come last.
+pub fn suggestions(own: &[(String, String)]) -> Vec<Suggestion> {
+    let own_keys: HashSet<String> = own.iter().map(|(_, e)| e.to_lowercase()).collect();
     let mut map: std::collections::HashMap<String, Suggestion> = std::collections::HashMap::new();
 
     for c in read_contacts() {
         let key = c.email.to_lowercase();
-        if exclude.contains(&key) {
+        if own_keys.contains(&key) {
             continue;
         }
         map.entry(key).or_insert(Suggestion {
@@ -64,19 +69,34 @@ pub fn suggestions(exclude: &[String]) -> Vec<Suggestion> {
             email: c.email,
             from_contacts: true,
             score: 0,
+            own: false,
         });
     }
 
     if let Ok(cache) = crate::cache::Cache::open() {
         for (name, email, count) in cache.address_history() {
             let key = email.to_lowercase();
-            if exclude.contains(&key) {
+            if own_keys.contains(&key) {
                 continue;
             }
             map.entry(key)
                 .and_modify(|s| s.score = s.score.max(count))
-                .or_insert(Suggestion { name, email, from_contacts: false, score: count });
+                .or_insert(Suggestion { name, email, from_contacts: false, score: count, own: false });
         }
+    }
+
+    for (name, email) in own {
+        let key = email.to_lowercase();
+        if key.is_empty() || !key.contains('@') {
+            continue;
+        }
+        map.entry(key).or_insert(Suggestion {
+            name: if name.trim().is_empty() { email.clone() } else { name.clone() },
+            email: email.clone(),
+            from_contacts: false,
+            score: 0,
+            own: true,
+        });
     }
 
     let mut out: Vec<Suggestion> = map.into_values().collect();

@@ -5004,9 +5004,10 @@ impl SimpleComponent for AppModel {
                 let own: HashSet<String> = self.config.iter().map(|c| c.email.to_lowercase()).collect();
                 let fresh: Vec<crate::contacts::Suggestion> = recipients
                     .into_iter()
-                    .filter(|(_, e)| e.contains('@') && !own.contains(&e.to_lowercase()))
+                    .filter(|(_, e)| e.contains('@'))
                     .map(|(name, email)| crate::contacts::Suggestion {
                         name: if name.is_empty() { email.clone() } else { name },
+                        own: own.contains(&email.to_lowercase()),
                         email,
                         from_contacts: false,
                         score: 1,
@@ -8549,8 +8550,8 @@ impl AppModel {
             })
             .unwrap_or(0);
 
-        // Exclude the user's own addresses from recipient suggestions.
-        let own: Vec<String> = self.config.iter().map(|c| c.email.clone()).collect();
+        // The user's own addresses go last in the recipient suggestions.
+        let own: Vec<(String, String)> = self.config.iter().map(|c| (c.name.clone(), c.email.clone())).collect();
         let id = self.next_compose_id;
         self.next_compose_id += 1;
         let init = ComposeInit {

@@ -1361,7 +1361,9 @@ impl Compose {
         matches.sort_by(|a, b| {
             let pa = a.email.to_lowercase().starts_with(&q) || a.name.to_lowercase().starts_with(&q);
             let pb = b.email.to_lowercase().starts_with(&q) || b.name.to_lowercase().starts_with(&q);
-            pb.cmp(&pa)
+            // Own addresses come after everyone else's, prefix match or not.
+            a.own.cmp(&b.own)
+                .then(pb.cmp(&pa))
                 .then(b.score.cmp(&a.score))
                 .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
         });
