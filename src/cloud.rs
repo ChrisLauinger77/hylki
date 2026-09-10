@@ -154,15 +154,18 @@ impl CloudAccount {
     pub fn key(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => format!("cloud:dropbox|{}", self.user.trim()),
+            CloudKind::GoogleDrive if self.goa_id.trim().is_empty() => format!("cloud:google|{}", self.user.trim()),
             CloudKind::GoogleDrive | CloudKind::OneDrive => format!("cloud:goa|{}", self.goa_id.trim()),
             _ => format!("cloud:{}|{}", self.base(), self.user.trim()),
         }
     }
 
-    /// Whether the keyring holds a secret for this account (the GOA kinds
-    /// have none: GOA keeps the sign-in).
+    /// Whether the keyring holds a secret for this account: not for one
+    /// signed in through GOA, which keeps the sign-in itself. A Google
+    /// Drive account signed in directly (no GOA id) holds its refresh
+    /// token there like Dropbox.
     pub fn has_secret(&self) -> bool {
-        !self.kind.via_goa()
+        !self.kind.via_goa() || (self.kind == CloudKind::GoogleDrive && self.goa_id.trim().is_empty())
     }
 
     /// Where the account is, for a list row: the server, or the service.
@@ -316,8 +319,8 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
             seafile_whoami(account, &token)
         }
         CloudKind::GoogleDrive => {
-            let token = goa_token(account)?;
-            drive_whoami(&token)
+            let token = drive_token(account, secret)?;
+            drive_whoami(&token).map(|(_, who)| who)
         }
         CloudKind::OneDrive => {
             let token = goa_token(account)?;
@@ -334,7 +337,7 @@ pub fn upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -> Re
         CloudKind::Nextcloud => nextcloud_upload_and_share(account, secret, path),
         CloudKind::Dropbox => dropbox_upload_and_share(account, secret, path),
         CloudKind::Seafile => seafile_upload_and_share(account, secret, path),
-        CloudKind::GoogleDrive => drive_upload_and_share(account, path),
+        CloudKind::GoogleDrive => drive_upload_and_share(account, secret, path),
         CloudKind::OneDrive => onedrive_upload_and_share(account, path),
     }
 }
@@ -1019,6 +1022,92 @@ const DRIVE_API: &str = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 const DRIVE_FOLDER: &str = "application/vnd.google-apps.folder";
 
+/// Google's own sign-in, for when GNOME Online Accounts cannot serve
+/// Drive (Fedora builds GOA without Google's Files feature, so its token
+/// carries no Drive scope). Needs a Google OAuth client from
+/// `oauth::provider_credentials("google")`: the build's, `oauth.toml`
+/// `[google]`, or the `VIREO_GOOGLE_CLIENT_*` variables. The scope is
+/// `drive.file`: only what Vireo itself uploads, nothing else in the
+/// drive, which is also a scope Google lets an unverified app use.
+fn google_settings() -> crate::config::OAuthSettings {
+    let (client_id, client_secret) = crate::oauth::provider_credentials("google");
+    crate::config::OAuthSettings {
+        auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+        token_url: "https://oauth2.googleapis.com/token".to_string(),
+        client_id,
+        client_secret,
+        scopes: "https://www.googleapis.com/auth/drive.file".to_string(),
+    }
+}
+
+/// Whether a Google OAuth client is configured for the direct sign-in.
+pub fn google_client_available() -> bool {
+    !google_settings().client_id.is_empty()
+}
+
+/// Sign in to Google in the browser (blocking; call off the UI thread).
+/// Answers with the refresh token to keep, the account's e-mail (for the
+/// keyring key) and its display name.
+pub fn google_connect() -> Result<(String, String, String), String> {
+    let settings = google_settings();
+    if settings.client_id.is_empty() {
+        return Err("No Google OAuth client is configured: put one in oauth.toml first.".to_string());
+    }
+    let flow = crate::oauth::run_flow(&settings).map_err(|e| format!("Google sign-in failed: {e}"))?;
+    let access = crate::oauth::refresh_access_token(&settings, &flow.refresh_token)
+        .map_err(|e| format!("Google sign-in failed: {e}"))?;
+    let (email, who) = drive_whoami(&access)?;
+    Ok((flow.refresh_token, email, who))
+}
+
+/// Access tokens last an hour; keep the ones minted, by refresh token.
+static GOOGLE_ACCESS: Mutex<Option<HashMap<String, (String, Instant)>>> = Mutex::new(None);
+
+/// A token for the Drive calls: GOA's for an account linked to one, else
+/// one minted from the refresh token of the direct sign-in.
+fn drive_token(account: &CloudAccount, refresh: &str) -> Result<String, String> {
+    if !account.goa_id.trim().is_empty() {
+        return goa_token(account);
+    }
+    if refresh.is_empty() {
+        return Err("The Google sign-in is missing: open the account's settings and sign in with Google again.".to_string());
+    }
+    if let Ok(mut g) = GOOGLE_ACCESS.lock() {
+        if let Some((tok, made)) = g.get_or_insert_with(HashMap::new).get(refresh) {
+            if made.elapsed() < Duration::from_secs(50 * 60) {
+                return Ok(tok.clone());
+            }
+        }
+    }
+    let settings = google_settings();
+    if settings.client_id.is_empty() {
+        return Err("The Google OAuth client this account signed in with is gone from oauth.toml.".to_string());
+    }
+    let tok = crate::oauth::refresh_access_token(&settings, refresh)
+        .map_err(|e| format!("Google refused the sign-in ({e}). Open Settings, Cloud Storage, and sign in with Google again."))?;
+    if let Ok(mut g) = GOOGLE_ACCESS.lock() {
+        g.get_or_insert_with(HashMap::new).insert(refresh.to_string(), (tok.clone(), Instant::now()));
+    }
+    Ok(tok)
+}
+
+/// A Drive error, with the one about scopes spelled out: it means the
+/// token came from a GOA that never asked Google for Drive.
+fn drive_err(what: &str, e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Status(403, resp) => {
+            let text = resp.into_string().unwrap_or_default();
+            if text.contains("insufficient authentication scopes") || text.contains("ACCESS_TOKEN_SCOPE_INSUFFICIENT") {
+                return format!(
+                    "{what}: the GNOME Online Accounts sign-in has no Google Drive access (this system's GNOME Online Accounts does not ask Google for it). Sign in with Google directly instead, from the account's settings."
+                );
+            }
+            format!("{what}: {} (HTTP 403)", api_message(&text).trim())
+        }
+        e => api_err(what, e),
+    }
+}
+
 fn drive_get(token: &str, url: &str) -> Result<serde_json::Value, ureq::Error> {
     ureq::get(url)
         .set("Authorization", &bearer(token))
@@ -1042,16 +1131,18 @@ fn drive_q(s: &str) -> String {
     s.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
-/// The signed-in Google account's display name (with the address).
-fn drive_whoami(token: &str) -> Result<String, String> {
+/// The signed-in Google account: its e-mail, and a display name with the
+/// address.
+fn drive_whoami(token: &str) -> Result<(String, String), String> {
     let v = drive_get(token, &format!("{DRIVE_API}/about?fields=user(displayName,emailAddress)"))
-        .map_err(|e| api_err("Could not reach Google Drive", e))?;
+        .map_err(|e| drive_err("Could not reach Google Drive", e))?;
     let name = v["user"]["displayName"].as_str().unwrap_or("");
     let email = v["user"]["emailAddress"].as_str().unwrap_or("");
     if name.is_empty() && email.is_empty() {
         return Err("Google Drive answered, but without an account.".to_string());
     }
-    Ok(if name.is_empty() { email.to_string() } else { format!("{name} ({email})") })
+    let who = if name.is_empty() { email.to_string() } else { format!("{name} ({email})") };
+    Ok((email.to_string(), who))
 }
 
 /// The id of the account's upload folder, each segment found by name
@@ -1065,7 +1156,7 @@ fn drive_folder(token: &str, folder: &str) -> Result<String, String> {
             drive_q(&parent)
         );
         let v = drive_get(token, &format!("{DRIVE_API}/files?q={}&fields=files(id)&pageSize=1", seg(&q)))
-            .map_err(|e| api_err("Could not look for the folder", e))?;
+            .map_err(|e| drive_err("Could not look for the folder", e))?;
         if let Some(id) = v["files"][0]["id"].as_str() {
             parent = id.to_string();
             continue;
@@ -1075,7 +1166,7 @@ fn drive_folder(token: &str, folder: &str) -> Result<String, String> {
             &format!("{DRIVE_API}/files?fields=id"),
             &serde_json::json!({"name": part, "mimeType": DRIVE_FOLDER, "parents": [parent]}),
         )
-        .map_err(|e| api_err("Could not create the folder", e))?;
+        .map_err(|e| drive_err("Could not create the folder", e))?;
         parent = made["id"]
             .as_str()
             .map(str::to_string)
@@ -1084,9 +1175,9 @@ fn drive_folder(token: &str, folder: &str) -> Result<String, String> {
     Ok(parent)
 }
 
-fn drive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<ShareResult, String> {
+fn drive_upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
-    let token = goa_token(account)?;
+    let token = drive_token(account, secret)?;
     let folder = drive_folder(&token, &account.folder_clean())?;
 
     // Drive allows two files of one name; stay out of that anyway.
@@ -1396,6 +1487,12 @@ mod tests {
         a.goa_id = "account_123".into();
         assert!(!a.has_secret());
         assert_eq!(a.key(), "cloud:goa|account_123");
+        // Signed in with Google directly: the refresh token is ours to keep.
+        a.goa_id.clear();
+        a.user = "me@gmail.com".into();
+        assert!(a.has_secret());
+        assert_eq!(a.key(), "cloud:google|me@gmail.com");
+        a.goa_id = "account_123".into();
         assert!(!CloudKind::GoogleDrive.can_expire());
         assert!(CloudKind::OneDrive.can_expire());
         let back = toml::to_string(&CloudFile { accounts: vec![a] }).unwrap();

@@ -211,15 +211,25 @@ with the size and any expiry, is placed in the message above your signature.
 Every kind of account can expire links after a number of days and protect
 them with a generated download password, shown to you to pass on separately.
 
-- **Google Drive and OneDrive** — through GNOME Online Accounts: add your
-  Google or Microsoft 365 account under Settings → Online Accounts, then pick
-  it in the cloud account's editor. GOA holds the sign-in and refreshes the
-  token, so Vireo stores no password or key. Uploads go into the upload
-  folder (made when missing) and are shared with "anyone with the link".
-  Google Drive offers neither link expiry nor passwords, so those two
-  options are greyed out for it. OneDrive accepts both with a Microsoft 365
-  subscription or OneDrive for Business, and a personal account reports
-  that they are not available, so leave them off there.
+- **OneDrive** — through GNOME Online Accounts: add your Microsoft 365
+  account under Settings → Online Accounts, then pick it in the cloud
+  account's editor. GOA holds the sign-in and refreshes the token, so Vireo
+  stores no password or key. Uploads go into the upload folder (made when
+  missing) and are shared with "anyone with the link". Link expiry and
+  passwords work with a Microsoft 365 subscription or OneDrive for
+  Business; a personal account reports that they are not available, so
+  leave them off there.
+- **Google Drive** — the same GOA picker, when your GNOME Online Accounts
+  asks Google for Drive access. Some distributions build it without
+  (Fedora does): the connection check then reports that the sign-in has no
+  Drive access. For those, sign in with Google directly: put a Google OAuth
+  client in `~/.config/vireo/oauth.toml` under `[google]` (see the OAuth
+  section above; a "Desktop app" client from the Google Cloud console, with
+  its consent screen published so refresh tokens do not expire after a
+  week) and the editor gains a **Sign in with Google** button. That sign-in
+  asks only for the `drive.file` scope, so Vireo can see and share what it
+  uploads and nothing else in the drive. Google Drive offers neither link
+  expiry nor passwords, so those two options are greyed out for it.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
   app password (made under *Security* in the server's personal settings).
   Uploads go over WebDAV; links come from the files-sharing API.

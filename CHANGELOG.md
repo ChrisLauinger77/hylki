@@ -14,7 +14,12 @@
   simple upload to 60 MB, then an upload session in 10 MiB chunks, rename
   on a taken name, `createLink` (anonymous view) with the expiry and
   password, which a personal account refuses with a message naming the
-  subscription they need. **Neither was tried against a live account.**
+  subscription they need. Fedora builds GOA without Google's Files
+  feature, so its token has no Drive scope: the check says so, and a
+  direct **Sign in with Google** (the `[google]` client from `oauth.toml`
+  or the build, scope `drive.file`, refresh token in the keyring under
+  `cloud:google|<e-mail>`) takes over when a client is configured.
+  **Neither service was tried against a live account.**
 - **Dropbox and Seafile as cloud storage** (#144 follow-up). Settings →
   Cloud Storage now starts with a Service choice: Nextcloud, ownCloud or
   OpenCloud as before, Dropbox, or Seafile. Dropbox signs in through the
