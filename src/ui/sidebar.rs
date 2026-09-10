@@ -1680,8 +1680,13 @@ impl Sidebar {
             && self.filtered_placement == AllInboxes;
         let tags_here = unified_shown && self.unified_tags_shown() && self.tags_placement == AllInboxes;
         let mut last_list: Option<gtk::ListBox> = None;
-        for kind in unified_rows {
+        for (i, kind) in unified_rows.into_iter().enumerate() {
             let built = self.build_unified_row(container, kind, &sections, sender);
+            if i == 0 {
+                // Only the first row keeps the list's top padding, as the
+                // gap under the compose bar.
+                built.header.add_css_class("unified-first");
+            }
             last_list = Some(built.list.clone());
             if kind == FolderKind::Inbox {
                 // All Inboxes keeps its own fields: the in-place updates and
@@ -1703,7 +1708,8 @@ impl Sidebar {
         // carries the gap instead.
         if let Some(list) = last_list {
             if !filtered_here && !tags_here {
-                list.set_margin_bottom(14);
+                // 14 plus the 6 the list's own padding used to give.
+                list.set_margin_bottom(20);
             }
         }
         if filtered_here {
@@ -2435,6 +2441,9 @@ impl Sidebar {
         let list = gtk::ListBox::new();
         list.set_selection_mode(gtk::SelectionMode::Single);
         list.add_css_class("navigation-sidebar");
+        // The unified rows stack with no gap between their pills, as
+        // folder rows in one list do (see styles.css).
+        list.add_css_class("unified-item");
 
         let row = gtk::ListBoxRow::new();
         // Tagged so the disclosure chevron can be lined up with the
@@ -2585,6 +2594,7 @@ impl Sidebar {
         let sub = gtk::ListBox::new();
         sub.set_selection_mode(gtk::SelectionMode::Single);
         sub.add_css_class("navigation-sidebar");
+        sub.add_css_class("unified-item");
         let mut rows: Vec<InboxRef> = Vec::new();
         let mut row_badges: HashMap<(u32, u32), gtk::Label> = HashMap::new();
         for section in sections {

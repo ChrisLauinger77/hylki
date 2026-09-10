@@ -159,6 +159,18 @@ headerbar.rail-header {
   margin-left: -2px;
 }
 
+/* The unified rows (All Inboxes, Starred, Sent, Drafts) and their account
+   lists are each a list of their own; without their vertical padding the
+   pills stack with no gap, as rows inside one list do. The first keeps
+   its top padding as the gap under the compose bar. */
+.unified-item {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.unified-item.unified-first {
+  padding-top: 6px;
+}
+
 /* Compact disclosure button in the "All Inboxes" row. */
 .chevron-btn {
   min-width: 24px;
