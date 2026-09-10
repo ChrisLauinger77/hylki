@@ -64,6 +64,7 @@ macro_rules! alt {
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
     alt!("envelope-bird-yellow", "Vireo envelope, yellow"),
+    alt!("envelope-bird-blue-subtle", "Vireo envelope, blue subtle"),
     alt!("envelope-bird-white", "Vireo envelope, white"),
     alt!("envelope-bird-beige", "Vireo envelope, beige"),
     alt!("envelope-bird-faded-blue", "Vireo envelope, faded blue"),
