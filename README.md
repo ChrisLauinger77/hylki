@@ -5,7 +5,7 @@
 <h1 align="center">Vireo</h1>
 
 <p align="center">
-  A clean, fast, <strong>GNOME-native</strong> email client — built with Rust and libadwaita, privacy-first.
+  A fast, <strong>GNOME-native</strong> email client — built with Rust and libadwaita, privacy-first.
 </p>
 
 <p align="center">
