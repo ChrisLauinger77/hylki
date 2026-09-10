@@ -90,7 +90,7 @@ impl SimpleComponent for CloudAccounts {
                                     #[wrap(Some)]
                                     set_header_suffix = &gtk::Box {
                                         set_orientation: gtk::Orientation::Vertical,
-                                        set_spacing: 10,
+                                        set_spacing: 20,
                                         set_valign: gtk::Align::Start,
                                         set_margin_start: 24,
                                         #[name = "brands"]
@@ -608,8 +608,7 @@ fn build_editor(
 
     // The fields each kind wants.
     let apply_kind = {
-        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
-            name.clone(),
+        let (url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
             url.clone(),
             user.clone(),
             pass.clone(),
