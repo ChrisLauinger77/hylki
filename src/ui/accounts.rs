@@ -37,8 +37,8 @@ enum ProviderKind {
 /// their servers from `crate::oauth::preset`; Manual/Custom are user-entered).
 pub(crate) struct Provider {
     label: &'static str,
-    /// The brand id of its mark (`brand::image_or`); empty = the generic
-    /// envelope (manual IMAP, custom OAuth).
+    /// The brand id of its mark (`brand::image_or`): "mail", the blue
+    /// envelope, for manual IMAP/POP3 and custom OAuth.
     brand: &'static str,
     kind: ProviderKind,
     imap_host: &'static str,
@@ -97,8 +97,8 @@ pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "GMX", brand: "gmx", kind: ProviderKind::Preset, imap_host: "imap.gmx.com", imap_port: 993, smtp_host: "mail.gmx.com", smtp_port: 587, hint: i18n_noop("Enable POP/IMAP access in GMX settings first.") },
     Provider { label: "Yandex Mail", brand: "yandex", kind: ProviderKind::Preset, imap_host: "imap.yandex.com", imap_port: 993, smtp_host: "smtp.yandex.com", smtp_port: 465, hint: APP_PW },
     Provider { label: "Mail.com", brand: "mailcom", kind: ProviderKind::Preset, imap_host: "imap.mail.com", imap_port: 993, smtp_host: "smtp.mail.com", smtp_port: 587, hint: "" },
-    Provider { label: "Custom (OAuth)…", brand: "", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
-    Provider { label: "Other (IMAP/POP3)…", brand: "", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
+    Provider { label: "Custom (OAuth)…", brand: "mail", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
+    Provider { label: "Other (IMAP/POP3)…", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
 ];
 
 /// Dropdown index of the "Other (IMAP/POP3)…" manual entry (the default).
@@ -2586,7 +2586,8 @@ fn activate_online_accounts_panel() -> Result<(), gtk::glib::Error> {
 }
 
 /// The brand id for a GNOME Online Accounts provider name ("Google",
-/// "Microsoft 365"…): the two mail providers GOA offers, else generic.
+/// "Microsoft 365"…): the two mail providers GOA offers, else the blue
+/// envelope.
 pub(crate) fn brand_for_goa(provider: &str) -> &'static str {
     let p = provider.to_ascii_lowercase();
     if p.contains("google") {
@@ -2594,7 +2595,7 @@ pub(crate) fn brand_for_goa(provider: &str) -> &'static str {
     } else if p.contains("microsoft") || p.contains("outlook") || p.contains("365") {
         "outlook"
     } else {
-        ""
+        "mail"
     }
 }
 
@@ -2971,8 +2972,8 @@ fn provider_index_for_account(acc: &AccountConfig) -> u32 {
 
 /// The brand id of the service an existing account is on: Microsoft 365
 /// over Graph, an OAuth account by its token endpoint, otherwise by its
-/// incoming server (the well-known hosts, then the provider table).
-/// Empty for anything else: the generic envelope.
+/// incoming server (the well-known hosts, then the provider table, whose
+/// manual entry gives anything else the blue envelope).
 fn brand_for_account(acc: &AccountConfig) -> &'static str {
     if acc.protocol == Protocol::Graph {
         return "outlook";
