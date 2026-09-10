@@ -85,19 +85,25 @@ impl SimpleComponent for CloudAccounts {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Cloud storage"),
                                     set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
+                                    // Across from the heading: the services' marks
+                                    // (picker order), with Add Account under them.
                                     #[wrap(Some)]
-                                    set_header_suffix = &gtk::Button {
-                                        set_label: &i18n("Add Account…"),
-                                        set_valign: gtk::Align::Center,
+                                    set_header_suffix = &gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 10,
+                                        set_valign: gtk::Align::Start,
                                         set_margin_start: 24,
-                                        connect_clicked => CloudAccountsInput::Add,
-                                    },
-                                    // The services' marks, in picker order (#brands).
-                                    #[name = "brands"]
-                                    gtk::Box {
-                                        set_orientation: gtk::Orientation::Horizontal,
-                                        set_spacing: 14,
-                                        set_margin_bottom: 8,
+                                        #[name = "brands"]
+                                        gtk::Box {
+                                            set_orientation: gtk::Orientation::Horizontal,
+                                            set_spacing: 12,
+                                            set_halign: gtk::Align::End,
+                                        },
+                                        gtk::Button {
+                                            set_label: &i18n("Add Account…"),
+                                            set_halign: gtk::Align::End,
+                                            connect_clicked => CloudAccountsInput::Add,
+                                        },
                                     },
                                     #[name = "list"]
                                     gtk::ListBox {
@@ -427,9 +433,9 @@ fn build_editor(
     // sign-in and the keyring entry belong to it.
     kind.set_sensitive(index.is_none());
     // What the account is called in the list; optional, the server or
-    // service stands in when empty. Titled per kind with an example, so
-    // it does not read as asking for the user's own name.
+    // service stands in when empty.
     let name = adw::EntryRow::new();
+    name.set_title(&i18n("Nickname (optional)"));
     name.set_text(&account.name);
     let url = adw::EntryRow::new();
     url.set_title(&i18n("Server URL"));
@@ -641,7 +647,6 @@ fn build_editor(
                 check.set_label(&i18n("Check Connection"));
                 expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely. Needs Microsoft 365 or OneDrive for Business"));
                 protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Needs Microsoft 365 or OneDrive for Business"));
-                name.set_title(&i18n("Account name, such as Work OneDrive (optional)"));
                 // A new OneDrive account starts with both off, so a free
                 // personal OneDrive works as it is.
                 if !editing {
@@ -657,14 +662,12 @@ fn build_editor(
             expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
             match k {
                 CloudKind::Nextcloud => {
-                    name.set_title(&i18n_f("Account name, such as Work {service} (optional)", &[("service", service.name)]));
                     user.set_title(&i18n("User name"));
                     pass.set_title(&if editing { i18n("App password (leave empty to keep)") } else { i18n("App password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
                     check.set_label(&i18n("Check Connection"));
                 }
                 CloudKind::Seafile => {
-                    name.set_title(&i18n("Account name, such as Team Seafile (optional)"));
                     user.set_title(&i18n("E-mail"));
                     pass.set_title(&if editing { i18n("Password (leave empty to keep)") } else { i18n("Password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
@@ -673,7 +676,6 @@ fn build_editor(
                 // Handled above, before the return.
                 CloudKind::OneDrive => {}
                 CloudKind::Dropbox => {
-                    name.set_title(&i18n("Account name, such as Personal Dropbox (optional)"));
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Dropbox allows link passwords and expiry dates on paid plans only."));
                     check.set_label(&i18n("Connect with Dropbox…"));
                     app_key_hint.set_label(&i18n_f(
