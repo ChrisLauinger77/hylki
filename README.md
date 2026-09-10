@@ -43,7 +43,7 @@ trackers by default — no telemetry, no analytics.
 - **Conversation threading**, compose/reply/forward with HTML signatures, editable drafts, and full folder management.
 - **Outbox** — a send that fails is kept and retried when the connection returns, not lost; queued messages can be edited, sent by hand or discarded.
 - **Send later** — schedule a message for tomorrow morning, Monday, or any date and time; it waits in the Outbox, editable, until then.
-- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud, OpenCloud or Seafile server, or to Dropbox, and put a share link in the message, with an optional expiry and download password.
+- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud, OpenCloud or Seafile server, or to Google Drive, OneDrive or Dropbox, and put a share link in the message, with an optional expiry and download password.
 - **Message previews** — the first one to three lines of each message under its subject in the list (or off).
 - **Single-key shortcuts** — Gmail-style `j`/`k`, `r`, `a`, `d` and friends, without a modifier (see below).
 - **Printing** — print a message with its sender, recipients and date, with an in-app preview that also saves straight to PDF.
@@ -203,7 +203,7 @@ during the build and they're compiled in via `option_env!`:
 VIREO_GOOGLE_CLIENT_ID=... VIREO_GOOGLE_CLIENT_SECRET=... cargo build --release
 ```
 
-### Cloud attachments (Nextcloud, Dropbox, Seafile)
+### Cloud attachments (Nextcloud, Google Drive, OneDrive, Dropbox, Seafile)
 
 Settings → Cloud Storage holds the accounts the composer's upload button can
 put files on. A file goes to the account's upload folder and a share link,
@@ -211,6 +211,15 @@ with the size and any expiry, is placed in the message above your signature.
 Every kind of account can expire links after a number of days and protect
 them with a generated download password, shown to you to pass on separately.
 
+- **Google Drive and OneDrive** — through GNOME Online Accounts: add your
+  Google or Microsoft 365 account under Settings → Online Accounts, then pick
+  it in the cloud account's editor. GOA holds the sign-in and refreshes the
+  token, so Vireo stores no password or key. Uploads go into the upload
+  folder (made when missing) and are shared with "anyone with the link".
+  Google Drive offers neither link expiry nor passwords, so those two
+  options are greyed out for it. OneDrive accepts both with a Microsoft 365
+  subscription or OneDrive for Business, and a personal account reports
+  that they are not available, so leave them off there.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
   app password (made under *Security* in the server's personal settings).
   Uploads go over WebDAV; links come from the files-sharing API.

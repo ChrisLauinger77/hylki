@@ -224,6 +224,73 @@ fn try_list() -> Result<Vec<GoaMailAccount>, String> {
     Ok(out)
 }
 
+/// A GNOME Online Accounts account whose token can reach the provider's
+/// file storage: Google (Drive) or Microsoft 365 (OneDrive).
+#[derive(Debug, Clone)]
+pub struct GoaFilesAccount {
+    pub id: String,
+    /// The account's e-mail, or its presentation identity.
+    pub email: String,
+    /// GOA's `ProviderType`: "google" or "ms_graph".
+    pub provider_type: String,
+    /// Whether the account's Files service is switched on in GNOME
+    /// Settings; off means the user did not mean files to be reachable.
+    pub files_enabled: bool,
+}
+
+/// List the GOA accounts that can serve cloud attachments (#144): every
+/// OAuth2 Google and Microsoft 365 account, Files switch or not. Empty when
+/// GOA is not around. Blocking.
+pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
+    let list = || -> Result<Vec<GoaFilesAccount>, String> {
+        let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
+        let reply = conn
+            .call_method(
+                Some(GOA_DEST),
+                GOA_PATH,
+                Some("org.freedesktop.DBus.ObjectManager"),
+                "GetManagedObjects",
+                &(),
+            )
+            .map_err(|e| e.to_string())?;
+        let (objects,): (ManagedObjects,) = reply.body().deserialize().map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for ifaces in objects.values() {
+            let Some(account) = ifaces.get(IFACE_ACCOUNT) else { continue };
+            if !ifaces.contains_key(IFACE_OAUTH2) {
+                continue;
+            }
+            let provider_type = get_str(account, "ProviderType");
+            if provider_type != "google" && provider_type != "ms_graph" {
+                continue;
+            }
+            let email = {
+                let e = ifaces.get(IFACE_MAIL).map(|m| get_str(m, "EmailAddress")).unwrap_or_default();
+                if e.is_empty() {
+                    get_str(account, "PresentationIdentity")
+                } else {
+                    e
+                }
+            };
+            out.push(GoaFilesAccount {
+                id: get_str(account, "Id"),
+                email,
+                provider_type,
+                files_enabled: !get_bool(account, "FilesDisabled"),
+            });
+        }
+        out.sort_by(|a, b| a.email.cmp(&b.email));
+        Ok(out)
+    };
+    match list() {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::debug!("GOA files discovery skipped: {e}");
+            Vec::new()
+        }
+    }
+}
+
 /// What currently exists in GNOME Online Accounts, as far as reconciliation
 /// cares: which account objects are present at all, and which of them have their
 /// Mail service switched off in GNOME Settings.

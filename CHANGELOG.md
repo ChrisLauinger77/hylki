@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Google Drive and OneDrive as cloud storage** (#144 follow-up), through
+  GNOME Online Accounts: the editor lists the Google and Microsoft 365
+  accounts GOA has (a new `goa::list_files_accounts`, Files switch shown
+  when off) and the account keeps only the GOA id (`goa_id`; no keyring
+  entry, `CloudAccount::has_secret`). Tokens come from GOA's
+  `GetAccessToken` at each use. Drive: folder segments found by name or
+  made, a resumable upload session fed in one request, an "anyone with the
+  link, reader" permission and the file's web link; Drive has no link
+  expiry or password, so both options are disabled for it. OneDrive:
+  simple upload to 60 MB, then an upload session in 10 MiB chunks, rename
+  on a taken name, `createLink` (anonymous view) with the expiry and
+  password, which a personal account refuses with a message naming the
+  subscription they need. **Neither was tried against a live account.**
 - **Dropbox and Seafile as cloud storage** (#144 follow-up). Settings →
   Cloud Storage now starts with a Service choice: Nextcloud, ownCloud or
   OpenCloud as before, Dropbox, or Seafile. Dropbox signs in through the

@@ -909,7 +909,12 @@ impl Component for Compose {
             }
 
             ComposeInput::CloudUpload { paths, account } => {
-                let Some(password) = crate::config::load_cloud_password(&account.key()) else {
+                let secret = if account.has_secret() {
+                    crate::config::load_cloud_password(&account.key())
+                } else {
+                    Some(String::new())
+                };
+                let Some(password) = secret else {
                     let parent = root.root().and_downcast::<gtk::Window>();
                     let d = adw::MessageDialog::new(
                         parent.as_ref(),

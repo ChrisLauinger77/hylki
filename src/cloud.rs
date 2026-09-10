@@ -12,6 +12,11 @@
 //! * **Seafile**: the web API, signed in with the account password (turned
 //!   into an API token on the spot) or a pasted API token. Uploads go
 //!   into a library, made when missing.
+//! * **Google Drive** and **OneDrive**: through a GNOME Online Accounts
+//!   account, whose token GOA hands out and refreshes; nothing of ours in
+//!   the keyring. Drive v3 (resumable upload, "anyone with the link"
+//!   permission) and Microsoft Graph (simple or session upload,
+//!   `createLink`).
 //!
 //! Accounts live in `cloud.toml` beside the other settings; each secret is
 //! in the system keyring under the account's [`CloudAccount::key`].
@@ -32,10 +37,44 @@ pub enum CloudKind {
     Nextcloud,
     Dropbox,
     Seafile,
+    #[serde(rename = "google-drive")]
+    GoogleDrive,
+    #[serde(rename = "onedrive")]
+    OneDrive,
 }
 
 impl CloudKind {
-    pub const ALL: [CloudKind; 3] = [CloudKind::Nextcloud, CloudKind::Dropbox, CloudKind::Seafile];
+    pub const ALL: [CloudKind; 5] = [
+        CloudKind::Nextcloud,
+        CloudKind::GoogleDrive,
+        CloudKind::OneDrive,
+        CloudKind::Dropbox,
+        CloudKind::Seafile,
+    ];
+
+    /// Signed in through GNOME Online Accounts: no secret of ours.
+    pub fn via_goa(self) -> bool {
+        matches!(self, CloudKind::GoogleDrive | CloudKind::OneDrive)
+    }
+
+    /// GOA's `ProviderType` for the kinds that go through it.
+    pub fn goa_provider(self) -> Option<&'static str> {
+        match self {
+            CloudKind::GoogleDrive => Some("google"),
+            CloudKind::OneDrive => Some("ms_graph"),
+            _ => None,
+        }
+    }
+
+    /// Whether the service can expire a public link.
+    pub fn can_expire(self) -> bool {
+        self != CloudKind::GoogleDrive
+    }
+
+    /// Whether the service can put a password on a public link.
+    pub fn can_password(self) -> bool {
+        self != CloudKind::GoogleDrive
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -63,6 +102,9 @@ pub struct CloudAccount {
     /// means the build's own (see `oauth::provider_credentials`).
     #[serde(default)]
     pub client_id: String,
+    /// Google Drive, OneDrive: the GNOME Online Accounts account id.
+    #[serde(default)]
+    pub goa_id: String,
     /// Links expire this many days after upload; 0 keeps them.
     #[serde(default)]
     pub expire_days: u32,
@@ -85,6 +127,7 @@ impl CloudAccount {
             folder: default_folder(),
             library: default_folder(),
             client_id: String::new(),
+            goa_id: String::new(),
             expire_days: 7,
             password: false,
         }
@@ -92,8 +135,11 @@ impl CloudAccount {
 
     /// The base URL as the requests want it: a scheme, no trailing slash.
     pub fn base(&self) -> String {
-        if self.kind == CloudKind::Dropbox {
-            return "https://www.dropbox.com".to_string();
+        match self.kind {
+            CloudKind::Dropbox => return "https://www.dropbox.com".to_string(),
+            CloudKind::GoogleDrive => return "https://drive.google.com".to_string(),
+            CloudKind::OneDrive => return "https://onedrive.live.com".to_string(),
+            _ => {}
         }
         let u = self.url.trim().trim_end_matches('/');
         if u.contains("://") {
@@ -108,14 +154,23 @@ impl CloudAccount {
     pub fn key(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => format!("cloud:dropbox|{}", self.user.trim()),
+            CloudKind::GoogleDrive | CloudKind::OneDrive => format!("cloud:goa|{}", self.goa_id.trim()),
             _ => format!("cloud:{}|{}", self.base(), self.user.trim()),
         }
     }
 
-    /// Where the account is, for a list row: the server, or "Dropbox".
+    /// Whether the keyring holds a secret for this account (the GOA kinds
+    /// have none: GOA keeps the sign-in).
+    pub fn has_secret(&self) -> bool {
+        !self.kind.via_goa()
+    }
+
+    /// Where the account is, for a list row: the server, or the service.
     pub fn where_shown(&self) -> String {
         match self.kind {
             CloudKind::Dropbox => "Dropbox".to_string(),
+            CloudKind::GoogleDrive => "Google Drive".to_string(),
+            CloudKind::OneDrive => "OneDrive".to_string(),
             _ => self.base(),
         }
     }
@@ -260,6 +315,14 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
             let token = seafile_token(account, secret)?;
             seafile_whoami(account, &token)
         }
+        CloudKind::GoogleDrive => {
+            let token = goa_token(account)?;
+            drive_whoami(&token)
+        }
+        CloudKind::OneDrive => {
+            let token = goa_token(account)?;
+            onedrive_whoami(&token)
+        }
     }
 }
 
@@ -271,6 +334,8 @@ pub fn upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -> Re
         CloudKind::Nextcloud => nextcloud_upload_and_share(account, secret, path),
         CloudKind::Dropbox => dropbox_upload_and_share(account, secret, path),
         CloudKind::Seafile => seafile_upload_and_share(account, secret, path),
+        CloudKind::GoogleDrive => drive_upload_and_share(account, path),
+        CloudKind::OneDrive => onedrive_upload_and_share(account, path),
     }
 }
 
@@ -892,6 +957,359 @@ fn seafile_upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -
 }
 
 // ---------------------------------------------------------------------
+// Google Drive and OneDrive, through GNOME Online Accounts
+// ---------------------------------------------------------------------
+
+/// A fresh access token for the account's GOA account.
+fn goa_token(account: &CloudAccount) -> Result<String, String> {
+    let id = account.goa_id.trim();
+    if id.is_empty() {
+        return Err("The account is not linked to a GNOME Online Accounts account: open its settings and choose one.".to_string());
+    }
+    crate::goa::oauth_token(id).ok_or_else(|| {
+        "GNOME Online Accounts gave no token for the account. Check it under Settings, Online Accounts; it may need signing in again.".to_string()
+    })
+}
+
+fn bearer(token: &str) -> String {
+    format!("Bearer {token}")
+}
+
+/// An error from a JSON API: the message inside, with the status.
+fn api_err(what: &str, e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Status(401, _) => {
+            format!("{what}: the service refused the sign-in. Check the account under Settings, Online Accounts.")
+        }
+        ureq::Error::Status(code, resp) => {
+            let text = resp.into_string().unwrap_or_default();
+            format!("{what}: {} (HTTP {code})", api_message(&text).trim())
+        }
+        ureq::Error::Transport(t) => format!("{what}: {t}"),
+    }
+}
+
+/// The message of a Google or Graph error body (`error.message`), else
+/// the plain short form.
+fn api_message(body: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+        if let Some(m) = v["error"]["message"].as_str() {
+            return m.chars().take(200).collect();
+        }
+    }
+    short_error(body)
+}
+
+/// Read whole chunks off a file: `buf.len()` bytes, or what is left.
+fn read_chunk(file: &mut std::fs::File, buf: &mut [u8], name: &str) -> Result<usize, String> {
+    let mut n = 0;
+    while n < buf.len() {
+        let r = file.read(&mut buf[n..]).map_err(|e| format!("could not read {name}: {e}"))?;
+        if r == 0 {
+            break;
+        }
+        n += r;
+    }
+    Ok(n)
+}
+
+// ----- Google Drive -----
+
+const DRIVE_API: &str = "https://www.googleapis.com/drive/v3";
+const DRIVE_UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
+const DRIVE_FOLDER: &str = "application/vnd.google-apps.folder";
+
+fn drive_get(token: &str, url: &str) -> Result<serde_json::Value, ureq::Error> {
+    ureq::get(url)
+        .set("Authorization", &bearer(token))
+        .timeout(Duration::from_secs(60))
+        .call()?
+        .into_json()
+        .map_err(ureq::Error::from)
+}
+
+fn drive_post(token: &str, url: &str, body: &serde_json::Value) -> Result<serde_json::Value, ureq::Error> {
+    ureq::post(url)
+        .set("Authorization", &bearer(token))
+        .timeout(Duration::from_secs(60))
+        .send_json(body)?
+        .into_json()
+        .map_err(ureq::Error::from)
+}
+
+/// Escape a value for a Drive search query string.
+fn drive_q(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('\'', "\\'")
+}
+
+/// The signed-in Google account's display name (with the address).
+fn drive_whoami(token: &str) -> Result<String, String> {
+    let v = drive_get(token, &format!("{DRIVE_API}/about?fields=user(displayName,emailAddress)"))
+        .map_err(|e| api_err("Could not reach Google Drive", e))?;
+    let name = v["user"]["displayName"].as_str().unwrap_or("");
+    let email = v["user"]["emailAddress"].as_str().unwrap_or("");
+    if name.is_empty() && email.is_empty() {
+        return Err("Google Drive answered, but without an account.".to_string());
+    }
+    Ok(if name.is_empty() { email.to_string() } else { format!("{name} ({email})") })
+}
+
+/// The id of the account's upload folder, each segment found by name
+/// under the last or made.
+fn drive_folder(token: &str, folder: &str) -> Result<String, String> {
+    let mut parent = "root".to_string();
+    for part in folder.split('/').filter(|p| !p.is_empty()) {
+        let q = format!(
+            "name = '{}' and mimeType = '{DRIVE_FOLDER}' and '{}' in parents and trashed = false",
+            drive_q(part),
+            drive_q(&parent)
+        );
+        let v = drive_get(token, &format!("{DRIVE_API}/files?q={}&fields=files(id)&pageSize=1", seg(&q)))
+            .map_err(|e| api_err("Could not look for the folder", e))?;
+        if let Some(id) = v["files"][0]["id"].as_str() {
+            parent = id.to_string();
+            continue;
+        }
+        let made = drive_post(
+            token,
+            &format!("{DRIVE_API}/files?fields=id"),
+            &serde_json::json!({"name": part, "mimeType": DRIVE_FOLDER, "parents": [parent]}),
+        )
+        .map_err(|e| api_err("Could not create the folder", e))?;
+        parent = made["id"]
+            .as_str()
+            .map(str::to_string)
+            .ok_or_else(|| "Could not create the folder: Google Drive gave no id.".to_string())?;
+    }
+    Ok(parent)
+}
+
+fn drive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<ShareResult, String> {
+    let (name, size) = local_file(path)?;
+    let token = goa_token(account)?;
+    let folder = drive_folder(&token, &account.folder_clean())?;
+
+    // Drive allows two files of one name; stay out of that anyway.
+    let q = format!("name = '{}' and '{}' in parents and trashed = false", drive_q(&name), drive_q(&folder));
+    let taken = drive_get(&token, &format!("{DRIVE_API}/files?q={}&fields=files(id)&pageSize=1", seg(&q)))
+        .map(|v| v["files"][0]["id"].is_string())
+        .unwrap_or(false);
+    let remote = if taken { stamped_name(&name) } else { name.clone() };
+
+    // A resumable upload: the metadata opens a session, the bytes follow
+    // in one request (the session is what lets Drive take a large file).
+    let open = ureq::post(&format!("{DRIVE_UPLOAD}?uploadType=resumable&fields=id,name,webViewLink"))
+        .set("Authorization", &bearer(&token))
+        .set("X-Upload-Content-Length", &size.to_string())
+        .timeout(Duration::from_secs(60))
+        .send_json(serde_json::json!({"name": remote, "parents": [folder]}))
+        .map_err(|e| api_err("Upload failed", e))?;
+    let session = open.header("Location").unwrap_or("").to_string();
+    if session.is_empty() {
+        return Err("Upload failed: Google Drive opened no upload session.".to_string());
+    }
+    let file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
+    let meta: serde_json::Value = ureq::put(&session)
+        .set("Content-Length", &size.to_string())
+        .set("Content-Type", "application/octet-stream")
+        .timeout(Duration::from_secs(60 * 60))
+        .send(file)
+        .map_err(|e| api_err("Upload failed", e))?
+        .into_json()
+        .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?;
+    let id = meta["id"].as_str().unwrap_or("").to_string();
+    if id.is_empty() {
+        return Err("Upload failed: Google Drive gave the file no id.".to_string());
+    }
+    let remote = meta["name"].as_str().unwrap_or(&remote).to_string();
+
+    // Anyone with the link may read. Drive has no link passwords, and
+    // no expiry on such a permission; the account's settings say so.
+    drive_post(
+        &token,
+        &format!("{DRIVE_API}/files/{id}/permissions"),
+        &serde_json::json!({"role": "reader", "type": "anyone"}),
+    )
+    .map_err(|e| api_err("Uploaded, but could not share the file", e))?;
+    let mut url = meta["webViewLink"].as_str().unwrap_or("").to_string();
+    if url.is_empty() {
+        let v = drive_get(&token, &format!("{DRIVE_API}/files/{id}?fields=webViewLink"))
+            .map_err(|e| api_err("Uploaded, but could not get the link", e))?;
+        url = v["webViewLink"].as_str().unwrap_or("").to_string();
+    }
+    if url.is_empty() {
+        return Err("Uploaded, but Google Drive gave no link.".to_string());
+    }
+    Ok(ShareResult { name: remote, size, url, password: None, expires: None })
+}
+
+// ----- OneDrive -----
+
+const GRAPH: &str = "https://graph.microsoft.com/v1.0";
+/// Above this the file goes up in an upload session (the simple upload
+/// takes up to 250 MB; stay well under).
+const ONEDRIVE_SINGLE_LIMIT: u64 = 60 * 1024 * 1024;
+/// Session chunks must be multiples of 320 KiB.
+const ONEDRIVE_CHUNK: usize = 32 * 320 * 1024;
+
+fn graph_json(req: ureq::Request, body: Option<&serde_json::Value>) -> Result<serde_json::Value, ureq::Error> {
+    let resp = match body {
+        Some(b) => req.send_json(b)?,
+        None => req.call()?,
+    };
+    resp.into_json().map_err(ureq::Error::from)
+}
+
+/// `/me/drive/root:/a/b` for a folder path, `/me/drive/root` for none.
+fn onedrive_item(path: &str) -> String {
+    if path.is_empty() {
+        format!("{GRAPH}/me/drive/root")
+    } else {
+        format!("{GRAPH}/me/drive/root:/{}", pct_path(path))
+    }
+}
+
+/// The signed-in Microsoft account's display name.
+fn onedrive_whoami(token: &str) -> Result<String, String> {
+    let v = graph_json(
+        ureq::get(&format!("{GRAPH}/me/drive?$select=id,owner"))
+            .set("Authorization", &bearer(token))
+            .timeout(Duration::from_secs(60)),
+        None,
+    )
+    .map_err(|e| api_err("Could not reach OneDrive", e))?;
+    let name = v["owner"]["user"]["displayName"].as_str().unwrap_or("");
+    if v["id"].as_str().unwrap_or("").is_empty() {
+        return Err("OneDrive answered, but without a drive.".to_string());
+    }
+    Ok(if name.is_empty() { "OneDrive".to_string() } else { name.to_string() })
+}
+
+/// Make sure the upload folder exists, one segment at a time.
+fn onedrive_folder(token: &str, folder: &str) -> Result<String, String> {
+    let mut dir = String::new();
+    for part in folder.split('/').filter(|p| !p.is_empty()) {
+        let next = if dir.is_empty() { part.to_string() } else { format!("{dir}/{part}") };
+        let there = ureq::get(&format!("{}?$select=id", onedrive_item(&next)))
+            .set("Authorization", &bearer(token))
+            .timeout(Duration::from_secs(60))
+            .call();
+        match there {
+            Ok(_) => {}
+            Err(ureq::Error::Status(404, _)) => {
+                let url = if dir.is_empty() {
+                    format!("{GRAPH}/me/drive/root/children")
+                } else {
+                    format!("{}:/children", onedrive_item(&dir))
+                };
+                graph_json(
+                    ureq::post(&url).set("Authorization", &bearer(token)).timeout(Duration::from_secs(60)),
+                    Some(&serde_json::json!({"name": part, "folder": {}, "@microsoft.graph.conflictBehavior": "fail"})),
+                )
+                .map_err(|e| api_err("Could not create the folder", e))?;
+            }
+            Err(e) => return Err(api_err("Could not look at the folder", e)),
+        }
+        dir = next;
+    }
+    Ok(dir)
+}
+
+fn onedrive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<ShareResult, String> {
+    let (name, size) = local_file(path)?;
+    let token = goa_token(account)?;
+    let dir = onedrive_folder(&token, &account.folder_clean())?;
+    let remote_path = if dir.is_empty() { name.clone() } else { format!("{dir}/{name}") };
+    let mut file = std::fs::File::open(path).map_err(|e| format!("could not read {name}: {e}"))?;
+
+    // A taken name is renamed by OneDrive ("report 1.pdf"); the answer
+    // says what it became.
+    let meta = if size <= ONEDRIVE_SINGLE_LIMIT {
+        let url = format!("{}:/content?@microsoft.graph.conflictBehavior=rename", onedrive_item(&remote_path));
+        ureq::put(&url)
+            .set("Authorization", &bearer(&token))
+            .set("Content-Length", &size.to_string())
+            .set("Content-Type", "application/octet-stream")
+            .timeout(Duration::from_secs(60 * 60))
+            .send(file)
+            .map_err(|e| api_err("Upload failed", e))?
+            .into_json::<serde_json::Value>()
+            .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?
+    } else {
+        let open = graph_json(
+            ureq::post(&format!("{}:/createUploadSession", onedrive_item(&remote_path)))
+                .set("Authorization", &bearer(&token))
+                .timeout(Duration::from_secs(60)),
+            Some(&serde_json::json!({"item": {"@microsoft.graph.conflictBehavior": "rename", "name": name}})),
+        )
+        .map_err(|e| api_err("Upload failed", e))?;
+        let session = open["uploadUrl"].as_str().unwrap_or("").to_string();
+        if session.is_empty() {
+            return Err("Upload failed: OneDrive opened no upload session.".to_string());
+        }
+        let mut buf = vec![0u8; ONEDRIVE_CHUNK];
+        let mut offset: u64 = 0;
+        loop {
+            let n = read_chunk(&mut file, &mut buf, &name)?;
+            if n == 0 {
+                return Err("Upload failed: the file ended early.".to_string());
+            }
+            let end = offset + n as u64 - 1;
+            let resp = ureq::put(&session)
+                .set("Content-Length", &n.to_string())
+                .set("Content-Range", &format!("bytes {offset}-{end}/{size}"))
+                .timeout(Duration::from_secs(60 * 60))
+                .send_bytes(&buf[..n])
+                .map_err(|e| api_err("Upload failed", e))?;
+            offset += n as u64;
+            if offset >= size {
+                break resp
+                    .into_json::<serde_json::Value>()
+                    .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?;
+            }
+        }
+    };
+    let id = meta["id"].as_str().unwrap_or("").to_string();
+    if id.is_empty() {
+        return Err("Upload failed: OneDrive gave the file no id.".to_string());
+    }
+    let remote = meta["name"].as_str().unwrap_or(&name).to_string();
+
+    // The public link. Expiry and passwords take a OneDrive for Business
+    // or Microsoft 365 subscription; a personal account says no.
+    let expires = expiry(account);
+    let pw = if account.password { Some(generate_password()) } else { None };
+    let mut body = serde_json::json!({"type": "view", "scope": "anonymous"});
+    if let Some(d) = &expires {
+        body["expirationDateTime"] = format!("{d}T00:00:00Z").into();
+    }
+    if let Some(p) = &pw {
+        body["password"] = p.as_str().into();
+    }
+    let v = graph_json(
+        ureq::post(&format!("{GRAPH}/me/drive/items/{id}/createLink"))
+            .set("Authorization", &bearer(&token))
+            .timeout(Duration::from_secs(60)),
+        Some(&body),
+    )
+    .map_err(|e| match e {
+        ureq::Error::Status(code, resp) if (expires.is_some() || pw.is_some()) && (code == 400 || code == 403) => {
+            let text = resp.into_string().unwrap_or_default();
+            format!(
+                "Uploaded, but OneDrive would not make the link: {}. Link expiry and passwords need a OneDrive for Business or Microsoft 365 subscription; turn them off in the account's settings.",
+                api_message(&text).trim()
+            )
+        }
+        e => api_err("Uploaded, but could not create the share link", e),
+    })?;
+    let url = v["link"]["webUrl"].as_str().unwrap_or("").to_string();
+    if url.is_empty() {
+        return Err("Uploaded, but OneDrive made no share link.".to_string());
+    }
+    Ok(ShareResult { name: remote, size, url, password: pw, expires })
+}
+
+// ---------------------------------------------------------------------
 
 /// A download password people can read out: letters and digits, no
 /// look-alikes, twelve long.
@@ -969,6 +1387,22 @@ mod tests {
         assert_eq!(d.key(), "cloud:dropbox|me@example.com");
         let back = toml::to_string(&CloudFile { accounts: vec![d] }).unwrap();
         assert!(back.contains("kind = \"dropbox\""));
+    }
+
+    #[test]
+    fn goa_kinds_have_no_secret_and_their_own_key() {
+        let mut a = CloudAccount::empty();
+        a.kind = CloudKind::GoogleDrive;
+        a.goa_id = "account_123".into();
+        assert!(!a.has_secret());
+        assert_eq!(a.key(), "cloud:goa|account_123");
+        assert!(!CloudKind::GoogleDrive.can_expire());
+        assert!(CloudKind::OneDrive.can_expire());
+        let back = toml::to_string(&CloudFile { accounts: vec![a] }).unwrap();
+        assert!(back.contains("kind = \"google-drive\""));
+        assert_eq!(drive_q("it's"), "it\\'s");
+        assert_eq!(onedrive_item("Vireo/Q3 report"), "https://graph.microsoft.com/v1.0/me/drive/root:/Vireo/Q3%20report");
+        assert_eq!(onedrive_item(""), "https://graph.microsoft.com/v1.0/me/drive/root");
     }
 
     #[test]
