@@ -84,7 +84,7 @@ impl SimpleComponent for CloudAccounts {
                             set_child = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Cloud storage"),
-                                    set_description: Some(&i18n("Connect your cloud storage provider to upload and share large files instead of an attachment. A cloud icon appears in the compose toolbar once a provider is added.\nSupported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and Seafile.")),
+                                    set_description: Some(&i18n("Connect your cloud storage provider to upload and share large files instead of an attachment. A cloud icon appears in the compose toolbar once a provider is added.\n\nSupported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and Seafile.")),
                                     // Across from the heading: the services' marks
                                     // (picker order), with Add Account under them.
                                     #[wrap(Some)]
