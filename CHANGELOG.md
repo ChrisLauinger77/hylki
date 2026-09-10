@@ -10,7 +10,14 @@
   used for every file of the upload, an empty field gets one generated
   per file as before. `ComposeInput::CloudUpload` carries the adjusted
   account copy and `link_password`; `cloud::upload_and_share` takes the
-  fixed password.
+  fixed password. A OneDrive account's plan decides what a link may
+  carry, so the connection check (or a Save without one) probes the
+  drive (`cloud::probe_link_terms`: a personal drive with a 5 GB quota is
+  a free one and takes neither expiry nor password, a Microsoft 365
+  personal one takes both, a business drive takes an expiry but no
+  password) and the answer is kept on the account (`link_expiry`,
+  `link_password`, `link_note` in `cloud.toml`); the rows it rules out
+  are greyed out with the reason, in the editor and the upload dialog.
 
 - **OneDrive as cloud storage** (#144 follow-up), through GNOME Online
   Accounts: the editor lists the Microsoft 365 accounts GOA has (a new

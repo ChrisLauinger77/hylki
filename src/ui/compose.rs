@@ -1621,8 +1621,14 @@ fn cloud_upload_dialog(
         let accounts = accounts.to_vec();
         move |i: usize| {
             if let Some(a) = accounts.get(i) {
-                expire.set_value(a.expire_days as f64);
-                protect.set_active(a.password);
+                // What the service allows for this account: a row it
+                // does not is greyed out, with the reason.
+                expire.set_sensitive(a.expiry_allowed());
+                expire.set_subtitle(&if a.expiry_allowed() { i18n("Days; 0 keeps the link") } else { a.link_note.clone() });
+                protect.set_sensitive(a.password_allowed());
+                protect.set_subtitle(if a.password_allowed() { "" } else { a.link_note.as_str() });
+                expire.set_value(if a.expiry_allowed() { a.expire_days as f64 } else { 0.0 });
+                protect.set_active(a.password_allowed() && a.password);
                 password.set_text("");
             }
         }

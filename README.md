@@ -223,7 +223,10 @@ of the generated one.
   download passwords need a Microsoft 365 subscription or OneDrive for
   Business**: a free personal OneDrive refuses the link when either is
   set, so a new OneDrive account starts with both off, and the editor says
-  so. Uploads and plain links work on any OneDrive. Google Drive is not offered: GNOME Online Accounts
+  so. The connection check finds out what the drive's plan allows and
+  greys out the rows it rules out, with the reason, in the account's
+  settings and in the upload dialog. Uploads and plain links work on any
+  OneDrive. Google Drive is not offered: GNOME Online Accounts
   does not ask Google for Drive access on every system, and Vireo carries
   no Google client of its own.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an

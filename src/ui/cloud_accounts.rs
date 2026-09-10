@@ -306,6 +306,7 @@ fn edit_dialog(
     group.add(&expire);
     group.add(&protect);
 
+
     let check_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     check_box.set_margin_top(8);
     let check = gtk::Button::with_label(&i18n("Check Connection"));
@@ -331,6 +332,9 @@ fn edit_dialog(
     // the Dropbox refresh token (with the account's e-mail and name), or
     // the Seafile API token from a two-step sign-in.
     let dropbox_login: Rc<RefCell<Option<(String, String, String)>>> = Rc::new(RefCell::new(None));
+    // What the connection check found the service allows on a link
+    // (OneDrive plans differ); saved with the account.
+    let link_terms: Rc<RefCell<Option<Option<cloud::LinkTerms>>>> = Rc::new(RefCell::new(None));
 
     let selected_kind = {
         let kind = kind.clone();
@@ -372,6 +376,24 @@ fn edit_dialog(
         }
     };
 
+    // The expiry and password rows follow what the service allows.
+    let apply_terms = {
+        let (expire, protect) = (expire.clone(), protect.clone());
+        move |a: &CloudAccount| {
+            expire.set_sensitive(a.expiry_allowed());
+            if !a.expiry_allowed() {
+                expire.set_value(0.0);
+                expire.set_subtitle(&a.link_note);
+            }
+            protect.set_sensitive(a.password_allowed());
+            if !a.password_allowed() {
+                protect.set_active(false);
+                protect.set_subtitle(&a.link_note);
+            }
+        }
+    };
+    apply_terms(&account);
+
     // The fields each kind wants.
     let apply_kind = {
         let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
@@ -392,6 +414,8 @@ fn edit_dialog(
         );
         let editing = index.is_some();
         let fill_goa = fill_goa.clone();
+        let apply_terms = apply_terms.clone();
+        let known = account.clone();
         move |k: CloudKind| {
             let dropbox = k == CloudKind::Dropbox;
             let goa = k.via_goa();
@@ -416,6 +440,10 @@ fn edit_dialog(
                 if !editing {
                     expire.set_value(0.0);
                     protect.set_active(false);
+                }
+                // What the plan was found to allow, over the generic words.
+                if known.kind == k {
+                    apply_terms(&known);
                 }
                 return;
             }
@@ -482,6 +510,7 @@ fn edit_dialog(
         let dropbox_login = dropbox_login.clone();
         let existing = account.clone();
         let (goa_row, goa_listed) = (goa_row.clone(), goa_listed.clone());
+        let link_terms = link_terms.clone();
         move || {
             let kind = selected_kind();
             let goa = if kind.via_goa() {
@@ -496,7 +525,7 @@ fn edit_dialog(
                 (CloudKind::OneDrive, _) => goa.as_ref().map(|(_, e)| e.clone()).unwrap_or_default(),
                 _ => user.text().trim().to_string(),
             };
-            CloudAccount {
+            let mut a = CloudAccount {
                 name: name.text().trim().to_string(),
                 kind,
                 url: url.text().trim().to_string(),
@@ -507,7 +536,29 @@ fn edit_dialog(
                 goa_id: goa.map(|(id, _)| id).unwrap_or_default(),
                 expire_days: expire.value() as u32,
                 password: protect.is_active(),
+                link_expiry: None,
+                link_password: None,
+                link_note: String::new(),
+            };
+            let probed = link_terms.borrow().clone();
+            match probed {
+                Some(t) => a.set_link_terms(t.as_ref()),
+                // Not probed this time: keep what the account already
+                // knew, if it is still the same kind of account.
+                None if existing.kind == kind => {
+                    a.link_expiry = existing.link_expiry;
+                    a.link_password = existing.link_password;
+                    a.link_note = existing.link_note.clone();
+                    if !a.expiry_allowed() {
+                        a.expire_days = 0;
+                    }
+                    if !a.password_allowed() {
+                        a.password = false;
+                    }
+                }
+                None => {}
             }
+            a
         }
     };
 
@@ -524,6 +575,8 @@ fn edit_dialog(
         let name = name.clone();
         let code = code.clone();
         let selected_kind = selected_kind.clone();
+        let link_terms = link_terms.clone();
+        let apply_terms = apply_terms.clone();
         check.connect_clicked(move |b| {
             let a = read();
             enum Job {
@@ -531,6 +584,7 @@ fn edit_dialog(
                 Dropbox(CloudAccount),
                 SeafileCode(CloudAccount, String, String),
             }
+            type Outcome = (String, Option<(String, String, String)>, Option<Option<cloud::LinkTerms>>);
             let job = if a.kind.via_goa() {
                 if a.goa_id.is_empty() {
                     status.set_label(&i18n("Choose an online account first."));
@@ -567,14 +621,17 @@ fn edit_dialog(
                 }
             };
             b.set_sensitive(false);
-            let (tx, rx) = std::sync::mpsc::channel::<Result<(String, Option<(String, String, String)>), String>>();
+            let (tx, rx) = std::sync::mpsc::channel::<Result<Outcome, String>>();
             std::thread::spawn(move || {
                 let r = match job {
-                    Job::Verify(a, pw) => cloud::verify(&a, &pw).map(|who| (who, None)),
+                    Job::Verify(a, pw) => cloud::verify(&a, &pw).map(|who| {
+                        let terms = cloud::probe_link_terms(&a, &pw).ok();
+                        (who, None, terms)
+                    }),
                     Job::Dropbox(a) => cloud::dropbox_connect(&a)
-                        .map(|(refresh, email, who)| (format!("{who} ({email})"), Some((refresh, email, who)))),
+                        .map(|(refresh, email, who)| (format!("{who} ({email})"), Some((refresh, email, who)), None)),
                     Job::SeafileCode(a, pw, otp) => cloud::seafile_login_with_code(&a, &pw, &otp)
-                        .map(|(token, who)| (who.clone(), Some((token, a.user.clone(), who)))),
+                        .map(|(token, who)| (who.clone(), Some((token, a.user.clone(), who)), None)),
                 };
                 let _ = tx.send(r);
             });
@@ -583,9 +640,20 @@ fn edit_dialog(
             let dropbox_login = dropbox_login.clone();
             let name = name.clone();
             let selected_kind_now = selected_kind.clone();
+            let link_terms = link_terms.clone();
+            let apply_terms = apply_terms.clone();
+            let read = read.clone();
             gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || match rx.try_recv() {
-                Ok(Ok((who, login))) => {
+                Ok(Ok((who, login, terms))) => {
                     status.set_label(&i18n_f("Signed in as {who}.", &[("who", &who)]));
+                    if let Some(t) = terms {
+                        *link_terms.borrow_mut() = Some(t);
+                        let a = read();
+                        apply_terms(&a);
+                        if !a.expiry_allowed() || !a.password_allowed() {
+                            status.set_label(&i18n_f("Signed in as {who}. {note}.", &[("who", &who), ("note", &a.link_note)]));
+                        }
+                    }
                     if let Some(l) = login {
                         if name.text().trim().is_empty() && selected_kind_now() == CloudKind::Dropbox {
                             name.set_text("Dropbox");
@@ -609,6 +677,7 @@ fn edit_dialog(
         });
     }
 
+    let link_terms = link_terms.clone();
     dialog.connect_response(None, move |_, resp| {
         if resp != "save" {
             return;
@@ -616,6 +685,19 @@ fn edit_dialog(
         let a = read();
         let secret = if a.kind.via_goa() {
             if a.goa_id.is_empty() {
+                return;
+            }
+            // Not checked this time: find out what the plan allows on
+            // the way, so the rows can say so next time.
+            if link_terms.borrow().is_none() {
+                let sender = sender.clone();
+                std::thread::spawn(move || {
+                    let mut a = a;
+                    if let Ok(t) = cloud::probe_link_terms(&a, "") {
+                        a.set_link_terms(t.as_ref());
+                    }
+                    let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: String::new() });
+                });
                 return;
             }
             String::new()

@@ -90,6 +90,25 @@ pub struct CloudAccount {
     /// Protect every link with a generated download password.
     #[serde(default)]
     pub password: bool,
+    /// What the service allows on a link, found out when the account was
+    /// checked or saved (`probe_link_terms`); unknown means assume yes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_expiry: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_password: Option<bool>,
+    /// Why, in a phrase for the greyed-out rows.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub link_note: String,
+}
+
+/// What a service lets a public link carry, as found by
+/// [`probe_link_terms`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct LinkTerms {
+    pub expiry: bool,
+    pub password: bool,
+    /// Why something is off, for the rows that show it.
+    pub note: String,
 }
 
 fn default_folder() -> String {
@@ -109,6 +128,42 @@ impl CloudAccount {
             goa_id: String::new(),
             expire_days: 7,
             password: false,
+            link_expiry: None,
+            link_password: None,
+            link_note: String::new(),
+        }
+    }
+
+    /// Whether the service lets this account's links expire (assumed
+    /// until a probe said otherwise).
+    pub fn expiry_allowed(&self) -> bool {
+        self.link_expiry.unwrap_or(true)
+    }
+
+    /// Whether the service lets this account's links take a password.
+    pub fn password_allowed(&self) -> bool {
+        self.link_password.unwrap_or(true)
+    }
+
+    /// Record what a probe found.
+    pub fn set_link_terms(&mut self, terms: Option<&LinkTerms>) {
+        match terms {
+            Some(t) => {
+                self.link_expiry = Some(t.expiry);
+                self.link_password = Some(t.password);
+                self.link_note = t.note.clone();
+            }
+            None => {
+                self.link_expiry = None;
+                self.link_password = None;
+                self.link_note.clear();
+            }
+        }
+        if !self.expiry_allowed() {
+            self.expire_days = 0;
+        }
+        if !self.password_allowed() {
+            self.password = false;
         }
     }
 
@@ -296,6 +351,47 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
             let token = goa_token(account)?;
             onedrive_whoami(&token)
         }
+    }
+}
+
+/// Find out what the service lets a link carry for this account: only
+/// OneDrive differs by plan, so the others answer `None` (everything).
+/// A free personal OneDrive takes neither an expiry nor a password, a
+/// Microsoft 365 personal one takes both, and OneDrive for Business takes
+/// an expiry but no link password. Microsoft does not say which plan a
+/// drive is on; a personal drive's quota tells a free one (5 GB) from a
+/// subscription (100 GB and up).
+pub fn probe_link_terms(account: &CloudAccount, _secret: &str) -> Result<Option<LinkTerms>, String> {
+    if account.kind != CloudKind::OneDrive {
+        return Ok(None);
+    }
+    let token = goa_token(account)?;
+    let v = graph_json(
+        ureq::get(&format!("{GRAPH}/me/drive?$select=driveType,quota"))
+            .set("Authorization", &bearer(&token))
+            .timeout(Duration::from_secs(60)),
+        None,
+    )
+    .map_err(|e| api_err("Could not look at the OneDrive plan", e))?;
+    let drive_type = v["driveType"].as_str().unwrap_or("");
+    let total = v["quota"]["total"].as_u64().unwrap_or(0);
+    Ok(Some(onedrive_terms(drive_type, total)))
+}
+
+fn onedrive_terms(drive_type: &str, quota_total: u64) -> LinkTerms {
+    const FREE_CEILING: u64 = 16 * 1024 * 1024 * 1024;
+    match drive_type {
+        "personal" if quota_total > 0 && quota_total <= FREE_CEILING => LinkTerms {
+            expiry: false,
+            password: false,
+            note: "Not available on a free personal OneDrive; needs a Microsoft 365 subscription".to_string(),
+        },
+        "personal" => LinkTerms { expiry: true, password: true, note: String::new() },
+        _ => LinkTerms {
+            expiry: true,
+            password: false,
+            note: "OneDrive for Business links take no password".to_string(),
+        },
     }
 }
 
@@ -1277,6 +1373,23 @@ mod tests {
         assert!(back.contains("kind = \"onedrive\""));
         assert_eq!(onedrive_item("Vireo/Q3 report"), "https://graph.microsoft.com/v1.0/me/drive/root:/Vireo/Q3%20report");
         assert_eq!(onedrive_item(""), "https://graph.microsoft.com/v1.0/me/drive/root");
+    }
+
+    #[test]
+    fn onedrive_plans_map_to_link_terms() {
+        let free = onedrive_terms("personal", 5 * 1024 * 1024 * 1024);
+        assert!(!free.expiry && !free.password && !free.note.is_empty());
+        let m365 = onedrive_terms("personal", 1024 * 1024 * 1024 * 1024);
+        assert!(m365.expiry && m365.password);
+        let biz = onedrive_terms("business", 1024 * 1024 * 1024 * 1024);
+        assert!(biz.expiry && !biz.password);
+        let mut a = CloudAccount::empty();
+        a.password = true;
+        a.set_link_terms(Some(&free));
+        assert_eq!((a.expire_days, a.password), (0, false));
+        assert!(!a.expiry_allowed() && !a.password_allowed());
+        a.set_link_terms(None);
+        assert!(a.expiry_allowed() && a.link_note.is_empty());
     }
 
     #[test]
