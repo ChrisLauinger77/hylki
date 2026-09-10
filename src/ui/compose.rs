@@ -1611,7 +1611,7 @@ fn cloud_upload_dialog(
     // This upload's terms, starting from the account's own.
     let expire = adw::SpinRow::with_range(0.0, 365.0, 1.0);
     expire.set_title(&i18n("Links expire after"));
-    expire.set_subtitle(&i18n("Days; 0 keeps the link"));
+    expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
     let protect = adw::SwitchRow::new();
     protect.set_title(&i18n("Protect with a password"));
     let password = adw::EntryRow::new();
@@ -1624,7 +1624,7 @@ fn cloud_upload_dialog(
                 // What the service allows for this account: a row it
                 // does not is greyed out, with the reason.
                 expire.set_sensitive(a.expiry_allowed());
-                expire.set_subtitle(&if a.expiry_allowed() { i18n("Days; 0 keeps the link") } else { a.link_note.clone() });
+                expire.set_subtitle(&if a.expiry_allowed() { i18n("Days; 0 keeps the link indefinitely") } else { a.link_note.clone() });
                 protect.set_sensitive(a.password_allowed());
                 protect.set_subtitle(if a.password_allowed() { "" } else { a.link_note.as_str() });
                 expire.set_value(if a.expiry_allowed() { a.expire_days as f64 } else { 0.0 });

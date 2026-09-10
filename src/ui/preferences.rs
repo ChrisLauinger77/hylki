@@ -218,6 +218,8 @@ pub struct Preferences {
     /// The account editor is up in the accounts slot: leaving it for another
     /// category asks about the unsaved changes first.
     editor_open: bool,
+    /// Which side page's editor is up: "accounts" or "cloud".
+    editor_page: &'static str,
 }
 
 /// One sidebar entry (#141): the stack child it shows, and whether that
@@ -331,6 +333,8 @@ pub enum PrefInput {
     /// The accounts editor subpage opened/closed — hide/show the shared
     /// header so the editor's own header takes over the window.
     EditorOpen(bool),
+    /// The Cloud Storage page's account editor is up (or gone).
+    CloudEditorOpen(bool),
 }
 
 #[derive(Debug)]
@@ -429,18 +433,33 @@ impl Preferences {
         dialog.set_close_response("cancel");
         let s = sender.clone();
         let accounts = self.accounts_sender.clone();
+        let cloud = self.cloud.as_ref().map(|c| c.sender().clone());
+        let editor_page = self.editor_page;
         let id = id.to_string();
         dialog.connect_response(None, move |_, resp| {
+            let cloud_editor = editor_page == "cloud";
             match resp {
                 "save" => {
-                    let _ = accounts.send(crate::ui::accounts::AccountsInput::Save);
+                    if cloud_editor {
+                        if let Some(c) = &cloud {
+                            let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::SaveClicked);
+                        }
+                    } else {
+                        let _ = accounts.send(crate::ui::accounts::AccountsInput::Save);
+                    }
                     s.input(PrefInput::ShowPageById(id.clone()));
                 }
                 "discard" => {
-                    let _ = accounts.send(crate::ui::accounts::AccountsInput::CloseEditor);
+                    if cloud_editor {
+                        if let Some(c) = &cloud {
+                            let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::CloseEditor);
+                        }
+                    } else {
+                        let _ = accounts.send(crate::ui::accounts::AccountsInput::CloseEditor);
+                    }
                     s.input(PrefInput::ShowPageById(id.clone()));
                 }
-                _ => s.input(PrefInput::ShowPageById("accounts".into())),
+                _ => s.input(PrefInput::ShowPageById(editor_page.into())),
             }
         });
         dialog.present();
@@ -1313,6 +1332,7 @@ impl Component for Preferences {
             pgp_keys: None,
             cloud: None,
             editor_open: false,
+            editor_page: "accounts",
         };
 
         let widgets = view_output!();
@@ -1657,7 +1677,11 @@ impl Component for Preferences {
             .detach();
         widgets.pgp_slot.set_child(Some(pgp.widget()));
         model.pgp_keys = Some(pgp);
-        let cloud = crate::ui::cloud_accounts::CloudAccounts::builder().launch(()).detach();
+        let cloud = crate::ui::cloud_accounts::CloudAccounts::builder()
+            .launch(())
+            .forward(sender.input_sender(), |o| match o {
+                crate::ui::cloud_accounts::CloudAccountsOutput::EditorOpen(open) => PrefInput::CloudEditorOpen(open),
+            });
         widgets.cloud_slot.set_child(Some(cloud.widget()));
         model.cloud = Some(cloud);
         // The sidebar (#141): a heading per section, a row per category.
@@ -1901,7 +1925,7 @@ impl Component for Preferences {
                 self.select_row(if accounts { "accounts" } else { "general" });
             }
             PrefInput::SelectPage(id) => {
-                if self.editor_open && id != "accounts" {
+                if self.editor_open && id != self.editor_page {
                     self.ask_to_leave_editor(&id, &sender);
                 } else {
                     self.show_page(&id);
@@ -1910,6 +1934,14 @@ impl Component for Preferences {
             PrefInput::ShowPageById(id) => self.select_row(&id),
             PrefInput::EditorOpen(open) => {
                 self.editor_open = open;
+                self.editor_page = "accounts";
+                if let Some(header) = &self.host_header {
+                    header.set_visible(!open);
+                }
+            }
+            PrefInput::CloudEditorOpen(open) => {
+                self.editor_open = open;
+                self.editor_page = "cloud";
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);
                 }

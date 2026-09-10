@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Cloud account editor as a page.** Adding or editing a cloud account
+  slides an editor page in over the Cloud Storage list, the way the mail
+  Accounts editor does (an `AdwNavigationView` in `CloudAccounts`, a
+  header with Save, the shared settings header hidden meanwhile and the
+  leave-editor prompt covering it; `CloudAccountsOutput::EditorOpen`,
+  `PrefInput::CloudEditorOpen`). The link expiry and password rows form a
+  "Link defaults" group that says they are the defaults the composer's
+  upload dialog starts from and can change per upload; "0 keeps the link
+  indefinitely".
 - **Per-upload link terms.** The composer's cloud upload dialog (shown for
   every upload now, the account row only with more than one account)
   carries the expiry in days, the password switch and a password field,

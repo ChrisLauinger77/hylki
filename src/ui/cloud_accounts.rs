@@ -26,6 +26,13 @@ pub struct CloudAccounts {
     accounts: Vec<CloudAccount>,
     list: gtk::ListBox,
     toasts: Option<adw::ToastOverlay>,
+    nav: Option<adw::NavigationView>,
+    editor_page: Option<adw::NavigationPage>,
+    editor_slot: Option<adw::Bin>,
+    /// What the editor's Save does, while one is up: reads the form and
+    /// sends `Save` (or starts the sign-in that will); answers whether it
+    /// accepted the form.
+    save_action: Rc<RefCell<Option<Rc<dyn Fn() -> bool>>>>,
 }
 
 #[derive(Debug)]
@@ -35,6 +42,11 @@ pub enum CloudAccountsInput {
     AddOf(CloudKind),
     Edit(usize),
     Remove(usize),
+    /// The editor page's Save button.
+    SaveClicked,
+    /// Leave the editor without saving (the settings window asks to, when
+    /// the user moves on).
+    CloseEditor,
     /// The editor's Save: `index` is the row being replaced, or none for a
     /// new account. The password is stored only when given.
     Save { index: Option<usize>, account: CloudAccount, password: String },
@@ -42,37 +54,98 @@ pub enum CloudAccountsInput {
     Failed(String),
 }
 
+#[derive(Debug)]
+pub enum CloudAccountsOutput {
+    /// The editor page is up (or gone): the settings window hides its
+    /// shared header meanwhile and asks before moving on.
+    EditorOpen(bool),
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for CloudAccounts {
     type Init = ();
     type Input = CloudAccountsInput;
-    type Output = ();
+    type Output = CloudAccountsOutput;
 
     view! {
-        #[name = "toasts"]
-        adw::ToastOverlay {
+        adw::Bin {
             #[wrap(Some)]
-            set_child = &adw::PreferencesPage {
-                add = &adw::PreferencesGroup {
-                    set_title: &i18n("Cloud storage"),
-                    set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
+            #[name = "nav"]
+            set_child = &adw::NavigationView {
+                // ---- list page ----
+                add = &adw::NavigationPage {
+                    set_title: &i18n("Cloud Storage"),
+                    set_tag: Some("list"),
+
                     #[wrap(Some)]
-                    set_header_suffix = &gtk::Button {
-                        set_label: &i18n("Add Account…"),
-                        set_valign: gtk::Align::Center,
-                        set_margin_start: 24,
-                        connect_clicked => CloudAccountsInput::Add,
+                    set_child = &adw::ToolbarView {
+                        #[wrap(Some)]
+                        #[name = "toasts"]
+                        set_content = &adw::ToastOverlay {
+                            #[wrap(Some)]
+                            set_child = &adw::PreferencesPage {
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Cloud storage"),
+                                    set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
+                                    #[wrap(Some)]
+                                    set_header_suffix = &gtk::Button {
+                                        set_label: &i18n("Add Account…"),
+                                        set_valign: gtk::Align::Center,
+                                        set_margin_start: 24,
+                                        connect_clicked => CloudAccountsInput::Add,
+                                    },
+                                    #[name = "list"]
+                                    gtk::ListBox {
+                                        add_css_class: "boxed-list",
+                                        set_selection_mode: gtk::SelectionMode::None,
+                                    },
+                                    #[name = "empty"]
+                                    gtk::Label {
+                                        set_label: &i18n("No cloud accounts yet."),
+                                        add_css_class: "dim-label",
+                                        set_margin_top: 12,
+                                    },
+                                },
+                            },
+                        },
                     },
-                    #[name = "list"]
-                    gtk::ListBox {
-                        add_css_class: "boxed-list",
-                        set_selection_mode: gtk::SelectionMode::None,
-                    },
-                    #[name = "empty"]
-                    gtk::Label {
-                        set_label: &i18n("No cloud accounts yet."),
-                        add_css_class: "dim-label",
-                        set_margin_top: 12,
+                },
+
+                // ---- editor page ----
+                #[name = "editor_page"]
+                add = &adw::NavigationPage {
+                    set_title: &i18n("Cloud Account"),
+                    set_tag: Some("editor"),
+
+                    #[wrap(Some)]
+                    set_child = &adw::ToolbarView {
+                        add_top_bar = &adw::HeaderBar {
+                            // The window's close button lives here while the
+                            // editor is up (the shared header hides).
+                            set_show_end_title_buttons: true,
+                            pack_end = &gtk::Button {
+                                set_label: &i18n("Save"),
+                                add_css_class: "suggested-action",
+                                connect_clicked => CloudAccountsInput::SaveClicked,
+                            },
+                        },
+
+                        #[wrap(Some)]
+                        set_content = &gtk::ScrolledWindow {
+                            set_hscrollbar_policy: gtk::PolicyType::Never,
+                            #[wrap(Some)]
+                            set_child = &adw::Clamp {
+                                set_maximum_size: 640,
+                                set_tightening_threshold: 480,
+                                set_margin_top: 24,
+                                set_margin_bottom: 24,
+                                set_margin_start: 24,
+                                set_margin_end: 24,
+                                #[wrap(Some)]
+                                #[name = "editor_slot"]
+                                set_child = &adw::Bin {},
+                            },
+                        },
                     },
                 },
             },
@@ -85,12 +158,32 @@ impl SimpleComponent for CloudAccounts {
             accounts: cloud::load_accounts(),
             list: widgets.list.clone(),
             toasts: Some(widgets.toasts.clone()),
+            nav: Some(widgets.nav.clone()),
+            editor_page: Some(widgets.editor_page.clone()),
+            editor_slot: Some(widgets.editor_slot.clone()),
+            save_action: Rc::new(RefCell::new(None)),
         };
         model.rebuild(&sender);
         widgets.empty.set_visible(model.accounts.is_empty());
+        // Tell the settings window when the editor page is up, every way
+        // in or out (Save, the back button, a swipe).
+        {
+            let s = sender.output_sender().clone();
+            let save_action = model.save_action.clone();
+            let slot = widgets.editor_slot.clone();
+            widgets.nav.connect_visible_page_notify(move |nav| {
+                let editor = nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor");
+                if !editor {
+                    // The form is done with: drop it and what Save would do.
+                    *save_action.borrow_mut() = None;
+                    slot.set_child(None::<&gtk::Widget>);
+                }
+                let _ = s.send(CloudAccountsOutput::EditorOpen(editor));
+            });
+        }
         // VIREO_SHOWCASE_EDIT_CLOUD=<index> opens that account's editor
-        // for a capture (demo only); "add", "add:dropbox" or
-        // "add:seafile" opens the Add dialog on that kind.
+        // for a capture (demo only); "add", "add:dropbox", "add:seafile"
+        // or "add:onedrive" opens the Add page on that kind.
         if let Ok(what) = std::env::var("VIREO_SHOWCASE_EDIT_CLOUD") {
             if std::env::var_os("VIREO_DEMO").is_some() {
                 let s = sender.input_sender().clone();
@@ -114,11 +207,11 @@ impl SimpleComponent for CloudAccounts {
             CloudAccountsInput::AddOf(kind) => {
                 let mut a = CloudAccount::empty();
                 a.kind = kind;
-                edit_dialog(self.list.root().and_downcast::<gtk::Window>().as_ref(), None, a, sender.input_sender().clone());
+                self.open_editor(None, a, &sender);
             }
             CloudAccountsInput::Edit(i) => {
                 if let Some(a) = self.accounts.get(i).cloned() {
-                    edit_dialog(self.list.root().and_downcast::<gtk::Window>().as_ref(), Some(i), a, sender.input_sender().clone());
+                    self.open_editor(Some(i), a, &sender);
                 }
             }
             CloudAccountsInput::Remove(i) => {
@@ -130,6 +223,15 @@ impl SimpleComponent for CloudAccounts {
                     self.toast(&i18n_f("Removed {name}", &[("name", &a.name)]));
                 }
             }
+            CloudAccountsInput::SaveClicked => {
+                let action = self.save_action.borrow().clone();
+                if let Some(f) = action {
+                    if f() {
+                        self.close_editor();
+                    }
+                }
+            }
+            CloudAccountsInput::CloseEditor => self.close_editor(),
             CloudAccountsInput::Failed(e) => self.toast(&e),
             CloudAccountsInput::Save { index, account, password } => {
                 if !password.is_empty() && account.has_secret() {
@@ -159,6 +261,27 @@ impl CloudAccounts {
     fn toast(&self, text: &str) {
         if let Some(t) = &self.toasts {
             t.add_toast(adw::Toast::new(text));
+        }
+    }
+
+    /// Slide the editor page in with the form for `account`.
+    fn open_editor(&mut self, index: Option<usize>, account: CloudAccount, sender: &ComponentSender<Self>) {
+        let (Some(nav), Some(page), Some(slot)) = (&self.nav, &self.editor_page, &self.editor_slot) else { return };
+        page.set_title(&if index.is_some() { i18n("Edit Cloud Account") } else { i18n("Add Cloud Account") });
+        let (form, save) = build_editor(index, account, sender.input_sender().clone());
+        slot.set_child(Some(&form));
+        *self.save_action.borrow_mut() = Some(save);
+        if nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+            return;
+        }
+        nav.push_by_tag("editor");
+    }
+
+    fn close_editor(&self) {
+        if let Some(nav) = &self.nav {
+            if nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+                nav.pop();
+            }
         }
     }
 
@@ -205,24 +328,17 @@ impl CloudAccounts {
     }
 }
 
-/// The account editor: a kind, the fields that kind needs, a connection
-/// check that signs in with what is typed (a browser sign-in, for
-/// Dropbox), and Save.
-fn edit_dialog(
-    parent: Option<&gtk::Window>,
+/// The account editor's form: a kind, the fields that kind needs, a
+/// connection check that signs in with what is typed (a browser sign-in,
+/// for Dropbox). Answers with the form and what the page's Save button
+/// does with it.
+fn build_editor(
     index: Option<usize>,
     account: CloudAccount,
     sender: relm4::Sender<CloudAccountsInput>,
-) {
-    let heading = if index.is_some() { i18n("Edit Cloud Account") } else { i18n("Add Cloud Account") };
-    let dialog = adw::MessageDialog::new(parent, Some(&heading), None);
-    dialog.add_response("cancel", &i18n("Cancel"));
-    dialog.add_response("save", &i18n("Save"));
-    dialog.set_default_response(Some("save"));
-    dialog.set_close_response("cancel");
-    dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
-
+) -> (gtk::Widget, Rc<dyn Fn() -> bool>) {
     let group = adw::PreferencesGroup::new();
+    group.set_title(&i18n("Account"));
     let kinds: Vec<String> = CloudKind::ALL.iter().map(|k| kind_label(*k)).collect();
     let kind_refs: Vec<&str> = kinds.iter().map(String::as_str).collect();
     let kind = adw::ComboRow::new();
@@ -287,7 +403,7 @@ fn edit_dialog(
     folder.set_text(&account.folder);
     let expire = adw::SpinRow::with_range(0.0, 365.0, 1.0);
     expire.set_title(&i18n("Links expire after"));
-    expire.set_subtitle(&i18n("Days; 0 keeps the link"));
+    expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
     expire.set_value(account.expire_days as f64);
     let protect = adw::SwitchRow::new();
     protect.set_title(&i18n("Protect links with a password"));
@@ -303,8 +419,16 @@ fn edit_dialog(
     group.add(&app_key);
     group.add(&library);
     group.add(&folder);
-    group.add(&expire);
-    group.add(&protect);
+    // The link terms: the defaults for this account, changeable for each
+    // upload in the composer's upload dialog.
+    let defaults = adw::PreferencesGroup::new();
+    defaults.set_title(&i18n("Link defaults"));
+    defaults.set_description(Some(&i18n(
+        "How share links from this account are made unless you choose otherwise for an email: the upload dialog in the composer shows these values and lets you change them for that upload alone.",
+    )));
+    defaults.set_margin_top(12);
+    defaults.add(&expire);
+    defaults.add(&protect);
 
 
     let check_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -320,13 +444,12 @@ fn edit_dialog(
     check_box.append(&status);
 
     let bx = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    bx.set_width_request(420);
     bx.append(&group);
     bx.append(&app_key_hint);
     bx.append(&goa_hint);
     bx.append(&seafile_hint);
     bx.append(&check_box);
-    dialog.set_extra_child(Some(&bx));
+    bx.append(&defaults);
 
     // A sign-in that made a secret of its own leaves it here until Save:
     // the Dropbox refresh token (with the account's e-mail and name), or
@@ -432,7 +555,7 @@ fn edit_dialog(
             if goa {
                 fill_goa(k);
                 check.set_label(&i18n("Check Connection"));
-                expire.set_subtitle(&i18n("Days; 0 keeps the link. Needs Microsoft 365 or OneDrive for Business"));
+                expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely. Needs Microsoft 365 or OneDrive for Business"));
                 protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Needs Microsoft 365 or OneDrive for Business"));
                 name.set_title(&i18n("Account name, such as Work OneDrive (optional)"));
                 // A new OneDrive account starts with both off, so a free
@@ -447,7 +570,7 @@ fn edit_dialog(
                 }
                 return;
             }
-            expire.set_subtitle(&i18n("Days; 0 keeps the link"));
+            expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
             match k {
                 CloudKind::Nextcloud => {
                     name.set_title(&i18n("Account name, such as Work Nextcloud (optional)"));
@@ -692,14 +815,11 @@ fn edit_dialog(
     }
 
     let link_terms = link_terms.clone();
-    dialog.connect_response(None, move |_, resp| {
-        if resp != "save" {
-            return;
-        }
+    let save: Rc<dyn Fn() -> bool> = Rc::new(move || {
         let a = read();
         let secret = if a.kind.via_goa() {
             if a.goa_id.is_empty() {
-                return;
+                return false;
             }
             // Not checked this time: find out what the plan allows on
             // the way, so the rows can say so next time.
@@ -712,7 +832,7 @@ fn edit_dialog(
                     }
                     let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: String::new() });
                 });
-                return;
+                return true;
             }
             String::new()
         } else if a.kind == CloudKind::Dropbox {
@@ -721,11 +841,11 @@ fn edit_dialog(
             match dropbox_login.borrow().as_ref() {
                 Some((refresh, _, _)) => refresh.clone(),
                 None if !a.user.is_empty() => String::new(),
-                None => return,
+                None => return false,
             }
         } else {
             if a.url.is_empty() || a.user.is_empty() {
-                return;
+                return false;
             }
             let otp = code.text().trim().to_string();
             match dropbox_login.borrow().as_ref() {
@@ -742,12 +862,13 @@ fn edit_dialog(
                             Err(e) => CloudAccountsInput::Failed(e),
                         });
                     });
-                    return;
+                    return true;
                 }
                 _ => pass.text().to_string(),
             }
         };
         let _ = sender.send(CloudAccountsInput::Save { index, account: a, password: secret });
+        true
     });
-    dialog.present();
+    (bx.upcast(), save)
 }
