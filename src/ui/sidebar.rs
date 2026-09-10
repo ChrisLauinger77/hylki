@@ -2585,12 +2585,14 @@ impl Sidebar {
                 hbox.append(&disc);
                 row.set_tooltip_text(Some(&t.name));
             } else {
+                // Laid out like the Filtered Folders rows: the same leaf
+                // expander slot, then the disc exactly where their glyph
+                // sits (both 16px), so the two sections' rows line up.
+                let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                spacer.set_width_request(TREE_EXPANDER_WIDTH);
+                hbox.append(&spacer);
                 if self.chevrons_left {
                     disc.set_margin_start(ROW_LEFT_INSET);
-                } else {
-                    // Under the header's caret, like a folder under its
-                    // account heading.
-                    disc.set_margin_start(TREE_EXPANDER_WIDTH);
                 }
                 hbox.append(&disc);
                 let label = gtk::Label::new(Some(&t.name));
