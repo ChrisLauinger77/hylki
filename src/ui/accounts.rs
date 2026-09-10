@@ -611,6 +611,15 @@ impl Component for AccountsWindow {
                                 add_css_class: "suggested-action",
                                 connect_clicked => AccountsInput::Save,
                             },
+                            // Left of Save, only while editing an existing
+                            // account; asks before removing.
+                            #[name = "remove_btn"]
+                            pack_end = &gtk::Button {
+                                set_label: &i18n("Remove"),
+                                add_css_class: "destructive-action",
+                                set_visible: false,
+                                connect_clicked => AccountsInput::RemoveCurrent,
+                            },
                         },
 
                         #[wrap(Some)]
@@ -992,16 +1001,6 @@ impl Component for AccountsWindow {
                             // For a GOA-imported account this removes it from
                             // Vireo only — it stays in GNOME Online Accounts and
                             // returns to the import list.
-                            #[name = "remove_group"]
-                            add = &adw::PreferencesGroup {
-                                gtk::Button {
-                                    set_label: &i18n("Remove Account"),
-                                    add_css_class: "destructive-action",
-                                    set_halign: gtk::Align::Center,
-                                    connect_clicked => AccountsInput::RemoveCurrent,
-                                },
-                            },
-
                             add = &adw::PreferencesGroup {
                                 gtk::Label {
                                     set_wrap: true,
@@ -1198,7 +1197,7 @@ impl Component for AccountsWindow {
                 self.sig_editor.set_html("");
                 widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
                 widgets.emoji_btn.set_label(&i18n("Add"));
-                widgets.remove_group.set_visible(false);
+                widgets.remove_btn.set_visible(false);
                 // A prior GOA edit may have hidden the provider picker.
                 widgets.provider_row.set_visible(true);
                 widgets.nav.push_by_tag("editor");
@@ -1252,7 +1251,7 @@ impl Component for AccountsWindow {
                 widgets.goa_banner.set_visible(is_goa);
                 // GOA accounts get the same Remove flow — it removes the account
                 // from Vireo only (back to the import list); GNOME keeps it.
-                widgets.remove_group.set_visible(true);
+                widgets.remove_btn.set_visible(true);
                 // GNOME owns a GOA account's connection outright, so the server
                 // and credential section isn't shown at all — only what Vireo
                 // owns (name, label, colour, signature, aliases) plus the email

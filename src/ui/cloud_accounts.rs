@@ -24,6 +24,10 @@ pub struct CloudAccounts {
     nav: Option<adw::NavigationView>,
     editor_page: Option<adw::NavigationPage>,
     editor_slot: Option<adw::Bin>,
+    /// The editor header's Remove, shown while an existing account is up.
+    remove_btn: Option<gtk::Button>,
+    /// Which account the editor shows (none for a new one).
+    editing: Option<usize>,
     /// What the editor's Save does, while one is up: reads the form and
     /// sends `Save` (or starts the sign-in that will); answers whether it
     /// accepted the form.
@@ -36,7 +40,9 @@ pub enum CloudAccountsInput {
     /// The editor for a new account of that kind.
     AddOf(CloudKind),
     Edit(usize),
-    /// The row's trash button: ask first.
+    /// The editor header's Remove: ask about the account being edited.
+    RemoveCurrent,
+    /// Ask before removing that account.
     ConfirmRemove(usize),
     Remove(usize),
     /// The editor page's Save button.
@@ -147,6 +153,15 @@ impl SimpleComponent for CloudAccounts {
                                 add_css_class: "suggested-action",
                                 connect_clicked => CloudAccountsInput::SaveClicked,
                             },
+                            // Left of Save, only while editing an existing
+                            // account; asks before removing.
+                            #[name = "remove_btn"]
+                            pack_end = &gtk::Button {
+                                set_label: &i18n("Remove"),
+                                add_css_class: "destructive-action",
+                                set_visible: false,
+                                connect_clicked => CloudAccountsInput::RemoveCurrent,
+                            },
                         },
 
                         #[wrap(Some)]
@@ -186,6 +201,8 @@ impl SimpleComponent for CloudAccounts {
             nav: Some(widgets.nav.clone()),
             editor_page: Some(widgets.editor_page.clone()),
             editor_slot: Some(widgets.editor_slot.clone()),
+            remove_btn: Some(widgets.remove_btn.clone()),
+            editing: None,
             save_action: Rc::new(RefCell::new(None)),
         };
         model.rebuild(&sender);
@@ -239,6 +256,11 @@ impl SimpleComponent for CloudAccounts {
                     self.open_editor(Some(i), a, &sender);
                 }
             }
+            CloudAccountsInput::RemoveCurrent => {
+                if let Some(i) = self.editing {
+                    sender.input(CloudAccountsInput::ConfirmRemove(i));
+                }
+            }
             CloudAccountsInput::ConfirmRemove(i) => {
                 let Some(a) = self.accounts.get(i) else { return };
                 let name = if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() };
@@ -263,6 +285,10 @@ impl SimpleComponent for CloudAccounts {
             }
             CloudAccountsInput::Remove(i) => {
                 if i < self.accounts.len() {
+                    if self.editing == Some(i) {
+                        self.editing = None;
+                        self.close_editor();
+                    }
                     let a = self.accounts.remove(i);
                     crate::config::delete_cloud_password(&a.key());
                     cloud::save_accounts(&self.accounts);
@@ -326,6 +352,10 @@ impl CloudAccounts {
     fn open_editor(&mut self, index: Option<usize>, account: CloudAccount, sender: &ComponentSender<Self>) {
         let (Some(nav), Some(page), Some(slot)) = (&self.nav, &self.editor_page, &self.editor_slot) else { return };
         page.set_title(&if index.is_some() { i18n("Edit Cloud Account") } else { i18n("Add Cloud Account") });
+        self.editing = index;
+        if let Some(b) = &self.remove_btn {
+            b.set_visible(index.is_some());
+        }
         let (form, save) = build_editor(index, account, sender.input_sender().clone());
         slot.set_child(Some(&form));
         *self.save_action.borrow_mut() = Some(save);
@@ -347,7 +377,7 @@ impl CloudAccounts {
         while let Some(child) = self.list.first_child() {
             self.list.remove(&child);
         }
-        for (i, a) in self.accounts.iter().enumerate() {
+        for a in self.accounts.iter() {
             // The same card as a Mail Accounts row: mark, name over
             // details, then a chevron; the row itself opens the editor.
             let row = gtk::ListBoxRow::new();
@@ -388,15 +418,6 @@ impl CloudAccounts {
                     }
                 });
             }
-            let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
-            rm.add_css_class("flat");
-            rm.set_valign(gtk::Align::Center);
-            rm.set_tooltip_text(Some(&i18n("Remove")));
-            let s = sender.input_sender().clone();
-            rm.connect_clicked(move |_| {
-                let _ = s.send(CloudAccountsInput::ConfirmRemove(i));
-            });
-            hbox.append(&rm);
             let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
             next.add_css_class("dim-label");
             hbox.append(&next);
