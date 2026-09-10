@@ -60,7 +60,7 @@ pub struct Folder {
 
 /// A single message (summary + body). In a real backend the body is loaded
 /// lazily; here it is always present.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Message {
     pub id: u32,
     /// Owning account; needed to route actions and to merge the unified inbox.

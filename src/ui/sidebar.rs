@@ -2430,6 +2430,8 @@ impl Sidebar {
     ) -> KindWidgets {
         let is_inbox = kind == FolderKind::Inbox;
         let title = kind_label(kind);
+        // Sent wears no unread chip anywhere: what you sent is not new mail.
+        let counted = kind != FolderKind::Sent;
         let unread = if is_inbox { self.unified_unread } else { self.kind_unread(kind) };
         let expanded = if is_inbox { self.unified_expanded } else { self.kind_open(kind) };
         let show_chip = unread > 0 && !expanded && self.show_unified_chip;
@@ -2608,7 +2610,12 @@ impl Sidebar {
             // app declines mail from other accounts, #23).
             row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
             sub.append(&row);
-            row_badges.insert((aid, folder.id), badge);
+            if counted {
+                row_badges.insert((aid, folder.id), badge);
+            } else {
+                badge.set_visible(false);
+                row.set_tooltip_text(None);
+            }
             rows.push(InboxRef {
                 account_id: aid,
                 folder_id: folder.id,
@@ -3038,6 +3045,9 @@ impl Sidebar {
     /// The unread total a unified row shows: every account's folder of that
     /// kind (Drafts counts every draft, as its chips do).
     fn kind_unread(&self, kind: FolderKind) -> u32 {
+        if kind == FolderKind::Sent {
+            return 0;
+        }
         self.sections
             .iter()
             .flat_map(|s| s.folders.iter())
@@ -3751,19 +3761,23 @@ fn build_folder_row(
     img.add_css_class("folder-icon");
     pin_icon_size(&img);
 
+    // Sent wears no unread chip: what you sent is not new mail. `None` keeps
+    // it off the in-place update lists too.
+    let counted = folder.kind != FolderKind::Sent;
+    let unread = if counted { folder.unread } else { 0 };
     let badge = if collapsed {
         hbox.set_halign(gtk::Align::Center);
-        let tip = if folder.unread > 0 {
-            format!("{} ({})", folder.name, folder.unread)
+        let tip = if unread > 0 {
+            format!("{} ({})", folder.name, unread)
         } else {
             folder.name.clone()
         };
         row.set_tooltip_text(Some(&tip));
         // Every folder carries an unread chip; in the rail it rides the icon's
         // corner so new mail shows without expanding the sidebar.
-        let (overlay, badge) = with_unread_overlay(&img, folder.unread);
+        let (overlay, badge) = with_unread_overlay(&img, unread);
         hbox.append(&overlay);
-        Some(badge)
+        counted.then_some(badge)
     } else {
         if inset {
             img.set_margin_start(ROW_LEFT_INSET);
@@ -3777,12 +3791,12 @@ fn build_folder_row(
 
         // Every folder shows an unread count chip — present but hidden when
         // zero so it can update in place.
-        let badge = gtk::Label::new(Some(&folder.unread.to_string()));
+        let badge = gtk::Label::new(Some(&unread.to_string()));
         badge.add_css_class("unread-badge");
         badge.set_valign(gtk::Align::Center);
-        badge.set_visible(folder.unread > 0);
+        badge.set_visible(unread > 0);
         hbox.append(&badge);
-        Some(badge)
+        counted.then_some(badge)
     };
 
     row.set_child(Some(&hbox));

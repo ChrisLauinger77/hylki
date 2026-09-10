@@ -625,7 +625,8 @@ impl Component for Preferences {
                         #[wrap(Some)]
                         #[name = "panels_stack"]
                         set_content = &gtk::Stack {
-                            set_transition_type: gtk::StackTransitionType::Crossfade,
+                            // Sections switch outright, no fade.
+                            set_transition_type: gtk::StackTransitionType::None,
 
                             #[name = "accounts_slot"]
                             add_named[Some("accounts")] = &adw::Bin {},

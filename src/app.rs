@@ -3318,14 +3318,33 @@ impl SimpleComponent for AppModel {
                     .iter()
                     .filter_map(|a| self.unified_folder_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
                     .collect();
-                // Keep every account's last known inbox and top it up from the
+                // Keep every account's last known slice and top it up from the
                 // folder caches, the way opening a single folder does. This used
                 // to clear the lot and wait: an account whose worker was slow to
                 // answer — busy backfilling a large mailbox, reconnecting, or
                 // offline — was simply absent from "All Inboxes", while its own
                 // Inbox, served from cache, still listed its mail. Each account's
                 // slice is replaced when its load lands.
-                for (account_id, folder_id, _) in &reqs {
+                for (account_id, folder_id, path) in &reqs {
+                    // A folder not seen since launch (only inboxes are primed
+                    // at startup): the on-disk index has it as last synced,
+                    // so the view opens at once — and after a restart — rather
+                    // than waiting on the worker.
+                    let seen = self
+                        .message_cache
+                        .get(&(*account_id, *folder_id))
+                        .is_some_and(|c| !c.is_empty());
+                    if !seen {
+                        let from_disk = self
+                            .cache
+                            .as_ref()
+                            .map(|c| c.load_messages(*account_id, path, *folder_id))
+                            .unwrap_or_default();
+                        if !from_disk.is_empty() {
+                            let from_disk = self.merge_local_tags(*account_id, from_disk);
+                            self.message_cache.insert((*account_id, *folder_id), from_disk);
+                        }
+                    }
                     if let Some(cached) = self.message_cache.get(&(*account_id, *folder_id)) {
                         if !cached.is_empty() {
                             self.unified_by_account.insert(*account_id, cached.clone());
@@ -6157,21 +6176,35 @@ impl SimpleComponent for AppModel {
                     }
                 }
                 // Cache for instant display when revisiting this folder.
+                // The worker answers a load from its cache first and from the
+                // server after, and the view was seeded from the same cache
+                // when it opened — so most arrivals change nothing. Only a
+                // changed list is worth re-threading and re-emitting: a
+                // rebuild of a large (or merged) list is not free, and it
+                // used to happen several times over per visit.
+                let unchanged = self.message_cache.get(&(account_id, folder_id)) == Some(&messages);
                 self.message_cache
                     .insert((account_id, folder_id), messages.clone());
-                // A sync can add a reply to a conversation already assembled, so
-                // what was stored is no longer necessarily the conversation.
-                self.forget_threads(account_id);
-                self.push_thread_links();
+                if !unchanged {
+                    // A sync can add a reply to a conversation already
+                    // assembled, so what was stored is no longer necessarily
+                    // the conversation.
+                    self.forget_threads(account_id);
+                    self.push_thread_links();
+                }
                 if self.unified {
                     // Accept only each account's folder of the view's kind;
                     // merge all by recency.
                     if self.unified_folder_of(account_id).map(|f| f.id) == Some(folder_id) {
-                        self.unified_by_account.insert(account_id, messages);
-                        self.emit_unified();
+                        let same_slice = unchanged
+                            && self.unified_by_account.get(&account_id).is_some_and(|s| *s == messages);
+                        if !same_slice {
+                            self.unified_by_account.insert(account_id, messages);
+                            self.emit_unified();
+                        }
                     }
                 } else if let Some(sel) = self.selected.as_ref() {
-                    if sel.account_id == account_id && sel.folder_id == folder_id {
+                    if sel.account_id == account_id && sel.folder_id == folder_id && !unchanged {
                         self.message_list
                             .emit(MessageListInput::SetMessages { messages });
                     }
