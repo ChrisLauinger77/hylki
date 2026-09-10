@@ -816,10 +816,9 @@ impl Component for Preferences {
 
                                     #[name = "remember_rail_row"]
                                     adw::SwitchRow {
-                                        set_title: &i18n("Remember the icon rail"),
-                                        set_subtitle: &i18n("Reopen collapsed to the icon rail if that is how \
-                                                       you left it. Off starts every launch with the full \
-                                                       sidebar."),
+                                        set_title: &i18n("Remember icon rail state"),
+                                        set_subtitle: &i18n("Reopen with icon rail in the last used state. Off \
+                                                       starts every launch with the full sidebar."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleRememberRail(row.is_active()));
                                         },
