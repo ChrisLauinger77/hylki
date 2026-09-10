@@ -485,4 +485,10 @@ before it lands (with the change explained on the pull request).
 Vireo is free software licensed under the **GNU Affero General Public License
 v3.0 or later** ([AGPL-3.0-or-later](LICENSE)).
 
+The Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and Seafile marks shown
+in Settings are trademarks of their owners, used only to identify those
+services, and are not covered by that licence (see
+[data/brands/README.md](data/brands/README.md)). Vireo is not affiliated with
+or endorsed by any of them.
+
 © 2026 Hyprlab

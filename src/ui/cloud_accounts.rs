@@ -13,17 +13,12 @@ use crate::cloud::{self, CloudAccount, CloudKind};
 use crate::i18n::{i18n, i18n_f};
 
 /// How a kind is named in the editor and the list.
-pub fn kind_label(kind: CloudKind) -> String {
-    match kind {
-        CloudKind::Nextcloud => i18n("Nextcloud, ownCloud or OpenCloud"),
-        CloudKind::Dropbox => i18n("Dropbox"),
-        CloudKind::Seafile => i18n("Seafile"),
-        CloudKind::OneDrive => i18n("OneDrive"),
-    }
-}
-
 pub struct CloudAccounts {
     accounts: Vec<CloudAccount>,
+    /// Keyring keys of the servers already asked which product they are
+    /// (accounts from before the picker told them apart), so a list
+    /// rebuild does not ask again.
+    probed: std::collections::HashSet<String>,
     list: gtk::ListBox,
     toasts: Option<adw::ToastOverlay>,
     nav: Option<adw::NavigationView>,
@@ -52,6 +47,9 @@ pub enum CloudAccountsInput {
     Save { index: Option<usize>, account: CloudAccount, password: String },
     /// A sign-in the editor finished after closing went wrong.
     Failed(String),
+    /// A server said which product it is (`cloud::detect_product`), for
+    /// the account with that keyring key.
+    ProductDetected { key: String, product: String },
 }
 
 #[derive(Debug)]
@@ -93,6 +91,13 @@ impl SimpleComponent for CloudAccounts {
                                         set_valign: gtk::Align::Center,
                                         set_margin_start: 24,
                                         connect_clicked => CloudAccountsInput::Add,
+                                    },
+                                    // The services' marks, in picker order (#brands).
+                                    #[name = "brands"]
+                                    gtk::Box {
+                                        set_orientation: gtk::Orientation::Horizontal,
+                                        set_spacing: 14,
+                                        set_margin_bottom: 8,
                                     },
                                     #[name = "list"]
                                     gtk::ListBox {
@@ -154,8 +159,14 @@ impl SimpleComponent for CloudAccounts {
 
     fn init(_init: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let widgets = view_output!();
+        for service in cloud::SERVICES.iter() {
+            let mark = crate::brand::image(service.brand(), 22);
+            mark.set_tooltip_text(Some(service.name));
+            widgets.brands.append(&mark);
+        }
         let mut model = CloudAccounts {
             accounts: cloud::load_accounts(),
+            probed: std::collections::HashSet::new(),
             list: widgets.list.clone(),
             toasts: Some(widgets.toasts.clone()),
             nav: Some(widgets.nav.clone()),
@@ -233,6 +244,17 @@ impl SimpleComponent for CloudAccounts {
             }
             CloudAccountsInput::CloseEditor => self.close_editor(),
             CloudAccountsInput::Failed(e) => self.toast(&e),
+            CloudAccountsInput::ProductDetected { key, product } => {
+                let mut changed = false;
+                for a in self.accounts.iter_mut().filter(|a| a.key() == key && a.product.is_empty()) {
+                    a.product = product.clone();
+                    changed = true;
+                }
+                if changed {
+                    cloud::save_accounts(&self.accounts);
+                    self.rebuild(&sender);
+                }
+            }
             CloudAccountsInput::Save { index, account, password } => {
                 if !password.is_empty() && account.has_secret() {
                     if let Err(e) = crate::config::store_cloud_password(&account.key(), &password) {
@@ -300,7 +322,19 @@ impl CloudAccounts {
                 sub.push_str(&format!(" · {}", i18n("password-protected")));
             }
             row.set_subtitle(&sub);
-            row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Vireo-cloud-symbolic"));
+            row.add_prefix(&crate::brand::image(a.brand(), 24));
+            // A server from before the picker told Nextcloud, ownCloud and
+            // OpenCloud apart: ask it once, in the background, and fill in
+            // its mark when it answers.
+            if a.kind == CloudKind::Nextcloud && a.product.is_empty() && self.probed.insert(a.key()) {
+                let (key, base) = (a.key(), a.base());
+                let s = sender.input_sender().clone();
+                std::thread::spawn(move || {
+                    if let Some(product) = cloud::detect_product(&base) {
+                        let _ = s.send(CloudAccountsInput::ProductDetected { key, product });
+                    }
+                });
+            }
             let edit = gtk::Button::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
             edit.add_css_class("flat");
             edit.set_valign(gtk::Align::Center);
@@ -339,12 +373,56 @@ fn build_editor(
 ) -> (gtk::Widget, Rc<dyn Fn() -> bool>) {
     let group = adw::PreferencesGroup::new();
     group.set_title(&i18n("Account"));
-    let kinds: Vec<String> = CloudKind::ALL.iter().map(|k| kind_label(*k)).collect();
-    let kind_refs: Vec<&str> = kinds.iter().map(String::as_str).collect();
+    let names: Vec<&str> = cloud::SERVICES.iter().map(|s| s.name).collect();
     let kind = adw::ComboRow::new();
     kind.set_title(&i18n("Service"));
-    kind.set_model(Some(&gtk::StringList::new(&kind_refs)));
-    kind.set_selected(CloudKind::ALL.iter().position(|k| *k == account.kind).unwrap_or(0) as u32);
+    kind.set_model(Some(&gtk::StringList::new(&names)));
+    // Each entry with the service's mark before its name, in the row and
+    // in the list that drops down.
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
+            let bx = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            let label = gtk::Label::new(None);
+            label.set_xalign(0.0);
+            bx.append(&gtk::Image::new());
+            bx.append(&label);
+            item.set_child(Some(&bx));
+        }
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        // By name, not position: the row's own selected-value slot is a
+        // list item with no position.
+        let name = item.item().and_downcast::<gtk::StringObject>().map(|s| s.string().to_string()).unwrap_or_default();
+        let Some(service) = cloud::SERVICES.iter().find(|s| s.name == name) else { return };
+        let Some(bx) = item.child().and_downcast::<gtk::Box>() else { return };
+        // (image, label): swap the image for the service's mark, name the label.
+        let Some(old) = bx.first_child() else { return };
+        let label = old.next_sibling().and_downcast::<gtk::Label>();
+        bx.remove(&old);
+        bx.prepend(&crate::brand::image(service.brand(), 20));
+        if let Some(label) = label {
+            label.set_label(service.name);
+        }
+    });
+    kind.set_factory(Some(&factory));
+    kind.set_selected(account.service_index().unwrap_or(0) as u32);
+    // The service's mark over the form, following the picker.
+    let header_mark = gtk::Image::new();
+    header_mark.set_pixel_size(56);
+    header_mark.set_halign(gtk::Align::Center);
+    header_mark.set_margin_bottom(18);
+    let set_header_mark = {
+        let header_mark = header_mark.clone();
+        move |id: &str| {
+            match crate::brand::texture(id, 112) {
+                Some(t) => header_mark.set_paintable(Some(&t)),
+                None => header_mark.set_icon_name(Some("co.hyprlab.Vireo-cloud-symbolic")),
+            }
+        }
+    };
+    set_header_mark(account.brand());
     // The kind is chosen when the account is made; afterwards the
     // sign-in and the keyring entry belong to it.
     kind.set_sensitive(index.is_none());
@@ -444,6 +522,7 @@ fn build_editor(
     check_box.append(&status);
 
     let bx = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    bx.append(&header_mark);
     bx.append(&group);
     bx.append(&app_key_hint);
     bx.append(&goa_hint);
@@ -459,9 +538,13 @@ fn build_editor(
     // (OneDrive plans differ); saved with the account.
     let link_terms: Rc<RefCell<Option<Option<cloud::LinkTerms>>>> = Rc::new(RefCell::new(None));
 
-    let selected_kind = {
+    let selected_service = {
         let kind = kind.clone();
-        move || CloudKind::ALL.get(kind.selected() as usize).copied().unwrap_or_default()
+        move || cloud::SERVICES.get(kind.selected() as usize).copied().unwrap_or(cloud::SERVICES[0])
+    };
+    let selected_kind = {
+        let selected_service = selected_service.clone();
+        move || selected_service().kind
     };
 
     // The GOA accounts the picker currently lists (those of the kind's
@@ -539,7 +622,8 @@ fn build_editor(
         let fill_goa = fill_goa.clone();
         let apply_terms = apply_terms.clone();
         let known = account.clone();
-        move |k: CloudKind| {
+        move |service: cloud::Service| {
+            let k = service.kind;
             let dropbox = k == CloudKind::Dropbox;
             let goa = k.via_goa();
             url.set_visible(!dropbox && !goa);
@@ -573,7 +657,7 @@ fn build_editor(
             expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
             match k {
                 CloudKind::Nextcloud => {
-                    name.set_title(&i18n("Account name, such as Work Nextcloud (optional)"));
+                    name.set_title(&i18n_f("Account name, such as Work {service} (optional)", &[("service", service.name)]));
                     user.set_title(&i18n("User name"));
                     pass.set_title(&if editing { i18n("App password (leave empty to keep)") } else { i18n("App password") });
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately"));
@@ -607,13 +691,15 @@ fn build_editor(
             }
         }
     };
-    apply_kind(account.kind);
+    apply_kind(cloud::SERVICES[account.service_index().unwrap_or(0)]);
     {
         let apply_kind = apply_kind.clone();
         let status = status.clone();
-        let selected_kind = selected_kind.clone();
+        let selected_service = selected_service.clone();
         kind.connect_selected_notify(move |_| {
-            apply_kind(selected_kind());
+            let service = selected_service();
+            apply_kind(service);
+            set_header_mark(service.brand());
             status.set_label("");
         });
     }
@@ -629,13 +715,14 @@ fn build_editor(
             expire.clone(),
             protect.clone(),
         );
-        let selected_kind = selected_kind.clone();
+        let selected_service = selected_service.clone();
         let dropbox_login = dropbox_login.clone();
         let existing = account.clone();
         let (goa_row, goa_listed) = (goa_row.clone(), goa_listed.clone());
         let link_terms = link_terms.clone();
         move || {
-            let kind = selected_kind();
+            let service = selected_service();
+            let kind = service.kind;
             let goa = if kind.via_goa() {
                 goa_listed.borrow().get(goa_row.selected() as usize).map(|a| (a.id.clone(), a.email.clone()))
             } else {
@@ -651,6 +738,7 @@ fn build_editor(
             let mut a = CloudAccount {
                 name: name.text().trim().to_string(),
                 kind,
+                product: service.product.to_string(),
                 url: url.text().trim().to_string(),
                 user,
                 folder: folder.text().trim().to_string(),

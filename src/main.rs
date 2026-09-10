@@ -5,6 +5,7 @@ mod app_icon;
 mod background;
 mod avatar;
 mod backend;
+mod brand;
 mod cache;
 mod cloud;
 mod color;
