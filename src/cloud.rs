@@ -93,6 +93,10 @@ pub struct CloudAccount {
     /// Links expire this many days after upload; 0 keeps them.
     #[serde(default)]
     pub expire_days: u32,
+    /// Off, the account stays configured but is not offered in the
+    /// composer, like a paused mail account.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Protect every link with a generated download password.
     #[serde(default)]
     pub password: bool,
@@ -185,6 +189,10 @@ fn default_folder() -> String {
     "Vireo".to_string()
 }
 
+fn default_true() -> bool {
+    true
+}
+
 impl CloudAccount {
     pub fn empty() -> Self {
         CloudAccount {
@@ -198,6 +206,7 @@ impl CloudAccount {
             client_id: String::new(),
             goa_id: String::new(),
             expire_days: 7,
+            enabled: true,
             password: false,
             link_expiry: None,
             link_password: None,
@@ -328,6 +337,11 @@ pub fn load_accounts() -> Vec<CloudAccount> {
     let Some(path) = path() else { return Vec::new() };
     let Ok(text) = std::fs::read_to_string(path) else { return Vec::new() };
     toml::from_str::<CloudFile>(&text).map(|f| f.accounts).unwrap_or_default()
+}
+
+/// The accounts the composer offers: those switched on.
+pub fn load_enabled_accounts() -> Vec<CloudAccount> {
+    load_accounts().into_iter().filter(|a| a.enabled).collect()
 }
 
 pub fn save_accounts(accounts: &[CloudAccount]) {

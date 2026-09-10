@@ -44,6 +44,9 @@ pub enum CloudAccountsInput {
     RemoveCurrent,
     /// Ask before removing that account.
     ConfirmRemove(usize),
+    /// A row's switch: keep the account, but offer it (or not) in the
+    /// composer.
+    ToggleEnabled { index: usize, enabled: bool },
     Remove(usize),
     /// The editor page's Save button.
     SaveClicked,
@@ -256,6 +259,14 @@ impl SimpleComponent for CloudAccounts {
                     self.open_editor(Some(i), a, &sender);
                 }
             }
+            CloudAccountsInput::ToggleEnabled { index, enabled } => {
+                if let Some(a) = self.accounts.get_mut(index) {
+                    if a.enabled != enabled {
+                        a.enabled = enabled;
+                        cloud::save_accounts(&self.accounts);
+                    }
+                }
+            }
             CloudAccountsInput::RemoveCurrent => {
                 if let Some(i) = self.editing {
                     sender.input(CloudAccountsInput::ConfirmRemove(i));
@@ -377,7 +388,7 @@ impl CloudAccounts {
         while let Some(child) = self.list.first_child() {
             self.list.remove(&child);
         }
-        for a in self.accounts.iter() {
+        for (i, a) in self.accounts.iter().enumerate() {
             // The same card as a Mail Accounts row: mark, name over
             // details, then a chevron; the row itself opens the editor.
             let row = gtk::ListBoxRow::new();
@@ -418,6 +429,17 @@ impl CloudAccounts {
                     }
                 });
             }
+            // On/off without removing, as a mail account's row has.
+            let toggle = gtk::Switch::new();
+            toggle.set_valign(gtk::Align::Center);
+            toggle.set_tooltip_text(Some(&i18n("Offer this account in the composer")));
+            toggle.set_active(a.enabled);
+            let s = sender.input_sender().clone();
+            toggle.connect_state_set(move |_, state| {
+                let _ = s.send(CloudAccountsInput::ToggleEnabled { index: i, enabled: state });
+                gtk::glib::Propagation::Proceed
+            });
+            hbox.append(&toggle);
             let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
             next.add_css_class("dim-label");
             hbox.append(&next);
@@ -573,7 +595,7 @@ fn build_editor(
     defaults.set_description(Some(&i18n(
         "How share links from this account are made unless you choose otherwise for an email: the upload dialog in the composer shows these values and lets you change them for that upload alone.",
     )));
-    defaults.set_margin_top(12);
+    defaults.set_margin_top(28);
     defaults.add(&expire);
     defaults.add(&protect);
 
@@ -803,6 +825,7 @@ fn build_editor(
                 name: name.text().trim().to_string(),
                 kind,
                 product: service.product.to_string(),
+                enabled: existing.enabled,
                 url: url.text().trim().to_string(),
                 user,
                 folder: folder.text().trim().to_string(),

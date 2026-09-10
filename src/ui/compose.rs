@@ -652,7 +652,7 @@ impl Component for Compose {
             sign: false,
             encrypt: false,
             send_at,
-            cloud_accounts: crate::cloud::load_accounts(),
+            cloud_accounts: crate::cloud::load_enabled_accounts(),
             cloud_links: Vec::new(),
             cloud_busy: 0,
             cloud_passwords: Vec::new(),
