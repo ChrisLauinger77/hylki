@@ -29,3 +29,13 @@ and re-run:
 magick -background none -density 400 data/brands/src/NAME.svg -resize 128x128 \
   -gravity center -extent 128x128 data/brands/NAME.png
 ```
+
+The ownCloud and OpenCloud marks are square tiles; they get the corner
+radius the other tile-shaped icons in the app have (20 px on 128), and
+nothing else changes:
+
+```sh
+magick data/brands/src/NAME.* -resize 128x128 \
+  \( -size 128x128 xc:none -draw "roundrectangle 0,0,127,127,20,20" \) \
+  -alpha set -compose DstIn -composite data/brands/NAME.png
+```
