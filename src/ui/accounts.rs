@@ -37,6 +37,9 @@ enum ProviderKind {
 /// their servers from `crate::oauth::preset`; Manual/Custom are user-entered).
 pub(crate) struct Provider {
     label: &'static str,
+    /// The brand id of its mark (`brand::image_or`); empty = the generic
+    /// envelope (manual IMAP, custom OAuth).
+    brand: &'static str,
     kind: ProviderKind,
     imap_host: &'static str,
     imap_port: u16,
@@ -83,19 +86,19 @@ const APP_PW: &str = i18n_noop("Requires an app-specific password (not your norm
 /// app-password IMAP providers, then the two manual escape hatches. IMAP uses
 /// SSL/TLS on 993; SMTP uses implicit TLS on 465 or STARTTLS on 587.
 pub(crate) const PROVIDERS: &[Provider] = &[
-    Provider { label: "Google (Gmail) — sign in", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
-    Provider { label: "Microsoft 365 / Outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in through GNOME Online Accounts.") },
-    Provider { label: "iCloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
-    Provider { label: "Yahoo Mail", kind: ProviderKind::Preset, imap_host: "imap.mail.yahoo.com", imap_port: 993, smtp_host: "smtp.mail.yahoo.com", smtp_port: 465, hint: APP_PW },
-    Provider { label: "Proton Mail (Bridge)", kind: ProviderKind::Preset, imap_host: "127.0.0.1", imap_port: 1143, smtp_host: "127.0.0.1", smtp_port: 1025, hint: i18n_noop("Requires Proton Mail Bridge running locally.") },
-    Provider { label: "Fastmail", kind: ProviderKind::Preset, imap_host: "imap.fastmail.com", imap_port: 993, smtp_host: "smtp.fastmail.com", smtp_port: 465, hint: APP_PW },
-    Provider { label: "AOL Mail", kind: ProviderKind::Preset, imap_host: "imap.aol.com", imap_port: 993, smtp_host: "smtp.aol.com", smtp_port: 465, hint: APP_PW },
-    Provider { label: "Zoho Mail", kind: ProviderKind::Preset, imap_host: "imap.zoho.com", imap_port: 993, smtp_host: "smtp.zoho.com", smtp_port: 465, hint: "" },
-    Provider { label: "GMX", kind: ProviderKind::Preset, imap_host: "imap.gmx.com", imap_port: 993, smtp_host: "mail.gmx.com", smtp_port: 587, hint: i18n_noop("Enable POP/IMAP access in GMX settings first.") },
-    Provider { label: "Yandex Mail", kind: ProviderKind::Preset, imap_host: "imap.yandex.com", imap_port: 993, smtp_host: "smtp.yandex.com", smtp_port: 465, hint: APP_PW },
-    Provider { label: "Mail.com", kind: ProviderKind::Preset, imap_host: "imap.mail.com", imap_port: 993, smtp_host: "smtp.mail.com", smtp_port: 587, hint: "" },
-    Provider { label: "Custom (OAuth)…", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
-    Provider { label: "Other (IMAP/POP3)…", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
+    Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
+    Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in through GNOME Online Accounts.") },
+    Provider { label: "iCloud", brand: "icloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
+    Provider { label: "Yahoo Mail", brand: "yahoo", kind: ProviderKind::Preset, imap_host: "imap.mail.yahoo.com", imap_port: 993, smtp_host: "smtp.mail.yahoo.com", smtp_port: 465, hint: APP_PW },
+    Provider { label: "Proton Mail (Bridge)", brand: "proton", kind: ProviderKind::Preset, imap_host: "127.0.0.1", imap_port: 1143, smtp_host: "127.0.0.1", smtp_port: 1025, hint: i18n_noop("Requires Proton Mail Bridge running locally.") },
+    Provider { label: "Fastmail", brand: "fastmail", kind: ProviderKind::Preset, imap_host: "imap.fastmail.com", imap_port: 993, smtp_host: "smtp.fastmail.com", smtp_port: 465, hint: APP_PW },
+    Provider { label: "AOL Mail", brand: "aol", kind: ProviderKind::Preset, imap_host: "imap.aol.com", imap_port: 993, smtp_host: "smtp.aol.com", smtp_port: 465, hint: APP_PW },
+    Provider { label: "Zoho Mail", brand: "zoho", kind: ProviderKind::Preset, imap_host: "imap.zoho.com", imap_port: 993, smtp_host: "smtp.zoho.com", smtp_port: 465, hint: "" },
+    Provider { label: "GMX", brand: "gmx", kind: ProviderKind::Preset, imap_host: "imap.gmx.com", imap_port: 993, smtp_host: "mail.gmx.com", smtp_port: 587, hint: i18n_noop("Enable POP/IMAP access in GMX settings first.") },
+    Provider { label: "Yandex Mail", brand: "yandex", kind: ProviderKind::Preset, imap_host: "imap.yandex.com", imap_port: 993, smtp_host: "smtp.yandex.com", smtp_port: 465, hint: APP_PW },
+    Provider { label: "Mail.com", brand: "mailcom", kind: ProviderKind::Preset, imap_host: "imap.mail.com", imap_port: 993, smtp_host: "smtp.mail.com", smtp_port: 587, hint: "" },
+    Provider { label: "Custom (OAuth)…", brand: "", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
+    Provider { label: "Other (IMAP/POP3)…", brand: "", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
 ];
 
 /// Dropdown index of the "Other (IMAP/POP3)…" manual entry (the default).
@@ -620,6 +623,18 @@ impl Component for AccountsWindow {
                             // credentials; Vireo only mirrors them, and can hide it
                             // locally. Both facts belong together, above the fields
                             // they explain.
+                            // The provider's mark over the form, following
+                            // the Provider picker (a generic envelope for
+                            // manual IMAP and custom OAuth).
+                            add = &adw::PreferencesGroup {
+                                #[name = "provider_mark"]
+                                gtk::Image {
+                                    set_pixel_size: 56,
+                                    set_halign: gtk::Align::Center,
+                                    set_margin_bottom: 6,
+                                },
+                            },
+
                             #[name = "goa_banner"]
                             add = &adw::PreferencesGroup {
                                 set_visible: false,
@@ -1095,7 +1110,7 @@ impl Component for AccountsWindow {
         widgets
             .provider_row
             .set_model(Some(&gtk::StringList::new(&provider_labels)));
-        widgets.provider_row.set_list_factory(Some(&non_ellipsizing_factory()));
+        widgets.provider_row.set_factory(Some(&provider_factory()));
 
         // Push override choices mirror AccountConfig::push (None / Some(true)
         // / Some(false), in that order).
@@ -2283,6 +2298,9 @@ impl AccountsWindow {
             handle.add_css_class("dim-label");
             hbox.append(&handle);
 
+            // The provider's mark, left of the name and address.
+            hbox.append(&crate::brand::image_or(brand_for_account(acc), 28, crate::brand::GENERIC_MAIL));
+
             let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
             vbox.set_hexpand(true);
             vbox.set_valign(gtk::Align::Center);
@@ -2435,6 +2453,11 @@ impl AccountsWindow {
     /// the servers for known providers.
     fn apply_provider(&self, widgets: &AccountsWindowWidgets) {
         let p = provider_at(widgets.provider_row.selected());
+        // The mark over the form: a GNOME Online Account's comes from the
+        // account itself (its picker is hidden), otherwise the picker's.
+        let editing_goa = self.editing.and_then(|i| self.accounts.get(i)).filter(|a| a.goa_id.is_some());
+        let brand = editing_goa.map(brand_for_account).unwrap_or(p.brand);
+        crate::brand::set_image(&widgets.provider_mark, brand, 56, crate::brand::GENERIC_MAIL);
         let is_password = p.is_password();
         let is_oauth = p.is_oauth();
         let is_custom = matches!(p.kind, ProviderKind::CustomOAuth);
@@ -2560,6 +2583,39 @@ fn activate_online_accounts_panel() -> Result<(), gtk::glib::Error> {
         gtk::gio::Cancellable::NONE,
     )?;
     Ok(())
+}
+
+/// The Provider picker's rows: the provider's mark (or the generic
+/// envelope) before its name, in the row and in the list that drops down.
+fn provider_factory() -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, item| {
+        if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
+            let bx = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            let label = gtk::Label::new(None);
+            label.set_xalign(0.0);
+            label.set_ellipsize(gtk::pango::EllipsizeMode::None);
+            bx.append(&gtk::Image::new());
+            bx.append(&label);
+            item.set_child(Some(&bx));
+        }
+    });
+    factory.connect_bind(|_, item| {
+        let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+        // By name, not position: the row's own selected-value slot is a
+        // list item with no position.
+        let name = item.item().and_downcast::<gtk::StringObject>().map(|o| o.string().to_string()).unwrap_or_default();
+        let Some(provider) = PROVIDERS.iter().find(|p| p.label == name) else { return };
+        let Some(bx) = item.child().and_downcast::<gtk::Box>() else { return };
+        let Some(old) = bx.first_child() else { return };
+        let label = old.next_sibling().and_downcast::<gtk::Label>();
+        bx.remove(&old);
+        bx.prepend(&crate::brand::image_or(provider.brand, 20, crate::brand::GENERIC_MAIL));
+        if let Some(label) = label {
+            label.set_label(&name);
+        }
+    });
+    factory
 }
 
 fn non_ellipsizing_factory() -> gtk::SignalListItemFactory {
@@ -2896,6 +2952,35 @@ fn provider_index_for_account(acc: &AccountConfig) -> u32 {
         return kind_index(kind);
     }
     preset_index_for_host(&acc.imap_host)
+}
+
+/// The brand id of the service an existing account is on: Microsoft 365
+/// over Graph, an OAuth account by its token endpoint, otherwise by its
+/// incoming server (the well-known hosts, then the provider table).
+/// Empty for anything else: the generic envelope.
+fn brand_for_account(acc: &AccountConfig) -> &'static str {
+    if acc.protocol == Protocol::Graph {
+        return "outlook";
+    }
+    if let Some(s) = acc.oauth_settings.as_ref().filter(|_| acc.oauth) {
+        if s.token_url.contains("googleapis") {
+            return "gmail";
+        }
+        if s.token_url.contains("microsoftonline") {
+            return "outlook";
+        }
+    }
+    let host = acc.imap_host.trim().to_ascii_lowercase();
+    if host.contains("gmail") || host.contains("googlemail") {
+        return "gmail";
+    }
+    if host.contains("outlook") || host.contains("office365") || host.contains("hotmail") || host.contains("live.com") {
+        return "outlook";
+    }
+    if host.contains("proton") {
+        return "proton";
+    }
+    provider_at(preset_index_for_host(&host)).brand
 }
 
 fn parse_color(hex: &str) -> gtk::gdk::RGBA {

@@ -330,6 +330,8 @@ pub struct AppModel {
     show_contacts: bool,
     /// Whether the settings window opens on Accounts (vs Preferences).
     settings_open_accounts: bool,
+    /// The Settings category last shown this session, to reopen on.
+    last_settings_page: Option<String>,
     /// The list header's count text ("N" / "N of M"), from the message list.
     list_count: String,
     /// Lines of preview text per message-list row (1–3).
@@ -718,6 +720,8 @@ pub enum AppMsg {
     /// The identity new messages are sent from (#157); empty = the open
     /// folder's account.
     SetComposeDefaultFrom(String),
+    /// The Settings window showed a category; remembered for reopening.
+    SettingsPageShown(String),
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
@@ -1925,6 +1929,7 @@ impl SimpleComponent for AppModel {
             show_attachments,
             show_contacts,
             settings_open_accounts: config::load_settings_open_accounts(),
+            last_settings_page: None,
             list_count: String::new(),
             preview_lines: config::load_preview_lines(),
             shortcuts_win: None,
@@ -5640,8 +5645,14 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::OpenSettings => {
-                let on_accounts = self.settings_open_accounts;
+                // The "opens to" preference decides the first open of the
+                // session; after that the window returns to where it was.
+                let on_accounts = self.settings_open_accounts && self.last_settings_page.is_none();
                 self.open_settings_window(&sender, on_accounts, false);
+            }
+
+            AppMsg::SettingsPageShown(id) => {
+                self.last_settings_page = Some(id);
             }
 
             AppMsg::OpenPreferences => self.open_settings_window(&sender, false, false),
@@ -10151,7 +10162,11 @@ impl AppModel {
         // Already open? Bring it forward and switch panels instead of
         // opening another.
         if let Some(p) = self.prefs.as_ref().filter(|p| p.widget().is_visible()) {
-            p.emit(PrefInput::ShowAccounts(on_accounts));
+            // Asked for Accounts: switch to it. Otherwise leave the window
+            // on whatever category it is showing.
+            if on_accounts {
+                p.emit(PrefInput::ShowAccounts(true));
+            }
             p.widget().present();
             if add_new {
                 if let Some(a) = &self.accounts_win {
@@ -10303,6 +10318,7 @@ impl AppModel {
                 })
                 .collect(),
             start_on_accounts: on_accounts,
+            start_page: if on_accounts { Some("accounts".to_string()) } else { self.last_settings_page.clone() },
         };
         let prefs = Preferences::builder()
             .transient_for(&self.window)
@@ -10356,6 +10372,7 @@ impl AppModel {
                 PrefOutput::ExportSettings => AppMsg::ExportSettings,
                 PrefOutput::ExportLog => AppMsg::ExportLog,
                 PrefOutput::ImportSettings => AppMsg::ImportSettings,
+                PrefOutput::PageShown(id) => AppMsg::SettingsPageShown(id),
                 PrefOutput::SetSidebarHoverExpand(on) => {
                     AppMsg::SetSidebarHoverExpand(on)
                 }

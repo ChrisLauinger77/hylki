@@ -20,6 +20,17 @@ as if it were part of the AGPL-licensed work.
 | `onedrive` | Microsoft Corporation | the current OneDrive product icon, as published on Wikimedia Commons (`Microsoft OneDrive Icon (2025 - present).svg`) |
 | `dropbox` | Dropbox, Inc. | the glyph of the 2017 Dropbox logo, in its brand blue #0061FF, as published on Wikimedia Commons (`Dropbox logo 2017.svg`); Dropbox's brand rules are at https://www.dropbox.com/branding |
 | `seafile` | Seafile Ltd. | `data/icons/scalable/apps/seafile.svg` in https://github.com/haiwen/seafile-client |
+| `gmail` | Google LLC | the current Gmail icon as published on Wikimedia Commons (`Gmail icon (2026).svg`) |
+| `outlook` | Microsoft Corporation | the current Outlook icon as published on Wikimedia Commons (`Microsoft Outlook Icon (2025–present).svg`) |
+| `icloud` | Apple Inc. | the iCloud logo as published on Wikimedia Commons (`ICloud logo.svg`) |
+| `yahoo` | Yahoo Inc. | Yahoo's own touch icon, https://www.yahoo.com/apple-touch-icon.png |
+| `proton` | Proton AG | Proton's own touch icon, https://proton.me/favicons/apple-touch-icon.png |
+| `fastmail` | Fastmail Pty Ltd | the Fastmail icon as published on Wikimedia Commons (`Fastmail icon 2019.svg`) |
+| `aol` | Yahoo Inc. | AOL's own touch icon, https://www.aol.com/apple-touch-icon.png |
+| `zoho` | Zoho Corporation | the Zoho Mail icon as published on Wikimedia Commons (`Zoho Mail-256.png`) |
+| `gmx` | 1&1 Mail & Media GmbH | the GMX logo as published on Wikimedia Commons (`GMX-Logo (2018-).svg`) |
+| `yandex` | Yandex LLC | the Yandex Mail icon as published on Wikimedia Commons (`Yandex Mail icon.svg`) |
+| `mailcom` | 1&1 Mail & Media Inc. | mail.com's own touch icon, https://www.mail.com/apple-touch-icon.png |
 
 `src/` keeps the files as fetched; the 128 px PNGs beside this file are
 what the binary embeds (`src/brand.rs`). To refresh one, replace the source
@@ -30,9 +41,12 @@ magick -background none -density 400 data/brands/src/NAME.svg -resize 128x128 \
   -gravity center -extent 128x128 data/brands/NAME.png
 ```
 
-The ownCloud and OpenCloud marks are square tiles; they get the corner
-radius the other tile-shaped icons in the app have (20 px on 128), and
-nothing else changes:
+The mail providers' marks (fetched 2026-09-10) are shown in the Provider
+picker, the Mail Accounts list and the account editor the same way.
+
+The square tiles (ownCloud, OpenCloud, Yahoo, Proton, AOL, mail.com) get
+the corner radius the other tile-shaped icons in the app have (20 px on
+128), and nothing else changes:
 
 ```sh
 magick data/brands/src/NAME.* -resize 128x128 \

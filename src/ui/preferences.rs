@@ -89,6 +89,9 @@ pub struct PrefInit {
     pub accounts_panel: gtk::Widget,
     /// Open showing the Accounts tab instead of Preferences.
     pub start_on_accounts: bool,
+    /// The category to open on, when the app remembers one from earlier
+    /// this session; overrides `start_on_accounts`.
+    pub start_page: Option<String>,
     /// The persisted "this window opens to" choice (true = Accounts).
     pub settings_open_accounts: bool,
     /// The accounts component's inbox, for the sidebar to pick its pages.
@@ -348,6 +351,8 @@ pub enum PrefInput {
 
 #[derive(Debug)]
 pub enum PrefOutput {
+    /// A category was shown, so the app can reopen the window on it.
+    PageShown(String),
     SetAutoRemoteContent(bool),
     SetShowRemoteBanner(bool),
     SetGravatar(bool),
@@ -1766,7 +1771,12 @@ impl Component for Preferences {
         model.side_list = Some(widgets.side_list.clone());
         model.content_page = Some(widgets.content_page.clone());
         model.split = Some(widgets.split.clone());
-        model.select_row(if init.start_on_accounts { "accounts" } else { "general" });
+        let first = init
+            .start_page
+            .as_deref()
+            .filter(|id| side_page(id).is_some())
+            .unwrap_or(if init.start_on_accounts { "accounts" } else { "general" });
+        model.select_row(first);
         model.host_header = Some(widgets.host_header.clone());
 
         ComponentParts { model, widgets }
@@ -1983,6 +1993,7 @@ impl Component for Preferences {
                     self.ask_to_leave_editor(&id, &sender);
                 } else {
                     self.show_page(&id);
+                    let _ = sender.output(PrefOutput::PageShown(id));
                 }
             }
             PrefInput::ShowPageById(id) => self.select_row(&id),
