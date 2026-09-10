@@ -2,24 +2,19 @@
 
 ## Unreleased
 
-- **Google Drive and OneDrive as cloud storage** (#144 follow-up), through
-  GNOME Online Accounts: the editor lists the Google and Microsoft 365
-  accounts GOA has (a new `goa::list_files_accounts`, Files switch shown
-  when off) and the account keeps only the GOA id (`goa_id`; no keyring
-  entry, `CloudAccount::has_secret`). Tokens come from GOA's
-  `GetAccessToken` at each use. Drive: folder segments found by name or
-  made, a resumable upload session fed in one request, an "anyone with the
-  link, reader" permission and the file's web link; Drive has no link
-  expiry or password, so both options are disabled for it. OneDrive:
-  simple upload to 60 MB, then an upload session in 10 MiB chunks, rename
-  on a taken name, `createLink` (anonymous view) with the expiry and
-  password, which a personal account refuses with a message naming the
-  subscription they need. Fedora builds GOA without Google's Files
-  feature, so its token has no Drive scope: the check says so, and a
-  direct **Sign in with Google** (the `[google]` client from `oauth.toml`
-  or the build, scope `drive.file`, refresh token in the keyring under
-  `cloud:google|<e-mail>`) takes over when a client is configured.
-  **Neither service was tried against a live account.**
+- **OneDrive as cloud storage** (#144 follow-up), through GNOME Online
+  Accounts: the editor lists the Microsoft 365 accounts GOA has (a new
+  `goa::list_files_accounts`, Files switch shown when off) and the
+  account keeps only the GOA id (`goa_id`; no keyring entry,
+  `CloudAccount::has_secret`). Tokens come from GOA's `GetAccessToken` at
+  each use. Simple upload to 60 MB, then an upload session in 10 MiB
+  chunks, rename on a taken name, `createLink` (anonymous view) with the
+  expiry and password, which a personal account refuses with a message
+  naming the subscription they need. Google Drive was built the same way
+  and dropped again: Fedora builds GOA without Google's Files feature, so
+  its token has no Drive scope, and a service that works only with a
+  Google client of the user's own is not worth offering. **OneDrive was
+  not tried against a live account.**
 - **Dropbox and Seafile as cloud storage** (#144 follow-up). Settings →
   Cloud Storage now starts with a Service choice: Nextcloud, ownCloud or
   OpenCloud as before, Dropbox, or Seafile. Dropbox signs in through the

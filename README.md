@@ -43,7 +43,7 @@ trackers by default — no telemetry, no analytics.
 - **Conversation threading**, compose/reply/forward with HTML signatures, editable drafts, and full folder management.
 - **Outbox** — a send that fails is kept and retried when the connection returns, not lost; queued messages can be edited, sent by hand or discarded.
 - **Send later** — schedule a message for tomorrow morning, Monday, or any date and time; it waits in the Outbox, editable, until then.
-- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud, OpenCloud or Seafile server, or to Google Drive, OneDrive or Dropbox, and put a share link in the message, with an optional expiry and download password.
+- **Cloud attachments** — upload a large file to your own Nextcloud, ownCloud, OpenCloud or Seafile server, or to OneDrive or Dropbox, and put a share link in the message, with an optional expiry and download password.
 - **Message previews** — the first one to three lines of each message under its subject in the list (or off).
 - **Single-key shortcuts** — Gmail-style `j`/`k`, `r`, `a`, `d` and friends, without a modifier (see below).
 - **Printing** — print a message with its sender, recipients and date, with an in-app preview that also saves straight to PDF.
@@ -203,7 +203,7 @@ during the build and they're compiled in via `option_env!`:
 VIREO_GOOGLE_CLIENT_ID=... VIREO_GOOGLE_CLIENT_SECRET=... cargo build --release
 ```
 
-### Cloud attachments (Nextcloud, Google Drive, OneDrive, Dropbox, Seafile)
+### Cloud attachments (Nextcloud, OneDrive, Dropbox, Seafile)
 
 Settings → Cloud Storage holds the accounts the composer's upload button can
 put files on. A file goes to the account's upload folder and a share link,
@@ -218,18 +218,9 @@ them with a generated download password, shown to you to pass on separately.
   missing) and are shared with "anyone with the link". Link expiry and
   passwords work with a Microsoft 365 subscription or OneDrive for
   Business; a personal account reports that they are not available, so
-  leave them off there.
-- **Google Drive** — the same GOA picker, when your GNOME Online Accounts
-  asks Google for Drive access. Some distributions build it without
-  (Fedora does): the connection check then reports that the sign-in has no
-  Drive access. For those, sign in with Google directly: put a Google OAuth
-  client in `~/.config/vireo/oauth.toml` under `[google]` (see the OAuth
-  section above; a "Desktop app" client from the Google Cloud console, with
-  its consent screen published so refresh tokens do not expire after a
-  week) and the editor gains a **Sign in with Google** button. That sign-in
-  asks only for the `drive.file` scope, so Vireo can see and share what it
-  uploads and nothing else in the drive. Google Drive offers neither link
-  expiry nor passwords, so those two options are greyed out for it.
+  leave them off there. Google Drive is not offered: GNOME Online Accounts
+  does not ask Google for Drive access on every system, and Vireo carries
+  no Google client of its own.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
   app password (made under *Security* in the server's personal settings).
   Uploads go over WebDAV; links come from the files-sharing API.

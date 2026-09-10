@@ -225,13 +225,15 @@ fn try_list() -> Result<Vec<GoaMailAccount>, String> {
 }
 
 /// A GNOME Online Accounts account whose token can reach the provider's
-/// file storage: Google (Drive) or Microsoft 365 (OneDrive).
+/// file storage: Microsoft 365 (OneDrive). Google is left out on purpose:
+/// GOA's Google token carries no Drive scope on every system (Fedora
+/// builds the Files feature out), so Drive is not offered.
 #[derive(Debug, Clone)]
 pub struct GoaFilesAccount {
     pub id: String,
     /// The account's e-mail, or its presentation identity.
     pub email: String,
-    /// GOA's `ProviderType`: "google" or "ms_graph".
+    /// GOA's `ProviderType`: "ms_graph".
     pub provider_type: String,
     /// Whether the account's Files service is switched on in GNOME
     /// Settings; off means the user did not mean files to be reachable.
@@ -239,8 +241,8 @@ pub struct GoaFilesAccount {
 }
 
 /// List the GOA accounts that can serve cloud attachments (#144): every
-/// OAuth2 Google and Microsoft 365 account, Files switch or not. Empty when
-/// GOA is not around. Blocking.
+/// OAuth2 Microsoft 365 account, Files switch or not. Empty when GOA is
+/// not around. Blocking.
 pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
     let list = || -> Result<Vec<GoaFilesAccount>, String> {
         let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
@@ -261,7 +263,7 @@ pub fn list_files_accounts() -> Vec<GoaFilesAccount> {
                 continue;
             }
             let provider_type = get_str(account, "ProviderType");
-            if provider_type != "google" && provider_type != "ms_graph" {
+            if provider_type != "ms_graph" {
                 continue;
             }
             let email = {

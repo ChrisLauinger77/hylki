@@ -18,7 +18,6 @@ pub fn kind_label(kind: CloudKind) -> String {
         CloudKind::Nextcloud => i18n("Nextcloud, ownCloud or OpenCloud"),
         CloudKind::Dropbox => i18n("Dropbox"),
         CloudKind::Seafile => i18n("Seafile"),
-        CloudKind::GoogleDrive => i18n("Google Drive"),
         CloudKind::OneDrive => i18n("OneDrive"),
     }
 }
@@ -56,7 +55,7 @@ impl SimpleComponent for CloudAccounts {
             set_child = &adw::PreferencesPage {
                 add = &adw::PreferencesGroup {
                     set_title: &i18n("Cloud storage"),
-                    set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, Google Drive, OneDrive, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
+                    set_description: Some(&i18n("Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or Seafile and put a share link in the message instead of an attachment.")),
                     #[wrap(Some)]
                     set_header_suffix = &gtk::Button {
                         set_label: &i18n("Add Account…"),
@@ -100,7 +99,6 @@ impl SimpleComponent for CloudAccounts {
                         "add" | "add:nextcloud" => CloudAccountsInput::AddOf(CloudKind::Nextcloud),
                         "add:dropbox" => CloudAccountsInput::AddOf(CloudKind::Dropbox),
                         "add:seafile" => CloudAccountsInput::AddOf(CloudKind::Seafile),
-                        "add:google-drive" => CloudAccountsInput::AddOf(CloudKind::GoogleDrive),
                         "add:onedrive" => CloudAccountsInput::AddOf(CloudKind::OneDrive),
                         i => CloudAccountsInput::Edit(i.parse().unwrap_or(0)),
                     });
@@ -258,7 +256,7 @@ fn edit_dialog(
     seafile_hint.set_margin_top(6);
     seafile_hint.set_margin_start(12);
     seafile_hint.set_margin_end(12);
-    // Google Drive and OneDrive: which GNOME Online Accounts account.
+    // OneDrive: which GNOME Online Accounts account.
     let goa_accounts = crate::goa::list_files_accounts();
     let goa_row = adw::ComboRow::new();
     goa_row.set_title(&i18n("Online account"));
@@ -312,18 +310,12 @@ fn edit_dialog(
     check_box.set_margin_top(8);
     let check = gtk::Button::with_label(&i18n("Check Connection"));
     check.set_valign(gtk::Align::Start);
-    // Google Drive's own sign-in, beside the check, for when GOA cannot
-    // serve Drive.
-    let google = gtk::Button::with_label(&i18n("Sign in with Google…"));
-    google.set_valign(gtk::Align::Start);
-    google.set_visible(false);
     let status = gtk::Label::new(None);
     status.set_wrap(true);
     status.set_xalign(0.0);
     status.set_hexpand(true);
     status.add_css_class("dim-label");
     check_box.append(&check);
-    check_box.append(&google);
     check_box.append(&status);
 
     let bx = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -366,34 +358,18 @@ fn edit_dialog(
                 goa_row.set_selected(i as u32);
             }
             goa_row.set_sensitive(!listed.is_empty());
-            let service = kind_label(k);
-            let mut hint = if listed.is_empty() {
-                i18n_f(
-                    "No {provider} account in GNOME Online Accounts yet. Add one under Settings, Online Accounts; {service} then signs in through it, and nothing more is needed here.",
-                    &[("provider", if k == CloudKind::GoogleDrive { "Google" } else { "Microsoft 365" }), ("service", &service)],
-                )
+            goa_hint.set_label(&if listed.is_empty() {
+                i18n("No Microsoft 365 account in GNOME Online Accounts yet. Add one under Settings, Online Accounts; OneDrive then signs in through it, and nothing more is needed here.")
             } else {
-                i18n_f(
-                    "{service} signs in through the GNOME Online Accounts account chosen above; there is no password to enter. An account marked Files is off still works here, but you may want to turn Files on for it under Settings, Online Accounts.",
-                    &[("service", &service)],
-                )
-            };
-            if k == CloudKind::GoogleDrive {
-                hint.push(' ');
-                hint.push_str(&if cloud::google_client_available() {
-                    i18n("Some systems build GNOME Online Accounts without Google Drive access (Fedora does); the check then says so, and Sign in with Google below signs Vireo in directly, for its own uploads only.")
-                } else {
-                    i18n("Some systems build GNOME Online Accounts without Google Drive access (Fedora does). Then sign in with Google directly: put a Google OAuth client of your own in ~/.config/vireo/oauth.toml under [google] (see the README), and a Sign in with Google button appears here.")
-                });
-            }
-            goa_hint.set_label(&hint);
+                i18n("OneDrive signs in through the GNOME Online Accounts account chosen above; there is no password to enter. An account marked Files is off still works here, but you may want to turn Files on for it under Settings, Online Accounts.")
+            });
             *goa_listed.borrow_mut() = listed;
         }
     };
 
     // The fields each kind wants.
     let apply_kind = {
-        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
+        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, goa_row, goa_hint) = (
             name.clone(),
             url.clone(),
             user.clone(),
@@ -405,17 +381,14 @@ fn edit_dialog(
             library.clone(),
             check.clone(),
             protect.clone(),
-            expire.clone(),
             goa_row.clone(),
             goa_hint.clone(),
         );
         let editing = index.is_some();
         let fill_goa = fill_goa.clone();
-        let google = google.clone();
         move |k: CloudKind| {
             let dropbox = k == CloudKind::Dropbox;
             let goa = k.via_goa();
-            google.set_visible(k == CloudKind::GoogleDrive && cloud::google_client_available());
             url.set_visible(!dropbox && !goa);
             user.set_visible(!dropbox && !goa);
             pass.set_visible(!dropbox && !goa);
@@ -426,23 +399,11 @@ fn edit_dialog(
             library.set_visible(k == CloudKind::Seafile);
             code.set_visible(k == CloudKind::Seafile);
             seafile_hint.set_visible(k == CloudKind::Seafile);
-            // Google Drive has no link expiry or password to offer.
-            expire.set_sensitive(k.can_expire());
-            expire.set_subtitle(&if k.can_expire() { i18n("Days; 0 keeps the link") } else { i18n("Not offered by Google Drive") });
-            protect.set_sensitive(k.can_password());
             if goa {
                 fill_goa(k);
                 check.set_label(&i18n("Check Connection"));
-                protect.set_subtitle(&if k.can_password() {
-                    i18n("A download password is made for each file and shown to you, to pass on separately. OneDrive allows link passwords and expiry dates with a Microsoft 365 subscription or OneDrive for Business.")
-                } else {
-                    i18n("Not offered by Google Drive")
-                });
-                name.set_title(&if k == CloudKind::GoogleDrive {
-                    i18n("Account name, such as Work Drive (optional)")
-                } else {
-                    i18n("Account name, such as Work OneDrive (optional)")
-                });
+                protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. OneDrive allows link passwords and expiry dates with a Microsoft 365 subscription or OneDrive for Business."));
+                name.set_title(&i18n("Account name, such as Work OneDrive (optional)"));
                 return;
             }
             match k {
@@ -461,7 +422,7 @@ fn edit_dialog(
                     check.set_label(&i18n("Check Connection"));
                 }
                 // Handled above, before the return.
-                CloudKind::GoogleDrive | CloudKind::OneDrive => {}
+                CloudKind::OneDrive => {}
                 CloudKind::Dropbox => {
                     name.set_title(&i18n("Account name, such as Personal Dropbox (optional)"));
                     protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Dropbox allows link passwords and expiry dates on paid plans only."));
@@ -509,27 +470,16 @@ fn edit_dialog(
         let (goa_row, goa_listed) = (goa_row.clone(), goa_listed.clone());
         move || {
             let kind = selected_kind();
-            // Google Drive signed in directly: this session's sign-in, or
-            // the account's existing one when nothing was picked anew.
-            let direct_google = kind == CloudKind::GoogleDrive
-                && (dropbox_login.borrow().is_some()
-                    || (existing.kind == CloudKind::GoogleDrive
-                        && existing.goa_id.is_empty()
-                        && !existing.user.is_empty()
-                        && goa_listed.borrow().is_empty()));
-            let goa = if kind.via_goa() && !direct_google {
+            let goa = if kind.via_goa() {
                 goa_listed.borrow().get(goa_row.selected() as usize).map(|a| (a.id.clone(), a.email.clone()))
             } else {
                 None
             };
             let user = match (kind, dropbox_login.borrow().as_ref()) {
-                (CloudKind::Dropbox | CloudKind::GoogleDrive, Some((_, email, _))) => email.clone(),
+                (CloudKind::Dropbox, Some((_, email, _))) => email.clone(),
                 (CloudKind::Dropbox, None) if existing.kind == CloudKind::Dropbox => existing.user.clone(),
                 (CloudKind::Dropbox, None) => String::new(),
-                (CloudKind::GoogleDrive, None) if direct_google => existing.user.clone(),
-                (CloudKind::GoogleDrive | CloudKind::OneDrive, _) => {
-                    goa.as_ref().map(|(_, e)| e.clone()).unwrap_or_default()
-                }
+                (CloudKind::OneDrive, _) => goa.as_ref().map(|(_, e)| e.clone()).unwrap_or_default(),
                 _ => user.text().trim().to_string(),
             };
             CloudAccount {
@@ -541,56 +491,14 @@ fn edit_dialog(
                 library: library.text().trim().to_string(),
                 client_id: app_key.text().trim().to_string(),
                 goa_id: goa.map(|(id, _)| id).unwrap_or_default(),
-                expire_days: if kind.can_expire() { expire.value() as u32 } else { 0 },
-                password: kind.can_password() && protect.is_active(),
+                expire_days: expire.value() as u32,
+                password: protect.is_active(),
             }
         }
     };
 
-    if (account.kind == CloudKind::Dropbox || (account.kind == CloudKind::GoogleDrive && account.goa_id.is_empty()))
-        && !account.user.is_empty()
-    {
+    if account.kind == CloudKind::Dropbox && !account.user.is_empty() {
         status.set_label(&i18n_f("Connected as {who}.", &[("who", &account.user)]));
-    }
-
-    // Sign in with Google: the browser flow, then the refresh token waits
-    // in the same slot as Dropbox's until Save.
-    {
-        let status = status.clone();
-        let dropbox_login = dropbox_login.clone();
-        let name = name.clone();
-        let check = check.clone();
-        google.connect_clicked(move |b| {
-            status.set_label(&i18n("Waiting for the sign-in in your browser…"));
-            b.set_sensitive(false);
-            check.set_sensitive(false);
-            let (tx, rx) = std::sync::mpsc::channel::<Result<(String, String, String), String>>();
-            std::thread::spawn(move || {
-                let _ = tx.send(cloud::google_connect());
-            });
-            let (status, b, check, dropbox_login, name) = (status.clone(), b.clone(), check.clone(), dropbox_login.clone(), name.clone());
-            gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
-                let r = match rx.try_recv() {
-                    Ok(r) => r,
-                    Err(std::sync::mpsc::TryRecvError::Empty) => return gtk::glib::ControlFlow::Continue,
-                    Err(_) => Err(String::new()),
-                };
-                match r {
-                    Ok((refresh, email, who)) => {
-                        status.set_label(&i18n_f("Signed in as {who}.", &[("who", &who)]));
-                        if name.text().trim().is_empty() {
-                            name.set_text("Google Drive");
-                        }
-                        *dropbox_login.borrow_mut() = Some((refresh, email, who));
-                    }
-                    Err(e) if !e.is_empty() => status.set_label(&e),
-                    Err(_) => {}
-                }
-                b.set_sensitive(true);
-                check.set_sensitive(true);
-                gtk::glib::ControlFlow::Break
-            });
-        });
     }
 
     {
@@ -610,25 +518,12 @@ fn edit_dialog(
                 SeafileCode(CloudAccount, String, String),
             }
             let job = if a.kind.via_goa() {
-                let direct = a.kind == CloudKind::GoogleDrive && a.goa_id.is_empty();
-                let secret = if direct {
-                    match dropbox_login.borrow().as_ref() {
-                        Some((refresh, _, _)) => refresh.clone(),
-                        None => crate::config::load_cloud_password(&existing.key()).unwrap_or_default(),
-                    }
-                } else {
-                    String::new()
-                };
-                if a.goa_id.is_empty() && secret.is_empty() {
-                    status.set_label(&if a.kind == CloudKind::GoogleDrive {
-                        i18n("Choose an online account first, or sign in with Google.")
-                    } else {
-                        i18n("Choose an online account first.")
-                    });
+                if a.goa_id.is_empty() {
+                    status.set_label(&i18n("Choose an online account first."));
                     return;
                 }
                 status.set_label(&i18n("Signing in…"));
-                Job::Verify(a, secret)
+                Job::Verify(a, String::new())
             } else if a.kind == CloudKind::Dropbox {
                 if cloud::dropbox_client_id(&a).is_empty() {
                     status.set_label(&i18n("Enter the app key of a Dropbox app first."));
@@ -706,18 +601,10 @@ fn edit_dialog(
         }
         let a = read();
         let secret = if a.kind.via_goa() {
-            if a.kind == CloudKind::GoogleDrive && a.goa_id.is_empty() {
-                match dropbox_login.borrow().as_ref() {
-                    Some((refresh, _, _)) => refresh.clone(),
-                    None if !a.user.is_empty() => String::new(),
-                    None => return,
-                }
-            } else {
-                if a.goa_id.is_empty() {
-                    return;
-                }
-                String::new()
+            if a.goa_id.is_empty() {
+                return;
             }
+            String::new()
         } else if a.kind == CloudKind::Dropbox {
             // Without a sign-in there is nothing to save; a re-opened
             // account keeps its token when none was made anew.
