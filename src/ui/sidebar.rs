@@ -2595,11 +2595,12 @@ impl Sidebar {
                     disc.set_margin_start(ROW_LEFT_INSET);
                 }
                 hbox.append(&disc);
+                // Regular weight, like the folder names above (the
+                // heading's bold is the section's, not its rows').
                 let label = gtk::Label::new(Some(&t.name));
                 label.set_hexpand(true);
                 label.set_halign(gtk::Align::Start);
                 label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                label.add_css_class("account-name");
                 hbox.append(&label);
             }
             row.set_child(Some(&hbox));
