@@ -36,6 +36,8 @@ pub enum CloudAccountsInput {
     /// The editor for a new account of that kind.
     AddOf(CloudKind),
     Edit(usize),
+    /// The row's trash button: ask first.
+    ConfirmRemove(usize),
     Remove(usize),
     /// The editor page's Save button.
     SaveClicked,
@@ -236,6 +238,28 @@ impl SimpleComponent for CloudAccounts {
                     self.open_editor(Some(i), a, &sender);
                 }
             }
+            CloudAccountsInput::ConfirmRemove(i) => {
+                let Some(a) = self.accounts.get(i) else { return };
+                let name = if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() };
+                let parent = relm4::main_application().active_window();
+                let dialog = adw::MessageDialog::new(
+                    parent.as_ref(),
+                    Some(&i18n_f("Remove {name}?", &[("name", &name)])),
+                    Some(&i18n("Vireo forgets the account and its sign-in. Files already uploaded, and the links in messages you sent, stay where they are.")),
+                );
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("remove", &i18n("Remove"));
+                dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_close_response("cancel");
+                let s = sender.input_sender().clone();
+                dialog.connect_response(None, move |_, response| {
+                    if response == "remove" {
+                        let _ = s.send(CloudAccountsInput::Remove(i));
+                    }
+                });
+                dialog.present();
+            }
             CloudAccountsInput::Remove(i) => {
                 if i < self.accounts.len() {
                     let a = self.accounts.remove(i);
@@ -369,7 +393,7 @@ impl CloudAccounts {
             rm.set_tooltip_text(Some(&i18n("Remove")));
             let s = sender.input_sender().clone();
             rm.connect_clicked(move |_| {
-                let _ = s.send(CloudAccountsInput::Remove(i));
+                let _ = s.send(CloudAccountsInput::ConfirmRemove(i));
             });
             hbox.append(&rm);
             let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
