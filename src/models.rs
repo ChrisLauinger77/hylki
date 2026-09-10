@@ -16,7 +16,7 @@ pub struct Account {
 }
 
 /// The well-known role of a folder, used to pick an icon and ordering.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderKind {
     Inbox,
     Starred,

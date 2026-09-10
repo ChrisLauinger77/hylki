@@ -915,6 +915,18 @@ struct PrivacyFile {
     /// section of its own. Off hides that section whatever the rules say.
     #[serde(default = "default_unified_filtered")]
     unified_filtered: bool,
+    /// The unified section's Starred / Sent / Drafts rows, one switch each
+    /// (All Inboxes is `show_unified` above).
+    #[serde(default)]
+    unified_kinds: UnifiedKinds,
+    /// Whether the unified section lists the tags (every account's mail with
+    /// the tag). Off hides that section; each account keeps its own.
+    #[serde(default = "default_on")]
+    unified_tags: bool,
+    /// Whether the account sections are shown at all. Off leaves the unified
+    /// section alone, for those who only ever work from it.
+    #[serde(default = "default_on")]
+    show_accounts: bool,
     /// Where the Filtered Folders section sits (#71 follow-up): inside All
     /// Inboxes, or in the scrolling sidebar above or below the accounts.
     #[serde(default)]
@@ -1053,6 +1065,9 @@ impl Default for PrivacyFile {
             show_unified: default_show_unified(),
             unified_chip: default_unified_chip(),
             unified_filtered: default_unified_filtered(),
+            unified_kinds: UnifiedKinds::default(),
+            unified_tags: true,
+            show_accounts: true,
             filtered_placement: SectionPlacement::default(),
             tags_placement: SectionPlacement::default(),
             chevrons_left: default_chevrons_left(),
@@ -1233,6 +1248,63 @@ pub fn load_unified_chip() -> bool {
 
 pub fn load_unified_filtered() -> bool {
     load_privacy().unified_filtered
+}
+
+pub fn load_unified_kinds() -> UnifiedKinds {
+    load_privacy().unified_kinds
+}
+
+pub fn load_unified_tags() -> bool {
+    load_privacy().unified_tags
+}
+
+pub fn load_show_accounts() -> bool {
+    load_privacy().show_accounts
+}
+
+/// Which of the unified section's folder rows are shown besides All
+/// Inboxes: each combines that folder across every account, and opens to
+/// the accounts' own. All on until switched off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct UnifiedKinds {
+    #[serde(default = "default_on")]
+    pub starred: bool,
+    #[serde(default = "default_on")]
+    pub sent: bool,
+    #[serde(default = "default_on")]
+    pub drafts: bool,
+}
+
+impl Default for UnifiedKinds {
+    fn default() -> Self {
+        UnifiedKinds { starred: true, sent: true, drafts: true }
+    }
+}
+
+impl UnifiedKinds {
+    pub const NONE: UnifiedKinds = UnifiedKinds { starred: false, sent: false, drafts: false };
+
+    pub fn any(self) -> bool {
+        self.starred || self.sent || self.drafts
+    }
+
+    /// Whether the row for `kind` is on (only Starred, Sent and Drafts have
+    /// one; anything else is `false`).
+    pub fn has(self, kind: crate::models::FolderKind) -> bool {
+        use crate::models::FolderKind::*;
+        match kind {
+            Starred => self.starred,
+            Sent => self.sent,
+            Drafts => self.drafts,
+            _ => false,
+        }
+    }
+
+    /// The kinds with a row, in sidebar order.
+    pub fn listed(self) -> Vec<crate::models::FolderKind> {
+        use crate::models::FolderKind::*;
+        [Starred, Sent, Drafts].into_iter().filter(|k| self.has(*k)).collect()
+    }
 }
 
 pub fn load_filtered_placement() -> SectionPlacement {
@@ -1864,6 +1936,9 @@ pub fn save_privacy(
     show_unified: bool,
     unified_chip: bool,
     unified_filtered: bool,
+    unified_kinds: UnifiedKinds,
+    unified_tags: bool,
+    show_accounts: bool,
     filtered_placement: SectionPlacement,
     tags_placement: SectionPlacement,
     chevrons_left: bool,
@@ -1935,6 +2010,9 @@ pub fn save_privacy(
         show_unified,
         unified_chip,
         unified_filtered,
+        unified_kinds,
+        unified_tags,
+        show_accounts,
         filtered_placement,
         tags_placement,
         chevrons_left,
@@ -1980,6 +2058,20 @@ struct SidebarFile {
     filtered_expanded: bool,
     #[serde(default = "default_on")]
     tags_expanded: bool,
+    /// The unified Starred / Sent / Drafts rows' account lists; closed
+    /// until opened.
+    #[serde(default)]
+    starred_expanded: bool,
+    #[serde(default)]
+    sent_expanded: bool,
+    #[serde(default)]
+    drafts_expanded: bool,
+    /// Account emails whose own Filtered Folders / Tags sections are open
+    /// (closed by default, like their custom folders).
+    #[serde(default)]
+    filtered_expanded_accounts: Vec<String>,
+    #[serde(default)]
+    tags_expanded_accounts: Vec<String>,
 }
 
 fn sidebar_path() -> Option<PathBuf> {
@@ -2005,6 +2097,13 @@ pub struct SidebarState {
     pub filtered_expanded: bool,
     /// Whether the Tags section is open.
     pub tags_expanded: bool,
+    /// The unified Starred / Sent / Drafts rows' account lists.
+    pub starred_expanded: bool,
+    pub sent_expanded: bool,
+    pub drafts_expanded: bool,
+    /// Account emails whose own Filtered Folders / Tags sections are open.
+    pub filtered_expanded_accounts: Vec<String>,
+    pub tags_expanded_accounts: Vec<String>,
 }
 
 pub fn load_sidebar_state() -> SidebarState {
@@ -2024,6 +2123,11 @@ pub fn load_sidebar_state() -> SidebarState {
             unified_expanded: s.unified_expanded,
             filtered_expanded: s.filtered_expanded,
             tags_expanded: s.tags_expanded,
+            starred_expanded: s.starred_expanded,
+            sent_expanded: s.sent_expanded,
+            drafts_expanded: s.drafts_expanded,
+            filtered_expanded_accounts: s.filtered_expanded_accounts,
+            tags_expanded_accounts: s.tags_expanded_accounts,
         })
         .unwrap_or_default()
 }
@@ -2044,6 +2148,11 @@ pub fn save_sidebar_state(state: &SidebarState) {
         unified_expanded: state.unified_expanded,
         filtered_expanded: state.filtered_expanded,
         tags_expanded: state.tags_expanded,
+        starred_expanded: state.starred_expanded,
+        sent_expanded: state.sent_expanded,
+        drafts_expanded: state.drafts_expanded,
+        filtered_expanded_accounts: state.filtered_expanded_accounts.clone(),
+        tags_expanded_accounts: state.tags_expanded_accounts.clone(),
     };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {

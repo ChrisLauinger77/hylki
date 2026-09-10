@@ -69,6 +69,9 @@ pub struct PrefInit {
     pub show_unified: bool,
     pub unified_chip: bool,
     pub unified_filtered: bool,
+    pub unified_kinds: crate::config::UnifiedKinds,
+    pub unified_tags: bool,
+    pub show_accounts: bool,
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
     pub chevrons_left: bool,
@@ -196,6 +199,12 @@ pub struct Preferences {
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
     show_unified: bool,
+    /// The unified Starred / Sent / Drafts switches, kept whole so each
+    /// toggle can hand the app the full set.
+    unified_kinds: crate::config::UnifiedKinds,
+    /// Mirrors the "Accounts in the sidebar" switch, which the main menu
+    /// can flip too.
+    show_accounts: bool,
     /// The icon rail's fold-up switches, kept whole so each toggle can hand
     /// the app the full set.
     rail_fold: crate::config::RailFold,
@@ -319,6 +328,13 @@ pub enum PrefInput {
     ToggleShowUnified(bool),
     ToggleUnifiedChip(bool),
     ToggleUnifiedFiltered(bool),
+    ToggleUnifiedStarred(bool),
+    ToggleUnifiedSent(bool),
+    ToggleUnifiedDrafts(bool),
+    ToggleUnifiedTags(bool),
+    ToggleShowAccounts(bool),
+    /// The main menu flipped "Show Accounts": the switch follows.
+    SetShowAccounts(bool),
     ChangeChevronSide(u32),
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
@@ -401,6 +417,9 @@ pub enum PrefOutput {
     SetShowUnified(bool),
     SetUnifiedChip(bool),
     SetUnifiedFiltered(bool),
+    SetUnifiedKinds(crate::config::UnifiedKinds),
+    SetUnifiedTags(bool),
+    SetShowAccounts(bool),
     SetChevronsLeft(bool),
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
@@ -707,57 +726,15 @@ impl Component for Preferences {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Sidebar"),
 
-                                    #[name = "show_unified_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("All Inboxes"),
-                                        set_subtitle: &i18n("A unified inbox combining every account, at the top \
-                                                       of the sidebar. Only shown with more than one \
-                                                       account."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleShowUnified(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "unified_chip_row"]
+                                    #[name = "show_accounts_row"]
                                     adw::SwitchRow {
                                         #[watch]
-                                        set_sensitive: model.show_unified,
-                                        set_title: &i18n("All Inboxes unread count"),
-                                        set_subtitle: &i18n("Show the combined unread chip next to All Inboxes \
-                                                       while its per-account list is folded up."),
+                                        set_active: model.show_accounts,
+                                        set_title: &i18n("Accounts in the sidebar"),
+                                        set_subtitle: &i18n("Each account's own section: its folders, filtered folders and tags. Off leaves the \
+                                                       unified section alone. Also in the main menu."),
                                         connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleUnifiedChip(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "unified_filtered_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Filtered Folders section"),
-                                        set_subtitle: &i18n("List the folders your filter rules file into in a \
-                                                       collapsible section. Each rule chooses whether its \
-                                                       folder appears there; this switch hides the section \
-                                                       altogether."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "filtered_placement_row"]
-                                    adw::ComboRow {
-                                        set_title: &i18n("Filtered Folders placement"),
-                                        set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
-                                                       scrolling sidebar above or below the accounts."),
-                                        connect_selected_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
-                                        },
-                                    },
-
-                                    #[name = "tags_placement_row"]
-                                    adw::ComboRow {
-                                        set_title: &i18n("Tags placement"),
-                                        set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
-                                        connect_selected_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
+                                            sender.input(PrefInput::ToggleShowAccounts(row.is_active()));
                                         },
                                     },
 
@@ -821,6 +798,106 @@ impl Component for Preferences {
                                                        starts every launch with the full sidebar."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleRememberRail(row.is_active()));
+                                        },
+                                    },
+                                },
+
+
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Unified"),
+                                    set_description: Some(
+                                        &i18n("The section at the top of the sidebar that combines every \
+                                               account. Only shown with more than one account."),
+                                    ),
+
+                                    #[name = "show_unified_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("All Inboxes"),
+                                        set_subtitle: &i18n("A unified inbox combining every account, at the top \
+                                                       of the sidebar. Only shown with more than one \
+                                                       account."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleShowUnified(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_chip_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.show_unified,
+                                        set_title: &i18n("All Inboxes unread count"),
+                                        set_subtitle: &i18n("Show the combined unread chip next to All Inboxes \
+                                                       while its per-account list is folded up."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedChip(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_starred_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Starred"),
+                                        set_subtitle: &i18n("Every account's starred folder as one list, opening to each account's own."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedStarred(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_sent_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Sent"),
+                                        set_subtitle: &i18n("Every account's sent mail as one list, opening to each account's own."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedSent(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_drafts_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Drafts"),
+                                        set_subtitle: &i18n("Every account's drafts as one list, opening to each account's own."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedDrafts(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_filtered_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Filtered Folders section"),
+                                        set_subtitle: &i18n("List the folders your filter rules file into in a \
+                                                       collapsible section. Each rule chooses whether its \
+                                                       folder appears there; this switch hides the section \
+                                                       altogether."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_tags_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Tags"),
+                                        set_subtitle: &i18n("The tags, each showing every account's mail with it. Each account keeps its own Tags \
+                                                       section either way."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedTags(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "filtered_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Filtered Folders placement"),
+                                        set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
+                                                       scrolling sidebar above or below the accounts."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "tags_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Tags placement"),
+                                        set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
                                         },
                                     },
                                 },
@@ -1445,6 +1522,8 @@ impl Component for Preferences {
         let mut model = Preferences {
             notifications: init.notifications,
             show_unified: init.show_unified,
+            unified_kinds: init.unified_kinds,
+            show_accounts: init.show_accounts,
             rail_fold: init.rail_fold,
             swipe_enabled: init.swipe_enabled,
             threading: init.threading,
@@ -1529,12 +1608,16 @@ impl Component for Preferences {
         widgets.show_unified_row.set_active(init.show_unified);
         widgets.unified_chip_row.set_active(init.unified_chip);
         widgets.unified_filtered_row.set_active(init.unified_filtered);
+        widgets.unified_starred_row.set_active(init.unified_kinds.starred);
+        widgets.unified_sent_row.set_active(init.unified_kinds.sent);
+        widgets.unified_drafts_row.set_active(init.unified_kinds.drafts);
+        widgets.unified_tags_row.set_active(init.unified_tags);
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
         ] {
             row.set_model(Some(&gtk::StringList::new(&[
-                i18n("Inside All Inboxes").as_str(),
+                i18n("In the unified section").as_str(),
                 i18n("Above the accounts").as_str(),
                 i18n("Below the accounts").as_str(),
             ])));
@@ -2015,6 +2098,30 @@ impl Component for Preferences {
             }
             PrefInput::ToggleUnifiedFiltered(on) => {
                 let _ = sender.output(PrefOutput::SetUnifiedFiltered(on));
+            }
+            PrefInput::ToggleUnifiedStarred(on) => {
+                self.unified_kinds.starred = on;
+                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
+            }
+            PrefInput::ToggleUnifiedSent(on) => {
+                self.unified_kinds.sent = on;
+                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
+            }
+            PrefInput::ToggleUnifiedDrafts(on) => {
+                self.unified_kinds.drafts = on;
+                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
+            }
+            PrefInput::ToggleUnifiedTags(on) => {
+                let _ = sender.output(PrefOutput::SetUnifiedTags(on));
+            }
+            PrefInput::ToggleShowAccounts(on) => {
+                if self.show_accounts != on {
+                    self.show_accounts = on;
+                    let _ = sender.output(PrefOutput::SetShowAccounts(on));
+                }
+            }
+            PrefInput::SetShowAccounts(on) => {
+                self.show_accounts = on;
             }
             PrefInput::ChangeFilteredPlacement(idx) => {
                 let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));
