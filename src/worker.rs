@@ -5080,6 +5080,7 @@ async fn load_messages(
         let recent =
             fetch_window(account_id, session, folder_id, total, PAGE_SIZE, use_envelope).await?;
         let mut merged = merge_index(cached, recent);
+        redecode_garbled_previews(session, &mut merged).await;
         // Reconcile deletions/moves made on the server or another device: drop any
         // message whose UID the server no longer lists (a plain merge would keep it
         // forever), and prune it from the cache so it doesn't come back. The full
@@ -5141,7 +5142,9 @@ async fn fetch_window(
     // unescaped quotes in the Message-ID) that our IMAP parser rejects. For those
     // the caller retries with `use_envelope = false`, and we instead pull the raw
     // header block — opaque to the IMAP parser — and parse it with mail-parser.
-    // `BODY.PEEK[1]<0.2048>` rides along for the list preview. Section 1 is the
+    // `BODY.PEEK[1]<0.2048>` rides along for the list preview, with `BODY.PEEK[1.MIME]`
+    // — the part's own headers — so the bytes are read in the charset they
+    // declare rather than assumed UTF-8 (#159). Section 1 is the
     // first body part of a multipart message and the whole body of a single-part
     // one, so one query covers both without a second round trip per message.
     // When that first part is itself a multipart — `mixed(alternative(text, html),
@@ -5153,11 +5156,7 @@ async fn fetch_window(
     // in the UI would miss the point. Read per sync, so turning it back on takes
     // effect without a restart.
     let want_preview = crate::config::load_preview_lines() > 0;
-    let preview_part = if want_preview {
-        format!(" BODY.PEEK[1]<0.{PREVIEW_FETCH_BYTES}>")
-    } else {
-        String::new()
-    };
+    let preview_part = if want_preview { preview_fetch_items() } else { String::new() };
     let mut messages: Vec<Message> = if use_envelope {
         let query = format!(
             "(UID ENVELOPE FLAGS BODYSTRUCTURE INTERNALDATE{REFS_FETCH_ITEM}{preview_part})"
@@ -5183,71 +5182,59 @@ async fn fetch_window(
             })
             .collect()
     };
-    // Fill in previews the summary fetch came back without. iCloud answers
-    // BODY[1] with nothing on a message it re-appended (a move-back from an
-    // undo, for one) — and keeps doing so on every later sync, so the row
-    // would wear a blank summary for good. The TEXT section survives (the
-    // full-body fetch the reader uses works fine), so re-ask with that and
-    // run the same MIME-prefix extraction. Bounded: genuinely body-less
-    // messages stay empty and shouldn't grow the fetch each sync.
+    // Fill in previews the summary fetch came back without (see
+    // [`retry_missing_previews`] for who those are). Bounded so body-less
+    // messages don't grow the fetch each sync.
     if want_preview {
         let missing: Vec<u32> = messages
             .iter()
             .filter(|m| m.preview.is_empty())
-            .take(12)
+            .take(PREVIEW_REDECODE_ROWS)
             .map(|m| m.uid)
             .collect();
-        if !missing.is_empty() {
-            tracing::info!(
-                "previews: retrying via BODY[TEXT] acct={account_id} folder={folder_id} uids={missing:?}"
-            );
-            let refetched: Result<Vec<Fetch>, _> = async {
-                fetch_uids(session, 
-                        uid_set(&missing),
-                        format!("(UID BODY.PEEK[TEXT]<0.{PREVIEW_REPAIR_BYTES}>)"),
-                    )
-                    .await?
-                    .try_collect()
-                    .await
-            }
-            .await;
-            match refetched {
-                Err(e) => tracing::warn!("previews: BODY[TEXT] retry failed: {e}"),
-                Ok(fetches) => {
-                    use async_imap::imap_proto::types::{MessageSection, SectionPath};
-                    for f in &fetches {
-                        let p = f
-                            .section(&SectionPath::Full(MessageSection::Text))
-                            .map(preview_from_part)
-                            .unwrap_or_default()
-                            .replace('\0', " ");
-                        if p.is_empty() {
-                            continue;
-                        }
-                        if let Some(m) =
-                            f.uid.and_then(|uid| messages.iter_mut().find(|m| m.uid == uid))
-                        {
-                            m.preview = p;
-                        }
-                    }
-                }
-            }
-        }
+        retry_missing_previews(session, &mut messages, missing).await;
     }
     messages.reverse(); // IMAP returns oldest-first; show newest at the top.
     Ok(messages)
 }
 
-/// The preview snippet from a fetch that asked for `BODY.PEEK[1]`.
+/// The preview snippet from a fetch that asked for `BODY.PEEK[1]` together with
+/// `BODY.PEEK[1.MIME]`, the part's own headers, which say what the bytes are.
 fn preview_of(fetch: &Fetch) -> String {
     use async_imap::imap_proto::types::SectionPath;
+    let ctype = section_content_type(fetch);
+    // An image or a document as the first part — photo mail, a forwarded
+    // file — has no text to show. An empty preview here lets the BODY[TEXT]
+    // retry look further into the message for the text part, instead of the
+    // row wearing the file's first bytes.
+    if ctype.as_deref().is_some_and(|t| {
+        !(t.starts_with("text/") || t.starts_with("multipart/") || t.starts_with("message/"))
+    }) {
+        return String::new();
+    }
+    let charset = ctype.as_deref().and_then(charset_param);
     let p = fetch
         .section(&SectionPath::Part(vec![1], None))
-        .map(preview_from_part)
+        .map(|bytes| preview_from_part(bytes, charset.as_deref()))
         .unwrap_or_default();
     // GTK labels abort on interior NULs, and decoded message text can carry
     // them.
     if p.contains('\0') { p.replace('\0', " ") } else { p }
+}
+
+/// The lowercased Content-Type section 1 declares, read from the
+/// `BODY[1.MIME]` header block that rides along with the preview fetch (#159).
+/// `None` when the server sent no MIME headers.
+fn section_content_type(fetch: &Fetch) -> Option<String> {
+    use async_imap::imap_proto::types::{MessageSection, SectionPath};
+    let mime = fetch.section(&SectionPath::Part(vec![1], Some(MessageSection::Mime)))?;
+    mime_header(&String::from_utf8_lossy(mime), "content-type")
+}
+
+/// The charset section 1 declares, when its headers name one — a multipart
+/// part 1 doesn't, its text parts carry their own.
+fn section_charset(fetch: &Fetch) -> Option<String> {
+    section_content_type(fetch).as_deref().and_then(charset_param)
 }
 
 /// How much of a message's first body part to fetch for the list preview. Enough
@@ -5265,40 +5252,198 @@ const PREVIEW_CHARS: usize = 240;
 /// reads deep enough to find it. Only a handful of messages ever qualify.
 const PREVIEW_REPAIR_BYTES: usize = 32768;
 
+/// How many cached rows with a garbled preview one sync re-reads.
+const PREVIEW_REDECODE_ROWS: usize = 12;
+
+/// The fetch items that read a message's first part for the list preview: a
+/// slice of its bytes plus its MIME headers, for the charset.
+fn preview_fetch_items() -> String {
+    format!(" BODY.PEEK[1]<0.{PREVIEW_FETCH_BYTES}> BODY.PEEK[1.MIME]")
+}
+
+/// Re-read the previews of cached rows that still show replacement characters
+/// (#159). Rows indexed before the preview fetch learned the part's charset
+/// keep their garbled snippet otherwise, since only the recent window is read
+/// again on each sync. A few rows per sync.
+async fn redecode_garbled_previews(session: &mut ImapSession, messages: &mut [Message]) {
+    if crate::config::load_preview_lines() == 0 {
+        return;
+    }
+    let uids: Vec<u32> = messages
+        .iter()
+        .filter(|m| m.preview.contains('\u{fffd}'))
+        .take(PREVIEW_REDECODE_ROWS)
+        .map(|m| m.uid)
+        .collect();
+    if uids.is_empty() {
+        return;
+    }
+    tracing::info!("previews: re-reading garbled rows uids={uids:?}");
+    let fetched: Result<Vec<Fetch>, _> = async {
+        fetch_uids(session, uid_set(&uids), format!("(UID{})", preview_fetch_items()))
+            .await?
+            .try_collect()
+            .await
+    }
+    .await;
+    let fetches = match fetched {
+        Err(e) => {
+            tracing::warn!("previews: garbled-row re-read failed: {e}");
+            return;
+        }
+        Ok(f) => f,
+    };
+    let mut still_missing = Vec::new();
+    for f in &fetches {
+        let Some(m) = f.uid.and_then(|uid| messages.iter_mut().find(|m| m.uid == uid)) else {
+            continue;
+        };
+        // Whatever this read produced — including nothing, when the part
+        // turned out to be a file — beats the garbage it replaces, and an
+        // empty row is not asked about again next sync.
+        m.preview = preview_of(f);
+        if m.preview.is_empty() {
+            still_missing.push(m.uid);
+        }
+    }
+    retry_missing_previews(session, messages, still_missing).await;
+}
+
+/// Fill in previews for `uids`, rows whose first-part read came back empty.
+///
+/// iCloud answers BODY[1] with nothing on a message it re-appended (a move-back
+/// from an undo, for one) — and keeps doing so on every later sync, so the row
+/// would wear a blank summary for good — and a message whose first part is a
+/// file has its text further in. The TEXT section survives (the full-body
+/// fetch the reader uses works fine), so re-ask with that and run the same
+/// MIME-prefix extraction. Callers bound the list: genuinely body-less messages
+/// stay empty and shouldn't grow the fetch each sync.
+async fn retry_missing_previews(session: &mut ImapSession, messages: &mut [Message], uids: Vec<u32>) {
+    if uids.is_empty() {
+        return;
+    }
+    tracing::info!("previews: retrying via BODY[TEXT] uids={uids:?}");
+    let refetched: Result<Vec<Fetch>, _> = async {
+        fetch_uids(
+            session,
+            uid_set(&uids),
+            format!("(UID BODY.PEEK[TEXT]<0.{PREVIEW_REPAIR_BYTES}> BODY.PEEK[1.MIME])"),
+        )
+        .await?
+        .try_collect()
+        .await
+    }
+    .await;
+    match refetched {
+        Err(e) => tracing::warn!("previews: BODY[TEXT] retry failed: {e}"),
+        Ok(fetches) => {
+            use async_imap::imap_proto::types::{MessageSection, SectionPath};
+            for f in &fetches {
+                let charset = section_charset(f);
+                let p = f
+                    .section(&SectionPath::Full(MessageSection::Text))
+                    .map(|b| preview_from_part(b, charset.as_deref()))
+                    .unwrap_or_default()
+                    .replace('\0', " ");
+                if p.is_empty() {
+                    continue;
+                }
+                if let Some(m) = f.uid.and_then(|uid| messages.iter_mut().find(|m| m.uid == uid)) {
+                    m.preview = p;
+                }
+            }
+        }
+    }
+}
+
 /// Turn the first bytes of a message's body part into a one-line snippet for the
 /// message list.
 ///
 /// What arrives is raw MIME, cut off mid-stream: still transfer-encoded, perhaps
 /// HTML, and (being a prefix) possibly ending mid-character or mid-tag. The
-/// encoding is declared in headers this fetch doesn't include, so it is inferred
-/// from the bytes themselves — wrongly guessing plain text for base64 would show
-/// gibberish in the list, which is worse than showing nothing.
-fn preview_from_part(bytes: &[u8]) -> String {
+/// transfer encoding is declared in headers this fetch doesn't include, so it is
+/// inferred from the bytes themselves — wrongly guessing plain text for base64
+/// would show gibberish in the list, which is worse than showing nothing. The
+/// charset is the one the part's MIME headers declared, when the caller has
+/// them.
+fn preview_from_part(bytes: &[u8], charset: Option<&str>) -> String {
     if bytes.is_empty() {
         return String::new();
     }
-    let text = String::from_utf8_lossy(bytes);
     // Section 1 can be a whole nested multipart rather than a body: descend to the
-    // text inside it, which also carries the encoding in its own headers instead
-    // of leaving it to be guessed.
-    if let Some(inner) = text_in_multipart(&text, 0) {
+    // text inside it, which also carries the encoding and charset in its own
+    // headers instead of leaving them to be guessed.
+    if let Some(inner) = text_in_multipart(bytes, 0) {
         return finish_preview(inner);
     }
-    let decoded = if looks_like_base64(&text) {
-        // Only whole 4-character groups can be decoded; the tail of a truncated
-        // fetch is dropped rather than turned into noise.
-        let clean: String = text.chars().filter(|c| !c.is_ascii_whitespace()).collect();
-        let usable = &clean[..clean.len() - clean.len() % 4];
-        crate::oauth::base64_decode(usable)
-            .map(|b| String::from_utf8_lossy(&b).to_string())
-            .unwrap_or_default()
-    } else if text.contains('=') {
-        decode_quoted_printable(&text)
+    let decoded = if looks_like_base64(bytes) {
+        decode_base64_prefix(bytes)
+    } else if bytes.contains(&b'=') {
+        decode_quoted_printable(bytes)
     } else {
-        text.to_string()
+        bytes.to_vec()
     };
 
-    finish_preview(decoded)
+    finish_preview(decode_text(&decoded, charset))
+}
+
+/// Text from a body's bytes, in the charset its headers declared (#159).
+///
+/// Everything here used to be read as UTF-8, so a bank's `iso-8859-2` mail
+/// showed a replacement character for every accented letter in the list while
+/// the reader — which hands the whole message to mail-parser — showed it fine.
+/// mail-parser's charset table is used here too; UTF-8 and ASCII are read
+/// directly.
+fn decode_text(bytes: &[u8], charset: Option<&str>) -> String {
+    let charset = charset
+        .map(|c| c.trim().trim_matches('"').to_ascii_lowercase())
+        .filter(|c| !c.is_empty());
+    let declared_unicode =
+        matches!(charset.as_deref(), Some("utf-8" | "utf8" | "us-ascii" | "ascii"));
+    if let Some(cs) = charset.as_deref().filter(|_| !declared_unicode) {
+        if let Some(decode) = mail_parser::decoders::charsets::map::charset_decoder(cs.as_bytes()) {
+            return decode(bytes);
+        }
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(s) => s.to_string(),
+        // A fetch of the first N bytes can end mid-character: keep the whole
+        // characters and drop the fragment rather than show it as noise.
+        Err(e) if e.error_len().is_none() => {
+            String::from_utf8_lossy(&bytes[..e.valid_up_to()]).into_owned()
+        }
+        // Declared UTF-8 that isn't: replacement characters mark the damage.
+        Err(_) if declared_unicode => String::from_utf8_lossy(bytes).into_owned(),
+        // 8-bit text with no (usable) charset: read it as Windows-1252, as
+        // browsers and mail clients do, which at least shows Western European
+        // accents rather than a row of replacement characters.
+        Err(_) => mail_parser::decoders::charsets::single_byte::decoder_cp1252(bytes),
+    }
+}
+
+/// The `charset=` parameter of a (lowercased) Content-Type value.
+fn charset_param(ctype: &str) -> Option<String> {
+    ctype
+        .split(';')
+        .skip(1)
+        .find_map(|p| {
+            let (k, v) = p.split_once('=')?;
+            (k.trim() == "charset").then(|| v.trim().trim_matches('"').to_string())
+        })
+        .filter(|c| !c.is_empty())
+}
+
+/// Decode as much of a (possibly truncated) base64 body as forms whole groups.
+fn decode_base64_prefix(body: &[u8]) -> Vec<u8> {
+    let clean: String = body
+        .iter()
+        .filter(|b| !b.is_ascii_whitespace())
+        .map(|&b| b as char)
+        .collect();
+    // Only whole 4-character groups can be decoded; the tail of a truncated
+    // fetch is dropped rather than turned into noise.
+    let usable = &clean[..clean.len() - clean.len() % 4];
+    crate::oauth::base64_decode(usable).unwrap_or_default()
 }
 
 /// Tidy decoded body text into the single line the list shows.
@@ -5416,50 +5561,83 @@ fn is_url(word: &str) -> bool {
 /// alternative, which matches what the reader shows. Nesting is followed a couple
 /// of levels deep — enough for `mixed(alternative(…))` — and no further, since a
 /// preview is not worth unbounded recursion through a hostile message.
-fn text_in_multipart(text: &str, depth: usize) -> Option<String> {
+fn text_in_multipart(part: &[u8], depth: usize) -> Option<String> {
     if depth > 3 {
         return None;
     }
-    let boundary = text.lines().next()?.trim_end();
-    // A boundary delimiter, not a message that merely opens with a dash.
-    if !boundary.starts_with("--") || boundary.len() < 3 || boundary.contains(' ') {
-        return None;
-    }
+    // The boundary opens the part — or follows a short preamble ("This is a
+    // multi-part message in MIME format.") when what arrived is a whole body
+    // rather than a part. A boundary delimiter, not a message that merely
+    // opens with a dash: two dashes, more after them, no spaces.
+    let boundary = part
+        .split(|&b| b == b'\n')
+        .take(10)
+        .map(|line| {
+            let end = line.iter().rposition(|b| !b.is_ascii_whitespace()).map_or(0, |i| i + 1);
+            &line[..end]
+        })
+        .find(|line| line.starts_with(b"--") && line.len() >= 3 && !line.contains(&b' '))?;
     let mut html: Option<String> = None;
-    for chunk in text.split(boundary).skip(1) {
-        let chunk = chunk.trim_start_matches(['\r', '\n']);
-        if chunk.starts_with("--") {
+    for chunk in split_on(part, boundary).skip(1) {
+        let start = chunk.iter().position(|b| !matches!(b, b'\r' | b'\n')).unwrap_or(chunk.len());
+        let chunk = &chunk[start..];
+        if chunk.starts_with(b"--") {
             break; // closing delimiter: no more parts
         }
         let Some((headers, body)) = split_mime_headers(chunk) else {
             continue;
         };
-        let ctype = mime_header(headers, "content-type").unwrap_or_default();
-        let encoding = mime_header(headers, "content-transfer-encoding").unwrap_or_default();
+        let headers = String::from_utf8_lossy(headers);
+        let ctype = mime_header(&headers, "content-type").unwrap_or_default();
+        let encoding = mime_header(&headers, "content-transfer-encoding").unwrap_or_default();
+        let charset = charset_param(&ctype);
         if ctype.starts_with("multipart/") {
             if let Some(inner) = text_in_multipart(body, depth + 1) {
                 return Some(inner);
             }
         } else if ctype.starts_with("text/plain") {
-            return Some(decode_mime_body(body, &encoding));
+            return Some(decode_mime_body(body, &encoding, charset.as_deref()));
         } else if ctype.starts_with("text/html") && html.is_none() {
-            html = Some(decode_mime_body(body, &encoding));
+            html = Some(decode_mime_body(body, &encoding, charset.as_deref()));
         }
     }
     html
 }
 
+/// The pieces of `hay` between occurrences of `sep`, like `str::split`.
+fn split_on<'a>(hay: &'a [u8], sep: &'a [u8]) -> impl Iterator<Item = &'a [u8]> {
+    let mut rest = Some(hay);
+    std::iter::from_fn(move || {
+        let cur = rest?;
+        match cur.windows(sep.len()).position(|w| w == sep) {
+            Some(i) => {
+                rest = Some(&cur[i + sep.len()..]);
+                Some(&cur[..i])
+            }
+            None => {
+                rest = None;
+                Some(cur)
+            }
+        }
+    })
+}
+
 /// Split a MIME part into its header block and its body.
-fn split_mime_headers(part: &str) -> Option<(&str, &str)> {
-    if let Some(i) = part.find("\r\n\r\n") {
+fn split_mime_headers(part: &[u8]) -> Option<(&[u8], &[u8])> {
+    if let Some(i) = part.windows(4).position(|w| w == b"\r\n\r\n") {
         return Some((&part[..i], &part[i + 4..]));
     }
-    part.find("\n\n").map(|i| (&part[..i], &part[i + 2..]))
+    part.windows(2)
+        .position(|w| w == b"\n\n")
+        .map(|i| (&part[..i], &part[i + 2..]))
 }
 
 /// One header's value, lowercased, from a MIME part's header block.
 fn mime_header(headers: &str, name: &str) -> Option<String> {
-    headers
+    // Unfold first: a parameter on a continuation line ("Content-Type:
+    // text/html;\r\n\tcharset=iso-8859-2") belongs to the header above it.
+    let unfolded = headers.replace("\r\n", "\n").replace("\n ", " ").replace("\n\t", " ");
+    unfolded
         .lines()
         .find(|l| {
             l.len() > name.len()
@@ -5469,31 +5647,27 @@ fn mime_header(headers: &str, name: &str) -> Option<String> {
         .map(|l| l[name.len()..].trim_start()[1..].trim().to_ascii_lowercase())
 }
 
-/// Decode a part's body according to the encoding it declares.
-fn decode_mime_body(body: &str, encoding: &str) -> String {
-    if encoding.starts_with("base64") {
-        // A truncated fetch ends mid-group; only whole groups can be decoded.
-        let clean: String = body.chars().filter(|c| !c.is_ascii_whitespace()).collect();
-        let usable = &clean[..clean.len() - clean.len() % 4];
-        crate::oauth::base64_decode(usable)
-            .map(|b| String::from_utf8_lossy(&b).to_string())
-            .unwrap_or_default()
+/// Decode a part's body according to the encoding and charset it declares.
+fn decode_mime_body(body: &[u8], encoding: &str, charset: Option<&str>) -> String {
+    let bytes = if encoding.starts_with("base64") {
+        decode_base64_prefix(body)
     } else if encoding.starts_with("quoted-printable") {
         decode_quoted_printable(body)
     } else {
-        body.to_string()
-    }
+        body.to_vec()
+    };
+    decode_text(&bytes, charset)
 }
 
 /// Whether a chunk looks like base64 rather than text: base64's alphabet only,
 /// and long enough that a short plain word can't be mistaken for it.
-fn looks_like_base64(text: &str) -> bool {
+fn looks_like_base64(bytes: &[u8]) -> bool {
     let mut significant = 0;
-    for c in text.chars() {
+    for &c in bytes {
         if c.is_ascii_whitespace() {
             continue;
         }
-        if !(c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=') {
+        if !(c.is_ascii_alphanumeric() || c == b'+' || c == b'/' || c == b'=') {
             return false;
         }
         significant += 1;
@@ -5501,48 +5675,42 @@ fn looks_like_base64(text: &str) -> bool {
     significant >= 40
 }
 
-/// Decode quoted-printable, leaving anything malformed as written (a truncated
-/// fetch can end mid-escape).
-fn decode_quoted_printable(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let bytes: Vec<u8> = {
-        let src = text.as_bytes();
-        let mut buf = Vec::with_capacity(src.len());
-        let mut i = 0;
-        while i < src.len() {
-            if src[i] == b'=' {
-                // "=\r\n" is a soft line break: the line continues.
-                if src.get(i + 1) == Some(&b'\r') && src.get(i + 2) == Some(&b'\n') {
+/// Decode quoted-printable to the bytes it stands for, leaving anything
+/// malformed as written (a truncated fetch can end mid-escape).
+fn decode_quoted_printable(src: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(src.len());
+    let mut i = 0;
+    while i < src.len() {
+        if src[i] == b'=' {
+            // "=\r\n" is a soft line break: the line continues.
+            if src.get(i + 1) == Some(&b'\r') && src.get(i + 2) == Some(&b'\n') {
+                i += 3;
+                continue;
+            }
+            if src.get(i + 1) == Some(&b'\n') {
+                i += 2;
+                continue;
+            }
+            let hex = src.get(i + 1..i + 3).and_then(|h| {
+                std::str::from_utf8(h).ok().and_then(|h| u8::from_str_radix(h, 16).ok())
+            });
+            match hex {
+                Some(b) => {
+                    buf.push(b);
                     i += 3;
                     continue;
                 }
-                if src.get(i + 1) == Some(&b'\n') {
-                    i += 2;
+                None => {
+                    buf.push(b'=');
+                    i += 1;
                     continue;
                 }
-                let hex = src.get(i + 1..i + 3).and_then(|h| {
-                    std::str::from_utf8(h).ok().and_then(|h| u8::from_str_radix(h, 16).ok())
-                });
-                match hex {
-                    Some(b) => {
-                        buf.push(b);
-                        i += 3;
-                        continue;
-                    }
-                    None => {
-                        buf.push(b'=');
-                        i += 1;
-                        continue;
-                    }
-                }
             }
-            buf.push(src[i]);
-            i += 1;
         }
-        buf
-    };
-    out.push_str(&String::from_utf8_lossy(&bytes));
-    out
+        buf.push(src[i]);
+        i += 1;
+    }
+    buf
 }
 
 /// Build a message summary from a raw header block (mail-parser), for servers
@@ -9511,7 +9679,7 @@ mod tests {
             "We have a quick update on how you connect your AI agent to Cloudways.\r\n",
             "--751d69df691580924654d5924db69f0ae9507550b8b16fd8b2d83daf1d3f--\r\n",
         );
-        let preview = preview_from_part(part.as_bytes());
+        let preview = preview_from_part(part.as_bytes(), None);
         assert!(preview.starts_with("Hi Camp crystal clear,"), "{preview}");
         assert!(!preview.contains("utm_campaign"), "{preview}");
     }
@@ -9519,18 +9687,18 @@ mod tests {
     #[test]
     fn preview_drops_rendered_links_but_keeps_their_text() {
         assert_eq!(
-            preview_from_part(b"Generate your Access Token ( https://example.com/api?a=1 )Got questions?"),
+            preview_from_part(b"Generate your Access Token ( https://example.com/api?a=1 )Got questions?", None),
             "Generate your Access Token Got questions?"
         );
         // Brackets that are not a link are left exactly as written.
         assert_eq!(
-            preview_from_part(b"Lunch (the usual place) at noon"),
+            preview_from_part(b"Lunch (the usual place) at noon", None),
             "Lunch (the usual place) at noon"
         );
         // A message that is nothing but a link still shows it: better than a
         // blank row.
         assert_eq!(
-            preview_from_part(b"https://example.com/only"),
+            preview_from_part(b"https://example.com/only", None),
             "https://example.com/only"
         );
     }
@@ -9557,11 +9725,11 @@ mod tests {
             "--b2=_cipkIEq1WkCIMIbpGDVyYc52x8YElrqa8uRU7GKJ8--\r\n",
         );
         assert_eq!(
-            preview_from_part(part.as_bytes()),
+            preview_from_part(part.as_bytes(), None),
             "Hello, I recently installed Vireo after reading about it on the omg!ubuntu website."
         );
         // Nothing of the MIME machinery reaches the list.
-        assert!(!preview_from_part(part.as_bytes()).contains("--b2="));
+        assert!(!preview_from_part(part.as_bytes(), None).contains("--b2="));
     }
 
     #[test]
@@ -9573,7 +9741,7 @@ mod tests {
             "<div>Only markup here</div>\r\n",
             "--x--\r\n",
         );
-        assert_eq!(preview_from_part(html_only.as_bytes()), "Only markup here");
+        assert_eq!(preview_from_part(html_only.as_bytes(), None), "Only markup here");
         // Two levels of nesting — mixed(alternative(...)) — are followed.
         let nested = concat!(
             "--outer\r\n",
@@ -9586,17 +9754,17 @@ mod tests {
             "--inner--\r\n",
             "--outer--\r\n",
         );
-        assert_eq!(preview_from_part(nested.as_bytes()), "Buried but readable");
+        assert_eq!(preview_from_part(nested.as_bytes(), None), "Buried but readable");
     }
 
     #[test]
     fn a_message_that_merely_starts_with_dashes_is_not_a_multipart() {
         // A signature separator, or a line of dashes, must still read as text.
         assert_eq!(
-            preview_from_part(b"-- \r\nRegards,\r\nSteve"),
+            preview_from_part(b"-- \r\nRegards,\r\nSteve", None),
             "-- Regards, Steve"
         );
-        assert_eq!(preview_from_part(b"--\r\nsigned off"), "-- signed off");
+        assert_eq!(preview_from_part(b"--\r\nsigned off", None), "-- signed off");
     }
 
     /// A PGP/MIME message's first part is the "Version: 1" stub, and an
@@ -9604,27 +9772,27 @@ mod tests {
     #[test]
     fn preview_names_an_encrypted_message() {
         let marker = crate::models::ENCRYPTED_PREVIEW;
-        assert_eq!(preview_from_part(b"Version: 1\r\n"), marker);
-        assert_eq!(preview_from_part(b"version: 1"), marker);
+        assert_eq!(preview_from_part(b"Version: 1\r\n", None), marker);
+        assert_eq!(preview_from_part(b"version: 1", None), marker);
         assert_eq!(
-            preview_from_part(b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n"),
+            preview_from_part(b"-----BEGIN PGP MESSAGE-----\r\n\r\nhQEMA3\r\n-----END PGP MESSAGE-----\r\n", None),
             marker
         );
         assert!(crate::models::preview_is_encrypted(marker));
         assert_eq!(crate::models::preview_display(marker), "Encrypted message");
         assert_eq!(crate::models::preview_display("Hello"), "Hello");
         assert_eq!(pgp_preview("Version 1 of the plan is attached"), None);
-        assert_eq!(preview_from_part(b"Hello there"), "Hello there");
+        assert_eq!(preview_from_part(b"Hello there", None), "Hello there");
     }
 
     #[test]
     fn preview_reads_plain_text() {
         let text = b"Here are the figures we discussed.\r\n\r\nLet me know if the Q3 line looks wrong.\r\n";
         assert_eq!(
-            preview_from_part(text),
+            preview_from_part(text, None),
             "Here are the figures we discussed. Let me know if the Q3 line looks wrong."
         );
-        assert_eq!(preview_from_part(b""), "");
+        assert_eq!(preview_from_part(b"", None), "");
     }
 
     #[test]
@@ -9632,14 +9800,14 @@ mod tests {
         // The fetch asks for body bytes only, so the encoding has to be inferred.
         // Quoted-printable, including a soft line break mid-sentence:
         let qp = b"Caf=C3=A9 meeting at 3pm =\r\nsharp, bring the numbers";
-        assert_eq!(preview_from_part(qp), "Café meeting at 3pm sharp, bring the numbers");
+        assert_eq!(preview_from_part(qp, None), "Café meeting at 3pm sharp, bring the numbers");
 
         // Base64 — shown raw this would be gibberish in the list.
         let encoded = crate::oauth::base64_encode(
             b"Base64 bodies are common from newsletters and phones alike.",
         );
         assert_eq!(
-            preview_from_part(encoded.as_bytes()),
+            preview_from_part(encoded.as_bytes(), None),
             "Base64 bodies are common from newsletters and phones alike."
         );
     }
@@ -9650,31 +9818,104 @@ mod tests {
         // incomplete tail is dropped rather than decoded into noise.
         let full = crate::oauth::base64_encode(&b"The quick brown fox jumps over the lazy dog. ".repeat(4));
         let truncated = &full[..full.len() - 3];
-        let preview = preview_from_part(truncated.as_bytes());
+        let preview = preview_from_part(truncated.as_bytes(), None);
         assert!(preview.starts_with("The quick brown fox"), "{preview}");
         // A quoted-printable escape cut in half stays literal instead of eating
         // the character after it.
-        assert!(preview_from_part(b"Total: 50=").ends_with('='));
+        assert!(preview_from_part(b"Total: 50=", None).ends_with('='));
     }
 
     #[test]
     fn preview_reads_html_and_skips_quoted_replies() {
         let html = b"<html><body><p>Meeting moved to <b>Tuesday</b>.</p></body></html>";
-        assert_eq!(preview_from_part(html), "Meeting moved to Tuesday.");
+        assert_eq!(preview_from_part(html, None), "Meeting moved to Tuesday.");
         let reply = b"Sounds good to me.\r\n\r\n> On Monday, Ada wrote:\r\n> the original text\r\n";
-        assert_eq!(preview_from_part(reply), "Sounds good to me.");
+        assert_eq!(preview_from_part(reply, None), "Sounds good to me.");
     }
 
     #[test]
     fn preview_is_capped() {
         let long = "word ".repeat(200);
-        assert_eq!(preview_from_part(long.as_bytes()).chars().count(), PREVIEW_CHARS);
+        assert_eq!(preview_from_part(long.as_bytes(), None).chars().count(), PREVIEW_CHARS);
     }
 
     #[test]
     fn short_text_is_not_mistaken_for_base64() {
         // "Meeting" is all base64 characters, but far too short to be a body.
-        assert_eq!(preview_from_part(b"Meeting"), "Meeting");
+        assert_eq!(preview_from_part(b"Meeting", None), "Meeting");
+    }
+
+    #[test]
+    fn preview_reads_the_charset_the_part_declares() {
+        // #159: a Hungarian bank's mail, quoted-printable in iso-8859-2. Read as
+        // UTF-8, every accented letter was a replacement character in the list
+        // while the reader showed the message fine.
+        let qp = b"Tisztelt =DCgyfel=FCnk! K=E9rj=FCk, =F5rizze meg.";
+        assert_eq!(
+            preview_from_part(qp, Some("iso-8859-2")),
+            "Tisztelt Ügyfelünk! Kérjük, őrizze meg."
+        );
+        // The 8-bit bytes as they are, no transfer encoding; label case and
+        // quotes as servers send them.
+        assert_eq!(preview_from_part(b"\xD5rizze meg", Some("\"ISO-8859-2\"")), "Őrizze meg");
+        assert_eq!(preview_from_part(b"\xF5rizze", Some("windows-1250")), "őrizze");
+        // Base64 is decoded to bytes first, then read in the charset.
+        let b64 = crate::oauth::base64_encode(b"Caf\xE9 meeting at three, bring the numbers please.");
+        assert_eq!(
+            preview_from_part(b64.as_bytes(), Some("iso-8859-1")),
+            "Café meeting at three, bring the numbers please."
+        );
+        // UTF-8 still reads as UTF-8 whatever it is called.
+        assert_eq!(preview_from_part("Café".as_bytes(), Some("UTF-8")), "Café");
+        assert_eq!(preview_from_part("Café".as_bytes(), Some("utf8")), "Café");
+    }
+
+    #[test]
+    fn preview_parts_of_a_multipart_carry_their_own_charset() {
+        let nested = b"--b1\r\nContent-Type: text/plain; charset=\"iso-8859-2\"\r\n\
+            Content-Transfer-Encoding: quoted-printable\r\n\r\n=D5rizze meg\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(nested, None), "Őrizze meg");
+        // A charset on a folded continuation line still counts.
+        let folded = b"--b1\r\nContent-Type: text/html;\r\n\tcharset=iso-8859-2\r\n\r\n\
+            <p>\xD5rizze meg</p>\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(folded, None), "Őrizze meg");
+    }
+
+    #[test]
+    fn preview_finds_the_parts_behind_a_mime_preamble() {
+        // A whole body (the BODY[TEXT] retry) can open with the preamble
+        // rather than the boundary.
+        let body = b"This is a multi-part message in MIME format.\r\n\r\n--b1\r\n\
+            Content-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgo=\r\n--b1\r\n\
+            Content-Type: text/plain\r\n\r\nThe photo from Sunday\r\n--b1--\r\n";
+        assert_eq!(preview_from_part(body, None), "The photo from Sunday");
+        // But plain text that merely mentions a dashed line is still text.
+        assert_eq!(preview_from_part(b"Hello\r\n--foo\r\nbar", None), "Hello --foo bar");
+    }
+
+    #[test]
+    fn preview_copes_with_bytes_that_are_not_utf8() {
+        // Undeclared 8-bit text reads as Windows-1252, the way browsers do.
+        assert_eq!(preview_from_part(b"Caf\xE9 au lait", None), "Café au lait");
+        // A slice that ends mid-character drops the fragment, not the row.
+        let cut = &"Café".as_bytes()[..4];
+        assert_eq!(preview_from_part(cut, None), "Caf");
+        assert_eq!(preview_from_part(cut, Some("utf-8")), "Caf");
+        // Declared UTF-8 that isn't: the damage shows as replacement characters.
+        assert_eq!(preview_from_part(b"a\xFFb", Some("utf-8")), "a\u{fffd}b");
+    }
+
+    #[test]
+    fn charset_param_is_read_from_a_content_type() {
+        assert_eq!(charset_param("text/html; charset=\"iso-8859-2\""), Some("iso-8859-2".into()));
+        assert_eq!(charset_param("text/plain; format=flowed; charset=utf-8"), Some("utf-8".into()));
+        assert_eq!(charset_param("multipart/alternative; boundary=b1"), None);
+        assert_eq!(
+            mime_header("Content-Type: text/plain;\r\n\tcharset=us-ascii\r\nX: y", "content-type")
+                .as_deref()
+                .and_then(charset_param),
+            Some("us-ascii".into())
+        );
     }
 
     /// Issue #9's message: an Apple Mail PDF marked `inline` with a filename and
