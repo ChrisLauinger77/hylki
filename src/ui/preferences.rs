@@ -1059,7 +1059,8 @@ impl Component for Preferences {
                                     #[name = "default_from_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Send new messages from"),
-                                        set_subtitle: &i18n("The From address a new message starts with.                                                        Replies still answer from the address the                                                        original was sent to."),
+                                        set_subtitle: &i18n("Replies still answer from the address the \
+                                                       original was sent to."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeComposeDefaultFrom(row.selected()));
                                         },
@@ -1551,7 +1552,7 @@ impl Component for Preferences {
         // enabled account and alias, labelled as the composer's From row
         // labels them. Only meaningful with more than one identity.
         {
-            let mut labels: Vec<String> = vec![i18n("Account of the open folder")];
+            let mut labels: Vec<String> = vec![i18n("Account of the current folder")];
             labels.extend(model.identities.iter().map(|(name, addr)| {
                 if name.trim().is_empty() {
                     addr.clone()
@@ -1570,6 +1571,7 @@ impl Component for Preferences {
                 .unwrap_or(0);
             widgets.default_from_row.set_selected(sel as u32);
             widgets.default_from_row.set_visible(model.identities.len() > 1);
+            widen_combo_value(&widgets.default_from_row, 50);
         }
         widgets.paste_plain_row.set_active(init.paste_plain);
         widgets.spellcheck_row.set_active(init.spellcheck);
@@ -2091,5 +2093,39 @@ fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
         1 => AboveAccounts,
         2 => BelowAccounts,
         _ => AllInboxes,
+    }
+}
+
+/// Give a combo row's selected-value label `extra` more pixels than the
+/// ellipsized width libadwaita allows it, so a sentence-length choice
+/// ("Account of the current folder") reads whole instead of trailing off.
+/// The value label is the row's only descendant label showing the
+/// selected string; nothing else in the row is touched.
+fn widen_combo_value(row: &adw::ComboRow, extra: i32) {
+    let Some(want) = row
+        .selected_item()
+        .and_downcast::<gtk::StringObject>()
+        .map(|s| s.string().to_string())
+    else {
+        return;
+    };
+    fn find(w: &gtk::Widget, want: &str) -> Option<gtk::Label> {
+        if let Some(label) = w.downcast_ref::<gtk::Label>() {
+            if label.label() == want {
+                return Some(label.clone());
+            }
+        }
+        let mut child = w.first_child();
+        while let Some(c) = child {
+            if let Some(hit) = find(&c, want) {
+                return Some(hit);
+            }
+            child = c.next_sibling();
+        }
+        None
+    }
+    if let Some(label) = find(row.upcast_ref::<gtk::Widget>(), &want) {
+        let (_, natural, _, _) = label.measure(gtk::Orientation::Horizontal, -1);
+        label.set_width_request(natural + extra);
     }
 }
