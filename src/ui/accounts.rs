@@ -19,7 +19,7 @@ const DEFAULT_COLOR: &str = "#3584e4";
 /// How an account signs in, chosen via the single Provider dropdown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProviderKind {
-    /// Manual IMAP/POP3 + password ("Other (IMAP/POP3)…").
+    /// Manual IMAP/POP3 + password ("IMAP/POP3 Account").
     Manual,
     /// A known IMAP provider: password auth with auto-filled servers.
     Preset,
@@ -58,6 +58,10 @@ impl Provider {
     pub(crate) fn wizard_label(&self) -> &'static str {
         self.label
     }
+    /// The plain IMAP/POP3 entry, the wizard's default.
+    pub(crate) fn wizard_is_manual(&self) -> bool {
+        self.kind == ProviderKind::Manual
+    }
     pub(crate) fn wizard_servers(&self) -> (&'static str, u16, &'static str, u16) {
         (self.imap_host, self.imap_port, self.smtp_host, self.smtp_port)
     }
@@ -83,10 +87,12 @@ impl Provider {
 
 const APP_PW: &str = i18n_noop("Requires an app-specific password (not your normal login password).");
 
-/// The Provider dropdown, in display order. OAuth options first, then the major
-/// app-password IMAP providers, then the two manual escape hatches. IMAP uses
-/// SSL/TLS on 993; SMTP uses implicit TLS on 465 or STARTTLS on 587.
+/// The Provider dropdown, in display order. The plain IMAP/POP3 entry first
+/// (the default), then the OAuth options, the major app-password IMAP
+/// providers, and custom OAuth last. IMAP uses SSL/TLS on 993; SMTP uses
+/// implicit TLS on 465 or STARTTLS on 587.
 pub(crate) const PROVIDERS: &[Provider] = &[
+    Provider { label: "IMAP/POP3 Account", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
     Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
     Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in through GNOME Online Accounts.") },
     Provider { label: "iCloud", brand: "icloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
@@ -99,10 +105,9 @@ pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "Yandex Mail", brand: "yandex", kind: ProviderKind::Preset, imap_host: "imap.yandex.com", imap_port: 993, smtp_host: "smtp.yandex.com", smtp_port: 465, hint: APP_PW },
     Provider { label: "Mail.com", brand: "mailcom", kind: ProviderKind::Preset, imap_host: "imap.mail.com", imap_port: 993, smtp_host: "smtp.mail.com", smtp_port: 587, hint: "" },
     Provider { label: "Custom (OAuth)…", brand: "mail-oauth", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
-    Provider { label: "Other (IMAP/POP3)…", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
 ];
 
-/// Dropdown index of the "Other (IMAP/POP3)…" manual entry (the default).
+/// Dropdown index of the "IMAP/POP3 Account" manual entry (the default).
 fn manual_index() -> u32 {
     PROVIDERS
         .iter()
@@ -2814,7 +2819,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.name_row.set_text(&acc.name);
     widgets.email_row.set_text(&acc.email);
     // Reflect the account's provider in the dropdown (OAuth by endpoint, known
-    // password providers by server, otherwise "Other (IMAP/POP3)…").
+    // password providers by server, otherwise "IMAP/POP3 Account").
     widgets.provider_row.set_selected(provider_index_for_account(acc));
     widgets
         .protocol_row

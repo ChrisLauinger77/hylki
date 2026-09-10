@@ -366,8 +366,9 @@ impl Component for Welcome {
         provider_row.set_model(Some(&gtk::StringList::new(&labels)));
         // The providers' marks before their names, as in Settings.
         provider_row.set_factory(Some(&crate::ui::accounts::provider_factory()));
-        // Default to the manual entry (last in the filtered list).
-        provider_row.set_selected(labels.len().saturating_sub(1) as u32);
+        // Default to the plain IMAP/POP3 entry.
+        let manual = wizard_providers().iter().position(|p| p.wizard_is_manual()).unwrap_or(0);
+        provider_row.set_selected(manual as u32);
         {
             let s = sender.clone();
             provider_row.connect_selected_notify(move |_| s.input(WelcomeInput::ProviderChanged));
@@ -381,7 +382,7 @@ impl Component for Welcome {
         let server_exp = adw::ExpanderRow::new();
         server_exp.set_title(&i18n("Server details"));
         server_exp.set_subtitle(&i18n("Filled in for known providers"));
-        // The default provider is the generic "Other (IMAP/POP3)" entry,
+        // The default provider is the plain "IMAP/POP3 Account" entry,
         // whose whole point is filling these in — start them open. Picking a
         // known provider collapses them (ProviderChanged), picking the
         // generic one re-opens them.
