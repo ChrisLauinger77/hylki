@@ -1469,9 +1469,16 @@ pub fn save_tags(tags: &[Tag]) {
 
 /// A portable settings bundle (#50): every configuration file Vireo keeps —
 /// preferences, accounts (colours, emoji, labels, aliases, folder roles and
-/// per-account push included), filters, sidebar layout, and window/pane
-/// state. Passwords and tokens never appear — their fields are
-/// skip_serializing, and they live in the keyring, not on disk.
+/// per-account push included), filters, tags, cloud storage accounts,
+/// sidebar layout, window/pane state (the app icon choice with it), and
+/// the words taught to the spell checker. Passwords and tokens never
+/// appear — their fields are skip_serializing, and they live in the
+/// keyring, not on disk; OpenPGP keys live in GnuPG's keyring, and the
+/// optional oauth.toml (a client id and secret the user supplied by hand)
+/// stays out for the same reason.
+///
+/// Sections added after the first release are optional, so a bundle from
+/// before them imports without wiping what it does not mention.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SettingsBundle {
     version: u32,
@@ -1488,6 +1495,13 @@ struct SettingsBundle {
     window: Option<WindowFile>,
     #[serde(default)]
     state: Option<StateFile>,
+    /// Cloud storage accounts (#144 onward); their sign-ins stay in the
+    /// keyring.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cloud: Option<Vec<crate::cloud::CloudAccount>>,
+    /// The spell checker's personal words, per language (#114).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    spell_words: Option<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 /// Parse one of the config directory's TOML files into its struct (None when
@@ -1518,6 +1532,8 @@ pub fn export_bundle() -> Result<String, String> {
         sidebar: read_file_struct(sidebar_path()),
         window: read_file_struct(window_path()),
         state: read_file_struct(state_path()),
+        cloud: Some(crate::cloud::load_accounts()),
+        spell_words: Some(crate::spell::all_personal_words()),
     };
     toml::to_string_pretty(&bundle).map_err(|e| e.to_string())
 }
@@ -1539,6 +1555,16 @@ pub fn import_bundle(text: &str) -> Result<usize, String> {
     write_file_struct(sidebar_path(), &bundle.sidebar)?;
     write_file_struct(window_path(), &bundle.window)?;
     write_file_struct(state_path(), &bundle.state)?;
+    if let Some(cloud) = &bundle.cloud {
+        crate::cloud::save_accounts(cloud);
+    }
+    // Words are merged, never removed: a backup can only teach the
+    // checker more.
+    if let Some(words) = &bundle.spell_words {
+        for (lang, list) in words {
+            crate::spell::merge_personal_words(lang, list);
+        }
+    }
     Ok(bundle.accounts.len())
 }
 
@@ -2473,6 +2499,11 @@ mod filter_tests {
             sidebar: None,
             window: None,
             state: None,
+            cloud: Some(vec![crate::cloud::CloudAccount::empty()]),
+            spell_words: Some(std::collections::BTreeMap::from([(
+                "en_US".to_string(),
+                vec!["Vireo".to_string()],
+            )])),
         };
         let text = toml::to_string_pretty(&bundle).unwrap();
         assert!(!text.contains("SECRET"));
@@ -2480,6 +2511,12 @@ mod filter_tests {
         let back: SettingsBundle = toml::from_str(&text).unwrap();
         assert_eq!(back.accounts[0].email, "a@b.c");
         assert!(back.accounts[0].password.is_empty());
+        // The later sections ride along, and a bundle without them (from
+        // before they existed) still parses, leaving them unset.
+        assert_eq!(back.cloud.as_ref().map(Vec::len), Some(1));
+        assert_eq!(back.spell_words.as_ref().and_then(|w| w.get("en_US")).map(Vec::len), Some(1));
+        let old: SettingsBundle = toml::from_str("version = 1\n[privacy]\n").unwrap();
+        assert!(old.cloud.is_none() && old.spell_words.is_none());
         // Auto-empty (#140): "never" is left out of the file, an age is kept.
         assert!(!text.contains("empty_junk_days"), "{text}");
         assert_eq!(back.accounts[0].empty_trash_days, 0);

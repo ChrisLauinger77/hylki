@@ -334,6 +334,59 @@ pub fn personal_words() -> Vec<String> {
         .collect()
 }
 
+/// Every language's personal word list in the enchant config dir, for a
+/// settings backup: language → words.
+pub fn all_personal_words() -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut out = std::collections::BTreeMap::new();
+    let dir = gtk::glib::user_config_dir().join("enchant");
+    let Ok(entries) = std::fs::read_dir(dir) else { return out };
+    for e in entries.flatten() {
+        let path = e.path();
+        if path.extension().and_then(|x| x.to_str()) != Some("dic") {
+            continue;
+        }
+        let Some(lang) = path.file_stem().and_then(|x| x.to_str()) else { continue };
+        let words: Vec<String> = std::fs::read_to_string(&path)
+            .unwrap_or_default()
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
+        if !words.is_empty() {
+            out.insert(lang.to_string(), words);
+        }
+    }
+    out
+}
+
+/// Add a backup's words for `lang` to its personal list, keeping what is
+/// already there (nothing is removed). The file is enchant's own
+/// one-word-per-line list, created when absent.
+pub fn merge_personal_words(lang: &str, words: &[String]) {
+    if words.is_empty() || lang.is_empty() || lang.contains('/') || lang.contains("..") {
+        return;
+    }
+    let dir = gtk::glib::user_config_dir().join("enchant");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join(format!("{lang}.dic"));
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let mut have: std::collections::BTreeSet<String> =
+        existing.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect();
+    let mut out = existing;
+    if !out.is_empty() && !out.ends_with('\n') {
+        out.push('\n');
+    }
+    for w in words.iter().map(|w| w.trim()).filter(|w| !w.is_empty()) {
+        if have.insert(w.to_string()) {
+            out.push_str(w);
+            out.push('\n');
+        }
+    }
+    let _ = std::fs::write(&path, out);
+    CHECKER.with(|c| *c.borrow_mut() = None);
+}
+
 /// Teach the checker a word: through enchant itself, so the file is written
 /// the way its own tooling writes it, and the subject's checker accepts the
 /// word immediately. The message body's checker (WebKit's own enchant

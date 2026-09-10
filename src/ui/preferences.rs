@@ -1302,8 +1302,11 @@ impl Component for Preferences {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Backup"),
                                     set_description: Some(
-                                        i18n("Accounts and preferences as one file. Passwords stay in the \
-                                         system keyring and are never exported.").as_str()
+                                        i18n("Everything Vireo keeps, as one file: mail and cloud storage \
+                                         accounts, preferences, filters, tags, the sidebar and window \
+                                         layout, the app icon choice and the words taught to the spell \
+                                         checker. Passwords and sign-ins stay in the system keyring and \
+                                         are never exported; OpenPGP keys stay in GnuPG.").as_str()
                                     ),
 
                                     adw::ActionRow {

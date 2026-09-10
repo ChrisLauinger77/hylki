@@ -5482,11 +5482,12 @@ impl SimpleComponent for AppModel {
                         let alert = adw::MessageDialog::new(
                             Some(&parent),
                             Some(i18n("Settings Imported").as_str()),
-                            Some(&format!(
-                                "{n} account(s) and all preferences were imported. \
-                                 Restart Vireo to apply them. Account passwords are \
-                                 not part of a backup; re-enter them on first \
-                                 connection if this is a new machine."
+                            Some(&i18n_f(
+                                "{n} mail account(s), the cloud storage accounts and all \
+                                 preferences were imported. Restart Vireo to apply them. \
+                                 Passwords and sign-ins are not part of a backup; re-enter \
+                                 them on first use if this is a new machine.",
+                                &[("n", &n.to_string())],
                             )),
                         );
                         alert.add_response("later", &i18n("Later"));
