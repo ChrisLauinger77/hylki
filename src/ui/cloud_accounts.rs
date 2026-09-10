@@ -650,8 +650,22 @@ fn edit_dialog(
                         *link_terms.borrow_mut() = Some(t);
                         let a = read();
                         apply_terms(&a);
-                        if !a.expiry_allowed() || !a.password_allowed() {
-                            status.set_label(&i18n_f("Signed in as {who}. {note}.", &[("who", &who), ("note", &a.link_note)]));
+                        // Say what the plan means in practice, not only
+                        // what it lacks: uploading and plain links work.
+                        let terms = match (a.expiry_allowed(), a.password_allowed()) {
+                            (false, false) => Some(i18n(
+                                "You can upload files and share plain links with this OneDrive. Link expiry and download passwords are not available on a free personal OneDrive (they need a Microsoft 365 subscription), so both are turned off for this account.",
+                            )),
+                            (true, false) => Some(i18n(
+                                "You can upload files, share links and set an expiry with this OneDrive. Download passwords are not available on OneDrive for Business links, so that option is turned off for this account.",
+                            )),
+                            (false, true) => Some(i18n(
+                                "You can upload files and share links with this OneDrive, with a download password. Link expiry is not available on it, so that option is turned off for this account.",
+                            )),
+                            (true, true) => None,
+                        };
+                        if let Some(t) = terms {
+                            status.set_label(&i18n_f("Signed in as {who}. {terms}", &[("who", &who), ("terms", &t)]));
                         }
                     }
                     if let Some(l) = login {
