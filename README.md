@@ -30,7 +30,7 @@
 > automatically; Flatpak users should [install Vireo fresh](https://vireo.hyprlab.co)
 > and remove the old Veem app. getveem.com now redirects here.
 
-Vireo is a desktop email client for Wayland that feels at home in GNOME. It talks
+Vireo is a GNOME-native desktop email client for the Linux desktop. It talks
 IMAP/SMTP directly, keeps your mail and credentials on your machine, and blocks
 trackers by default — no telemetry, no analytics.
 
