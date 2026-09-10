@@ -111,6 +111,7 @@ impl SimpleComponent for CloudAccounts {
                                     gtk::ListBox {
                                         add_css_class: "boxed-list",
                                         set_selection_mode: gtk::SelectionMode::None,
+                                        set_margin_top: 16,
                                         // A row opens its editor, as the Mail
                                         // Accounts list does.
                                         connect_row_activated[sender] => move |_, row| {
