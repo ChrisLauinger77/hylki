@@ -206,7 +206,11 @@ pub enum ComposeInput {
     CloudAttach,
     /// Files picked; ask which account and how, then upload.
     CloudPicked(Vec<std::path::PathBuf>),
-    CloudUpload { paths: Vec<std::path::PathBuf>, account: crate::cloud::CloudAccount },
+    /// Upload these files to `account`, whose `expire_days` and `password`
+    /// carry the user's choices for this upload; `link_password` is a
+    /// password of their own for every link, else one is generated per
+    /// file.
+    CloudUpload { paths: Vec<std::path::PathBuf>, account: crate::cloud::CloudAccount, link_password: Option<String> },
     /// One upload finished (in a thread): the link, or why not.
     CloudUploaded { name: String, result: Result<crate::cloud::ShareResult, String> },
     /// Take a link back out of the body.
@@ -736,6 +740,16 @@ impl Component for Compose {
             model.rebuild_attachments(&widgets.attach_box, &sender);
         }
 
+        // VIREO_SHOWCASE_CLOUD_DIALOG opens the cloud upload dialog on a
+        // stand-in file two seconds after the composer is up (demo only),
+        // for a capture of this upload's terms.
+        if std::env::var_os("VIREO_SHOWCASE_CLOUD_DIALOG").is_some() && std::env::var_os("VIREO_DEMO").is_some() {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(2, move || {
+                s.input(ComposeInput::CloudPicked(vec![std::path::PathBuf::from("/tmp/Q3 report.pdf")]));
+            });
+        }
+
         // Wire autocomplete *after* prefilling, so the initial text doesn't pop it.
         for (row, field) in [
             (&widgets.to_row, Field::To),
@@ -908,7 +922,7 @@ impl Component for Compose {
                 cloud_upload_dialog(parent.as_ref(), &self.cloud_accounts, paths, sender.input_sender().clone());
             }
 
-            ComposeInput::CloudUpload { paths, account } => {
+            ComposeInput::CloudUpload { paths, account, link_password } => {
                 let secret = if account.has_secret() {
                     crate::config::load_cloud_password(&account.key())
                 } else {
@@ -930,9 +944,9 @@ impl Component for Compose {
                     self.cloud_busy += 1;
                     self.rebuild_attachments(&widgets.attach_box, &sender);
                     let s = sender.input_sender().clone();
-                    let (a, pw) = (account.clone(), password.clone());
+                    let (a, pw, lp) = (account.clone(), password.clone(), link_password.clone());
                     std::thread::spawn(move || {
-                        let result = crate::cloud::upload_and_share(&a, &pw, &path);
+                        let result = crate::cloud::upload_and_share(&a, &pw, &path, lp.as_deref());
                         let _ = s.send(ComposeInput::CloudUploaded { name, result });
                     });
                 }
@@ -1563,16 +1577,16 @@ fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
-/// Which account to upload to, and a reminder of how its links are made.
-/// One account skips the question.
+/// Which account to upload to, and how the links are made this time:
+/// the expiry and the password, seeded from the account's settings and
+/// changeable for this upload alone.
 fn cloud_upload_dialog(
     parent: Option<&gtk::Window>,
     accounts: &[crate::cloud::CloudAccount],
     paths: Vec<std::path::PathBuf>,
     sender: relm4::Sender<ComposeInput>,
 ) {
-    if accounts.len() == 1 {
-        let _ = sender.send(ComposeInput::CloudUpload { paths, account: accounts[0].clone() });
+    if accounts.is_empty() {
         return;
     }
     let n = paths.len();
@@ -1586,23 +1600,69 @@ fn cloud_upload_dialog(
     dialog.set_default_response(Some("upload"));
     dialog.set_close_response("cancel");
     dialog.set_response_appearance("upload", adw::ResponseAppearance::Suggested);
+
     let names: Vec<String> = accounts.iter().map(|a| if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() }).collect();
     let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
     let combo = adw::ComboRow::new();
     combo.set_title(&i18n("Account"));
     combo.set_model(Some(&gtk::StringList::new(&name_refs)));
+    combo.set_visible(accounts.len() > 1);
+
+    // This upload's terms, starting from the account's own.
+    let expire = adw::SpinRow::with_range(0.0, 365.0, 1.0);
+    expire.set_title(&i18n("Links expire after"));
+    expire.set_subtitle(&i18n("Days; 0 keeps the link"));
+    let protect = adw::SwitchRow::new();
+    protect.set_title(&i18n("Protect with a password"));
+    let password = adw::EntryRow::new();
+    password.set_title(&i18n("Download password (empty: generated)"));
+    let apply_defaults = {
+        let (expire, protect, password) = (expire.clone(), protect.clone(), password.clone());
+        let accounts = accounts.to_vec();
+        move |i: usize| {
+            if let Some(a) = accounts.get(i) {
+                expire.set_value(a.expire_days as f64);
+                protect.set_active(a.password);
+                password.set_text("");
+            }
+        }
+    };
+    apply_defaults(0);
+    password.set_visible(protect.is_active());
+    {
+        let password = password.clone();
+        protect.connect_active_notify(move |p| password.set_visible(p.is_active()));
+    }
+    {
+        let apply_defaults = apply_defaults.clone();
+        combo.connect_selected_notify(move |c| apply_defaults(c.selected() as usize));
+    }
+
     let group = adw::PreferencesGroup::new();
     group.add(&combo);
-    dialog.set_extra_child(Some(&group));
+    group.add(&expire);
+    group.add(&protect);
+    group.add(&password);
+    let bx = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    bx.set_width_request(400);
+    bx.append(&group);
+    dialog.set_extra_child(Some(&bx));
+
     let accounts = accounts.to_vec();
     let paths = std::cell::RefCell::new(Some(paths));
     dialog.connect_response(None, move |_, resp| {
         if resp != "upload" {
             return;
         }
-        if let (Some(paths), Some(account)) = (paths.borrow_mut().take(), accounts.get(combo.selected() as usize)) {
-            let _ = sender.send(ComposeInput::CloudUpload { paths, account: account.clone() });
-        }
+        let (Some(paths), Some(account)) = (paths.borrow_mut().take(), accounts.get(combo.selected() as usize)) else {
+            return;
+        };
+        let mut account = account.clone();
+        account.expire_days = expire.value() as u32;
+        account.password = protect.is_active();
+        let typed = password.text().trim().to_string();
+        let link_password = (account.password && !typed.is_empty()).then_some(typed);
+        let _ = sender.send(ComposeInput::CloudUpload { paths, account, link_password });
     });
     dialog.present();
 }

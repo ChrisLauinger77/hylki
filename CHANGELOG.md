@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Per-upload link terms.** The composer's cloud upload dialog (shown for
+  every upload now, the account row only with more than one account)
+  carries the expiry in days, the password switch and a password field,
+  seeded from the chosen account's settings and reset when the account
+  changes; what is set applies to that upload alone. A typed password is
+  used for every file of the upload, an empty field gets one generated
+  per file as before. `ComposeInput::CloudUpload` carries the adjusted
+  account copy and `link_password`; `cloud::upload_and_share` takes the
+  fixed password.
+
 - **OneDrive as cloud storage** (#144 follow-up), through GNOME Online
   Accounts: the editor lists the Microsoft 365 accounts GOA has (a new
   `goa::list_files_accounts`, Files switch shown when off) and the

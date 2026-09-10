@@ -209,7 +209,11 @@ Settings → Cloud Storage holds the accounts the composer's upload button can
 put files on. A file goes to the account's upload folder and a share link,
 with the size and any expiry, is placed in the message above your signature.
 Every kind of account can expire links after a number of days and protect
-them with a generated download password, shown to you to pass on separately.
+them with a download password, shown to you to pass on separately. The
+account's settings are the defaults: the upload dialog in the composer
+shows them for each upload, where the expiry can be changed or removed,
+the password turned on or off, and a password of your own typed in place
+of the generated one.
 
 - **OneDrive** — through GNOME Online Accounts: add your Microsoft 365
   account under Settings → Online Accounts, then pick it in the cloud

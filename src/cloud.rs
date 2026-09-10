@@ -301,13 +301,33 @@ pub fn verify(account: &CloudAccount, secret: &str) -> Result<String, String> {
 
 /// Upload `path` into the account's folder and share it by public link.
 /// A file already there by that name is left alone: the upload takes
-/// another name instead.
-pub fn upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -> Result<ShareResult, String> {
+/// another name instead. The account's `expire_days` and `password` say
+/// how the link is made (the composer hands in a copy with the user's
+/// choices for this upload); `fixed_password` is the password to use
+/// when one is wanted, else one is generated per file.
+pub fn upload_and_share(
+    account: &CloudAccount,
+    secret: &str,
+    path: &Path,
+    fixed_password: Option<&str>,
+) -> Result<ShareResult, String> {
     match account.kind {
-        CloudKind::Nextcloud => nextcloud_upload_and_share(account, secret, path),
-        CloudKind::Dropbox => dropbox_upload_and_share(account, secret, path),
-        CloudKind::Seafile => seafile_upload_and_share(account, secret, path),
-        CloudKind::OneDrive => onedrive_upload_and_share(account, path),
+        CloudKind::Nextcloud => nextcloud_upload_and_share(account, secret, path, fixed_password),
+        CloudKind::Dropbox => dropbox_upload_and_share(account, secret, path, fixed_password),
+        CloudKind::Seafile => seafile_upload_and_share(account, secret, path, fixed_password),
+        CloudKind::OneDrive => onedrive_upload_and_share(account, path, fixed_password),
+    }
+}
+
+/// The link's download password: none unless the account (as handed in)
+/// wants one; then the fixed one when given, else a fresh one.
+fn share_password(account: &CloudAccount, fixed: Option<&str>) -> Option<String> {
+    if !account.password {
+        return None;
+    }
+    match fixed.map(str::trim).filter(|p| !p.is_empty()) {
+        Some(p) => Some(p.to_string()),
+        None => Some(generate_password()),
     }
 }
 
@@ -348,7 +368,12 @@ fn nextcloud_verify(account: &CloudAccount, password: &str) -> Result<String, St
     Ok(name)
 }
 
-fn nextcloud_upload_and_share(account: &CloudAccount, password: &str, path: &Path) -> Result<ShareResult, String> {
+fn nextcloud_upload_and_share(
+    account: &CloudAccount,
+    password: &str,
+    path: &Path,
+    fixed: Option<&str>,
+) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
     let folder = account.folder_clean();
     let root = dav_root(account);
@@ -393,7 +418,7 @@ fn nextcloud_upload_and_share(account: &CloudAccount, password: &str, path: &Pat
     // The public link.
     let share_path = format!("/{folder}/{remote}");
     let expires = expiry(account);
-    let pw = if account.password { Some(generate_password()) } else { None };
+    let pw = share_password(account, fixed);
     let mut form: Vec<(&str, String)> = vec![
         ("path", share_path),
         ("shareType", "3".to_string()),
@@ -576,7 +601,12 @@ fn dropbox_content(
         .map_err(ureq::Error::from)
 }
 
-fn dropbox_upload_and_share(account: &CloudAccount, refresh: &str, path: &Path) -> Result<ShareResult, String> {
+fn dropbox_upload_and_share(
+    account: &CloudAccount,
+    refresh: &str,
+    path: &Path,
+    fixed: Option<&str>,
+) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
     let access = dropbox_access(account, refresh)?;
     let remote_path = format!("/{}/{}", account.folder_clean(), name);
@@ -645,7 +675,7 @@ fn dropbox_upload_and_share(account: &CloudAccount, refresh: &str, path: &Path) 
     // The public link. Passwords and expiry are settings only paid plans
     // may set; Dropbox says so with a settings_error.
     let expires = expiry(account);
-    let pw = if account.password { Some(generate_password()) } else { None };
+    let pw = share_password(account, fixed);
     let mut settings = serde_json::json!({"audience": "public", "access": "viewer"});
     if let Some(p) = &pw {
         settings["requested_visibility"] = "password".into();
@@ -838,7 +868,12 @@ fn multipart_upload(
     Ok((format!("multipart/form-data; boundary={boundary}"), len, body))
 }
 
-fn seafile_upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -> Result<ShareResult, String> {
+fn seafile_upload_and_share(
+    account: &CloudAccount,
+    secret: &str,
+    path: &Path,
+    fixed: Option<&str>,
+) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
     let token = seafile_token(account, secret)?;
     let authz = seafile_auth(&token);
@@ -902,7 +937,7 @@ fn seafile_upload_and_share(account: &CloudAccount, secret: &str, path: &Path) -
     // The share link.
     let file_path = if dir.is_empty() { format!("/{remote}") } else { format!("{dir}/{remote}") };
     let expires = expiry(account);
-    let pw = if account.password { Some(generate_password()) } else { None };
+    let pw = share_password(account, fixed);
     let days = account.expire_days.to_string();
     let mut form: Vec<(&str, &str)> = vec![("repo_id", repo.as_str()), ("path", file_path.as_str())];
     if let Some(p) = &pw {
@@ -1057,7 +1092,7 @@ fn onedrive_folder(token: &str, folder: &str) -> Result<String, String> {
     Ok(dir)
 }
 
-fn onedrive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<ShareResult, String> {
+fn onedrive_upload_and_share(account: &CloudAccount, path: &Path, fixed: Option<&str>) -> Result<ShareResult, String> {
     let (name, size) = local_file(path)?;
     let token = goa_token(account)?;
     let dir = onedrive_folder(&token, &account.folder_clean())?;
@@ -1120,7 +1155,7 @@ fn onedrive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<Shar
     // The public link. Expiry and passwords take a OneDrive for Business
     // or Microsoft 365 subscription; a personal account says no.
     let expires = expiry(account);
-    let pw = if account.password { Some(generate_password()) } else { None };
+    let pw = share_password(account, fixed);
     let mut body = serde_json::json!({"type": "view", "scope": "anonymous"});
     if let Some(d) = &expires {
         body["expirationDateTime"] = format!("{d}T00:00:00Z").into();
@@ -1242,6 +1277,16 @@ mod tests {
         assert!(back.contains("kind = \"onedrive\""));
         assert_eq!(onedrive_item("Vireo/Q3 report"), "https://graph.microsoft.com/v1.0/me/drive/root:/Vireo/Q3%20report");
         assert_eq!(onedrive_item(""), "https://graph.microsoft.com/v1.0/me/drive/root");
+    }
+
+    #[test]
+    fn the_link_password_follows_the_choice() {
+        let mut a = CloudAccount::empty();
+        assert_eq!(share_password(&a, Some("typed")), None);
+        a.password = true;
+        assert_eq!(share_password(&a, Some(" typed ")).as_deref(), Some("typed"));
+        assert_eq!(share_password(&a, Some("  ")).map(|p| p.len()), Some(12));
+        assert_eq!(share_password(&a, None).map(|p| p.len()), Some(12));
     }
 
     #[test]
