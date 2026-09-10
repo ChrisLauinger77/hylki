@@ -195,6 +195,12 @@ msgstr ""
 msgid "Settings Imported"
 msgstr ""
 
+msgid ""
+"{n} mail account(s), the cloud storage accounts and all preferences were "
+"imported. Restart Vireo to apply them. Passwords and sign-ins are not part "
+"of a backup; re-enter them on first use if this is a new machine."
+msgstr ""
+
 msgid "Later"
 msgstr ""
 
@@ -686,6 +692,9 @@ msgstr ""
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr ""
 
+msgid "Enter your server details manually."
+msgstr ""
+
 msgid "Sign in with your browser — no password needed."
 msgstr ""
 
@@ -699,9 +708,6 @@ msgid "Enable POP/IMAP access in GMX settings first."
 msgstr ""
 
 msgid "Enter your provider's OAuth endpoints, then sign in."
-msgstr ""
-
-msgid "Enter your server details manually."
 msgstr ""
 
 msgid "Mail Accounts"
@@ -981,9 +987,6 @@ msgid "Edit HTML…"
 msgstr ""
 
 msgid "Import File…"
-msgstr ""
-
-msgid "Remove Account"
 msgstr ""
 
 msgid ""
@@ -1347,8 +1350,10 @@ msgstr ""
 msgid ""
 "Connect your cloud storage provider to upload and share large files instead "
 "of an attachment. A cloud icon appears in the compose toolbar once a "
-"provider is added. Supported providers: Nextcloud, ownCloud, OpenCloud, "
-"OneDrive, Dropbox and Seafile."
+"provider is added.\n"
+"\n"
+"Supported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and "
+"Seafile."
 msgstr ""
 
 msgid "Add Account…"
@@ -1358,6 +1363,14 @@ msgid "No cloud accounts yet."
 msgstr ""
 
 msgid "Cloud Account"
+msgstr ""
+
+msgid "Remove {name}?"
+msgstr ""
+
+msgid ""
+"Vireo forgets the account and its sign-in. Files already uploaded, and the "
+"links in messages you sent, stay where they are."
 msgstr ""
 
 msgid "Removed {name}"
@@ -1376,6 +1389,9 @@ msgid "links expire after {n} days"
 msgstr ""
 
 msgid "password-protected"
+msgstr ""
+
+msgid "Offer this account in the composer"
 msgstr ""
 
 msgid "Service"
@@ -2688,8 +2704,11 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Accounts and preferences as one file. Passwords stay in the system keyring "
-"and are never exported."
+"Everything Vireo keeps, as one file: mail and cloud storage accounts, "
+"preferences, filters, tags, the sidebar and window layout, the app icon "
+"choice and the words taught to the spell checker. Passwords and sign-ins "
+"stay in the system keyring and are never exported; OpenPGP keys stay in "
+"GnuPG."
 msgstr ""
 
 msgid "Export settings"

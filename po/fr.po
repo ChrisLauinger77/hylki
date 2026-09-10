@@ -203,6 +203,12 @@ msgstr "Importer des paramètres"
 msgid "Settings Imported"
 msgstr "Paramètres importés"
 
+msgid ""
+"{n} mail account(s), the cloud storage accounts and all preferences were "
+"imported. Restart Vireo to apply them. Passwords and sign-ins are not part "
+"of a backup; re-enter them on first use if this is a new machine."
+msgstr ""
+
 msgid "Later"
 msgstr "Plus tard"
 
@@ -731,6 +737,9 @@ msgstr ""
 "Nécessite un mot de passe spécifique à l'application (différent de votre mot "
 "de passe habituel)."
 
+msgid "Enter your server details manually."
+msgstr "Saisissez manuellement les détails de votre serveur."
+
 msgid "Sign in with your browser — no password needed."
 msgstr "Connectez-vous via votre navigateur — aucun mot de passe requis."
 
@@ -747,9 +756,6 @@ msgid "Enter your provider's OAuth endpoints, then sign in."
 msgstr ""
 "Saisissez les points de terminaison OAuth de votre fournisseur, puis "
 "connectez-vous."
-
-msgid "Enter your server details manually."
-msgstr "Saisissez manuellement les détails de votre serveur."
 
 msgid "Mail Accounts"
 msgstr "Comptes e-mail"
@@ -1066,9 +1072,6 @@ msgstr "Editer HTML…"
 
 msgid "Import File…"
 msgstr "Importer le fichier…"
-
-msgid "Remove Account"
-msgstr "Supprimer le compte"
 
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
@@ -1448,8 +1451,10 @@ msgstr "Stockage en ligne"
 msgid ""
 "Connect your cloud storage provider to upload and share large files instead "
 "of an attachment. A cloud icon appears in the compose toolbar once a "
-"provider is added. Supported providers: Nextcloud, ownCloud, OpenCloud, "
-"OneDrive, Dropbox and Seafile."
+"provider is added.\n"
+"\n"
+"Supported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and "
+"Seafile."
 msgstr ""
 
 msgid "Add Account…"
@@ -1460,6 +1465,15 @@ msgstr "Aucun compte cloud pour le moment."
 
 msgid "Cloud Account"
 msgstr "Compte cloud"
+
+#, fuzzy
+msgid "Remove {name}?"
+msgstr "{name} supprimé"
+
+msgid ""
+"Vireo forgets the account and its sign-in. Files already uploaded, and the "
+"links in messages you sent, stay where they are."
+msgstr ""
 
 msgid "Removed {name}"
 msgstr "{name} supprimé"
@@ -1478,6 +1492,10 @@ msgstr "les liens expirent après {n} jours"
 
 msgid "password-protected"
 msgstr "protégé par mot de passe"
+
+#, fuzzy
+msgid "Offer this account in the composer"
+msgstr "Utiliser ce compte dans Vireo"
 
 msgid "Service"
 msgstr "Service"
@@ -3026,11 +3044,12 @@ msgstr ""
 "raccourcies à leur domaine."
 
 msgid ""
-"Accounts and preferences as one file. Passwords stay in the system keyring "
-"and are never exported."
+"Everything Vireo keeps, as one file: mail and cloud storage accounts, "
+"preferences, filters, tags, the sidebar and window layout, the app icon "
+"choice and the words taught to the spell checker. Passwords and sign-ins "
+"stay in the system keyring and are never exported; OpenPGP keys stay in "
+"GnuPG."
 msgstr ""
-"Les comptes et préférences dans un seul fichier. Les mots de passe restent "
-"dans le trousseau de clés du système et ne sont jamais exportés."
 
 msgid "Export settings"
 msgstr "Exporter les paramètres"
@@ -3673,6 +3692,16 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Remove Account"
+#~ msgstr "Supprimer le compte"
+
+#~ msgid ""
+#~ "Accounts and preferences as one file. Passwords stay in the system "
+#~ "keyring and are never exported."
+#~ msgstr ""
+#~ "Les comptes et préférences dans un seul fichier. Les mots de passe "
+#~ "restent dans le trousseau de clés du système et ne sont jamais exportés."
 
 #~ msgid ""
 #~ "Label messages with one or more coloured tags. Tags are stored on the "

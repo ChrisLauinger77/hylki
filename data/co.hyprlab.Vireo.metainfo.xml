@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.26.0" date="2026-09-10">
+      <description>
+        <p>A default sender for new messages and number keys for tags. The cloud services' and mail providers' own marks throughout Settings and the setup wizard. The Cloud Storage panel works like Mail Accounts: separate Nextcloud, ownCloud and OpenCloud entries, cards with an on/off switch, Remove in the editor header with a confirmation. The Settings window reopens on the last category. Settings backup includes cloud accounts and spell-checker words. French updated.</p>
+      </description>
+    </release>
     <release version="1.25.2" date="2026-09-09">
       <description>
         <p>Cloud attachments to OneDrive, Dropbox and Seafile, with link expiry and passwords chosen per upload; recipient suggestions remember everyone you write to.</p>

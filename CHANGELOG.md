@@ -1,5 +1,76 @@
 # Changelog
 
+## 1.26.0 — 2026-09-10
+
+A default sender for new messages and number keys for tags (#157), the
+services' own marks throughout Settings, a Cloud Storage panel that works
+like Mail Accounts, and a fuller settings backup.
+
+- **Default sender for new messages** (#157, @7system7). Settings → Composing
+  → "Send new messages from": the account of the current folder (as before)
+  or any enabled account or alias (`config::compose_default_from`, an
+  address). New Message, Compose-to from a contact, `mailto:` links and file
+  hand-offs all open from it (`App::new_message_from`,
+  `ComposePrefill::from_address`; `build_compose_init` prefers the reply
+  address, then this, then the account's own). Replies are untouched. The
+  row hides with a single identity; a default whose account is disabled
+  falls back silently. The combo's value label gets 50px beyond
+  libadwaita's ellipsized width (`widen_combo_value`).
+- **Tags by number** (#157 follow-up). With single-key shortcuts on, `1`–`9`
+  add or remove the first nine tags in Settings order and `0` takes every
+  configured tag off the message (keypad digits too; `Shortcut::Tag`,
+  `Shortcut::ClearTags`, which re-reads the message between removals).
+  The tag list in Settings drags to reorder (`AccountsInput::MoveTag`), the
+  first nine rows show their key, and the Ctrl+? reference adds a
+  "Your tags" section.
+- **Service marks.** `data/brands/` carries the official marks of the six
+  cloud services and eleven mail providers (sources and a trademark notice
+  in its README; the project README says they are not under the AGPL, per
+  AGPLv3 §7(e)); `src/brand.rs` embeds 128px PNGs rendered from them and
+  decodes at the size shown, cached. Vireo's own blue envelope stands for
+  IMAP/POP3 and unknown servers, the yellow one for custom OAuth. Shown in
+  the cloud Service picker, the Cloud Storage panel (a strip across from the
+  heading, and each row), the cloud editor (a header mark following the
+  picker), the mail Provider picker in Settings and the welcome wizard,
+  the Mail Accounts list, the account editor header, and both GNOME Online
+  Accounts import lists (`Provider.brand`, `brand_for_account`,
+  `brand_for_goa`, `provider_factory`). The picker factories bind by name,
+  since a combo row's selected-value slot has no list position.
+- **Cloud Storage panel.** The Service picker lists Nextcloud, ownCloud and
+  OpenCloud separately (`CloudAccount::product`; accounts from before ask
+  their server's `status.php` once, `cloud::detect_product`). Rows are the
+  Mail Accounts card: mark, name over details, an on/off switch
+  (`CloudAccount::enabled`; off keeps the account but the composer no longer
+  offers it, `cloud::load_enabled_accounts`) and a chevron; the row opens
+  the editor. Remove moves into the editor header left of Save, shown only
+  for an existing account, and asks first. The name row is "Nickname
+  (optional)"; the description is reworded with the providers on their own
+  paragraph; Link defaults sit further below Check Connection.
+- **Account editor.** Remove moves into the header left of Save (it still
+  asks first); the Remove group at the bottom of the form is gone. The
+  Provider picker's manual entry is renamed "IMAP/POP3 Account" and sits
+  first, in Settings and the wizard, and stays the default.
+- **Settings window remembers its category** for the session
+  (`App::last_settings_page`, `PrefOutput::PageShown`); the "opens to
+  Accounts" preference decides only the first open, an explicit Accounts
+  request still goes there, and bringing an open window forward no longer
+  switches it to General.
+- **Settings backup** carries the cloud storage accounts (sign-ins stay in
+  the keyring) and every language's spell-checker word list, both optional
+  sections so an older bundle imports without wiping them; words are merged
+  on import, never removed. The Backup page and the import dialog say what
+  a backup holds. The optional hand-written `oauth.toml` stays out (it
+  holds a client secret).
+- **Reader.** Find-in-message uses `loupe-with-arrow-symbolic` (from the
+  GNOME icon development kit, kept under `data/icons`).
+- **French** (PR #158, @frenchy82): the 1.25.2 cloud strings and fourteen
+  corrections, merged against the refreshed template; the strings added in
+  this release await translation.
+- **Credits.** Yiannis Ioannides (@yioannides, PR #75) joins the About
+  window's Thanks list, the README and the website; @p-mitana joins the
+  About window.
+- README: tagline without "clean".
+
 ## 1.25.2 — 2026-09-09
 
 Cloud attachments grow to OneDrive, Dropbox and Seafile, with link terms

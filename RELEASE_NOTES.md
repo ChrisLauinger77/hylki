@@ -2,6 +2,24 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.26.0
+
+**Choose the sender for new messages.** Settings, Composing has "Send new messages from": the account of the current folder, as before, or any of your accounts or aliases. New messages, messages to a contact, mailto links and files sent from the file manager all start from that address. Replies still answer from the address the original was sent to. Requested by [@7system7](https://github.com/7system7) (#157).
+
+**Tags by number.** With single-key shortcuts on, the keys 1 to 9 add or remove your first nine tags on the message you are reading, and 0 removes every tag. Drag the tags in Settings to set their order; each of the first nine shows its key, and the shortcuts reference lists which number is which tag. Suggested by [@7system7](https://github.com/7system7) in #157.
+
+**The services' own marks.** Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and Seafile show their logos in the Cloud Storage panel, its Service picker and the account editor. Gmail, Outlook, iCloud, Yahoo, Proton, Fastmail, AOL, Zoho, GMX, Yandex and mail.com show theirs in the Provider picker, in Settings and the setup wizard, in the Mail Accounts list, in the account editor and in the GNOME Online Accounts import lists. Plain IMAP/POP3 accounts get a blue envelope, custom OAuth accounts a yellow one. The marks are their owners' trademarks, used only to identify the services; see the README.
+
+**Cloud Storage, like Mail Accounts.** The Service picker lists Nextcloud, ownCloud and OpenCloud separately. Each account is a card with its mark, a switch to take it out of the composer without removing it, and a chevron; clicking the card opens the editor. Remove sits in the editor's header beside Save and asks before deleting. The name field is "Nickname (optional)".
+
+**Remove in the header.** The mail account editor's Remove button moves to the header beside Save as well. The Provider picker's plain entry is now "IMAP/POP3 Account" and comes first.
+
+**Settings reopens where you were.** The Settings window returns to the category you last had open, for as long as Vireo runs.
+
+**A fuller backup.** Export Settings now includes the cloud storage accounts and the words you have taught the spell checker. Importing an older backup leaves those alone.
+
+**Smaller things.** The reader's find button has a new icon. French gains the cloud storage strings and fourteen corrections by [@frenchy82](https://github.com/frenchy82) (#158); the strings added in this release await translation. [@yioannides](https://github.com/yioannides) (#75) and [@p-mitana](https://github.com/p-mitana) join the Thanks list in the About window.
+
 ## What's new in 1.25.2
 
 **OneDrive, Dropbox and Seafile for cloud attachments.** Settings, Cloud Storage now offers a choice of service. OneDrive signs in through the Microsoft 365 account in GNOME Online Accounts, with nothing to type. Dropbox signs in through your browser with an app key of your own, and the editor walks through making one. Seafile takes your password, plus the current code if your account uses two-step verification. Link expiry and download passwords depend on the plan: a free personal OneDrive and a Dropbox Basic plan allow neither, and the app says so where the options are. Requested in #144 by [@7system7](https://github.com/7system7).
