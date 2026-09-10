@@ -109,6 +109,11 @@ impl SimpleComponent for CloudAccounts {
                                     gtk::ListBox {
                                         add_css_class: "boxed-list",
                                         set_selection_mode: gtk::SelectionMode::None,
+                                        // A row opens its editor, as the Mail
+                                        // Accounts list does.
+                                        connect_row_activated[sender] => move |_, row| {
+                                            sender.input(CloudAccountsInput::Edit(row.index() as usize));
+                                        },
                                     },
                                     #[name = "empty"]
                                     gtk::Label {
@@ -318,8 +323,20 @@ impl CloudAccounts {
             self.list.remove(&child);
         }
         for (i, a) in self.accounts.iter().enumerate() {
-            let row = adw::ActionRow::new();
-            row.set_title(&if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() });
+            // The same card as a Mail Accounts row: mark, name over
+            // details, then a chevron; the row itself opens the editor.
+            let row = gtk::ListBoxRow::new();
+            row.set_activatable(true);
+            let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+            hbox.add_css_class("account-list-row");
+            hbox.append(&crate::brand::image(a.brand(), 28));
+            let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            vbox.set_hexpand(true);
+            vbox.set_valign(gtk::Align::Center);
+            let title = gtk::Label::new(Some(&if a.name.trim().is_empty() { a.where_shown() } else { a.name.clone() }));
+            title.set_halign(gtk::Align::Start);
+            title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            title.add_css_class("account-name");
             let mut sub = format!("{} · {}", a.where_shown(), a.user);
             if a.expire_days > 0 {
                 sub.push_str(&format!(" · {}", i18n_f("links expire after {n} days", &[("n", &a.expire_days.to_string())])));
@@ -327,8 +344,13 @@ impl CloudAccounts {
             if a.password {
                 sub.push_str(&format!(" · {}", i18n("password-protected")));
             }
-            row.set_subtitle(&sub);
-            row.add_prefix(&crate::brand::image(a.brand(), 24));
+            let subtitle = gtk::Label::new(Some(&sub));
+            subtitle.set_halign(gtk::Align::Start);
+            subtitle.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            subtitle.add_css_class("account-email");
+            vbox.append(&title);
+            vbox.append(&subtitle);
+            hbox.append(&vbox);
             // A server from before the picker told Nextcloud, ownCloud and
             // OpenCloud apart: ask it once, in the background, and fill in
             // its mark when it answers.
@@ -341,15 +363,6 @@ impl CloudAccounts {
                     }
                 });
             }
-            let edit = gtk::Button::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
-            edit.add_css_class("flat");
-            edit.set_valign(gtk::Align::Center);
-            edit.set_tooltip_text(Some(&i18n("Edit")));
-            let s = sender.input_sender().clone();
-            edit.connect_clicked(move |_| {
-                let _ = s.send(CloudAccountsInput::Edit(i));
-            });
-            row.add_suffix(&edit);
             let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
@@ -358,7 +371,11 @@ impl CloudAccounts {
             rm.connect_clicked(move |_| {
                 let _ = s.send(CloudAccountsInput::Remove(i));
             });
-            row.add_suffix(&rm);
+            hbox.append(&rm);
+            let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
+            next.add_css_class("dim-label");
+            hbox.append(&next);
+            row.set_child(Some(&hbox));
             self.list.append(&row);
         }
         self.list.set_visible(!self.accounts.is_empty());

@@ -2417,6 +2417,7 @@ impl AccountsWindow {
         for (pos, g) in self.goa.iter().enumerate() {
             let row = adw::ActionRow::new();
             row.set_title(&g.email);
+            row.add_prefix(&crate::brand::image_or(brand_for_goa(&g.provider), 24, crate::brand::GENERIC_MAIL));
             let mut subtitle = if g.provider.is_empty() {
                 "Mail".to_string()
             } else {
@@ -2585,9 +2586,24 @@ fn activate_online_accounts_panel() -> Result<(), gtk::glib::Error> {
     Ok(())
 }
 
+/// The brand id for a GNOME Online Accounts provider name ("Google",
+/// "Microsoft 365"…): the two mail providers GOA offers, else generic.
+pub(crate) fn brand_for_goa(provider: &str) -> &'static str {
+    let p = provider.to_ascii_lowercase();
+    if p.contains("google") {
+        "gmail"
+    } else if p.contains("microsoft") || p.contains("outlook") || p.contains("365") {
+        "outlook"
+    } else {
+        ""
+    }
+}
+
 /// The Provider picker's rows: the provider's mark (or the generic
 /// envelope) before its name, in the row and in the list that drops down.
-fn provider_factory() -> gtk::SignalListItemFactory {
+/// Shared with the welcome wizard's picker, which lists a subset by the
+/// same labels.
+pub(crate) fn provider_factory() -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
         if let Some(item) = item.downcast_ref::<gtk::ListItem>() {

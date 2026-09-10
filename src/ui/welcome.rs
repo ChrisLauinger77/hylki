@@ -364,6 +364,8 @@ impl Component for Welcome {
         provider_row.set_title(&i18n("Provider"));
         let labels: Vec<&str> = wizard_providers().iter().map(|p| p.wizard_label()).collect();
         provider_row.set_model(Some(&gtk::StringList::new(&labels)));
+        // The providers' marks before their names, as in Settings.
+        provider_row.set_factory(Some(&crate::ui::accounts::provider_factory()));
         // Default to the manual entry (last in the filtered list).
         provider_row.set_selected(labels.len().saturating_sub(1) as u32);
         {
@@ -868,6 +870,11 @@ fn rebuild_goa_rows(
         let row = adw::ActionRow::new();
         row.set_title(&g.email);
         row.set_subtitle(&g.provider);
+        row.add_prefix(&crate::brand::image_or(
+            crate::ui::accounts::brand_for_goa(&g.provider),
+            24,
+            crate::brand::GENERIC_MAIL,
+        ));
         let btn = gtk::Button::with_label(&i18n("Add"));
         btn.add_css_class("suggested-action");
         btn.set_valign(gtk::Align::Center);
