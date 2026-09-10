@@ -852,10 +852,14 @@ struct PrivacyFile {
     /// full sidebar out over the panes without needing the expand button.
     #[serde(default)]
     sidebar_hover_expand: bool,
-    /// Reopen with the sidebar as it was left: full or icon rail, which
-    /// accounts and sections are open. Off starts every launch afresh.
+    /// Reopen with the accounts, folders and sections as they were left.
+    /// Off starts every launch with everything folded up.
     #[serde(default = "default_on")]
     remember_sidebar: bool,
+    /// Reopen collapsed to the icon rail if that is how it was left. Off
+    /// starts every launch with the full sidebar.
+    #[serde(default = "default_on")]
+    remember_rail: bool,
     /// Icon rail: a dot for unread mail in place of the count. On by
     /// default, as are the fold-ups below.
     #[serde(default = "default_on")]
@@ -1094,6 +1098,7 @@ impl Default for PrivacyFile {
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
             remember_sidebar: true,
+            remember_rail: true,
             rail_dots: true,
             rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
@@ -1693,6 +1698,10 @@ pub fn load_remember_sidebar() -> bool {
     load_privacy().remember_sidebar
 }
 
+pub fn load_remember_rail() -> bool {
+    load_privacy().remember_rail
+}
+
 pub fn load_rail_dots() -> bool {
     load_privacy().rail_dots
 }
@@ -1848,6 +1857,7 @@ pub fn save_privacy(
     show_remote_banner: bool,
     sidebar_hover_expand: bool,
     remember_sidebar: bool,
+    remember_rail: bool,
     rail_dots: bool,
     rail_fold: RailFold,
     app_theme: AppTheme,
@@ -1918,6 +1928,7 @@ pub fn save_privacy(
         show_remote_banner,
         sidebar_hover_expand,
         remember_sidebar,
+        remember_rail,
         rail_dots,
         rail_fold,
         app_theme,

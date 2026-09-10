@@ -291,8 +291,10 @@ pub struct AppModel {
     rail_snapshot: std::rc::Rc<std::cell::RefCell<Option<gtk::gdk::Paintable>>>,
     /// Preference: hovering the icon rail opens the peek by itself.
     sidebar_hover_expand: bool,
-    /// Preference: the sidebar reopens as it was left.
+    /// Preference: accounts, folders and sections reopen as they were left.
     remember_sidebar: bool,
+    /// Preference: the sidebar reopens in the icon rail if left there.
+    remember_rail: bool,
     /// The three sections' open state, as the sidebar last reported it,
     /// persisted with the rest of the sidebar layout.
     unified_expanded: bool,
@@ -756,8 +758,10 @@ pub enum AppMsg {
     ListCount(String),
     /// Preference: hovering the narrow-window rail floats the sidebar out.
     SetSidebarHoverExpand(bool),
-    /// Preference: the sidebar reopens as it was left.
+    /// Preference: accounts, folders and sections reopen as they were left.
     SetRememberSidebar(bool),
+    /// Preference: the sidebar reopens in the icon rail if left there.
+    SetRememberRail(bool),
     /// The sidebar's All Inboxes / Filtered Folders / Tags sections were
     /// opened or folded — record it with the layout.
     SidebarSectionsOpen { all_inboxes: bool, filtered: bool, tags: bool },
@@ -1601,20 +1605,17 @@ impl SimpleComponent for AppModel {
         install_scheme_css(&root);
 
         let mut sidebar_state = config::load_sidebar_state();
-        // Settings → Sidebar → "Remember the sidebar layout": off starts
-        // every launch with the full sidebar, every account open and the
-        // sections as they first come, keeping only the account order.
+        // Settings → Sidebar: "Remember the icon rail" off starts every
+        // launch with the full sidebar; "Remember the sidebar layout" off
+        // starts with every section folded up — and every account, folded as
+        // it arrives (SetAccount) — keeping only the account order. The two
+        // are independent.
         let remember_sidebar = config::load_remember_sidebar();
+        let remember_rail = config::load_remember_rail();
+        let icon_only = remember_rail && sidebar_state.icon_only;
         if !remember_sidebar {
-            sidebar_state = config::SidebarState {
-                order: sidebar_state.order,
-                unified_expanded: true,
-                filtered_expanded: true,
-                tags_expanded: true,
-                ..Default::default()
-            };
+            sidebar_state = config::SidebarState { order: sidebar_state.order, ..Default::default() };
         }
-        let icon_only = sidebar_state.icon_only;
         let unified_expanded = sidebar_state.unified_expanded;
         let filtered_expanded = sidebar_state.filtered_expanded;
         let tags_expanded = sidebar_state.tags_expanded;
@@ -1954,6 +1955,7 @@ impl SimpleComponent for AppModel {
             rail_snapshot: std::rc::Rc::new(std::cell::RefCell::new(None)),
             sidebar_hover_expand: config::load_sidebar_hover_expand(),
             remember_sidebar,
+            remember_rail,
             unified_expanded,
             filtered_expanded,
             tags_expanded,
@@ -3462,6 +3464,13 @@ impl SimpleComponent for AppModel {
             AppMsg::SetRememberSidebar(on) => {
                 if self.remember_sidebar != on {
                     self.remember_sidebar = on;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SetRememberRail(on) => {
+                if self.remember_rail != on {
+                    self.remember_rail = on;
                     self.save_settings();
                 }
             }
@@ -5767,6 +5776,13 @@ impl SimpleComponent for AppModel {
                 if let Some(existing) = self.accounts.iter_mut().find(|a| a.id == account.id) {
                     *existing = account;
                 } else {
+                    // Layout not remembered: an account starts folded up,
+                    // wherever it came from (config, GOA, the demo). Only
+                    // on arrival, so opening it by hand sticks for the
+                    // session.
+                    if !self.remember_sidebar && !self.collapsed.contains(&account.email) {
+                        self.collapsed.push(account.email.clone());
+                    }
                     self.accounts.push(account);
                     self.accounts.sort_by_key(|a| a.id);
                 }
@@ -6632,6 +6648,7 @@ impl AppModel {
             self.show_remote_banner,
             self.sidebar_hover_expand,
             self.remember_sidebar,
+            self.remember_rail,
             self.rail_dots,
             self.rail_fold,
             self.app_theme,
@@ -10378,6 +10395,7 @@ impl AppModel {
             settings_open_accounts: self.settings_open_accounts,
             sidebar_hover_expand: self.sidebar_hover_expand,
             remember_sidebar: self.remember_sidebar,
+            remember_rail: self.remember_rail,
             rail_dots: self.rail_dots,
             rail_fold: self.rail_fold,
             card_actions_hover: self.card_actions_hover,
@@ -10474,6 +10492,7 @@ impl AppModel {
                     AppMsg::SetSidebarHoverExpand(on)
                 }
                 PrefOutput::SetRememberSidebar(on) => AppMsg::SetRememberSidebar(on),
+                PrefOutput::SetRememberRail(on) => AppMsg::SetRememberRail(on),
                 PrefOutput::SetRailDots(on) => AppMsg::SetRailDots(on),
                 PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
