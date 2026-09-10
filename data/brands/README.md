@@ -31,7 +31,8 @@ as if it were part of the AGPL-licensed work.
 | `gmx` | 1&1 Mail & Media GmbH | the GMX logo as published on Wikimedia Commons (`GMX-Logo (2018-).svg`) |
 | `yandex` | Yandex LLC | the Yandex Mail icon as published on Wikimedia Commons (`Yandex Mail icon.svg`) |
 | `mailcom` | 1&1 Mail & Media Inc. | mail.com's own touch icon, https://www.mail.com/apple-touch-icon.png |
-| `mail` | Vireo's own blue envelope (not a third-party mark): manual IMAP/POP3, custom OAuth and any account on a server the app does not recognise | drawn for the app, `src/mail.svg` |
+| `mail` | Vireo's own blue envelope (not a third-party mark): manual IMAP/POP3 and any account on a server the app does not recognise | drawn for the app, `src/mail.svg` |
+| `mail-oauth` | Vireo's own yellow envelope (not a third-party mark): custom OAuth accounts | drawn for the app, `src/mail-oauth.svg` |
 
 `src/` keeps the files as fetched; the 128 px PNGs beside this file are
 what the binary embeds (`src/brand.rs`). To refresh one, replace the source

@@ -38,7 +38,8 @@ enum ProviderKind {
 pub(crate) struct Provider {
     label: &'static str,
     /// The brand id of its mark (`brand::image_or`): "mail", the blue
-    /// envelope, for manual IMAP/POP3 and custom OAuth.
+    /// envelope, for manual IMAP/POP3; "mail-oauth", the yellow one, for
+    /// custom OAuth.
     brand: &'static str,
     kind: ProviderKind,
     imap_host: &'static str,
@@ -97,7 +98,7 @@ pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "GMX", brand: "gmx", kind: ProviderKind::Preset, imap_host: "imap.gmx.com", imap_port: 993, smtp_host: "mail.gmx.com", smtp_port: 587, hint: i18n_noop("Enable POP/IMAP access in GMX settings first.") },
     Provider { label: "Yandex Mail", brand: "yandex", kind: ProviderKind::Preset, imap_host: "imap.yandex.com", imap_port: 993, smtp_host: "smtp.yandex.com", smtp_port: 465, hint: APP_PW },
     Provider { label: "Mail.com", brand: "mailcom", kind: ProviderKind::Preset, imap_host: "imap.mail.com", imap_port: 993, smtp_host: "smtp.mail.com", smtp_port: 587, hint: "" },
-    Provider { label: "Custom (OAuth)…", brand: "mail", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
+    Provider { label: "Custom (OAuth)…", brand: "mail-oauth", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
     Provider { label: "Other (IMAP/POP3)…", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
 ];
 
@@ -2985,6 +2986,10 @@ fn brand_for_account(acc: &AccountConfig) -> &'static str {
         if s.token_url.contains("microsoftonline") {
             return "outlook";
         }
+    }
+    // Native OAuth against anything else: the custom-OAuth envelope.
+    if acc.oauth && acc.goa_id.is_none() {
+        return "mail-oauth";
     }
     let host = acc.imap_host.trim().to_ascii_lowercase();
     if host.contains("gmail") || host.contains("googlemail") {
