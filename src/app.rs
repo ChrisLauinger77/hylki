@@ -1334,7 +1334,7 @@ impl SimpleComponent for AppModel {
                                 },
                                 // In-message find (#103), right of the star.
                                 pack_start = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-system-search-symbolic",
+                                    set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
                                     set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
