@@ -2,6 +2,18 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.25.2
+
+**OneDrive, Dropbox and Seafile for cloud attachments.** Settings, Cloud Storage now offers a choice of service. OneDrive signs in through the Microsoft 365 account in GNOME Online Accounts, with nothing to type. Dropbox signs in through your browser with an app key of your own, and the editor walks through making one. Seafile takes your password, plus the current code if your account uses two-step verification. Link expiry and download passwords depend on the plan: a free personal OneDrive and a Dropbox Basic plan allow neither, and the app says so where the options are. Requested in #144 by [@7system7](https://github.com/7system7).
+
+**Link terms per upload.** The upload dialog in the composer shows the account's expiry and password settings for each upload and lets you change them for that email alone, including a download password of your own. The account's settings stay the defaults.
+
+**Cloud account editor as a page.** Adding or editing a cloud account slides in as a page of the Settings window, like the mail Accounts editor.
+
+**Suggestions remember everyone you write to.** An address you send to is offered in the next message's recipient dropdown at once, whichever way the message went out, and your own account addresses are offered too, after everyone else.
+
+**Smaller things.** The Settings window is a little taller, so its sidebar no longer scrolls. The app icon gallery gains "Vireo envelope, blue subtle". The page the browser shows after a sign-in displays the app icon on its own.
+
 ## What's new in 1.25.1
 
 **French translation updated.** Every string added in 1.25.0 is now translated: Send Later, cloud attachments, Empty Trash and Empty Junk, drafts and the reply panel fields. French is complete at 949 of 949 strings. Translation by [@frenchy82](https://github.com/frenchy82) (#156).

@@ -1427,13 +1427,28 @@ msgstr "Le fichier n'a pas pu être ouvert"
 msgid "Response"
 msgstr "Réponse"
 
+msgid "Nextcloud, ownCloud or OpenCloud"
+msgstr ""
+
+msgid "Dropbox"
+msgstr ""
+
+msgid "Seafile"
+msgstr ""
+
+msgid "OneDrive"
+msgstr ""
+
+msgid "Cloud Storage"
+msgstr "Stockage en ligne"
+
 msgid "Cloud storage"
 msgstr "Stockage en ligne"
 
+#, fuzzy
 msgid ""
-"Upload a large file to your own Nextcloud, ownCloud or OpenCloud and put a "
-"share link in the message instead of an attachment. Sign in with an app "
-"password, made under Security in the server's personal settings."
+"Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or "
+"Seafile and put a share link in the message instead of an attachment."
 msgstr ""
 "Envoyez un fichier volumineux vers votre propre Nextcloud, ownCloud ou "
 "OpenCloud, et insérez un lien de partage dans le message au lieu d'une pièce "
@@ -1446,19 +1461,18 @@ msgstr "Ajouter un compte…"
 msgid "No cloud accounts yet."
 msgstr "Aucun compte cloud pour le moment."
 
+#, fuzzy
+msgid "Cloud Account"
+msgstr "Ajouter un compte cloud"
+
 msgid "Removed {name}"
 msgstr "{name} supprimé"
 
-msgid "Could not store the app password in the keyring: {e}"
+#, fuzzy
+msgid "Could not store the sign-in in the keyring: {e}"
 msgstr ""
 "Impossible d'enregistrer le mot de passe d'application dans le trousseau de "
 "clés : {e}"
-
-msgid "links expire after {n} days"
-msgstr "les liens expirent après {n} jours"
-
-msgid "password-protected"
-msgstr "protégé par mot de passe"
 
 msgid "Edit Cloud Account"
 msgstr "Modifier le compte cloud"
@@ -1466,17 +1480,37 @@ msgstr "Modifier le compte cloud"
 msgid "Add Cloud Account"
 msgstr "Ajouter un compte cloud"
 
+msgid "links expire after {n} days"
+msgstr "les liens expirent après {n} jours"
+
+msgid "password-protected"
+msgstr "protégé par mot de passe"
+
+msgid "Service"
+msgstr ""
+
 msgid "Server URL"
 msgstr "URL du serveur"
 
-msgid "User name"
-msgstr "Nom d'utilisateur"
+msgid "Two-step verification code, if the account uses it"
+msgstr ""
 
-msgid "App password (leave empty to keep)"
-msgstr "Mot de passe d'application (laisser vide pour le conserver)"
+msgid ""
+"Sign in with your Seafile password. If the account uses two-step "
+"verification, also enter the current code from your authenticator app: Vireo "
+"turns it into an API token once and keeps that instead of the password. A "
+"token obtained another way can be pasted in the password field."
+msgstr ""
 
-msgid "App password"
-msgstr "Mot de passe d'application"
+#, fuzzy
+msgid "Online account"
+msgstr "GNOME Comptes en ligne"
+
+msgid "Dropbox app key"
+msgstr ""
+
+msgid "Library"
+msgstr ""
 
 msgid "Upload folder"
 msgstr "Dossier de téléversement"
@@ -1484,7 +1518,8 @@ msgstr "Dossier de téléversement"
 msgid "Links expire after"
 msgstr "Les liens expirent après"
 
-msgid "Days; 0 keeps the link"
+#, fuzzy
+msgid "Days; 0 keeps the link indefinitely"
 msgstr "Jours ; 0 conserve le lien indéfiniment"
 
 msgid "Protect links with a password"
@@ -1497,18 +1532,165 @@ msgstr ""
 "Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
 "présenté, à transmettre séparément"
 
+#, fuzzy
+msgid "Link defaults"
+msgstr "Par défaut"
+
+msgid ""
+"How share links from this account are made unless you choose otherwise for "
+"an email: the upload dialog in the composer shows these values and lets you "
+"change them for that upload alone."
+msgstr ""
+
 msgid "Check Connection"
 msgstr "Vérifier la connexion"
+
+msgid "{email} (Files is off)"
+msgstr ""
+
+msgid ""
+"No Microsoft 365 account in GNOME Online Accounts yet. Add one under "
+"Settings, Online Accounts; OneDrive then signs in through it, and nothing "
+"more is needed here."
+msgstr ""
+
+msgid ""
+"OneDrive signs in through the GNOME Online Accounts account chosen above; "
+"there is no password to enter. An account marked Files is off still works "
+"here, but you may want to turn Files on for it under Settings, Online "
+"Accounts."
+msgstr ""
+
+msgid ""
+"Uploads and plain share links work with any OneDrive. Link expiry and "
+"download passwords are a Microsoft 365 subscription or OneDrive for Business "
+"feature: on a free personal OneDrive the link is refused when either is set, "
+"so keep Links expire after at 0 and the password switch off there."
+msgstr ""
+
+msgid ""
+"Days; 0 keeps the link indefinitely. Needs Microsoft 365 or OneDrive for "
+"Business"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"A download password is made for each file and shown to you, to pass on "
+"separately. Needs Microsoft 365 or OneDrive for Business"
+msgstr ""
+"Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
+"présenté, à transmettre séparément"
+
+msgid "Account name, such as Work OneDrive (optional)"
+msgstr ""
+
+msgid "Account name, such as Work Nextcloud (optional)"
+msgstr ""
+
+msgid "User name"
+msgstr "Nom d'utilisateur"
+
+msgid "App password (leave empty to keep)"
+msgstr "Mot de passe d'application (laisser vide pour le conserver)"
+
+msgid "App password"
+msgstr "Mot de passe d'application"
+
+msgid "Account name, such as Team Seafile (optional)"
+msgstr ""
+
+#, fuzzy
+msgid "E-mail"
+msgstr "E-mail"
+
+#, fuzzy
+msgid "Password (leave empty to keep)"
+msgstr "Mot de passe d'application (laisser vide pour le conserver)"
+
+msgid "Account name, such as Personal Dropbox (optional)"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"A download password is made for each file and shown to you, to pass on "
+"separately. Dropbox allows link passwords and expiry dates on paid plans "
+"only."
+msgstr ""
+"Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
+"présenté, à transmettre séparément"
+
+#, fuzzy
+msgid "Connect with Dropbox…"
+msgstr "Connexion à {host}…"
+
+msgid ""
+"Dropbox only lets an app sign in when it is registered, so make one for "
+"yourself (it takes a minute and stays private):\n"
+"1. Open dropbox.com/developers/apps, signed in to your Dropbox, and press "
+"Create app.\n"
+"2. Choose Scoped access, then App folder (Vireo sees only its own folder "
+"under Apps) or Full Dropbox (uploads go to the folder named above).\n"
+"3. Give the app a name that no one else has used, such as Vireo for your "
+"name, and press Create app.\n"
+"4. On the Permissions tab, tick account_info.read, files.content.write and "
+"sharing.write, then press Submit.\n"
+"5. On the Settings tab, under OAuth 2, add the redirect URI {uri} and press "
+"Add.\n"
+"6. Copy the App key from the top of the Settings tab into the field above.\n"
+"The app may stay in Development status; that allows your own account. Leave "
+"the field empty to use the app key this build was made with, when it has one."
+msgstr ""
+
+#, fuzzy
+msgid "Connected as {who}."
+msgstr "Connecté en tant que {who}."
+
+msgid "Choose an online account first."
+msgstr ""
+
+msgid "Signing in…"
+msgstr "Connexion…"
+
+msgid "Enter the app key of a Dropbox app first."
+msgstr ""
+
+msgid "Waiting for the sign-in in your browser…"
+msgstr ""
+
+#, fuzzy
+msgid "Fill in the server URL, e-mail and password first."
+msgstr ""
+"Renseignez d'abord l'URL du serveur, le nom d'utilisateur et le mot de passe "
+"d'application."
 
 msgid "Fill in the server URL, user name and app password first."
 msgstr ""
 "Renseignez d'abord l'URL du serveur, le nom d'utilisateur et le mot de passe "
 "d'application."
 
-msgid "Signing in…"
-msgstr "Connexion…"
-
 msgid "Signed in as {who}."
+msgstr "Connecté en tant que {who}."
+
+msgid ""
+"You can upload files and share plain links with this OneDrive. Link expiry "
+"and download passwords are not available on a free personal OneDrive (they "
+"need a Microsoft 365 subscription), so both are turned off for this account."
+msgstr ""
+
+msgid ""
+"You can upload files, share links and set an expiry with this OneDrive. "
+"Download passwords are not available on OneDrive for Business links, so that "
+"option is turned off for this account."
+msgstr ""
+
+msgid ""
+"You can upload files and share links with this OneDrive, with a download "
+"password. Link expiry is not available on it, so that option is turned off "
+"for this account."
+msgstr ""
+
+#, fuzzy
+msgid "Signed in as {who}. {terms}"
 msgstr "Connecté en tant que {who}."
 
 msgid "Collapse into reader"
@@ -1604,12 +1786,13 @@ msgstr "Afficher Cc, Cci et Répondre à"
 msgid "Upload to Cloud Storage"
 msgstr "Téléverser vers un stockage en ligne"
 
-msgid "No app password"
-msgstr "Aucun mot de passe d'application"
+msgid "Not signed in"
+msgstr ""
 
+#, fuzzy
 msgid ""
-"The app password for {name} is not in the keyring. Open Settings, Cloud "
-"Storage, and enter it again."
+"The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, "
+"and enter it again."
 msgstr ""
 "Le mot de passe d'application pour {name} n'est pas dans le trousseau de "
 "clés. Ouvrez Paramètres, Stockage en ligne, et saisissez-le à nouveau."
@@ -1641,6 +1824,14 @@ msgstr[1] ""
 
 msgid "Upload"
 msgstr "Téléverser"
+
+#, fuzzy
+msgid "Protect with a password"
+msgstr "Protéger les liens par un mot de passe"
+
+#, fuzzy
+msgid "Download password (empty: generated)"
+msgstr "Mot de passe de téléchargement pour {name} : {password}"
 
 msgid ""
 "There is no OpenPGP key of your own for {addr}. Generate one under Settings, "
@@ -2209,9 +2400,6 @@ msgstr "Toutes les 30 minutes"
 
 msgid "Senders"
 msgstr "Expéditeurs"
-
-msgid "Cloud Storage"
-msgstr "Stockage en ligne"
 
 msgid "General"
 msgstr "Général"
@@ -3451,6 +3639,9 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "No app password"
+#~ msgstr "Aucun mot de passe d'application"
 
 #~ msgid "Accounts & Settings"
 #~ msgstr "Comptes et paramètres"

@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.25.2" date="2026-09-09">
+      <description>
+        <p>Cloud attachments to OneDrive, Dropbox and Seafile, with link expiry and passwords chosen per upload; recipient suggestions remember everyone you write to.</p>
+      </description>
+    </release>
     <release version="1.25.1" date="2026-09-09">
       <description>
         <p>French translation completed for the 1.25.0 features; thread node dots in the message list are drawn whole again; richer demo content.</p>
