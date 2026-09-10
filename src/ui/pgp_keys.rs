@@ -164,23 +164,37 @@ impl Component for PgpKeys {
         let widgets = view_output!();
         model.toasts = Some(widgets.toasts.clone());
 
-        let available = pgp::available();
-        if available {
-            let version = gpg_version().unwrap_or_default();
-            widgets.status_row.set_subtitle(&i18n_f(
-                "GnuPG {version} found. Vireo reads and writes its keyring, the same one the gpg \
-                 command and other mail programs use.",
-                &[("version", &version)],
-            ));
-        } else {
-            widgets.status_row.set_subtitle(&i18n(
-                "GnuPG was not found. Install the gnupg package to read encrypted mail and \
-                 check signatures; the Flatpak build carries it.",
-            ));
-            widgets.status_row.add_css_class("error");
+        // Probing gpg runs it; done a moment after the Settings window is
+        // up rather than before it can appear.
+        {
+            let status_row = widgets.status_row.clone();
+            let own_group = widgets.own_group.clone();
+            let others_group = widgets.others_group.clone();
+            let s = sender.clone();
+            gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
+                let available = pgp::available();
+                if available {
+                    let version = gpg_version().unwrap_or_default();
+                    status_row.set_subtitle(&i18n_f(
+                        "GnuPG {version} found. Vireo reads and writes its keyring, the same one the gpg \
+                         command and other mail programs use.",
+                        &[("version", &version)],
+                    ));
+                } else {
+                    status_row.set_subtitle(&i18n(
+                        "GnuPG was not found. Install the gnupg package to read encrypted mail and \
+                         check signatures; the Flatpak build carries it.",
+                    ));
+                    status_row.add_css_class("error");
+                }
+                own_group.set_sensitive(available);
+                others_group.set_sensitive(available);
+                if available {
+                    s.input(PgpKeysInput::Refresh);
+                }
+                gtk::glib::ControlFlow::Break
+            });
         }
-        widgets.own_group.set_sensitive(available);
-        widgets.others_group.set_sensitive(available);
 
         let empty_own = gtk::Label::new(Some(&i18n("No key of your own yet. Generate one for your address.")));
         empty_own.add_css_class("dim-label");
@@ -193,9 +207,6 @@ impl Component for PgpKeys {
         empty_others.set_margin_bottom(14);
         others_list.set_placeholder(Some(&empty_others));
 
-        if available {
-            model.reload(&sender);
-        }
         ComponentParts { model, widgets }
     }
 

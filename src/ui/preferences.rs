@@ -222,6 +222,12 @@ pub struct Preferences {
     /// The content stack (one child per category, plus the accounts panel
     /// in its "accounts" slot), driven by the sidebar (#141).
     panels_stack: Option<gtk::Stack>,
+    /// The accounts panel's slot, for the fresh panel each open brings.
+    accounts_slot: Option<adw::Bin>,
+    /// Pages taken out of the stack until after the window's first paint:
+    /// only the page shown is laid out and styled for it, the rest come
+    /// back a moment later (or at once, should one be asked for first).
+    deferred_pages: std::cell::RefCell<Vec<(String, gtk::Widget)>>,
     /// The sidebar list, for selecting a category from update().
     side_list: Option<gtk::ListBox>,
     /// The content pane's page, whose title names the chosen category.
@@ -368,6 +374,12 @@ pub enum PrefInput {
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
     ShowAccounts(bool),
+    /// Put the deferred pages back into the stack (scheduled after the
+    /// first paint).
+    MountPages,
+    /// A fresh accounts panel for this open (the window is kept between
+    /// opens; the panel is rebuilt over the current accounts).
+    SetAccountsPanel { panel: gtk::Widget, sender: relm4::Sender<crate::ui::accounts::AccountsInput> },
     /// A sidebar category was chosen (#141).
     SelectPage(String),
     /// Select a category by id from outside (the app's showcase hook).
@@ -517,9 +529,20 @@ impl Preferences {
         dialog.present();
     }
 
+    /// Return the deferred pages to the stack (see `deferred_pages`).
+    fn mount_pages(&self) {
+        let pages = std::mem::take(&mut *self.deferred_pages.borrow_mut());
+        if let Some(stack) = &self.panels_stack {
+            for (name, child) in pages {
+                stack.add_named(&child, Some(&name));
+            }
+        }
+    }
+
     /// Show a category: the accounts component's page, or one of ours.
     fn show_page(&self, id: &str) {
         let Some(page) = side_page(id) else { return };
+        self.mount_pages();
         if let Some(stack) = &self.panels_stack {
             if page.accounts {
                 stack.set_visible_child_name("accounts");
@@ -556,6 +579,8 @@ impl Component for Preferences {
             // sidebar at this height, and nothing is remembered from a resize.
             set_default_height: 772,
             set_title: Some(i18n("Settings").as_str()),
+            // Closing hides: the window is kept and shown again next time.
+            set_hide_on_close: true,
 
             connect_close_request[sender] => move |_| {
                 let _ = sender.output(PrefOutput::Closed);
@@ -627,6 +652,11 @@ impl Component for Preferences {
                         set_content = &gtk::Stack {
                             // Sections switch outright, no fade.
                             set_transition_type: gtk::StackTransitionType::None,
+                            // Only the shown page is measured: homogeneous, the
+                            // stack measured every page's rows on every layout
+                            // pass, which was most of the window's first paint.
+                            set_hhomogeneous: false,
+                            set_vhomogeneous: false,
 
                             #[name = "accounts_slot"]
                             add_named[Some("accounts")] = &adw::Bin {},
@@ -1520,6 +1550,7 @@ impl Component for Preferences {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let t_init = std::time::Instant::now();
         let mut model = Preferences {
             notifications: init.notifications,
             show_unified: init.show_unified,
@@ -1531,6 +1562,8 @@ impl Component for Preferences {
             thread_expansion: init.thread_expansion,
             list_palette: init.list_palette,
             panels_stack: None,
+            accounts_slot: None,
+            deferred_pages: std::cell::RefCell::new(Vec::new()),
             side_list: None,
             content_page: None,
             split: None,
@@ -1544,6 +1577,7 @@ impl Component for Preferences {
         };
 
         let widgets = view_output!();
+        tracing::debug!("settings window: preferences view built in {:?}", t_init.elapsed());
 
         // Settings never truncates. AdwComboRow's DEFAULT item factory builds
         // the selected-value display with an ellipsizing label — and rebuilds
@@ -1673,16 +1707,24 @@ impl Component for Preferences {
             subtitle.set_wrap(true);
             body.append(&title);
             body.append(&subtitle);
-            let s = sender.clone();
-            let strip = crate::ui::icon_picker::strip(
-                &init.app_icon,
-                56,
-                std::rc::Rc::new(move |id: &str| s.input(PrefInput::ChangeAppIcon(id.to_string()))),
-            );
-            strip.set_margin_top(6);
-            body.append(&strip);
             widgets.app_icon_row.set_child(Some(&body));
+            // The icon gallery decodes the whole catalogue; it fills in a
+            // moment after the window is up rather than holding it back.
+            let s = sender.clone();
+            let app_icon = init.app_icon.clone();
+            gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
+                let s = s.clone();
+                let strip = crate::ui::icon_picker::strip(
+                    &app_icon,
+                    56,
+                    std::rc::Rc::new(move |id: &str| s.input(PrefInput::ChangeAppIcon(id.to_string()))),
+                );
+                strip.set_margin_top(6);
+                body.append(&strip);
+                gtk::glib::ControlFlow::Break
+            });
         }
+        tracing::debug!("settings window: preferences icon strip done at {:?}", t_init.elapsed());
 
         widgets.tray_row.set_active(init.tray);
         let tray_icon_labels_owned: Vec<String> = TRAY_ICONS.iter().map(|(l, _)| i18n(l)).collect();
@@ -1708,6 +1750,7 @@ impl Component for Preferences {
                 tray_mail_row.set_sensitive(row.is_active());
             });
         }
+        tracing::debug!("settings window: prefs tail A (tray) at {:?}", t_init.elapsed());
         widgets.single_key_row.set_active(init.single_key_shortcuts);
         widgets.console_mode_row.set_active(init.console_mode);
         widgets.read_mark_row.set_model(Some(&gtk::StringList::new(&[
@@ -1778,6 +1821,13 @@ impl Component for Preferences {
         // codes are gone — a language nobody has a dictionary for silently
         // checks nothing, so only real options are offered (#114).
         {
+            // Listing the installed dictionaries reads several directories;
+            // done a moment after the window is up, not before it.
+            let spell_lang_row = widgets.spell_lang_row.clone();
+            let spelling_group = widgets.spelling_group.clone();
+            let spellcheck_langs = init.spellcheck_langs.clone();
+            let sender = sender.clone();
+            gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
             let dicts = crate::ui::rich_editor::installed_dictionaries();
             let list = gtk::StringList::new(&[]);
             list.append(&i18n_f(
@@ -1789,16 +1839,16 @@ impl Component for Preferences {
             for d in &dicts {
                 list.append(&crate::spell::language_display_name(d));
             }
-            widgets.spell_lang_row.set_model(Some(&list));
+            spell_lang_row.set_model(Some(&list));
             let selected = dicts
                 .iter()
-                .position(|d| *d == init.spellcheck_langs)
+                .position(|d| *d == spellcheck_langs)
                 .map(|i| i as u32 + 1)
                 .unwrap_or(0);
-            widgets.spell_lang_row.set_selected(selected);
+            spell_lang_row.set_selected(selected);
             if dicts.is_empty() {
-                widgets.spell_lang_row.set_sensitive(false);
-                widgets.spelling_group.set_description(Some(
+                spell_lang_row.set_sensitive(false);
+                spelling_group.set_description(Some(
                     "No dictionaries are visible to the app. On Flatpak, add your \
                      language with: flatpak config --set extra-languages <code>",
                 ));
@@ -1806,11 +1856,13 @@ impl Component for Preferences {
             let s = sender.clone();
             // Connected after the initial set_selected, so restoring the
             // saved choice doesn't immediately re-save it.
-            widgets.spell_lang_row.connect_selected_notify(move |row| {
+            spell_lang_row.connect_selected_notify(move |row| {
                 let i = row.selected() as usize;
                 let code =
                     if i == 0 { String::new() } else { dicts.get(i - 1).cloned().unwrap_or_default() };
                 s.input(PrefInput::SpellLangsEdited(code));
+            });
+                gtk::glib::ControlFlow::Break
             });
         }
         {
@@ -1830,6 +1882,7 @@ impl Component for Preferences {
             exp.add_row(&add);
             rebuild_personal_words(&exp);
         }
+        tracing::debug!("settings window: prefs tail B (words) at {:?}", t_init.elapsed());
 
         // Date and clock combos.
         let date_labels_owned: Vec<String> = DATE_STYLES.iter().map(|(l, _)| i18n(l)).collect();
@@ -1877,6 +1930,7 @@ impl Component for Preferences {
             .position(|(_, t)| *t == init.message_theme)
             .unwrap_or(0);
         widgets.message_theme_row.set_selected(theme_sel as u32);
+        tracing::debug!("settings window: prefs tail C (themes) at {:?}", t_init.elapsed());
 
         // The reader's font override (#56): the button shows the chosen font,
         // or the interface font when none was chosen yet (so what it shows is
@@ -1929,6 +1983,7 @@ impl Component for Preferences {
         widgets.cloud_slot.set_child(Some(cloud.widget()));
         model.cloud = Some(cloud);
         // The sidebar (#141): a heading per section, a row per category.
+        tracing::debug!("settings window: prefs tail D (before sidebar rows) at {:?}", t_init.elapsed());
         for (section, pages) in SIDE_PAGES {
             let heading = gtk::ListBoxRow::new();
             heading.set_selectable(false);
@@ -1961,6 +2016,8 @@ impl Component for Preferences {
         narrow.add_setter(&widgets.split, "collapsed", Some(&true.to_value()));
         root.add_breakpoint(narrow);
         model.panels_stack = Some(widgets.panels_stack.clone());
+        model.accounts_slot = Some(widgets.accounts_slot.clone());
+        tracing::debug!("settings window: prefs tail E (sidebar rows built) at {:?}", t_init.elapsed());
         model.side_list = Some(widgets.side_list.clone());
         model.content_page = Some(widgets.content_page.clone());
         model.split = Some(widgets.split.clone());
@@ -1970,8 +2027,34 @@ impl Component for Preferences {
             .filter(|id| side_page(id).is_some())
             .unwrap_or(if init.start_on_accounts { "accounts" } else { "general" });
         model.select_row(first);
+        // Every page but the one shown leaves the stack until after the
+        // first paint: laid out and styled together, the pages' hundreds of
+        // rows were most of the wait for the window to appear.
+        {
+            let stack = &widgets.panels_stack;
+            let shown = stack.visible_child_name().map(|n| n.to_string());
+            let pages = stack.pages();
+            let mut deferred = Vec::new();
+            for i in 0..pages.n_items() {
+                let Some(page) = pages.item(i).and_downcast::<gtk::StackPage>() else { continue };
+                let name = page.name().map(|n| n.to_string()).unwrap_or_default();
+                if Some(&name) != shown.as_ref() {
+                    deferred.push((name, page.child()));
+                }
+            }
+            for (_, child) in &deferred {
+                stack.remove(child);
+            }
+            *model.deferred_pages.borrow_mut() = deferred;
+            let s = sender.clone();
+            gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
+                s.input(PrefInput::MountPages);
+                gtk::glib::ControlFlow::Break
+            });
+        }
         model.host_header = Some(widgets.host_header.clone());
 
+        tracing::debug!("settings window: preferences init {:?}", t_init.elapsed());
         ComponentParts { model, widgets }
     }
 
@@ -2114,6 +2197,13 @@ impl Component for Preferences {
             }
             PrefInput::ToggleUnifiedTags(on) => {
                 let _ = sender.output(PrefOutput::SetUnifiedTags(on));
+            }
+            PrefInput::MountPages => self.mount_pages(),
+            PrefInput::SetAccountsPanel { panel, sender: accounts } => {
+                self.accounts_sender = accounts;
+                if let Some(slot) = &self.accounts_slot {
+                    slot.set_child(Some(&panel));
+                }
             }
             PrefInput::ToggleShowAccounts(on) => {
                 if self.show_accounts != on {

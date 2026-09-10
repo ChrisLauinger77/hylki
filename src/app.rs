@@ -137,6 +137,9 @@ pub struct AppModel {
     window: adw::ApplicationWindow,
     prefs: Option<Controller<Preferences>>,
     accounts_win: Option<Controller<AccountsWindow>>,
+    /// What the accounts panel was built over (its init, printed), to tell
+    /// whether a reopened Settings window needs a fresh one.
+    accounts_seed: Option<String>,
     /// Standalone compose windows (multiple allowed at once). Pruned as they close.
     composers: Vec<ComposeHost>,
     /// The reader's inline reply/forward composer, if open.
@@ -795,6 +798,11 @@ pub enum AppMsg {
     SetRememberSidebar(bool),
     /// Preference: the sidebar reopens in the icon rail if left there.
     SetRememberRail(bool),
+    /// Build the Settings window ahead of its first open (see the handler).
+    PrewarmSettings,
+    /// Close the Settings window as the user would (the showcase's reopen
+    /// timing).
+    DebugCloseSettings,
     /// The sidebar's All Inboxes / Filtered Folders / Tags sections were
     /// opened or folded — record it with the layout.
     SidebarSectionsOpen {
@@ -1925,6 +1933,7 @@ impl SimpleComponent for AppModel {
             window: root.clone(),
             prefs: None,
             accounts_win: None,
+            accounts_seed: None,
             composers: Vec::new(),
             reader_compose: None,
             draining_composers: Vec::new(),
@@ -3060,6 +3069,18 @@ impl SimpleComponent for AppModel {
                             });
                         }
                     });
+                    // VIREO_SHOWCASE_SETTINGS_REOPEN=1 closes the window at
+                    // 5s and opens it again at 7s, to time a reopen.
+                    if std::env::var("VIREO_SHOWCASE_SETTINGS_REOPEN").is_ok() {
+                        let s = sender.clone();
+                        gtk::glib::timeout_add_seconds_local_once(5, move || {
+                            s.input(AppMsg::DebugCloseSettings);
+                        });
+                        let s = sender.clone();
+                        gtk::glib::timeout_add_seconds_local_once(7, move || {
+                            s.input(AppMsg::OpenAccounts);
+                        });
+                    }
                 }
                 let main: gtk::Window = root.clone().upcast();
                 let settings_window = move || {
@@ -3174,6 +3195,13 @@ impl SimpleComponent for AppModel {
             gtk::glib::timeout_add_seconds_local(30, move || {
                 s.input(AppMsg::SendDueScheduled);
                 gtk::glib::ControlFlow::Continue
+            });
+        }
+        {
+            // Settings, built hidden a moment after startup (see PrewarmSettings).
+            let s = sender.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                s.input(AppMsg::PrewarmSettings);
             });
         }
         ComponentParts { model, widgets }
@@ -5971,11 +5999,32 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            // Closing the combined Settings window drops both
-            // panels' components.
-            AppMsg::ClosePreferences => {
-                self.prefs = None;
-                self.accounts_win = None;
+            // Closing the combined Settings window hides it (the window's
+            // own hide-on-close); both panels stay for the next open, which
+            // then only rebuilds the accounts panel.
+            AppMsg::ClosePreferences => {}
+
+            // Build the Settings window ahead of its first open, hidden and
+            // realized, a moment after startup: its first appearance is
+            // then a present() rather than a build, a layout and a paint.
+            AppMsg::DebugCloseSettings => {
+                if let Some(p) = &self.prefs {
+                    p.widget().close();
+                }
+            }
+
+            AppMsg::PrewarmSettings => {
+                if self.prefs.is_none() {
+                    self.build_settings_window(&sender, self.settings_open_accounts);
+                    if let Some(p) = &self.prefs {
+                        let w = p.widget();
+                        WidgetExt::realize(w);
+                        // Measuring runs the first CSS pass and Pango layouts
+                        // now, so the first frame after present has less to do.
+                        let _ = w.measure(gtk::Orientation::Horizontal, -1);
+                        let _ = w.measure(gtk::Orientation::Vertical, 920);
+                    }
+                }
             }
 
             AppMsg::SettingsEditorOpen(open) => {
@@ -10516,100 +10565,20 @@ impl AppModel {
     /// Open (or focus) the combined Settings window on the
     /// requested panel. When `add_new`, jump straight to the "add account"
     /// form — used by the empty-state "Add first account" button.
-    fn open_settings_window(
-        &mut self,
-        sender: &ComponentSender<Self>,
-        on_accounts: bool,
-        add_new: bool,
-    ) {
-        // Already open? Bring it forward and switch panels instead of
-        // opening another.
-        if let Some(p) = self.prefs.as_ref().filter(|p| p.widget().is_visible()) {
-            // Asked for Accounts: switch to it. Otherwise leave the window
-            // on whatever category it is showing.
-            if on_accounts {
-                p.emit(PrefInput::ShowAccounts(true));
-            }
-            p.widget().present();
-            if add_new {
-                if let Some(a) = &self.accounts_win {
-                    a.emit(crate::ui::accounts::AccountsInput::AddAccount);
-                }
-            }
-            return;
-        }
-        // Pass accounts in display order, with passwords prefilled from the keyring
-        // so the editor shows them when editing.
-        let order = self.ordered_emails();
-        let mut accounts: Vec<AccountConfig> = Vec::new();
-        for email in &order {
-            if let Some(a) = self.config.iter().find(|c| &c.email == email) {
-                accounts.push(a.clone());
-            }
-        }
-        for c in &self.config {
-            if !accounts.iter().any(|a| a.email == c.email) {
-                accounts.push(c.clone());
-            }
-        }
-        for a in &mut accounts {
-            if a.password.is_empty() {
-                a.password = config::load_password(&a.email).unwrap_or_default();
-            }
-            if a.smtp_separate && a.smtp_password.is_empty() {
-                a.smtp_password = config::load_smtp_password(&a.email).unwrap_or_default();
-            }
-            // Aliases with their own SMTP (#34): prefill too, so editing keeps
-            // the stored password (and an email rename can re-store it under
-            // the new address).
-            let email = a.email.clone();
-            for alias in &mut a.aliases {
-                if alias.has_own_smtp() && alias.smtp_password.is_empty() {
-                    alias.smtp_password =
-                        config::load_alias_smtp_password(&email, &alias.address())
-                            .unwrap_or_default();
-                }
-            }
-        }
-        // Demo mode: the sample accounts exist only at the backend layer, so
-        // the Accounts panel would sit empty in screenshots — hand it
-        // matching stand-in configs instead.
-        if accounts.is_empty() && demo_mode() {
-            accounts = demo_account_configs();
-        }
-        // The accounts panel component (embedded behind the "Accounts" tab).
-        let accounts = AccountsWindow::builder()
-            .launch(crate::ui::accounts::AccountsInit {
-                accounts,
-                allowed_senders: self.allowed_senders.clone(),
-                blacklist: self.blacklist.clone(),
-                filters: self.filters.clone(),
-                tags: self.tags.clone(),
-            })
-            .forward(sender.input_sender(), |out| match out {
-                AccountsOutput::Saved { original_email, account } => {
-                    AppMsg::AccountSaved { original_email, account }
-                }
-                AccountsOutput::Removed { email } => AppMsg::AccountRemoved { email },
-                AccountsOutput::Reordered(emails) => AppMsg::AccountsReordered(emails),
-                AccountsOutput::EnabledChanged { email, enabled } => {
-                    AppMsg::AccountEnabledChanged { email, enabled }
-                }
-                AccountsOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
-                AccountsOutput::EditorOpen(open) => AppMsg::SettingsEditorOpen(open),
-                AccountsOutput::AddSender(addr) => AppMsg::AddSender(addr),
-                AccountsOutput::RemoveSender(addr) => AppMsg::RemoveSender(addr),
-                AccountsOutput::AddBlacklist(addr) => AppMsg::AddBlacklist(addr),
-                AccountsOutput::RemoveBlacklist(addr) => AppMsg::RemoveBlacklist(addr),
-                AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
-                AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
-            });
-        if add_new {
-            accounts.emit(crate::ui::accounts::AccountsInput::AddAccount);
-        }
-
-        // The host window: the preferences component, carrying the accounts
-        // panel behind its other tab.
+    /// Build the Settings window and its accounts panel, hidden. It is
+    /// kept for the life of the app once built: `open_settings_window`
+    /// presents it, and closing it hides it, so opening never waits on
+    /// hundreds of rows being built and laid out again.
+    fn build_settings_window(&mut self, sender: &ComponentSender<Self>, on_accounts: bool) {
+        let t_open = std::time::Instant::now();
+        // Pass accounts in display order. Passwords stay in the keyring until
+        // an account's editor opens (the panel fetches them then, off the
+        // main thread): reading every account's secrets up front cost a
+        // keyring round trip or three per account, which is what made this
+        // window slow to appear.
+        let init = self.accounts_panel_init();
+        self.accounts_seed = Some(format!("{init:?}"));
+        let accounts = Self::launch_accounts_panel(init, sender);
         let init = PrefInit {
             auto_remote_content: self.auto_remote_content,
             show_remote_banner: self.show_remote_banner,
@@ -10772,7 +10741,6 @@ impl AppModel {
                 PrefOutput::SetOverrideColors(on) => AppMsg::SetOverrideColors(on),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
-        prefs.widget().present();
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
             self.folder_choice_map(),
         ));
@@ -10802,7 +10770,146 @@ impl AppModel {
             }
         }
         self.accounts_win = Some(accounts);
+        tracing::debug!("settings window: built in {:?}", t_open.elapsed());
         self.prefs = Some(prefs);
+    }
+
+    /// A fresh accounts panel over the current accounts (in display
+    /// order), filters, tags and sender lists. Passwords stay in the keyring
+    /// until an account's editor opens (the panel fetches them then, off
+    /// the main thread): reading every account's secrets up front cost a
+    /// keyring round trip or three per account, which is what made this
+    /// window slow to appear with many accounts.
+    fn accounts_panel_init(&self) -> crate::ui::accounts::AccountsInit {
+        let order = self.ordered_emails();
+        let mut accounts: Vec<AccountConfig> = Vec::new();
+        for email in &order {
+            if let Some(a) = self.config.iter().find(|c| &c.email == email) {
+                accounts.push(a.clone());
+            }
+        }
+        for c in &self.config {
+            if !accounts.iter().any(|a| a.email == c.email) {
+                accounts.push(c.clone());
+            }
+        }
+        // Demo mode: the sample accounts exist only at the backend layer, so
+        // the Accounts panel would sit empty in screenshots — hand it
+        // matching stand-in configs instead.
+        if accounts.is_empty() && demo_mode() {
+            accounts = demo_account_configs();
+        }
+        // The accounts panel component (embedded behind the "Accounts" tab).
+        crate::ui::accounts::AccountsInit {
+                accounts,
+                allowed_senders: self.allowed_senders.clone(),
+                blacklist: self.blacklist.clone(),
+                filters: self.filters.clone(),
+                tags: self.tags.clone(),
+            }
+    }
+
+    /// Launch an accounts panel over `init`.
+    fn launch_accounts_panel(
+        init: crate::ui::accounts::AccountsInit,
+        sender: &ComponentSender<Self>,
+    ) -> Controller<AccountsWindow> {
+        let accounts = AccountsWindow::builder()
+            .launch(init)
+            .forward(sender.input_sender(), |out| match out {
+                AccountsOutput::Saved { original_email, account } => {
+                    AppMsg::AccountSaved { original_email, account }
+                }
+                AccountsOutput::Removed { email } => AppMsg::AccountRemoved { email },
+                AccountsOutput::Reordered(emails) => AppMsg::AccountsReordered(emails),
+                AccountsOutput::EnabledChanged { email, enabled } => {
+                    AppMsg::AccountEnabledChanged { email, enabled }
+                }
+                AccountsOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
+                AccountsOutput::EditorOpen(open) => AppMsg::SettingsEditorOpen(open),
+                AccountsOutput::AddSender(addr) => AppMsg::AddSender(addr),
+                AccountsOutput::RemoveSender(addr) => AppMsg::RemoveSender(addr),
+                AccountsOutput::AddBlacklist(addr) => AppMsg::AddBlacklist(addr),
+                AccountsOutput::RemoveBlacklist(addr) => AppMsg::RemoveBlacklist(addr),
+                AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
+                AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
+            });
+
+        // The host window: the preferences component, carrying the accounts
+        // panel behind its other tab.
+        accounts
+    }
+
+    /// Show Settings: the window kept from a previous open (its accounts
+    /// panel rebuilt over the current accounts) or a newly built one.
+    fn open_settings_window(
+        &mut self,
+        sender: &ComponentSender<Self>,
+        on_accounts: bool,
+        add_new: bool,
+    ) {
+        let t_open = std::time::Instant::now();
+        let hidden = self.prefs.as_ref().is_some_and(|p| !p.widget().is_visible());
+        if self.prefs.is_none() {
+            self.build_settings_window(sender, on_accounts);
+        } else if hidden {
+            // Accounts, filters, tags and senders may have changed since: a
+            // fresh panel over today's state — or the kept one, when
+            // nothing did, with any editor it was left in closed.
+            let init = self.accounts_panel_init();
+            let seed = format!("{init:?}");
+            let page = if on_accounts {
+                "accounts".to_string()
+            } else {
+                self.last_settings_page.clone().unwrap_or_else(|| "general".to_string())
+            };
+            if self.accounts_seed.as_deref() == Some(seed.as_str()) {
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::CloseEditor);
+                }
+            } else {
+                let accounts = Self::launch_accounts_panel(init, sender);
+                self.accounts_seed = Some(seed);
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::SetAccountsPanel {
+                        panel: accounts.widget().clone().upcast(),
+                        sender: accounts.sender().clone(),
+                    });
+                }
+                self.accounts_win = Some(accounts);
+            }
+            if let Some(p) = &self.prefs {
+                p.emit(PrefInput::EditorOpen(false));
+                p.emit(PrefInput::ShowPageById(page));
+            }
+        } else if on_accounts {
+            // Already showing: switch to Accounts if asked, else leave the
+            // window on whatever category it is showing.
+            if let Some(p) = &self.prefs {
+                p.emit(PrefInput::ShowAccounts(true));
+            }
+        }
+        if let Some(p) = &self.prefs {
+            p.widget().present();
+        }
+        if add_new {
+            if let Some(a) = &self.accounts_win {
+                a.emit(crate::ui::accounts::AccountsInput::AddAccount);
+            }
+        }
+        tracing::debug!("settings window: presented in {:?}", t_open.elapsed());
+        {
+            let t = t_open;
+            gtk::glib::idle_add_local_once(move || {
+                tracing::debug!("settings window: first idle after open at {:?}", t.elapsed());
+            });
+            if let Some(p) = &self.prefs {
+                p.widget().add_tick_callback(move |_, _| {
+                    tracing::debug!("settings window: first frame at {:?}", t.elapsed());
+                    gtk::glib::ControlFlow::Break
+                });
+            }
+        }
     }
 
     /// Confirm and remove an account (drops its keyring password too).

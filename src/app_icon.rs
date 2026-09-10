@@ -555,11 +555,23 @@ fn edit_icon_line(path: &std::path::Path, icon: &str) {
 pub fn texture(id: &str, px: i32) -> Option<gtk::gdk::Texture> {
     use gtk::gdk_pixbuf::PixbufLoader;
     use gtk::prelude::PixbufLoaderExt;
+    thread_local! {
+        // Decoded once per (icon, size): the gallery is rebuilt with every
+        // Settings window, and decoding the catalogue is the slow part.
+        static DECODED: std::cell::RefCell<std::collections::HashMap<(String, i32), gtk::gdk::Texture>> =
+            std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+    let key = (id.to_string(), px);
+    if let Some(t) = DECODED.with(|c| c.borrow().get(&key).cloned()) {
+        return Some(t);
+    }
     let loader = PixbufLoader::with_type("png").ok()?;
     loader.set_size(px, px);
     loader.write(png_for(id)).ok()?;
     loader.close().ok()?;
-    Some(gtk::gdk::Texture::for_pixbuf(&loader.pixbuf()?))
+    let texture = gtk::gdk::Texture::for_pixbuf(&loader.pixbuf()?);
+    DECODED.with(|c| c.borrow_mut().insert(key, texture.clone()));
+    Some(texture)
 }
 
 // ---------------------------------------------------------------------------

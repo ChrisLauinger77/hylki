@@ -151,7 +151,9 @@ pub struct AccountsWindow {
     /// Emoji currently chosen in the editor (`None` → use initials).
     emoji: Option<String>,
     /// WYSIWYG editor for the account signature.
-    sig_editor: RichEditor,
+    /// The signature's rich editor — a WebKit view, so it is created when
+    /// an account's editor first opens rather than with the panel.
+    sig_editor: Option<RichEditor>,
     /// The email value the label field currently mirrors, so the label auto-fills
     /// from the email until the user customizes it.
     label_synced: String,
@@ -336,6 +338,72 @@ pub enum AccountsCmd {
     OAuth(Result<String, String>),
     /// Alias SMTP test result (#34).
     AliasTested(Result<(), String>),
+    /// An account's secrets, read from the keyring for its editor.
+    Secrets(AccountSecrets),
+}
+
+/// What the keyring holds for one account: its password, its own SMTP
+/// password when SMTP is separate, and each alias's SMTP password (by the
+/// alias address, #34). Read off the main thread when the editor opens, so
+/// the Settings window never waits on the keyring.
+#[derive(Debug, Clone)]
+pub struct AccountSecrets {
+    pub email: String,
+    pub password: String,
+    pub smtp_password: String,
+    pub aliases: Vec<(String, String)>,
+}
+
+impl AccountSecrets {
+    /// The keyring entries `acc` lacks (blocking; run off the main thread).
+    fn load(acc: &AccountConfig) -> AccountSecrets {
+        let password = if acc.oauth || !acc.password.is_empty() {
+            acc.password.clone()
+        } else {
+            crate::config::load_password(&acc.email).unwrap_or_default()
+        };
+        let smtp_password = if acc.smtp_separate && acc.smtp_password.is_empty() {
+            crate::config::load_smtp_password(&acc.email).unwrap_or_default()
+        } else {
+            acc.smtp_password.clone()
+        };
+        let aliases = acc
+            .aliases
+            .iter()
+            .filter(|al| al.has_own_smtp() && al.smtp_password.is_empty())
+            .map(|al| {
+                let addr = al.address();
+                let pw = crate::config::load_alias_smtp_password(&acc.email, &addr)
+                    .unwrap_or_default();
+                (addr, pw)
+            })
+            .collect();
+        AccountSecrets { email: acc.email.clone(), password, smtp_password, aliases }
+    }
+
+    /// Whether `acc` still needs anything from the keyring.
+    fn needed(acc: &AccountConfig) -> bool {
+        (!acc.oauth && acc.password.is_empty())
+            || (acc.smtp_separate && acc.smtp_password.is_empty())
+            || acc.aliases.iter().any(|al| al.has_own_smtp() && al.smtp_password.is_empty())
+    }
+
+    /// Write the secrets into `acc` where it has none.
+    fn apply(&self, acc: &mut AccountConfig) {
+        if acc.password.is_empty() {
+            acc.password = self.password.clone();
+        }
+        if acc.smtp_password.is_empty() {
+            acc.smtp_password = self.smtp_password.clone();
+        }
+        for al in acc.aliases.iter_mut() {
+            if al.smtp_password.is_empty() {
+                if let Some((_, pw)) = self.aliases.iter().find(|(a, _)| *a == al.address()) {
+                    al.smtp_password = pw.clone();
+                }
+            }
+        }
+    }
 }
 
 /// Whether a list row survives the page's search text (#141): matched
@@ -359,6 +427,7 @@ fn row_matches(row: &gtk::ListBoxRow, query: &str) -> bool {
 /// Everything the Accounts panel needs at launch: the accounts themselves
 /// plus the mail-hygiene lists that live on this tab (filters, allow list,
 /// blocklist).
+#[derive(Debug, Clone)]
 pub struct AccountsInit {
     pub accounts: Vec<AccountConfig>,
     pub allowed_senders: Vec<String>,
@@ -393,7 +462,11 @@ impl Component for AccountsWindow {
                         #[wrap(Some)]
                         #[name = "list_stack"]
                         set_content = &gtk::Stack {
-                            set_transition_type: gtk::StackTransitionType::Crossfade,
+                            // Sections switch outright, and only the shown
+                            // one is measured.
+                            set_transition_type: gtk::StackTransitionType::None,
+                            set_hhomogeneous: false,
+                            set_vhomogeneous: false,
 
                             add_named[Some("accounts")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
@@ -600,7 +673,9 @@ impl Component for AccountsWindow {
                     },
                 },
 
-                // ---- editor page ----
+                // ---- editor page ---- (taken out of the view until an
+                // editor opens: see `mount_editor`)
+                #[name = "editor_page"]
                 add = &adw::NavigationPage {
                     set_title: &i18n("Account"),
                     set_tag: Some("editor"),
@@ -1029,6 +1104,7 @@ impl Component for AccountsWindow {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let t_init = std::time::Instant::now();
         let goa = importable_goa_accounts(&init.accounts);
 
         let senders = relm4::factory::FactoryVecDeque::builder()
@@ -1046,7 +1122,7 @@ impl Component for AccountsWindow {
             accounts: init.accounts,
             editing: None,
             emoji: None,
-            sig_editor: RichEditor::new(""),
+            sig_editor: None,
             label_synced: String::new(),
             goa,
             pending_oauth_refresh: None,
@@ -1088,6 +1164,10 @@ impl Component for AccountsWindow {
         senders_box.set_visible(!model.sender_addrs.is_empty());
         blacklist_box.set_visible(!model.blacklist_addrs.is_empty());
         let widgets = view_output!();
+        // The editor's sixty-odd rows stay out of the widget tree until an
+        // editor opens, so the Settings window's first layout skips them.
+        widgets.nav.remove(&widgets.editor_page);
+        tracing::debug!("settings window: accounts view built in {:?}", t_init.elapsed());
         model.filters_list = Some(widgets.filters_list.clone());
         {
             let q = model.filters_query.clone();
@@ -1100,8 +1180,9 @@ impl Component for AccountsWindow {
         model.rebuild_filter_rows(&sender);
         model.tags_list = Some(widgets.tags_list.clone());
         model.rebuild_tag_rows(&sender);
-        widgets.sig_holder.append(&model.sig_editor.widget);
+        let t_list = std::time::Instant::now();
         model.rebuild_account_list(&widgets.accounts_list, &sender);
+        tracing::debug!("settings window: accounts list built in {:?}", t_list.elapsed());
         model.rebuild_goa_list(&widgets.goa_list, &sender);
         widgets.goa_group.set_visible(!model.goa.is_empty());
         widgets
@@ -1159,6 +1240,7 @@ impl Component for AccountsWindow {
             });
         }
 
+        tracing::debug!("settings window: accounts panel init {:?}", t_init.elapsed());
         ComponentParts { model, widgets }
     }
 
@@ -1200,12 +1282,13 @@ impl Component for AccountsWindow {
                 set_connection_editable(widgets, true);
                 widgets.goa_banner.set_visible(false);
                 self.apply_provider(widgets);
-                self.sig_editor.set_html("");
+                self.sig_editor(widgets).set_html("");
                 widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
                 widgets.emoji_btn.set_label(&i18n("Add"));
                 widgets.remove_btn.set_visible(false);
                 // A prior GOA edit may have hidden the provider picker.
                 widgets.provider_row.set_visible(true);
+                mount_editor(widgets);
                 widgets.nav.push_by_tag("editor");
             }
 
@@ -1239,11 +1322,29 @@ impl Component for AccountsWindow {
                 self.alias_edits = acc.aliases.clone();
                 self.rebuild_alias_list(&widgets.aliases_list, &sender);
                 fill_editor(widgets, &acc);
+                // The secrets come from the keyring now, off the main thread,
+                // and land in the fields when they arrive (Save reads the
+                // keyring itself should it come first).
+                if AccountSecrets::needed(&acc) {
+                    let acc = acc.clone();
+                    sender.oneshot_command(async move {
+                        let email = acc.email.clone();
+                        let secrets = tokio::task::spawn_blocking(move || AccountSecrets::load(&acc))
+                            .await
+                            .unwrap_or(AccountSecrets {
+                                email,
+                                password: String::new(),
+                                smtp_password: String::new(),
+                                aliases: Vec::new(),
+                            });
+                        AccountsCmd::Secrets(secrets)
+                    });
+                }
                 self.populate_folder_combos(widgets, Some(&acc));
                 self.apply_provider(widgets);
                 // Label mirrors the email until customized.
                 self.label_synced = acc.email.clone();
-                self.sig_editor
+                self.sig_editor(widgets)
                     .set_html(&rich_editor::signature_to_html(acc.signature.as_deref().unwrap_or("")));
                 widgets
                     .color_btn
@@ -1298,6 +1399,7 @@ impl Component for AccountsWindow {
                     "Switching this off returns the account to the import list — it \
                      stays in GNOME Online Accounts."
                 });
+                mount_editor(widgets);
                 widgets.nav.push_by_tag("editor");
             }
 
@@ -1462,7 +1564,7 @@ impl Component for AccountsWindow {
                 // Pull the signature HTML out of the editor first (async), then
                 // finish saving in SaveWithSig.
                 let s = sender.clone();
-                self.sig_editor
+                self.sig_editor(widgets)
                     .extract_html(move |html| s.input(AccountsInput::SaveWithSig(html)));
             }
 
@@ -1472,7 +1574,7 @@ impl Component for AccountsWindow {
 
             AccountsInput::SignatureEditSource => {
                 let s = sender.clone();
-                self.sig_editor
+                self.sig_editor(widgets)
                     .extract_html(move |html| s.input(AccountsInput::SignatureSourceLoaded(html)));
             }
             AccountsInput::SignatureSourceLoaded(html) => {
@@ -1514,7 +1616,7 @@ impl Component for AccountsWindow {
                 dialog.present();
             }
             AccountsInput::SignatureApplySource(source) => {
-                self.sig_editor.set_html(&rich_editor::signature_from_source(&source, None));
+                self.sig_editor(widgets).set_html(&rich_editor::signature_from_source(&source, None));
             }
             AccountsInput::SignatureImport => {
                 let dialog = gtk::FileDialog::new();
@@ -1541,7 +1643,7 @@ impl Component for AccountsWindow {
             AccountsInput::SignatureImportFile(path) => match std::fs::read(&path) {
                 Ok(bytes) => {
                     let text = String::from_utf8_lossy(&bytes);
-                    self.sig_editor
+                    self.sig_editor(widgets)
                         .set_html(&rich_editor::signature_from_source(&text, path.parent()));
                 }
                 Err(e) => {
@@ -1637,6 +1739,11 @@ impl Component for AccountsWindow {
                 } else {
                     true
                 };
+                // Saved before the keyring answered, or with the field left
+                // as it was: the stored secrets stand.
+                if AccountSecrets::needed(&account) {
+                    AccountSecrets::load(&account).apply(&mut account);
+                }
                 let password_ok = account.oauth || !account.password.is_empty();
                 // A GOA account's connection fields were all restored from the
                 // original above (GNOME owns them; a Graph account rightly has
@@ -1987,6 +2094,30 @@ impl Component for AccountsWindow {
         _root: &Self::Root,
     ) {
         match result {
+            AccountsCmd::Secrets(secrets) => {
+                // Still editing that account: fill in what the user hasn't
+                // typed over meanwhile.
+                let Some(i) = self.editing else { return };
+                if self.accounts.get(i).is_none_or(|a| a.email != secrets.email) {
+                    return;
+                }
+                if let Some(acc) = self.accounts.get_mut(i) {
+                    secrets.apply(acc);
+                }
+                if widgets.pass_row.text().is_empty() {
+                    widgets.pass_row.set_text(&secrets.password);
+                }
+                if widgets.smtp_pass_row.text().is_empty() {
+                    widgets.smtp_pass_row.set_text(&secrets.smtp_password);
+                }
+                for al in self.alias_edits.iter_mut() {
+                    if al.smtp_password.is_empty() {
+                        if let Some((_, pw)) = secrets.aliases.iter().find(|(a, _)| *a == al.address()) {
+                            al.smtp_password = pw.clone();
+                        }
+                    }
+                }
+            }
             AccountsCmd::Test(result) => {
                 let line = |label: &str, r: &Result<(), String>| match r {
                     Ok(()) => format!("✓ {label}: connected"),
@@ -2044,6 +2175,18 @@ impl Component for AccountsWindow {
 
 impl AccountsWindow {
     /// Rebuild the editor's send-as alias list from `alias_edits` (#34).
+    /// The signature editor, created (and mounted in its holder) on first
+    /// use: a WebKit view is the slowest thing the panel would otherwise
+    /// build, for a field most visits never reach.
+    fn sig_editor(&mut self, widgets: &AccountsWindowWidgets) -> &RichEditor {
+        if self.sig_editor.is_none() {
+            let editor = RichEditor::new("");
+            widgets.sig_holder.append(&editor.widget);
+            self.sig_editor = Some(editor);
+        }
+        self.sig_editor.as_ref().expect("created above")
+    }
+
     fn rebuild_alias_list(&self, list: &gtk::ListBox, sender: &ComponentSender<Self>) {
         while let Some(child) = list.first_child() {
             list.remove(&child);
@@ -2813,6 +2956,14 @@ fn signature_is_empty(html: &str) -> bool {
         out
     };
     stripped.replace("&nbsp;", " ").trim().is_empty()
+}
+
+/// Put the editor page into the navigation view if it isn't there (it is
+/// left out until first needed — see the panel's init).
+fn mount_editor(widgets: &AccountsWindowWidgets) {
+    if widgets.editor_page.parent().is_none() {
+        widgets.nav.add(&widgets.editor_page);
+    }
 }
 
 fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
