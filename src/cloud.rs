@@ -1138,7 +1138,7 @@ fn onedrive_upload_and_share(account: &CloudAccount, path: &Path) -> Result<Shar
         ureq::Error::Status(code, resp) if (expires.is_some() || pw.is_some()) && (code == 400 || code == 403) => {
             let text = resp.into_string().unwrap_or_default();
             format!(
-                "Uploaded, but OneDrive would not make the link: {}. Link expiry and passwords need a OneDrive for Business or Microsoft 365 subscription; turn them off in the account's settings.",
+                "Uploaded, but OneDrive would not make the link: {}. Link expiry and download passwords need a Microsoft 365 subscription or OneDrive for Business; on a free personal OneDrive set Links expire after to 0 and turn the password off, under Settings, Cloud Storage.",
                 api_message(&text).trim()
             )
         }

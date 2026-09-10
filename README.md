@@ -215,10 +215,11 @@ them with a generated download password, shown to you to pass on separately.
   account under Settings → Online Accounts, then pick it in the cloud
   account's editor. GOA holds the sign-in and refreshes the token, so Vireo
   stores no password or key. Uploads go into the upload folder (made when
-  missing) and are shared with "anyone with the link". Link expiry and
-  passwords work with a Microsoft 365 subscription or OneDrive for
-  Business; a personal account reports that they are not available, so
-  leave them off there. Google Drive is not offered: GNOME Online Accounts
+  missing) and are shared with "anyone with the link". **Link expiry and
+  download passwords need a Microsoft 365 subscription or OneDrive for
+  Business**: a free personal OneDrive refuses the link when either is
+  set, so a new OneDrive account starts with both off, and the editor says
+  so. Uploads and plain links work on any OneDrive. Google Drive is not offered: GNOME Online Accounts
   does not ask Google for Drive access on every system, and Vireo carries
   no Google client of its own.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an

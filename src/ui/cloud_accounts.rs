@@ -358,18 +358,23 @@ fn edit_dialog(
                 goa_row.set_selected(i as u32);
             }
             goa_row.set_sensitive(!listed.is_empty());
-            goa_hint.set_label(&if listed.is_empty() {
+            let mut hint = if listed.is_empty() {
                 i18n("No Microsoft 365 account in GNOME Online Accounts yet. Add one under Settings, Online Accounts; OneDrive then signs in through it, and nothing more is needed here.")
             } else {
                 i18n("OneDrive signs in through the GNOME Online Accounts account chosen above; there is no password to enter. An account marked Files is off still works here, but you may want to turn Files on for it under Settings, Online Accounts.")
-            });
+            };
+            hint.push_str("\n\n");
+            hint.push_str(&i18n(
+                "Uploads and plain share links work with any OneDrive. Link expiry and download passwords are a Microsoft 365 subscription or OneDrive for Business feature: on a free personal OneDrive the link is refused when either is set, so keep Links expire after at 0 and the password switch off there.",
+            ));
+            goa_hint.set_label(&hint);
             *goa_listed.borrow_mut() = listed;
         }
     };
 
     // The fields each kind wants.
     let apply_kind = {
-        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, goa_row, goa_hint) = (
+        let (name, url, user, pass, code, seafile_hint, app_key, app_key_hint, library, check, protect, expire, goa_row, goa_hint) = (
             name.clone(),
             url.clone(),
             user.clone(),
@@ -381,6 +386,7 @@ fn edit_dialog(
             library.clone(),
             check.clone(),
             protect.clone(),
+            expire.clone(),
             goa_row.clone(),
             goa_hint.clone(),
         );
@@ -402,10 +408,18 @@ fn edit_dialog(
             if goa {
                 fill_goa(k);
                 check.set_label(&i18n("Check Connection"));
-                protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. OneDrive allows link passwords and expiry dates with a Microsoft 365 subscription or OneDrive for Business."));
+                expire.set_subtitle(&i18n("Days; 0 keeps the link. Needs Microsoft 365 or OneDrive for Business"));
+                protect.set_subtitle(&i18n("A download password is made for each file and shown to you, to pass on separately. Needs Microsoft 365 or OneDrive for Business"));
                 name.set_title(&i18n("Account name, such as Work OneDrive (optional)"));
+                // A new OneDrive account starts with both off, so a free
+                // personal OneDrive works as it is.
+                if !editing {
+                    expire.set_value(0.0);
+                    protect.set_active(false);
+                }
                 return;
             }
+            expire.set_subtitle(&i18n("Days; 0 keeps the link"));
             match k {
                 CloudKind::Nextcloud => {
                     name.set_title(&i18n("Account name, such as Work Nextcloud (optional)"));
