@@ -852,8 +852,9 @@ struct PrivacyFile {
     /// full sidebar out over the panes without needing the expand button.
     #[serde(default)]
     sidebar_hover_expand: bool,
-    /// Icon rail: a dot for unread mail in place of the count.
-    #[serde(default)]
+    /// Icon rail: a dot for unread mail in place of the count. On by
+    /// default, as are the fold-ups below.
+    #[serde(default = "default_on")]
     rail_dots: bool,
     /// Icon rail: the sections folded up by themselves when the sidebar
     /// collapses, one switch each.
@@ -1088,7 +1089,7 @@ impl Default for PrivacyFile {
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
-            rail_dots: false,
+            rail_dots: true,
             rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
             preview_lines: default_preview_lines(),
@@ -1694,21 +1695,31 @@ pub fn load_rail_fold() -> RailFold {
 /// Which sidebar sections fold up by themselves when the sidebar collapses
 /// to its icon rail (Settings → Sidebar → Icon rail), and open again when it
 /// expands. Each has its own switch so the rail is just the way the user
-/// wants it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// wants it; all are on until switched off.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RailFold {
     /// Every expanded account's folder list.
-    #[serde(default)]
+    #[serde(default = "default_on")]
     pub accounts: bool,
     /// The per-account inbox list under All Inboxes.
-    #[serde(default)]
+    #[serde(default = "default_on")]
     pub all_inboxes: bool,
     /// The Filtered Folders section.
-    #[serde(default)]
+    #[serde(default = "default_on")]
     pub filtered: bool,
     /// The Tags section.
-    #[serde(default)]
+    #[serde(default = "default_on")]
     pub tags: bool,
+}
+
+fn default_on() -> bool {
+    true
+}
+
+impl Default for RailFold {
+    fn default() -> Self {
+        RailFold::ALL
+    }
 }
 
 impl RailFold {
