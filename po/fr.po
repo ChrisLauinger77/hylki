@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-09 18:03+0200\n"
+"PO-Revision-Date: 2026-09-10 11:15+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -236,6 +236,9 @@ msgid ""
 msgstr ""
 "Les raccourcis à touche unique sont désactivés. Activez-les dans Paramètres "
 "→ Système et apparence."
+
+msgid "Your tags"
+msgstr ""
 
 msgid "Restarting Vireo"
 msgstr "Redémarrage de Vireo"
@@ -508,6 +511,12 @@ msgstr "Marquer comme lu ou non lu"
 msgid "Select this row (for a bulk action)"
 msgstr "Sélectionner cette ligne (pour une action groupée)"
 
+msgid "Add or remove a tag (the first nine, in Settings order)"
+msgstr ""
+
+msgid "Remove every tag"
+msgstr ""
+
 msgid "Everything else"
 msgstr "Tout le reste"
 
@@ -762,12 +771,10 @@ msgstr "Ajouter un compte"
 
 msgid ""
 "Label messages with one or more coloured tags. Tags are stored on the mail "
-"server as IMAP keywords, so Thunderbird and other clients show the same tags."
+"server as IMAP keywords, so Thunderbird and other clients show the same "
+"tags. Drag a tag to reorder: the order here is the sidebar's, and the first "
+"nine answer to the 1–9 keys."
 msgstr ""
-"Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
-"étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
-"clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
-"étiquettes."
 
 msgid "Add Tag…"
 msgstr "Ajouter un tag…"
@@ -1196,6 +1203,11 @@ msgstr ", marqué {tag}"
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
 
+msgid ""
+"Press this key on a message to add or remove the tag (with single-key "
+"shortcuts on)"
+msgstr ""
+
 msgid "Remove tag"
 msgstr "Supprimer la balise"
 
@@ -1427,33 +1439,18 @@ msgstr "Le fichier n'a pas pu être ouvert"
 msgid "Response"
 msgstr "Réponse"
 
-msgid "Nextcloud, ownCloud or OpenCloud"
-msgstr ""
-
-msgid "Dropbox"
-msgstr ""
-
-msgid "Seafile"
-msgstr ""
-
-msgid "OneDrive"
-msgstr ""
-
 msgid "Cloud Storage"
 msgstr "Stockage en ligne"
 
 msgid "Cloud storage"
 msgstr "Stockage en ligne"
 
-#, fuzzy
 msgid ""
-"Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox or "
-"Seafile and put a share link in the message instead of an attachment."
+"Connect your cloud storage provider to upload and share large files instead "
+"of an attachment. A cloud icon appears in the compose toolbar once a "
+"provider is added. Supported providers: Nextcloud, ownCloud, OpenCloud, "
+"OneDrive, Dropbox and Seafile."
 msgstr ""
-"Envoyez un fichier volumineux vers votre propre Nextcloud, ownCloud ou "
-"OpenCloud, et insérez un lien de partage dans le message au lieu d'une pièce "
-"jointe. Connectez-vous avec un mot de passe d'application, créé dans les "
-"paramètres personnels du serveur, sous Sécurité."
 
 msgid "Add Account…"
 msgstr "Ajouter un compte…"
@@ -1461,18 +1458,14 @@ msgstr "Ajouter un compte…"
 msgid "No cloud accounts yet."
 msgstr "Aucun compte cloud pour le moment."
 
-#, fuzzy
 msgid "Cloud Account"
-msgstr "Ajouter un compte cloud"
+msgstr "Compte cloud"
 
 msgid "Removed {name}"
 msgstr "{name} supprimé"
 
-#, fuzzy
 msgid "Could not store the sign-in in the keyring: {e}"
-msgstr ""
-"Impossible d'enregistrer le mot de passe d'application dans le trousseau de "
-"clés : {e}"
+msgstr "Impossible d'enregistrer la connexion dans le trousseau de clés : {e}"
 
 msgid "Edit Cloud Account"
 msgstr "Modifier le compte cloud"
@@ -1487,13 +1480,16 @@ msgid "password-protected"
 msgstr "protégé par mot de passe"
 
 msgid "Service"
+msgstr "Service"
+
+msgid "Nickname (optional)"
 msgstr ""
 
 msgid "Server URL"
 msgstr "URL du serveur"
 
 msgid "Two-step verification code, if the account uses it"
-msgstr ""
+msgstr "Code de vérification en deux étapes, si le compte l'utilise"
 
 msgid ""
 "Sign in with your Seafile password. If the account uses two-step "
@@ -1501,16 +1497,20 @@ msgid ""
 "turns it into an API token once and keeps that instead of the password. A "
 "token obtained another way can be pasted in the password field."
 msgstr ""
+"Connectez-vous avec votre mot de passe Seafile. Si le compte utilise la "
+"vérification en deux étapes, saisissez également le code actuel de votre "
+"application d'authentification : Vireo le transforme une fois en jeton API "
+"et conserve celui-ci à la place du mot de passe. Un jeton obtenu autrement "
+"peut être collé dans le champ du mot de passe."
 
-#, fuzzy
 msgid "Online account"
-msgstr "GNOME Comptes en ligne"
+msgstr "Compte en ligne"
 
 msgid "Dropbox app key"
-msgstr ""
+msgstr "Clé d'application Dropbox"
 
 msgid "Library"
-msgstr ""
+msgstr "Bibliothèque"
 
 msgid "Upload folder"
 msgstr "Dossier de téléversement"
@@ -1518,7 +1518,6 @@ msgstr "Dossier de téléversement"
 msgid "Links expire after"
 msgstr "Les liens expirent après"
 
-#, fuzzy
 msgid "Days; 0 keeps the link indefinitely"
 msgstr "Jours ; 0 conserve le lien indéfiniment"
 
@@ -1532,27 +1531,32 @@ msgstr ""
 "Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
 "présenté, à transmettre séparément"
 
-#, fuzzy
 msgid "Link defaults"
-msgstr "Par défaut"
+msgstr "Valeurs par défaut des liens"
 
 msgid ""
 "How share links from this account are made unless you choose otherwise for "
 "an email: the upload dialog in the composer shows these values and lets you "
 "change them for that upload alone."
 msgstr ""
+"Comment les liens de partage de ce compte sont créés, sauf indication "
+"contraire pour un e-mail donné : la boîte de dialogue d'envoi dans l'éditeur "
+"affiche ces valeurs et permet de les modifier pour cet envoi uniquement."
 
 msgid "Check Connection"
 msgstr "Vérifier la connexion"
 
 msgid "{email} (Files is off)"
-msgstr ""
+msgstr "{email} (Fichiers désactivés)"
 
 msgid ""
 "No Microsoft 365 account in GNOME Online Accounts yet. Add one under "
 "Settings, Online Accounts; OneDrive then signs in through it, and nothing "
 "more is needed here."
 msgstr ""
+"Aucun compte Microsoft 365 dans les Comptes en ligne GNOME pour le moment. "
+"Ajoutez-en un dans Paramètres, Comptes en ligne ; OneDrive s'y connectera "
+"alors automatiquement, sans rien d'autre à faire ici."
 
 msgid ""
 "OneDrive signs in through the GNOME Online Accounts account chosen above; "
@@ -1560,6 +1564,10 @@ msgid ""
 "here, but you may want to turn Files on for it under Settings, Online "
 "Accounts."
 msgstr ""
+"OneDrive se connecte via le compte des Comptes en ligne GNOME choisi ci-"
+"dessus ; il n'y a pas de mot de passe à saisir. Un compte marqué « Fichiers "
+"désactivé » fonctionne quand même ici, mais vous pouvez souhaiter activer "
+"Fichiers pour ce compte dans Paramètres, Comptes en ligne."
 
 msgid ""
 "Uploads and plain share links work with any OneDrive. Link expiry and "
@@ -1567,25 +1575,27 @@ msgid ""
 "feature: on a free personal OneDrive the link is refused when either is set, "
 "so keep Links expire after at 0 and the password switch off there."
 msgstr ""
+"Les envois et les liens de partage simples fonctionnent avec n'importe quel "
+"OneDrive. L'expiration des liens et les mots de passe de téléchargement sont "
+"des fonctionnalités de Microsoft 365 ou de OneDrive Entreprise : sur un "
+"OneDrive personnel gratuit, le lien est refusé si l'un des deux est activé ; "
+"laissez donc « Les liens expirent après » à 0 et le mot de passe désactivé "
+"pour ce compte."
 
 msgid ""
 "Days; 0 keeps the link indefinitely. Needs Microsoft 365 or OneDrive for "
 "Business"
 msgstr ""
+"Jours ; 0 conserve le lien indéfiniment. Nécessite Microsoft 365 ou OneDrive "
+"Entreprise"
 
-#, fuzzy
 msgid ""
 "A download password is made for each file and shown to you, to pass on "
 "separately. Needs Microsoft 365 or OneDrive for Business"
 msgstr ""
 "Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
-"présenté, à transmettre séparément"
-
-msgid "Account name, such as Work OneDrive (optional)"
-msgstr ""
-
-msgid "Account name, such as Work Nextcloud (optional)"
-msgstr ""
+"présenté, à transmettre séparément. Nécessite Microsoft 365 ou OneDrive "
+"Entreprise."
 
 msgid "User name"
 msgstr "Nom d'utilisateur"
@@ -1596,32 +1606,23 @@ msgstr "Mot de passe d'application (laisser vide pour le conserver)"
 msgid "App password"
 msgstr "Mot de passe d'application"
 
-msgid "Account name, such as Team Seafile (optional)"
-msgstr ""
-
-#, fuzzy
 msgid "E-mail"
 msgstr "E-mail"
 
-#, fuzzy
 msgid "Password (leave empty to keep)"
-msgstr "Mot de passe d'application (laisser vide pour le conserver)"
+msgstr "Mot de passe (laisser vide pour le conserver)"
 
-msgid "Account name, such as Personal Dropbox (optional)"
-msgstr ""
-
-#, fuzzy
 msgid ""
 "A download password is made for each file and shown to you, to pass on "
 "separately. Dropbox allows link passwords and expiry dates on paid plans "
 "only."
 msgstr ""
 "Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
-"présenté, à transmettre séparément"
+"présenté, à transmettre séparément. Dropbox n'autorise les mots de passe et "
+"dates d'expiration des liens que sur les forfaits payants."
 
-#, fuzzy
 msgid "Connect with Dropbox…"
-msgstr "Connexion à {host}…"
+msgstr "Se connecter avec Dropbox…"
 
 msgid ""
 "Dropbox only lets an app sign in when it is registered, so make one for "
@@ -1640,28 +1641,44 @@ msgid ""
 "The app may stay in Development status; that allows your own account. Leave "
 "the field empty to use the app key this build was made with, when it has one."
 msgstr ""
+"Dropbox ne permet à une application de se connecter que si elle est "
+"enregistrée ; créez-en donc une pour vous (cela prend une minute et reste "
+"privé) :\n"
+"1. Ouvrez dropbox.com/developers/apps, connecté à votre compte Dropbox, et "
+"cliquez sur Create app.\n"
+"2. Choisissez Scoped access, puis App folder (Vireo ne voit alors que son "
+"propre dossier sous Apps) ou Full Dropbox (les envois vont dans le dossier "
+"indiqué ci-dessus).\n"
+"3. Donnez à l'application un nom que personne d'autre n'a utilisé, par "
+"exemple « Vireo » suivi de votre nom, puis cliquez sur Create app.\n"
+"4. Dans l'onglet Permissions, cochez account_info.read, files.content.write "
+"et sharing.write, puis cliquez sur Submit.\n"
+"5. Dans l'onglet Settings, sous OAuth 2, ajoutez l'URI de redirection {uri} "
+"et cliquez sur Add.\n"
+"6. Copiez la clé d'application (App key) en haut de l'onglet Settings dans "
+"le champ ci-dessus.\n"
+"L'application peut rester au statut Development ; cela suffit pour votre "
+"propre compte. Laissez le champ vide pour utiliser la clé d'application "
+"fournie avec cette version, si elle en a une."
 
-#, fuzzy
 msgid "Connected as {who}."
 msgstr "Connecté en tant que {who}."
 
 msgid "Choose an online account first."
-msgstr ""
+msgstr "Choisissez d'abord un compte en ligne."
 
 msgid "Signing in…"
 msgstr "Connexion…"
 
 msgid "Enter the app key of a Dropbox app first."
-msgstr ""
+msgstr "Saisissez d'abord la clé d'application d'une application Dropbox."
 
 msgid "Waiting for the sign-in in your browser…"
-msgstr ""
+msgstr "En attente de la connexion dans votre navigateur…"
 
-#, fuzzy
 msgid "Fill in the server URL, e-mail and password first."
 msgstr ""
-"Renseignez d'abord l'URL du serveur, le nom d'utilisateur et le mot de passe "
-"d'application."
+"Renseignez d'abord l'URL du serveur, l'adresse e-mail et le mot de passe."
 
 msgid "Fill in the server URL, user name and app password first."
 msgstr ""
@@ -1676,22 +1693,33 @@ msgid ""
 "and download passwords are not available on a free personal OneDrive (they "
 "need a Microsoft 365 subscription), so both are turned off for this account."
 msgstr ""
+"Vous pouvez envoyer des fichiers et partager des liens simples avec ce "
+"OneDrive. L'expiration des liens et les mots de passe de téléchargement ne "
+"sont pas disponibles sur un OneDrive personnel gratuit (ils nécessitent un "
+"abonnement Microsoft 365), ces deux options sont donc désactivées pour ce "
+"compte."
 
 msgid ""
 "You can upload files, share links and set an expiry with this OneDrive. "
 "Download passwords are not available on OneDrive for Business links, so that "
 "option is turned off for this account."
 msgstr ""
+"Vous pouvez envoyer des fichiers, partager des liens et définir une "
+"expiration avec ce OneDrive. Les mots de passe de téléchargement ne sont pas "
+"disponibles sur les liens OneDrive Entreprise, cette option est donc "
+"désactivée pour ce compte."
 
 msgid ""
 "You can upload files and share links with this OneDrive, with a download "
 "password. Link expiry is not available on it, so that option is turned off "
 "for this account."
 msgstr ""
+"Vous pouvez envoyer des fichiers et partager des liens avec ce OneDrive, "
+"avec un mot de passe de téléchargement. L'expiration des liens n'est pas "
+"disponible, cette option est donc désactivée pour ce compte."
 
-#, fuzzy
 msgid "Signed in as {who}. {terms}"
-msgstr "Connecté en tant que {who}."
+msgstr "Connecté en tant que {who}. {terms}"
 
 msgid "Collapse into reader"
 msgstr "Réduire dans le lecteur"
@@ -1787,15 +1815,14 @@ msgid "Upload to Cloud Storage"
 msgstr "Téléverser vers un stockage en ligne"
 
 msgid "Not signed in"
-msgstr ""
+msgstr "Non connecté"
 
-#, fuzzy
 msgid ""
 "The sign-in for {name} is not in the keyring. Open Settings, Cloud Storage, "
 "and enter it again."
 msgstr ""
-"Le mot de passe d'application pour {name} n'est pas dans le trousseau de "
-"clés. Ouvrez Paramètres, Stockage en ligne, et saisissez-le à nouveau."
+"La connexion pour {name} n'est pas dans le trousseau de clés. Ouvrez "
+"Paramètres, Stockage en ligne, et saisissez-la à nouveau."
 
 msgid "link expires {date}"
 msgstr "le lien expire le {date}"
@@ -1825,13 +1852,11 @@ msgstr[1] ""
 msgid "Upload"
 msgstr "Téléverser"
 
-#, fuzzy
 msgid "Protect with a password"
-msgstr "Protéger les liens par un mot de passe"
+msgstr "Protéger par un mot de passe"
 
-#, fuzzy
 msgid "Download password (empty: generated)"
-msgstr "Mot de passe de téléchargement pour {name} : {password}"
+msgstr "Mot de passe de téléchargement (vide : généré)"
 
 msgid ""
 "There is no OpenPGP key of your own for {addr}. Generate one under Settings, "
@@ -2802,6 +2827,12 @@ msgstr ""
 "La réponse en ligne s'ouvre avec ses champs d'adresse et d'objet visibles. "
 "Désactivé, ils restent repliés derrière un bouton dans l'en-tête du panneau."
 
+msgid "Send new messages from"
+msgstr ""
+
+msgid "Replies still answer from the address the original was sent to."
+msgstr ""
+
 msgid "Paste as plain text"
 msgstr "Coller comme texte brut"
 
@@ -3059,6 +3090,9 @@ msgstr "Affiché au survol"
 
 msgid "Always visible"
 msgstr "Toujours visible"
+
+msgid "Account of the current folder"
+msgstr ""
 
 msgid "System language — {language}"
 msgstr "Langue du système — {language}"
@@ -3639,6 +3673,48 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
+#~ "same tags."
+#~ msgstr ""
+#~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
+#~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
+#~ "clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
+#~ "étiquettes."
+
+#~ msgid "Nextcloud, ownCloud or OpenCloud"
+#~ msgstr "Nextcloud, ownCloud ou OpenCloud"
+
+#~ msgid "Dropbox"
+#~ msgstr "Dropbox"
+
+#~ msgid "Seafile"
+#~ msgstr "Seafile"
+
+#~ msgid "OneDrive"
+#~ msgstr "OneDrive"
+
+#~ msgid ""
+#~ "Upload a large file to Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox "
+#~ "or Seafile and put a share link in the message instead of an attachment."
+#~ msgstr ""
+#~ "Envoyez un fichier volumineux vers Nextcloud, ownCloud, OpenCloud, "
+#~ "OneDrive, Dropbox ou Seafile, et insérez un lien de partage dans le "
+#~ "message au lieu d'une pièce jointe."
+
+#~ msgid "Account name, such as Work OneDrive (optional)"
+#~ msgstr "Nom du compte, par exemple OneDrive professionnel (facultatif)"
+
+#~ msgid "Account name, such as Work Nextcloud (optional)"
+#~ msgstr "Nom du compte, par exemple Nextcloud professionnel (facultatif)"
+
+#~ msgid "Account name, such as Team Seafile (optional)"
+#~ msgstr "Nom du compte, par exemple Seafile d'équipe (facultatif)"
+
+#~ msgid "Account name, such as Personal Dropbox (optional)"
+#~ msgstr "Nom du compte, par exemple Dropbox personnel (facultatif)"
 
 #~ msgid "No app password"
 #~ msgstr "Aucun mot de passe d'application"
