@@ -48,6 +48,9 @@ pub struct PrefInit {
     /// "New message" composes inline over the reading pane (vs a window).
     pub compose_inline: bool,
     pub reply_fields: bool,
+    /// The identity new messages are sent from (#157); empty = the open
+    /// folder's account. One of `identities`' addresses.
+    pub compose_default_from: String,
     pub paste_plain: bool,
     pub spellcheck: bool,
     pub spellcheck_langs: String,
@@ -213,6 +216,9 @@ pub struct Preferences {
     host_header: Option<adw::HeaderBar>,
     /// The OpenPGP page (#133), kept alive with the window.
     pgp_keys: Option<Controller<crate::ui::pgp_keys::PgpKeys>>,
+    /// (name, address) per enabled account and alias, the rows of the
+    /// "Send new messages from" combo after its first (#157).
+    identities: Vec<(String, String)>,
     /// The Cloud Storage page (#144), likewise.
     cloud: Option<Controller<crate::ui::cloud_accounts::CloudAccounts>>,
     /// The account editor is up in the accounts slot: leaving it for another
@@ -288,6 +294,9 @@ pub enum PrefInput {
     ToggleSwipeReversed(bool),
     ToggleComposeInline(bool),
     ToggleReplyFields(bool),
+    /// The "Send new messages from" combo: 0 = the open folder's account,
+    /// then `identities` in order.
+    ChangeComposeDefaultFrom(u32),
     TogglePastePlain(bool),
     ToggleSpellcheck(bool),
     SpellLangsEdited(String),
@@ -360,6 +369,7 @@ pub enum PrefOutput {
     SetSwipeReversed(bool),
     SetComposeInline(bool),
     SetReplyFields(bool),
+    SetComposeDefaultFrom(String),
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
@@ -1046,6 +1056,15 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "default_from_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Send new messages from"),
+                                        set_subtitle: &i18n("The From address a new message starts with.                                                        Replies still answer from the address the                                                        original was sent to."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeComposeDefaultFrom(row.selected()));
+                                        },
+                                    },
+
                                     #[name = "paste_plain_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Paste as plain text"),
@@ -1330,6 +1349,7 @@ impl Component for Preferences {
             accounts_sender: init.accounts_sender.clone(),
             host_header: None,
             pgp_keys: None,
+            identities: init.identities.clone(),
             cloud: None,
             editor_open: false,
             editor_page: "accounts",
@@ -1527,6 +1547,30 @@ impl Component for Preferences {
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
         widgets.reply_fields_row.set_active(init.reply_fields);
+        // "Send new messages from": the open folder's account, then every
+        // enabled account and alias, labelled as the composer's From row
+        // labels them. Only meaningful with more than one identity.
+        {
+            let mut labels: Vec<String> = vec![i18n("Account of the open folder")];
+            labels.extend(model.identities.iter().map(|(name, addr)| {
+                if name.trim().is_empty() {
+                    addr.clone()
+                } else {
+                    format!("{name} <{addr}>")
+                }
+            }));
+            let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+            widgets.default_from_row.set_model(Some(&gtk::StringList::new(&refs)));
+            let want = init.compose_default_from.trim();
+            let sel = model
+                .identities
+                .iter()
+                .position(|(_, addr)| addr.eq_ignore_ascii_case(want))
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            widgets.default_from_row.set_selected(sel as u32);
+            widgets.default_from_row.set_visible(model.identities.len() > 1);
+        }
         widgets.paste_plain_row.set_active(init.paste_plain);
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language dropdown offers exactly what checking can use: the
@@ -1800,6 +1844,14 @@ impl Component for Preferences {
             }
             PrefInput::ToggleReplyFields(on) => {
                 let _ = sender.output(PrefOutput::SetReplyFields(on));
+            }
+            PrefInput::ChangeComposeDefaultFrom(index) => {
+                let addr = (index > 0)
+                    .then(|| self.identities.get(index as usize - 1))
+                    .flatten()
+                    .map(|(_, addr)| addr.clone())
+                    .unwrap_or_default();
+                let _ = sender.output(PrefOutput::SetComposeDefaultFrom(addr));
             }
             PrefInput::ToggleComposeInline(on) => {
                 let _ = sender.output(PrefOutput::SetComposeInline(on));

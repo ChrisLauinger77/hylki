@@ -73,6 +73,8 @@ time for this list in the app; the same key closes it again.
 | <kbd>/</kbd> | Search | <kbd>s</kbd> | Star or unstar |
 | <kbd>c</kbd> | Compose | <kbd>m</kbd> | Mark read or unread |
 | <kbd>?</kbd> | This list | <kbd>x</kbd> | Select the row (for a bulk action) |
+| | | <kbd>1</kbd> … <kbd>9</kbd> | Add or remove a tag (the first nine, in Settings order) |
+| | | <kbd>0</kbd> | Remove every tag |
 
 <kbd>Esc</kbd> backs out of a reply, forward or compose and returns you to the
 message list. It works whether or not single-key shortcuts are enabled — as does

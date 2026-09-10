@@ -453,6 +453,9 @@ pub struct AppModel {
     /// "New message" composes inline over the reading pane (vs a window).
     compose_inline: bool,
     reply_fields: bool,
+    /// The identity new messages are sent from (#157); empty = the open
+    /// folder's account.
+    compose_default_from: String,
     paste_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
@@ -710,6 +713,9 @@ pub enum AppMsg {
     SetComposeInline(bool),
     /// Reply panel shows its From/To/Subject rows from the start (#154).
     SetReplyFields(bool),
+    /// The identity new messages are sent from (#157); empty = the open
+    /// folder's account.
+    SetComposeDefaultFrom(String),
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
@@ -1980,6 +1986,7 @@ impl SimpleComponent for AppModel {
             swipe_reversed: config::load_swipe_reversed(),
             compose_inline: config::load_compose_inline(),
             reply_fields: config::load_reply_fields(),
+            compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
@@ -4065,14 +4072,15 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Compose => {
-                let account = self.active_account();
+                let (account, prefill) =
+                    self.new_message_from(self.active_account(), ComposePrefill::default());
                 if self.compose_inline {
                     // The new-message pane slides down over the reader,
                     // exactly like an inline reply — same composer, same
                     // pop-out-to-window toggle in its header.
-                    self.open_inline_reply(account, ComposePrefill::default(), None, &sender);
+                    self.open_inline_reply(account, prefill, None, &sender);
                 } else {
-                    self.open_compose(account, ComposePrefill::default(), &sender);
+                    self.open_compose(account, prefill, &sender);
                 }
             }
 
@@ -4775,6 +4783,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetComposeDefaultFrom(addr) => {
+                if self.compose_default_from != addr {
+                    self.compose_default_from = addr;
+                    self.save_settings();
+                }
+            }
+
             AppMsg::SetPastePlain(on) => {
                 if self.paste_plain != on {
                     self.paste_plain = on;
@@ -4860,6 +4875,7 @@ impl SimpleComponent for AppModel {
                     to: addr,
                     ..Default::default()
                 };
+                let (account, prefill) = self.new_message_from(account, prefill);
                 // Same preference as "New Message": slide down over the
                 // reader, unless composing is set to open in a window.
                 if self.compose_inline {
@@ -4885,6 +4901,7 @@ impl SimpleComponent for AppModel {
                     .map(|m| m.account_id)
                     .unwrap_or_else(|| self.active_account());
                 let prefill = ComposePrefill { attachments: paths, ..Default::default() };
+                let (account, prefill) = self.new_message_from(account, prefill);
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
                 } else {
@@ -4982,6 +4999,7 @@ impl SimpleComponent for AppModel {
                     .as_ref()
                     .map(|m| m.account_id)
                     .unwrap_or_else(|| self.active_account());
+                let (account, prefill) = self.new_message_from(account, prefill);
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
                 } else {
@@ -6501,6 +6519,7 @@ impl AppModel {
             self.swipe_reversed,
             self.compose_inline,
             self.reply_fields,
+            &self.compose_default_from,
             self.paste_plain,
             self.spellcheck,
             self.spellcheck_langs.clone(),
@@ -6555,6 +6574,34 @@ impl AppModel {
             }
             Shortcut::Compose => sender.input(AppMsg::Compose),
             Shortcut::Shortcuts => self.show_shortcuts(),
+            Shortcut::Tag(n) => {
+                // Settings order, first nine. A number past the list does
+                // nothing rather than something surprising.
+                if let Some(tag) = self.tags.get(usize::from(n).saturating_sub(1)) {
+                    sender.input(AppMsg::ToggleTagCurrent(tag.keyword.clone()));
+                }
+            }
+            Shortcut::ClearTags => {
+                // Only configured tags come off: a message's other keywords
+                // ($Forwarded, a client's own flags) are not ours to drop.
+                // Re-read the message between removals, since set_tag
+                // patches the copy the next call will read.
+                let keywords: Vec<String> = self
+                    .reply_target()
+                    .map(|m| {
+                        self.tags
+                            .iter()
+                            .filter(|t| m.has_keyword(&t.keyword))
+                            .map(|t| t.keyword.clone())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for keyword in keywords {
+                    if let Some(m) = self.reply_target() {
+                        self.set_tag(&m, &keyword, false);
+                    }
+                }
+            }
         }
     }
 
@@ -6636,6 +6683,32 @@ impl AppModel {
             for (key, what) in *keys {
                 let row = adw::ActionRow::builder().title(i18n(what)).build();
                 let label = gtk::Label::new(Some(key));
+                label.add_css_class("shortcut-key");
+                label.set_valign(gtk::Align::Center);
+                row.add_suffix(&label);
+                list.append(&row);
+            }
+            page.append(&list);
+        }
+
+        // Which number is which tag (#157): the first nine, in Settings
+        // order, each with its swatch. Only when there are tags to list.
+        if !self.tags.is_empty() {
+            let title = gtk::Label::new(Some(i18n("Your tags").as_str()));
+            title.add_css_class("heading");
+            title.set_halign(gtk::Align::Start);
+            title.set_margin_top(14);
+            title.set_margin_bottom(6);
+            page.append(&title);
+            let list = gtk::ListBox::new();
+            list.add_css_class("boxed-list");
+            list.set_selection_mode(gtk::SelectionMode::None);
+            for (i, tag) in self.tags.iter().take(9).enumerate() {
+                let row = adw::ActionRow::builder()
+                    .title(gtk::glib::markup_escape_text(&tag.name))
+                    .build();
+                row.add_prefix(&crate::ui::context_menu::swatch_widget(&tag.color, true));
+                let label = gtk::Label::new(Some(&(i + 1).to_string()));
                 label.add_css_class("shortcut-key");
                 label.set_valign(gtk::Align::Center);
                 row.add_suffix(&label);
@@ -6760,6 +6833,33 @@ impl AppModel {
             .map(|s| s.account_id)
             .or_else(|| self.accounts.first().map(|a| a.id))
             .unwrap_or(1)
+    }
+
+    /// The account and identity a NEW message opens from (#157). With a
+    /// default sender chosen in Settings → Composing, that identity — an
+    /// account's own address or one of its aliases — as long as its account
+    /// is still enabled; otherwise `fallback` (the open folder's or open
+    /// message's account, as before) from its own address. Replies never
+    /// come through here: they answer from the address written to.
+    fn new_message_from(&self, fallback: u32, mut prefill: ComposePrefill) -> (u32, ComposePrefill) {
+        let want = self.compose_default_from.trim();
+        if want.is_empty() {
+            return (fallback, prefill);
+        }
+        let owner = self.config.iter().enumerate().find(|(_, c)| {
+            c.enabled
+                && (c.email.eq_ignore_ascii_case(want)
+                    || c.aliases.iter().any(|al| {
+                        crate::config::split_identity(&al.identity).1.eq_ignore_ascii_case(want)
+                    }))
+        });
+        match owner {
+            Some((idx, _)) => {
+                prefill.from_address = want.to_string();
+                (idx as u32 + 1, prefill)
+            }
+            None => (fallback, prefill),
+        }
     }
 
     /// Spawn one worker per configured account (or a single mock worker when no
@@ -8409,6 +8509,7 @@ impl AppModel {
             encrypt: false,
             outbox_origin: Some(id),
             reply_addressed_to: String::new(),
+            from_address: String::new(),
             send_at: item.send_at,
         };
         // The Outbox stays the folder on screen: its list is still what's listed,
@@ -8534,8 +8635,11 @@ impl AppModel {
             .collect();
         // Default identity: for a reply, whichever of the account's addresses
         // the original was sent to — mail to an alias is answered as the alias.
-        // Otherwise (and when nothing matches) the account's own address.
+        // For a new message, the default sender chosen in Settings (#157), if
+        // it is one of this account's addresses. Otherwise (and when nothing
+        // matches) the account's own address.
         let hay = prefill.reply_addressed_to.to_lowercase();
+        let want = prefill.from_address.trim().to_lowercase();
         let selected = (!hay.is_empty())
             .then(|| {
                 accounts.iter().position(|c| {
@@ -8543,6 +8647,14 @@ impl AppModel {
                 })
             })
             .flatten()
+            .or_else(|| {
+                (!want.is_empty()).then(|| {
+                    accounts
+                        .iter()
+                        .position(|c| c.id == account_id && c.email.to_lowercase() == want)
+                })
+                .flatten()
+            })
             .or_else(|| {
                 accounts
                     .iter()
@@ -10162,6 +10274,7 @@ impl AppModel {
             swipe_reversed: self.swipe_reversed,
             compose_inline: self.compose_inline,
             reply_fields: self.reply_fields,
+            compose_default_from: self.compose_default_from.clone(),
             paste_plain: self.paste_plain,
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),
@@ -10218,6 +10331,7 @@ impl AppModel {
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
                 PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
+                PrefOutput::SetComposeDefaultFrom(addr) => AppMsg::SetComposeDefaultFrom(addr),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
                 PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
                 PrefOutput::SetSpellcheckLangs(l) => AppMsg::SetSpellcheckLangs(l),
@@ -11407,6 +11521,11 @@ pub enum Shortcut {
     Compose,
     Search,
     Shortcuts,
+    /// Add or remove the Nth tag (1-based, in Settings order) on the
+    /// message being read (#157).
+    Tag(u8),
+    /// Take every tag off the message being read.
+    ClearTags,
 }
 
 /// The shortcut for a key press, if any. `shift` distinguishes `r` from `R`.
@@ -11431,6 +11550,17 @@ fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
         Key::c => Shortcut::Compose,
         Key::slash => Shortcut::Search,
         Key::question => Shortcut::Shortcuts,
+        // Tags by number, the way Evolution labels mail (#157). 0 clears.
+        Key::_1 | Key::KP_1 => Shortcut::Tag(1),
+        Key::_2 | Key::KP_2 => Shortcut::Tag(2),
+        Key::_3 | Key::KP_3 => Shortcut::Tag(3),
+        Key::_4 | Key::KP_4 => Shortcut::Tag(4),
+        Key::_5 | Key::KP_5 => Shortcut::Tag(5),
+        Key::_6 | Key::KP_6 => Shortcut::Tag(6),
+        Key::_7 | Key::KP_7 => Shortcut::Tag(7),
+        Key::_8 | Key::KP_8 => Shortcut::Tag(8),
+        Key::_9 | Key::KP_9 => Shortcut::Tag(9),
+        Key::_0 | Key::KP_0 => Shortcut::ClearTags,
         _ => return None,
     };
     Some(action)
@@ -11462,6 +11592,8 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("s", i18n_noop("Star or unstar")),
             ("m", i18n_noop("Mark read or unread")),
             ("x", i18n_noop("Select this row (for a bulk action)")),
+            ("1 … 9", i18n_noop("Add or remove a tag (the first nine, in Settings order)")),
+            ("0", i18n_noop("Remove every tag")),
         ],
     ),
     (
@@ -12835,6 +12967,11 @@ mod tests {
         assert_eq!(shortcut_for(Key::Left, false), Some(Shortcut::BackToList));
         // Shift distinguishes reply from reply-all.
         assert_eq!(shortcut_for(Key::R, true), Some(Shortcut::ReplyAll));
+        // Digits toggle tags by position, on the keypad too; 0 clears (#157).
+        assert_eq!(shortcut_for(Key::_1, false), Some(Shortcut::Tag(1)));
+        assert_eq!(shortcut_for(Key::KP_5, false), Some(Shortcut::Tag(5)));
+        assert_eq!(shortcut_for(Key::_9, false), Some(Shortcut::Tag(9)));
+        assert_eq!(shortcut_for(Key::_0, false), Some(Shortcut::ClearTags));
         // Anything unmapped is left to the widget with focus.
         assert_eq!(shortcut_for(Key::z, false), None);
         assert_eq!(shortcut_for(Key::Return, false), None);
@@ -12849,7 +12986,7 @@ mod tests {
             .iter()
             .flat_map(|(_, keys)| keys.iter().map(|(key, _)| *key))
             .collect();
-        for key in ["j  or  ↓", "r", "a", "d", "w", "b", "x", "?"] {
+        for key in ["j  or  ↓", "r", "a", "d", "w", "b", "x", "?", "1 … 9", "0"] {
             assert!(documented.contains(&key), "{key} is not in the reference");
         }
         // Every documented line has a description.

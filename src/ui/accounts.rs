@@ -259,6 +259,9 @@ pub enum AccountsInput {
     AddTag,
     EditTag(usize),
     RemoveTag(usize),
+    /// A tag row was dragged onto another: reorder (#157). The order is the
+    /// sidebar's, and the 1–9 shortcuts'.
+    MoveTag { from: usize, to: usize },
     TagAdded(crate::config::Tag),
     TagEdited(usize, crate::config::Tag),
 }
@@ -434,7 +437,9 @@ impl Component for AccountsWindow {
                                     set_description: Some(
                                         i18n("Label messages with one or more coloured tags. \
                                          Tags are stored on the mail server as IMAP keywords, \
-                                         so Thunderbird and other clients show the same tags.").as_str()
+                                         so Thunderbird and other clients show the same tags. \
+                                         Drag a tag to reorder: the order here is the sidebar's, \
+                                         and the first nine answer to the 1–9 keys.").as_str()
                                     ),
                                     #[wrap(Some)]
                                     set_header_suffix = &gtk::Button {
@@ -1909,6 +1914,15 @@ impl Component for AccountsWindow {
                     let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
                 }
             }
+            AccountsInput::MoveTag { from, to } => {
+                if from < self.tags.len() && from != to {
+                    let tag = self.tags.remove(from);
+                    let to = to.min(self.tags.len());
+                    self.tags.insert(to, tag);
+                    self.rebuild_tag_rows(&sender);
+                    let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
+                }
+            }
             AccountsInput::TagAdded(tag) => {
                 self.tags.push(tag);
                 self.rebuild_tag_rows(&sender);
@@ -3082,7 +3096,41 @@ impl AccountsWindow {
             row.connect_activated(move |_| s.input(AccountsInput::EditTag(i)));
             row.set_title(&gtk::glib::markup_escape_text(&t.name));
             row.set_subtitle(&gtk::glib::markup_escape_text(&t.keyword));
+            let handle = gtk::Image::from_icon_name("co.hyprlab.Vireo-list-drag-handle-symbolic");
+            handle.add_css_class("dim-label");
+            row.add_prefix(&handle);
             row.add_prefix(&crate::ui::context_menu::swatch_widget(&t.color, true));
+            // The number that toggles it from the keyboard (#157), for the
+            // first nine.
+            if i < 9 {
+                let key = gtk::Label::new(Some(&(i + 1).to_string()));
+                key.add_css_class("shortcut-key");
+                key.set_valign(gtk::Align::Center);
+                key.set_tooltip_text(Some(
+                    i18n("Press this key on a message to add or remove the tag (with single-key shortcuts on)").as_str(),
+                ));
+                row.add_suffix(&key);
+            }
+            // Drag to reorder, as the accounts list does.
+            let drag = gtk::DragSource::new();
+            drag.set_actions(gtk::gdk::DragAction::MOVE);
+            let from = i as u32;
+            drag.connect_prepare(move |_, _, _| {
+                Some(gtk::gdk::ContentProvider::for_value(&from.to_value()))
+            });
+            row.add_controller(drag);
+            let drop = gtk::DropTarget::new(gtk::glib::Type::U32, gtk::gdk::DragAction::MOVE);
+            let to = i;
+            let input = sender.input_sender().clone();
+            drop.connect_drop(move |_, value, _, _| {
+                if let Ok(from) = value.get::<u32>() {
+                    let _ = input.send(AccountsInput::MoveTag { from: from as usize, to });
+                    true
+                } else {
+                    false
+                }
+            });
+            row.add_controller(drop);
             let edit = gtk::Image::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
             edit.set_margin_start(6);
             row.add_suffix(&edit);

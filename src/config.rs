@@ -826,6 +826,12 @@ struct PrivacyFile {
     /// from the start (#154); off, a button in its header reveals them.
     #[serde(default)]
     reply_fields: bool,
+    /// The identity new messages are sent from (#157): an account's or
+    /// alias's address, or empty for the account of the open folder (the
+    /// original behaviour). Replies keep answering from the address the
+    /// original was sent to, whatever this says.
+    #[serde(default)]
+    compose_default_from: String,
     /// The inset-card default for lone messages (#57, #153) was applied
     /// once to installs that predate it. Set on the first load that did so.
     #[serde(default)]
@@ -1069,6 +1075,7 @@ impl Default for PrivacyFile {
             swipe_reversed: false,
             compose_inline: default_compose_inline(),
             reply_fields: false,
+            compose_default_from: String::new(),
             single_card_default_applied: false,
             paste_plain: default_paste_plain(),
             spellcheck: default_spellcheck(),
@@ -1115,6 +1122,11 @@ fn load_privacy() -> PrivacyFile {
 /// Whether the inline reply panel shows From, To and Subject from the start (#154).
 pub fn load_reply_fields() -> bool {
     load_privacy().reply_fields
+}
+
+/// The address new messages are sent from; empty = the open folder's account.
+pub fn load_compose_default_from() -> String {
+    load_privacy().compose_default_from
 }
 
 /// Senders whose messages may auto-load remote content. Stored lowercased.
@@ -1719,6 +1731,7 @@ pub fn save_privacy(
     swipe_reversed: bool,
     compose_inline: bool,
     reply_fields: bool,
+    compose_default_from: &str,
     paste_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
@@ -1783,6 +1796,7 @@ pub fn save_privacy(
         swipe_reversed,
         compose_inline,
         reply_fields,
+        compose_default_from: compose_default_from.to_string(),
         paste_plain,
         spellcheck,
         // Every save is after the first load, which applied it.

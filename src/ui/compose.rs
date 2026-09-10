@@ -103,6 +103,10 @@ pub struct ComposePrefill {
     /// For a reply: the original's To+Cc, so the composer can answer from the
     /// alias the mail was addressed to (#34). Empty otherwise.
     pub reply_addressed_to: String,
+    /// For a new message: the address to send from when the user has chosen
+    /// a default identity in Settings (#157). Empty = the account's own
+    /// address. Ignored when `reply_addressed_to` names an identity.
+    pub from_address: String,
     /// Send Later (#145): a queued message's scheduled time, kept while it is
     /// edited so Send re-queues it for the same moment.
     pub send_at: Option<i64>,
