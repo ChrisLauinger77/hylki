@@ -368,8 +368,12 @@ impl Component for Compose {
                                 gtk::Box {
                                     set_orientation: gtk::Orientation::Vertical,
                                     set_spacing: 2,
+                                    // Menu rows, not buttons: regular weight
+                                    // like every other popover menu (#167).
+                                    add_css_class: "context-menu-list",
                                     gtk::Button {
                                         add_css_class: "flat",
+                                        add_css_class: "context-menu-item",
                                         set_halign: gtk::Align::Fill,
                                         #[wrap(Some)]
                                         set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
@@ -382,6 +386,7 @@ impl Component for Compose {
                                     gtk::Separator {},
                                     gtk::Button {
                                         add_css_class: "flat",
+                                        add_css_class: "context-menu-item",
                                         #[wrap(Some)]
                                         set_child = &gtk::Label { set_label: &i18n("Tomorrow morning (8:00)"), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
@@ -391,6 +396,7 @@ impl Component for Compose {
                                     },
                                     gtk::Button {
                                         add_css_class: "flat",
+                                        add_css_class: "context-menu-item",
                                         #[wrap(Some)]
                                         set_child = &gtk::Label { set_label: &i18n("Tomorrow afternoon (13:00)"), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
@@ -400,6 +406,7 @@ impl Component for Compose {
                                     },
                                     gtk::Button {
                                         add_css_class: "flat",
+                                        add_css_class: "context-menu-item",
                                         #[wrap(Some)]
                                         set_child = &gtk::Label { set_label: &i18n("Monday morning (8:00)"), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
@@ -410,6 +417,7 @@ impl Component for Compose {
                                     gtk::Separator {},
                                     gtk::Button {
                                         add_css_class: "flat",
+                                        add_css_class: "context-menu-item",
                                         #[wrap(Some)]
                                         set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
