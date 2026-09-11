@@ -167,11 +167,6 @@ pub struct SectionData {
 }
 
 /// Initial state for the sidebar.
-/// Start margin that centres the peek's refresh button over the rail's
-/// 80px column: (80 - the flat icon button's 36px) / 2, measured against
-/// the rail in a demo run (rail refresh at x=22, menu at x=23).
-const PEEK_RAIL_REFRESH_MARGIN: i32 = 22;
-
 pub struct SidebarInit {
     /// Icon-only mode: hide all text, show just icons and account pills.
     pub collapsed: bool,
@@ -288,11 +283,6 @@ pub struct Sidebar {
     selected: Sel,
     /// Icon-only mode: hide all text, show just icons and account pills.
     collapsed: bool,
-    /// The narrow-window peek: expanded rows floating over the icon rail.
-    /// The rail's own refresh button stays in place below the menu, so the
-    /// panel's first 80px column is the rail, pixel for pixel, with the
-    /// labels sliding out beside it.
-    peek: bool,
     /// Whether the "Attachments" row is shown (in the pinned footer).
     show_attachments: bool,
     /// Whether the "Contacts" row is shown (in the pinned footer).
@@ -425,11 +415,6 @@ pub enum SidebarInput {
     /// unlike ToggleCollapsed this never reports CollapsedChanged, so it can't
     /// overwrite the user's own persisted choice.
     SetCollapsed(bool),
-    /// The expanded rows are (or are no longer) the narrow-window peek
-    /// floating over the rail — see the `peek` field. Rebuilds only when the
-    /// rows are expanded; set it before SetCollapsed(false) on open and after
-    /// SetCollapsed(true) on close so each transition rebuilds once.
-    SetPeek(bool),
     /// Toggle the collapsible "Folders" (custom folders) section for an account.
     ToggleCustomFoldersLocal(u32),
     /// Collapse/expand one folder-tree node (a parent folder's chevron, #51).
@@ -668,7 +653,6 @@ impl Component for Sidebar {
             color_provider,
             selected: Sel::None,
             collapsed: init.collapsed,
-            peek: false,
             show_attachments: init.show_attachments,
             show_contacts: init.show_contacts,
             outbox_count: 0,
@@ -1305,21 +1289,6 @@ impl Component for Sidebar {
                 }
             }
 
-            SidebarInput::SetPeek(peek) => {
-                if self.peek != peek {
-                    self.peek = peek;
-                    if !self.collapsed {
-                        self.rebuild_normal(
-                            &widgets.pinned_box,
-                            &widgets.normal_box,
-                            &widgets.footer_box,
-                            &sender,
-                        );
-                        self.restore_selection();
-                    }
-                }
-            }
-
             SidebarInput::ToggleCollapsed => {
                 self.collapsed = !self.collapsed;
                 self.rail_open.clear();
@@ -1704,13 +1673,9 @@ impl Sidebar {
         // and centred (Refresh lives in the app's header bar, top-left across
         // from the menu). The collapsed rail's header only has room for the
         // menu button, so Refresh stacks here instead — directly below it.
-        // The peek keeps that rail stack (the panel floats over the rail and
-        // its first column must not move), just pinned to the rail's centre
-        // line instead of the wider panel's.
         {
-            let rail_stack = self.collapsed || self.peek;
             let bar = gtk::Box::new(
-                if rail_stack {
+                if self.collapsed {
                     gtk::Orientation::Vertical
                 } else {
                     gtk::Orientation::Horizontal
@@ -1720,19 +1685,13 @@ impl Sidebar {
 
             self.sync_stack = None;
             self.sync_spinner = None;
-            if rail_stack {
+            if self.collapsed {
                 // Refresh, showing a spinner while any account syncs.
                 let refresh = gtk::Button::new();
                 refresh.set_tooltip_text(Some(i18n("Refresh or long-press for Status Bar").as_str()));
                 refresh.add_css_class("flat");
                 refresh.set_valign(gtk::Align::Center);
-                if self.peek {
-                    // Centred over the rail's 80px, where the rail draws it.
-                    refresh.set_halign(gtk::Align::Start);
-                    refresh.set_margin_start(PEEK_RAIL_REFRESH_MARGIN);
-                } else {
-                    refresh.set_halign(gtk::Align::Center);
-                }
+                refresh.set_halign(gtk::Align::Center);
                 let stack = gtk::Stack::new();
                 stack.set_transition_type(gtk::StackTransitionType::Crossfade);
                 let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-view-refresh-symbolic");

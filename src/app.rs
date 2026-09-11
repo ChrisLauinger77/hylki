@@ -8107,8 +8107,6 @@ impl AppModel {
         self.sidebar_peek = false;
         self.sidebar_collapsed = false;
         self.rail_active = false;
-        // Off the peek layout (Refresh back to the header, no rail stack).
-        self.sidebar.emit(SidebarInput::SetPeek(false));
         self.sidebar.emit(SidebarInput::SetCollapsed(false));
         self.peek_transition.set(true);
         split.set_collapsed(false);
@@ -8211,9 +8209,6 @@ impl AppModel {
                     });
                 (ghost, img)
             });
-            // Peek layout first, so the expanded rebuild below is the one
-            // that keeps the rail's refresh stacked under the menu.
-            self.sidebar.emit(SidebarInput::SetPeek(true));
             if sync_rows {
                 self.sidebar.emit(SidebarInput::SetCollapsed(false));
             }
@@ -8288,8 +8283,6 @@ impl AppModel {
                     if sync_rows {
                         let _ = sidebar_sender.send(SidebarInput::SetCollapsed(true));
                     }
-                    // After the rail switch, so it costs no rebuild of its own.
-                    let _ = sidebar_sender.send(SidebarInput::SetPeek(false));
                     if let (Some(h), Some(t), Some(m)) =
                         (header.as_ref(), title.as_ref(), menu.as_ref())
                     {
@@ -13536,12 +13529,11 @@ fn set_sidebar_header_compact(
     title.set_visible(!compact);
 }
 
-/// The peek variant of the sidebar header: the panel floats over the icon
-/// rail, so its first 80px column must be the rail, unchanged — the
-/// hamburger stays centred over that strip, exactly where the rail draws it,
-/// and Refresh stays out of the header (the rows keep the rail's refresh
-/// stacked below the menu, see `SidebarInput::SetPeek`). The "Vireo" title
-/// is centred in the panel. Window controls stay hidden, matching the rail.
+/// The peek variant of the expanded sidebar header: identical layout to the
+/// expanded sidebar's — Refresh at the top-left, the hamburger at the top-end,
+/// the "Vireo" title centred — so the floating panel reads as the same
+/// sidebar, just overlaid. Window
+/// controls stay hidden, matching the rail the peek floats out of.
 fn set_sidebar_header_peek(
     header: &adw::HeaderBar,
     title: &gtk::Label,
@@ -13556,17 +13548,14 @@ fn set_sidebar_header_peek(
     }
     header.remove_css_class("rail-header");
     header.set_title_widget(Some(title));
-    // Centre the button over the rail's width, compensating the header's own
-    // start padding, so it sits where the rail drew it.
-    let w = menu.width().max(34);
-    menu.set_margin_start(((SIDEBAR_RAIL_WIDTH as i32 - w) / 2 - PEEK_HEADER_PADDING).max(0));
-    header.pack_start(menu);
+    // Same placement as the expanded sidebar header (Refresh start, menu
+    // end), so the overlay reads as the normal sidebar rather than shuffling
+    // its buttons around.
+    menu.set_margin_start(0);
+    header.pack_start(refresh);
+    header.pack_end(menu);
     title.set_visible(true);
 }
-
-/// The start padding libadwaita gives a header bar (the rail header zeroes
-/// it via `.rail-header`); the peek's pinned hamburger compensates for it.
-const PEEK_HEADER_PADDING: i32 = 6;
 
 /// Ask for a folder and write every attachment into it.
 fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWindow>) {
