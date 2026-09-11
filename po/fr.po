@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-10 11:15+0200\n"
+"PO-Revision-Date: 2026-09-10 17:52+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -100,9 +100,8 @@ msgstr "Télécharger…"
 msgid "Settings"
 msgstr "Paramètres"
 
-#, fuzzy
 msgid "Show Accounts"
-msgstr "Comptes"
+msgstr ""
 
 msgid "Print Preview…"
 msgstr "Aperçu avant impression…"
@@ -119,9 +118,8 @@ msgstr "Actions"
 msgid "Tags"
 msgstr "Mots-clés"
 
-#, fuzzy
 msgid "Move To…"
-msgstr "Déplacer vers"
+msgstr ""
 
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualiser ou appuyer longuement pour la barre d'état"
@@ -219,6 +217,11 @@ msgid ""
 "imported. Restart Vireo to apply them. Passwords and sign-ins are not part "
 "of a backup; re-enter them on first use if this is a new machine."
 msgstr ""
+"{n} compte(s) de messagerie, les comptes de stockage dans le cloud et tous "
+"les paramètres ont été importés. Redémarrez Vireo pour les appliquer. Les "
+"mots de passe et les identifiants ne sont pas inclus dans la sauvegarde ; "
+"vous devrez les saisir à nouveau lors de la première utilisation s'il s'agit "
+"d'un nouvel ordinateur."
 
 msgid "Later"
 msgstr "Plus tard"
@@ -255,7 +258,7 @@ msgstr ""
 "→ Système et apparence."
 
 msgid "Your tags"
-msgstr ""
+msgstr "Vos balises"
 
 msgid "Restarting Vireo"
 msgstr "Redémarrage de Vireo"
@@ -400,9 +403,8 @@ msgstr "Vider"
 msgid "No Junk folder available for this account"
 msgstr "Aucun dossier Indésirables disponible pour ce compte"
 
-#, fuzzy
 msgid "No Inbox folder available for this account"
-msgstr "Aucun dossier Indésirables disponible pour ce compte"
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "Aucun carnet d'adresses disponible pour ajouter des contacts"
@@ -534,9 +536,11 @@ msgstr "Sélectionner cette ligne (pour une action groupée)"
 
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
+"Ajouter ou supprimer un tag (les neuf premiers, dans l'ordre défini dans les "
+"paramètres)"
 
 msgid "Remove every tag"
-msgstr ""
+msgstr "Supprimer toutes les balises"
 
 msgid "Everything else"
 msgstr "Tout le reste"
@@ -559,9 +563,8 @@ msgstr "Commencez par le prévisualiser au format PDF"
 msgid "Reveal the status bar (also: long-press Refresh)"
 msgstr "Afficher la barre d'état (ou appui long sur Actualiser)"
 
-#, fuzzy
 msgid "Show or hide the accounts in the sidebar"
-msgstr "Contacts dans la barre latérale"
+msgstr ""
 
 msgid "Console mode (when enabled in Settings)"
 msgstr "Mode console (si activé dans les paramètres)"
@@ -794,7 +797,6 @@ msgstr ""
 "Comptes e-mail issus des Paramètres de GNOME. Activez-en un pour l'utiliser "
 "dans Vireo."
 
-#, fuzzy
 msgid ""
 "Label messages with one or more coloured tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same "
@@ -803,10 +805,6 @@ msgid ""
 "Drag a tag to reorder: the order here is the sidebar's, and the first nine "
 "answer to the 1–9 keys."
 msgstr ""
-"Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
-"étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
-"clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
-"étiquettes."
 
 msgid "Add Tag…"
 msgstr "Ajouter un tag…"
@@ -814,9 +812,8 @@ msgstr "Ajouter un tag…"
 msgid "Look through every mailbox for tags other clients have set"
 msgstr ""
 
-#, fuzzy
 msgid "Find Tags…"
-msgstr "Ajouter un tag…"
+msgstr ""
 
 msgid "Search filters"
 msgstr "Filtres de recherche"
@@ -990,11 +987,8 @@ msgstr "Tester la connexion"
 msgid "Appearance"
 msgstr "Apparence"
 
-#, fuzzy
 msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
-"Comment ce compte est affiché dans la barre latérale et dans la vue Toutes "
-"les boîtes de réception."
 
 msgid "Label (defaults to email address)"
 msgstr "Étiquette (adresse e-mail par défaut)"
@@ -1005,23 +999,20 @@ msgstr ""
 msgid "The circle, and this account's marks in the sidebar and lists"
 msgstr ""
 
-#, fuzzy
 msgid "Circle shows"
-msgstr "Couleur du cercle"
+msgstr ""
 
 msgid "Initials or emoji"
 msgstr ""
 
-#, fuzzy
 msgid "Picture"
-msgstr "Signature"
+msgstr ""
 
 msgid "Emoji"
 msgstr "Émoji"
 
-#, fuzzy
 msgid "Shown in the circle instead of the initials"
-msgstr "Optionnel — affiché à la place des initiales"
+msgstr ""
 
 msgid "Choose…"
 msgstr ""
@@ -1264,9 +1255,8 @@ msgstr ", marqué {tag}"
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
 
-#, fuzzy
 msgid "Searching…"
-msgstr "Synchronisation…"
+msgstr ""
 
 msgid "No New Tags"
 msgstr ""
@@ -1282,22 +1272,21 @@ msgid ""
 "or choose which to add. Names and colours can be changed afterwards."
 msgstr ""
 
-#, fuzzy
 msgid "Import Selected"
-msgstr "Importer des paramètres"
+msgstr ""
 
-#, fuzzy
 msgid "Import All"
-msgstr "Importer la clé"
+msgstr ""
 
-#, fuzzy
 msgid "{n} messages"
-msgstr "Supprimer {n} messages"
+msgstr ""
 
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
 msgstr ""
+"Appuyez sur cette touche sur un message pour ajouter ou supprimer le tag "
+"(lorsque les raccourcis à une seule touche sont activés)"
 
 msgid "Remove tag"
 msgstr "Supprimer la balise"
@@ -1388,11 +1377,8 @@ msgstr "Aucun"
 msgid "Count unread mail"
 msgstr "Compter les messages non lus"
 
-#, fuzzy
 msgid "Include the folder's unread mail in the tray icon's unread count"
 msgstr ""
-"Inclure les e-mails non lus du dossier dans le compteur global et l'icône de "
-"la zone de notification"
 
 msgid "Thumbnail size"
 msgstr "Taille des vignettes"
@@ -1539,6 +1525,13 @@ msgid ""
 "Supported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and "
 "Seafile."
 msgstr ""
+"Connectez votre service de stockage dans le cloud pour télécharger et "
+"partager des fichiers volumineux sans avoir à les joindre. Une icône "
+"représentant un nuage apparaît dans la barre d'outils de rédaction une fois "
+"le service ajouté.\n"
+"\n"
+"Services pris en charge : Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox "
+"et Seafile."
 
 msgid "No cloud accounts yet."
 msgstr "Aucun compte cloud pour le moment."
@@ -1546,14 +1539,16 @@ msgstr "Aucun compte cloud pour le moment."
 msgid "Cloud Account"
 msgstr "Compte cloud"
 
-#, fuzzy
 msgid "Remove {name}?"
-msgstr "{name} supprimé"
+msgstr "{name} supprimé?"
 
 msgid ""
 "Vireo forgets the account and its sign-in. Files already uploaded, and the "
 "links in messages you sent, stay where they are."
 msgstr ""
+"Vireo oublie le compte et ses identifiants de connexion. Les fichiers déjà "
+"téléchargés, ainsi que les liens contenus dans les messages que vous avez "
+"envoyés, restent en place."
 
 msgid "Removed {name}"
 msgstr "{name} supprimé"
@@ -1573,15 +1568,14 @@ msgstr "les liens expirent après {n} jours"
 msgid "password-protected"
 msgstr "protégé par mot de passe"
 
-#, fuzzy
 msgid "Offer this account in the composer"
-msgstr "Utiliser ce compte dans Vireo"
+msgstr "Proposer ce compte dans le compositeur"
 
 msgid "Service"
 msgstr "Service"
 
 msgid "Nickname (optional)"
-msgstr ""
+msgstr "Pseudo (facultatif)"
 
 msgid "Server URL"
 msgstr "URL du serveur"
@@ -1693,7 +1687,7 @@ msgid ""
 msgstr ""
 "Un mot de passe de téléchargement est créé pour chaque fichier et vous est "
 "présenté, à transmettre séparément. Nécessite Microsoft 365 ou OneDrive "
-"Entreprise."
+"Entreprise"
 
 msgid "User name"
 msgstr "Nom d'utilisateur"
@@ -2040,9 +2034,8 @@ msgstr "Ajouter un numéro de téléphone"
 msgid "Add website"
 msgstr "Ajouter un site web"
 
-#, fuzzy
 msgid "Search folders"
-msgstr "Filtres de recherche"
+msgstr ""
 
 msgid "Mark as read"
 msgstr "Marquer comme lu"
@@ -2293,7 +2286,7 @@ msgid "Import…"
 msgstr "Importer…"
 
 msgid "Generate…"
-msgstr "Générer..."
+msgstr "Générer…"
 
 msgid "Other people's keys"
 msgstr "Les clés des autres"
@@ -2328,7 +2321,7 @@ msgid "No key of your own yet. Generate one for your address."
 msgstr "Vous n'avez pas encore de clé. Générez-en une pour votre adresse."
 
 msgid "No keys from other people yet."
-msgstr "Je n'ai pas encore reçu de clés d'autres personnes."
+msgstr "Aucune clé provenant d'autres personnes pour le moment."
 
 msgid "Generating the key…"
 msgstr "Génération de la clé…"
@@ -2475,7 +2468,7 @@ msgstr "Supprimer cette clé"
 msgid "{n} key imported."
 msgid_plural "{n} keys imported."
 msgstr[0] "{n} Clé importée."
-msgstr[1] "Clés {n} importées."
+msgstr[1] "{n} Clés importées."
 
 msgid "That key was already in your keyring."
 msgstr "Cette clé se trouvait déjà sur votre trousseau."
@@ -2558,29 +2551,21 @@ msgstr "Système"
 msgid "Backup"
 msgstr "Sauvegarde"
 
-#, fuzzy
 msgid "Save the filter?"
-msgstr "Enregistrer le compte ?"
+msgstr ""
 
-#, fuzzy
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
 msgstr ""
-"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-les "
-"avant de continuer."
 
-#, fuzzy
 msgid "Save the tag?"
-msgstr "Enregistrer le compte ?"
+msgstr ""
 
-#, fuzzy
 msgid ""
 "The tag editor is open. Save what you changed, or discard it, before moving "
 "on."
 msgstr ""
-"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-les "
-"avant de continuer."
 
 msgid "Save the account?"
 msgstr "Enregistrer le compte ?"
@@ -2643,9 +2628,8 @@ msgstr ""
 "La vue affichée en premier lorsque les Paramètres sont ouverts depuis le "
 "menu."
 
-#, fuzzy
 msgid "Accounts in the sidebar"
-msgstr "Contacts dans la barre latérale"
+msgstr ""
 
 msgid ""
 "Each account's own section: its folders, filtered folders and tags. Off "
@@ -2655,13 +2639,10 @@ msgstr ""
 msgid "Chevron placement"
 msgstr "Emplacement des chevrons"
 
-#, fuzzy
 msgid ""
 "Which side of Inboxes and the account rows their expand/collapse chevrons "
 "sit on."
 msgstr ""
-"De quel côté des boîtes de réception et des lignes de compte se trouvent les "
-"«flèches » permettant de les développer ou de les réduire."
 
 msgid "Attachments in the sidebar"
 msgstr "Pièces jointes dans la barre latérale"
@@ -2712,17 +2693,13 @@ msgstr ""
 msgid "Unified"
 msgstr ""
 
-#, fuzzy
 msgid ""
 "The section at the top of the sidebar that combines every account. Only "
 "shown with more than one account."
 msgstr ""
-"Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
-"latérale. Affichée uniquement si vous avez plusieurs comptes."
 
-#, fuzzy
 msgid "Inboxes"
-msgstr "Boîte de réception"
+msgstr ""
 
 msgid ""
 "A unified inbox combining every account, at the top of the sidebar. Only "
@@ -2731,9 +2708,8 @@ msgstr ""
 "Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
 "latérale. Affichée uniquement si vous avez plusieurs comptes."
 
-#, fuzzy
 msgid "Starred"
-msgstr "Ajouter une étoile"
+msgstr ""
 
 msgid ""
 "Every account's starred folder as one list, opening to each account's own."
@@ -2748,33 +2724,26 @@ msgstr ""
 msgid "Every account's archive as one list, opening to each account's own."
 msgstr ""
 
-#, fuzzy
 msgid ""
 "List every folder your filter rules file into in a collapsible section of "
 "the unified view."
 msgstr ""
-"Répertoriez les dossiers vers lesquels votre fichier de règles de filtrage "
-"redirige dans une section repliable. Chaque règle détermine si son dossier "
-"apparaît dans cette section ; ce bouton permet de masquer complètement la "
-"section."
 
 msgid ""
 "The tags, each showing every account's mail with it. Each account keeps its "
 "own Tags section either way."
 msgstr ""
 
-#, fuzzy
 msgid "Unread counts"
-msgstr "Non lus en premier"
+msgstr ""
 
 msgid ""
 "Which unified rows show their combined unread chip while folded up. "
 "Expanded, the rows beneath carry the counts. Sent never shows one."
 msgstr ""
 
-#, fuzzy
 msgid "Filters placement"
-msgstr "Emplacement des dossiers filtrés"
+msgstr ""
 
 msgid ""
 "In the unified section, as a row like Inboxes whose caret opens the folders; "
@@ -2812,16 +2781,14 @@ msgid ""
 "them, and the full sidebar comes back exactly as you left it."
 msgstr ""
 
-#, fuzzy
 msgid "All accounts"
-msgstr "Comptes"
+msgstr ""
 
 msgid "Every account's folder list."
 msgstr ""
 
-#, fuzzy
 msgid "The account list under Inboxes."
-msgstr "Afficher sous Toutes les boîtes"
+msgstr ""
 
 msgid "The account list under the unified Starred row."
 msgstr ""
@@ -2884,9 +2851,8 @@ msgstr ""
 "La palette ⋯ de la liste des messages s'ouvre automatiquement lorsque le "
 "pointeur s'arrête sur une ligne."
 
-#, fuzzy
 msgid "Actions Palette as a menu"
-msgstr "Délai d'expiration de la palette d'actions"
+msgstr ""
 
 msgid ""
 "The ⋯ opens the row's menu, the same one a right-click shows, instead of "
@@ -3074,10 +3040,12 @@ msgstr ""
 "Désactivé, ils restent repliés derrière un bouton dans l'en-tête du panneau."
 
 msgid "Send new messages from"
-msgstr ""
+msgstr "Envoyer de nouveaux messages depuis"
 
 msgid "Replies still answer from the address the original was sent to."
 msgstr ""
+"Les réponses sont toujours envoyées depuis l'adresse à laquelle le message "
+"d'origine a été envoyé."
 
 msgid "Paste as plain text"
 msgstr "Coller comme texte brut"
@@ -3278,6 +3246,12 @@ msgid ""
 "stay in the system keyring and are never exported; OpenPGP keys stay in "
 "GnuPG."
 msgstr ""
+"Vireo conserve toutes ces informations dans un seul fichier : comptes de "
+"messagerie et de stockage dans le cloud, préférences, filtres, balises, "
+"disposition de la barre latérale et de la fenêtre, choix de l'icône de "
+"l'application et mots ajoutés au correcteur orthographique. Les mots de "
+"passe et identifiants restent dans le trousseau du système et ne sont jamais "
+"exportés ; les clés OpenPGP restent dans GnuPG."
 
 msgid "Export settings"
 msgstr "Exporter les paramètres"
@@ -3339,7 +3313,7 @@ msgid "Always visible"
 msgstr "Toujours visible"
 
 msgid "Account of the current folder"
-msgstr ""
+msgstr "Informations sur le dossier actuel"
 
 msgid "System language — {language}"
 msgstr "Langue du système — {language}"
@@ -3427,9 +3401,8 @@ msgstr "Insérer un lien"
 msgid "Insert"
 msgstr "Insérer"
 
-#, fuzzy
 msgid "Folder"
-msgstr "Dossiers"
+msgstr ""
 
 msgid "Add account"
 msgstr "Ajouter un compte"
@@ -3473,24 +3446,20 @@ msgstr "Ajouter un dossier"
 msgid "Show each inbox"
 msgstr "Afficher chaque boîte de réception"
 
-#, fuzzy
 msgid "Show each account"
-msgstr "Afficher chaque boîte de réception"
+msgstr ""
 
-#, fuzzy
 msgid "Show each folder"
-msgstr "Afficher chaque boîte de réception"
+msgstr ""
 
-#, fuzzy
 msgid "Show each tag"
-msgstr "Afficher chaque boîte de réception"
+msgstr ""
 
 msgid "Long-press to expand or collapse"
 msgstr ""
 
-#, fuzzy
 msgid "Edit Filter…"
-msgstr "Modifier le filtre"
+msgstr ""
 
 msgid "Rename Folder…"
 msgstr "Renommer le dossier…"
@@ -3504,9 +3473,8 @@ msgstr "Vider la Corbeille…"
 msgid "Empty Junk…"
 msgstr "Vider les Indésirables…"
 
-#, fuzzy
 msgid "Edit Tag…"
-msgstr "Modifier la balise"
+msgstr ""
 
 msgid "Welcome to Vireo"
 msgstr "Bienvenue dans Vireo"
@@ -3763,13 +3731,11 @@ msgstr "Impossible de marquer le dossier comme lu : {e}"
 msgid "Could not mark as spam: {e}"
 msgstr "Impossible de marquer comme indésirable : {e}"
 
-#, fuzzy
 msgid "Could not mark as not spam: {e}"
-msgstr "Impossible de marquer comme indésirable : {e}"
+msgstr ""
 
-#, fuzzy
 msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Impossible de déplacer {len} messages : {e}"
+msgstr ""
 
 msgid "Could not move message: {e}"
 msgstr "Impossible de déplacer le message : {e}"
@@ -3910,11 +3876,8 @@ msgstr ""
 msgid "Features:"
 msgstr "Fonctionnalités :"
 
-#, fuzzy
 msgid "Multiple IMAP and POP3 accounts, with a unified Inboxes view"
 msgstr ""
-"Gestion de plusieurs comptes IMAP et POP3, avec une vue unifiée Toutes les "
-"boîtes"
 
 msgid ""
 "Google, Microsoft and custom OAuth 2.0 sign-in, plus GNOME Online Accounts "
@@ -3957,8 +3920,41 @@ msgstr "Hyprlab"
 #~ msgid "Add Account"
 #~ msgstr "Ajouter un compte"
 
+#~ msgid ""
+#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
+#~ "same tags. Drag a tag to reorder: the order here is the sidebar's, and "
+#~ "the first nine answer to the 1–9 keys."
+#~ msgstr ""
+#~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
+#~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
+#~ "clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
+#~ "étiquettes. Faites glisser une étiquette pour la réorganiser : l'ordre "
+#~ "affiché ici correspond à celui de la barre latérale, et les neuf "
+#~ "premières correspondent aux touches 1 à 9."
+
+#~ msgid "How this account is shown in the sidebar and the All Inboxes view."
+#~ msgstr ""
+#~ "Comment ce compte est affiché dans la barre latérale et dans la vue "
+#~ "Toutes les boîtes de réception."
+
+#~ msgid "Circle color"
+#~ msgstr "Couleur du cercle"
+
+#~ msgid "Optional — shown instead of initials"
+#~ msgstr "Optionnel — affiché à la place des initiales"
+
 #~ msgid "Show name initials instead of an emoji"
 #~ msgstr "Afficher les initiales du nom au lieu d'un émoji"
+
+#~ msgid ""
+#~ "Include the folder's unread mail in the unread count and the tray icon"
+#~ msgstr ""
+#~ "Inclure les e-mails non lus du dossier dans le compteur global et l'icône "
+#~ "de la zone de notification"
+
+#~ msgid "Show under All Inboxes"
+#~ msgstr "Afficher sous Toutes les boîtes"
 
 #~ msgid "All Inboxes"
 #~ msgstr "Toutes les boîtes"
@@ -3977,6 +3973,19 @@ msgstr "Hyprlab"
 #~ msgstr "Section « Dossiers filtrés »"
 
 #~ msgid ""
+#~ "List the folders your filter rules file into in a collapsible section. "
+#~ "Each rule chooses whether its folder appears there; this switch hides the "
+#~ "section altogether."
+#~ msgstr ""
+#~ "Répertoriez les dossiers vers lesquels votre fichier de règles de "
+#~ "filtrage redirige dans une section repliable. Chaque règle détermine si "
+#~ "son dossier apparaît dans cette section ; ce bouton permet de masquer "
+#~ "complètement la section."
+
+#~ msgid "Filtered Folders placement"
+#~ msgstr "Emplacement des dossiers filtrés"
+
+#~ msgid ""
 #~ "Inside All Inboxes, folding away with it, or in the scrolling sidebar "
 #~ "above or below the accounts."
 #~ msgstr ""
@@ -3987,11 +3996,23 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "À l'endroit où se trouve la section « Balises », avec les mêmes options."
 
+#~ msgid ""
+#~ "Which side of All Inboxes and the account rows their expand/collapse "
+#~ "chevrons sit on."
+#~ msgstr ""
+#~ "De quel côté des boîtes de réception et des lignes de compte se trouvent "
+#~ "les «flèches » permettant de les développer ou de les réduire."
+
 #~ msgid "Inside All Inboxes"
 #~ msgstr "Dans toutes les boîtes de réception"
 
 #~ msgid "Filtered Folders"
 #~ msgstr "Dossiers filtrés"
+
+#~ msgid "Multiple IMAP and POP3 accounts, with a unified All Inboxes view"
+#~ msgstr ""
+#~ "Gestion de plusieurs comptes IMAP et POP3, avec une vue unifiée Toutes "
+#~ "les boîtes"
 
 #~ msgid "Remove Account"
 #~ msgstr "Supprimer le compte"
@@ -4002,6 +4023,16 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Les comptes et préférences dans un seul fichier. Les mots de passe "
 #~ "restent dans le trousseau de clés du système et ne sont jamais exportés."
+
+#~ msgid ""
+#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
+#~ "same tags."
+#~ msgstr ""
+#~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
+#~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
+#~ "clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
+#~ "étiquettes."
 
 #~ msgid "Nextcloud, ownCloud or OpenCloud"
 #~ msgstr "Nextcloud, ownCloud ou OpenCloud"
