@@ -796,7 +796,7 @@ impl Component for Preferences {
                                     #[name = "chevron_side_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Chevron placement"),
-                                        set_subtitle: &i18n("Which side of All Inboxes and the account rows \
+                                        set_subtitle: &i18n("Which side of Inboxes and the account rows \
                                                        their expand/collapse chevrons sit on."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeChevronSide(row.selected()));
@@ -867,7 +867,7 @@ impl Component for Preferences {
 
                                     #[name = "show_unified_row"]
                                     adw::SwitchRow {
-                                        set_title: &i18n("All Inboxes"),
+                                        set_title: &i18n("Inboxes"),
                                         set_subtitle: &i18n("A unified inbox combining every account, at the top \
                                                        of the sidebar. Only shown with more than one \
                                                        account."),
@@ -942,7 +942,7 @@ impl Component for Preferences {
 
                                         #[name = "unified_chip_all_inboxes_row"]
                                         add_row = &adw::SwitchRow {
-                                            set_title: &i18n("All Inboxes"),
+                                            set_title: &i18n("Inboxes"),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleUnifiedChipAllInboxes(row.is_active()));
                                             },
@@ -980,7 +980,7 @@ impl Component for Preferences {
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Filters placement"),
-                                        set_subtitle: &i18n("In the unified section, as a row like All Inboxes \
+                                        set_subtitle: &i18n("In the unified section, as a row like Inboxes \
                                                        whose caret opens the folders; or above or below \
                                                        the accounts as a heading with its own list."),
                                         connect_selected_notify[sender] => move |row| {
@@ -1040,8 +1040,8 @@ impl Component for Preferences {
                                         },
                                         #[name = "rail_fold_all_inboxes_row"]
                                         add_row = &adw::SwitchRow {
-                                            set_title: &i18n("All Inboxes"),
-                                            set_subtitle: &i18n("The account list under All Inboxes."),
+                                            set_title: &i18n("Inboxes"),
+                                            set_subtitle: &i18n("The account list under Inboxes."),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
                                             },

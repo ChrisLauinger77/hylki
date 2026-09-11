@@ -36,7 +36,7 @@ trackers by default — no telemetry, no analytics.
 
 ## Features
 
-- **Multiple accounts** — IMAP and POP3, each on its own background worker, with a unified *All Inboxes* view.
+- **Multiple accounts** — IMAP and POP3, each on its own background worker, with a unified *Inboxes* view.
 - **OAuth 2.0 sign-in** — Google, Microsoft and custom providers over XOAUTH2, plus import from GNOME Online Accounts.
 - **Whole-mailbox sync & search** — no message-count cap; a fast first page loads instantly, the rest indexes in the background with infinite scroll.
 - **Two-way sync** — deletions and moves from your phone or another client sync back automatically (IMAP IDLE + reconciliation).

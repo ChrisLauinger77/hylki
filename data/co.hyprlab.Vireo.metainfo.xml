@@ -20,7 +20,7 @@
     </p>
     <p>Features:</p>
     <ul>
-      <li>Multiple IMAP and POP3 accounts, with a unified All Inboxes view</li>
+      <li>Multiple IMAP and POP3 accounts, with a unified Inboxes view</li>
       <li>Google, Microsoft and custom OAuth 2.0 sign-in, plus GNOME Online Accounts import</li>
       <li>Whole-mailbox sync and search with infinite scroll</li>
       <li>Deletions and moves made on other devices sync back automatically</li>

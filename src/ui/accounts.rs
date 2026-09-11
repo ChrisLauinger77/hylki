@@ -916,7 +916,7 @@ impl Component for AccountsWindow {
                                 set_title: &i18n("Appearance"),
                                 set_description: Some(
                                     i18n("How this account is shown in the sidebar and \
-                                     the All Inboxes view.").as_str()
+                                     the Inboxes view.").as_str()
                                 ),
 
                                 #[name = "label_row"]
