@@ -3585,8 +3585,15 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::ContextMenu { x, y } => {
-                if let Some(row) = self.rows.widget().row_at_y(y as i32) {
-                    let list = self.rows.widget();
+                let list = self.rows.widget();
+                // By the row's band first; failing that, by what is drawn
+                // under the pointer, walked up to its row.
+                let row = list.row_at_y(y as i32).or_else(|| {
+                    list.pick(x, y, gtk::PickFlags::DEFAULT)
+                        .and_then(|w| w.ancestor(gtk::ListBoxRow::static_type()))
+                        .and_downcast::<gtk::ListBoxRow>()
+                });
+                if let Some(row) = row {
                     let selected = list.selected_rows();
                     let in_selection = selected.iter().any(|r| r.index() == row.index());
                     if selected.len() > 1 && in_selection {
@@ -4375,11 +4382,16 @@ impl MessageList {
         list.connect_row_activated(move |_, row| {
             let _ = s.send(MessageListInput::RowActivated(row.index()));
         });
-        // Right-click (or long-press) a row to open its context menu.
+        // Right-click a row to open its context menu. In the capture phase,
+        // so the press reaches the list before any widget inside the row
+        // (a conversation head's count chip, the hover palette's buttons)
+        // can take it; claimed, so none of them acts on it afterwards.
         let click = gtk::GestureClick::new();
         click.set_button(gtk::gdk::BUTTON_SECONDARY);
+        click.set_propagation_phase(gtk::PropagationPhase::Capture);
         let s = input.clone();
-        click.connect_pressed(move |_, _, x, y| {
+        click.connect_pressed(move |g, _, x, y| {
+            g.set_state(gtk::EventSequenceState::Claimed);
             let _ = s.send(MessageListInput::ContextMenu { x, y });
         });
         list.add_controller(click);
