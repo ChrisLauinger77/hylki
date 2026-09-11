@@ -7780,6 +7780,15 @@ impl AppModel {
         self.set_header_refresh_busy(busy);
     }
 
+    /// An account's avatar picture (#162), when one is set and its file is
+    /// still there.
+    fn account_avatar(&self, account_id: u32) -> Option<std::path::PathBuf> {
+        self.config
+            .get(account_id.saturating_sub(1) as usize)
+            .and_then(|c| c.avatar.as_deref())
+            .and_then(config::avatar_path)
+    }
+
     /// Custom avatar emoji for an account, if set.
     fn account_emoji(&self, account_id: u32) -> Option<String> {
         // Demo mode only: showcase the emoji-avatar feature on the sample accounts.
@@ -8496,6 +8505,7 @@ impl AppModel {
                     .collect();
                 let color = self.account_color(account.id);
                 let emoji = self.account_emoji(account.id);
+                let avatar = self.account_avatar(account.id);
                 // This account's collapsed tree nodes, keyed "email\tpath".
                 let prefix = format!("{email}\t");
                 let tree_collapsed = self
@@ -8511,6 +8521,7 @@ impl AppModel {
                     tags_expanded: self.tags_expanded_accounts.contains(email),
                     color,
                     emoji,
+                    avatar,
                     account,
                     folders,
                     filtered,
@@ -12926,6 +12937,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         smtp_password: String::new(),
         color: Some(color.into()),
         emoji: Some(emoji.into()),
+        avatar: None,
         signature: None,
         signature_html: false,
         label: None,

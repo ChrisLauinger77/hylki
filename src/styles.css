@@ -121,6 +121,10 @@ headerbar.rail-header {
   min-height: 21px;
   border-radius: 10.5px;
 }
+/* The account editor's avatar preview (#162): a 32px disc. */
+.account-avatar-preview {
+  border-radius: 16px;
+}
 
 /* Inbox rows nested under "All Inboxes": no indent so their account pills
    line up with the folder icons in the rest of the sidebar. */

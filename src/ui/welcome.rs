@@ -903,6 +903,7 @@ fn blank_account() -> AccountConfig {
         smtp_password: String::new(),
         color: None,
         emoji: None,
+        avatar: None,
         signature: None,
         signature_html: false,
         label: None,

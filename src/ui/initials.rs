@@ -201,6 +201,39 @@ pub fn glyph_picture(text: &str, bg_hex: &str, scale: f64, size: i32) -> gtk::Pi
 }
 
 thread_local! {
+    /// Account avatar pictures already loaded, by path and modification
+    /// time: the sidebar rebuilds often and must not read the file each
+    /// time.
+    static AVATAR_TEXTURES: RefCell<HashMap<(std::path::PathBuf, Option<std::time::SystemTime>), gdk::Texture>> =
+        RefCell::new(HashMap::new());
+}
+
+/// An account's avatar picture (#162) for a disc of `size` px: the stored
+/// copy is square already, so it fills the disc and the disc clips it.
+pub fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Picture {
+    let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
+    let key = (path.to_path_buf(), mtime);
+    let texture = AVATAR_TEXTURES.with(|c| {
+        if let Some(t) = c.borrow().get(&key) {
+            return Some(t.clone());
+        }
+        let t = gdk::Texture::from_filename(path).ok()?;
+        c.borrow_mut().insert(key, t.clone());
+        Some(t)
+    });
+    let picture = match texture {
+        Some(t) => gtk::Picture::for_paintable(&t),
+        None => gtk::Picture::new(),
+    };
+    picture.set_content_fit(gtk::ContentFit::Cover);
+    picture.set_can_shrink(true);
+    picture.set_size_request(size, size);
+    picture.set_halign(gtk::Align::Center);
+    picture.set_valign(gtk::Align::Center);
+    picture
+}
+
+thread_local! {
     /// Reader-card circles already rendered this session, by what they
     /// show: a conversation repeats its senders, and every render of the
     /// document would otherwise draw them again.

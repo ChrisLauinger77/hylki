@@ -90,6 +90,43 @@ pub fn data_base() -> Option<PathBuf> {
     shared_base(dirs::data_dir, "data")
 }
 
+/// Where the accounts' avatar pictures live (#162).
+pub fn avatars_dir() -> Option<PathBuf> {
+    data_base().map(|d| d.join("avatars"))
+}
+
+/// The picture behind an account's `avatar` name, if the file is there.
+pub fn avatar_path(name: &str) -> Option<PathBuf> {
+    let p = avatars_dir()?.join(name);
+    p.is_file().then_some(p)
+}
+
+/// Drop avatar pictures no account refers to any more. A file younger than
+/// ten minutes is left alone: it may be a picture just chosen in an
+/// account editor that has not been saved yet.
+fn prune_avatars(accounts: &[AccountConfig]) {
+    let Some(dir) = avatars_dir() else { return };
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    let used: std::collections::HashSet<&str> =
+        accounts.iter().filter_map(|a| a.avatar.as_deref()).collect();
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if used.contains(name) {
+            continue;
+        }
+        let fresh = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age < std::time::Duration::from_secs(600));
+        if !fresh {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 /// Service name used for keyring entries; password items are keyed by email.
 const KEYRING_SERVICE: &str = "co.hyprlab.Vireo";
 
@@ -144,6 +181,11 @@ pub struct AccountConfig {
     /// Sidebar avatar emoji; when absent, the account-name initials are shown.
     #[serde(default)]
     pub emoji: Option<String>,
+    /// Sidebar avatar picture (#162): the file name of a scaled copy kept
+    /// under the data directory's `avatars/`. Shown before the emoji and
+    /// the initials when set and the file is present.
+    #[serde(default)]
+    pub avatar: Option<String>,
     /// Composition signature appended to new messages from this account.
     #[serde(default)]
     pub signature: Option<String>,
@@ -384,6 +426,7 @@ pub fn load() -> Option<Vec<AccountConfig>> {
 /// doing so would wipe the keyring entry of any account that wasn't just edited.
 pub fn save(accounts: &[AccountConfig]) -> std::io::Result<()> {
     write_config(accounts)?;
+    prune_avatars(accounts);
     for account in accounts {
         if !account.password.is_empty() {
             if let Err(e) = store_password(&account.email, &account.password) {
@@ -2866,6 +2909,7 @@ mod filter_tests {
             smtp_password: String::new(),
             color: None,
             emoji: None,
+            avatar: None,
             signature: None,
             signature_html: false,
             label: None,
