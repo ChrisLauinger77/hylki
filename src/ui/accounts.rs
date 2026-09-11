@@ -1006,15 +1006,14 @@ impl Component for AccountsWindow {
                             // The sidebar circle as it will look, above the
                             // rows that shape it: the accent colour, and the
                             // picture, emoji or initials it shows.
+                            // No title and no margins of its own: the page
+                            // already spaces its groups, and the circle
+                            // should not sit in a band of nothing.
                             add = &adw::PreferencesGroup {
-                                set_title: &i18n("Preview"),
-
                                 gtk::Box {
                                     set_orientation: gtk::Orientation::Vertical,
-                                    set_spacing: 6,
+                                    set_spacing: 2,
                                     set_halign: gtk::Align::Center,
-                                    set_margin_top: 4,
-                                    set_margin_bottom: 4,
 
                                     #[name = "preview_disc"]
                                     gtk::Box {
