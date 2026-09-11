@@ -1338,6 +1338,21 @@ impl Cache {
         }
     }
 
+    /// How many cached messages of the account carry `keyword` (server or
+    /// local), for the tag finder's report where the server itself gives no
+    /// count (Microsoft 365 categories).
+    pub fn count_with_keyword(&self, account_id: u32, keyword: &str) -> usize {
+        let needle = format!(" {} ", keyword.to_ascii_lowercase());
+        let sql = format!(
+            "SELECT count(*) FROM messages \
+             WHERE account_id = ?1 AND instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0"
+        );
+        self.conn
+            .query_row(&sql, params![account_id, needle], |row| row.get::<_, i64>(0))
+            .map(|n| n.max(0) as usize)
+            .unwrap_or(0)
+    }
+
     /// Every cached message of the account carrying `keyword` — on the server
     /// or locally — newest first, with the folder each sits in. Backs the
     /// sidebar's tag views (#71); the caller maps paths to folder ids and

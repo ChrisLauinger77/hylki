@@ -147,6 +147,8 @@ pub struct AccountsWindow {
     /// Tags (#71), managed on this tab too — the rules' "Tag with" names them.
     tags: Vec<crate::config::Tag>,
     tags_list: Option<gtk::ListBox>,
+    /// The tag finder's button, dimmed while the mailboxes are being read.
+    find_tags_btn: Option<gtk::Button>,
     /// Paths behind the currently-open editor's folder combos (index 0 in the
     /// combo is "Automatic"; entry N here is combo index N + 1).
     folder_paths: Vec<String>,
@@ -279,6 +281,26 @@ pub enum AccountsInput {
     MoveTag { from: usize, to: usize },
     TagAdded(crate::config::Tag),
     TagEdited(usize, crate::config::Tag),
+    /// The tag finder: "Find Tags…" was pressed (the app scans every
+    /// account and answers with `TagFindings`).
+    FindTags,
+    /// The scan is under way (or over): dim the button meanwhile.
+    TagScanning(bool),
+    /// What the scan found that is not a tag here yet, ready to offer.
+    TagFindings(Vec<TagProposal>),
+    /// The tags the user chose from the report.
+    ImportTags(Vec<crate::config::Tag>),
+}
+
+/// One keyword the tag finder proposes as a tag: the tag as it would be
+/// added (name, keyword, colour) and where the keyword was seen.
+#[derive(Debug, Clone)]
+pub struct TagProposal {
+    pub tag: crate::config::Tag,
+    /// Messages carrying it, where known (0 = not counted).
+    pub count: usize,
+    /// "Folder" or "account: Folder" entries, for the report's subtitle.
+    pub places: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -306,6 +328,8 @@ pub enum AccountsOutput {
     RemoveBlacklist(String),
     SetFilters(Vec<crate::config::FilterRule>),
     SetTags(Vec<crate::config::Tag>),
+    /// The tag finder wants every account scanned for keywords in use.
+    FindTags,
 }
 
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
@@ -529,11 +553,24 @@ impl Component for AccountsWindow {
                                          and the first nine answer to the 1–9 keys.").as_str()
                                     ),
                                     #[wrap(Some)]
-                                    set_header_suffix = &gtk::Button {
-                                        set_label: &i18n("Add Tag…"),
+                                    set_header_suffix = &gtk::Box {
+                                        set_spacing: 6,
                                         set_valign: gtk::Align::Center,
-                                        add_css_class: "flat",
-                                        connect_clicked => AccountsInput::AddTag,
+                                        // The tag finder: read every mailbox
+                                        // for keywords already in use and
+                                        // offer them as tags.
+                                        #[name = "find_tags_btn"]
+                                        gtk::Button {
+                                            set_label: &i18n("Find Tags…"),
+                                            set_tooltip_text: Some(i18n("Look through every mailbox for tags other clients have set").as_str()),
+                                            add_css_class: "flat",
+                                            connect_clicked => AccountsInput::FindTags,
+                                        },
+                                        gtk::Button {
+                                            set_label: &i18n("Add Tag…"),
+                                            add_css_class: "flat",
+                                            connect_clicked => AccountsInput::AddTag,
+                                        },
                                     },
 
                                     #[name = "tags_list"]
@@ -1147,6 +1184,7 @@ impl Component for AccountsWindow {
             senders_query: Default::default(),
             tags: init.tags,
             tags_list: None,
+            find_tags_btn: None,
         };
         {
             let mut guard = model.senders.guard();
@@ -1185,6 +1223,7 @@ impl Component for AccountsWindow {
         }
         model.rebuild_filter_rows(&sender);
         model.tags_list = Some(widgets.tags_list.clone());
+        model.find_tags_btn = Some(widgets.find_tags_btn.clone());
         model.rebuild_tag_rows(&sender);
         let t_list = std::time::Instant::now();
         model.rebuild_account_list(&widgets.accounts_list, &sender);
@@ -2093,6 +2132,30 @@ impl Component for AccountsWindow {
                         self.rebuild_filter_rows(&sender);
                         let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
                     }
+                }
+            }
+            AccountsInput::FindTags => {
+                self.set_tag_scanning(true);
+                let _ = sender.output(AccountsOutput::FindTags);
+            }
+            AccountsInput::TagScanning(on) => self.set_tag_scanning(on),
+            AccountsInput::TagFindings(found) => {
+                self.set_tag_scanning(false);
+                let parent = root.root().and_downcast::<gtk::Window>();
+                self.show_tag_findings(parent.as_ref(), found, &sender);
+            }
+            AccountsInput::ImportTags(tags) => {
+                let mut added = 0;
+                for t in tags {
+                    if !self.tags.iter().any(|x| x.keyword.eq_ignore_ascii_case(&t.keyword)) {
+                        self.tags.push(t);
+                        added += 1;
+                    }
+                }
+                if added > 0 {
+                    self.rebuild_tag_rows(&sender);
+                    self.rebuild_filter_rows(&sender);
+                    let _ = sender.output(AccountsOutput::SetTags(self.tags.clone()));
                 }
             }
         }
@@ -3308,6 +3371,116 @@ impl AccountsWindow {
             row.add_suffix(&next);
             list.append(&row);
         }
+    }
+
+    /// The tag finder's button while a scan runs: dimmed, saying so.
+    fn set_tag_scanning(&self, on: bool) {
+        let Some(btn) = &self.find_tags_btn else { return };
+        btn.set_sensitive(!on);
+        btn.set_label(&if on { i18n("Searching…") } else { i18n("Find Tags…") });
+    }
+
+    /// The tag finder's report: every keyword found that is not a tag here
+    /// yet, each with a proposed name and colour, ticked to be imported.
+    /// "Import All" takes the lot; "Import Selected" only the ticked ones.
+    fn show_tag_findings(
+        &self,
+        parent: Option<&gtk::Window>,
+        found: Vec<TagProposal>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if found.is_empty() {
+            let dialog = adw::MessageDialog::new(
+                parent,
+                Some(i18n("No New Tags").as_str()),
+                Some(i18n("No tags were found in your mailboxes that are not already set up here.").as_str()),
+            );
+            dialog.add_response("ok", &i18n("OK"));
+            dialog.set_default_response(Some("ok"));
+            dialog.set_close_response("ok");
+            dialog.present();
+            return;
+        }
+
+        let n = found.len();
+        let dialog = adw::MessageDialog::new(
+            parent,
+            Some(i18n("Tags Found").as_str()),
+            Some(
+                i18n_f(
+                    "{n} tags are in use in your mailboxes but not set up here. \
+                     Import them all, or choose which to add. Names and colours \
+                     can be changed afterwards.",
+                    &[("n", &n.to_string())],
+                )
+                .as_str(),
+            ),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("selected", &i18n("Import Selected"));
+        dialog.add_response("all", &i18n("Import All"));
+        dialog.set_response_appearance("all", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("all"));
+        dialog.set_close_response("cancel");
+
+        let list = gtk::ListBox::new();
+        list.add_css_class("boxed-list");
+        list.set_selection_mode(gtk::SelectionMode::None);
+        let mut checks: Vec<(gtk::CheckButton, crate::config::Tag)> = Vec::new();
+        for p in &found {
+            let row = adw::ActionRow::new();
+            row.set_title(&gtk::glib::markup_escape_text(&p.tag.name));
+            let mut parts = vec![p.tag.keyword.clone()];
+            if p.count > 0 {
+                parts.push(i18n_f("{n} messages", &[("n", &p.count.to_string())]));
+            }
+            parts.extend(p.places.iter().cloned());
+            row.set_subtitle(&gtk::glib::markup_escape_text(&parts.join(" · ")));
+            row.add_prefix(&crate::ui::context_menu::swatch_widget(&p.tag.color, true));
+            let check = gtk::CheckButton::new();
+            check.set_active(true);
+            check.set_valign(gtk::Align::Center);
+            row.add_suffix(&check);
+            row.set_activatable_widget(Some(&check));
+            checks.push((check, p.tag.clone()));
+            list.append(&row);
+        }
+        let scroller = gtk::ScrolledWindow::new();
+        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scroller.set_propagate_natural_height(true);
+        scroller.set_max_content_height(360);
+        // Wider than the dialog's default column, so a row's keyword, count
+        // and folders read on a line or two.
+        scroller.set_size_request(520, -1);
+        scroller.set_child(Some(&list));
+        dialog.set_extra_child(Some(&scroller));
+
+        // The report is the showcase's to capture (VIREO_SHOWCASE_FIND_TAGS).
+        if std::env::var("VIREO_SHOWCASE_FIND_TAGS").is_ok() {
+            if let Ok(path) = std::env::var("VIREO_SHOWCASE") {
+                let d = dialog.clone();
+                gtk::glib::timeout_add_seconds_local_once(2, move || {
+                    crate::app::showcase_capture(d.upcast_ref(), &path);
+                });
+            }
+        }
+
+        let s = sender.clone();
+        dialog.connect_response(None, move |_, resp| {
+            let tags: Vec<crate::config::Tag> = match resp {
+                "all" => checks.iter().map(|(_, t)| t.clone()).collect(),
+                "selected" => checks
+                    .iter()
+                    .filter(|(c, _)| c.is_active())
+                    .map(|(_, t)| t.clone())
+                    .collect(),
+                _ => return,
+            };
+            if !tags.is_empty() {
+                s.input(AccountsInput::ImportTags(tags));
+            }
+        });
+        dialog.present();
     }
 
     /// The Tags list (#71): a row per tag — its colour as a disc, its name,

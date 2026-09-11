@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 use crate::backend::{MailBackend, MockBackend};
 use crate::cache::Cache;
 use crate::config::AccountConfig;
-use crate::models::{Account, Folder, FolderKind, Message};
+use crate::models::{Account, Folder, FolderKind, KeywordFinding, Message};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// Number of most-recent messages to fetch attachment info (BODYSTRUCTURE) for;
@@ -256,6 +256,11 @@ pub enum MailRequest {
     RefreshUnread,
     /// Force a fresh connection and re-list folders (e.g. after a failure).
     Reconnect,
+    /// The tag finder (Settings → Tags → Find Tags…): report every keyword
+    /// in use across the account's folders as one
+    /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
+    /// the app can tell when every account has reported.
+    FindKeywords,
 }
 
 /// A message composed by the user, ready to send.
@@ -327,6 +332,9 @@ pub enum WorkerEvent {
     /// Message-ID lives (`folder_path`, `uid`), or `None` when no folder of
     /// this account has it.
     Located { message_id: String, hit: Option<(String, u32)> },
+    /// The answer to [`MailRequest::FindKeywords`]: the keywords in use on
+    /// this account, system flags left out.
+    KeywordsFound(Vec<KeywordFinding>),
     /// Cached attachments for an inbox, for the attachments gallery.
     Gallery { items: Vec<crate::models::GalleryItem> },
     /// The background backfill for a folder finished — its whole index is now
@@ -1540,6 +1548,57 @@ async fn run_imap(
                     Err(e) => tracing::warn!("[account {account_id}] locate: listing folders failed: {e}"),
                 }
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit });
+            }
+
+            MailRequest::FindKeywords => {
+                // Every folder, read-only: EXAMINE answers with the mailbox's
+                // FLAGS line, which lists the keywords in use there, and a
+                // KEYWORD search per candidate says how many messages carry
+                // it (some servers list every keyword ever defined, so an
+                // unused one is dropped here).
+                let sess = session.as_mut().unwrap();
+                let mut found: Vec<KeywordFinding> = Vec::new();
+                match list_folders(account_id, sess).await {
+                    Ok(folders) => {
+                        for f in &folders {
+                            let Ok(mb) = exam(sess, &f.path).await else { continue };
+                            let candidates: Vec<String> = mb
+                                .flags
+                                .iter()
+                                .filter_map(|fl| match fl {
+                                    Flag::Custom(k) if !is_system_keyword(k) => Some(k.to_string()),
+                                    _ => None,
+                                })
+                                .collect();
+                            for kw in candidates {
+                                let n = match search_uids(sess, format!("KEYWORD {kw}")).await {
+                                    Ok(set) => set.len(),
+                                    Err(_) => 0,
+                                };
+                                if n == 0 {
+                                    continue;
+                                }
+                                match found.iter_mut().find(|x| x.keyword.eq_ignore_ascii_case(&kw)) {
+                                    Some(x) => {
+                                        x.count += n;
+                                        if !x.folders.contains(&f.name) {
+                                            x.folders.push(f.name.clone());
+                                        }
+                                    }
+                                    None => found.push(KeywordFinding {
+                                        keyword: kw,
+                                        name: None,
+                                        color: None,
+                                        count: n,
+                                        folders: vec![f.name.clone()],
+                                    }),
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => tracing::warn!("[account {account_id}] find tags: listing folders failed: {e}"),
+                }
+                emit(WorkerEvent::KeywordsFound(found));
             }
 
             MailRequest::UndoMove { path, dest, dest_folder_id, message_ids } => {
@@ -3986,6 +4045,60 @@ fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
 /// The command's verb and first argument, for the terse OK line.
 fn cmd_head(cmd: &str) -> String {
     cmd.split_whitespace().take(3).collect::<Vec<_>>().join(" ")
+}
+
+/// Keywords that are a server's or another client's bookkeeping, not tags a
+/// person set: left out of the tag finder's report. System flags (`\Seen`…)
+/// never reach here as keywords, but a leading backslash is rejected too.
+pub fn is_system_keyword(keyword: &str) -> bool {
+    let k = keyword.to_ascii_lowercase();
+    if k.starts_with('\\') {
+        return true;
+    }
+    const SYSTEM: &[&str] = &[
+        "$junk", "$notjunk", "junk", "nonjunk", "notjunk", "$autojunk",
+        "$forwarded", "$mdnsent", "$phishing", "$submitted", "$submitpending",
+        "$hasattachment", "$hasnoattachment", "$signed", "$encrypted", "$recent",
+        "$isnotification", "$ismailinglist", "$istrusted", "$notification",
+    ];
+    SYSTEM.contains(&k.as_str())
+        // Apple Mail's flag colours and Fastmail's internal annotations.
+        || k.starts_with("$mailflagbit")
+        || k.starts_with("$x-me-")
+}
+
+/// A Microsoft 365 category colour (`preset0`…`preset24`) as the nearest
+/// `#rrggbb`; `None` for "none" or anything unknown.
+fn graph_preset_color(preset: &str) -> Option<String> {
+    let hex = match preset.to_ascii_lowercase().as_str() {
+        "preset0" => "#c01c28",  // red
+        "preset1" => "#e66100",  // orange
+        "preset2" => "#865e3c",  // brown
+        "preset3" => "#f5c211",  // yellow
+        "preset4" => "#2ec27e",  // green
+        "preset5" => "#0e9aa7",  // teal
+        "preset6" => "#6b8e23",  // olive
+        "preset7" => "#1c71d8",  // blue
+        "preset8" => "#813d9c",  // purple
+        "preset9" => "#b5127a",  // cranberry
+        "preset10" => "#5d7c99", // steel
+        "preset11" => "#3f5567", // dark steel
+        "preset12" => "#77767b", // gray
+        "preset13" => "#5e5c64", // dark gray
+        "preset14" => "#241f31", // black
+        "preset15" => "#a51d2d", // dark red
+        "preset16" => "#c64600", // dark orange
+        "preset17" => "#63452c", // dark brown
+        "preset18" => "#e5a50a", // dark yellow
+        "preset19" => "#26a269", // dark green
+        "preset20" => "#0b7c85", // dark teal
+        "preset21" => "#55701c", // dark olive
+        "preset22" => "#1a5fb4", // dark blue
+        "preset23" => "#613583", // dark purple
+        "preset24" => "#8f0e5d", // dark cranberry
+        _ => return None,
+    };
+    Some(hex.to_string())
 }
 
 async fn sel(session: &mut ImapSession, path: &str) -> Result<async_imap::types::Mailbox, async_imap::error::Error> {
@@ -6814,6 +6927,8 @@ async fn run_pop3(
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
             }
+            // POP3 has no server-side keywords: nothing to find.
+            MailRequest::FindKeywords => emit(WorkerEvent::KeywordsFound(Vec::new())),
             MailRequest::LoadGallery => {
                 if let Some(c) = cache.as_ref() {
                     let items = c.gallery_items(account_id, GALLERY_DATA_CAP, GALLERY_LIMIT);
@@ -7203,6 +7318,25 @@ async fn run_mock(
                 // No folders to search here beyond what the cache already
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
+            }
+            // What a scan of a lived-in mailbox turns up: Thunderbird's
+            // built-ins and a few of the user's own, plus one the demo's tags
+            // already know (dropped by the app before the report).
+            MailRequest::FindKeywords => {
+                let f = |keyword: &str, count: usize, folders: &[&str]| KeywordFinding {
+                    keyword: keyword.to_string(),
+                    name: None,
+                    color: None,
+                    count,
+                    folders: folders.iter().map(|s| s.to_string()).collect(),
+                };
+                emit(WorkerEvent::KeywordsFound(vec![
+                    f("$label1", 14, &["Inbox", "Archive"]),
+                    f("$label4", 6, &["Inbox"]),
+                    f("Receipts", 23, &["Inbox", "Archive"]),
+                    f("travel_plans", 4, &["Inbox"]),
+                    f("Work", 9, &["Inbox"]),
+                ]));
             }
             // The mock backend has no attachment cache.
             MailRequest::LoadGallery => {
@@ -8287,6 +8421,40 @@ async fn run_graph(
                 // No folders to search here beyond what the cache already
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
+            }
+            MailRequest::FindKeywords => {
+                // Categories are defined once per mailbox, with a name and a
+                // colour: the master list is the whole answer. Counts come
+                // from the cache, the only place Vireo has them.
+                let mut found: Vec<KeywordFinding> = Vec::new();
+                if let Some(token) = graph_token(&account, &emit).await {
+                    let t = token.clone();
+                    let cats = tokio::task::spawn_blocking(move || {
+                        graph_get_json(&t, &format!("{GRAPH_BASE}/me/outlook/masterCategories"))
+                    })
+                    .await
+                    .unwrap_or_else(|_| Err("task failed".into()));
+                    match cats {
+                        Ok(v) => {
+                            for c in v["value"].as_array().into_iter().flatten() {
+                                let Some(name) = c["displayName"].as_str() else { continue };
+                                let count = cache
+                                    .as_ref()
+                                    .map(|c| c.count_with_keyword(account_id, name))
+                                    .unwrap_or(0);
+                                found.push(KeywordFinding {
+                                    keyword: name.to_string(),
+                                    name: Some(name.to_string()),
+                                    color: graph_preset_color(c["color"].as_str().unwrap_or("")),
+                                    count,
+                                    folders: Vec::new(),
+                                });
+                            }
+                        }
+                        Err(e) => tracing::warn!("[account {account_id}] find tags: categories failed: {e}"),
+                    }
+                }
+                emit(WorkerEvent::KeywordsFound(found));
             }
             MailRequest::LoadGallery => {
                 if let Some(c) = cache.as_ref() {

@@ -43,6 +43,23 @@ impl FolderKind {
     }
 }
 
+/// A keyword found in use on a mail server: what the tag finder (Settings →
+/// Tags → Find Tags…) reports per account, before the user decides which
+/// become tags.
+#[derive(Debug, Clone)]
+pub struct KeywordFinding {
+    /// The keyword as the server spells it (a Microsoft 365 category's name).
+    pub keyword: String,
+    /// A display name the server itself carries (Microsoft 365 categories).
+    pub name: Option<String>,
+    /// A colour the server itself carries, `#rrggbb`.
+    pub color: Option<String>,
+    /// Messages carrying it, where the server could say (0 = not counted).
+    pub count: usize,
+    /// The folders it was seen in (display names).
+    pub folders: Vec<String>,
+}
+
 /// A mail folder within an account.
 #[derive(Debug, Clone)]
 pub struct Folder {

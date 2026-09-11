@@ -1558,6 +1558,58 @@ impl Tag {
     pub fn css_class(&self) -> String {
         tag_css_class(&self.keyword)
     }
+
+    /// The name to offer for a keyword found on a server (the tag finder):
+    /// Thunderbird's five built-ins get Thunderbird's names; anything else
+    /// sheds a leading `$`, turns `_`/`-` into spaces and capitalises each
+    /// word (`travel_plans` → "Travel Plans", `$Receipts` → "Receipts").
+    pub fn name_for_keyword(keyword: &str) -> String {
+        match keyword.to_ascii_lowercase().as_str() {
+            "$label1" => return "Important".to_string(),
+            "$label2" => return "Work".to_string(),
+            "$label3" => return "Personal".to_string(),
+            "$label4" => return "To Do".to_string(),
+            "$label5" => return "Later".to_string(),
+            _ => {}
+        }
+        let bare = keyword.trim_start_matches('$');
+        let name: String = bare
+            .split(['_', '-'])
+            .filter(|w| !w.is_empty())
+            .map(|w| {
+                let mut cs = w.chars();
+                match cs.next() {
+                    Some(first) => first.to_uppercase().chain(cs).collect::<String>(),
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        if name.is_empty() { keyword.to_string() } else { name }
+    }
+
+    /// The colour to offer for a found keyword: Thunderbird's built-ins get
+    /// their Thunderbird colours (as the palette has them); the rest take
+    /// the first palette colour not in `taken`, cycling once every colour is.
+    pub fn color_for_keyword(keyword: &str, taken: &[String]) -> String {
+        let fixed = match keyword.to_ascii_lowercase().as_str() {
+            "$label1" => Some(TAG_COLORS[4]), // red
+            "$label2" => Some(TAG_COLORS[3]), // orange
+            "$label3" => Some(TAG_COLORS[1]), // green
+            "$label4" => Some(TAG_COLORS[0]), // blue
+            "$label5" => Some(TAG_COLORS[5]), // purple
+            _ => None,
+        };
+        if let Some(c) = fixed {
+            return c.to_string();
+        }
+        TAG_COLORS
+            .iter()
+            .find(|c| !taken.iter().any(|t| t.eq_ignore_ascii_case(c)))
+            .copied()
+            .unwrap_or(TAG_COLORS[taken.len() % TAG_COLORS.len()])
+            .to_string()
+    }
 }
 
 /// The CSS class for a keyword's colour: `tag-` plus the keyword lowercased,
@@ -2723,6 +2775,30 @@ mod filter_tests {
             tag: String::new(),
             count_unread: true,
         }
+    }
+
+    #[test]
+    fn found_keywords_get_names_and_colours() {
+        // Thunderbird's built-ins keep Thunderbird's names and colours.
+        assert_eq!(Tag::name_for_keyword("$label1"), "Important");
+        assert_eq!(Tag::name_for_keyword("$LABEL4"), "To Do");
+        assert_eq!(Tag::color_for_keyword("$label1", &[]), TAG_COLORS[4]);
+        // Anything else reads as words.
+        assert_eq!(Tag::name_for_keyword("travel_plans"), "Travel Plans");
+        assert_eq!(Tag::name_for_keyword("$Receipts"), "Receipts");
+        assert_eq!(Tag::name_for_keyword("to-do"), "To Do");
+        assert_eq!(Tag::name_for_keyword("$"), "$");
+        // Colours skip what is taken, then cycle.
+        let taken: Vec<String> = TAG_COLORS[..2].iter().map(|c| c.to_string()).collect();
+        assert_eq!(Tag::color_for_keyword("Receipts", &taken), TAG_COLORS[2]);
+        let all: Vec<String> = TAG_COLORS.iter().map(|c| c.to_string()).collect();
+        assert_eq!(Tag::color_for_keyword("Receipts", &all), TAG_COLORS[0]);
+        // Bookkeeping keywords are not tags.
+        assert!(crate::worker::is_system_keyword("$Forwarded"));
+        assert!(crate::worker::is_system_keyword("NonJunk"));
+        assert!(crate::worker::is_system_keyword("$MailFlagBit1"));
+        assert!(!crate::worker::is_system_keyword("$label2"));
+        assert!(!crate::worker::is_system_keyword("Receipts"));
     }
 
     #[test]
