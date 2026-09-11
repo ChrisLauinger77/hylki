@@ -4530,7 +4530,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ReplyAll => {
-                if let Some(m) = self.reply_target() {
+                if let Some(m) = self.compose_target() {
                     let self_email = self.email_of(m.account_id).unwrap_or_default();
                     self.open_inline_reply(
                         m.account_id,
@@ -4542,13 +4542,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Forward => {
-                if let Some(m) = self.reply_target() {
+                if let Some(m) = self.compose_target() {
                     self.open_inline_reply(m.account_id, forward_prefill(&m), Some((m.account_id, m.id)), &sender);
                 }
             }
 
             AppMsg::AddToContacts => {
-                if let Some(m) = self.reply_target() {
+                if let Some(m) = self.compose_target() {
                     self.show_add_contact_dialog(&m.from_name, &m.from_addr, &sender);
                 }
             }
@@ -7776,6 +7776,28 @@ impl AppModel {
         welcome.widget().present();
         self.welcome = Some(welcome);
     }
+    /// The message a reply, reply-all or forward addresses: the reply
+    /// target, except when only the list row is selected over a
+    /// conversation. That row stands for the thread's head, its oldest
+    /// message, and a reply from the toolbar means the latest one (#165):
+    /// the newest message from someone else, or the newest of all when
+    /// every message is the user's own.
+    fn compose_target(&self) -> Option<Message> {
+        let m = self.reply_target()?;
+        if self.selection_from_cards || !self.thread_star_target(&m) {
+            return Some(m);
+        }
+        let own = self.email_of(m.account_id).unwrap_or_default();
+        let newest = |from_others: bool| {
+            self.current_thread
+                .iter()
+                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
+                .max_by_key(|t| t.timestamp)
+                .cloned()
+        };
+        newest(true).or_else(|| newest(false)).or(Some(m))
+    }
+
 
     /// The open-marks-read side effects for the just-selected message (#100):
     /// server flag, list row, cached copy, badges, notification.
