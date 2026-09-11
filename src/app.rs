@@ -7890,15 +7890,25 @@ impl AppModel {
     /// target, except when only the list row is selected over a
     /// conversation. That row stands for the thread's head, its oldest
     /// message; the toolbar's reply follows the reading pane instead and
-    /// addresses the message shown at the top (#165) — the newest with
-    /// "newest first" on, the head otherwise. A highlighted card is
-    /// addressed as itself.
+    /// addresses the message shown at the top (#165) — with "newest first"
+    /// on, the newest message from someone else (never the user's own
+    /// reply by accident), or the newest of all when every message is
+    /// theirs; the head otherwise. A highlighted card is addressed as
+    /// itself.
     fn compose_target(&self) -> Option<Message> {
         let m = self.reply_target()?;
         if self.selection_from_cards || !self.thread_star_target(&m) || !self.thread_newest_first {
             return Some(m);
         }
-        self.current_thread.iter().max_by_key(|t| t.timestamp).cloned().or(Some(m))
+        let own = self.email_of(m.account_id).unwrap_or_default();
+        let newest = |from_others: bool| {
+            self.current_thread
+                .iter()
+                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
+                .max_by_key(|t| t.timestamp)
+                .cloned()
+        };
+        newest(true).or_else(|| newest(false)).or(Some(m))
     }
 
     /// Launch (or re-present) the welcome wizard: the first run's greeting,
