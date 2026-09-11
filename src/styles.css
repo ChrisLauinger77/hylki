@@ -466,6 +466,16 @@ button.star-active {
 
 /* Unread count: a perfect circle for a single digit that grows horizontally
    into a pill for larger numbers, but never taller. */
+/* The small filter glyph on a main folder's icon corner (a filter files
+   into it): a sidebar-coloured halo keeps it legible over the icon. */
+.filter-mark {
+  margin-top: -4px;
+  margin-right: -6px;
+  background: @sidebar_bg_color;
+  border-radius: 9999px;
+  padding: 1px;
+}
+
 .unread-badge {
   background: @accent_bg_color;
   color: @accent_fg_color;

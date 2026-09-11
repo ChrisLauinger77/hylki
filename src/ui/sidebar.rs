@@ -3066,7 +3066,7 @@ impl Sidebar {
                 0,
                 lead.as_ref(),
                 self.chevrons_left,
-                Some(icon),
+                FolderGlyph::Icon(icon),
             );
             let Some(badge) = badge else { continue };
             // Name the account too: the tint alone is a hint.
@@ -3965,11 +3965,27 @@ fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
 
 /// The icon a folder row wears when a filter rule files into it: the
 /// filter-folder glyph in the account's colour, in place in the hierarchy.
-fn filter_icon(section: &SectionData, folder: &Folder) -> Option<gtk::Image> {
+fn filter_icon(section: &SectionData, folder: &Folder) -> FolderGlyph {
     if !section.filtered.iter().any(|f| f.id == folder.id) {
-        return None;
+        return FolderGlyph::Plain;
     }
-    Some(filtered_folder_icon(folder, section.account.id))
+    if folder.kind == FolderKind::Custom {
+        FolderGlyph::Icon(filtered_folder_icon(folder, section.account.id))
+    } else {
+        FolderGlyph::Marked(section.account.id)
+    }
+}
+
+/// What a folder row shows for its icon.
+enum FolderGlyph {
+    /// The folder kind's own icon.
+    Plain,
+    /// The caller's icon in place of it (a filter destination's tinted glyph).
+    Icon(gtk::Image),
+    /// The kind's own icon, grey as ever, with a small filter glyph in the
+    /// account's colour riding its corner: a main folder (Archive, Junk…)
+    /// that a filter files into.
+    Marked(u32),
 }
 
 /// The icon of a folder a filter files into: a custom folder wears the
@@ -4003,7 +4019,7 @@ fn build_folder_row(
     depth: usize,
     lead: Option<&gtk::Widget>,
     inset: bool,
-    icon: Option<gtk::Image>,
+    glyph: FolderGlyph,
 ) -> (gtk::ListBoxRow, Option<gtk::Label>) {
     let row = gtk::ListBoxRow::new();
     let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
@@ -4029,10 +4045,32 @@ fn build_folder_row(
     }
 
     // The folder kind's icon, unless the caller brought its own (the
-    // Filtered Folders rows' account-tinted glyph).
-    let img = icon.unwrap_or_else(|| gtk::Image::from_icon_name(folder.kind.icon()));
+    // Filters rows' account-tinted glyph).
+    let img = match &glyph {
+        FolderGlyph::Icon(icon) => icon.clone(),
+        _ => gtk::Image::from_icon_name(folder.kind.icon()),
+    };
     img.add_css_class("folder-icon");
     pin_icon_size(&img);
+    // A marked folder carries the filter glyph on the icon's corner: top
+    // right, or bottom right in the rail where the unread badge has the
+    // top. The mark takes no room of its own.
+    let visual: gtk::Widget = match glyph {
+        FolderGlyph::Marked(account_id) => {
+            let overlay = gtk::Overlay::new();
+            overlay.set_child(Some(&img));
+            let mark = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-symbolic");
+            mark.set_pixel_size(9);
+            mark.add_css_class("filter-mark");
+            mark.add_css_class(&format!("acct-tint-{account_id}"));
+            mark.set_halign(gtk::Align::End);
+            mark.set_valign(if collapsed { gtk::Align::End } else { gtk::Align::Start });
+            overlay.add_overlay(&mark);
+            overlay.set_measure_overlay(&mark, false);
+            overlay.upcast()
+        }
+        _ => img.clone().upcast(),
+    };
 
     // Sent wears no unread chip: what you sent is not new mail. `None` keeps
     // it off the in-place update lists too.
@@ -4048,14 +4086,14 @@ fn build_folder_row(
         row.set_tooltip_text(Some(&tip));
         // Every folder carries an unread chip; in the rail it rides the icon's
         // corner so new mail shows without expanding the sidebar.
-        let (overlay, badge) = with_unread_overlay(&img, unread);
+        let (overlay, badge) = with_unread_overlay(&visual, unread);
         hbox.append(&overlay);
         counted.then_some(badge)
     } else {
         if inset {
-            img.set_margin_start(ROW_LEFT_INSET);
+            visual.set_margin_start(ROW_LEFT_INSET);
         }
-        hbox.append(&img);
+        hbox.append(&visual);
         let name = gtk::Label::new(Some(&folder.name));
         name.set_hexpand(true);
         name.set_halign(gtk::Align::Start);
