@@ -3967,7 +3967,7 @@ impl AccountsWindow {
         // can opt its folder out (#116).
         let count_row = adw::SwitchRow::new();
         count_row.set_title(&i18n("Count unread mail"));
-        count_row.set_subtitle(&i18n("Include the folder's unread mail in the unread count and the tray icon"));
+        count_row.set_subtitle(&i18n("Include the folder's unread mail in the tray icon's unread count"));
         count_row.set_active(true);
 
         // Editing: every field starts from the rule as it stands.

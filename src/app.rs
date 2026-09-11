@@ -8081,9 +8081,9 @@ impl AppModel {
         let folders = self.folder_unread.clone();
         let unified = self.unified_unread();
         self.sidebar
-            .emit(SidebarInput::SetUnread { folders, unified });
-        // The same number is what GNOME shows beside Vireo in Background Apps,
-        // so a process with no window still says what it is there for.
+            .emit(SidebarInput::SetUnread { folders, unified: self.inboxes_unread() });
+        // The counted total is what GNOME shows beside Vireo in Background
+        // Apps, so a process with no window still says what it is there for.
         if self.run_in_background.get() {
             crate::background::set_status(&crate::background::status_text(unified));
         }
@@ -8338,7 +8338,7 @@ impl AppModel {
         // The other unified rows are as pointless with one account.
         let unified_kinds =
             if multi_account { self.unified_kinds } else { config::UnifiedKinds::NONE };
-        let unified_unread = self.unified_unread();
+        let unified_unread = self.inboxes_unread();
         let unified_folders = self.unified_folder_refs();
         self.sidebar.emit(SidebarInput::SetContents {
             sections,
@@ -12138,11 +12138,21 @@ impl AppModel {
         self.counted_folders(account_id).iter().map(|f| self.folder_unread_of(f)).sum()
     }
 
-    /// The number behind the All Inboxes chip, the tray icon's dot and
-    /// menu, and the Background Apps status: every account's counted
-    /// unread mail.
+    /// The number behind the tray icon's dot and menu and the Background
+    /// Apps status: every account's counted unread mail.
     fn unified_unread(&self) -> u32 {
         self.accounts.iter().map(|a| self.counted_unread(a.id)).sum()
+    }
+
+    /// The number behind the unified Inboxes chip: the inboxes alone. A
+    /// filter's destination has its own row (under Filters, and in its
+    /// account), with its own chip, so it is not counted here as well.
+    fn inboxes_unread(&self) -> u32 {
+        self.accounts
+            .iter()
+            .filter_map(|a| self.inbox_of(a.id))
+            .map(|f| self.folder_unread_of(f))
+            .sum()
     }
 
     /// A watcher or sweep reported a changed unread count for `folder_id`.
