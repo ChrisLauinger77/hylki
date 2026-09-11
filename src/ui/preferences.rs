@@ -390,9 +390,10 @@ pub enum PrefInput {
     SelectPage(String),
     /// Select a category by id from outside (the app's showcase hook).
     ShowPageById(String),
-    /// The accounts editor subpage opened/closed — hide/show the shared
-    /// header so the editor's own header takes over the window.
-    EditorOpen(bool),
+    /// An accounts-panel editor subpage (account, filter or tag) opened on
+    /// the named settings page, or closed — hide/show the shared header so
+    /// the editor's own header takes over the window.
+    EditorOpen(Option<&'static str>),
     /// The Cloud Storage page's account editor is up (or gone).
     CloudEditorOpen(bool),
 }
@@ -489,11 +490,21 @@ impl Preferences {
     /// or stay. Staying puts the selection back on Mail Accounts.
     fn ask_to_leave_editor(&self, id: &str, sender: &ComponentSender<Self>) {
         let parent = relm4::main_application().active_window();
-        let dialog = adw::MessageDialog::new(
-            parent.as_ref(),
-            Some(&i18n("Save the account?")),
-            Some(&i18n("The account editor is open. Save what you changed, or discard it, before moving on.")),
-        );
+        let (heading, body) = match self.editor_page {
+            "filters" => (
+                i18n("Save the filter?"),
+                i18n("The filter editor is open. Save what you changed, or discard it, before moving on."),
+            ),
+            "tags" => (
+                i18n("Save the tag?"),
+                i18n("The tag editor is open. Save what you changed, or discard it, before moving on."),
+            ),
+            _ => (
+                i18n("Save the account?"),
+                i18n("The account editor is open. Save what you changed, or discard it, before moving on."),
+            ),
+        };
+        let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&heading), Some(&body));
         dialog.add_response("cancel", &i18n("Cancel"));
         dialog.add_response("discard", &i18n("Discard"));
         dialog.add_response("save", &i18n("Save"));
@@ -515,7 +526,7 @@ impl Preferences {
                             let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::SaveClicked);
                         }
                     } else {
-                        let _ = accounts.send(crate::ui::accounts::AccountsInput::Save);
+                        let _ = accounts.send(crate::ui::accounts::AccountsInput::SaveOpenPage);
                     }
                     s.input(PrefInput::ShowPageById(id.clone()));
                 }
@@ -2416,11 +2427,11 @@ impl Component for Preferences {
                 }
             }
             PrefInput::ShowPageById(id) => self.select_row(&id),
-            PrefInput::EditorOpen(open) => {
-                self.editor_open = open;
-                self.editor_page = "accounts";
+            PrefInput::EditorOpen(page) => {
+                self.editor_open = page.is_some();
+                self.editor_page = page.unwrap_or("accounts");
                 if let Some(header) = &self.host_header {
-                    header.set_visible(!open);
+                    header.set_visible(page.is_none());
                 }
             }
             PrefInput::CloudEditorOpen(open) => {

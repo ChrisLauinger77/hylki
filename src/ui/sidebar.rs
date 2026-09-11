@@ -525,6 +525,8 @@ pub enum CtxAction {
     RenameFolder { account_id: u32, name: String, path: String },
     /// Erase everything in Trash or Junk (#152).
     EmptyFolder { account_id: u32, folder_id: u32, name: String, path: String },
+    /// Open Settings on the filter rule that files into this folder.
+    EditFilter { account_id: u32, path: String },
 }
 
 #[relm4::component(pub)]
@@ -2113,8 +2115,9 @@ impl Sidebar {
             list.set_selection_mode(gtk::SelectionMode::Single);
             list.add_css_class("navigation-sidebar");
             for folder in &essential {
+                let icon = filter_icon(section, folder);
                 let (row, badge) =
-                    build_folder_row(folder, self.collapsed, 0, None, self.chevrons_left, None);
+                    build_folder_row(folder, self.collapsed, 0, None, self.chevrons_left, icon);
                 row.add_controller(folder_drop_target(id, folder.path.clone(), sender));
                 list.append(&row);
                 if let Some(badge) = badge {
@@ -2134,6 +2137,7 @@ impl Sidebar {
                 &list,
                 id,
                 essential.iter().map(|f| (*f).clone()).collect(),
+                section.filtered.iter().map(|f| f.path.clone()).collect(),
                 sender,
             );
 
@@ -2199,7 +2203,7 @@ impl Sidebar {
                             depth,
                             lead.as_ref(),
                             self.chevrons_left,
-                            None,
+                            filter_icon(section, folder),
                         );
                     // Hidden while any ancestor is collapsed; the row still
                     // exists, so selection indices stay stable. Its content
@@ -2263,7 +2267,8 @@ impl Sidebar {
                     &custom_list,
                     id,
                     custom.iter().map(|f| (*f).clone()).collect(),
-                    sender,
+                    section.filtered.iter().map(|f| f.path.clone()).collect(),
+                sender,
                 );
 
                 custom_revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -2332,18 +2337,16 @@ impl Sidebar {
 
             let wrap = gtk::Box::new(gtk::Orientation::Vertical, 0);
             wrap.append(&list);
+            // The account's own Tags section, above its folder hierarchy:
+            // every tag scoped to this account, there whatever the unified
+            // section shows. (Its filtered folders are marked in place in
+            // the hierarchy instead — see `filter_icon`.)
+            if !self.tags.is_empty() {
+                self.build_tags_section(&wrap, Slot::Account(id), false, sender);
+            }
             if !custom.is_empty() {
                 wrap.append(&folders_toggle);
                 wrap.append(&custom_revealer);
-            }
-            // The account's own Filtered Folders and Tags sections: every
-            // rule's folder, and every tag scoped to this account — there
-            // whether or not the unified section shows either.
-            if !section.filtered.is_empty() {
-                self.build_filtered_section(&wrap, Slot::Account(id), &sections, sender);
-            }
-            if !self.tags.is_empty() {
-                self.build_tags_section(&wrap, Slot::Account(id), false, sender);
             }
             wrap.append(&add_btn);
             revealer.set_child(Some(&wrap));
@@ -3634,6 +3637,7 @@ fn attach_folder_context_menu(
     list: &gtk::ListBox,
     id: u32,
     folders: Vec<Folder>,
+    filtered: Vec<String>,
     sender: &ComponentSender<Sidebar>,
 ) {
     let click = gtk::GestureClick::new();
@@ -3649,6 +3653,13 @@ fn attach_folder_context_menu(
                 (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead { account_id: id, folder_id: f.id }),
                 (i18n_noop("Refresh"), CtxAction::RefreshFolder { account_id: id, folder_id: f.id }),
             ];
+            // A filter files into this folder: its rule is a click away.
+            if filtered.iter().any(|p| *p == f.path) {
+                items.push((i18n_noop("Edit Filter…"), CtxAction::EditFilter {
+                    account_id: id,
+                    path: f.path.clone(),
+                }));
+            }
             // Only user-created folders can be renamed or deleted.
             if f.kind == FolderKind::Custom {
                 items.push((i18n_noop("Rename Folder…"), CtxAction::RenameFolder {
@@ -3918,6 +3929,17 @@ fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
                 && matches!(folder.path.as_bytes()[g.path.len()], b'/' | b'.' | b'\\')
         })
         .count()
+}
+
+/// The icon a folder row wears when a filter rule files into it: the
+/// filter-folder glyph in the account's colour, in place in the hierarchy.
+fn filter_icon(section: &SectionData, folder: &Folder) -> Option<gtk::Image> {
+    if !section.filtered.iter().any(|f| f.id == folder.id) {
+        return None;
+    }
+    let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-folder-symbolic");
+    icon.add_css_class(&format!("acct-tint-{}", section.account.id));
+    Some(icon)
 }
 
 /// Build one folder row. `depth` indents sub-folders to mirror the server's

@@ -138,6 +138,10 @@ pub struct AccountsWindow {
     filters_list: Option<gtk::ListBox>,
     /// The filters page's search text, read by the list's filter function.
     filters_query: std::rc::Rc<std::cell::RefCell<String>>,
+    /// The open filter or tag page's Save: reads the form and hands the
+    /// result back, true when it went through (the page then pops). The
+    /// settings window's leave-editor prompt saves through it too.
+    form_save: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn() -> bool>>>>,
     /// The senders page's search text, shared by both lists.
     senders_query: std::rc::Rc<std::cell::RefCell<String>>,
     /// Tags (#71), managed on this tab too — the rules' "Tag with" names them.
@@ -257,14 +261,16 @@ pub enum AccountsInput {
     RemoveBlacklistRow(String),
     AddFilter,
     RemoveFilter(usize),
-    /// Open the filter dialog on an existing rule.
+    /// Save whichever editor page is up (account, filter or tag): the
+    /// settings window's leave-editor prompt.
+    SaveOpenPage,
+    /// Open the filter page on an existing rule.
     EditFilter(usize),
     /// The dialog saved changes to the rule at this index.
     FilterEdited(usize, crate::config::FilterRule),
     /// The rule's "count unread" switch was flipped (#116).
     SetFilterCounted(usize, bool),
     /// Toggle whether a rule's folder is listed under All Inboxes.
-    SetFilterUnified(usize, bool),
     FilterAdded(crate::config::FilterRule),
     /// Tags (#71): the dialog, and what it hands back.
     AddTag,
@@ -291,9 +297,10 @@ pub enum AccountsOutput {
     EnabledChanged { email: String, enabled: bool },
     /// Import a GNOME Online Account into Vireo (with its credentials).
     ImportGoa(Box<AccountConfig>),
-    /// The editor subpage opened (true) or closed (false) — the combined
-    /// settings window hides its shared header while it is open.
-    EditorOpen(bool),
+    /// An editor subpage opened (the settings page it belongs to: accounts,
+    /// filters or tags) or closed (`None`) — the combined settings window
+    /// hides its shared header while one is open.
+    EditorOpen(Option<&'static str>),
     /// Mail-hygiene changes, routed to the same app handlers Settings used.
     AddSender(String),
     RemoveSender(String),
@@ -1138,6 +1145,7 @@ impl Component for AccountsWindow {
             filter_rules: init.filters,
             filters_list: None,
             filters_query: Default::default(),
+            form_save: Default::default(),
             senders_query: Default::default(),
             tags: init.tags,
             tags_list: None,
@@ -1231,11 +1239,18 @@ impl Component for AccountsWindow {
         // every way in or out (Save, back button, swipe) lands here.
         {
             let s = sender.output_sender().clone();
+            let form_save = model.form_save.clone();
             widgets.nav.connect_visible_page_notify(move |nav| {
-                let editor = nav
-                    .visible_page()
-                    .and_then(|p| p.tag())
-                    .is_some_and(|tag| tag == "editor");
+                let tag = nav.visible_page().and_then(|p| p.tag());
+                let editor = match tag.as_deref() {
+                    Some("editor") => Some("accounts"),
+                    Some("filter") => Some("filters"),
+                    Some("tag") => Some("tags"),
+                    _ => None,
+                };
+                if !matches!(editor, Some("filters") | Some("tags")) {
+                    form_save.borrow_mut().take();
+                }
                 let _ = s.send(AccountsOutput::EditorOpen(editor));
             });
         }
@@ -1256,8 +1271,25 @@ impl Component for AccountsWindow {
                 widgets.list_stack.set_visible_child_name(&id);
             }
             AccountsInput::CloseEditor => {
-                if widgets.nav.visible_page().and_then(|p| p.tag()).is_some_and(|t| t == "editor") {
+                if widgets
+                    .nav
+                    .visible_page()
+                    .and_then(|p| p.tag())
+                    .is_some_and(|t| t == "editor" || t == "filter" || t == "tag")
+                {
                     widgets.nav.pop();
+                }
+            }
+            AccountsInput::SaveOpenPage => {
+                match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
+                    Some("editor") => sender.input(AccountsInput::Save),
+                    Some("filter") | Some("tag") => {
+                        let saved = self.form_save.borrow().as_ref().is_some_and(|f| f());
+                        if saved {
+                            widgets.nav.pop();
+                        }
+                    }
+                    _ => {}
                 }
             }
             AccountsInput::SearchFilters(text) => {
@@ -1995,11 +2027,11 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsInput::AddFilter => {
-                self.open_filter_dialog(&sender, None);
+                self.open_filter_page(&widgets.nav, &sender, None);
             }
             AccountsInput::EditFilter(i) => {
                 if let Some(rule) = self.filter_rules.get(i).cloned() {
-                    self.open_filter_dialog(&sender, Some((i, rule)));
+                    self.open_filter_page(&widgets.nav, &sender, Some((i, rule)));
                 }
             }
             AccountsInput::FilterEdited(i, rule) => {
@@ -2025,10 +2057,10 @@ impl Component for AccountsWindow {
                 self.rebuild_filter_rows(&sender);
                 let _ = sender.output(AccountsOutput::SetFilters(self.filter_rules.clone()));
             }
-            AccountsInput::AddTag => self.open_tag_dialog(&sender, None),
+            AccountsInput::AddTag => self.open_tag_page(&widgets.nav, &sender, None),
             AccountsInput::EditTag(i) => {
                 if let Some(tag) = self.tags.get(i).cloned() {
-                    self.open_tag_dialog(&sender, Some((i, tag)));
+                    self.open_tag_page(&widgets.nav, &sender, Some((i, tag)));
                 }
             }
             AccountsInput::RemoveTag(i) => {
@@ -2069,15 +2101,6 @@ impl Component for AccountsWindow {
                 if let Some(r) = self.filter_rules.get_mut(i) {
                     if r.count_unread != on {
                         r.count_unread = on;
-                        let _ = sender
-                            .output(AccountsOutput::SetFilters(self.filter_rules.clone()));
-                    }
-                }
-            }
-            AccountsInput::SetFilterUnified(i, on) => {
-                if let Some(r) = self.filter_rules.get_mut(i) {
-                    if r.show_in_unified != on {
-                        r.show_in_unified = on;
                         let _ = sender
                             .output(AccountsOutput::SetFilters(self.filter_rules.clone()));
                     }
@@ -3316,16 +3339,6 @@ impl AccountsWindow {
             count.connect_active_notify(move |sw| {
                 s.input(AccountsInput::SetFilterCounted(i, sw.is_active()))
             });
-            let unified = place(
-                1,
-                "All Inboxes",
-                r.show_in_unified,
-                "List this folder under All Inboxes, in its Filtered Folders section",
-            );
-            let s = sender.clone();
-            unified.connect_active_notify(move |sw| {
-                s.input(AccountsInput::SetFilterUnified(i, sw.is_active()))
-            });
             row.add_suffix(&grid);
             // A pencil says "activate to edit" (full strength, like the trash
             // button beside it); the trash button removes.
@@ -3411,8 +3424,9 @@ impl AccountsWindow {
     /// name until the user edits it; editing an existing tag keeps its
     /// keyword unless changed, since the messages carry the keyword, not
     /// the name.
-    fn open_tag_dialog(
+    fn open_tag_page(
         &self,
+        nav: &adw::NavigationView,
         sender: &ComponentSender<Self>,
         edit: Option<(usize, crate::config::Tag)>,
     ) {
@@ -3423,11 +3437,6 @@ impl AccountsWindow {
         } else {
             (i18n("Add Tag"), i18n("Add Tag"))
         };
-        let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&title), None);
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("add", &verb);
-        dialog.set_response_appearance("add", adw::ResponseAppearance::Suggested);
-        dialog.set_default_response(Some("add"));
 
         let form = gtk::ListBox::new();
         form.add_css_class("boxed-list");
@@ -3543,7 +3552,7 @@ impl AccountsWindow {
             toggle.set_active(custom.is_some());
             let custom = std::rc::Rc::new(std::cell::RefCell::new(custom));
             let chosen = chosen.clone();
-            let dialog = dialog.clone();
+            let parent = parent.clone();
             toggle.connect_clicked(move |t| {
                 let picker = gtk::ColorDialog::new();
                 picker.set_with_alpha(false);
@@ -3554,7 +3563,7 @@ impl AccountsWindow {
                 let chosen = chosen.clone();
                 let custom = custom.clone();
                 picker.choose_rgba(
-                    Some(&dialog),
+                    parent.as_ref(),
                     Some(&initial),
                     None::<&gtk::gio::Cancellable>,
                     move |res| match res {
@@ -3605,13 +3614,12 @@ impl AccountsWindow {
         form.append(&name_row);
         form.append(&color_row);
         form.append(&keyword_row);
-        dialog.set_extra_child(Some(&form));
 
         let s = sender.clone();
-        dialog.connect_response(Some("add"), move |_, _| {
+        self.push_form_page(nav, "tag", &title, &verb, &form, move || {
             let name = name_row.text().trim().to_string();
             if name.is_empty() {
-                return;
+                return false;
             }
             // A keyword the server would refuse falls back to the derived one.
             let typed = keyword_row.text().trim().to_string();
@@ -3624,15 +3632,74 @@ impl AccountsWindow {
                 Some(i) => AccountsInput::TagEdited(i, tag),
                 None => AccountsInput::TagAdded(tag),
             });
+            true
         });
-        dialog.present();
+    }
+
+    /// Slide a form in as its own page, the way the account editor does:
+    /// its header carries the window's close button and a Save button;
+    /// the back button (or a swipe) leaves without saving. `save` reads
+    /// the form and returns true once it went through, which pops the page.
+    fn push_form_page(
+        &self,
+        nav: &adw::NavigationView,
+        tag: &str,
+        title: &str,
+        verb: &str,
+        form: &gtk::ListBox,
+        save: impl Fn() -> bool + 'static,
+    ) {
+        let save: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(save);
+        let header = adw::HeaderBar::new();
+        header.set_show_end_title_buttons(true);
+        let save_btn = gtk::Button::with_label(verb);
+        save_btn.add_css_class("suggested-action");
+        {
+            let nav = nav.clone();
+            let save = save.clone();
+            save_btn.connect_clicked(move |_| {
+                if save() {
+                    nav.pop();
+                }
+            });
+        }
+        header.pack_end(&save_btn);
+
+        let group = adw::PreferencesGroup::new();
+        group.add(form);
+        let page = adw::PreferencesPage::new();
+        page.add(&group);
+
+        let view = adw::ToolbarView::new();
+        view.add_top_bar(&header);
+        view.set_content(Some(&page));
+
+        let nav_page = adw::NavigationPage::new(&view, title);
+        nav_page.set_tag(Some(tag));
+        // Enter in an entry saves, like the dialog's default response did.
+        let mut child = form.first_child();
+        while let Some(c) = child {
+            if let Some(entry) = c.downcast_ref::<adw::EntryRow>() {
+                let nav = nav.clone();
+                let save = save.clone();
+                entry.connect_entry_activated(move |_| {
+                    if save() {
+                        nav.pop();
+                    }
+                });
+            }
+            child = c.next_sibling();
+        }
+        *self.form_save.borrow_mut() = Some(Box::new(move || save()));
+        nav.push(&nav_page);
     }
 
     /// The filter dialog: account, field, match, value, destination, and
     /// the two per-rule switches. With `edit`, it opens on that existing
     /// rule (prefilled, "Save") and replaces it in place; otherwise it adds.
-    fn open_filter_dialog(
+    fn open_filter_page(
         &self,
+        nav: &adw::NavigationView,
         sender: &ComponentSender<Self>,
         edit: Option<(usize, crate::config::FilterRule)>,
     ) {
@@ -3641,17 +3708,11 @@ impl AccountsWindow {
         if emails.is_empty() {
             return;
         }
-        let parent = relm4::main_application().active_window();
         let (title, verb) = if edit.is_some() {
             (i18n("Edit Filter"), i18n("Save"))
         } else {
             (i18n("Add Filter"), i18n("Add Filter"))
         };
-        let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&title), None);
-        dialog.add_response("cancel", &i18n("Cancel"));
-        dialog.add_response("add", &verb);
-        dialog.set_response_appearance("add", adw::ResponseAppearance::Suggested);
-        dialog.set_default_response(Some("add"));
 
         let form = gtk::ListBox::new();
         form.add_css_class("boxed-list");
@@ -3734,16 +3795,6 @@ impl AccountsWindow {
         count_row.set_subtitle(&i18n("Include the folder's unread mail in the unread count and the tray icon"));
         count_row.set_active(true);
 
-        // Listing the folder under All Inboxes is the rule's choice: off
-        // unless asked, so the unified view's Filtered Folders section only
-        // ever holds folders someone put there.
-        let unified_row = adw::SwitchRow::new();
-        unified_row.set_title(&i18n("Show under All Inboxes"));
-        unified_row.set_subtitle(
-            "List the folder in the Filtered Folders section inside All Inboxes",
-        );
-        unified_row.set_active(false);
-
         // Editing: every field starts from the rule as it stands.
         let edit_index = edit.as_ref().map(|(i, _)| *i);
         if let Some((_, rule)) = &edit {
@@ -3774,7 +3825,6 @@ impl AccountsWindow {
                 tag_row.set_selected(idx as u32 + 1);
             }
             count_row.set_active(rule.count_unread);
-            unified_row.set_active(rule.show_in_unified);
         }
 
         form.append(&account_row);
@@ -3784,18 +3834,16 @@ impl AccountsWindow {
         form.append(&dest_row);
         form.append(&tag_row);
         form.append(&count_row);
-        form.append(&unified_row);
-        dialog.set_extra_child(Some(&form));
 
         let s = sender.clone();
-        dialog.connect_response(Some("add"), move |_, _| {
+        self.push_form_page(nav, "filter", &title, &verb, &form, move || {
             let value = value_row.text().trim().to_string();
             let paths = dest_paths.borrow();
             let (Some(email), Some(dest)) = (
                 emails.get(account_row.selected() as usize),
                 paths.get(dest_row.selected() as usize),
             ) else {
-                return;
+                return false;
             };
             let tag = match tag_row.selected() {
                 0 => String::new(),
@@ -3803,7 +3851,7 @@ impl AccountsWindow {
             };
             // A rule needs something to match and something to do.
             if value.is_empty() || (dest.is_empty() && tag.is_empty()) {
-                return;
+                return false;
             }
             let rule = FilterRule {
                 account_email: email.clone(),
@@ -3823,14 +3871,13 @@ impl AccountsWindow {
                 dest_path: dest.clone(),
                 tag,
                 count_unread: count_row.is_active(),
-                show_in_unified: unified_row.is_active(),
             };
             s.input(match edit_index {
                 Some(i) => AccountsInput::FilterEdited(i, rule),
                 None => AccountsInput::FilterAdded(rule),
             });
+            true
         });
-        dialog.present();
     }
 }
 

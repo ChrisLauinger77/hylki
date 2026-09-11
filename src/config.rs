@@ -910,9 +910,8 @@ struct PrivacyFile {
     /// counts granularly and the total is never shown).
     #[serde(default = "default_unified_chip")]
     unified_chip: bool,
-    /// Whether All Inboxes lists the folders that filter rules file into (for
-    /// rules whose "Show under All Inboxes" switch is on) in a collapsible
-    /// section of its own. Off hides that section whatever the rules say.
+    /// Whether the unified section lists the folders that filter rules file
+    /// into, in a Filtered Folders section of its own. Off hides the section.
     #[serde(default = "default_unified_filtered")]
     unified_filtered: bool,
     /// The unified section's Starred / Sent / Drafts rows, one switch each
@@ -1384,12 +1383,6 @@ pub struct FilterRule {
     /// destinations never count, whatever this says.
     #[serde(default = "count_unread_default")]
     pub count_unread: bool,
-    /// Whether the destination folder is listed under All Inboxes, in its
-    /// collapsible "Filtered Folders" section, so filed mail is a click away
-    /// from the unified view. Off by default: a rule opts its folder in.
-    /// Settings → Sidebar can switch the whole section off regardless.
-    #[serde(default)]
-    pub show_in_unified: bool,
 }
 
 fn count_unread_default() -> bool {
@@ -2680,7 +2673,6 @@ mod filter_tests {
             dest_path: "Archive".into(),
             tag: String::new(),
             count_unread: true,
-            show_in_unified: false,
         }
     }
 

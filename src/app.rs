@@ -989,7 +989,7 @@ pub enum AppMsg {
     OpenPreferences,
     ClosePreferences,
     /// The accounts editor subpage opened/closed in the settings window.
-    SettingsEditorOpen(bool),
+    SettingsEditorOpen(Option<&'static str>),
     /// The "settings window opens to" preference changed (true = Accounts).
     SetSettingsOpenAccounts(bool),
     // Worker events (each carries the account it came from)
@@ -3825,6 +3825,25 @@ impl SimpleComponent for AppModel {
                         .collect();
                     for (account_id, folder_id, path) in reqs {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+                    }
+                }
+                CtxAction::EditFilter { account_id, path } => {
+                    // The first rule filing into this folder, in the
+                    // Filters page's editor.
+                    let email = self.email_of(account_id);
+                    let index = email.and_then(|email| {
+                        self.filters.iter().position(|r| {
+                            r.account_email.eq_ignore_ascii_case(&email) && r.dest_path == path
+                        })
+                    });
+                    if let Some(i) = index {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("filters".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditFilter(i));
+                        }
                     }
                 }
                 CtxAction::OpenAccountSettings(account_id) => {
@@ -10048,8 +10067,46 @@ impl AppModel {
             }
             self.save_sidebar_state();
         }
+        // The open folder follows its rename (or its parent's): the
+        // selection used to keep the old path, and every auto-fetch asked
+        // the server for a mailbox that no longer existed.
+        let followed = self.selected.as_ref().and_then(|s| {
+            if s.account_id != account_id {
+                return None;
+            }
+            if s.path == path {
+                Some(new_path.clone())
+            } else {
+                s.path.strip_prefix(&old_prefix).map(|rest| format!("{new_prefix}{rest}"))
+            }
+        });
+        if let Some(moved) = followed {
+            let id = self
+                .folders
+                .get(&account_id)
+                .and_then(|fs| fs.iter().find(|f| f.path == moved))
+                .map(|f| f.id);
+            if let (Some(sel), Some(id)) = (self.selected.as_mut(), id) {
+                sel.path = moved.clone();
+                sel.folder_id = id;
+            }
+        }
         self.rebuild_sidebar();
+        if let Some(sel) = self.selected.clone().filter(|s| s.account_id == account_id) {
+            self.sidebar.emit(SidebarInput::SelectFolderRow {
+                account_id,
+                path: sel.path.clone(),
+            });
+        }
         self.send_to(account_id, MailRequest::RenameFolder { old_path: path, new_path });
+        // The worker runs requests in order: the reload queues behind the
+        // RENAME and refills the cleared view from the folder's new name.
+        if let Some(sel) = self.selected.clone().filter(|s| s.account_id == account_id) {
+            self.send_to(account_id, MailRequest::LoadMessages {
+                folder_id: sel.folder_id,
+                path: sel.path,
+            });
+        }
     }
 
     /// The account's hierarchy delimiter, inferred from its folder paths (the
@@ -11078,7 +11135,7 @@ impl AppModel {
                 self.accounts_win = Some(accounts);
             }
             if let Some(p) = &self.prefs {
-                p.emit(PrefInput::EditorOpen(false));
+                p.emit(PrefInput::EditorOpen(None));
                 p.emit(PrefInput::ShowPageById(page));
             }
         } else if on_accounts {
@@ -11885,11 +11942,10 @@ impl AppModel {
         out
     }
 
-    /// The folders listed in All Inboxes' "Filtered Folders" section: the
-    /// destination of every rule whose "Show under All Inboxes" switch is
-    /// on, in account order then rule order, without repeats; nothing when
-    /// Settings → Sidebar has the section off. An inbox destination is
-    /// already an All Inboxes row and is skipped.
+    /// The folders the unified "Filtered Folders" section lists: the
+    /// destination of every rule, in account order then rule order, without
+    /// repeats; nothing when Settings → Sidebar has the section off. An
+    /// inbox destination is already an All Inboxes row and is skipped.
     fn unified_folder_refs(&self) -> Vec<UnifiedFolderRef> {
         let mut out: Vec<UnifiedFolderRef> = Vec::new();
         if !self.unified_filtered {
@@ -11898,9 +11954,7 @@ impl AppModel {
         for email in self.ordered_emails() {
             let Some(account) = self.accounts.iter().find(|a| a.email == email) else { continue };
             let Some(folders) = self.folders.get(&account.id) else { continue };
-            let rules = self.filters.iter().filter(|r| {
-                r.show_in_unified && r.account_email.eq_ignore_ascii_case(&email)
-            });
+            let rules = self.filters.iter().filter(|r| r.account_email.eq_ignore_ascii_case(&email));
             for r in rules {
                 let Some(f) = folders.iter().find(|f| f.path == r.dest_path) else { continue };
                 if f.kind == FolderKind::Inbox
@@ -12490,7 +12544,6 @@ fn demo_filters() -> Vec<config::FilterRule> {
         dest_path: dest.into(),
         tag: String::new(),
         count_unread: true,
-        show_in_unified: true,
     };
     vec![
         mk("jason@vireo.hyprlab.co", FilterField::FromAddress, FilterMatch::EndsWith, "substack.com", "Newsletters"),
