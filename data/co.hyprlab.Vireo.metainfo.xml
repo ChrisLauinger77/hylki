@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.27.1" date="2026-09-11">
+      <description>
+        <p>French translation catch-up: the strings added in 1.26.0 are now translated (PR #160 by frenchy82).</p>
+      </description>
+    </release>
     <release version="1.27.0" date="2026-09-11">
       <description>
         <p>A Move To button in the reader. Reply on a conversation answers its latest message. Tags set on another device reach the tag lists. A picture can stand in for the account's emoji or initials, with a preview in the account editor. The Actions Palette can act as a menu. The unified section gains Starred, Sent, Drafts, Archive, Filters and Tags rows; the sidebar layout is remembered; the icon rail folds items and shows unread dots. Folder switches and the Settings window open in tens of milliseconds. A tag finder imports tags other clients set. Not Spam in Junk. Sender logos at full size. List previews read their charset.</p>
