@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.27.2" date="2026-09-11">
+      <description>
+        <p>Inbox and Archive use GNOME's inbox and shoe-box icons in the sidebar, toolbars and menus.</p>
+      </description>
+    </release>
     <release version="1.27.1" date="2026-09-11">
       <description>
         <p>French translation catch-up: the strings added in 1.26.0 are now translated (PR #160 by frenchy82).</p>

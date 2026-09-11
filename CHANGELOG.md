@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.27.2 — 2026-09-11
+
+Inbox and Archive use GNOME's own icons.
+
+- **Inbox and Archive icons** are now GNOME Icon Library's
+  `inbox-symbolic` and `shoe-box-symbolic` (icon-development-kit, CC0),
+  copied verbatim into `data/icons/hicolor/scalable/actions/` as
+  `mail-inbox-symbolic` and `mail-archive-symbolic` and re-bundled with
+  `tools/gen-icon-gresource.sh`. They replace the hand-drawn tray and box
+  everywhere those names are used: the sidebar, the list toolbar and bulk
+  bar, the row action palette, the context menus and the reader's Archive
+  button.
+- **README screenshot** refreshed to show the new icons.
+
 ## 1.27.1 — 2026-09-11
 
 French translation catch-up for the 1.26.0 strings.
