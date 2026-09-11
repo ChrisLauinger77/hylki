@@ -430,7 +430,7 @@ pub struct AppModel {
     /// Whether the sidebar offers the unified "All Inboxes" section at all.
     show_unified_pref: bool,
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
-    unified_chip: bool,
+    unified_chips: config::UnifiedChips,
     /// Whether All Inboxes lists the folders that opted-in filter rules file
     /// into, in its "Filtered Folders" section (Settings → Sidebar).
     unified_filtered: bool,
@@ -795,7 +795,7 @@ pub enum AppMsg {
     SetAttachmentsRow(bool),
     SetContactsRow(bool),
     SetShowUnified(bool),
-    SetUnifiedChip(bool),
+    SetUnifiedChips(config::UnifiedChips),
     SetUnifiedFiltered(bool),
     /// The unified section's Starred / Sent / Drafts rows.
     SetUnifiedKinds(config::UnifiedKinds),
@@ -2157,7 +2157,7 @@ impl SimpleComponent for AppModel {
             thread_newest_first: config::load_thread_newest_first(),
             always_show_recipients: config::load_always_show_recipients(),
             show_unified_pref: config::load_show_unified(),
-            unified_chip: config::load_unified_chip(),
+            unified_chips: config::load_unified_chips(),
             unified_filtered: config::load_unified_filtered(),
             filtered_placement: config::load_filtered_placement(),
             tags_placement: config::load_tags_placement(),
@@ -4972,9 +4972,9 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetUnifiedChip(show) => {
-                if self.unified_chip != show {
-                    self.unified_chip = show;
+            AppMsg::SetUnifiedChips(chips) => {
+                if self.unified_chips != chips {
+                    self.unified_chips = chips;
                     self.save_settings();
                     self.rebuild_sidebar();
                 }
@@ -7078,7 +7078,7 @@ impl AppModel {
             self.rail_fold,
             self.app_theme,
             self.show_unified_pref,
-            self.unified_chip,
+            self.unified_chips,
             self.unified_filtered,
             self.unified_kinds,
             self.unified_tags,
@@ -8289,7 +8289,7 @@ impl AppModel {
             unified_kinds,
             unified_tags: self.unified_tags,
             show_accounts: self.show_accounts,
-            unified_chip: self.unified_chip,
+            unified_chips: self.unified_chips,
             chevrons_left: self.chevrons_left,
             rail_dots: self.rail_dots,
             rail_fold: self.rail_fold,
@@ -10873,7 +10873,7 @@ impl AppModel {
             show_attachments: self.show_attachments,
             show_contacts: self.show_contacts,
             show_unified: self.show_unified_pref,
-            unified_chip: self.unified_chip,
+            unified_chips: self.unified_chips,
             unified_filtered: self.unified_filtered,
             unified_kinds: self.unified_kinds,
             unified_tags: self.unified_tags,
@@ -10968,7 +10968,7 @@ impl AppModel {
                 PrefOutput::SetAttachmentsRow(show) => AppMsg::SetAttachmentsRow(show),
                 PrefOutput::SetContactsRow(show) => AppMsg::SetContactsRow(show),
                 PrefOutput::SetShowUnified(show) => AppMsg::SetShowUnified(show),
-                PrefOutput::SetUnifiedChip(show) => AppMsg::SetUnifiedChip(show),
+                PrefOutput::SetUnifiedChips(chips) => AppMsg::SetUnifiedChips(chips),
                 PrefOutput::SetUnifiedFiltered(show) => AppMsg::SetUnifiedFiltered(show),
                 PrefOutput::SetUnifiedKinds(kinds) => AppMsg::SetUnifiedKinds(kinds),
                 PrefOutput::SetUnifiedTags(show) => AppMsg::SetUnifiedTags(show),

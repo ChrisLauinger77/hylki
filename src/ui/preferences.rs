@@ -67,7 +67,7 @@ pub struct PrefInit {
     pub show_attachments: bool,
     pub show_contacts: bool,
     pub show_unified: bool,
-    pub unified_chip: bool,
+    pub unified_chips: crate::config::UnifiedChips,
     pub unified_filtered: bool,
     pub unified_kinds: crate::config::UnifiedKinds,
     pub unified_tags: bool,
@@ -202,6 +202,8 @@ pub struct Preferences {
     /// The unified Starred / Sent / Drafts switches, kept whole so each
     /// toggle can hand the app the full set.
     unified_kinds: crate::config::UnifiedKinds,
+    /// The unified rows' unread-chip switches, likewise kept whole.
+    unified_chips: crate::config::UnifiedChips,
     /// Mirrors the "Accounts in the sidebar" switch, which the main menu
     /// can flip too.
     show_accounts: bool,
@@ -332,7 +334,11 @@ pub enum PrefInput {
     ToggleAttachmentsRow(bool),
     ToggleContactsRow(bool),
     ToggleShowUnified(bool),
-    ToggleUnifiedChip(bool),
+    ToggleUnifiedChipAllInboxes(bool),
+    ToggleUnifiedChipStarred(bool),
+    ToggleUnifiedChipDrafts(bool),
+    ToggleUnifiedChipArchive(bool),
+    ToggleUnifiedChipFiltered(bool),
     ToggleUnifiedFiltered(bool),
     ToggleUnifiedStarred(bool),
     ToggleUnifiedSent(bool),
@@ -434,7 +440,7 @@ pub enum PrefOutput {
     SetAttachmentsRow(bool),
     SetContactsRow(bool),
     SetShowUnified(bool),
-    SetUnifiedChip(bool),
+    SetUnifiedChips(crate::config::UnifiedChips),
     SetUnifiedFiltered(bool),
     SetUnifiedKinds(crate::config::UnifiedKinds),
     SetUnifiedTags(bool),
@@ -870,18 +876,6 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "unified_chip_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.show_unified,
-                                        set_title: &i18n("All Inboxes unread count"),
-                                        set_subtitle: &i18n("Show the combined unread chip next to All Inboxes \
-                                                       while its per-account list is folded up."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleUnifiedChip(row.is_active()));
-                                        },
-                                    },
-
                                     #[name = "unified_starred_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Starred"),
@@ -921,10 +915,8 @@ impl Component for Preferences {
                                     #[name = "unified_filtered_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Filtered Folders section"),
-                                        set_subtitle: &i18n("List the folders your filter rules file into in a \
-                                                       collapsible section. Each rule chooses whether its \
-                                                       folder appears there; this switch hides the section \
-                                                       altogether."),
+                                        set_subtitle: &i18n("List every folder your filter rules file into in a \
+                                                       collapsible section of the unified view."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedFiltered(row.is_active()));
                                         },
@@ -937,6 +929,51 @@ impl Component for Preferences {
                                                        section either way."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedTags(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_chips_row"]
+                                    adw::ExpanderRow {
+                                        set_title: &i18n("Unread counts"),
+                                        set_subtitle: &i18n("Which unified rows show their combined unread \
+                                                       chip while folded up. Expanded, the rows beneath \
+                                                       carry the counts. Sent never shows one."),
+                                        set_expanded: true,
+
+                                        #[name = "unified_chip_all_inboxes_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("All Inboxes"),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleUnifiedChipAllInboxes(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "unified_chip_starred_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Starred"),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleUnifiedChipStarred(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "unified_chip_drafts_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Drafts"),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleUnifiedChipDrafts(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "unified_chip_archive_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Archive"),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleUnifiedChipArchive(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "unified_chip_filtered_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Filtered Folders"),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleUnifiedChipFiltered(row.is_active()));
+                                            },
                                         },
                                     },
 
@@ -1623,6 +1660,7 @@ impl Component for Preferences {
             notifications: init.notifications,
             show_unified: init.show_unified,
             unified_kinds: init.unified_kinds,
+            unified_chips: init.unified_chips,
             show_accounts: init.show_accounts,
             rail_fold: init.rail_fold,
             swipe_enabled: init.swipe_enabled,
@@ -1709,7 +1747,11 @@ impl Component for Preferences {
         widgets.show_attachments_row.set_active(init.show_attachments);
         widgets.show_contacts_row.set_active(init.show_contacts);
         widgets.show_unified_row.set_active(init.show_unified);
-        widgets.unified_chip_row.set_active(init.unified_chip);
+        widgets.unified_chip_all_inboxes_row.set_active(init.unified_chips.all_inboxes);
+        widgets.unified_chip_starred_row.set_active(init.unified_chips.starred);
+        widgets.unified_chip_drafts_row.set_active(init.unified_chips.drafts);
+        widgets.unified_chip_archive_row.set_active(init.unified_chips.archive);
+        widgets.unified_chip_filtered_row.set_active(init.unified_chips.filtered);
         widgets.unified_filtered_row.set_active(init.unified_filtered);
         widgets.unified_starred_row.set_active(init.unified_kinds.starred);
         widgets.unified_sent_row.set_active(init.unified_kinds.sent);
@@ -2251,8 +2293,25 @@ impl Component for Preferences {
                 self.show_unified = on;
                 let _ = sender.output(PrefOutput::SetShowUnified(on));
             }
-            PrefInput::ToggleUnifiedChip(on) => {
-                let _ = sender.output(PrefOutput::SetUnifiedChip(on));
+            PrefInput::ToggleUnifiedChipAllInboxes(on) => {
+                self.unified_chips.all_inboxes = on;
+                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+            }
+            PrefInput::ToggleUnifiedChipStarred(on) => {
+                self.unified_chips.starred = on;
+                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+            }
+            PrefInput::ToggleUnifiedChipDrafts(on) => {
+                self.unified_chips.drafts = on;
+                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+            }
+            PrefInput::ToggleUnifiedChipArchive(on) => {
+                self.unified_chips.archive = on;
+                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
+            }
+            PrefInput::ToggleUnifiedChipFiltered(on) => {
+                self.unified_chips.filtered = on;
+                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
             }
             PrefInput::ToggleUnifiedFiltered(on) => {
                 let _ = sender.output(PrefOutput::SetUnifiedFiltered(on));

@@ -224,7 +224,7 @@ pub struct Sidebar {
     show_unified: bool,
     /// Whether the collapsed-up "All Inboxes" row wears its total-unread chip
     /// (while expanded, the per-inbox sub-list carries the counts instead).
-    show_unified_chip: bool,
+    unified_chips: crate::config::UnifiedChips,
     /// Whether the disclosure chevrons LEAD their rows (Settings: Chevron
     /// placement). Off restores the classic trailing position.
     chevrons_left: bool,
@@ -351,7 +351,7 @@ pub enum SidebarInput {
         unified_tags: bool,
         /// Whether the account sections are shown at all.
         show_accounts: bool,
-        unified_chip: bool,
+        unified_chips: crate::config::UnifiedChips,
         chevrons_left: bool,
         rail_dots: bool,
         rail_fold: crate::config::RailFold,
@@ -612,7 +612,7 @@ impl Component for Sidebar {
         let mut model = Sidebar {
             sections: Vec::new(),
             show_unified: false,
-            show_unified_chip: true,
+            unified_chips: crate::config::UnifiedChips::default(),
             chevrons_left: false,
             rail_dots: false,
             rail_fold: crate::config::RailFold::default(),
@@ -706,7 +706,7 @@ impl Component for Sidebar {
                 unified_kinds,
                 unified_tags,
                 show_accounts,
-                unified_chip,
+                unified_chips,
                 chevrons_left,
                 rail_dots,
                 rail_fold,
@@ -732,7 +732,7 @@ impl Component for Sidebar {
                     .collect();
                 self.sections = sections;
                 self.show_unified = show_unified;
-                self.show_unified_chip = unified_chip;
+                self.unified_chips = unified_chips;
                 self.chevrons_left = chevrons_left;
                 self.rail_dots = rail_dots;
                 // "Fold up expanded items" is a view of the rail, not a
@@ -1163,21 +1163,21 @@ impl Component for Sidebar {
                     label.set_visible(
                         unified > 0
                             && !self.row_shown_open(UnifiedRow::Kind(FolderKind::Inbox))
-                            && self.show_unified_chip,
+                            && self.unified_chips.all_inboxes,
                     );
                 }
                 for (slot, badges) in &self.filtered_badges {
                     let total: u32 = badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
                     if let Some(b) = self.filtered_sections.get(slot).and_then(|w| w.badge.as_ref()) {
                         b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.filtered_open(*slot));
+                        b.set_visible(total > 0 && !self.filtered_open(*slot) && self.unified_chips.filtered);
                     }
                 }
                 for (row, w) in &self.kind_widgets {
                     let total: u32 = w.row_badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
                     if let Some(b) = &w.badge {
                         b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.row_shown_open(*row) && self.show_unified_chip);
+                        b.set_visible(total > 0 && !self.row_shown_open(*row) && self.chip_shown(*row));
                     }
                 }
                 // Keep the avatar-circle badges in sync too. They only show while
@@ -2459,7 +2459,7 @@ impl Sidebar {
         let counted = row_kind != UnifiedRow::Kind(FolderKind::Sent);
         let unread = self.row_unread(row_kind);
         let expanded = self.row_shown_open(row_kind);
-        let show_chip = unread > 0 && !expanded && self.show_unified_chip;
+        let show_chip = unread > 0 && !expanded && self.chip_shown(row_kind);
         let toggle_tip = match row_kind {
             UnifiedRow::Kind(FolderKind::Inbox) => i18n("Show each inbox"),
             UnifiedRow::Kind(_) => i18n("Show each account"),
@@ -2894,7 +2894,7 @@ impl Sidebar {
                 rev.set_reveal_child(open);
             }
             if let Some(label) = &self.unified_badge {
-                label.set_visible(unread > 0 && !open && self.show_unified_chip);
+                label.set_visible(unread > 0 && !open && self.unified_chips.all_inboxes);
             }
             if let Some(ch) = &self.unified_chevron {
                 ch.set_icon_name(Some(chevron_icon(open)));
@@ -2904,7 +2904,7 @@ impl Sidebar {
             // Expanded: the list shows each count, so the total chip bows
             // out; it returns when folded back up.
             if let Some(b) = &w.badge {
-                b.set_visible(unread > 0 && !open && self.show_unified_chip);
+                b.set_visible(unread > 0 && !open && self.chip_shown(row));
             }
             if let Some(ch) = &w.chevron {
                 ch.set_icon_name(Some(chevron_icon(open)));
@@ -2975,8 +2975,9 @@ impl Sidebar {
         let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         hb.add_css_class("folder-row");
         // The header's unread chip — the section's total — shows only while
-        // the section is folded up, as All Inboxes' does.
-        let show_chip = unread > 0 && !open;
+        // the section is folded up, as All Inboxes' does, and only with its
+        // switch on (Settings → Sidebar → Unread counts).
+        let show_chip = unread > 0 && !open && self.unified_chips.filtered;
         let badge: gtk::Label;
         if self.collapsed {
             // The rail has no room for a label: Jason's filter-folder glyph
@@ -3230,6 +3231,16 @@ impl Sidebar {
         revealer.set_child(Some(&list));
         parent.append(&revealer);
         self.tag_sections.insert(slot, SectionWidgets { revealer, chevron, toggle, list, badge: None });
+    }
+
+    /// Whether a unified row's total-unread chip is switched on (Settings →
+    /// Sidebar → Unified → Unread counts). Sent and Tags never carry one.
+    fn chip_shown(&self, row: UnifiedRow) -> bool {
+        match row {
+            UnifiedRow::Kind(kind) => self.unified_chips.has(kind),
+            UnifiedRow::Filtered => self.unified_chips.filtered,
+            UnifiedRow::Tags => false,
+        }
     }
 
     /// Whether the unified Tags section has anything to show.
