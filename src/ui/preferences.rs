@@ -41,6 +41,8 @@ pub struct PrefInit {
     pub list_palette: bool,
     /// The list's Actions Palette opens on row hover (no ⋯ click).
     pub list_palette_hover: bool,
+    /// The row's ⋯ opens the row menu instead of the sliding palette.
+    pub list_palette_menu: bool,
     /// Message rows take a sideways swipe to archive / delete (#92).
     pub swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
@@ -317,6 +319,7 @@ pub enum PrefInput {
     ChangeCardActionsMode(u32),
     ToggleListPalette(bool),
     ToggleListPaletteHover(bool),
+    ToggleListPaletteMenu(bool),
     ToggleSwipeEnabled(bool),
     ToggleSwipeReversed(bool),
     ToggleComposeInline(bool),
@@ -425,6 +428,7 @@ pub enum PrefOutput {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
+    SetListPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
@@ -1144,6 +1148,18 @@ impl Component for Preferences {
                                                        by itself while the pointer rests on a row."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleListPaletteHover(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "list_palette_menu_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.list_palette,
+                                        set_title: &i18n("Actions Palette as a menu"),
+                                        set_subtitle: &i18n("The \u{22ef} opens the row's menu, the same one a \
+                                                       right-click shows, instead of sliding the palette out."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleListPaletteMenu(row.is_active()));
                                         },
                                     },
 
@@ -1901,6 +1917,7 @@ impl Component for Preferences {
         });
         widgets.list_palette_row.set_active(init.list_palette);
         widgets.list_palette_hover_row.set_active(init.list_palette_hover);
+        widgets.list_palette_menu_row.set_active(init.list_palette_menu);
         widgets.swipe_enabled_row.set_active(init.swipe_enabled);
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
@@ -2238,6 +2255,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleListPaletteHover(on) => {
                 let _ = sender.output(PrefOutput::SetListPaletteHover(on));
+            }
+            PrefInput::ToggleListPaletteMenu(on) => {
+                let _ = sender.output(PrefOutput::SetListPaletteMenu(on));
             }
             PrefInput::ToggleSwipeEnabled(on) => {
                 self.swipe_enabled = on;

@@ -811,6 +811,10 @@ struct PrivacyFile {
     /// needing the ⋯ click.
     #[serde(default)]
     list_palette_hover: bool,
+    /// Whether the ⋯ on a message row opens the row's menu in place of
+    /// sliding the Actions Palette out.
+    #[serde(default)]
+    list_palette_menu: bool,
     /// Whether message rows take a sideways swipe at all (#92, PR #135).
     #[serde(default = "default_swipe_enabled")]
     swipe_enabled: bool,
@@ -1107,6 +1111,7 @@ impl Default for PrivacyFile {
             card_actions_auto: default_card_actions_auto(),
             list_palette: default_list_palette(),
             list_palette_hover: false,
+            list_palette_menu: false,
             swipe_enabled: default_swipe_enabled(),
             swipe_reversed: false,
             compose_inline: default_compose_inline(),
@@ -1825,6 +1830,11 @@ pub fn load_list_palette_hover() -> bool {
     load_privacy().list_palette_hover
 }
 
+/// Whether a row's ⋯ opens the row menu instead of the sliding palette.
+pub fn load_list_palette_menu() -> bool {
+    load_privacy().list_palette_menu
+}
+
 fn default_swipe_enabled() -> bool {
     true
 }
@@ -2041,6 +2051,7 @@ pub fn save_privacy(
     card_actions_auto: bool,
     list_palette: bool,
     list_palette_hover: bool,
+    list_palette_menu: bool,
     swipe_enabled: bool,
     swipe_reversed: bool,
     compose_inline: bool,
@@ -2113,6 +2124,7 @@ pub fn save_privacy(
         card_actions_auto,
         list_palette,
         list_palette_hover,
+        list_palette_menu,
         swipe_enabled,
         swipe_reversed,
         compose_inline,
