@@ -1486,8 +1486,14 @@ impl SimpleComponent for AppModel {
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::PrintPreview),
                                 },
                                 pack_end = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-mail-mark-junk-symbolic",
-                                    set_tooltip_text: Some(i18n("Mark as Spam").as_str()),
+                                    #[watch]
+                                    set_icon_name: if model.target_in_junk() {
+                                        "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"
+                                    } else {
+                                        "co.hyprlab.Vireo-mail-mark-junk-symbolic"
+                                    },
+                                    #[watch]
+                                    set_tooltip_text: Some(if model.target_in_junk() { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
                                     add_css_class: "flat",
                                     #[watch]
                                     set_visible: !model.showing_outbox && !model.reader_actions_collapsed
@@ -4393,6 +4399,7 @@ impl SimpleComponent for AppModel {
                     RowAction::ToggleStar => self.set_star(&m, !m.starred),
                     RowAction::ToggleRead => self.set_read(&m, m.unread),
                     RowAction::Spam => self.mark_spam_msg(m),
+                    RowAction::NotSpam => self.mark_ham_msg(m),
                     RowAction::Archive => self.move_to(m, FolderKind::Archive),
                     RowAction::MoveToInbox => self.move_to(m, FolderKind::Inbox),
                     RowAction::Delete => self.delete_messages(vec![m], &sender),
@@ -4434,6 +4441,7 @@ impl SimpleComponent for AppModel {
                     // one tick so the spinner paints before the blocking work runs.
                     BulkAction::Archive
                     | BulkAction::Spam
+                    | BulkAction::NotSpam
                     | BulkAction::Delete
                     | BulkAction::MoveToInbox => {
                         // Deleting in Trash means erasing, not moving — split the
@@ -4610,8 +4618,14 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::MarkSpam => {
+                // In Junk the same button, shortcut and menu entry mean the
+                // reverse (#168).
                 if let Some(m) = self.reply_target() {
-                    self.mark_spam_msg(m);
+                    if self.in_junk(&m) {
+                        self.mark_ham_msg(m);
+                    } else {
+                        self.mark_spam_msg(m);
+                    }
                 }
             }
 
@@ -8579,7 +8593,11 @@ impl AppModel {
                     if restorable {
                         section.push(entry!(i18n("Move to Inbox"), "mail-inbox", AppMsg::MoveToInbox, acts));
                     }
-                    section.push(entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts));
+                    if self.target_in_junk() {
+                        section.push(entry!(i18n("Not Spam"), "mail-mark-notjunk", AppMsg::MarkSpam, acts));
+                    } else {
+                        section.push(entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts));
+                    }
                     section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts));
                     section.push(entry!(
                         i18n("Delete"),
@@ -8723,11 +8741,12 @@ impl AppModel {
             .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
             .is_some_and(|f| f.kind == FolderKind::Sent);
         self.message_list.emit(MessageListInput::SetShowRecipient(is_sent));
-        // Trash and Junk offer the way back to the Inbox (#138).
-        let restorable = self
-            .folder_kind(account_id, folder_id)
-            .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk));
+        // Trash and Junk offer the way back to the Inbox (#138); Junk's is
+        // "Not Spam" (#168).
+        let kind = self.folder_kind(account_id, folder_id);
+        let restorable = kind.is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk));
         self.message_list.emit(MessageListInput::SetRestorable(restorable));
+        self.message_list.emit(MessageListInput::SetInJunk(kind == Some(FolderKind::Junk)));
         self.selected = Some(SelectedFolder {
             account_id,
             folder_id,
@@ -9832,6 +9851,18 @@ impl AppModel {
         })
     }
 
+    fn in_junk(&self, m: &Message) -> bool {
+        self.folders.get(&m.account_id).is_some_and(|fs| {
+            fs.iter().any(|f| f.id == m.folder_id && f.kind == FolderKind::Junk)
+        })
+    }
+
+    /// Whether the reader's target sits in Junk: the spam button, shortcut
+    /// and menu entry then read "Not Spam" (#168).
+    fn target_in_junk(&self) -> bool {
+        self.reply_target().is_some_and(|m| self.in_junk(&m))
+    }
+
     /// Delete `messages`: the ones still outside Trash are moved there, and any
     /// already in Trash are erased for good once the user confirms.
     fn delete_messages(&mut self, messages: Vec<Message>, sender: &ComponentSender<Self>) {
@@ -10522,6 +10553,25 @@ impl AppModel {
         };
         self.push_undo(m.account_id, &dest, &src, vec![m.message_id.clone()]);
         self.send_to(m.account_id, MailRequest::MarkSpam { path: src, uid: m.uid, dest });
+        self.discard_message(&m);
+    }
+
+    /// Not spam (#168): tell the server (`$NotJunk`, `$Junk` cleared) and
+    /// put the message back in its account's Inbox.
+    fn mark_ham_msg(&mut self, m: Message) {
+        let Some(src) = self.resolve_folder_path(&m) else {
+            return;
+        };
+        let Some(dest) = self.folder_path_for(m.account_id, FolderKind::Inbox) else {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n("No Inbox folder available for this account"),
+                error: true,
+                connectivity: false,
+            });
+            return;
+        };
+        self.push_undo(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.send_to(m.account_id, MailRequest::MarkHam { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
 
@@ -11718,7 +11768,7 @@ impl AppModel {
             BulkAction::Archive => FolderKind::Archive,
             BulkAction::Delete => FolderKind::Trash,
             BulkAction::Spam => FolderKind::Junk,
-            BulkAction::MoveToInbox => FolderKind::Inbox,
+            BulkAction::NotSpam | BulkAction::MoveToInbox => FolderKind::Inbox,
             // Non-removing actions never reach here (handled inline).
             BulkAction::MarkRead
             | BulkAction::MarkUnread
@@ -11766,7 +11816,12 @@ impl AppModel {
         }
         for ((account_id, src), (dest, uids, message_ids)) in groups {
             self.push_undo(account_id, &dest, &src, message_ids);
-            self.send_to(account_id, MailRequest::MoveMessages { path: src, uids, dest });
+            let req = if action == BulkAction::NotSpam {
+                MailRequest::MarkHamMany { path: src, uids, dest }
+            } else {
+                MailRequest::MoveMessages { path: src, uids, dest }
+            };
+            self.send_to(account_id, req);
         }
         self.update_busy_indicator();
         self.message_list.emit(MessageListInput::RemoveMany(removed_ids));

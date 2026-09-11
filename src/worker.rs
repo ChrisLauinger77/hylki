@@ -171,6 +171,12 @@ pub enum MailRequest {
     /// Mark a message as spam: tag `$Junk` (so the server filter can learn) and
     /// move it to the Junk folder.
     MarkSpam { path: String, uid: u32, dest: String },
+    /// The opposite (#168): tag `$NotJunk`, clear `$Junk`, and move the
+    /// message back to `dest` (the Inbox).
+    MarkHam { path: String, uid: u32, dest: String },
+    /// [`MailRequest::MarkHam`] for a selection, in one server round; answers
+    /// with [`WorkerEvent::BulkComplete`] like `MoveMessages`.
+    MarkHamMany { path: String, uids: Vec<u32>, dest: String },
     /// Add or remove the `\Seen` flag.
     SetSeen { path: String, uid: u32, seen: bool },
     /// Mark every message in a folder as read (`\Seen`).
@@ -1469,6 +1475,51 @@ async fn run_imap(
                         lost = true;
                     }
                 }
+            }
+
+            MailRequest::MarkHam { path, uid, dest } => {
+                let sess = session.as_mut().unwrap();
+                match mark_ham(sess, &path, &[uid], &dest).await {
+                    Ok(created) => {
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_message(account_id, &path, uid);
+                        }
+                        if created {
+                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                        }
+                    }
+                    Err(e) => {
+                        emit(WorkerEvent::Error {
+                            text: i18n_f("Could not mark as not spam: {e}", &[("e", &(e).to_string())]),
+                            connectivity: false,
+                        });
+                        lost = true;
+                    }
+                }
+            }
+
+            MailRequest::MarkHamMany { path, uids, dest } => {
+                let sess = session.as_mut().unwrap();
+                match mark_ham(sess, &path, &uids, &dest).await {
+                    Ok(created) => {
+                        if let Some(c) = cache.as_ref() {
+                            for uid in &uids {
+                                c.delete_message(account_id, &path, *uid);
+                            }
+                        }
+                        if created {
+                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                        }
+                    }
+                    Err(e) => {
+                        emit(WorkerEvent::Error {
+                            text: i18n_f("Could not mark {len} messages as not spam: {e}", &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())]),
+                            connectivity: false,
+                        });
+                        lost = true;
+                    }
+                }
+                emit(WorkerEvent::BulkComplete);
             }
 
             MailRequest::MoveMessage { path, uid, dest } => {
@@ -4504,6 +4555,24 @@ async fn mark_spam(
     move_or_create(session, path, uid, dest).await
 }
 
+/// The reverse of [`mark_spam`] (#168): set `$NotJunk` and clear `$Junk` on
+/// every uid (best-effort, as above), then move them back to `dest`.
+async fn mark_ham(
+    session: &mut ImapSession,
+    path: &str,
+    uids: &[u32],
+    dest: &str,
+) -> Result<bool, async_imap::error::Error> {
+    sel(session, path).await?;
+    let set = uid_set(uids);
+    for query in ["+FLAGS ($NotJunk)", "-FLAGS ($Junk)"] {
+        if let Ok(stream) = store_uids(session, set.clone(), query).await {
+            let _: Result<Vec<Fetch>, _> = stream.try_collect().await;
+        }
+    }
+    move_messages(session, path, uids, dest).await
+}
+
 /// Whether a host is this machine. Local mail bridges — Proton Bridge, hydroxide,
 /// DavMail — terminate TLS with a certificate generated on the machine itself at
 /// install time: no CA has signed it and it is issued for an address rather than
@@ -7101,6 +7170,9 @@ async fn run_pop3(
             // POP3 has no folders to move between: deleting removes from the
             // server. (Archive/spam have no destination folder, so the UI never
             // reaches here for those.)
+            // Not-spam has nothing to do here either (no Junk folder to leave).
+            MailRequest::MarkHam { .. } => {}
+            MailRequest::MarkHamMany { .. } => emit(WorkerEvent::BulkComplete),
             MailRequest::MoveMessage { uid, .. } | MailRequest::MarkSpam { uid, .. } => {
                 match pop3_delete(&account, uid).await {
                     Ok(()) => {
@@ -7379,6 +7451,7 @@ async fn run_mock(
             | MailRequest::SetKeyword { .. }
             | MailRequest::MarkAllRead { .. }
             | MailRequest::MarkSpam { .. }
+            | MailRequest::MarkHam { .. }
             | MailRequest::MoveMessage { .. }
             | MailRequest::UndoMove { .. }
             | MailRequest::CreateFolder { .. }
@@ -7396,7 +7469,7 @@ async fn run_mock(
             // The demo backend sends nothing, so its Outbox is always empty.
             MailRequest::LoadOutbox => emit(WorkerEvent::Outbox { items: Vec::new() }),
             // Signal completion so the demo's bulk spinner clears.
-            MailRequest::MoveMessages { .. } | MailRequest::PurgeMessages { .. } => {
+            MailRequest::MoveMessages { .. } | MailRequest::MarkHamMany { .. } | MailRequest::PurgeMessages { .. } => {
                 emit(WorkerEvent::BulkComplete)
             }
             MailRequest::SaveDraft { .. } => emit(WorkerEvent::DraftSaved),
@@ -8714,6 +8787,31 @@ async fn run_graph(
                         connectivity: false,
                     });
                 }
+            }
+
+            // Microsoft 365 learns from the move itself: back to the Inbox.
+            MailRequest::MarkHam { path, uid, dest } => {
+                if let Err(e) =
+                    graph_move_uids(&account, account_id, &mut state, &path, &[uid], &dest, cache.as_ref())
+                        .await
+                {
+                    emit(WorkerEvent::Error {
+                        text: i18n_f("Could not mark as not spam: {e}", &[("e", &(e).to_string())]),
+                        connectivity: false,
+                    });
+                }
+            }
+            MailRequest::MarkHamMany { path, uids, dest } => {
+                if let Err(e) =
+                    graph_move_uids(&account, account_id, &mut state, &path, &uids, &dest, cache.as_ref())
+                        .await
+                {
+                    emit(WorkerEvent::Error {
+                        text: i18n_f("Could not mark {len} messages as not spam: {e}", &[("len", &(uids.len()).to_string()), ("e", &(e).to_string())]),
+                        connectivity: false,
+                    });
+                }
+                emit(WorkerEvent::BulkComplete);
             }
 
             MailRequest::MoveMessages { path, uids, dest } => {

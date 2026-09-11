@@ -43,6 +43,7 @@
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-forward-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-inbox-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-mark-junk-symbolic.svg</file>
+    <file>icons/scalable/actions/co.hyprlab.Vireo-mail-mark-notjunk-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-message-new-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-read-symbolic.svg</file>
     <file>icons/scalable/actions/co.hyprlab.Vireo-mail-reply-all-symbolic.svg</file>

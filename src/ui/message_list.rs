@@ -65,8 +65,15 @@ impl MessageRow {
         action(&archive, RowAction::Archive);
         let delete = button("co.hyprlab.Vireo-user-trash-symbolic", i18n("Delete"));
         action(&delete, RowAction::Delete);
-        let spam = button("co.hyprlab.Vireo-mail-mark-junk-symbolic", i18n("Mark as spam"));
-        action(&spam, RowAction::Spam);
+        let spam = if self.in_junk {
+            let b = button("co.hyprlab.Vireo-mail-mark-notjunk-symbolic", i18n("Not spam"));
+            action(&b, RowAction::NotSpam);
+            b
+        } else {
+            let b = button("co.hyprlab.Vireo-mail-mark-junk-symbolic", i18n("Mark as spam"));
+            action(&b, RowAction::Spam);
+            b
+        };
         let contact = button("co.hyprlab.Vireo-contact-new-symbolic", i18n("Add sender to Contacts"));
         action(&contact, RowAction::AddContact);
         let source = button("co.hyprlab.Vireo-code-symbolic", i18n("View Source"));
@@ -109,6 +116,9 @@ pub enum RowAction {
     ToggleStar,
     ToggleRead,
     Spam,
+    /// The reverse, for a message in Junk (#168): tell the server it is
+    /// wanted and put it back in the Inbox.
+    NotSpam,
     Archive,
     Delete,
     /// Put a message from Trash or Junk back in its account's Inbox (#138).
@@ -140,6 +150,8 @@ pub struct RowInit {
     /// Whether the row carries the Actions Palette line at all (preference);
     /// off returns its reserved space to the row.
     pub show_palette: bool,
+    /// The list shows Junk: the palette's spam button reads "Not Spam".
+    pub in_junk: bool,
     /// Number of messages in this conversation (only set on a thread head; 1 for
     /// a standalone message).
     pub thread_count: usize,
@@ -313,6 +325,7 @@ pub struct MessageRow {
     tags_rendered: std::cell::RefCell<Vec<String>>,
     /// Whether this row shows the Actions Palette line at all (preference).
     show_palette: bool,
+    in_junk: bool,
     /// Conversation size (only meaningful on a thread head).
     thread_count: usize,
     /// Nested reply under a thread head.
@@ -1329,6 +1342,7 @@ impl FactoryComponent for MessageRow {
             palette_hover,
             tags,
             show_palette,
+            in_junk,
             thread_count,
             is_thread_child,
             is_last_child,
@@ -1366,6 +1380,7 @@ impl FactoryComponent for MessageRow {
             tags,
             tags_rendered: std::cell::RefCell::new(Vec::new()),
             show_palette,
+            in_junk,
             thread_count,
             is_thread_child,
             is_last_child,
@@ -2123,6 +2138,8 @@ pub struct MessageList {
     show_recipient: bool,
     /// The list shows Trash or Junk, where menus offer "Move to Inbox" (#138).
     restorable: bool,
+    /// The list shows Junk: "Not Spam" stands where "Mark as Spam" would.
+    in_junk: bool,
     /// Rendered thread membership: message key → conversation key, rebuilt with
     /// the rows. Lets a read-state change on a hidden reply refresh its head.
     msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
@@ -2198,7 +2215,7 @@ pub enum SearchScope {
 }
 
 /// A bulk action applied to every selected message at once.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BulkAction {
     MarkRead,
     MarkUnread,
@@ -2208,6 +2225,8 @@ pub enum BulkAction {
     Unflag,
     Archive,
     Spam,
+    /// The reverse of `Spam`, for a selection in Junk (#168).
+    NotSpam,
     Delete,
     /// Back to the Inbox, for a selection in Trash or Junk (#138).
     MoveToInbox,
@@ -2337,6 +2356,8 @@ pub enum MessageListInput {
     SetSwipeEnabled(bool),
     /// The list shows Trash or Junk: menus offer "Move to Inbox" (#138).
     SetRestorable(bool),
+    /// The list shows Junk: "Not Spam" replaces "Mark as Spam" (#168).
+    SetInJunk(bool),
     /// Folder switch: reset infinite-scroll paging back to the first page and
     /// scroll to the top (a plain `SetMessages` now preserves paging for refreshes).
     ResetPaging,
@@ -2525,9 +2546,16 @@ impl SimpleComponent for MessageList {
                         connect_clicked => MessageListInput::Bulk(BulkAction::Archive),
                     },
                     gtk::Button {
-                        set_icon_name: "co.hyprlab.Vireo-mail-mark-junk-symbolic",
-                        set_tooltip_text: Some(i18n("Mark as Spam").as_str()),
+                        #[watch]
+                        set_icon_name: if model.in_junk {
+                            "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"
+                        } else {
+                            "co.hyprlab.Vireo-mail-mark-junk-symbolic"
+                        },
+                        #[watch]
+                        set_tooltip_text: Some(if model.in_junk { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
                         add_css_class: "flat",
+                        // Mapped to NotSpam in Junk by the Bulk handler.
                         connect_clicked => MessageListInput::Bulk(BulkAction::Spam),
                     },
                     gtk::Button {
@@ -2692,6 +2720,7 @@ impl SimpleComponent for MessageList {
             expanded_threads: std::collections::HashSet::new(),
             show_recipient: false,
             restorable: false,
+            in_junk: false,
             default_expanded: false,
             msg_thread: std::collections::HashMap::new(),
             thread_members: std::collections::HashMap::new(),
@@ -2933,6 +2962,7 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::SetRestorable(on) => self.restorable = on,
+            MessageListInput::SetInJunk(on) => self.in_junk = on,
             MessageListInput::ContactPhotosChanged => {
                 // Pointless when the circles aren't drawn; rows check the
                 // fresh index as they are rebuilt.
@@ -3111,6 +3141,9 @@ impl SimpleComponent for MessageList {
                 self.selected_ids = keys;
             }
             MessageListInput::Bulk(action) => {
+                // The bulk bar's spam button is one button: in Junk it means
+                // the reverse.
+                let action = if self.in_junk && action == BulkAction::Spam { BulkAction::NotSpam } else { action };
                 let messages: Vec<Message> = self
                     .rows
                     .widget()
@@ -3768,11 +3801,17 @@ impl MessageList {
             tag_section,
             {
                 let mut section = Vec::new();
-                // In Trash or Junk the way back is the first thing offered.
-                if self.restorable {
-                    section.push(item(RowAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                // In Junk the way back is "Not Spam" (#168): the server is
+                // told, and the message returns to the Inbox. In Trash it
+                // is a plain move, with spam still on offer.
+                if self.in_junk {
+                    section.push(item(RowAction::NotSpam, &i18n("Not Spam"), "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"));
+                } else {
+                    if self.restorable {
+                        section.push(item(RowAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                    }
+                    section.push(item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 }
-                section.push(item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 section.push(item(RowAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
                 section.push(item(RowAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
                 section
@@ -3803,10 +3842,14 @@ impl MessageList {
             ],
             {
                 let mut section = Vec::new();
-                if self.restorable {
-                    section.push(item(BulkAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                if self.in_junk {
+                    section.push(item(BulkAction::NotSpam, &i18n("Not Spam"), "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"));
+                } else {
+                    if self.restorable {
+                        section.push(item(BulkAction::MoveToInbox, &i18n("Move to Inbox"), "co.hyprlab.Vireo-mail-inbox-symbolic"));
+                    }
+                    section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 }
-                section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 section.push(item(BulkAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
                 section.push(item(BulkAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
                 section
@@ -4034,6 +4077,7 @@ impl MessageList {
                         palette_hover: self.palette_hover.clone(),
                         tags: self.tags.clone(),
                         show_palette: self.list_palette,
+                        in_junk: self.in_junk,
                         thread_count: 0,
                         is_thread_child: true,
                         is_last_child: i == children.len() - 1,
@@ -4338,6 +4382,7 @@ impl MessageList {
                     palette_hover: self.palette_hover.clone(),
                     tags: self.tags.clone(),
                     show_palette: self.list_palette,
+                    in_junk: self.in_junk,
                     thread_count: meta.count,
                     is_thread_child: meta.is_child,
                     is_last_child: meta.is_last,

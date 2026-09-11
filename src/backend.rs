@@ -376,6 +376,18 @@ fn sample_messages() -> Vec<Message> {
             preview: "Thanks for supporting Central Books! Your order of 2 items is confirmed and will ship within 2 business days…",
             body: "Thanks for supporting Central Books!\n\nYour order of 2 items is confirmed and will ship within 2 business days.\n\n  • The Design of Everyday Things\n  • A Philosophy of Software Design\n\nBookshop.org",
             date: "Tue", unread: false, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
+        // Junk (account 1): what the filter caught, so the folder's "Not
+        // Spam" path (#168) has something to act on.
+        Spec { id: 46, account_id: 1, folder_id: 6, from_name: "Prize Department", from_addr: "winner@lucky-draw-notify.biz", to: ME,
+            subject: "You have been selected!!!",
+            preview: "Congratulations, your address was chosen in our monthly draw. Confirm your details within 24 hours to claim…",
+            body: "Congratulations, your address was chosen in our monthly draw.\n\nConfirm your details within 24 hours to claim your prize.",
+            date: "Mon", unread: true, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
+        Spec { id: 47, account_id: 1, folder_id: 6, from_name: "Nordic Sauna Club", from_addr: "news@nordicsaunaclub.example", to: ME,
+            subject: "Your membership offer expires tonight",
+            preview: "Last chance: 40% off a year of unlimited sessions. Offer ends at midnight…",
+            body: "Last chance: 40% off a year of unlimited sessions.\n\nOffer ends at midnight.",
+            date: "Sun", unread: true, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
     ];
     let mut out: Vec<Message> = specs.iter().map(build).collect();
     // VIREO_DEMO_BULK=N pads every account's Inbox and Sent with N more
