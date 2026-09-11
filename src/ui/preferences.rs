@@ -916,8 +916,9 @@ impl Component for Preferences {
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Filtered Folders placement"),
-                                        set_subtitle: &i18n("Inside All Inboxes, folding away with it, or in the \
-                                                       scrolling sidebar above or below the accounts."),
+                                        set_subtitle: &i18n("In the unified section, as a row like All Inboxes \
+                                                       whose caret opens the folders; or above or below \
+                                                       the accounts as a heading with its own list."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
                                         },
@@ -926,7 +927,8 @@ impl Component for Preferences {
                                     #[name = "tags_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Tags placement"),
-                                        set_subtitle: &i18n("Where the Tags section sits, with the same choices."),
+                                        set_subtitle: &i18n("The same choices for the Tags section: a unified \
+                                                       row, or a heading above or below the accounts."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
                                         },

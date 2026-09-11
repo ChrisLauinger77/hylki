@@ -77,6 +77,54 @@ struct KindWidgets {
     row_badges: HashMap<(u32, u32), gtk::Label>,
 }
 
+/// A row of the unified section: All Inboxes and the Starred / Sent /
+/// Drafts rows (one folder per account), the Filtered Folders row (every
+/// rule's folder) and the Tags row (every tag) — all built alike.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum UnifiedRow {
+    Kind(FolderKind),
+    Filtered,
+    Tags,
+}
+
+/// What a unified row is called.
+fn row_title(row: UnifiedRow) -> String {
+    match row {
+        UnifiedRow::Kind(kind) => kind_label(kind),
+        UnifiedRow::Filtered => i18n("Filtered Folders"),
+        UnifiedRow::Tags => i18n("Tags"),
+    }
+}
+
+/// A unified row's icon.
+fn row_icon(row: UnifiedRow) -> &'static str {
+    match row {
+        UnifiedRow::Kind(kind) => kind.icon(),
+        UnifiedRow::Filtered => "co.hyprlab.Vireo-filter-folder-symbolic",
+        UnifiedRow::Tags => "co.hyprlab.Vireo-tag-symbolic",
+    }
+}
+
+/// The message a unified row's header sends when selected.
+fn select_msg(row: UnifiedRow) -> SidebarInput {
+    match row {
+        UnifiedRow::Kind(FolderKind::Inbox) => SidebarInput::UnifiedRowSelected,
+        UnifiedRow::Kind(kind) => SidebarInput::UnifiedKindRowSelected(kind),
+        UnifiedRow::Filtered => SidebarInput::UnifiedFilteredSelected,
+        UnifiedRow::Tags => SidebarInput::UnifiedTagsSelected,
+    }
+}
+
+/// The message a unified row's chevron (or double-click) sends.
+fn toggle_msg(row: UnifiedRow) -> SidebarInput {
+    match row {
+        UnifiedRow::Kind(FolderKind::Inbox) => SidebarInput::ToggleUnifiedExpand,
+        UnifiedRow::Kind(kind) => SidebarInput::ToggleKindExpand(kind),
+        UnifiedRow::Filtered => SidebarInput::ToggleFilteredExpand(Slot::Unified),
+        UnifiedRow::Tags => SidebarInput::ToggleTagsExpand(Slot::Unified),
+    }
+}
+
 /// The chevron glyph for a section that is open or folded.
 fn chevron_icon(open: bool) -> &'static str {
     if open { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }
@@ -155,6 +203,10 @@ enum Sel {
     AccountFiltered(u32, String),
     /// A unified Starred / Sent / Drafts row: the merged view.
     UnifiedKind(FolderKind),
+    /// The unified Filtered Folders row: every rule's folder, merged.
+    UnifiedFiltered,
+    /// The unified Tags row: every tagged message.
+    UnifiedTags,
     /// An account's folder picked in a unified Starred / Sent / Drafts
     /// row's account list.
     UnifiedKindRow(FolderKind, u32),
@@ -279,7 +331,7 @@ pub struct Sidebar {
     /// account lists are open, and their widgets.
     unified_kinds: crate::config::UnifiedKinds,
     kind_expanded: HashMap<FolderKind, bool>,
-    kind_widgets: HashMap<FolderKind, KindWidgets>,
+    kind_widgets: HashMap<UnifiedRow, KindWidgets>,
     /// Whether the unified Tags section is shown at all.
     unified_tags: bool,
     /// Whether the account sections are shown at all.
@@ -321,6 +373,10 @@ pub enum SidebarInput {
     ToggleTagsExpand(Slot),
     /// A unified Starred / Sent / Drafts row was chosen (the merged view).
     UnifiedKindRowSelected(FolderKind),
+    /// The unified Filtered Folders row was chosen (every rule's folder).
+    UnifiedFilteredSelected,
+    /// The unified Tags row was chosen (every tagged message).
+    UnifiedTagsSelected,
     /// A row in a unified Starred / Sent / Drafts row's account list.
     KindSubRowSelected { kind: FolderKind, index: i32 },
     /// Toggle a unified Starred / Sent / Drafts row's account list.
@@ -398,6 +454,10 @@ pub enum SidebarOutput {
     /// A unified Starred / Sent / Drafts row was chosen: every account's
     /// folder of that kind, merged.
     UnifiedKindSelected(FolderKind),
+    /// The unified Filtered Folders row: every rule's folder, merged.
+    UnifiedFilteredSelected,
+    /// The unified Tags row: every tagged message.
+    UnifiedTagsSelected,
     /// The user toggled an account's own Filtered Folders / Tags section.
     ToggleAccountFiltered(u32),
     ToggleAccountTags(u32),
@@ -730,12 +790,18 @@ impl Component for Sidebar {
                         self.selected = Sel::None;
                     }
                 }
-                // A unified row switched off in Settings: its view stays,
-                // nothing shows selected.
+                // A unified row switched off in Settings (or with nothing
+                // left to list): its view stays, nothing shows selected.
                 if let Sel::UnifiedKind(kind) = &self.selected {
                     if !self.unified_kinds.has(*kind) {
                         self.selected = Sel::None;
                     }
+                }
+                if self.selected == Sel::UnifiedFiltered && self.unified_folders.is_empty() {
+                    self.selected = Sel::None;
+                }
+                if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
+                    self.selected = Sel::None;
                 }
                 // A folder picked in a switched-off row's account list is
                 // still the open folder: carry the highlight to the
@@ -941,33 +1007,44 @@ impl Component for Sidebar {
                 }
             }
 
+            // The unified slot is a unified row when placed in the unified
+            // section, a heading (like an account's own) above or below the
+            // accounts.
             SidebarInput::ToggleTagsExpand(slot) => {
-                let open = !self.tags_open(slot);
-                self.set_tags_open(slot, open, &sender);
-                if let Some(w) = self.tag_sections.get(&slot) {
-                    w.revealer.set_reveal_child(open);
-                    if slot == Slot::Unified {
-                        w.toggle.set_margin_bottom(tags_toggle_gap(open));
+                if slot == Slot::Unified && self.kind_widgets.contains_key(&UnifiedRow::Tags) {
+                    self.toggle_row(UnifiedRow::Tags, &sender);
+                } else {
+                    let open = !self.tags_open(slot);
+                    self.set_tags_open(slot, open, &sender);
+                    if let Some(w) = self.tag_sections.get(&slot) {
+                        w.revealer.set_reveal_child(open);
+                        if slot == Slot::Unified {
+                            w.toggle.set_margin_bottom(tags_toggle_gap(open));
+                        }
+                        w.chevron.set_icon_name(Some(chevron_icon(open)));
                     }
-                    w.chevron.set_icon_name(Some(chevron_icon(open)));
                 }
             }
 
             SidebarInput::ToggleFilteredExpand(slot) => {
-                let open = !self.filtered_open(slot);
-                self.set_filtered_open(slot, open, &sender);
-                let unread = self.filtered_unread(slot);
-                if let Some(w) = self.filtered_sections.get(&slot) {
-                    w.revealer.set_reveal_child(open);
-                    if slot == Slot::Unified {
-                        w.toggle.set_margin_bottom(unified_folders_toggle_gap(open));
+                if slot == Slot::Unified && self.kind_widgets.contains_key(&UnifiedRow::Filtered) {
+                    self.toggle_row(UnifiedRow::Filtered, &sender);
+                } else {
+                    let open = !self.filtered_open(slot);
+                    self.set_filtered_open(slot, open, &sender);
+                    let unread = self.filtered_unread(slot);
+                    if let Some(w) = self.filtered_sections.get(&slot) {
+                        w.revealer.set_reveal_child(open);
+                        if slot == Slot::Unified {
+                            w.toggle.set_margin_bottom(unified_folders_toggle_gap(open));
+                        }
+                        // Folded: the header wears the section's total;
+                        // open, each row carries its own count.
+                        if let Some(b) = &w.badge {
+                            b.set_visible(unread > 0 && !open);
+                        }
+                        w.chevron.set_icon_name(Some(chevron_icon(open)));
                     }
-                    // Folded: the header wears the section's total; open,
-                    // each row carries its own count and the total bows out.
-                    if let Some(b) = &w.badge {
-                        b.set_visible(unread > 0 && !open);
-                    }
-                    w.chevron.set_icon_name(Some(chevron_icon(open)));
                 }
             }
 
@@ -981,10 +1058,28 @@ impl Component for Sidebar {
                 let _ = sender.output(SidebarOutput::UnifiedKindSelected(kind));
             }
 
+            SidebarInput::UnifiedFilteredSelected => {
+                if self.selected == Sel::UnifiedFiltered {
+                    return;
+                }
+                self.selected = Sel::UnifiedFiltered;
+                self.clear_other_selections(Sel::UnifiedFiltered);
+                let _ = sender.output(SidebarOutput::UnifiedFilteredSelected);
+            }
+
+            SidebarInput::UnifiedTagsSelected => {
+                if self.selected == Sel::UnifiedTags {
+                    return;
+                }
+                self.selected = Sel::UnifiedTags;
+                self.clear_other_selections(Sel::UnifiedTags);
+                let _ = sender.output(SidebarOutput::UnifiedTagsSelected);
+            }
+
             SidebarInput::KindSubRowSelected { kind, index } => {
                 let Some(r) = self
                     .kind_widgets
-                    .get(&kind)
+                    .get(&UnifiedRow::Kind(kind))
                     .and_then(|w| w.rows.get(index as usize))
                     .cloned()
                 else {
@@ -1004,23 +1099,7 @@ impl Component for Sidebar {
                 });
             }
 
-            SidebarInput::ToggleKindExpand(kind) => {
-                let open = !self.kind_open(kind);
-                self.kind_expanded.insert(kind, open);
-                self.report_sections(&sender);
-                let unread = self.kind_unread(kind);
-                if let Some(w) = self.kind_widgets.get(&kind) {
-                    w.revealer.set_reveal_child(open);
-                    // Expanded: the account list shows each count, so the
-                    // total chip bows out; it returns when folded back up.
-                    if let Some(b) = &w.badge {
-                        b.set_visible(unread > 0 && !open && self.show_unified_chip);
-                    }
-                    if let Some(ch) = &w.chevron {
-                        ch.set_icon_name(Some(chevron_icon(open)));
-                    }
-                }
-            }
+            SidebarInput::ToggleKindExpand(kind) => self.toggle_row(UnifiedRow::Kind(kind), &sender),
 
             SidebarInput::FolderRowSelected { account_id, index } => {
                 let folder = self
@@ -1068,7 +1147,7 @@ impl Component for Sidebar {
                 }
                 if let Sel::UnifiedKindRow(kind, acc) = &self.selected {
                     if *acc == account_id
-                        && self.kind_widgets.get(kind).is_some_and(|w| {
+                        && self.kind_widgets.get(&UnifiedRow::Kind(*kind)).is_some_and(|w| {
                             w.rows.iter().any(|r| r.account_id == account_id && r.path == path)
                         })
                     {
@@ -1126,11 +1205,11 @@ impl Component for Sidebar {
                         b.set_visible(total > 0 && !self.filtered_open(*slot));
                     }
                 }
-                for (kind, w) in &self.kind_widgets {
+                for (row, w) in &self.kind_widgets {
                     let total: u32 = w.row_badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
                     if let Some(b) = &w.badge {
                         b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.kind_open(*kind) && self.show_unified_chip);
+                        b.set_visible(total > 0 && !self.row_open(*row) && self.show_unified_chip);
                     }
                 }
                 // Keep the avatar-circle badges in sync too. They only show while
@@ -1662,62 +1741,27 @@ impl Sidebar {
             pinned.append(&bar);
         }
 
-        // The unified section: the "All Inboxes" row and the Starred / Sent /
-        // Drafts rows (Settings → Sidebar → Unified), each with an expandable
-        // per-account list, then — placed here — the Filtered Folders and
-        // Tags sections that span every account. It heads the scrolling
-        // sidebar rather than the pinned area: with several rows open at
-        // once it can stand taller than a short window, and pinned it would
-        // have forced the window taller than the screen.
-        let mut unified_rows: Vec<FolderKind> = Vec::new();
+        // The unified section: the "All Inboxes" row, the Starred / Sent /
+        // Drafts rows (Settings → Sidebar → Unified), then — placed here —
+        // the Filtered Folders and Tags rows, all built alike: a header
+        // row that opens the merged view and a caret that opens the list
+        // beneath. It heads the scrolling sidebar rather than the pinned
+        // area: with several lists open at once it can stand taller than a
+        // short window, and pinned it would have forced the window taller
+        // than the screen.
+        let mut unified_rows: Vec<UnifiedRow> = Vec::new();
         if self.show_unified {
-            unified_rows.push(FolderKind::Inbox);
+            unified_rows.push(UnifiedRow::Kind(FolderKind::Inbox));
         }
-        unified_rows.extend(self.unified_kinds.listed());
+        unified_rows.extend(self.unified_kinds.listed().into_iter().map(UnifiedRow::Kind));
         let unified_shown = !unified_rows.is_empty();
-        let filtered_here = unified_shown
-            && !self.unified_folders.is_empty()
-            && self.filtered_placement == AllInboxes;
-        let tags_here = unified_shown && self.unified_tags_shown() && self.tags_placement == AllInboxes;
-        let mut last_list: Option<gtk::ListBox> = None;
-        for (i, kind) in unified_rows.into_iter().enumerate() {
-            let built = self.build_unified_row(container, kind, &sections, sender);
-            if i == 0 {
-                // Only the first row keeps the list's top padding, as the
-                // gap under the compose bar.
-                built.header.add_css_class("unified-first");
-            }
-            last_list = Some(built.list.clone());
-            if kind == FolderKind::Inbox {
-                // All Inboxes keeps its own fields: the in-place updates and
-                // the tray's "View all unread" address it directly.
-                self.unified_list = Some(built.header);
-                self.unified_revealer = Some(built.revealer);
-                self.unified_chevron = built.chevron;
-                self.unified_badge = built.badge;
-                self.unified_inbox_list = Some(built.list);
-                self.unified_inboxes = built.rows;
-                self.unified_inbox_badges = built.row_badges;
-            } else {
-                self.kind_widgets.insert(kind, built);
-            }
+        if unified_shown && !self.unified_folders.is_empty() && self.filtered_placement == AllInboxes {
+            unified_rows.push(UnifiedRow::Filtered);
         }
-        // Breathing room between the last account list and the first
-        // account section below; folds away with its revealer. With a
-        // Filtered Folders or Tags section underneath, that section's list
-        // carries the gap instead.
-        if let Some(list) = last_list {
-            if !filtered_here && !tags_here {
-                // 14 plus the 6 the list's own padding used to give.
-                list.set_margin_bottom(20);
-            }
+        if unified_shown && self.unified_tags_shown() && self.tags_placement == AllInboxes {
+            unified_rows.push(UnifiedRow::Tags);
         }
-        if filtered_here {
-            self.build_filtered_section(container, Slot::Unified, &sections, sender);
-        }
-        if tags_here {
-            self.build_tags_section(container, Slot::Unified, filtered_here, sender);
-        }
+        self.build_unified_run(container, &unified_rows, &sections, sender);
 
         // Contacts and Attachments live in the pinned footer against the
         // sidebar's bottom edge — they keep out of the way of the account
@@ -1879,6 +1923,8 @@ impl Sidebar {
         // account), which would otherwise have nowhere to be.
         let no_unified = !self.show_unified && !self.unified_kinds.any();
         let above = |p: SectionPlacement| p == AboveAccounts || (p == AllInboxes && no_unified);
+        // These placements keep the heading style (a caret heading and its
+        // rows); "in the unified section" draws them as unified rows.
         let filtered_above = !self.unified_folders.is_empty() && above(self.filtered_placement);
         let tags_above = self.unified_tags_shown() && above(self.tags_placement);
         if filtered_above {
@@ -2416,28 +2462,31 @@ impl Sidebar {
 
     /// Re-apply the current selection after a rebuild; on first populate (no
     /// prior selection) default to the unified row if shown, else the first folder.
-    /// One unified row — All Inboxes, or the unified section's Starred /
-    /// Sent / Drafts — with its expandable per-account list: the header row
-    /// selects the merged view, the caret opens the accounts' own folders of
-    /// that kind. In the icon-only rail a small toggle button under the icon
+    /// One row of the unified section — All Inboxes, Starred / Sent /
+    /// Drafts, Filtered Folders or Tags — with its expandable list beneath:
+    /// the header row selects the merged view, the caret opens the list
+    /// (each account's folder of that kind, each filtered folder, each
+    /// tag). In the icon-only rail a small toggle button under the icon
     /// stands in for the in-row chevron.
     fn build_unified_row(
         &mut self,
         parent: &gtk::Box,
-        kind: FolderKind,
+        row_kind: UnifiedRow,
         sections: &[SectionData],
         sender: &ComponentSender<Self>,
     ) -> KindWidgets {
-        let is_inbox = kind == FolderKind::Inbox;
-        let title = kind_label(kind);
+        let is_inbox = row_kind == UnifiedRow::Kind(FolderKind::Inbox);
+        let title = row_title(row_kind);
         // Sent wears no unread chip anywhere: what you sent is not new mail.
-        let counted = kind != FolderKind::Sent;
-        let unread = if is_inbox { self.unified_unread } else { self.kind_unread(kind) };
-        let expanded = if is_inbox { self.unified_expanded } else { self.kind_open(kind) };
+        let counted = row_kind != UnifiedRow::Kind(FolderKind::Sent);
+        let unread = self.row_unread(row_kind);
+        let expanded = self.row_open(row_kind);
         let show_chip = unread > 0 && !expanded && self.show_unified_chip;
-        let toggle_tip = if is_inbox { i18n("Show each inbox") } else { i18n("Show each account") };
-        let toggle_msg = move || {
-            if is_inbox { SidebarInput::ToggleUnifiedExpand } else { SidebarInput::ToggleKindExpand(kind) }
+        let toggle_tip = match row_kind {
+            UnifiedRow::Kind(FolderKind::Inbox) => i18n("Show each inbox"),
+            UnifiedRow::Kind(_) => i18n("Show each account"),
+            UnifiedRow::Filtered => i18n("Show each folder"),
+            UnifiedRow::Tags => i18n("Show each tag"),
         };
 
         let list = gtk::ListBox::new();
@@ -2453,7 +2502,7 @@ impl Sidebar {
         row.add_css_class("unified-row");
         let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         hbox.add_css_class("folder-row");
-        let img = gtk::Image::from_icon_name(kind.icon());
+        let img = gtk::Image::from_icon_name(row_icon(row_kind));
         img.add_css_class("folder-icon");
         let mut chevron_img: Option<gtk::Image> = None;
         let badge: gtk::Label;
@@ -2467,11 +2516,11 @@ impl Sidebar {
             hbox.append(&overlay);
             badge = b;
         } else {
-            // The disclosure chevron toggling the per-account sub-list — its
-            // own button either way (selecting the unified view and
-            // expanding it stay separate actions). Placement follows
-            // Settings → Chevron placement: leading (overlaid on the row's
-            // left edge — see below), or classic trailing.
+            // The disclosure chevron toggling the list — its own button
+            // either way (selecting the merged view and expanding it stay
+            // separate actions). Placement follows Settings → Chevron
+            // placement: leading (overlaid on the row's left edge — see
+            // below), or classic trailing.
             let chevron = gtk::Image::from_icon_name(chevron_icon(expanded));
             let chev_btn = gtk::Button::new();
             chev_btn.set_child(Some(&chevron));
@@ -2481,7 +2530,7 @@ impl Sidebar {
             chev_btn.set_tooltip_text(Some(toggle_tip.as_str()));
             let cs = sender.input_sender().clone();
             chev_btn.connect_clicked(move |_| {
-                let _ = cs.send(toggle_msg());
+                let _ = cs.send(toggle_msg(row_kind));
             });
             row.add_css_class(if self.chevrons_left { "chev-left" } else { "chev-right" });
             pin_icon_size(&img);
@@ -2503,9 +2552,9 @@ impl Sidebar {
             hbox.append(&label);
             chevron_img = Some(chevron.clone());
             // The total-unread chip right-aligns like every folder row's,
-            // one shared column down the sidebar. While the sub-list is
-            // expanded the per-account rows carry the counts, so the total
-            // is redundant and hidden.
+            // one shared column down the sidebar. While the list is
+            // expanded its rows carry the counts, so the total is
+            // redundant and hidden.
             let b = gtk::Label::new(Some(&unread.to_string()));
             b.add_css_class("unread-badge");
             b.set_valign(gtk::Align::Center);
@@ -2537,20 +2586,16 @@ impl Sidebar {
         let s = sender.input_sender().clone();
         list.connect_row_selected(move |_, row| {
             if row.is_some() {
-                let _ = s.send(if is_inbox {
-                    SidebarInput::UnifiedRowSelected
-                } else {
-                    SidebarInput::UnifiedKindRowSelected(kind)
-                });
+                let _ = s.send(select_msg(row_kind));
             }
         });
-        // Double-click toggles the per-account sub-list, same as the
-        // chevron (single click only selects; activation needs the
-        // double-click once single-click activation is off).
+        // Double-click toggles the list, same as the chevron (single click
+        // only selects; activation needs the double-click once single-click
+        // activation is off).
         list.set_activate_on_single_click(false);
         let s2 = sender.input_sender().clone();
         list.connect_row_activated(move |_, _| {
-            let _ = s2.send(toggle_msg());
+            let _ = s2.send(toggle_msg(row_kind));
         });
         if is_inbox {
             // Right-click "All Inboxes": act on every inbox at once.
@@ -2585,85 +2630,178 @@ impl Sidebar {
             toggle.set_child(Some(&chevron));
             let cs = sender.input_sender().clone();
             toggle.connect_clicked(move |_| {
-                let _ = cs.send(toggle_msg());
+                let _ = cs.send(toggle_msg(row_kind));
             });
             parent.append(&toggle);
             chevron_img = Some(chevron);
         }
 
-        // The per-account list: each account's folder of this kind, as a
-        // pill row.
+        // The list beneath: the same row shape for all — a lead (account
+        // pill, tinted folder glyph, tag disc), a name, an unread chip.
         let sub = gtk::ListBox::new();
         sub.set_selection_mode(gtk::SelectionMode::Single);
         sub.add_css_class("navigation-sidebar");
         sub.add_css_class("unified-item");
         let mut rows: Vec<InboxRef> = Vec::new();
         let mut row_badges: HashMap<(u32, u32), gtk::Label> = HashMap::new();
-        for section in sections {
-            let Some(folder) = section.folders.iter().find(|f| f.kind == kind) else {
-                continue;
-            };
-            let aid = section.account.id;
-            let (row, badge) =
-                build_unified_inbox_row(section, folder, self.collapsed, self.chevrons_left);
-            // A message dropped here moves to that account's folder (the
-            // app declines mail from other accounts, #23).
-            row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
-            sub.append(&row);
-            if counted {
-                row_badges.insert((aid, folder.id), badge);
-            } else {
-                badge.set_visible(false);
-                row.set_tooltip_text(None);
+        match row_kind {
+            UnifiedRow::Kind(kind) => {
+                for section in sections {
+                    let Some(folder) = section.folders.iter().find(|f| f.kind == kind) else {
+                        continue;
+                    };
+                    let aid = section.account.id;
+                    let (row, badge) =
+                        build_unified_inbox_row(section, folder, self.collapsed, self.chevrons_left);
+                    // A message dropped here moves to that account's folder
+                    // (the app declines mail from other accounts, #23).
+                    row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
+                    sub.append(&row);
+                    if counted {
+                        row_badges.insert((aid, folder.id), badge);
+                    } else {
+                        badge.set_visible(false);
+                        row.set_tooltip_text(None);
+                    }
+                    rows.push(InboxRef {
+                        account_id: aid,
+                        folder_id: folder.id,
+                        name: folder.name.clone(),
+                        path: folder.path.clone(),
+                    });
+                }
+                let ss = sender.input_sender().clone();
+                sub.connect_row_selected(move |_, row| {
+                    if let Some(row) = row {
+                        let _ = ss.send(if is_inbox {
+                            SidebarInput::UnifiedInboxRowSelected(row.index())
+                        } else {
+                            SidebarInput::KindSubRowSelected { kind, index: row.index() }
+                        });
+                    }
+                });
+                // Right-click a row: act on that account's folder.
+                let click = gtk::GestureClick::new();
+                click.set_button(gtk::gdk::BUTTON_SECONDARY);
+                let cs = sender.clone();
+                let sub_w = sub.clone();
+                let refs = rows.clone();
+                click.connect_pressed(move |_, _, x, y| {
+                    if let Some(r) = sub_w
+                        .row_at_y(y as i32)
+                        .and_then(|row| refs.get(row.index() as usize))
+                    {
+                        show_sidebar_menu(
+                            &sub_w,
+                            x,
+                            y,
+                            vec![
+                                (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder_id,
+                                }),
+                                (i18n_noop("Refresh"), CtxAction::RefreshFolder {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder_id,
+                                }),
+                                (i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(r.account_id)),
+                            ],
+                            &cs,
+                        );
+                    }
+                });
+                sub.add_controller(click);
             }
-            rows.push(InboxRef {
-                account_id: aid,
-                folder_id: folder.id,
-                name: folder.name.clone(),
-                path: folder.path.clone(),
-            });
-        }
-        let ss = sender.input_sender().clone();
-        sub.connect_row_selected(move |_, row| {
-            if let Some(row) = row {
-                let _ = ss.send(if is_inbox {
-                    SidebarInput::UnifiedInboxRowSelected(row.index())
-                } else {
-                    SidebarInput::KindSubRowSelected { kind, index: row.index() }
+            UnifiedRow::Filtered => {
+                let refs = self.unified_folders.clone();
+                for r in &refs {
+                    let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
+                        continue;
+                    };
+                    // The filter-folder glyph in the account's colour says
+                    // whose folder this is; the tooltip names the account.
+                    let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-folder-symbolic");
+                    icon.add_css_class(&format!("acct-tint-{}", section.account.id));
+                    pin_icon_size(&icon);
+                    let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
+                    let (row, badge) = build_unified_sub_row(
+                        &icon,
+                        &r.folder.name,
+                        &tip,
+                        r.folder.unread,
+                        self.collapsed,
+                        self.chevrons_left,
+                    );
+                    // Filtered folders take drops like any folder of their account.
+                    row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
+                    sub.append(&row);
+                    row_badges.insert((r.account_id, r.folder.id), badge);
+                }
+                self.filtered_badges.insert(Slot::Unified, row_badges.clone());
+                let ss = sender.input_sender().clone();
+                sub.connect_row_selected(move |_, row| {
+                    if let Some(row) = row {
+                        let _ = ss.send(SidebarInput::FilteredRowSelected {
+                            slot: Slot::Unified,
+                            index: row.index(),
+                        });
+                    }
+                });
+                // Right-click a filtered folder: act on that folder alone.
+                let click = gtk::GestureClick::new();
+                click.set_button(gtk::gdk::BUTTON_SECONDARY);
+                let cs = sender.clone();
+                let sub_w = sub.clone();
+                click.connect_pressed(move |_, _, x, y| {
+                    if let Some(r) = sub_w
+                        .row_at_y(y as i32)
+                        .and_then(|row| refs.get(row.index() as usize))
+                    {
+                        show_sidebar_menu(
+                            &sub_w,
+                            x,
+                            y,
+                            vec![
+                                (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder.id,
+                                }),
+                                (i18n_noop("Refresh"), CtxAction::RefreshFolder {
+                                    account_id: r.account_id,
+                                    folder_id: r.folder.id,
+                                }),
+                            ],
+                            &cs,
+                        );
+                    }
+                });
+                sub.add_controller(click);
+            }
+            UnifiedRow::Tags => {
+                for t in &self.tags {
+                    let disc = crate::ui::context_menu::swatch_widget(&t.color, true);
+                    let (row, badge) = build_unified_sub_row(
+                        &disc,
+                        &t.name,
+                        &t.name,
+                        0,
+                        self.collapsed,
+                        self.chevrons_left,
+                    );
+                    badge.set_visible(false);
+                    sub.append(&row);
+                }
+                let ss = sender.input_sender().clone();
+                sub.connect_row_selected(move |_, row| {
+                    if let Some(row) = row {
+                        let _ = ss.send(SidebarInput::TagRowSelected {
+                            slot: Slot::Unified,
+                            index: row.index(),
+                        });
+                    }
                 });
             }
-        });
-        // Right-click a sub-row: act on that account's folder.
-        let click = gtk::GestureClick::new();
-        click.set_button(gtk::gdk::BUTTON_SECONDARY);
-        let cs = sender.clone();
-        let sub_w = sub.clone();
-        let refs = rows.clone();
-        click.connect_pressed(move |_, _, x, y| {
-            if let Some(r) = sub_w
-                .row_at_y(y as i32)
-                .and_then(|row| refs.get(row.index() as usize))
-            {
-                show_sidebar_menu(
-                    &sub_w,
-                    x,
-                    y,
-                    vec![
-                        (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
-                            account_id: r.account_id,
-                            folder_id: r.folder_id,
-                        }),
-                        (i18n_noop("Refresh"), CtxAction::RefreshFolder {
-                            account_id: r.account_id,
-                            folder_id: r.folder_id,
-                        }),
-                        (i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(r.account_id)),
-                    ],
-                    &cs,
-                );
-            }
-        });
-        sub.add_controller(click);
+        }
 
         let revealer = gtk::Revealer::new();
         revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -2683,6 +2821,105 @@ impl Sidebar {
             list: sub,
             rows,
             row_badges,
+        }
+    }
+
+    /// Whether a unified row's list is open. All Inboxes, Filtered Folders
+    /// and Tags keep their own state (persisted, folded by the rail); the
+    /// Starred / Sent / Drafts rows live in `kind_expanded`.
+    fn row_open(&self, row: UnifiedRow) -> bool {
+        match row {
+            UnifiedRow::Kind(FolderKind::Inbox) => self.unified_expanded,
+            UnifiedRow::Kind(kind) => self.kind_open(kind),
+            UnifiedRow::Filtered => self.unified_folders_expanded,
+            UnifiedRow::Tags => self.tags_expanded,
+        }
+    }
+
+    fn set_row_open(&mut self, row: UnifiedRow, open: bool) {
+        match row {
+            UnifiedRow::Kind(FolderKind::Inbox) => self.unified_expanded = open,
+            UnifiedRow::Kind(kind) => {
+                self.kind_expanded.insert(kind, open);
+            }
+            UnifiedRow::Filtered => self.unified_folders_expanded = open,
+            UnifiedRow::Tags => self.tags_expanded = open,
+        }
+    }
+
+    /// The unread total a unified row's folded chip shows.
+    fn row_unread(&self, row: UnifiedRow) -> u32 {
+        match row {
+            UnifiedRow::Kind(FolderKind::Inbox) => self.unified_unread,
+            UnifiedRow::Kind(kind) => self.kind_unread(kind),
+            UnifiedRow::Filtered => self.filtered_unread(Slot::Unified),
+            UnifiedRow::Tags => 0,
+        }
+    }
+
+    /// Open or fold a unified row's list in place (a click on its chevron,
+    /// a double-click on the row), and report the section states.
+    fn toggle_row(&mut self, row: UnifiedRow, sender: &ComponentSender<Self>) {
+        let open = !self.row_open(row);
+        self.set_row_open(row, open);
+        self.report_sections(sender);
+        let unread = self.row_unread(row);
+        if row == UnifiedRow::Kind(FolderKind::Inbox) {
+            if let Some(rev) = &self.unified_revealer {
+                rev.set_reveal_child(open);
+            }
+            if let Some(label) = &self.unified_badge {
+                label.set_visible(unread > 0 && !open && self.show_unified_chip);
+            }
+            if let Some(ch) = &self.unified_chevron {
+                ch.set_icon_name(Some(chevron_icon(open)));
+            }
+        } else if let Some(w) = self.kind_widgets.get(&row) {
+            w.revealer.set_reveal_child(open);
+            // Expanded: the list shows each count, so the total chip bows
+            // out; it returns when folded back up.
+            if let Some(b) = &w.badge {
+                b.set_visible(unread > 0 && !open && self.show_unified_chip);
+            }
+            if let Some(ch) = &w.chevron {
+                ch.set_icon_name(Some(chevron_icon(open)));
+            }
+        }
+    }
+
+    /// Build a run of unified rows into `parent`, the first row keeping the
+    /// list's top padding as the gap above the run and the last row's list
+    /// carrying the gap to whatever follows.
+    fn build_unified_run(
+        &mut self,
+        parent: &gtk::Box,
+        rows: &[UnifiedRow],
+        sections: &[SectionData],
+        sender: &ComponentSender<Self>,
+    ) {
+        let n = rows.len();
+        for (i, row) in rows.iter().copied().enumerate() {
+            let built = self.build_unified_row(parent, row, sections, sender);
+            if i == 0 {
+                built.header.add_css_class("unified-first");
+            }
+            if i + 1 == n {
+                // 14 plus the 6 the list's own padding used to give.
+                built.list.set_margin_bottom(20);
+            }
+            if row == UnifiedRow::Kind(FolderKind::Inbox) {
+                // All Inboxes keeps its own fields: the in-place updates and
+                // the tray's "View all unread" address it directly.
+                self.unified_list = Some(built.header);
+                self.unified_revealer = Some(built.revealer);
+                self.unified_chevron = built.chevron;
+                self.unified_badge = built.badge;
+                self.unified_inbox_list = Some(built.list);
+                self.unified_inboxes = built.rows;
+                self.unified_inbox_badges = built.row_badges;
+            } else {
+                self.kind_widgets.insert(row, built);
+            }
         }
     }
 
@@ -3065,12 +3302,20 @@ impl Sidebar {
     }
 
     fn select_tag(&self, account: Option<u32>, keyword: &str) {
-        let slot = account.map_or(Slot::Unified, Slot::Account);
-        if let Some(w) = self.tag_sections.get(&slot) {
-            if let Some(idx) = self.tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
-                if let Some(row) = w.list.row_at_index(idx as i32) {
-                    w.list.select_row(Some(&row));
-                }
+        let Some(idx) = self.tags.iter().position(|t| t.keyword.eq_ignore_ascii_case(keyword)) else {
+            return;
+        };
+        let list = match account {
+            None => self
+                .kind_widgets
+                .get(&UnifiedRow::Tags)
+                .map(|w| w.list.clone())
+                .or_else(|| self.tag_sections.get(&Slot::Unified).map(|w| w.list.clone())),
+            Some(id) => self.tag_sections.get(&Slot::Account(id)).map(|w| w.list.clone()),
+        };
+        if let Some(list) = list {
+            if let Some(row) = list.row_at_index(idx as i32) {
+                list.select_row(Some(&row));
             }
         }
     }
@@ -3083,11 +3328,21 @@ impl Sidebar {
                 l.unselect_all();
             }
         }
-        for (kind, w) in &self.kind_widgets {
-            if keep != Sel::UnifiedKind(*kind) {
+        for (row, w) in &self.kind_widgets {
+            let keep_header = match row {
+                UnifiedRow::Kind(k) => keep == Sel::UnifiedKind(*k),
+                UnifiedRow::Filtered => keep == Sel::UnifiedFiltered,
+                UnifiedRow::Tags => keep == Sel::UnifiedTags,
+            };
+            if !keep_header {
                 w.header.unselect_all();
             }
-            if !matches!(&keep, Sel::UnifiedKindRow(k, _) if k == kind) {
+            let keep_list = match row {
+                UnifiedRow::Kind(k) => matches!(&keep, Sel::UnifiedKindRow(kk, _) if kk == k),
+                UnifiedRow::Filtered => matches!(keep, Sel::UnifiedFolder(..)),
+                UnifiedRow::Tags => matches!(keep, Sel::Tag(None, _)),
+            };
+            if !keep_list {
                 w.list.unselect_all();
             }
         }
@@ -3164,6 +3419,13 @@ impl Sidebar {
         }
     }
 
+    /// Highlight a unified row's header (row 0 of its own list).
+    fn select_row_header(&self, row: UnifiedRow) {
+        if let Some(w) = self.kind_widgets.get(&row) {
+            w.header.select_row(w.header.row_at_index(0).as_ref());
+        }
+    }
+
     fn restore_selection(&mut self) {
         match self.selected.clone() {
             Sel::Unified => self.select_unified(),
@@ -3177,13 +3439,11 @@ impl Sidebar {
                 self.select_filtered_row(Slot::Account(acc), acc, &path)
             }
             Sel::Tag(acc, kw) => self.select_tag(acc, &kw),
-            Sel::UnifiedKind(kind) => {
-                if let Some(w) = self.kind_widgets.get(&kind) {
-                    w.header.select_row(w.header.row_at_index(0).as_ref());
-                }
-            }
+            Sel::UnifiedKind(kind) => self.select_row_header(UnifiedRow::Kind(kind)),
+            Sel::UnifiedFiltered => self.select_row_header(UnifiedRow::Filtered),
+            Sel::UnifiedTags => self.select_row_header(UnifiedRow::Tags),
             Sel::UnifiedKindRow(kind, acc) => {
-                if let Some(w) = self.kind_widgets.get(&kind) {
+                if let Some(w) = self.kind_widgets.get(&UnifiedRow::Kind(kind)) {
                     if let Some(idx) = w.rows.iter().position(|r| r.account_id == acc) {
                         w.list.select_row(w.list.row_at_index(idx as i32).as_ref());
                     }
@@ -3227,15 +3487,25 @@ impl Sidebar {
         }
     }
 
+    /// Highlight a filtered folder's row: in the unified row's list, or an
+    /// account's own section.
     fn select_filtered_row(&self, slot: Slot, account_id: u32, path: &str) {
-        let Some(w) = self.filtered_sections.get(&slot) else { return };
+        let list = match slot {
+            Slot::Unified => self
+                .kind_widgets
+                .get(&UnifiedRow::Filtered)
+                .map(|w| w.list.clone())
+                .or_else(|| self.filtered_sections.get(&slot).map(|w| w.list.clone())),
+            Slot::Account(_) => self.filtered_sections.get(&slot).map(|w| w.list.clone()),
+        };
+        let Some(list) = list else { return };
         if let Some(idx) = self
             .filtered_rows
             .get(&slot)
             .and_then(|rows| rows.iter().position(|r| r.account_id == account_id && r.folder.path == path))
         {
-            if let Some(row) = w.list.row_at_index(idx as i32) {
-                w.list.select_row(Some(&row));
+            if let Some(row) = list.row_at_index(idx as i32) {
+                list.select_row(Some(&row));
             }
         }
     }

@@ -218,14 +218,16 @@ pub struct AppModel {
     /// The lightbox picture + its scroller, for applying zoom sizes.
     lightbox_picture: Option<gtk::Picture>,
     lightbox_scroller: Option<gtk::ScrolledWindow>,
-    /// True when a unified view is active (no single folder): every
-    /// account's folder of `unified_kind` merged into one list.
+    /// True when a unified view is active (no single folder): the folders
+    /// `unified_view` names, merged into one list.
     unified: bool,
-    /// Which folder the unified view merges: Inbox for All Inboxes, or
-    /// Starred / Sent / Drafts for the unified section's other rows.
-    unified_kind: FolderKind,
-    /// account_id → that account's latest inbox messages (for the unified view).
-    unified_by_account: HashMap<u32, Vec<Message>>,
+    /// Which folders the unified view merges: every account's Inbox for All
+    /// Inboxes, its Starred / Sent / Drafts for those rows, or every
+    /// filter rule's folder for the Filtered Folders row.
+    unified_view: UnifiedView,
+    /// (account, folder) → that folder's latest messages, for the unified
+    /// view's merge.
+    unified_slices: HashMap<(u32, u32), Vec<Message>>,
     /// Accounts whose inbox has been requested for the unified view since
     /// launch (the cache-primed slices still need their catch-up sync).
     unified_boot_requested: HashSet<u32>,
@@ -456,8 +458,8 @@ pub struct AppModel {
     tags: Vec<config::Tag>,
     /// The tag view, if that is the view — alongside `unified` and
     /// `selected`, never with: the account it is scoped to (`None` spans
-    /// every account) and the keyword.
-    tag_view: Option<(Option<u32>, String)>,
+    /// every account) and the keyword (`None` for every tag at once).
+    tag_view: Option<(Option<u32>, Option<String>)>,
     /// The tag colours as `.tag-<keyword>` classes, app-wide (the list's
     /// chips, the sidebar's rows, the menus' swatches).
     tag_provider: gtk::CssProvider,
@@ -572,12 +574,22 @@ struct PopOut {
     controller: Controller<MessageWindow>,
 }
 
+/// Which folders a unified view merges (see `AppModel::unified_view`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnifiedView {
+    /// Every account's folder of this kind.
+    Kind(FolderKind),
+    /// Every filter rule's folder listed under All Inboxes.
+    Filtered,
+}
+
 #[derive(Debug)]
 pub enum AppMsg {
     // User actions
-    /// A unified row was chosen: All Inboxes, or the unified section's
-    /// Starred / Sent / Drafts row — every account's folder of that kind.
-    UnifiedSelected(FolderKind),
+    /// A unified row was chosen: All Inboxes, the unified section's Starred
+    /// / Sent / Drafts row (every account's folder of that kind), or its
+    /// Filtered Folders row (every rule's folder).
+    UnifiedSelected(UnifiedView),
     /// Show the attachments gallery (sidebar "Attachments" row).
     ShowAttachments,
     /// Show the Outbox (queued, unsent messages).
@@ -936,9 +948,10 @@ pub enum AppMsg {
     /// The tags changed in Settings (#71).
     SetTags(Vec<config::Tag>),
     /// A tag row in the sidebar was chosen: list everything carrying it.
-    /// A tag row was chosen: its keyword, and the account it is scoped to
-    /// (an account section's own Tags row) or `None` for every account.
-    TagSelected { keyword: String, account: Option<u32> },
+    /// A tag row was chosen: its keyword (`None` for the unified Tags row,
+    /// every tag at once), and the account it is scoped to (an account
+    /// section's own Tags row) or `None` for every account.
+    TagSelected { keyword: Option<String>, account: Option<u32> },
     /// Put a tag on one message, or take it off (row menu, palette, card).
     SetTag { message: Box<Message>, keyword: String, add: bool },
     /// The reader toolbar's tag menu: toggle a tag on the reader's target.
@@ -1729,10 +1742,20 @@ impl SimpleComponent for AppModel {
                 show_contacts,
             })
             .forward(sender.input_sender(), |out| match out {
-                SidebarOutput::UnifiedSelected => AppMsg::UnifiedSelected(FolderKind::Inbox),
-                SidebarOutput::UnifiedKindSelected(kind) => AppMsg::UnifiedSelected(kind),
+                SidebarOutput::UnifiedSelected => {
+                    AppMsg::UnifiedSelected(UnifiedView::Kind(FolderKind::Inbox))
+                }
+                SidebarOutput::UnifiedKindSelected(kind) => {
+                    AppMsg::UnifiedSelected(UnifiedView::Kind(kind))
+                }
+                SidebarOutput::UnifiedFilteredSelected => {
+                    AppMsg::UnifiedSelected(UnifiedView::Filtered)
+                }
+                SidebarOutput::UnifiedTagsSelected => {
+                    AppMsg::TagSelected { keyword: None, account: None }
+                }
                 SidebarOutput::TagSelected { keyword, account } => {
-                    AppMsg::TagSelected { keyword, account }
+                    AppMsg::TagSelected { keyword: Some(keyword), account }
                 }
                 SidebarOutput::ToggleAccountFiltered(id) => AppMsg::ToggleAccountFiltered(id),
                 SidebarOutput::ToggleAccountTags(id) => AppMsg::ToggleAccountTags(id),
@@ -2000,8 +2023,8 @@ impl SimpleComponent for AppModel {
             },
             attachment_cache: crate::ram_cache::RamCache::new(ATTACHMENT_CACHE_BUDGET),
             unified: false,
-            unified_kind: FolderKind::Inbox,
-            unified_by_account: HashMap::new(),
+            unified_view: UnifiedView::Kind(FolderKind::Inbox),
+            unified_slices: HashMap::new(),
             unified_boot_requested: HashSet::new(),
             message_cache: HashMap::new(),
             indexed_folders: HashSet::new(),
@@ -2984,14 +3007,17 @@ impl SimpleComponent for AppModel {
                 // row at 3s, All Inboxes at 6s and the row again at 9s, so the
                 // timing logs show a cold and a warm open.
                 if let Ok(which) = std::env::var("VIREO_SHOWCASE_UNIFIED") {
-                    let kind = match which.as_str() {
-                        "starred" => FolderKind::Starred,
-                        "drafts" => FolderKind::Drafts,
-                        _ => FolderKind::Sent,
+                    let pick = move || match which.as_str() {
+                        "starred" => SidebarInput::UnifiedKindRowSelected(FolderKind::Starred),
+                        "drafts" => SidebarInput::UnifiedKindRowSelected(FolderKind::Drafts),
+                        "filtered" => SidebarInput::UnifiedFilteredSelected,
+                        "tags" => SidebarInput::UnifiedTagsSelected,
+                        _ => SidebarInput::UnifiedKindRowSelected(FolderKind::Sent),
                     };
                     let sb = model.sidebar.sender().clone();
+                    let p = pick.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
-                        let _ = sb.send(SidebarInput::UnifiedKindRowSelected(kind));
+                        let _ = sb.send(p());
                     });
                     let sb = model.sidebar.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
@@ -2999,7 +3025,7 @@ impl SimpleComponent for AppModel {
                     });
                     let sb = model.sidebar.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(9, move || {
-                        let _ = sb.send(SidebarInput::UnifiedKindRowSelected(kind));
+                        let _ = sb.send(pick());
                     });
                 }
                 // VIREO_SHOWCASE_FOLD_FILTERED folds All Inboxes' Filtered
@@ -3335,19 +3361,19 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::UnifiedSelected(kind) => {
+            AppMsg::UnifiedSelected(view) => {
                 let t_open = std::time::Instant::now();
                 self.close_sidebar_peek();
                 self.leave_gallery();
                 self.showing_contacts = false;
                 self.showing_outbox = false;
-                // Another kind's slices are another view's: start afresh
-                // (the per-account loads below refill them).
-                if self.unified_kind != kind {
-                    self.unified_by_account.clear();
+                // Another view's slices are another view's: start afresh
+                // (the loads below refill them).
+                if self.unified_view != view {
+                    self.unified_slices.clear();
                     self.unified_boot_requested.clear();
                 }
-                self.unified_kind = kind;
+                self.unified_view = view;
                 self.unified = true;
                 self.tag_view = None;
                 self.selected = None;
@@ -3361,14 +3387,11 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 self.message_list.emit(MessageListInput::ResetPaging);
                 // A Sent view's rows all come from you — name the recipients.
-                self.message_list
-                    .emit(MessageListInput::SetShowRecipient(kind == FolderKind::Sent));
+                self.message_list.emit(MessageListInput::SetShowRecipient(
+                    view == UnifiedView::Kind(FolderKind::Sent),
+                ));
                 self.message_list.emit(MessageListInput::SetRestorable(false));
-                let reqs: Vec<(u32, u32, String)> = self
-                    .accounts
-                    .iter()
-                    .filter_map(|a| self.unified_folder_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
-                    .collect();
+                let reqs = self.unified_targets();
                 // Keep every account's last known slice and top it up from the
                 // folder caches, the way opening a single folder does. This used
                 // to clear the lot and wait: an account whose worker was slow to
@@ -3398,16 +3421,16 @@ impl SimpleComponent for AppModel {
                     }
                     if let Some(cached) = self.message_cache.get(&(*account_id, *folder_id)) {
                         if !cached.is_empty() {
-                            self.unified_by_account.insert(*account_id, cached.clone());
+                            self.unified_slices.insert((*account_id, *folder_id), cached.clone());
                         }
                     }
                 }
-                // Forget accounts that no longer have an inbox to contribute
-                // (removed or disabled since the last visit).
-                let live: std::collections::HashSet<u32> =
-                    reqs.iter().map(|(a, _, _)| *a).collect();
-                self.unified_by_account.retain(|a, _| live.contains(a));
-                if self.unified_by_account.is_empty() {
+                // Forget folders that no longer contribute (an account
+                // removed or disabled, a rule gone, since the last visit).
+                let live: std::collections::HashSet<(u32, u32)> =
+                    reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
+                self.unified_slices.retain(|k, _| live.contains(k));
+                if self.unified_slices.is_empty() {
                     self.message_list
                         .emit(MessageListInput::SetLoading);
                 } else {
@@ -3420,9 +3443,9 @@ impl SimpleComponent for AppModel {
                 }
                 self.push_index_complete();
                 tracing::info!(
-                    "unified {kind:?}: opened in {:?} with {} cached messages",
+                    "unified {view:?}: opened in {:?} with {} cached messages",
                     t_open.elapsed(),
-                    self.unified_by_account.values().map(Vec::len).sum::<usize>()
+                    self.unified_slices.values().map(Vec::len).sum::<usize>()
                 );
             }
 
@@ -4315,11 +4338,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Refresh => {
                 if self.unified {
-                    let reqs: Vec<(u32, u32, String)> = self
-                        .accounts
-                        .iter()
-                        .filter_map(|a| self.unified_folder_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
-                        .collect();
+                    let reqs = self.unified_targets();
                     for (account_id, folder_id, path) in reqs {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
@@ -6126,8 +6145,12 @@ impl SimpleComponent for AppModel {
                 // priming already painted its slice, and this is what brings
                 // in whatever changed since the app last ran.
                 if self.unified && self.unified_boot_requested.insert(account_id) {
-                    if let Some(inbox) = self.unified_folder_of(account_id) {
-                        let (folder_id, path) = (inbox.id, inbox.path.clone());
+                    let mine: Vec<(u32, u32, String)> = self
+                        .unified_targets()
+                        .into_iter()
+                        .filter(|(a, _, _)| *a == account_id)
+                        .collect();
+                    for (_, folder_id, path) in mine {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
@@ -6270,13 +6293,15 @@ impl SimpleComponent for AppModel {
                     self.push_thread_links();
                 }
                 if self.unified {
-                    // Accept only each account's folder of the view's kind;
-                    // merge all by recency.
-                    if self.unified_folder_of(account_id).map(|f| f.id) == Some(folder_id) {
+                    // Accept only the folders the view merges, by recency.
+                    if self.is_unified_target(account_id, folder_id) {
                         let same_slice = unchanged
-                            && self.unified_by_account.get(&account_id).is_some_and(|s| *s == messages);
+                            && self
+                                .unified_slices
+                                .get(&(account_id, folder_id))
+                                .is_some_and(|s| *s == messages);
                         if !same_slice {
-                            self.unified_by_account.insert(account_id, messages);
+                            self.unified_slices.insert((account_id, folder_id), messages);
                             self.emit_unified();
                         }
                     }
@@ -6341,9 +6366,9 @@ impl SimpleComponent for AppModel {
                 entry.extend(fresh.iter().cloned());
                 // Feed the visible list so search covers the new messages live.
                 if self.unified {
-                    if self.unified_folder_of(account_id).map(|f| f.id) == Some(folder_id) {
-                        self.unified_by_account
-                            .entry(account_id)
+                    if self.is_unified_target(account_id, folder_id) {
+                        self.unified_slices
+                            .entry((account_id, folder_id))
                             .or_default()
                             .extend(fresh.iter().cloned());
                         self.message_list
@@ -7190,10 +7215,9 @@ impl AppModel {
 
     fn current_index_complete(&self) -> bool {
         if self.unified {
-            self.accounts.iter().all(|a| {
-                self.unified_folder_of(a.id)
-                    .map_or(true, |f| self.indexed_folders.contains(&(a.id, f.id)))
-            })
+            self.unified_targets()
+                .iter()
+                .all(|(a, f, _)| self.indexed_folders.contains(&(*a, *f)))
         } else if let Some(sel) = &self.selected {
             self.indexed_folders.contains(&(sel.account_id, sel.folder_id))
         } else {
@@ -7283,7 +7307,7 @@ impl AppModel {
                 let messages = cache.load_messages(account_id, &inbox.path, inbox.id);
                 if !messages.is_empty() {
                     self.message_cache.insert((account_id, inbox.id), messages.clone());
-                    self.unified_by_account.insert(account_id, messages);
+                    self.unified_slices.insert((account_id, inbox.id), messages);
                 }
             }
             // The folders counting filters file into (#116) as well, so the
@@ -7358,7 +7382,7 @@ impl AppModel {
         self.selected = None;
         self.unified = false;
         self.tag_view = None;
-        self.unified_by_account.clear();
+        self.unified_slices.clear();
         self.message_cache.clear();
         self.body_cache.clear();
         self.attachments.clear();
@@ -10007,9 +10031,12 @@ impl AppModel {
                 }
             }
         }
-        self.unified_by_account
-            .get(&account_id)
-            .and_then(|msgs| msgs.iter().find(|m| m.id == id).cloned())
+        self.unified_slices
+            .iter()
+            .filter(|((a, _), _)| *a == account_id)
+            .flat_map(|(_, msgs)| msgs.iter())
+            .find(|m| m.id == id)
+            .cloned()
     }
 
     /// Explain how to set up the system keyring (Secret Service) so passwords
@@ -10279,11 +10306,9 @@ impl AppModel {
                 m.unread = false;
             }
         }
-        if self.unified_folder_of(account_id).map(|f| f.id) == Some(folder_id) {
-            if let Some(msgs) = self.unified_by_account.get_mut(&account_id) {
-                for m in msgs {
-                    m.unread = false;
-                }
+        if let Some(msgs) = self.unified_slices.get_mut(&(account_id, folder_id)) {
+            for m in msgs {
+                m.unread = false;
             }
         }
         self.folder_unread.insert((account_id, folder_id), 0);
@@ -10353,7 +10378,7 @@ impl AppModel {
     fn emit_unified(&self) {
         let t = std::time::Instant::now();
         let mut merged: Vec<Message> =
-            self.unified_by_account.values().flatten().cloned().collect();
+            self.unified_slices.values().flatten().cloned().collect();
         merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         tracing::debug!("unified: merged {} messages in {:?}", merged.len(), t.elapsed());
         self.message_list.emit(MessageListInput::SetMessages { messages: merged });
@@ -10364,21 +10389,31 @@ impl AppModel {
     /// out; Gmail's per-label copies of one message collapse to one row,
     /// the inbox copy where there is one (its actions land where expected).
     fn emit_tag_view(&self) {
-        let Some((scope, kw)) = self.tag_view.as_ref().map(|(a, k)| (*a, k.as_str())) else {
-            return;
-        };
+        let Some((scope, kw)) = self.tag_view.clone() else { return };
         let in_scope = |account_id: u32| scope.map_or(true, |id| id == account_id);
+        // One keyword, or — the unified Tags row — every configured tag.
+        let keywords: Vec<String> = match kw {
+            Some(k) => vec![k],
+            None => self.tags.iter().map(|t| t.keyword.clone()).collect(),
+        };
         let mut out: Vec<Message> = Vec::new();
+        let mut seen_rows: std::collections::HashSet<(u32, u32, u32)> =
+            std::collections::HashSet::new();
         if let Some(cache) = self.cache.as_ref() {
             for account in self.accounts.iter().filter(|a| in_scope(a.id)) {
                 let Some(folders) = self.folders.get(&account.id) else { continue };
-                for (path, mut m) in cache.messages_with_keyword(account.id, kw) {
-                    let Some(f) = folders.iter().find(|f| f.path == path) else { continue };
-                    if matches!(f.kind, FolderKind::Trash | FolderKind::Junk) {
-                        continue;
+                for kw in &keywords {
+                    for (path, mut m) in cache.messages_with_keyword(account.id, kw) {
+                        let Some(f) = folders.iter().find(|f| f.path == path) else { continue };
+                        if matches!(f.kind, FolderKind::Trash | FolderKind::Junk) {
+                            continue;
+                        }
+                        m.folder_id = f.id;
+                        // A message with several tags answers several keywords.
+                        if seen_rows.insert((m.account_id, m.folder_id, m.uid)) {
+                            out.push(m);
+                        }
                     }
-                    m.folder_id = f.id;
-                    out.push(m);
                 }
             }
         }
@@ -10394,7 +10429,12 @@ impl AppModel {
                 {
                     continue;
                 }
-                out.extend(messages.iter().filter(|m| m.has_keyword(kw)).cloned());
+                out.extend(
+                    messages
+                        .iter()
+                        .filter(|m| keywords.iter().any(|k| m.has_keyword(k)))
+                        .cloned(),
+                );
             }
         }
         let inbox_first = |m: &Message| {
@@ -10459,8 +10499,8 @@ impl AppModel {
                 c.keywords = keywords.clone();
             }
         }
-        if let Some(msgs) = self.unified_by_account.get_mut(&aid) {
-            for c in msgs.iter_mut().filter(|c| same(c) && c.folder_id == fid) {
+        if let Some(msgs) = self.unified_slices.get_mut(&(aid, fid)) {
+            for c in msgs.iter_mut().filter(|c| same(c)) {
                 c.keywords = keywords.clone();
             }
         }
@@ -10480,7 +10520,12 @@ impl AppModel {
             p.controller.emit(MessageWindowInput::SetKeywords(keywords));
         }
         // In this tag's own view an untagged message has no row to keep.
-        if !add && self.tag_view.as_ref().is_some_and(|(_, v)| v.eq_ignore_ascii_case(keyword)) {
+        if !add
+            && self
+                .tag_view
+                .as_ref()
+                .is_some_and(|(_, v)| v.as_deref().is_some_and(|v| v.eq_ignore_ascii_case(keyword)))
+        {
             self.message_list.emit(MessageListInput::Remove(id));
         }
     }
@@ -11363,7 +11408,7 @@ impl AppModel {
         if let Some(p) = self.popouts.get(&(m.account_id, m.id)) {
             p.window.close();
         }
-        if let Some(msgs) = self.unified_by_account.get_mut(&m.account_id) {
+        if let Some(msgs) = self.unified_slices.get_mut(&(m.account_id, m.folder_id)) {
             msgs.retain(|x| x.uid != m.uid);
         }
         if let Some(msgs) = self.message_cache.get_mut(&(m.account_id, m.folder_id)) {
@@ -11608,10 +11653,33 @@ impl AppModel {
         self.folders.get(&account_id)?.iter().find(|f| f.kind == kind)
     }
 
-    /// An account's folder that the open unified view merges (its inbox for
-    /// All Inboxes, its Sent for the unified Sent row, and so on).
-    fn unified_folder_of(&self, account_id: u32) -> Option<&Folder> {
-        self.folder_of_kind(account_id, self.unified_kind)
+    /// The folders the open unified view merges: (account, folder id, path).
+    fn unified_targets(&self) -> Vec<(u32, u32, String)> {
+        match self.unified_view {
+            UnifiedView::Kind(kind) => self
+                .accounts
+                .iter()
+                .filter_map(|a| self.folder_of_kind(a.id, kind).map(|f| (a.id, f.id, f.path.clone())))
+                .collect(),
+            UnifiedView::Filtered => self
+                .unified_folder_refs()
+                .into_iter()
+                .map(|r| (r.account_id, r.folder.id, r.folder.path))
+                .collect(),
+        }
+    }
+
+    /// Whether a folder is one the open unified view merges.
+    fn is_unified_target(&self, account_id: u32, folder_id: u32) -> bool {
+        match self.unified_view {
+            UnifiedView::Kind(kind) => {
+                self.folder_of_kind(account_id, kind).is_some_and(|f| f.id == folder_id)
+            }
+            UnifiedView::Filtered => self
+                .unified_folder_refs()
+                .iter()
+                .any(|r| r.account_id == account_id && r.folder.id == folder_id),
+        }
     }
 
     /// The folders an account's own "Filtered Folders" section lists: the
@@ -11734,7 +11802,7 @@ impl AppModel {
         else {
             return;
         };
-        let open = (self.unified && folder.kind == self.unified_kind)
+        let open = (self.unified && self.is_unified_target(account_id, folder_id))
             || self
                 .selected
                 .as_ref()
@@ -11777,9 +11845,11 @@ impl AppModel {
                 }
             }
         }
-        if let Some(msgs) = self.unified_by_account.get_mut(&account_id) {
-            if let Some(m) = msgs.iter_mut().find(|m| m.id == message_id) {
-                m.unread = unread;
+        for ((aid, _), msgs) in self.unified_slices.iter_mut() {
+            if *aid == account_id {
+                if let Some(m) = msgs.iter_mut().find(|m| m.id == message_id) {
+                    m.unread = unread;
+                }
             }
         }
     }
