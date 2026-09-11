@@ -316,12 +316,13 @@ pub struct Sidebar {
     /// Whether the unified "Tags" section is open.
     tags_expanded: bool,
     tag_sections: HashMap<Slot, SectionWidgets>,
-    /// The rail's own open state for the items "Fold up expanded items"
-    /// starts folded: a long press there opens or folds them for the rail
-    /// alone, the saved state untouched. Cleared whenever the sidebar
-    /// changes width, so the full sidebar shows what was saved.
+    /// The rail's own open states: anything opened or folded while the
+    /// sidebar is the icon rail lands here, the saved state untouched, so
+    /// the full sidebar comes back as it was left. Cleared whenever the
+    /// sidebar changes width. An item absent here shows its saved state —
+    /// or folded, when "Fold up expanded items" covers it.
     rail_open: HashMap<UnifiedRow, bool>,
-    rail_open_accounts: std::collections::HashSet<u32>,
+    rail_open_accounts: HashMap<u32, bool>,
     /// Which unified Starred / Sent / Drafts rows are shown, whether their
     /// account lists are open, and their widgets.
     unified_kinds: crate::config::UnifiedKinds,
@@ -660,7 +661,7 @@ impl Component for Sidebar {
             ]),
             kind_widgets: HashMap::new(),
             rail_open: HashMap::new(),
-            rail_open_accounts: std::collections::HashSet::new(),
+            rail_open_accounts: HashMap::new(),
             unified_tags: true,
             show_accounts: true,
             filtered_placement: crate::config::SectionPlacement::default(),
@@ -1280,10 +1281,10 @@ impl Component for Sidebar {
             }
 
             SidebarInput::ToggleCollapseLocal(id) => {
-                // Started folded for the rail (Settings → Sidebar → Icon
-                // rail): this opens or folds it for the rail alone — the
-                // saved state stays as it is for the full sidebar.
-                let rail_only = self.locked_accounts();
+                // In the rail this opens or folds the account for the rail
+                // alone — the saved state stays as it is for the full
+                // sidebar, which comes back as it was left.
+                let rail_only = self.collapsed;
                 if let Some(rev) = self.revealers.get(&id) {
                     let expanded = !rev.reveals_child();
                     rev.set_reveal_child(expanded);
@@ -1291,11 +1292,7 @@ impl Component for Sidebar {
                         ch.set_icon_name(Some(if expanded { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }));
                     }
                     if rail_only {
-                        if expanded {
-                            self.rail_open_accounts.insert(id);
-                        } else {
-                            self.rail_open_accounts.remove(&id);
-                        }
+                        self.rail_open_accounts.insert(id, expanded);
                     } else if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                         s.collapsed = !expanded;
                     }
@@ -2830,24 +2827,28 @@ impl Sidebar {
         self.collapsed && self.rail_fold.folds_accounts()
     }
 
-    /// Whether a unified row's list shows open: in the rail, for a row
-    /// "Fold up expanded items" covers, its rail-only state (folded until
-    /// long-pressed open); otherwise its own.
+    /// Whether a unified row's list shows open. In the rail: what it was
+    /// last set to there, else folded when "Fold up expanded items" covers
+    /// it, else its saved state. In the full sidebar: its saved state.
     fn row_shown_open(&self, row: UnifiedRow) -> bool {
-        if self.locked_row(row) {
-            self.rail_open.get(&row).copied().unwrap_or(false)
-        } else {
-            self.row_open(row)
+        if !self.collapsed {
+            return self.row_open(row);
+        }
+        match self.rail_open.get(&row) {
+            Some(open) => *open,
+            None => !self.locked_row(row) && self.row_open(row),
         }
     }
 
     /// Whether an account's section shows folded: the same rule, with the
     /// rail-only state in `rail_open_accounts`.
     fn account_shown_folded(&self, section: &SectionData) -> bool {
-        if self.locked_accounts() {
-            !self.rail_open_accounts.contains(&section.account.id)
-        } else {
-            section.collapsed
+        if !self.collapsed {
+            return section.collapsed;
+        }
+        match self.rail_open_accounts.get(&section.account.id) {
+            Some(open) => !*open,
+            None => self.locked_accounts() || section.collapsed,
         }
     }
 
@@ -2876,9 +2877,9 @@ impl Sidebar {
     /// a double-click on the row), and report the section states.
     fn toggle_row(&mut self, row: UnifiedRow, sender: &ComponentSender<Self>) {
         let open = !self.row_shown_open(row);
-        if self.locked_row(row) {
-            // Started folded for the rail: opened or folded for the rail
-            // alone, the saved state untouched.
+        if self.collapsed {
+            // Opened or folded for the rail alone: the saved state is
+            // untouched, and the full sidebar comes back as it was left.
             self.rail_open.insert(row, open);
         } else {
             self.set_row_open(row, open);
