@@ -2462,7 +2462,14 @@ impl Sidebar {
         let badge: gtk::Label;
         if self.collapsed {
             hbox.set_halign(gtk::Align::Center);
-            row.set_tooltip_text(Some(&if unread > 0 { format!("{title} ({unread})") } else { title.clone() }));
+            let mut tip = if unread > 0 { format!("{title} ({unread})") } else { title.clone() };
+            if !locked {
+                // The rail has no room for a chevron: a long press on the
+                // icon opens or folds the list instead.
+                tip.push('\n');
+                tip.push_str(&i18n("Long-press to expand or collapse"));
+            }
+            row.set_tooltip_text(Some(&tip));
             // Total-unread chip overlaid on the icon so the count stays
             // visible in the icon-only rail.
             let (overlay, b) = with_unread_overlay(&img, unread);
@@ -2504,6 +2511,7 @@ impl Sidebar {
                 label.set_margin_start(-2);
             }
             hbox.append(&label);
+            row.set_tooltip_text(Some(i18n("Long-press to expand or collapse").as_str()));
             chevron_img = Some(chevron.clone());
             // The total-unread chip right-aligns like every folder row's,
             // one shared column down the sidebar. While the list is
@@ -2573,22 +2581,21 @@ impl Sidebar {
         }
         parent.append(&list);
 
-        // The rail's stand-in for the in-row chevron — unless the row is
-        // folded up for the rail, in which case it stays so.
-        if self.collapsed && !locked {
-            let toggle = gtk::Button::new();
-            toggle.add_css_class("flat");
-            toggle.add_css_class("chevron-btn");
-            toggle.set_halign(gtk::Align::Center);
-            toggle.set_tooltip_text(Some(toggle_tip.as_str()));
-            let chevron = gtk::Image::from_icon_name(chevron_icon(expanded));
-            toggle.set_child(Some(&chevron));
+        // A long press on the row opens or folds the list in either layout
+        // (a plain click still selects the merged view): in the rail it is
+        // the only way, there being no room for a chevron; in the full
+        // sidebar it sits alongside the chevron. Not while the row is
+        // folded up for the rail.
+        if !locked {
+            let press = gtk::GestureLongPress::new();
+            press.set_touch_only(false);
             let cs = sender.input_sender().clone();
-            toggle.connect_clicked(move |_| {
+            press.connect_pressed(move |g, _, _| {
+                // Claimed, so the release doesn't also count as a click.
+                g.set_state(gtk::EventSequenceState::Claimed);
                 let _ = cs.send(toggle_msg(row_kind));
             });
-            parent.append(&toggle);
-            chevron_img = Some(chevron);
+            list.add_controller(press);
         }
 
         // The list beneath: the same row shape for all — a lead (account
