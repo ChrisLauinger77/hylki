@@ -1144,12 +1144,20 @@ impl Component for AccountsWindow {
                                      can use this account's SMTP server, or bring its own.").as_str()
                                 ),
 
+                                // At the header's end, styled like the Add
+                                // Filter…, Add Tag… and cloud Add Account…
+                                // buttons.
                                 #[wrap(Some)]
-                                set_header_suffix = &gtk::Button {
-                                    set_label: &i18n("Add Alias…"),
-                                    set_valign: gtk::Align::Center,
-                                    add_css_class: "flat",
-                                    connect_clicked => AccountsInput::AliasAdd,
+                                set_header_suffix = &gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_valign: gtk::Align::Start,
+                                    set_halign: gtk::Align::End,
+                                    set_margin_start: 24,
+                                    gtk::Button {
+                                        set_label: &i18n("Add Alias…"),
+                                        set_size_request: (130, -1),
+                                        connect_clicked => AccountsInput::AliasAdd,
+                                    },
                                 },
 
                                 #[name = "aliases_list"]
