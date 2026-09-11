@@ -914,7 +914,7 @@ impl Component for Preferences {
 
                                     #[name = "unified_filtered_row"]
                                     adw::SwitchRow {
-                                        set_title: &i18n("Filtered Folders section"),
+                                        set_title: &i18n("Filters"),
                                         set_subtitle: &i18n("List every folder your filter rules file into in a \
                                                        collapsible section of the unified view."),
                                         connect_active_notify[sender] => move |row| {
@@ -970,7 +970,7 @@ impl Component for Preferences {
                                         },
                                         #[name = "unified_chip_filtered_row"]
                                         add_row = &adw::SwitchRow {
-                                            set_title: &i18n("Filtered Folders"),
+                                            set_title: &i18n("Filters"),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleUnifiedChipFiltered(row.is_active()));
                                             },
@@ -979,7 +979,7 @@ impl Component for Preferences {
 
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
-                                        set_title: &i18n("Filtered Folders placement"),
+                                        set_title: &i18n("Filters placement"),
                                         set_subtitle: &i18n("In the unified section, as a row like All Inboxes \
                                                        whose caret opens the folders; or above or below \
                                                        the accounts as a heading with its own list."),
@@ -1080,8 +1080,8 @@ impl Component for Preferences {
                                         },
                                         #[name = "rail_fold_filtered_row"]
                                         add_row = &adw::SwitchRow {
-                                            set_title: &i18n("Filtered Folders"),
-                                            set_subtitle: &i18n("The folders under the Filtered Folders row."),
+                                            set_title: &i18n("Filters"),
+                                            set_subtitle: &i18n("The folders under the Filters row."),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleRailFoldFiltered(row.is_active()));
                                             },

@@ -91,7 +91,7 @@ enum UnifiedRow {
 fn row_title(row: UnifiedRow) -> String {
     match row {
         UnifiedRow::Kind(kind) => kind_label(kind),
-        UnifiedRow::Filtered => i18n("Filtered Folders"),
+        UnifiedRow::Filtered => i18n("Filters"),
         UnifiedRow::Tags => i18n("Tags"),
     }
 }
@@ -1858,8 +1858,7 @@ impl Sidebar {
             img.add_css_class("folder-icon");
             pin_icon_size(&img);
             let badge = gtk::Label::new(Some(&self.outbox_count.to_string()));
-            badge.add_css_class("unread-badge");
-            badge.set_valign(gtk::Align::Center);
+            style_badge(&badge, 5);
             if self.collapsed {
                 hbox.set_halign(gtk::Align::Center);
                 row.set_tooltip_text(Some(&format!(
@@ -2528,6 +2527,9 @@ impl Sidebar {
             let label = gtk::Label::new(Some(&title));
             label.set_halign(gtk::Align::Start);
             label.set_hexpand(true);
+            // Squeezed by a wide chip, the title shortens; the chip and the
+            // chevron never leave the row.
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
             label.add_css_class("account-name");
             if self.chevrons_left {
                 label.set_margin_start(-2);
@@ -2540,8 +2542,7 @@ impl Sidebar {
             // expanded its rows carry the counts, so the total is
             // redundant and hidden.
             let b = gtk::Label::new(Some(&unread.to_string()));
-            b.add_css_class("unread-badge");
-            b.set_valign(gtk::Align::Center);
+            style_badge(&b, 5);
             b.set_visible(show_chip);
             hbox.append(&b);
             badge = b;
@@ -2701,10 +2702,9 @@ impl Sidebar {
                     let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
                         continue;
                     };
-                    // The filter-folder glyph in the account's colour says
-                    // whose folder this is; the tooltip names the account.
-                    let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-folder-symbolic");
-                    icon.add_css_class(&format!("acct-tint-{}", section.account.id));
+                    // The glyph in the account's colour says whose folder
+                    // this is; the tooltip names the account.
+                    let icon = filtered_folder_icon(&r.folder, section.account.id);
                     pin_icon_size(&icon);
                     let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
                     let (row, badge) = build_unified_sub_row(
@@ -2989,9 +2989,9 @@ impl Sidebar {
             hb.append(&overlay);
             badge = b;
             toggle.set_tooltip_text(Some(&if unread > 0 {
-                format!("{} ({unread})", i18n("Filtered Folders"))
+                format!("{} ({unread})", i18n("Filters"))
             } else {
-                i18n("Filtered Folders")
+                i18n("Filters")
             }));
         } else {
             // A leading caret and the label, like the accounts' "Folders"
@@ -3002,7 +3002,7 @@ impl Sidebar {
                 chevron.set_margin_start(2);
             }
             hb.append(&chevron);
-            let lbl = gtk::Label::new(Some(i18n("Filtered Folders").as_str()));
+            let lbl = gtk::Label::new(Some(i18n("Filters").as_str()));
             if unified {
                 lbl.add_css_class("account-name");
             }
@@ -3011,8 +3011,7 @@ impl Sidebar {
             lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
             hb.append(&lbl);
             let b = gtk::Label::new(Some(&unread.to_string()));
-            b.add_css_class("unread-badge");
-            b.set_valign(gtk::Align::Center);
+            style_badge(&b, 5);
             b.set_visible(show_chip);
             hb.append(&b);
             badge = b;
@@ -3051,11 +3050,9 @@ impl Sidebar {
             };
             // Laid out exactly like a folder under an account's "Folders"
             // heading — same builder, same leaf expander slot — so folders
-            // read the same wherever they sit in the sidebar. Only the icon
-            // differs: the filter-folder glyph in the account's colour, which
-            // is what says whose folder this is.
-            let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-folder-symbolic");
-            icon.add_css_class(&format!("acct-tint-{}", section.account.id));
+            // read the same wherever they sit in the sidebar. Only the
+            // colour differs: the account's, which says whose folder this is.
+            let icon = filtered_folder_icon(&r.folder, section.account.id);
             let lead: Option<gtk::Widget> = if self.collapsed {
                 None
             } else {
@@ -3888,8 +3885,7 @@ fn build_unified_sub_row(
         hbox.append(&name);
 
         let badge = gtk::Label::new(Some(&unread.to_string()));
-        badge.add_css_class("unread-badge");
-        badge.set_valign(gtk::Align::Center);
+        style_badge(&badge, 5);
         badge.set_visible(unread > 0);
         hbox.append(&badge);
         badge
@@ -3940,7 +3936,7 @@ fn with_unread_overlay(
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(child));
     let badge = gtk::Label::new(Some(&unread.to_string()));
-    badge.add_css_class("unread-badge");
+    style_badge(&badge, 4);
     badge.add_css_class("unread-badge-mini");
     badge.set_halign(gtk::Align::End);
     badge.set_valign(gtk::Align::Start);
@@ -3973,9 +3969,30 @@ fn filter_icon(section: &SectionData, folder: &Folder) -> Option<gtk::Image> {
     if !section.filtered.iter().any(|f| f.id == folder.id) {
         return None;
     }
-    let icon = gtk::Image::from_icon_name("co.hyprlab.Vireo-filter-folder-symbolic");
-    icon.add_css_class(&format!("acct-tint-{}", section.account.id));
-    Some(icon)
+    Some(filtered_folder_icon(folder, section.account.id))
+}
+
+/// The icon of a folder a filter files into: a custom folder wears the
+/// filter-folder glyph, a main folder (Archive, Junk…) keeps its own —
+/// either in the account's colour, which is what says "part of a filter".
+fn filtered_folder_icon(folder: &Folder, account_id: u32) -> gtk::Image {
+    let name = if folder.kind == FolderKind::Custom {
+        "co.hyprlab.Vireo-filter-folder-symbolic"
+    } else {
+        folder.kind.icon()
+    };
+    let icon = gtk::Image::from_icon_name(name);
+    icon.add_css_class(&format!("acct-tint-{account_id}"));
+    icon
+}
+
+/// An unread chip: the count in a pill that never pushes its row wider
+/// than the sidebar — past `max_chars` digits it ends in an ellipsis.
+fn style_badge(badge: &gtk::Label, max_chars: i32) {
+    badge.add_css_class("unread-badge");
+    badge.set_valign(gtk::Align::Center);
+    badge.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    badge.set_max_width_chars(max_chars);
 }
 
 /// Build one folder row. `depth` indents sub-folders to mirror the server's
@@ -4048,8 +4065,7 @@ fn build_folder_row(
         // Every folder shows an unread count chip — present but hidden when
         // zero so it can update in place.
         let badge = gtk::Label::new(Some(&unread.to_string()));
-        badge.add_css_class("unread-badge");
-        badge.set_valign(gtk::Align::Center);
+        style_badge(&badge, 5);
         badge.set_visible(unread > 0);
         hbox.append(&badge);
         counted.then_some(badge)
