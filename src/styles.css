@@ -222,7 +222,7 @@ headerbar.rail-header {
 }
 
 /* Filter rule rows in the Accounts window: extra breathing room around the
-   two-line title and the stacked switches. */
+   two-line title. */
 .filter-rule-row {
   padding-top: 8px;
   padding-bottom: 8px;

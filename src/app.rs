@@ -3846,6 +3846,17 @@ impl SimpleComponent for AppModel {
                         }
                     }
                 }
+                CtxAction::EditTag(keyword) => {
+                    if let Some(i) = self.tags.iter().position(|t| t.keyword == keyword) {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("tags".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditTag(i));
+                        }
+                    }
+                }
                 CtxAction::OpenAccountSettings(account_id) => {
                     // Straight to this account's editor, not the accounts list.
                     let email = self

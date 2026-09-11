@@ -527,6 +527,8 @@ pub enum CtxAction {
     EmptyFolder { account_id: u32, folder_id: u32, name: String, path: String },
     /// Open Settings on the filter rule that files into this folder.
     EditFilter { account_id: u32, path: String },
+    /// Open Settings on this tag (by keyword).
+    EditTag(String),
 }
 
 #[relm4::component(pub)]
@@ -2515,6 +2517,15 @@ impl Sidebar {
             });
             row.add_css_class(if self.chevrons_left { "chev-left" } else { "chev-right" });
             pin_icon_size(&img);
+            if matches!(row_kind, UnifiedRow::Filtered | UnifiedRow::Tags) {
+                // These two glyphs ink their canvas edge to edge where the
+                // mail glyphs above keep a pixel or two of margin, so at the
+                // same size their left edge sat left of the others'. Drawn
+                // at 14px inside the same 16px slot, the edges line up and
+                // the label column stays put.
+                img.set_pixel_size(14);
+                img.set_size_request(16, 16);
+            }
             if self.chevrons_left {
                 // Centers this 16px icon on the avatar circles below it
                 // (rather than matching left edges) — a small icon flush
@@ -2738,22 +2749,9 @@ impl Sidebar {
                         .row_at_y(y as i32)
                         .and_then(|row| refs.get(row.index() as usize))
                     {
-                        show_sidebar_menu(
-                            &sub_w,
-                            x,
-                            y,
-                            vec![
-                                (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
-                                    account_id: r.account_id,
-                                    folder_id: r.folder.id,
-                                }),
-                                (i18n_noop("Refresh"), CtxAction::RefreshFolder {
-                                    account_id: r.account_id,
-                                    folder_id: r.folder.id,
-                                }),
-                            ],
-                            &cs,
-                        );
+                        // The same menu the folder has under its account.
+                        let items = folder_menu_items(r.account_id, &r.folder, true);
+                        show_sidebar_menu(&sub_w, x, y, items, &cs);
                     }
                 });
                 sub.add_controller(click);
@@ -2781,6 +2779,11 @@ impl Sidebar {
                         });
                     }
                 });
+                attach_tag_context_menu(
+                    &sub,
+                    self.tags.iter().map(|t| t.keyword.clone()).collect(),
+                    sender,
+                );
             }
         }
 
@@ -3092,7 +3095,8 @@ impl Sidebar {
                 let _ = ss.send(SidebarInput::FilteredRowSelected { slot, index: row.index() });
             }
         });
-        // Right-click a filtered folder: act on that folder alone.
+        // Right-click a filtered folder: the same menu it has under its
+        // account.
         let click = gtk::GestureClick::new();
         click.set_button(gtk::gdk::BUTTON_SECONDARY);
         let cs = sender.clone();
@@ -3103,22 +3107,8 @@ impl Sidebar {
                 .row_at_y(y as i32)
                 .and_then(|row| refs.get(row.index() as usize))
             {
-                show_sidebar_menu(
-                    &list_w,
-                    x,
-                    y,
-                    vec![
-                        (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
-                            account_id: r.account_id,
-                            folder_id: r.folder.id,
-                        }),
-                        (i18n_noop("Refresh"), CtxAction::RefreshFolder {
-                            account_id: r.account_id,
-                            folder_id: r.folder.id,
-                        }),
-                    ],
-                    &cs,
-                );
+                let items = folder_menu_items(r.account_id, &r.folder, true);
+                show_sidebar_menu(&list_w, x, y, items, &cs);
             }
         });
         list.add_controller(click);
@@ -3238,6 +3228,7 @@ impl Sidebar {
                 let _ = ss.send(SidebarInput::TagRowSelected { slot, index: row.index() });
             }
         });
+        attach_tag_context_menu(&list, self.tags.iter().map(|t| t.keyword.clone()).collect(), sender);
 
         let revealer = gtk::Revealer::new();
         revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -3633,6 +3624,78 @@ fn folder_drop_target(
 
 /// Wire a right-click menu (Mark as Read / Refresh / Delete) onto a folder list;
 /// `folders` maps the list's row indices to their folders.
+/// The context menu of one folder — the same wherever the folder is
+/// listed (under its account, or as a filtered folder in the unified
+/// section): `filtered` says a filter rule files into it.
+fn folder_menu_items(id: u32, f: &Folder, filtered: bool) -> Vec<(&'static str, CtxAction)> {
+    let mut items = vec![
+        (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead { account_id: id, folder_id: f.id }),
+        (i18n_noop("Refresh"), CtxAction::RefreshFolder { account_id: id, folder_id: f.id }),
+    ];
+    // A filter files into this folder: its rule is a click away.
+    if filtered {
+        items.push((i18n_noop("Edit Filter…"), CtxAction::EditFilter {
+            account_id: id,
+            path: f.path.clone(),
+        }));
+    }
+    // Only user-created folders can be renamed or deleted.
+    if f.kind == FolderKind::Custom {
+        items.push((i18n_noop("Rename Folder…"), CtxAction::RenameFolder {
+            account_id: id,
+            name: f.name.clone(),
+            path: f.path.clone(),
+        }));
+        items.push((i18n_noop("Delete Folder…"), CtxAction::DeleteFolder {
+            account_id: id,
+            name: f.name.clone(),
+            path: f.path.clone(),
+        }));
+    }
+    // Trash and Junk can be emptied outright (#152).
+    let empty_label = match f.kind {
+        FolderKind::Trash => Some(i18n_noop("Empty Trash…")),
+        FolderKind::Junk => Some(i18n_noop("Empty Junk…")),
+        _ => None,
+    };
+    if let Some(label) = empty_label {
+        items.push((label, CtxAction::EmptyFolder {
+            account_id: id,
+            folder_id: f.id,
+            name: f.name.clone(),
+            path: f.path.clone(),
+        }));
+    }
+    items
+}
+
+/// Right-click on a tag row, wherever tags are listed: edit it in Settings.
+fn attach_tag_context_menu(
+    list: &gtk::ListBox,
+    keywords: Vec<String>,
+    sender: &ComponentSender<Sidebar>,
+) {
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_SECONDARY);
+    let cs = sender.clone();
+    let list_w = list.clone();
+    click.connect_pressed(move |_, _, x, y| {
+        if let Some(k) = list_w
+            .row_at_y(y as i32)
+            .and_then(|row| keywords.get(row.index() as usize))
+        {
+            show_sidebar_menu(
+                &list_w,
+                x,
+                y,
+                vec![(i18n_noop("Edit Tag…"), CtxAction::EditTag(k.clone()))],
+                &cs,
+            );
+        }
+    });
+    list.add_controller(click);
+}
+
 fn attach_folder_context_menu(
     list: &gtk::ListBox,
     id: u32,
@@ -3649,44 +3712,7 @@ fn attach_folder_context_menu(
             .row_at_y(y as i32)
             .and_then(|row| folders.get(row.index() as usize))
         {
-            let mut items = vec![
-                (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead { account_id: id, folder_id: f.id }),
-                (i18n_noop("Refresh"), CtxAction::RefreshFolder { account_id: id, folder_id: f.id }),
-            ];
-            // A filter files into this folder: its rule is a click away.
-            if filtered.iter().any(|p| *p == f.path) {
-                items.push((i18n_noop("Edit Filter…"), CtxAction::EditFilter {
-                    account_id: id,
-                    path: f.path.clone(),
-                }));
-            }
-            // Only user-created folders can be renamed or deleted.
-            if f.kind == FolderKind::Custom {
-                items.push((i18n_noop("Rename Folder…"), CtxAction::RenameFolder {
-                    account_id: id,
-                    name: f.name.clone(),
-                    path: f.path.clone(),
-                }));
-                items.push((i18n_noop("Delete Folder…"), CtxAction::DeleteFolder {
-                    account_id: id,
-                    name: f.name.clone(),
-                    path: f.path.clone(),
-                }));
-            }
-            // Trash and Junk can be emptied outright (#152).
-            let empty_label = match f.kind {
-                FolderKind::Trash => Some(i18n_noop("Empty Trash…")),
-                FolderKind::Junk => Some(i18n_noop("Empty Junk…")),
-                _ => None,
-            };
-            if let Some(label) = empty_label {
-                items.push((label, CtxAction::EmptyFolder {
-                    account_id: id,
-                    folder_id: f.id,
-                    name: f.name.clone(),
-                    path: f.path.clone(),
-                }));
-            }
+            let items = folder_menu_items(id, f, filtered.iter().any(|p| *p == f.path));
             show_sidebar_menu(&list_w, x, y, items, &cs);
         }
     });

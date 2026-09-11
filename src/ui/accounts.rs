@@ -268,8 +268,6 @@ pub enum AccountsInput {
     EditFilter(usize),
     /// The dialog saved changes to the rule at this index.
     FilterEdited(usize, crate::config::FilterRule),
-    /// The rule's "count unread" switch was flipped (#116).
-    SetFilterCounted(usize, bool),
     /// Toggle whether a rule's folder is listed under All Inboxes.
     FilterAdded(crate::config::FilterRule),
     /// Tags (#71): the dialog, and what it hands back.
@@ -2097,15 +2095,6 @@ impl Component for AccountsWindow {
                     }
                 }
             }
-            AccountsInput::SetFilterCounted(i, on) => {
-                if let Some(r) = self.filter_rules.get_mut(i) {
-                    if r.count_unread != on {
-                        r.count_unread = on;
-                        let _ = sender
-                            .output(AccountsOutput::SetFilters(self.filter_rules.clone()));
-                    }
-                }
-            }
         }
     }
 
@@ -3304,47 +3293,9 @@ impl AccountsWindow {
                 subtitle.push_str(&i18n_f(", tagged {tag}", &[("tag", &name)]));
             }
             row.set_subtitle(&subtitle);
-            // The rule's two switches stacked in a narrow two-column grid —
-            // labels right-aligned against their switches — so the row's
-            // title keeps its width: "Count unread" (whether the folder's
-            // unread mail joins the unread total, #116) over "All Inboxes"
-            // (whether the folder is listed in All Inboxes' Filtered
-            // Folders section).
-            let grid = gtk::Grid::new();
-            grid.set_column_spacing(8);
-            grid.set_row_spacing(4);
-            grid.set_valign(gtk::Align::Center);
-            // Both switches are about the destination folder: a rule that
-            // only tags has none.
-            grid.set_visible(!r.dest_path.is_empty());
-            let mut place = |line: i32, text: &str, active: bool, tip: &str| -> gtk::Switch {
-                let label = gtk::Label::new(Some(text));
-                label.set_halign(gtk::Align::End);
-                label.set_valign(gtk::Align::Center);
-                let sw = gtk::Switch::new();
-                sw.set_active(active);
-                sw.set_valign(gtk::Align::Center);
-                sw.set_tooltip_text(Some(tip));
-                grid.attach(&label, 0, line, 1, 1);
-                grid.attach(&sw, 1, line, 1, 1);
-                sw
-            };
-            let count = place(
-                0,
-                "Count unread",
-                r.count_unread,
-                "Include this folder's unread mail in the unread count and the tray icon",
-            );
-            let s = sender.clone();
-            count.connect_active_notify(move |sw| {
-                s.input(AccountsInput::SetFilterCounted(i, sw.is_active()))
-            });
-            row.add_suffix(&grid);
-            // A pencil says "activate to edit" (full strength, like the trash
-            // button beside it); the trash button removes.
-            let edit = gtk::Image::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
-            edit.set_margin_start(6);
-            row.add_suffix(&edit);
+            // The trash button removes; a chevron says the row opens the
+            // rule's editor, as the account and cloud rows do. The rule's
+            // "count unread" switch lives in the editor.
             let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
@@ -3352,6 +3303,9 @@ impl AccountsWindow {
             let s = sender.clone();
             rm.connect_clicked(move |_| s.input(AccountsInput::RemoveFilter(i)));
             row.add_suffix(&rm);
+            let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
+            next.add_css_class("dim-label");
+            row.add_suffix(&next);
             list.append(&row);
         }
     }
@@ -3406,9 +3360,6 @@ impl AccountsWindow {
                 }
             });
             row.add_controller(drop);
-            let edit = gtk::Image::from_icon_name("co.hyprlab.Vireo-document-edit-symbolic");
-            edit.set_margin_start(6);
-            row.add_suffix(&edit);
             let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
@@ -3416,6 +3367,11 @@ impl AccountsWindow {
             let s = sender.clone();
             rm.connect_clicked(move |_| s.input(AccountsInput::RemoveTag(i)));
             row.add_suffix(&rm);
+            // A chevron says the row opens the tag's editor, as the
+            // account and cloud rows do.
+            let next = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-next-symbolic");
+            next.add_css_class("dim-label");
+            row.add_suffix(&next);
             list.append(&row);
         }
     }
