@@ -8,6 +8,7 @@ use crate::models::DraftOrigin;
 use crate::ui::rich_editor::{self, RichEditor, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f};
+use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,6 +24,11 @@ fn sig_html(sig: &str) -> String {
     let body = rich_editor::signature_to_html(sig);
     format!("<div class=\"vireo-sig\"><br>-- <br>{body}</div>")
 }
+
+/// The narrowest the compose pane goes (its `adw::BreakpointBin` floor).
+const COMPOSE_MIN_WIDTH: i32 = 360;
+/// Fallback fold threshold when the toolbar could not be measured at init.
+const COMPOSE_ACTIONS_BREAKPOINT: f64 = 620.0;
 
 /// Size the pane for its host. Both hosts impose a definite height now — the
 /// reader-covering overlay inline (it fills the whole pane), the window itself
@@ -169,6 +175,10 @@ pub struct Compose {
     /// A compact reply's field rows, revealed by the header button (#154)
     /// or from the start by the preference.
     fields_shown: bool,
+    /// The pane is too narrow for the full toolbar: everything but Cancel,
+    /// Send and the fields chevron folds into the ⋯ menu (like the reader's
+    /// header), so the window controls at the end never leave the canvas.
+    narrow: bool,
     /// A recipient/subject field was edited since open (body edits are tracked
     /// separately by the editor itself). Used for save-if-dirty.
     fields_dirty: bool,
@@ -206,6 +216,11 @@ pub enum ComposeInput {
     ClearSendAt,
     /// A compact reply shows or hides its From/To/Subject rows (#154).
     ShowFields(bool),
+    /// The pane crossed its width breakpoint: fold the toolbar into the ⋯
+    /// menu, or spread it out again.
+    SetNarrow(bool),
+    /// The folded toolbar's ⋯ button: the actions as a menu.
+    OverflowMenu,
     /// Cloud attachments (#144): pick files to upload and share.
     CloudAttach,
     /// Files picked; ask which account and how, then upload.
@@ -287,9 +302,18 @@ impl Component for Compose {
         // Host-agnostic root: the same pane is shown inline (in a reader Revealer)
         // or set as the content of an app-owned window. Hosting/close is the app's
         // job (see ComposeOutput::ToggleWindow / Close).
-        adw::ToolbarView {
+        adw::BreakpointBin {
+            // The floor the pane can shrink to (inline in a narrow reader,
+            // or a small window): below the measured full-toolbar width the
+            // breakpoint set in `init` folds the actions into the ⋯ menu.
+            set_size_request: (COMPOSE_MIN_WIDTH, 200),
+
+            #[wrap(Some)]
+            #[name = "toolbar_root"]
+            set_child = &adw::ToolbarView {
                 #[name = "header"]
                 add_top_bar = &adw::HeaderBar {
+                    add_css_class: "compose-toolbar",
                     set_show_start_title_buttons: false,
                     set_show_end_title_buttons: false,
                     // No "Vireo" branding on the compose bar.
@@ -305,6 +329,8 @@ impl Component for Compose {
                     pack_start = &gtk::Button {
                         set_label: &i18n("Save Draft"),
                         set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
+                        #[watch]
+                        set_visible: !model.narrow,
                         connect_clicked => ComposeInput::SaveDraft,
                     },
                     // Only while editing an existing draft: the message is
@@ -313,7 +339,7 @@ impl Component for Compose {
                         set_label: &i18n("Delete Draft"),
                         set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
                         #[watch]
-                        set_visible: model.draft_origin.is_some(),
+                        set_visible: model.draft_origin.is_some() && !model.narrow,
                         connect_clicked => ComposeInput::DeleteDraft,
                     },
                     // Send, with Send Later beside it (#145): presets, or a
@@ -395,12 +421,23 @@ impl Component for Compose {
                             },
                         },
                     },
+                    // The folded toolbar (narrow pane): every action that is
+                    // not Cancel or Send lives in this menu.
+                    #[name = "overflow_btn"]
+                    pack_end = &gtk::Button {
+                        set_icon_name: "co.hyprlab.Vireo-view-more-horizontal-symbolic",
+                        set_tooltip_text: Some(i18n("Actions").as_str()),
+                        #[watch]
+                        set_visible: model.narrow,
+                        connect_clicked => ComposeInput::OverflowMenu,
+                    },
                     // OpenPGP (#133): only offered where a gpg exists.
                     #[name = "encrypt_btn"]
                     pack_end = &gtk::ToggleButton {
                         set_icon_name: "co.hyprlab.Vireo-channel-secure-symbolic",
                         set_tooltip_text: Some(i18n("Encrypt with OpenPGP to every recipient's key").as_str()),
-                        set_visible: crate::pgp::available(),
+                        #[watch]
+                        set_visible: crate::pgp::available() && !model.narrow,
                         connect_toggled[sender] => move |b| {
                             sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
                         },
@@ -409,7 +446,8 @@ impl Component for Compose {
                     pack_end = &gtk::ToggleButton {
                         set_icon_name: "co.hyprlab.Vireo-security-high-symbolic",
                         set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
-                        set_visible: crate::pgp::available(),
+                        #[watch]
+                        set_visible: crate::pgp::available() && !model.narrow,
                         connect_toggled[sender] => move |b| {
                             sender.input(ComposeInput::ToggleSign(b.is_active()));
                         },
@@ -417,6 +455,8 @@ impl Component for Compose {
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-attachment-symbolic",
                         set_tooltip_text: Some(i18n("Attach files").as_str()),
+                        #[watch]
+                        set_visible: !model.narrow,
                         connect_clicked => ComposeInput::AttachFiles,
                     },
                     // Cloud attachments (#144): only with an account set up.
@@ -424,7 +464,7 @@ impl Component for Compose {
                         set_icon_name: "co.hyprlab.Vireo-cloud-symbolic",
                         set_tooltip_text: Some(i18n("Upload to cloud storage and share a link").as_str()),
                         #[watch]
-                        set_visible: !model.cloud_accounts.is_empty(),
+                        set_visible: !model.cloud_accounts.is_empty() && !model.narrow,
                         #[watch]
                         set_sensitive: model.cloud_busy == 0,
                         connect_clicked => ComposeInput::CloudAttach,
@@ -432,13 +472,17 @@ impl Component for Compose {
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-x-office-address-book-symbolic",
                         set_tooltip_text: Some(i18n("Open Contacts").as_str()),
+                        #[watch]
+                        set_visible: !model.narrow,
                         connect_clicked => ComposeInput::OpenContacts,
                     },
                     // Promote inline reply → window, or collapse window → inline.
-                    // Icon/visibility set in `init` and on SetWindowed.
+                    // Icon set in `init` and on SetWindowed.
                     #[name = "toggle_btn"]
                     pack_end = &gtk::Button {
                         set_tooltip_text: Some(i18n("Open in window").as_str()),
+                        #[watch]
+                        set_visible: model.can_toggle && !model.narrow,
                         connect_clicked => ComposeInput::ToggleWindowed,
                     },
                     // The compact reply's From/To/Subject rows (#154): folded
@@ -572,6 +616,7 @@ impl Component for Compose {
                         set_vexpand: true,
                     },
                 },
+            },
         }
     }
 
@@ -648,6 +693,7 @@ impl Component for Compose {
             // addressed: replies arrive with To filled, forwards do not.
             compact: compact && !prefill.to.trim().is_empty(),
             fields_shown: crate::config::load_reply_fields(),
+            narrow: false,
             fields_dirty: false,
             sign: false,
             encrypt: false,
@@ -667,9 +713,37 @@ impl Component for Compose {
         // The inline/window toggle: only reply/forward panes can toggle. Its icon
         // reflects the current host (fullscreen = "expand to window", restore =
         // "collapse back inline").
-        widgets.toggle_btn.set_visible(model.can_toggle);
         set_toggle_icon(&widgets.toggle_btn, model.windowed);
-        size_for_host(&root, &widgets.header, &widgets.editor_holder, model.windowed);
+        size_for_host(&widgets.toolbar_root, &widgets.header, &widgets.editor_holder, model.windowed);
+
+        // Fold the toolbar once the pane is narrower than the full row (as
+        // the reader's header does). Measured on the first map — before
+        // anything is hidden, and once the header has a window, since the
+        // window controls it carries inline only exist (and measure) with
+        // one. A later host move changes that by a few dozen pixels; the
+        // first host's threshold is kept, which only ever folds early.
+        {
+            let s = sender.clone();
+            let header: gtk::Widget = widgets.header.clone().upcast();
+            let measured = std::rc::Rc::new(std::cell::Cell::new(false));
+            root.connect_map(move |root| {
+                if measured.replace(true) {
+                    return;
+                }
+                let full = header.measure(gtk::Orientation::Horizontal, -1).1;
+                let threshold = if full <= 0 { COMPOSE_ACTIONS_BREAKPOINT } else { full as f64 + 24.0 };
+                let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+                    adw::BreakpointConditionLengthType::MaxWidth,
+                    threshold,
+                    adw::LengthUnit::Px,
+                ));
+                let s1 = s.clone();
+                bp.connect_apply(move |_| s1.input(ComposeInput::SetNarrow(true)));
+                let s2 = s.clone();
+                bp.connect_unapply(move |_| s2.input(ComposeInput::SetNarrow(false)));
+                root.add_breakpoint(bp);
+            });
+        }
 
         // Per-row visibility (#25): To always; Cc/Bcc only when prefilled (a
         // reply-all carries Cc). The Subject is always shown — replies and
@@ -885,6 +959,7 @@ impl Component for Compose {
         sender: ComponentSender<Self>,
         root: &Self::Root,
     ) {
+        'handle: {
         match message {
             ComposeInput::Cancel => {
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
@@ -902,6 +977,57 @@ impl Component for Compose {
             ComposeInput::ShowFields(on) => {
                 self.fields_shown = on;
                 widgets.fields_list.set_visible(!(self.compact && !self.windowed) || on);
+            }
+
+            ComposeInput::SetNarrow(narrow) => self.narrow = narrow,
+
+            ComposeInput::OverflowMenu => {
+                let entry = |label: String, icon: &str, msg: fn() -> ComposeInput| {
+                    let s = sender.clone();
+                    MenuEntry::new(&label, move || s.input(msg()))
+                        .icon(&format!("co.hyprlab.Vireo-{icon}-symbolic"))
+                };
+                let mut drafts = vec![entry(i18n("Save Draft"), "document-save", || ComposeInput::SaveDraft)];
+                if self.draft_origin.is_some() {
+                    drafts.push(entry(i18n("Delete Draft"), "user-trash", || ComposeInput::DeleteDraft));
+                }
+                let mut attach = vec![entry(i18n("Attach files"), "mail-attachment", || ComposeInput::AttachFiles)];
+                if !self.cloud_accounts.is_empty() {
+                    attach.push(
+                        entry(i18n("Upload to cloud storage and share a link"), "cloud", || ComposeInput::CloudAttach)
+                            .enabled(self.cloud_busy == 0),
+                    );
+                }
+                attach.push(entry(i18n("Open Contacts"), "x-office-address-book", || ComposeInput::OpenContacts));
+                // The OpenPGP toggles go through their buttons so the
+                // toggled handlers keep the model and the buttons agreeing.
+                let mut pgp = Vec::new();
+                if crate::pgp::available() {
+                    let check = |on: bool, icon: &str| if on { "verified-checkmark" } else { icon }.to_string();
+                    let sign = widgets.sign_btn.clone();
+                    pgp.push(
+                        MenuEntry::new(&i18n("Sign with your OpenPGP key"), move || sign.set_active(!sign.is_active()))
+                            .icon(&format!("co.hyprlab.Vireo-{}-symbolic", check(self.sign, "security-high"))),
+                    );
+                    let encrypt = widgets.encrypt_btn.clone();
+                    pgp.push(
+                        MenuEntry::new(
+                            &i18n("Encrypt with OpenPGP to every recipient's key"),
+                            move || encrypt.set_active(!encrypt.is_active()),
+                        )
+                        .icon(&format!("co.hyprlab.Vireo-{}-symbolic", check(self.encrypt, "channel-secure"))),
+                    );
+                }
+                let mut host = Vec::new();
+                if self.can_toggle {
+                    host.push(if self.windowed {
+                        entry(i18n("Collapse into reader"), "view-restore", || ComposeInput::ToggleWindowed)
+                    } else {
+                        entry(i18n("Open in window"), "view-fullscreen", || ComposeInput::ToggleWindowed)
+                    });
+                }
+                let btn = &widgets.overflow_btn;
+                show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![drafts, attach, pgp, host]);
             }
 
             ComposeInput::CloudAttach => {
@@ -941,7 +1067,7 @@ impl Component for Compose {
                     );
                     d.add_response("ok", &i18n("OK"));
                     d.present();
-                    return;
+                    break 'handle;
                 };
                 for path in paths {
                     let name = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
@@ -1049,7 +1175,7 @@ impl Component for Compose {
             ComposeInput::SetWindowed(windowed) => {
                 self.windowed = windowed;
                 set_toggle_icon(&widgets.toggle_btn, windowed);
-                size_for_host(root, &widgets.header, &widgets.editor_holder, windowed);
+                size_for_host(&widgets.toolbar_root, &widgets.header, &widgets.editor_holder, windowed);
                 // A compact reply grows its field rows back in a window (and
                 // sheds them again if it returns inline).
                 widgets.fields_list.set_visible(!(self.compact && !windowed) || self.fields_shown);
@@ -1080,7 +1206,7 @@ impl Component for Compose {
             ComposeInput::OpenContacts => {
                 // Browse contacts; the chosen one is appended to the To field.
                 let Some(win) = root.root().and_downcast::<gtk::Window>() else {
-                    return;
+                    break 'handle;
                 };
                 let to_row = widgets.to_row.clone();
                 crate::ui::contacts_browser::present(&win, move |contact| {
@@ -1193,7 +1319,7 @@ impl Component for Compose {
 
             ComposeInput::CompletionMove(delta) => {
                 if self.completion_count == 0 {
-                    return;
+                    break 'handle;
                 }
                 let max = self.completion_count as i32 - 1;
                 let new = (self.completion_selected as i32 + delta).clamp(0, max) as usize;
@@ -1210,7 +1336,7 @@ impl Component for Compose {
                     Some(Field::To) => &widgets.to_row,
                     Some(Field::Cc) => &widgets.cc_row,
                     Some(Field::Bcc) => &widgets.bcc_row,
-                    None => return,
+                    None => break 'handle,
                 };
                 let text = row.text().to_string();
                 let token = text.rsplit(',').next().unwrap_or("").trim().to_string();
@@ -1241,7 +1367,7 @@ impl Component for Compose {
                 let to = widgets.to_row.text().trim().to_string();
                 if to.is_empty() {
                     widgets.to_row.add_css_class("error");
-                    return;
+                    break 'handle;
                 }
                 let cc = widgets.cc_row.text().trim().to_string();
                 let bcc = widgets.bcc_row.text().trim().to_string();
@@ -1266,7 +1392,7 @@ impl Component for Compose {
                         );
                         dialog.add_response("ok", &i18n("OK"));
                         dialog.present();
-                        return;
+                        break 'handle;
                     }
                 }
                 let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
@@ -1331,6 +1457,11 @@ impl Component for Compose {
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
             }
         }
+        }
+        // Overriding `update_with_view` takes over relm4's default, which
+        // ran `update_view` after every message; without this the `#[watch]`
+        // bindings above only ever hold their `init` values.
+        self.update_view(widgets, sender);
     }
 }
 
