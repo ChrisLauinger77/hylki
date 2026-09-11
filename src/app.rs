@@ -1134,48 +1134,15 @@ impl SimpleComponent for AppModel {
 
                 append: model.notifications.widget(),
 
-                #[name = "sidebar_split"]
+                // The peek panel's split view: permanently collapsed, so
+                // showing its sidebar slides the expanded panel in from the
+                // window's left edge over the rail and the panes — with
+                // libadwaita's scrim, shadow and swipe — while the docked
+                // rail underneath stays exactly as it is (see
+                // set_sidebar_peek). The account split view is its content.
+                #[name = "peek_split"]
                 adw::OverlaySplitView {
                     set_vexpand: true,
-                    set_max_sidebar_width: 280.0,
-                    // Low enough (with the panes' own minimums) that the whole
-                    // window fits half of a 1920px screen — see READER_MIN_WIDTH.
-                    set_min_sidebar_width: 180.0,
-                    set_sidebar_width_fraction: 0.2,
-
-                    #[wrap(Some)]
-                    set_sidebar = &adw::ToolbarView {
-                        #[name = "sidebar_header"]
-                        add_top_bar = &adw::HeaderBar {
-                            add_css_class: "flat",
-                            #[wrap(Some)]
-                            #[name = "app_title"]
-                            set_title_widget = &gtk::Label {
-                                set_label: crate::APP_NAME,
-                                add_css_class: "app-title",
-                            },
-                            pack_start: &model.sidebar_refresh,
-                            #[name = "sidebar_menu"]
-                            pack_end = &gtk::MenuButton {
-                                set_icon_name: "co.hyprlab.Vireo-open-menu-symbolic",
-                                set_tooltip_text: Some(i18n("Main Menu").as_str()),
-                                add_css_class: "flat",
-                                set_menu_model: Some(&model.menu),
-                            },
-                        },
-                        #[wrap(Some)]
-                        set_content = model.sidebar.widget(),
-                    },
-
-                    // The peek panel's own split view, nested in the content
-                    // slot: permanently collapsed, so showing its sidebar
-                    // slides the expanded panel out over the panes from the
-                    // rail's right edge — with libadwaita's scrim, shadow and
-                    // swipe — while the docked rail above stays exactly as it
-                    // is (see set_sidebar_peek).
-                    #[name = "peek_split"]
-                    #[wrap(Some)]
-                    set_content = &adw::OverlaySplitView {
                     set_collapsed: true,
                     set_show_sidebar: false,
                     set_min_sidebar_width: 280.0,
@@ -1219,6 +1186,40 @@ impl SimpleComponent for AppModel {
                         },
                         #[wrap(Some)]
                         set_content = model.peek_sidebar.widget(),
+                    },
+
+                    #[wrap(Some)]
+                    #[name = "sidebar_split"]
+                    set_content = &adw::OverlaySplitView {
+                    set_vexpand: true,
+                    set_max_sidebar_width: 280.0,
+                    // Low enough (with the panes' own minimums) that the whole
+                    // window fits half of a 1920px screen — see READER_MIN_WIDTH.
+                    set_min_sidebar_width: 180.0,
+                    set_sidebar_width_fraction: 0.2,
+
+                    #[wrap(Some)]
+                    set_sidebar = &adw::ToolbarView {
+                        #[name = "sidebar_header"]
+                        add_top_bar = &adw::HeaderBar {
+                            add_css_class: "flat",
+                            #[wrap(Some)]
+                            #[name = "app_title"]
+                            set_title_widget = &gtk::Label {
+                                set_label: crate::APP_NAME,
+                                add_css_class: "app-title",
+                            },
+                            pack_start: &model.sidebar_refresh,
+                            #[name = "sidebar_menu"]
+                            pack_end = &gtk::MenuButton {
+                                set_icon_name: "co.hyprlab.Vireo-open-menu-symbolic",
+                                set_tooltip_text: Some(i18n("Main Menu").as_str()),
+                                add_css_class: "flat",
+                                set_menu_model: Some(&model.menu),
+                            },
+                        },
+                        #[wrap(Some)]
+                        set_content = model.sidebar.widget(),
                     },
 
                     #[wrap(Some)]
@@ -2677,14 +2678,27 @@ impl SimpleComponent for AppModel {
             for (pane, is_rail) in panes {
                 let Some(pane) = pane else { continue };
                 let motion = gtk::EventControllerMotion::new();
+                let armed = std::rc::Rc::new(std::cell::Cell::new(false));
                 {
                     let s = sender.input_sender().clone();
                     let pending = pending.clone();
+                    let armed = armed.clone();
                     motion.connect_enter(move |_, _, _| {
                         if let Some(prev) = pending.borrow_mut().take() {
                             prev.remove();
                         }
-                        if is_rail {
+                        armed.set(true);
+                    });
+                }
+                if is_rail {
+                    // Hover-open waits for the pointer to actually move over
+                    // the rail. GTK also synthesises an "enter" when the rail
+                    // reappears under a resting pointer as the panel slides
+                    // away — opening on that would fold and float forever.
+                    let s = sender.input_sender().clone();
+                    let armed = armed.clone();
+                    motion.connect_motion(move |_, _, _| {
+                        if armed.replace(false) {
                             let _ = s.send(AppMsg::SidebarHoverEnter);
                         }
                     });
