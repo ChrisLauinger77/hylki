@@ -564,12 +564,12 @@ impl Component for AccountsWindow {
                                         set_valign: gtk::Align::Start,
                                         set_halign: gtk::Align::End,
                                         set_margin_start: 24,
-                                        // Both 100px wide (filling the column,
+                                        // Both 130px wide (filling the column,
                                         // so they always share one width), and
                                         // the finder's label change moves nothing.
                                         gtk::Button {
                                             set_label: &i18n("Add Tag…"),
-                                            set_size_request: (100, -1),
+                                            set_size_request: (130, -1),
                                             connect_clicked => AccountsInput::AddTag,
                                         },
                                         // The tag finder: read every mailbox
@@ -578,7 +578,7 @@ impl Component for AccountsWindow {
                                         #[name = "find_tags_btn"]
                                         gtk::Button {
                                             set_tooltip_text: Some(i18n("Look through every mailbox for tags other clients have set").as_str()),
-                                            set_size_request: (100, -1),
+                                            set_size_request: (130, -1),
                                             connect_clicked => AccountsInput::FindTags,
                                             // A spinner inside the button
                                             // while the mailboxes are read.
