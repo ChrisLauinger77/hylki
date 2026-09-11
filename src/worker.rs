@@ -267,6 +267,11 @@ pub enum MailRequest {
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
     /// the app can tell when every account has reported.
     FindKeywords,
+    /// Bring every folder's cached keywords in line with the server (#166):
+    /// a tag set or cleared on another device reaches the tag views here
+    /// without the folder it sits in being opened. `keywords` are the
+    /// configured tags. Answered with [`WorkerEvent::KeywordsSynced`].
+    RefreshKeywords { keywords: Vec<String> },
 }
 
 /// A message composed by the user, ready to send.
@@ -341,6 +346,9 @@ pub enum WorkerEvent {
     /// The answer to [`MailRequest::FindKeywords`]: the keywords in use on
     /// this account, system flags left out.
     KeywordsFound(Vec<KeywordFinding>),
+    /// The answer to [`MailRequest::RefreshKeywords`]: the folders whose
+    /// cached keywords changed (empty when nothing did).
+    KeywordsSynced { paths: Vec<String> },
     /// Cached attachments for an inbox, for the attachments gallery.
     Gallery { items: Vec<crate::models::GalleryItem> },
     /// The background backfill for a folder finished — its whole index is now
@@ -1650,6 +1658,12 @@ async fn run_imap(
                     Err(e) => tracing::warn!("[account {account_id}] find tags: listing folders failed: {e}"),
                 }
                 emit(WorkerEvent::KeywordsFound(found));
+            }
+
+            MailRequest::RefreshKeywords { keywords } => {
+                let sess = session.as_mut().unwrap();
+                let paths = refresh_keywords(account_id, sess, cache.as_ref(), &keywords).await;
+                emit(WorkerEvent::KeywordsSynced { paths });
             }
 
             MailRequest::UndoMove { path, dest, dest_folder_id, message_ids } => {
@@ -5142,6 +5156,50 @@ async fn refresh_folders(
 /// miss. A folder with no baseline yet is recorded, not reported: everything
 /// that happened while Vireo was closed would otherwise look like fresh
 /// activity.
+/// The keyword half of a refresh with a tag view open (#166): every folder
+/// is examined and, for each configured tag, the server's KEYWORD search is
+/// set against the cached keywords. Tags set or cleared from another client
+/// land in the index here — a folder's own sync only sees them once that
+/// folder is opened. Returns the folders whose rows changed.
+async fn refresh_keywords(
+    account_id: u32,
+    session: &mut ImapSession,
+    cache: Option<&Cache>,
+    keywords: &[String],
+) -> Vec<String> {
+    let mut changed = Vec::new();
+    let Some(cache) = cache else { return changed };
+    if keywords.is_empty() {
+        return changed;
+    }
+    for f in cache.load_folders(account_id) {
+        if exam(session, &f.path).await.is_err() {
+            continue;
+        }
+        let mut touched = false;
+        for kw in keywords {
+            let Ok(server) = search_uids(session, format!("KEYWORD {kw}")).await else { continue };
+            let cached: std::collections::HashSet<u32> =
+                cache.uids_with_keyword(account_id, &f.path, kw).into_iter().collect();
+            // A uid the index does not hold is new mail: the write hits
+            // nothing, and the folder's own sync brings it with its flags.
+            for uid in server.difference(&cached) {
+                touched |= cache.set_keyword(account_id, &f.path, *uid, kw, true);
+            }
+            for uid in cached.difference(&server) {
+                touched |= cache.set_keyword(account_id, &f.path, *uid, kw, false);
+            }
+        }
+        if touched {
+            changed.push(f.path.clone());
+        }
+    }
+    if !changed.is_empty() {
+        tracing::info!("keywords: changed {changed:?}");
+    }
+    changed
+}
+
 async fn refresh_unread_counts(
     account_id: u32,
     session: &mut ImapSession,
@@ -6998,6 +7056,7 @@ async fn run_pop3(
             }
             // POP3 has no server-side keywords: nothing to find.
             MailRequest::FindKeywords => emit(WorkerEvent::KeywordsFound(Vec::new())),
+            MailRequest::RefreshKeywords { .. } => emit(WorkerEvent::KeywordsSynced { paths: Vec::new() }),
             MailRequest::LoadGallery => {
                 if let Some(c) = cache.as_ref() {
                     let items = c.gallery_items(account_id, GALLERY_DATA_CAP, GALLERY_LIMIT);
@@ -7460,6 +7519,7 @@ async fn run_mock(
             | MailRequest::FlushOutbox { .. }
             | MailRequest::DeleteOutbox { .. }
             | MailRequest::RefreshUnread
+            | MailRequest::RefreshKeywords { .. }
             | MailRequest::Reconnect => {}
             // The demo's folders are fixed, but an emptied one reads as empty.
             MailRequest::EmptyFolder { folder_id, .. } => {
@@ -8528,6 +8588,25 @@ async fn run_graph(
                     }
                 }
                 emit(WorkerEvent::KeywordsFound(found));
+            }
+            MailRequest::RefreshKeywords { .. } => {
+                // Categories arrive with each folder's listing, so the
+                // listing is the sync: every folder is re-read, which
+                // rewrites its cached keywords (#166).
+                let mut paths = Vec::new();
+                if let Some(token) = graph_token(&account, &emit).await {
+                    let folders: Vec<(String, u32)> =
+                        state.folders.iter().map(|(p, (id, _))| (p.clone(), *id)).collect();
+                    for (path, folder_id) in folders {
+                        if graph_load_folder(&token, account_id, folder_id, &path, cache.as_ref(), &mut state)
+                            .await
+                            .is_ok()
+                        {
+                            paths.push(path);
+                        }
+                    }
+                }
+                emit(WorkerEvent::KeywordsSynced { paths });
             }
             MailRequest::LoadGallery => {
                 if let Some(c) = cache.as_ref() {

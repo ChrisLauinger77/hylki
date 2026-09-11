@@ -1270,16 +1270,35 @@ impl Cache {
     }
 
     /// Add or drop a keyword on a cached row (the server copy just changed).
-    pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) {
+    pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) -> bool {
         let mut current = self.keywords_of(account_id, folder_path, uid);
         current.retain(|k| !k.eq_ignore_ascii_case(keyword));
         if add {
             current.push(keyword.to_string());
         }
-        let _ = self.conn.execute(
-            "UPDATE messages SET keywords = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
-            params![current.join(" "), account_id, folder_path, uid],
-        );
+        self.conn
+            .execute(
+                "UPDATE messages SET keywords = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
+                params![current.join(" "), account_id, folder_path, uid],
+            )
+            .is_ok_and(|n| n > 0)
+    }
+
+    /// The uids in one folder whose cached server-side keywords include
+    /// `keyword` (the keyword re-sync of #166 diffs this against the
+    /// server's own search).
+    pub fn uids_with_keyword(&self, account_id: u32, folder_path: &str, keyword: &str) -> Vec<u32> {
+        let needle = format!(" {} ", keyword.to_ascii_lowercase());
+        let run = || -> rusqlite::Result<Vec<u32>> {
+            let mut stmt = self.conn.prepare(
+                "SELECT uid FROM messages \
+                 WHERE account_id = ?1 AND folder_path = ?2 \
+                   AND instr(' ' || lower(keywords) || ' ', ?3) > 0",
+            )?;
+            let rows = stmt.query_map(params![account_id, folder_path, needle], |r| r.get(0))?;
+            rows.collect()
+        };
+        run().unwrap_or_default()
     }
 
     /// The server-side keywords cached for one message (local tags excluded).

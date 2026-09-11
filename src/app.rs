@@ -474,6 +474,10 @@ pub struct AppModel {
     /// asked for meanwhile runs when it lands.
     tag_view_loading: bool,
     tag_view_dirty: bool,
+    /// When each account's keywords were last re-synced from the server
+    /// (#166), so reopening a tag view within a few seconds does not scan
+    /// every folder again.
+    keyword_sync_at: HashMap<u32, std::time::Instant>,
     /// The tag colours as `.tag-<keyword>` classes, app-wide (the list's
     /// chips, the sidebar's rows, the menus' swatches).
     tag_provider: gtk::CssProvider,
@@ -909,6 +913,8 @@ pub enum AppMsg {
     FindTags,
     /// One account's answer to the scan.
     KeywordsFound { account_id: u32, findings: Vec<KeywordFinding> },
+    /// A keyword re-sync (#166) changed the cached keywords of these folders.
+    KeywordsSynced { account_id: u32, paths: Vec<String> },
     /// The scan's safety net: report what has come in, if the scan `gen` is
     /// still the one running.
     TagScanTimeout(u32),
@@ -2203,6 +2209,7 @@ impl SimpleComponent for AppModel {
             tag_view_cache: HashMap::new(),
             tag_view_loading: false,
             tag_view_dirty: false,
+            keyword_sync_at: HashMap::new(),
             tag_provider: gtk::CssProvider::new(),
             cache: crate::cache::Cache::open().ok(),
             filter_moved: Default::default(),
@@ -4496,6 +4503,10 @@ impl SimpleComponent for AppModel {
                 for w in self.workers.values() {
                     let _ = w.send(MailRequest::RefreshUnread);
                 }
+                // A tag view lists what the index holds, and the index only
+                // learns a folder's flags when that folder syncs: have the
+                // accounts in scope re-read their keywords (#166).
+                self.sync_tag_keywords();
             }
 
             AppMsg::ShowcaseFolder(kind) => {
@@ -4524,7 +4535,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Reply => {
-                if let Some(m) = self.reply_target() {
+                if let Some(m) = self.compose_target() {
                     self.open_inline_reply(m.account_id, self.reply_pgp(&m, reply_prefill(&m)), Some((m.account_id, m.id)), &sender);
                 }
             }
@@ -4548,7 +4559,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::AddToContacts => {
-                if let Some(m) = self.compose_target() {
+                if let Some(m) = self.reply_target() {
                     self.show_add_contact_dialog(&m.from_name, &m.from_addr, &sender);
                 }
             }
@@ -5859,7 +5870,28 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetInJunk(false));
                 self.show_tag_view();
                 self.refresh_tag_view(&sender);
+                self.sync_tag_keywords();
                 self.push_index_complete();
+            }
+
+            AppMsg::KeywordsSynced { account_id, paths } => {
+                if paths.is_empty() {
+                    return;
+                }
+                // The index changed under the open views: the tag view
+                // re-reads it, and an open folder among the changed ones
+                // re-syncs so its rows' chips follow.
+                if self.tag_view.is_some() {
+                    self.refresh_tag_view(&sender);
+                }
+                if let Some(sel) = self.selected.clone() {
+                    if sel.account_id == account_id && paths.contains(&sel.path) {
+                        self.send_to(account_id, MailRequest::LoadMessages {
+                            folder_id: sel.folder_id,
+                            path: sel.path,
+                        });
+                    }
+                }
             }
 
             AppMsg::TagViewLoaded { key, rows } => {
@@ -7744,6 +7776,28 @@ impl AppModel {
         }
     }
 
+    /// The message a reply, reply-all or forward addresses: the reply
+    /// target, except when only the list row is selected over a
+    /// conversation. That row stands for the thread's head, its oldest
+    /// message, and a reply from the toolbar means the latest one (#165):
+    /// the newest message from someone else, or the newest of all when
+    /// every message is the user's own.
+    fn compose_target(&self) -> Option<Message> {
+        let m = self.reply_target()?;
+        if self.selection_from_cards || !self.thread_star_target(&m) {
+            return Some(m);
+        }
+        let own = self.email_of(m.account_id).unwrap_or_default();
+        let newest = |from_others: bool| {
+            self.current_thread
+                .iter()
+                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
+                .max_by_key(|t| t.timestamp)
+                .cloned()
+        };
+        newest(true).or_else(|| newest(false)).or(Some(m))
+    }
+
     /// Launch (or re-present) the welcome wizard: the first run's greeting,
     /// the VIREO_WELCOME review mode, and — on beta builds only — the burger
     /// menu's Welcome Wizard entry for testers.
@@ -7776,28 +7830,6 @@ impl AppModel {
         welcome.widget().present();
         self.welcome = Some(welcome);
     }
-    /// The message a reply, reply-all or forward addresses: the reply
-    /// target, except when only the list row is selected over a
-    /// conversation. That row stands for the thread's head, its oldest
-    /// message, and a reply from the toolbar means the latest one (#165):
-    /// the newest message from someone else, or the newest of all when
-    /// every message is the user's own.
-    fn compose_target(&self) -> Option<Message> {
-        let m = self.reply_target()?;
-        if self.selection_from_cards || !self.thread_star_target(&m) {
-            return Some(m);
-        }
-        let own = self.email_of(m.account_id).unwrap_or_default();
-        let newest = |from_others: bool| {
-            self.current_thread
-                .iter()
-                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
-                .max_by_key(|t| t.timestamp)
-                .cloned()
-        };
-        newest(true).or_else(|| newest(false)).or(Some(m))
-    }
-
 
     /// The open-marks-read side effects for the just-selected message (#100):
     /// server flag, list row, cached copy, badges, notification.
@@ -10696,6 +10728,33 @@ impl AppModel {
 
     /// The keywords a tag view answers: one, or — the unified Tags row —
     /// every configured tag.
+    /// With a tag view open, ask the accounts in its scope to bring their
+    /// cached keywords in line with the server (#166). An account scanned
+    /// within the last few seconds is left alone: reopening a view, or a
+    /// refresh right after opening one, must not walk every folder twice.
+    fn sync_tag_keywords(&mut self) {
+        const PAUSE: std::time::Duration = std::time::Duration::from_secs(15);
+        let Some((scope, _)) = self.tag_view.clone() else { return };
+        let keywords: Vec<String> = self.tags.iter().map(|t| t.keyword.clone()).collect();
+        if keywords.is_empty() {
+            return;
+        }
+        let now = std::time::Instant::now();
+        let ids: Vec<u32> = self
+            .accounts
+            .iter()
+            .map(|a| a.id)
+            .filter(|id| scope.map_or(true, |s| s == *id))
+            .collect();
+        for id in ids {
+            if self.keyword_sync_at.get(&id).is_some_and(|t| now.duration_since(*t) < PAUSE) {
+                continue;
+            }
+            self.keyword_sync_at.insert(id, now);
+            self.send_to(id, MailRequest::RefreshKeywords { keywords: keywords.clone() });
+        }
+    }
+
     fn tag_view_keywords(&self, kw: &Option<String>) -> Vec<String> {
         match kw {
             Some(k) => vec![k.clone()],
@@ -13281,6 +13340,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         }
         WorkerEvent::Located { message_id, hit } => AppMsg::MidLocated { account_id, message_id, hit },
         WorkerEvent::KeywordsFound(findings) => AppMsg::KeywordsFound { account_id, findings },
+        WorkerEvent::KeywordsSynced { paths } => AppMsg::KeywordsSynced { account_id, paths },
         WorkerEvent::Restored { folder_id, message_ids } => {
             AppMsg::UndoRestored { account_id, folder_id, message_ids }
         }
