@@ -551,7 +551,7 @@ impl Component for AccountsWindow {
                                     set_description: Some(
                                         i18n("Label messages with one or more coloured tags. \
                                          Tags are stored on the mail server as IMAP keywords, \
-                                         so Thunderbird and other clients show the same tags. \
+                                         so Thunderbird and other clients show the same tags.\n\n\
                                          Drag a tag to reorder: the order here is the sidebar's, \
                                          and the first nine answer to the 1–9 keys.").as_str()
                                     ),
@@ -562,10 +562,14 @@ impl Component for AccountsWindow {
                                         set_orientation: gtk::Orientation::Vertical,
                                         set_spacing: 12,
                                         set_valign: gtk::Align::Start,
+                                        set_halign: gtk::Align::End,
                                         set_margin_start: 24,
+                                        // Both 100px wide (filling the column,
+                                        // so they always share one width), and
+                                        // the finder's label change moves nothing.
                                         gtk::Button {
                                             set_label: &i18n("Add Tag…"),
-                                            set_halign: gtk::Align::End,
+                                            set_size_request: (100, -1),
                                             connect_clicked => AccountsInput::AddTag,
                                         },
                                         // The tag finder: read every mailbox
@@ -574,7 +578,7 @@ impl Component for AccountsWindow {
                                         #[name = "find_tags_btn"]
                                         gtk::Button {
                                             set_tooltip_text: Some(i18n("Look through every mailbox for tags other clients have set").as_str()),
-                                            set_halign: gtk::Align::End,
+                                            set_size_request: (100, -1),
                                             connect_clicked => AccountsInput::FindTags,
                                             // A spinner inside the button
                                             // while the mailboxes are read.
