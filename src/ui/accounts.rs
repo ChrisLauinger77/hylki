@@ -147,8 +147,11 @@ pub struct AccountsWindow {
     /// Tags (#71), managed on this tab too — the rules' "Tag with" names them.
     tags: Vec<crate::config::Tag>,
     tags_list: Option<gtk::ListBox>,
-    /// The tag finder's button, dimmed while the mailboxes are being read.
-    find_tags_btn: Option<gtk::Button>,
+    /// The tag finder's button: its spinner turns while the mailboxes are
+    /// being read, and its label says so.
+    find_tags_spinner: Option<gtk::Spinner>,
+    find_tags_label: Option<gtk::Label>,
+    tag_scanning: bool,
     /// Paths behind the currently-open editor's folder combos (index 0 in the
     /// combo is "Automatic"; entry N here is combo index N + 1).
     folder_paths: Vec<String>,
@@ -553,23 +556,40 @@ impl Component for AccountsWindow {
                                          and the first nine answer to the 1–9 keys.").as_str()
                                     ),
                                     #[wrap(Some)]
+                                    // Stacked like the Cloud Storage panel's
+                                    // buttons: a column at the header's end.
                                     set_header_suffix = &gtk::Box {
-                                        set_spacing: 6,
-                                        set_valign: gtk::Align::Center,
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 12,
+                                        set_valign: gtk::Align::Start,
+                                        set_margin_start: 24,
+                                        gtk::Button {
+                                            set_label: &i18n("Add Tag…"),
+                                            set_halign: gtk::Align::End,
+                                            connect_clicked => AccountsInput::AddTag,
+                                        },
                                         // The tag finder: read every mailbox
                                         // for keywords already in use and
                                         // offer them as tags.
                                         #[name = "find_tags_btn"]
                                         gtk::Button {
-                                            set_label: &i18n("Find Tags…"),
                                             set_tooltip_text: Some(i18n("Look through every mailbox for tags other clients have set").as_str()),
-                                            add_css_class: "flat",
+                                            set_halign: gtk::Align::End,
                                             connect_clicked => AccountsInput::FindTags,
-                                        },
-                                        gtk::Button {
-                                            set_label: &i18n("Add Tag…"),
-                                            add_css_class: "flat",
-                                            connect_clicked => AccountsInput::AddTag,
+                                            // A spinner inside the button
+                                            // while the mailboxes are read.
+                                            gtk::Box {
+                                                set_spacing: 6,
+                                                set_halign: gtk::Align::Center,
+                                                #[name = "find_tags_spinner"]
+                                                gtk::Spinner {
+                                                    set_visible: false,
+                                                },
+                                                #[name = "find_tags_label"]
+                                                gtk::Label {
+                                                    set_label: &i18n("Find Tags…"),
+                                                },
+                                            },
                                         },
                                     },
 
@@ -1184,7 +1204,9 @@ impl Component for AccountsWindow {
             senders_query: Default::default(),
             tags: init.tags,
             tags_list: None,
-            find_tags_btn: None,
+            find_tags_spinner: None,
+            find_tags_label: None,
+            tag_scanning: false,
         };
         {
             let mut guard = model.senders.guard();
@@ -1223,7 +1245,8 @@ impl Component for AccountsWindow {
         }
         model.rebuild_filter_rows(&sender);
         model.tags_list = Some(widgets.tags_list.clone());
-        model.find_tags_btn = Some(widgets.find_tags_btn.clone());
+        model.find_tags_spinner = Some(widgets.find_tags_spinner.clone());
+        model.find_tags_label = Some(widgets.find_tags_label.clone());
         model.rebuild_tag_rows(&sender);
         let t_list = std::time::Instant::now();
         model.rebuild_account_list(&widgets.accounts_list, &sender);
@@ -2135,8 +2158,10 @@ impl Component for AccountsWindow {
                 }
             }
             AccountsInput::FindTags => {
-                self.set_tag_scanning(true);
-                let _ = sender.output(AccountsOutput::FindTags);
+                if !self.tag_scanning {
+                    self.set_tag_scanning(true);
+                    let _ = sender.output(AccountsOutput::FindTags);
+                }
             }
             AccountsInput::TagScanning(on) => self.set_tag_scanning(on),
             AccountsInput::TagFindings(found) => {
@@ -3373,11 +3398,17 @@ impl AccountsWindow {
         }
     }
 
-    /// The tag finder's button while a scan runs: dimmed, saying so.
-    fn set_tag_scanning(&self, on: bool) {
-        let Some(btn) = &self.find_tags_btn else { return };
-        btn.set_sensitive(!on);
-        btn.set_label(&if on { i18n("Searching…") } else { i18n("Find Tags…") });
+    /// The tag finder's button while a scan runs: a turning spinner beside
+    /// a label saying so. A press meanwhile starts nothing.
+    fn set_tag_scanning(&mut self, on: bool) {
+        self.tag_scanning = on;
+        if let Some(spinner) = &self.find_tags_spinner {
+            spinner.set_visible(on);
+            spinner.set_spinning(on);
+        }
+        if let Some(label) = &self.find_tags_label {
+            label.set_label(&if on { i18n("Searching…") } else { i18n("Find Tags…") });
+        }
     }
 
     /// The tag finder's report: every keyword found that is not a tag here
