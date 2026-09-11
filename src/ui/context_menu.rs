@@ -9,6 +9,10 @@
 //! tying the menu entries to the buttons users already know. In a menu where
 //! any entry carries an icon, iconless entries get a blank slot of the same
 //! width so every label stays aligned.
+//!
+//! An entry can open a submenu ([`MenuEntry::submenu`]): the popover slides
+//! to a page of its own, headed by a back row, the way `GtkPopoverMenu`
+//! nests — so a long list (every tag) never makes the main menu too tall.
 
 use gtk::prelude::*;
 
@@ -24,6 +28,8 @@ pub struct MenuEntry {
     swatch: Option<(String, bool)>,
     enabled: bool,
     activate: Box<dyn Fn()>,
+    /// Sections of a nested page this entry opens instead of acting.
+    submenu: Option<Vec<Vec<MenuEntry>>>,
 }
 
 impl MenuEntry {
@@ -34,6 +40,21 @@ impl MenuEntry {
             swatch: None,
             enabled: true,
             activate: Box::new(activate),
+            submenu: None,
+        }
+    }
+
+    /// An entry that opens `sections` as a page of the same popover, headed
+    /// by a back row carrying this entry's label. Disabled when empty.
+    pub fn submenu(label: impl Into<String>, sections: Vec<Vec<MenuEntry>>) -> Self {
+        let empty = sections.iter().all(|s| s.is_empty());
+        Self {
+            label: label.into(),
+            icon: None,
+            swatch: None,
+            enabled: !empty,
+            activate: Box::new(|| {}),
+            submenu: Some(sections),
         }
     }
 
@@ -80,18 +101,93 @@ pub fn show_context_menu_with_header(
     popover.set_position(gtk::PositionType::Bottom);
     popover.add_css_class("menu");
 
+    // Pages: the menu itself, and one per submenu, slid between. Each page
+    // keeps its own size, so the popover fits whichever is showing.
+    let stack = gtk::Stack::new();
+    stack.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    stack.set_transition_duration(150);
+    stack.set_hhomogeneous(false);
+    stack.set_vhomogeneous(false);
+    stack.set_interpolate_size(true);
+
+    let list = build_page(&popover, &stack, "main", header, sections, None);
+    stack.add_named(&list, Some("main"));
+    // Submenu pages were added while the main page was built; start on it.
+    stack.set_visible_child_name("main");
+
+    popover.set_child(Some(&stack));
+    popover.set_parent(parent);
+    popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+    popover.connect_closed(|p| p.unparent());
+    popover.popup();
+
+    // VIREO_SHOWCASE_MENU=main|<submenu label> captures the popover's page
+    // a second after it opens (the window snapshot never includes it).
+    if let Ok(which) = std::env::var("VIREO_SHOWCASE_MENU") {
+        if let Ok(path) = std::env::var("VIREO_SHOWCASE") {
+            let stack = stack.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
+                if which != "main" {
+                    stack.set_visible_child_name(&format!("sub:{which}"));
+                }
+                let stack = stack.clone();
+                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+                    crate::app::showcase_capture(stack.upcast_ref(), &path);
+                });
+            });
+        }
+    }
+}
+
+/// One page of the popover: the caption (a bulk menu's "5 selected", or a
+/// submenu's back row), then the sections. A submenu entry adds its own
+/// page to `stack` and slides to it; every other entry acts and closes.
+fn build_page(
+    popover: &gtk::Popover,
+    stack: &gtk::Stack,
+    page_name: &str,
+    header: Option<&str>,
+    sections: Vec<Vec<MenuEntry>>,
+    back_to: Option<&str>,
+) -> gtk::Widget {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
     list.add_css_class("context-menu-list");
 
-    if let Some(text) = header {
-        let caption = gtk::Label::new(Some(text));
-        caption.set_xalign(0.0);
-        caption.add_css_class("dim-label");
-        caption.add_css_class("caption");
-        caption.set_margin_start(10);
-        caption.set_margin_top(4);
-        caption.set_margin_bottom(2);
-        list.append(&caption);
+    match (back_to, header) {
+        (Some(parent_page), Some(title)) => {
+            // The way back: a row with a leading chevron and the submenu's
+            // name, then a hairline before its entries.
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            let img = gtk::Image::from_icon_name("co.hyprlab.Vireo-go-previous-symbolic");
+            img.set_pixel_size(16);
+            row.append(&img);
+            let lbl = gtk::Label::new(Some(title));
+            lbl.set_xalign(0.0);
+            lbl.set_hexpand(true);
+            lbl.add_css_class("heading");
+            row.append(&lbl);
+            let btn = gtk::Button::new();
+            btn.set_child(Some(&row));
+            btn.add_css_class("flat");
+            btn.add_css_class("context-menu-item");
+            btn.set_halign(gtk::Align::Fill);
+            let stack = stack.clone();
+            let parent_page = parent_page.to_string();
+            btn.connect_clicked(move |_| stack.set_visible_child_name(&parent_page));
+            list.append(&btn);
+            list.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        }
+        (None, Some(text)) => {
+            let caption = gtk::Label::new(Some(text));
+            caption.set_xalign(0.0);
+            caption.add_css_class("dim-label");
+            caption.add_css_class("caption");
+            caption.set_margin_start(10);
+            caption.set_margin_top(4);
+            caption.set_margin_bottom(2);
+            list.append(&caption);
+        }
+        _ => {}
     }
 
     // Any icon in the menu means every row reserves the icon slot, keeping
@@ -109,7 +205,7 @@ pub fn show_context_menu_with_header(
         first = false;
 
         for entry in entries {
-            let MenuEntry { label, icon, swatch, enabled, activate } = entry;
+            let MenuEntry { label, icon, swatch, enabled, activate, submenu } = entry;
 
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             if let Some((color, on)) = swatch {
@@ -134,22 +230,38 @@ pub fn show_context_menu_with_header(
             btn.set_halign(gtk::Align::Fill);
             btn.set_sensitive(enabled);
 
-            let weak = popover.downgrade();
-            btn.connect_clicked(move |_| {
-                activate();
-                if let Some(p) = weak.upgrade() {
-                    p.popdown();
-                }
-            });
+            if let Some(sections) = submenu {
+                // A trailing chevron says the row opens rather than acts.
+                let chevron = gtk::Image::from_icon_name("co.hyprlab.Vireo-pan-end-symbolic");
+                chevron.set_pixel_size(16);
+                chevron.add_css_class("dim-label");
+                row.append(&chevron);
+                let name = format!("sub:{label}");
+                let page = build_page(popover, stack, &name, Some(&label), sections, Some(page_name));
+                // Tall lists scroll within the page rather than past the
+                // screen; short ones size exactly, as every page does.
+                let scroller = gtk::ScrolledWindow::new();
+                scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+                scroller.set_propagate_natural_height(true);
+                scroller.set_propagate_natural_width(true);
+                scroller.set_max_content_height(420);
+                scroller.set_child(Some(&page));
+                stack.add_named(&scroller, Some(&name));
+                let stack = stack.clone();
+                btn.connect_clicked(move |_| stack.set_visible_child_name(&name));
+            } else {
+                let weak = popover.downgrade();
+                btn.connect_clicked(move |_| {
+                    activate();
+                    if let Some(p) = weak.upgrade() {
+                        p.popdown();
+                    }
+                });
+            }
             list.append(&btn);
         }
     }
-
-    popover.set_child(Some(&list));
-    popover.set_parent(parent);
-    popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-    popover.connect_closed(|p| p.unparent());
-    popover.popup();
+    list.upcast()
 }
 
 /// A 16px colour swatch for a menu row: a filled disc when `on`, a ring when

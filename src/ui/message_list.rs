@@ -3738,18 +3738,24 @@ impl MessageList {
         }
 
         // Tags (#71): one toggle per tag, a filled swatch where the message
-        // carries it. Absent until a tag exists.
+        // carries it, behind a "Tags" submenu so a long list never makes
+        // this menu too tall. Absent until a tag exists.
         let tag_section = {
             let tags = self.tags.borrow().clone();
             let s = sender.clone();
             let m = msg.clone();
-            tag_menu_entries(&tags, msg, move |keyword, add| {
+            let entries = tag_menu_entries(&tags, msg, move |keyword, add| {
                 let _ = s.output(MessageListOutput::SetTag {
                     message: Box::new(m.clone()),
                     keyword,
                     add,
                 });
-            })
+            });
+            if entries.is_empty() {
+                Vec::new()
+            } else {
+                vec![MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic")]
+            }
         };
 
         let sections = vec![

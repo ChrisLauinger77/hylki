@@ -3084,6 +3084,14 @@ impl SimpleComponent for AppModel {
                         let _ = sb.send(pick());
                     });
                 }
+                // VIREO_SHOWCASE_ROW_MENU=1 opens the first row's context
+                // menu at 5s (pair with VIREO_SHOWCASE_MENU to capture it).
+                if std::env::var("VIREO_SHOWCASE_ROW_MENU").is_ok() {
+                    let ml = model.message_list.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let _ = ml.send(MessageListInput::ContextMenu { x: 120.0, y: 40.0 });
+                    });
+                }
                 // VIREO_SHOWCASE_RAIL=1 collapses the sidebar to the rail
                 // at 3s (the user's own toggle, fold-ups and all).
                 if std::env::var("VIREO_SHOWCASE_RAIL").is_ok() {
@@ -8550,8 +8558,14 @@ impl AppModel {
                         entry!(i18n("Flag"), "starred", AppMsg::ToggleStar, acts)
                     },
                 ],
-                // Tags (#71), where there are any and something to tag.
-                self.reader_tag_entries(sender).unwrap_or_default(),
+                // Tags (#71), where there are any and something to tag —
+                // behind a submenu, as in the message list's menu.
+                self.reader_tag_entries(sender)
+                    .map(|entries| {
+                        vec![MenuEntry::submenu(i18n("Tags"), vec![entries])
+                            .icon("co.hyprlab.Vireo-tag-symbolic")]
+                    })
+                    .unwrap_or_default(),
                 // View Source is deliberately absent: it lives in the message
                 // list's context menu only (the Outbox variant above keeps it —
                 // queued rows have no such menu).
