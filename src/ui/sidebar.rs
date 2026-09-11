@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use relm4::prelude::*;
 
 use crate::models::{Account, Folder, FolderKind};
@@ -254,6 +254,11 @@ pub struct Sidebar {
     /// The rebuild freeze-frame Picture and its pending lift timer.
     freeze_frame: Option<gtk::Picture>,
     freeze_timer: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>>,
+    /// The freeze-frame's fade during a rail toggle (see `rebuild_normal`).
+    freeze_fade: std::rc::Rc<std::cell::RefCell<Option<adw::TimedAnimation>>>,
+    /// The rail state the rows on screen were built for, so a rebuild can
+    /// tell a full ↔ rail toggle from an in-place refresh.
+    built_collapsed: bool,
     /// The "Folders" section revealer and its chevron, per account.
     custom_revealers: HashMap<u32, gtk::Revealer>,
     custom_chevrons: HashMap<u32, gtk::Image>,
@@ -542,6 +547,7 @@ impl Component for Sidebar {
         gtk::Box {
             set_orientation: gtk::Orientation::Vertical,
 
+            #[name = "body_overlay"]
             gtk::Overlay {
                 set_vexpand: true,
 
@@ -584,10 +590,14 @@ impl Component for Sidebar {
 
                 // Freeze-frame for rebuilds: the sidebar's last-rendered pixels,
                 // shown over the swap so recreating every row never shimmers.
+                // Anchored at the start and sized to the pixels it holds, so
+                // the pane animating to or from the rail beneath it can never
+                // stretch or squash the picture (the overlay clips it instead).
                 #[name = "freeze_frame"]
                 add_overlay = &gtk::Picture {
                     set_visible: false,
                     set_can_target: false,
+                    set_halign: gtk::Align::Start,
                     set_content_fit: gtk::ContentFit::Fill,
                 },
             },
@@ -626,6 +636,8 @@ impl Component for Sidebar {
             tree_row_revealers: HashMap::new(),
             freeze_frame: None,
             freeze_timer: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            freeze_fade: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            built_collapsed: init.collapsed,
             custom_revealers: HashMap::new(),
             custom_chevrons: HashMap::new(),
             unified_list: None,
@@ -678,6 +690,7 @@ impl Component for Sidebar {
 
         let widgets = view_output!();
         model.freeze_frame = Some(widgets.freeze_frame.clone());
+        widgets.body_overlay.set_clip_overlay(&widgets.freeze_frame, true);
         // Never scroll-to-focus: a rebuild (folder drag-and-drop) destroys
         // the focused row, GTK hands focus to some early widget, and the
         // viewport would yank the sidebar to the top to show it — the
@@ -1501,25 +1514,64 @@ impl Sidebar {
         // identical pixels, so the crossover is invisible. The snapshot is of
         // the overlay's whole child (pinned block + scroller + footer),
         // matching the area the freeze-frame Picture stretches over.
+        //
+        // A toggle between the full sidebar and the icon rail is different:
+        // the pane's width animates underneath the snapshot for 200ms (the
+        // app's `animate_sidebar`), so the snapshot keeps the width it was
+        // taken at (never stretched to the moving pane — that was a visible
+        // smear of every icon) and fades out over the same 200ms while the
+        // fresh rows, centred in the pane as it moves, come through beneath.
+        let rail_toggle = self.built_collapsed != self.collapsed;
+        self.built_collapsed = self.collapsed;
         if let (Some(freeze), Some(area)) = (self.freeze_frame.clone(), pinned.parent()) {
             if container.first_child().is_some() || pinned.first_child().is_some() {
                 use gtk::gdk::prelude::PaintableExt;
+                // Take before skipping: the fade's done handler clears the
+                // same slot, so the borrow must be over by then.
+                let fading = self.freeze_fade.borrow_mut().take();
+                if let Some(prev) = fading {
+                    prev.skip();
+                }
+                let pending = self.freeze_timer.borrow_mut().take();
+                if let Some(prev) = pending {
+                    prev.remove();
+                }
                 let live = gtk::WidgetPaintable::new(Some(&area));
                 freeze.set_paintable(Some(&live.current_image()));
+                freeze.set_size_request(area.width().max(1), -1);
+                freeze.set_opacity(1.0);
                 freeze.set_visible(true);
-                let timer = gtk::glib::timeout_add_local_once(
-                    std::time::Duration::from_millis(80),
-                    {
+                if rail_toggle {
+                    let target = adw::CallbackAnimationTarget::new({
                         let freeze = freeze.clone();
-                        let slot = self.freeze_timer.clone();
-                        move || {
+                        move |v| freeze.set_opacity(v)
+                    });
+                    let anim = adw::TimedAnimation::new(&freeze, 1.0, 0.0, 200, target);
+                    anim.set_easing(adw::Easing::EaseOutCubic);
+                    anim.connect_done({
+                        let freeze = freeze.clone();
+                        let slot = self.freeze_fade.clone();
+                        move |_| {
                             slot.borrow_mut().take();
                             freeze.set_visible(false);
+                            freeze.set_opacity(1.0);
                         }
-                    },
-                );
-                if let Some(prev) = self.freeze_timer.borrow_mut().replace(timer) {
-                    prev.remove();
+                    });
+                    *self.freeze_fade.borrow_mut() = Some(anim.clone());
+                    anim.play();
+                } else {
+                    let timer = gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(80),
+                        {
+                            let freeze = freeze.clone();
+                            let slot = self.freeze_timer.clone();
+                            move || {
+                                slot.borrow_mut().take();
+                                freeze.set_visible(false);
+                            }
+                        },
+                    );
+                    *self.freeze_timer.borrow_mut() = Some(timer);
                 }
             }
         }
