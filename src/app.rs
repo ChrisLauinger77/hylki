@@ -1494,11 +1494,14 @@ impl SimpleComponent for AppModel {
                                     set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
                                     set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
                                     add_css_class: "flat",
+                                    // Greyed out, not hidden, with no message
+                                    // open: the toolbar must not shift.
                                     #[watch]
                                     set_visible: !model.showing_outbox
-                                        && model.current.is_some()
                                         && model.reader_compose.is_none()
                                         && !model.reader_actions_collapsed,
+                                    #[watch]
+                                    set_sensitive: model.current.is_some(),
                                     connect_clicked[sender] => move |_| {
                                         sender.input(AppMsg::OpenReaderFind);
                                     },
