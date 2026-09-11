@@ -511,6 +511,8 @@ pub struct AppModel {
     /// Whether the message list rows carry an Actions Palette at all.
     list_palette: bool,
     list_palette_hover: bool,
+    /// The row's ⋯ opens the row menu instead of the sliding palette.
+    list_palette_menu: bool,
     /// Message rows take a sideways swipe to archive / delete (#92).
     swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
@@ -785,6 +787,7 @@ pub enum AppMsg {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
+    SetListPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetComposeInline(bool),
@@ -1465,26 +1468,14 @@ impl SimpleComponent for AppModel {
                                     },
                                 },
                                 // In-message find (#103), right of the star.
-                                pack_start = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
-                                    set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
-                                    add_css_class: "flat",
-                                    #[watch]
-                                    set_visible: !model.showing_outbox
-                                        && model.current.is_some()
-                                        && model.reader_compose.is_none()
-                                        && !model.reader_actions_collapsed,
-                                    connect_clicked[sender] => move |_| {
-                                        sender.input(AppMsg::OpenReaderFind);
-                                    },
-                                },
                                 // (No Add-to-Contacts button here: the action
                                 // lives on the address itself — right-click any
                                 // address in a message header.)
                                 // pack_end fills right-to-left, so these are declared
                                 // in reverse of their visual order. Left to right:
-                                // Archive, Delete, Spam, Print. (The sender-check
-                                // seal lives in the message header now — #88.)
+                                // Archive, Delete, Spam, Move To, Find, Print. (The
+                                // sender-check seal lives in the message header
+                                // now — #88.)
                                                                 pack_end = &gtk::Button {
                                     set_icon_name: "co.hyprlab.Vireo-printer-symbolic",
                                     set_tooltip_text: Some(i18n("Print Preview (Ctrl+Shift+P)").as_str()),
@@ -1498,6 +1489,33 @@ impl SimpleComponent for AppModel {
                                     // shows what will come out and prints from
                                     // there, so nobody spends paper to find out.
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::PrintPreview),
+                                },
+                                pack_end = &gtk::Button {
+                                    set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
+                                    set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
+                                    add_css_class: "flat",
+                                    #[watch]
+                                    set_visible: !model.showing_outbox
+                                        && model.current.is_some()
+                                        && model.reader_compose.is_none()
+                                        && !model.reader_actions_collapsed,
+                                    connect_clicked[sender] => move |_| {
+                                        sender.input(AppMsg::OpenReaderFind);
+                                    },
+                                },
+                                // Move To… (#164), between Find and Spam: a
+                                // folder picker for the target, or the whole
+                                // list selection.
+                                pack_end = &gtk::Box {
+                                    #[local_ref]
+                                    reader_move_btn -> gtk::Button {
+                                        #[watch]
+                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
+                                            && model.reader_compose.is_none(),
+                                        #[watch]
+                                        set_sensitive: model.reply_target().is_some()
+                                            || model.list_selection.len() > 1,
+                                    },
                                 },
                                 pack_end = &gtk::Button {
                                     #[watch]
@@ -1539,20 +1557,6 @@ impl SimpleComponent for AppModel {
                                     #[watch]
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::Archive),
-                                },
-                                // Move To… (#164), left of Archive: a folder
-                                // picker for the target, or the whole list
-                                // selection.
-                                pack_end = &gtk::Box {
-                                    #[local_ref]
-                                    reader_move_btn -> gtk::Button {
-                                        #[watch]
-                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                            && model.reader_compose.is_none(),
-                                        #[watch]
-                                        set_sensitive: model.reply_target().is_some()
-                                            || model.list_selection.len() > 1,
-                                    },
                                 },
                                 pack_end = &gtk::Spinner {
                                     set_valign: gtk::Align::Center,
@@ -2249,6 +2253,7 @@ impl SimpleComponent for AppModel {
             card_actions_auto: config::load_card_actions_auto(),
             list_palette: config::load_list_palette(),
             list_palette_hover: config::load_list_palette_hover(),
+            list_palette_menu: config::load_list_palette_menu(),
             swipe_enabled: config::load_swipe_enabled(),
             swipe_reversed: config::load_swipe_reversed(),
             compose_inline: config::load_compose_inline(),
@@ -5280,6 +5285,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetListPaletteMenu(on) => {
+                if self.list_palette_menu != on {
+                    self.list_palette_menu = on;
+                    self.save_settings();
+                    self.message_list.emit(MessageListInput::SetPaletteMenu(on));
+                }
+            }
+
             AppMsg::SetSwipeEnabled(on) => {
                 if self.swipe_enabled != on {
                     self.swipe_enabled = on;
@@ -7264,6 +7277,7 @@ impl AppModel {
             self.card_actions_auto,
             self.list_palette,
             self.list_palette_hover,
+            self.list_palette_menu,
             self.swipe_enabled,
             self.swipe_reversed,
             self.compose_inline,
@@ -7875,23 +7889,16 @@ impl AppModel {
     /// The message a reply, reply-all or forward addresses: the reply
     /// target, except when only the list row is selected over a
     /// conversation. That row stands for the thread's head, its oldest
-    /// message, and a reply from the toolbar means the latest one (#165):
-    /// the newest message from someone else, or the newest of all when
-    /// every message is the user's own.
+    /// message; the toolbar's reply follows the reading pane instead and
+    /// addresses the message shown at the top (#165) — the newest with
+    /// "newest first" on, the head otherwise. A highlighted card is
+    /// addressed as itself.
     fn compose_target(&self) -> Option<Message> {
         let m = self.reply_target()?;
-        if self.selection_from_cards || !self.thread_star_target(&m) {
+        if self.selection_from_cards || !self.thread_star_target(&m) || !self.thread_newest_first {
             return Some(m);
         }
-        let own = self.email_of(m.account_id).unwrap_or_default();
-        let newest = |from_others: bool| {
-            self.current_thread
-                .iter()
-                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
-                .max_by_key(|t| t.timestamp)
-                .cloned()
-        };
-        newest(true).or_else(|| newest(false)).or(Some(m))
+        self.current_thread.iter().max_by_key(|t| t.timestamp).cloned().or(Some(m))
     }
 
     /// Launch (or re-present) the welcome wizard: the first run's greeting,
@@ -11201,6 +11208,7 @@ impl AppModel {
             card_actions_auto: self.card_actions_auto,
             list_palette: self.list_palette,
             list_palette_hover: self.list_palette_hover,
+            list_palette_menu: self.list_palette_menu,
             swipe_enabled: self.swipe_enabled,
             swipe_reversed: self.swipe_reversed,
             compose_inline: self.compose_inline,
@@ -11259,6 +11267,7 @@ impl AppModel {
                 }
                 PrefOutput::SetListPalette(on) => AppMsg::SetListPalette(on),
                 PrefOutput::SetListPaletteHover(on) => AppMsg::SetListPaletteHover(on),
+                PrefOutput::SetListPaletteMenu(on) => AppMsg::SetListPaletteMenu(on),
                 PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
