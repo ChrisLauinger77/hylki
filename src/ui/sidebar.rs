@@ -2517,15 +2517,6 @@ impl Sidebar {
             });
             row.add_css_class(if self.chevrons_left { "chev-left" } else { "chev-right" });
             pin_icon_size(&img);
-            if matches!(row_kind, UnifiedRow::Filtered | UnifiedRow::Tags) {
-                // These two glyphs ink their canvas edge to edge where the
-                // mail glyphs above keep a pixel or two of margin, so at the
-                // same size their left edge sat left of the others'. Drawn
-                // at 14px inside the same 16px slot, the edges line up and
-                // the label column stays put.
-                img.set_pixel_size(14);
-                img.set_size_request(16, 16);
-            }
             if self.chevrons_left {
                 // Centers this 16px icon on the avatar circles below it
                 // (rather than matching left edges) — a small icon flush
@@ -2723,6 +2714,7 @@ impl Sidebar {
                         r.folder.unread,
                         self.collapsed,
                         self.chevrons_left,
+                        false,
                     );
                     // Filtered folders take drops like any folder of their account.
                     row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
@@ -2766,6 +2758,7 @@ impl Sidebar {
                         0,
                         self.collapsed,
                         self.chevrons_left,
+                        false,
                     );
                     badge.set_visible(false);
                     sub.append(&row);
@@ -3828,7 +3821,7 @@ fn build_unified_inbox_row(
     }
     circle.append(&glyph);
 
-    build_unified_sub_row(&circle, label, label, inbox.unread, collapsed, inset)
+    build_unified_sub_row(&circle, label, label, inbox.unread, collapsed, inset, true)
 }
 
 /// A row nested under "All Inboxes": `lead` (the account's pill), `title`,
@@ -3842,11 +3835,15 @@ fn build_unified_sub_row(
     unread: u32,
     collapsed: bool,
     inset: bool,
+    pill: bool,
 ) -> (gtk::ListBoxRow, gtk::Label) {
     let row = gtk::ListBoxRow::new();
     let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     hbox.add_css_class("folder-row");
-    if !collapsed {
+    // The 2px pull-in centres a 21px account pill on the 16px icon column;
+    // a row led by a 16px icon or disc sits on that column as it is, and
+    // pulled in it read as drifting left of the header's glyph.
+    if !collapsed && pill {
         hbox.add_css_class("unified-subrow");
     }
 
@@ -3871,7 +3868,9 @@ fn build_unified_sub_row(
         }
 
         let name = gtk::Label::new(Some(title));
-        name.set_margin_start(6);
+        // The label keeps the same column either way: the icon-led row
+        // gave up the 2px pull-in, so its label gives up 2px here.
+        name.set_margin_start(if pill { 6 } else { 4 });
         name.set_hexpand(true);
         name.set_halign(gtk::Align::Start);
         name.set_ellipsize(gtk::pango::EllipsizeMode::End);
