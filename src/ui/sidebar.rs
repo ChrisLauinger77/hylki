@@ -316,6 +316,12 @@ pub struct Sidebar {
     /// Whether the unified "Tags" section is open.
     tags_expanded: bool,
     tag_sections: HashMap<Slot, SectionWidgets>,
+    /// The rail's own open state for the items "Fold up expanded items"
+    /// starts folded: a long press there opens or folds them for the rail
+    /// alone, the saved state untouched. Cleared whenever the sidebar
+    /// changes width, so the full sidebar shows what was saved.
+    rail_open: HashMap<UnifiedRow, bool>,
+    rail_open_accounts: std::collections::HashSet<u32>,
     /// Which unified Starred / Sent / Drafts rows are shown, whether their
     /// account lists are open, and their widgets.
     unified_kinds: crate::config::UnifiedKinds,
@@ -653,6 +659,8 @@ impl Component for Sidebar {
                 (FolderKind::Drafts, init.drafts_expanded),
             ]),
             kind_widgets: HashMap::new(),
+            rail_open: HashMap::new(),
+            rail_open_accounts: std::collections::HashSet::new(),
             unified_tags: true,
             show_accounts: true,
             filtered_placement: crate::config::SectionPlacement::default(),
@@ -1176,7 +1184,7 @@ impl Component for Sidebar {
                             .copied()
                             .unwrap_or(0);
                         label.set_text(&n.to_string());
-                        label.set_visible((section.collapsed || self.locked_accounts()) && n > 0);
+                        label.set_visible(self.account_shown_folded(section) && n > 0);
                     }
                 }
                 self.unified_unread = unified;
@@ -1245,6 +1253,8 @@ impl Component for Sidebar {
                 // persisted preference.
                 if self.collapsed != collapsed {
                     self.collapsed = collapsed;
+                    self.rail_open.clear();
+                    self.rail_open_accounts.clear();
                     self.rebuild_normal(
                         &widgets.pinned_box,
                         &widgets.normal_box,
@@ -1257,6 +1267,8 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleCollapsed => {
                 self.collapsed = !self.collapsed;
+                self.rail_open.clear();
+                self.rail_open_accounts.clear();
                 self.rebuild_normal(
                     &widgets.pinned_box,
                     &widgets.normal_box,
@@ -1268,18 +1280,23 @@ impl Component for Sidebar {
             }
 
             SidebarInput::ToggleCollapseLocal(id) => {
-                // Folded up for the rail: it stays so until the sidebar
-                // expands (Settings → Sidebar → Icon rail).
-                if self.locked_accounts() {
-                    return;
-                }
+                // Started folded for the rail (Settings → Sidebar → Icon
+                // rail): this opens or folds it for the rail alone — the
+                // saved state stays as it is for the full sidebar.
+                let rail_only = self.locked_accounts();
                 if let Some(rev) = self.revealers.get(&id) {
                     let expanded = !rev.reveals_child();
                     rev.set_reveal_child(expanded);
                     if let Some(ch) = self.chevrons.get(&id) {
                         ch.set_icon_name(Some(if expanded { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }));
                     }
-                    if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
+                    if rail_only {
+                        if expanded {
+                            self.rail_open_accounts.insert(id);
+                        } else {
+                            self.rail_open_accounts.remove(&id);
+                        }
+                    } else if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                         s.collapsed = !expanded;
                     }
                     // The Inbox chip lives inside the folder list we just hid/shown,
@@ -1295,7 +1312,9 @@ impl Component for Sidebar {
                         label.set_text(&n.to_string());
                         label.set_visible(!expanded && n > 0);
                     }
-                    let _ = sender.output(SidebarOutput::ToggleCollapse(id));
+                    if !rail_only {
+                        let _ = sender.output(SidebarOutput::ToggleCollapse(id));
+                    }
                 }
             }
 
@@ -1946,7 +1965,7 @@ impl Sidebar {
             circle_overlay.set_hexpand(false);
             // Folded for the rail (Settings → Sidebar → Icon rail) reads as
             // collapsed here, without touching the saved state.
-            let folded = section.collapsed || self.locked_accounts();
+            let folded = self.account_shown_folded(section);
             circle_badge.set_visible(folded && inbox_unread > 0);
             self.account_circle_badges.insert(id, circle_badge);
             if !self.collapsed && self.chevrons_left {
@@ -2434,7 +2453,6 @@ impl Sidebar {
         let counted = row_kind != UnifiedRow::Kind(FolderKind::Sent);
         let unread = self.row_unread(row_kind);
         let expanded = self.row_shown_open(row_kind);
-        let locked = self.locked_row(row_kind);
         let show_chip = unread > 0 && !expanded && self.show_unified_chip;
         let toggle_tip = match row_kind {
             UnifiedRow::Kind(FolderKind::Inbox) => i18n("Show each inbox"),
@@ -2463,12 +2481,10 @@ impl Sidebar {
         if self.collapsed {
             hbox.set_halign(gtk::Align::Center);
             let mut tip = if unread > 0 { format!("{title} ({unread})") } else { title.clone() };
-            if !locked {
-                // The rail has no room for a chevron: a long press on the
-                // icon opens or folds the list instead.
-                tip.push('\n');
-                tip.push_str(&i18n("Long-press to expand or collapse"));
-            }
+            // The rail has no room for a chevron: a long press on the icon
+            // opens or folds the list instead.
+            tip.push('\n');
+            tip.push_str(&i18n("Long-press to expand or collapse"));
             row.set_tooltip_text(Some(&tip));
             // Total-unread chip overlaid on the icon so the count stays
             // visible in the icon-only rail.
@@ -2584,9 +2600,8 @@ impl Sidebar {
         // A long press on the row opens or folds the list in either layout
         // (a plain click still selects the merged view): in the rail it is
         // the only way, there being no room for a chevron; in the full
-        // sidebar it sits alongside the chevron. Not while the row is
-        // folded up for the rail.
-        if !locked {
+        // sidebar it sits alongside the chevron.
+        {
             let press = gtk::GestureLongPress::new();
             press.set_touch_only(false);
             let cs = sender.input_sender().clone();
@@ -2798,8 +2813,9 @@ impl Sidebar {
         }
     }
 
-    /// Whether "Fold up expanded items" holds this row folded: the sidebar
-    /// is the icon rail and the row's switch is on.
+    /// Whether "Fold up expanded items" starts this row folded in the rail:
+    /// the sidebar is the icon rail and the row's switch is on. Such a row
+    /// keeps its own rail-only open state (`rail_open`).
     fn locked_row(&self, row: UnifiedRow) -> bool {
         self.collapsed
             && match row {
@@ -2814,10 +2830,25 @@ impl Sidebar {
         self.collapsed && self.rail_fold.folds_accounts()
     }
 
-    /// Whether a unified row's list shows open: its own state, unless the
-    /// rail holds it folded.
+    /// Whether a unified row's list shows open: in the rail, for a row
+    /// "Fold up expanded items" covers, its rail-only state (folded until
+    /// long-pressed open); otherwise its own.
     fn row_shown_open(&self, row: UnifiedRow) -> bool {
-        self.row_open(row) && !self.locked_row(row)
+        if self.locked_row(row) {
+            self.rail_open.get(&row).copied().unwrap_or(false)
+        } else {
+            self.row_open(row)
+        }
+    }
+
+    /// Whether an account's section shows folded: the same rule, with the
+    /// rail-only state in `rail_open_accounts`.
+    fn account_shown_folded(&self, section: &SectionData) -> bool {
+        if self.locked_accounts() {
+            !self.rail_open_accounts.contains(&section.account.id)
+        } else {
+            section.collapsed
+        }
     }
 
     fn set_row_open(&mut self, row: UnifiedRow, open: bool) {
@@ -2844,13 +2875,15 @@ impl Sidebar {
     /// Open or fold a unified row's list in place (a click on its chevron,
     /// a double-click on the row), and report the section states.
     fn toggle_row(&mut self, row: UnifiedRow, sender: &ComponentSender<Self>) {
-        // Folded up for the rail: it stays so until the sidebar expands.
+        let open = !self.row_shown_open(row);
         if self.locked_row(row) {
-            return;
+            // Started folded for the rail: opened or folded for the rail
+            // alone, the saved state untouched.
+            self.rail_open.insert(row, open);
+        } else {
+            self.set_row_open(row, open);
+            self.report_sections(sender);
         }
-        let open = !self.row_open(row);
-        self.set_row_open(row, open);
-        self.report_sections(sender);
         let unread = self.row_unread(row);
         if row == UnifiedRow::Kind(FolderKind::Inbox) {
             if let Some(rev) = &self.unified_revealer {

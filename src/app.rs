@@ -3044,6 +3044,19 @@ impl SimpleComponent for AppModel {
                         let _ = sb.send(SidebarInput::ToggleCollapsed);
                     });
                 }
+                // VIREO_SHOWCASE_TOGGLE=starred|sent|drafts toggles that
+                // unified row's list at 5s (what a long-press does).
+                if let Ok(which) = std::env::var("VIREO_SHOWCASE_TOGGLE") {
+                    let kind = match which.as_str() {
+                        "sent" => FolderKind::Sent,
+                        "drafts" => FolderKind::Drafts,
+                        _ => FolderKind::Starred,
+                    };
+                    let sb = model.sidebar.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let _ = sb.send(SidebarInput::ToggleKindExpand(kind));
+                    });
+                }
                 // VIREO_SHOWCASE_FOLD_FILTERED folds All Inboxes' Filtered
                 // Folders section, to check its folded header.
                 if std::env::var("VIREO_SHOWCASE_FOLD_FILTERED").is_ok() {

@@ -961,9 +961,10 @@ impl Component for Preferences {
                                     #[name = "rail_fold_row"]
                                     adw::ExpanderRow {
                                         set_title: &i18n("Fold up expanded items"),
-                                        set_subtitle: &i18n("While the sidebar is the icon rail, these show folded \
-                                                       up and stay so; they open again as they were when it \
-                                                       expands. Switch one off to leave it as it is."),
+                                        set_subtitle: &i18n("When the sidebar collapses to the icon rail, the items \
+                                                       switched on below start folded up. A long-press in the \
+                                                       rail still expands or collapses any of them, and the \
+                                                       full sidebar comes back exactly as you left it."),
                                         set_show_enable_switch: true,
                                         set_expanded: true,
                                         connect_enable_expansion_notify[sender] => move |row| {
