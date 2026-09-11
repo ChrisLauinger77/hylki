@@ -2679,6 +2679,14 @@ impl SimpleComponent for AppModel {
             });
             app.add_action(&quit);
             gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, "app.quit", &["<Ctrl>q"]);
+            // Ctrl+Shift+A shows or hides the sidebar's account sections
+            // (the same switch as the main menu's and Settings'): activating
+            // the stateful action without a value toggles it.
+            gtk::prelude::GtkApplicationExt::set_accels_for_action(
+                &app,
+                "app.show-accounts",
+                &["<Ctrl><Shift>a"],
+            );
             // Ctrl+W closes the window only (issue #64): with "run in the
             // background" on, mail keeps arriving — unlike Ctrl+Q, which
             // quits outright. GTK's built-in window.close action does
@@ -12208,6 +12216,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+P", i18n_noop("Print the message you are reading")),
             ("Ctrl+Shift+P", i18n_noop("Preview it as a PDF first")),
             ("Ctrl+Shift+S", i18n_noop("Reveal the status bar (also: long-press Refresh)")),
+            ("Ctrl+Shift+A", i18n_noop("Show or hide the accounts in the sidebar")),
             ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
             ("Ctrl+Q", i18n_noop("Quit Vireo entirely")),

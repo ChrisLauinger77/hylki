@@ -763,7 +763,8 @@ impl Component for Preferences {
                                         set_active: model.show_accounts,
                                         set_title: &i18n("Accounts in the sidebar"),
                                         set_subtitle: &i18n("Each account's own section: its folders, filtered folders and tags. Off leaves the \
-                                                       unified section alone. Also in the main menu."),
+                                                       unified section alone. Also in the main menu, and \
+                                                       Ctrl+Shift+A."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleShowAccounts(row.is_active()));
                                         },
