@@ -296,17 +296,28 @@ pub struct AppModel {
     /// the sidebar, which read as an instant dismissal and closed every peek
     /// the moment it opened.
     peek_transition: std::rc::Rc<std::cell::Cell<bool>>,
-    /// The pending end-of-close restore (rail + rows return after the slide-
-    /// out animation). Cancelled if the peek reopens mid-flight.
+    /// The fallback poll for the end-of-close restore (rail + rows return
+    /// once the slide-out has finished). Cancelled if the peek reopens
+    /// mid-flight.
     peek_close_timer: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>>,
+    /// The pending end-of-close restore itself, so a resize that lands
+    /// mid-slide-out can run it at once instead of leaving it queued behind
+    /// the split view's side-by-side switch.
+    peek_close_restore: std::rc::Rc<std::cell::RefCell<Option<std::rc::Rc<dyn Fn(bool)>>>>,
+    /// Bumped by every peek transition: the close watchers (tick callback and
+    /// poll) carry the generation they were armed under and stand down when
+    /// a newer transition has superseded them.
+    peek_gen: std::rc::Rc<std::cell::Cell<u64>>,
     /// Snapshot of the rail shown in the content strip while the peek floats,
     /// so the slide reveals rail icons rather than a blank band.
     peek_rail_ghost: Option<gtk::Picture>,
-    /// The rail's pixels, captured whenever the pointer enters the sidebar —
-    /// always before a click can land. Snapshotting at open time is too late
-    /// for the expand-button path: the sidebar has already rebuilt its rows
-    /// to the expanded set, which render as nothing until layout runs, and
-    /// the ghost came out blank.
+    /// The rail's pixels, captured when the pointer enters the sidebar, for
+    /// the hover-expand peek: by the time that open runs, the row under the
+    /// pointer already carries its hover highlight, and the ghost strip must
+    /// not. The expand-button peek clears this and captures the rail live
+    /// instead — the rail's state can change between a pointer-enter and a
+    /// later click (a folder picked, a section folded), and a stale ghost
+    /// under the sliding panel reads as the rail jumping.
     rail_snapshot: std::rc::Rc<std::cell::RefCell<Option<gtk::gdk::Paintable>>>,
     /// Preference: hovering the icon rail opens the peek by itself.
     sidebar_hover_expand: bool,
@@ -2155,6 +2166,8 @@ impl SimpleComponent for AppModel {
             sidebar_peek: false,
             peek_transition: std::rc::Rc::new(std::cell::Cell::new(false)),
             peek_close_timer: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            peek_close_restore: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            peek_gen: std::rc::Rc::new(std::cell::Cell::new(0)),
             peek_rail_ghost: None,
             rail_snapshot: std::rc::Rc::new(std::cell::RefCell::new(None)),
             sidebar_hover_expand: config::load_sidebar_hover_expand(),
@@ -3718,6 +3731,14 @@ impl SimpleComponent for AppModel {
             AppMsg::AutoRail(on) => {
                 tracing::info!("peek: auto-rail {on} (peek={})", self.sidebar_peek);
                 self.auto_rail = on;
+                if !on {
+                    // A close still sliding out when the window widens: land
+                    // it now, before the side-by-side switch below.
+                    let pending = self.peek_close_restore.borrow_mut().take();
+                    if let Some(restore) = pending {
+                        restore(true);
+                    }
+                }
                 if !on && self.sidebar_peek {
                     // Widened with the overlay open: fold it back before the
                     // split view returns to side-by-side. Closing puts the rows
@@ -3750,7 +3771,18 @@ impl SimpleComponent for AppModel {
                 // the button's job is to bring the sidebar back, not to feed
                 // a toggle into state that already lost the plot: repair to
                 // the rail first, then toggle normally from there.
-                if !self.sidebar_peek {
+                if self.sidebar_peek {
+                    if self.auto_rail {
+                        // Narrow window: the button folds the floating peek
+                        // back to the rail.
+                        self.rail_active = true;
+                        self.set_sidebar_peek(false, true, true);
+                    } else {
+                        // A hover peek at a width with room for the full
+                        // sidebar: the button pins it side by side.
+                        self.pin_sidebar_from_peek();
+                    }
+                } else {
                     if let Some(split) = self.sidebar_split.clone() {
                         if split.is_collapsed() || !split.shows_sidebar() {
                             tracing::info!(
@@ -3760,9 +3792,7 @@ impl SimpleComponent for AppModel {
                             );
                             // A pending end-of-close restore would stomp the
                             // peek this press is about to open.
-                            if let Some(timer) = self.peek_close_timer.borrow_mut().take() {
-                                timer.remove();
-                            }
+                            self.cancel_peek_close();
                             self.rail_active = true;
                             self.sidebar.emit(SidebarInput::SetCollapsed(true));
                             self.compact_sidebar_header(true);
@@ -3777,8 +3807,25 @@ impl SimpleComponent for AppModel {
                             }
                         }
                     }
+                    if self.auto_rail {
+                        // Narrow window: the app runs the open itself, in the
+                        // one order that leaves the docked rail untouched —
+                        // capture the live rail, swap in its ghost and collapse
+                        // the split in a single layout pass, and only then
+                        // rebuild the rows expanded (hidden, off-screen) for the
+                        // slide-in. Letting the sidebar toggle its rows first
+                        // (ToggleCollapsed) re-laid the docked 80px rail around
+                        // expanded rows before the app could collapse it, and
+                        // the ghost then showed whatever the last pointer-enter
+                        // had cached — both read as the rail jumping under the
+                        // panel.
+                        *self.rail_snapshot.borrow_mut() = None;
+                        self.rail_active = false;
+                        self.set_sidebar_peek(true, true, true);
+                    } else {
+                        self.sidebar.emit(SidebarInput::ToggleCollapsed);
+                    }
                 }
-                self.sidebar.emit(SidebarInput::ToggleCollapsed);
             }
 
             AppMsg::SidebarPeekDismissed => {
@@ -8051,14 +8098,12 @@ impl AppModel {
 
     /// Pin the floating hover-peek open as the normal side-by-side sidebar:
     /// the arrow inside the peek, clicked at a width that can host the full
-    /// sidebar, persists the expanded state. The sidebar just railed its rows
-    /// on that click — expand them back, drop the overlay, and save.
+    /// sidebar, persists the expanded state. Keep the rows expanded (a
+    /// showcase toggle may have railed them), drop the overlay, and save.
     fn pin_sidebar_from_peek(&mut self) {
         tracing::info!("peek: pinned to side-by-side");
         let Some(split) = self.sidebar_split.clone() else { return };
-        if let Some(timer) = self.peek_close_timer.borrow_mut().take() {
-            timer.remove();
-        }
+        self.cancel_peek_close();
         self.sidebar_peek = false;
         self.sidebar_collapsed = false;
         self.rail_active = false;
@@ -8120,9 +8165,7 @@ impl AppModel {
             self.sidebar_peek, split.is_collapsed(), split.shows_sidebar()
         );
         // A reopen or re-close supersedes any pending end-of-close restore.
-        if let Some(timer) = self.peek_close_timer.borrow_mut().take() {
-            timer.remove();
-        }
+        self.cancel_peek_close();
         self.sidebar_peek = open;
         // Property notifies fire synchronously inside these setters; the guard
         // keeps the scrim-dismiss watcher from reading the transition itself
@@ -8194,11 +8237,26 @@ impl AppModel {
                 split.set_show_sidebar(true);
             }
         } else {
-            // The end-of-close restore: rail widths, rows, and header back in
-            // one go. Runs after the slide-out animation (so nothing inside
-            // the panel jumps mid-flight), or immediately for a resize-driven
-            // close, where the layout is jumping anyway.
-            let restore = {
+            // The end-of-close restore, in two steps once the slide-out has
+            // finished (so nothing inside the panel jumps mid-flight):
+            // 1. the rows back to the rail and the header compact — the panel
+            //    is off-screen and hidden, so nothing visible changes;
+            // 2. on a low-priority idle, after the sidebar component has
+            //    rebuilt its rows: dock the split at rail width and drop the
+            //    ghost, swapping frozen pixels for the live rail with zero net
+            //    movement. Docking in the same breath as the row switch laid
+            //    the 80px rail around still-expanded rows for a frame.
+            //
+            // "Finished" is read from the split view itself — its slide is a
+            // spring (about 290ms to settle) whose done handler hides the
+            // sidebar bin; docking while it still runs let it finish *after*
+            // the dock and hide the docked rail, which is how the rail used
+            // to vanish with a dead toggle (1.17.1). `early` is the
+            // resize-driven close that can't wait: it re-kicks the spring
+            // toward "shown" so its finish can't take the rail with it.
+            let gen = self.peek_gen.get();
+            let fired = std::rc::Rc::new(std::cell::Cell::new(false));
+            let restore: std::rc::Rc<dyn Fn(bool)> = std::rc::Rc::new({
                 let split = split.clone();
                 let guard = self.peek_transition.clone();
                 let sidebar_sender = self.sidebar.sender().clone();
@@ -8207,10 +8265,21 @@ impl AppModel {
                 let menu = self.sidebar_menu.clone();
                 let refresh = self.sidebar_refresh.clone();
                 let close_timer = self.peek_close_timer.clone();
+                let pending = self.peek_close_restore.clone();
+                let peek_gen = self.peek_gen.clone();
                 let ghost = self.peek_rail_ghost.clone();
-                move || {
-                    tracing::info!("peek: restore (rail back, sync_rows={sync_rows})");
-                    close_timer.borrow_mut().take();
+                let fired = fired.clone();
+                move |early: bool| {
+                    if peek_gen.get() != gen || fired.replace(true) {
+                        return;
+                    }
+                    tracing::info!("peek: restore (rail back, sync_rows={sync_rows}, early={early})");
+                    // Whichever watcher fired, the others stand down. (The
+                    // poll takes its own id out before calling here.)
+                    if let Some(timer) = close_timer.borrow_mut().take() {
+                        timer.remove();
+                    }
+                    pending.borrow_mut().take();
                     if sync_rows {
                         let _ = sidebar_sender.send(SidebarInput::SetCollapsed(true));
                     }
@@ -8219,30 +8288,115 @@ impl AppModel {
                     {
                         set_sidebar_header_compact(h, t, m, &refresh, true);
                     }
-                    guard.set(true);
-                    split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
-                    split.set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
-                    split.set_collapsed(false);
-                    split.set_show_sidebar(true);
-                    // The real rail replaces the ghost with identical pixels.
-                    if let Some(g) = ghost.as_ref() {
-                        g.set_visible(false);
+                    let dock = {
+                        let split = split.clone();
+                        let guard = guard.clone();
+                        let peek_gen = peek_gen.clone();
+                        let ghost = ghost.clone();
+                        move || {
+                            if peek_gen.get() != gen {
+                                return;
+                            }
+                            guard.set(true);
+                            split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
+                            split.set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
+                            split.set_collapsed(false);
+                            split.set_show_sidebar(true);
+                            if early {
+                                // Restart the split's spring from wherever it
+                                // is toward "shown" — a play() on a running
+                                // animation restarts it.
+                                split.set_show_sidebar(false);
+                                split.set_show_sidebar(true);
+                            }
+                            // The real rail replaces the ghost with identical
+                            // pixels.
+                            if let Some(g) = ghost.as_ref() {
+                                g.set_visible(false);
+                            }
+                            guard.set(false);
+                        }
+                    };
+                    if early {
+                        dock();
+                    } else {
+                        gtk::glib::idle_add_local_full(gtk::glib::Priority::LOW, move || {
+                            dock();
+                            gtk::glib::ControlFlow::Break
+                        });
                     }
-                    guard.set(false);
                 }
-            };
+            });
             split.set_show_sidebar(false);
-            if animate {
-                let timer = gtk::glib::timeout_add_local_once(
-                    std::time::Duration::from_millis(320),
-                    restore,
-                );
-                *self.peek_close_timer.borrow_mut() = Some(timer);
+            // The split's own sidebar bin: hidden (child-visible off) by the
+            // slide-out's done handler, and by nothing else during a close.
+            let bin = split.sidebar().and_then(|s| s.parent());
+            let slid_out = {
+                let bin = bin.clone();
+                move || bin.as_ref().is_none_or(|b| !b.is_child_visible())
+            };
+            if !animate {
+                restore(true);
+            } else if slid_out() {
+                // Animations off (or the widget unmapped): already done.
+                restore(false);
             } else {
-                restore();
+                *self.peek_close_restore.borrow_mut() = Some(restore.clone());
+                let peek_gen = self.peek_gen.clone();
+                // Frame-accurate: the tick right after the done handler.
+                {
+                    let restore = restore.clone();
+                    let peek_gen = peek_gen.clone();
+                    let slid_out = slid_out.clone();
+                    let fired = fired.clone();
+                    split.add_tick_callback(move |_, _| {
+                        if peek_gen.get() != gen || fired.get() {
+                            return gtk::glib::ControlFlow::Break;
+                        }
+                        if slid_out() {
+                            restore(false);
+                            return gtk::glib::ControlFlow::Break;
+                        }
+                        gtk::glib::ControlFlow::Continue
+                    });
+                }
+                // Safety net for a frame clock that stops ticking mid-close
+                // (the window occluded or unmapped): poll the same signal.
+                let close_timer = self.peek_close_timer.clone();
+                let timer = gtk::glib::timeout_add_local(
+                    std::time::Duration::from_millis(250),
+                    {
+                        let close_timer = close_timer.clone();
+                        move || {
+                            if peek_gen.get() != gen || fired.get() {
+                                close_timer.borrow_mut().take();
+                                return gtk::glib::ControlFlow::Break;
+                            }
+                            if slid_out() {
+                                // Own id out first: restore removes what it
+                                // finds, and this source is mid-dispatch.
+                                close_timer.borrow_mut().take();
+                                restore(false);
+                                return gtk::glib::ControlFlow::Break;
+                            }
+                            gtk::glib::ControlFlow::Continue
+                        }
+                    },
+                );
+                *close_timer.borrow_mut() = Some(timer);
             }
         }
         self.peek_transition.set(false);
+    }
+
+    /// Drop a pending end-of-close restore and its watchers: a newer peek
+    /// transition (reopen, pin, repair) supersedes it.
+    fn cancel_peek_close(&self) {
+        self.peek_gen.set(self.peek_gen.get() + 1);
+        if let Some(timer) = self.peek_close_timer.borrow_mut().take() {
+            timer.remove();
+        }
+        self.peek_close_restore.borrow_mut().take();
     }
 
     /// Smoothly animate the sidebar rail between its expanded width and the
