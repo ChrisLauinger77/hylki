@@ -1998,22 +1998,23 @@ impl Sidebar {
             circle.set_size_request(30, 30);
             // Drawn ink-centred (see `ui::initials`), not a label: a lone
             // letter or an emoji sits exactly in the middle of the disc.
-            let glyph = match (&section.avatar, &section.emoji) {
+            let glyph: gtk::Widget = match (&section.avatar, &section.emoji) {
                 (Some(path), _) => {
                     // A picture fills the disc; the disc's rounded corners
                     // clip it into a circle.
                     circle.set_overflow(gtk::Overflow::Hidden);
-                    crate::ui::initials::avatar_picture(path, 30)
+                    crate::ui::initials::avatar_picture(path, 30).upcast()
                 }
                 (None, Some(em)) if !em.is_empty() => {
-                    crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30)
+                    crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30).upcast()
                 }
                 _ => crate::ui::initials::glyph_picture(
                     &account_initials(&name_str, &section.account.email),
                     &section.color,
                     0.47,
                     30,
-                ),
+                )
+                .upcast(),
             };
             circle.append(&glyph);
             // While this account's section is collapsed its Inbox row (and the
@@ -3878,20 +3879,21 @@ fn build_unified_inbox_row(
     circle.set_halign(gtk::Align::Center);
     circle.set_hexpand(false);
     circle.set_size_request(21, 21);
-    let glyph = match (&section.avatar, &section.emoji) {
+    let glyph: gtk::Widget = match (&section.avatar, &section.emoji) {
         (Some(path), _) => {
             circle.set_overflow(gtk::Overflow::Hidden);
-            crate::ui::initials::avatar_picture(path, 21)
+            crate::ui::initials::avatar_picture(path, 21).upcast()
         }
         (None, Some(em)) if !em.is_empty() => {
-            crate::ui::initials::glyph_picture(em, &section.color, 0.6, 21)
+            crate::ui::initials::glyph_picture(em, &section.color, 0.6, 21).upcast()
         }
         _ => crate::ui::initials::glyph_picture(
             &account_initials(label, &section.account.email),
             &section.color,
             0.5,
             21,
-        ),
+        )
+        .upcast(),
     };
     circle.append(&glyph);
 

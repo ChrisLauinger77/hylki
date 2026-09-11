@@ -209,8 +209,11 @@ thread_local! {
 }
 
 /// An account's avatar picture (#162) for a disc of `size` px: the stored
-/// copy is square already, so it fills the disc and the disc clips it.
-pub fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Picture {
+/// copy is square already, so it fills the disc and the disc clips it. An
+/// image at a fixed pixel size, not a picture: a picture's natural size is
+/// the texture's, and the disc (a box, whose size request is only a floor)
+/// would grow to it.
+pub fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Image {
     let mtime = std::fs::metadata(path).and_then(|m| m.modified()).ok();
     let key = (path.to_path_buf(), mtime);
     let texture = AVATAR_TEXTURES.with(|c| {
@@ -221,16 +224,14 @@ pub fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Picture {
         c.borrow_mut().insert(key, t.clone());
         Some(t)
     });
-    let picture = match texture {
-        Some(t) => gtk::Picture::for_paintable(&t),
-        None => gtk::Picture::new(),
+    let image = match texture {
+        Some(t) => gtk::Image::from_paintable(Some(&t)),
+        None => gtk::Image::new(),
     };
-    picture.set_content_fit(gtk::ContentFit::Cover);
-    picture.set_can_shrink(true);
-    picture.set_size_request(size, size);
-    picture.set_halign(gtk::Align::Center);
-    picture.set_valign(gtk::Align::Center);
-    picture
+    image.set_pixel_size(size);
+    image.set_halign(gtk::Align::Center);
+    image.set_valign(gtk::Align::Center);
+    image
 }
 
 thread_local! {

@@ -3158,14 +3158,14 @@ impl AccountsWindow {
         };
         let picture = self.saved_avatar().and_then(|n| crate::config::avatar_path(&n));
         let emoji = self.saved_emoji();
-        let (glyph, caption) = match (&picture, &emoji) {
-            (Some(path), _) => (crate::ui::initials::avatar_picture(path, 72), i18n("Picture")),
+        let (glyph, caption): (gtk::Widget, String) = match (&picture, &emoji) {
+            (Some(path), _) => (crate::ui::initials::avatar_picture(path, 72).upcast(), i18n("Picture")),
             (None, Some(em)) => (
-                crate::ui::initials::glyph_picture(em, &color, 0.55, 72),
+                crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast(),
                 i18n("Emoji"),
             ),
-            _ if self.picture_mode => (initials(), i18n("Initials until a picture is chosen")),
-            _ => (initials(), i18n("Initials")),
+            _ if self.picture_mode => (initials().upcast(), i18n("Initials until a picture is chosen")),
+            _ => (initials().upcast(), i18n("Initials")),
         };
         disc.append(&glyph);
         widgets.preview_caption.set_label(&caption);
