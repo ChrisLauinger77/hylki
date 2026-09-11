@@ -3717,17 +3717,15 @@ impl Sidebar {
         if !which.any() {
             return;
         }
-        if which.all_inboxes {
-            if self.unified_expanded {
-                self.unified_expanded = false;
-                self.rail_restore.all_inboxes = true;
-            }
-            // The other unified rows fold with it.
-            for (kind, open) in self.kind_expanded.iter_mut() {
-                if *open {
-                    *open = false;
-                    self.rail_restore.kinds.push(*kind);
-                }
+        if which.all_inboxes && self.unified_expanded {
+            self.unified_expanded = false;
+            self.rail_restore.all_inboxes = true;
+        }
+        // The Starred / Sent / Drafts rows, each on its own switch.
+        for (kind, open) in self.kind_expanded.iter_mut() {
+            if *open && which.folds_kind(*kind) {
+                *open = false;
+                self.rail_restore.kinds.push(*kind);
             }
         }
         if which.filtered && self.unified_folders_expanded {
@@ -3770,12 +3768,15 @@ impl Sidebar {
         if !which.any() {
             return;
         }
-        if which.all_inboxes {
-            if std::mem::take(&mut self.rail_restore.all_inboxes) {
-                self.unified_expanded = true;
-            }
-            for kind in std::mem::take(&mut self.rail_restore.kinds) {
+        if which.all_inboxes && std::mem::take(&mut self.rail_restore.all_inboxes) {
+            self.unified_expanded = true;
+        }
+        let kinds = std::mem::take(&mut self.rail_restore.kinds);
+        for kind in kinds {
+            if which.folds_kind(kind) {
                 self.kind_expanded.insert(kind, true);
+            } else {
+                self.rail_restore.kinds.push(kind);
             }
         }
         if which.filtered && std::mem::take(&mut self.rail_restore.filtered) {

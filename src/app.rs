@@ -3036,6 +3036,14 @@ impl SimpleComponent for AppModel {
                         let _ = sb.send(pick());
                     });
                 }
+                // VIREO_SHOWCASE_RAIL=1 collapses the sidebar to the rail
+                // at 3s (the user's own toggle, fold-ups and all).
+                if std::env::var("VIREO_SHOWCASE_RAIL").is_ok() {
+                    let sb = model.sidebar.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        let _ = sb.send(SidebarInput::ToggleCollapsed);
+                    });
+                }
                 // VIREO_SHOWCASE_FOLD_FILTERED folds All Inboxes' Filtered
                 // Folders section, to check its folded header.
                 if std::env::var("VIREO_SHOWCASE_FOLD_FILTERED").is_ok() {

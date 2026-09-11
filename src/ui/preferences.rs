@@ -350,6 +350,9 @@ pub enum PrefInput {
     ToggleRailDots(bool),
     ToggleRailFoldAccounts(bool),
     ToggleRailFoldAllInboxes(bool),
+    ToggleRailFoldStarred(bool),
+    ToggleRailFoldSent(bool),
+    ToggleRailFoldDrafts(bool),
     ToggleRailFoldFiltered(bool),
     ToggleRailFoldTags(bool),
     ChangePreviewLines(u32),
@@ -968,10 +971,37 @@ impl Component for Preferences {
                                     #[name = "rail_fold_all_inboxes_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Fold up All Inboxes"),
-                                        set_subtitle: &i18n("Collapse the per-account inbox list under All \
-                                                       Inboxes in the icon rail."),
+                                        set_subtitle: &i18n("Collapse the account list under All Inboxes in \
+                                                       the icon rail."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_starred_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up Starred"),
+                                        set_subtitle: &i18n("Collapse the account list under the unified Starred row in the icon rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldStarred(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_sent_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up Sent"),
+                                        set_subtitle: &i18n("Collapse the account list under the unified Sent row in the icon rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldSent(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "rail_fold_drafts_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold up Drafts"),
+                                        set_subtitle: &i18n("Collapse the account list under the unified Drafts row in the icon rail."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldDrafts(row.is_active()));
                                         },
                                     },
 
@@ -1669,6 +1699,9 @@ impl Component for Preferences {
         widgets.rail_dots_row.set_active(init.rail_dots);
         widgets.rail_fold_accounts_row.set_active(init.rail_fold.accounts);
         widgets.rail_fold_all_inboxes_row.set_active(init.rail_fold.all_inboxes);
+        widgets.rail_fold_starred_row.set_active(init.rail_fold.starred);
+        widgets.rail_fold_sent_row.set_active(init.rail_fold.sent);
+        widgets.rail_fold_drafts_row.set_active(init.rail_fold.drafts);
         widgets.rail_fold_filtered_row.set_active(init.rail_fold.filtered);
         widgets.rail_fold_tags_row.set_active(init.rail_fold.tags);
         let preview_labels_owned = [i18n("Off"), i18n("1 line"), i18n("2 lines"), i18n("3 lines")];
@@ -2247,6 +2280,18 @@ impl Component for Preferences {
             }
             PrefInput::ToggleRailFoldAllInboxes(on) => {
                 self.rail_fold.all_inboxes = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldStarred(on) => {
+                self.rail_fold.starred = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldSent(on) => {
+                self.rail_fold.sent = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldDrafts(on) => {
+                self.rail_fold.drafts = on;
                 let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
             }
             PrefInput::ToggleRailFoldFiltered(on) => {

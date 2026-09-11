@@ -1794,6 +1794,13 @@ pub struct RailFold {
     /// The per-account inbox list under All Inboxes.
     #[serde(default = "default_on")]
     pub all_inboxes: bool,
+    /// The unified Starred / Sent / Drafts rows' account lists.
+    #[serde(default = "default_on")]
+    pub starred: bool,
+    #[serde(default = "default_on")]
+    pub sent: bool,
+    #[serde(default = "default_on")]
+    pub drafts: bool,
     /// The Filtered Folders section.
     #[serde(default = "default_on")]
     pub filtered: bool,
@@ -1814,21 +1821,48 @@ impl Default for RailFold {
 
 impl RailFold {
     /// Every section.
-    pub const ALL: RailFold =
-        RailFold { accounts: true, all_inboxes: true, filtered: true, tags: true };
+    pub const ALL: RailFold = RailFold {
+        accounts: true,
+        all_inboxes: true,
+        starred: true,
+        sent: true,
+        drafts: true,
+        filtered: true,
+        tags: true,
+    };
 
     /// The switches on here that were off in `before`.
     pub fn gained_since(self, before: RailFold) -> RailFold {
         RailFold {
             accounts: self.accounts && !before.accounts,
             all_inboxes: self.all_inboxes && !before.all_inboxes,
+            starred: self.starred && !before.starred,
+            sent: self.sent && !before.sent,
+            drafts: self.drafts && !before.drafts,
             filtered: self.filtered && !before.filtered,
             tags: self.tags && !before.tags,
         }
     }
 
     pub fn any(self) -> bool {
-        self.accounts || self.all_inboxes || self.filtered || self.tags
+        self.accounts
+            || self.all_inboxes
+            || self.starred
+            || self.sent
+            || self.drafts
+            || self.filtered
+            || self.tags
+    }
+
+    /// Whether the unified row for `kind` (Starred, Sent or Drafts) folds.
+    pub fn folds_kind(self, kind: crate::models::FolderKind) -> bool {
+        use crate::models::FolderKind::*;
+        match kind {
+            Starred => self.starred,
+            Sent => self.sent,
+            Drafts => self.drafts,
+            _ => false,
+        }
     }
 }
 
