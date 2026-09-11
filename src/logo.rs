@@ -2,12 +2,15 @@
 //! initials, so mail from Apple, Amazon or PayPal is recognisable at a glance
 //! (#30).
 //!
-//! The icon comes from the sender's own domain, in descending order of quality:
-//! `apple-touch-icon.png` (180px, and what a site publishes when it cares how it
-//! looks as an icon), then `favicon.ico`. No third-party service is involved and
-//! no per-user identifier is sent, but the request does tell that domain your IP
-//! address — which is exactly what blocking remote content avoids. So this is off
-//! by default and gated behind a Preferences switch, as Gravatar is.
+//! The icon comes from the sender's own domain, the largest it declares first:
+//! the icons its home page links (`<link rel="icon" sizes="192x192">`,
+//! `apple-touch-icon`) and the ones in its web manifest — where the 512px
+//! icons usually live — then the well-known paths, `apple-touch-icon.png`
+//! (180px) and `favicon.ico` (16–48px, the last resort). No third-party service
+//! is involved and no per-user identifier is sent, but the requests do tell
+//! that domain your IP address — which is exactly what blocking remote content
+//! avoids. So this is off by default and gated behind a Preferences switch, as
+//! Gravatar is.
 //!
 //! One fetch per domain per session, remembered either way: a miss is cached too,
 //! or every row from the same sender would ask again.
@@ -163,20 +166,243 @@ pub fn fetch(email: &str) -> Option<Vec<u8>> {
     None
 }
 
-/// Where a site publishes its icon, best first.
+/// Where a site publishes its icon, largest first: what its home page and
+/// web manifest declare, merged with the well-known paths (the root
+/// `apple-touch-icon.png` counts as 180px, `favicon.ico` as 32px) — so a
+/// declared 32px icon still loses to a root apple-touch-icon, and a declared
+/// 512px one is tried before anything else.
 fn candidate_urls(domain: &str) -> Vec<String> {
-    [
-        format!("https://{domain}/apple-touch-icon.png"),
-        format!("https://www.{domain}/apple-touch-icon.png"),
-        format!("https://{domain}/favicon.ico"),
-        format!("https://www.{domain}/favicon.ico"),
-    ]
-    .to_vec()
+    let mut found = discover(domain);
+    found.extend([
+        (180, format!("https://{domain}/apple-touch-icon.png")),
+        (180, format!("https://www.{domain}/apple-touch-icon.png")),
+        (32, format!("https://{domain}/favicon.ico")),
+        (32, format!("https://www.{domain}/favicon.ico")),
+    ]);
+    found.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut out: Vec<String> = Vec::new();
+    for (_, url) in found {
+        if !out.contains(&url) {
+            out.push(url);
+        }
+    }
+    out
+}
+
+/// The icons a site's home page declares — its `<link rel="icon">`s and
+/// `apple-touch-icon`s — and those in its web manifest, each with the size
+/// the site claims for it. Empty when the page cannot be read.
+fn discover(domain: &str) -> Vec<(u32, String)> {
+    let Some((base, html)) = get_text(&format!("https://{domain}/"))
+        .or_else(|| get_text(&format!("https://www.{domain}/")))
+    else {
+        return Vec::new();
+    };
+    let mut found = link_icons(&html, &base);
+    if let Some(manifest) = link_manifest(&html, &base) {
+        if let Some((mbase, json)) = get_text(&manifest) {
+            found.extend(manifest_icons(&json, &mbase));
+        }
+    }
+    found
+}
+
+/// The browser-ish identity sites see: plenty answer a bare library
+/// identity with a challenge page instead of their icon.
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux) Vireo";
+
+/// A page or manifest as text, with the URL it was finally served from (so
+/// relative links resolve against where redirects landed). Capped: the head
+/// of a page is what matters, and a manifest is small.
+fn get_text(url: &str) -> Option<(String, String)> {
+    use std::io::Read;
+    let resp = ureq::get(url)
+        .set("User-Agent", USER_AGENT)
+        .set("Accept", "text/html,application/manifest+json,application/json;q=0.9,*/*;q=0.5")
+        .timeout(std::time::Duration::from_secs(5))
+        .call()
+        .ok()?;
+    let final_url = resp.get_url().to_string();
+    let mut buf = Vec::new();
+    resp.into_reader().take(512 * 1024).read_to_end(&mut buf).ok()?;
+    Some((final_url, String::from_utf8_lossy(&buf).into_owned()))
+}
+
+/// The `<link>` tags of a page, each as its attributes (names lowercased,
+/// entity `&amp;` unescaped in values). A tolerant scan, not a parser: enough
+/// for the `rel`/`href`/`sizes`/`type` of icon links.
+fn link_tags(html: &str) -> Vec<Vec<(String, String)>> {
+    let lower = html.to_ascii_lowercase();
+    let mut tags = Vec::new();
+    let mut at = 0;
+    while let Some(i) = lower[at..].find("<link") {
+        let start = at + i + 5;
+        let Some(len) = html[start..].find('>') else { break };
+        let tag = &html[start..start + len];
+        at = start + len;
+        if !tag.starts_with(|c: char| c.is_whitespace()) {
+            continue;
+        }
+        let mut attrs = Vec::new();
+        let mut rest = tag.trim();
+        while !rest.is_empty() {
+            let name_len = rest
+                .find(|c: char| c == '=' || c.is_whitespace() || c == '/')
+                .unwrap_or(rest.len());
+            let name = rest[..name_len].to_ascii_lowercase();
+            rest = rest[name_len..].trim_start();
+            let mut value = String::new();
+            if let Some(r) = rest.strip_prefix('=') {
+                let r = r.trim_start();
+                if let Some(q) = r.chars().next().filter(|c| *c == '"' || *c == '\'') {
+                    let inner = &r[1..];
+                    let end = inner.find(q).unwrap_or(inner.len());
+                    value = inner[..end].to_string();
+                    rest = inner[end..].strip_prefix(q).unwrap_or("").trim_start();
+                } else {
+                    let end = r.find(|c: char| c.is_whitespace()).unwrap_or(r.len());
+                    value = r[..end].to_string();
+                    rest = r[end..].trim_start();
+                }
+            } else {
+                rest = rest.trim_start_matches('/').trim_start();
+            }
+            if !name.is_empty() {
+                attrs.push((name, value.replace("&amp;", "&")));
+            }
+        }
+        tags.push(attrs);
+    }
+    tags
+}
+
+fn attr<'a>(attrs: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    attrs.iter().find(|(n, _)| n == name).map(|(_, v)| v.as_str())
+}
+
+/// The largest edge a `sizes` attribute claims ("32x32 192x192" → 192;
+/// "any" or nothing → `None`).
+fn largest_size(sizes: Option<&str>) -> Option<u32> {
+    sizes?
+        .split_whitespace()
+        .filter_map(|s| s.split(['x', 'X']).next()?.parse::<u32>().ok())
+        .max()
+}
+
+fn is_svg(href: &str, mime: Option<&str>) -> bool {
+    mime.is_some_and(|t| t.to_ascii_lowercase().contains("svg"))
+        || href.split(['?', '#']).next().unwrap_or("").to_ascii_lowercase().ends_with(".svg")
+}
+
+/// The icon links a page declares, with their claimed (or assumed) sizes.
+/// Vector icons are left out: a pixbuf loader would rasterise them at a
+/// nominal 16px. `mask-icon`s are monochrome silhouettes, not the brand.
+fn link_icons(html: &str, base: &str) -> Vec<(u32, String)> {
+    let mut out = Vec::new();
+    for attrs in link_tags(html) {
+        let Some(href) = attr(&attrs, "href").map(str::trim).filter(|h| !h.is_empty()) else { continue };
+        let rel = attr(&attrs, "rel").unwrap_or("").to_ascii_lowercase();
+        let rels: Vec<&str> = rel.split_whitespace().collect();
+        if is_svg(href, attr(&attrs, "type")) || rels.contains(&"mask-icon") {
+            continue;
+        }
+        let claimed = largest_size(attr(&attrs, "sizes"));
+        let size = if rels.iter().any(|r| r.starts_with("apple-touch-icon")) {
+            claimed.unwrap_or(180)
+        } else if rels.contains(&"fluid-icon") {
+            claimed.unwrap_or(128)
+        } else if rels.contains(&"icon") {
+            claimed.unwrap_or(48)
+        } else {
+            continue;
+        };
+        if let Some(url) = resolve_url(base, href) {
+            out.push((size, url));
+        }
+    }
+    out
+}
+
+/// The page's web manifest, if it links one.
+fn link_manifest(html: &str, base: &str) -> Option<String> {
+    link_tags(html).into_iter().find_map(|attrs| {
+        let rel = attr(&attrs, "rel")?.to_ascii_lowercase();
+        if !rel.split_whitespace().any(|r| r == "manifest") {
+            return None;
+        }
+        resolve_url(base, attr(&attrs, "href")?.trim())
+    })
+}
+
+/// The icons a web manifest lists, with their claimed sizes.
+fn manifest_icons(json: &str, base: &str) -> Vec<(u32, String)> {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return Vec::new() };
+    v["icons"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|icon| {
+            let src = icon["src"].as_str()?.trim();
+            if src.is_empty() || is_svg(src, icon["type"].as_str()) {
+                return None;
+            }
+            let size = largest_size(icon["sizes"].as_str()).unwrap_or(48);
+            Some((size, resolve_url(base, src)?))
+        })
+        .collect()
+}
+
+/// `href` as seen from `base` (an absolute URL): absolute, scheme-relative,
+/// root-relative or relative to the base's directory. Only `http(s)`.
+fn resolve_url(base: &str, href: &str) -> Option<String> {
+    let href = href.trim();
+    let lower = href.to_ascii_lowercase();
+    if lower.starts_with("https://") || lower.starts_with("http://") {
+        return Some(href.to_string());
+    }
+    if lower.starts_with("//") {
+        return Some(format!("https:{href}"));
+    }
+    if href.contains(':') && !href.starts_with('/') && !href.starts_with('.') {
+        // data:, mailto: and the like.
+        return None;
+    }
+    let scheme_end = base.find("://")? + 3;
+    let host_end = base[scheme_end..].find('/').map(|i| scheme_end + i).unwrap_or(base.len());
+    let origin = &base[..host_end];
+    if let Some(rest) = href.strip_prefix('/') {
+        return Some(format!("{origin}/{rest}"));
+    }
+    let path = &base[host_end..];
+    let dir = match path.rfind('/') {
+        Some(i) => &path[..=i],
+        None => "/",
+    };
+    let mut segments: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
+    let mut tail = href;
+    loop {
+        if let Some(r) = tail.strip_prefix("../") {
+            segments.pop();
+            tail = r;
+        } else if let Some(r) = tail.strip_prefix("./") {
+            tail = r;
+        } else {
+            break;
+        }
+    }
+    let mut url = format!("{origin}/");
+    for seg in segments {
+        url.push_str(seg);
+        url.push('/');
+    }
+    url.push_str(tail);
+    Some(url)
 }
 
 fn get(url: &str) -> Option<Vec<u8>> {
     use std::io::Read;
     let resp = ureq::get(url)
+        .set("User-Agent", USER_AGENT)
         .timeout(std::time::Duration::from_secs(5))
         .call()
         .ok()?;
@@ -321,6 +547,43 @@ mod tests {
         // Country-code pairs keep three labels.
         assert_eq!(domain_of("a@mail.bbc.co.uk").as_deref(), Some("bbc.co.uk"));
         assert_eq!(domain_of("a@shop.example.com.au").as_deref(), Some("example.com.au"));
+    }
+
+    #[test]
+    fn declared_icons_are_found_and_ranked_by_size() {
+        let html = r##"<html><head>
+            <link rel='stylesheet' href='/style.css'>
+            <link rel="icon" href="/img/favicon-32x32.png" sizes="32x32" />
+            <LINK REL="icon" HREF="//cdn.example.com/icon-192.png?v=2&amp;x=1" SIZES="192x192">
+            <link rel="apple-touch-icon" href="touch.png">
+            <link rel="icon" type="image/svg+xml" href="/icon.svg">
+            <link rel="mask-icon" href="/pin.png" color="#000">
+            <link rel="manifest" href="../site.webmanifest">
+            </head></html>"##;
+        let base = "https://www.example.com/a/b/index.html";
+        let icons = link_icons(html, base);
+        assert_eq!(
+            icons,
+            vec![
+                (32, "https://www.example.com/img/favicon-32x32.png".to_string()),
+                (192, "https://cdn.example.com/icon-192.png?v=2&x=1".to_string()),
+                (180, "https://www.example.com/a/b/touch.png".to_string()),
+            ]
+        );
+        assert_eq!(link_manifest(html, base).as_deref(), Some("https://www.example.com/a/site.webmanifest"));
+        let manifest = r#"{"icons":[{"src":"/i/512.png","sizes":"512x512","type":"image/png"},
+                                     {"src":"v.svg","sizes":"any","type":"image/svg+xml"},
+                                     {"src":"i/any.png","sizes":"any"}]}"#;
+        assert_eq!(
+            manifest_icons(manifest, "https://www.example.com/a/site.webmanifest"),
+            vec![
+                (512, "https://www.example.com/i/512.png".to_string()),
+                (48, "https://www.example.com/a/i/any.png".to_string()),
+            ]
+        );
+        assert_eq!(largest_size(Some("16x16 48x48 32x32")), Some(48));
+        assert_eq!(resolve_url("https://example.com", "favicon.ico").as_deref(), Some("https://example.com/favicon.ico"));
+        assert_eq!(resolve_url("https://example.com/", "data:image/png;base64,AAAA"), None);
     }
 
     #[test]
