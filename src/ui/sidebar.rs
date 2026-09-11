@@ -1997,11 +1997,12 @@ impl Sidebar {
             // Drawn ink-centred (see `ui::initials`), not a label: a lone
             // letter or an emoji sits exactly in the middle of the disc.
             let glyph = match &section.emoji {
-                Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.55),
+                Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30),
                 _ => crate::ui::initials::glyph_picture(
                     &account_initials(&name_str, &section.account.email),
                     &section.color,
                     0.47,
+                    30,
                 ),
             };
             circle.append(&glyph);
@@ -3868,11 +3869,12 @@ fn build_unified_inbox_row(
     circle.set_hexpand(false);
     circle.set_size_request(21, 21);
     let glyph = match &section.emoji {
-        Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.6),
+        Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.6, 21),
         _ => crate::ui::initials::glyph_picture(
             &account_initials(label, &section.account.email),
             &section.color,
             0.5,
+            21,
         ),
     };
     circle.append(&glyph);

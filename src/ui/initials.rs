@@ -186,15 +186,17 @@ impl InitialsPaintable {
 }
 
 /// A sidebar circle's glyph: `text` ink-centred in the colour that reads
-/// on `bg_hex` (the circle's own ground, painted by its CSS), filling
-/// whatever square it is given.
-pub fn glyph_picture(text: &str, bg_hex: &str, scale: f64) -> gtk::Picture {
+/// on `bg_hex` (the circle's own ground, painted by its CSS), exactly
+/// `size` square — sized outright rather than expanding, since an expand
+/// flag would climb into the row and stretch it.
+pub fn glyph_picture(text: &str, bg_hex: &str, scale: f64, size: i32) -> gtk::Picture {
     let fg = gdk::RGBA::parse(crate::color::readable_text(bg_hex)).unwrap_or(gdk::RGBA::WHITE);
     let picture = gtk::Picture::for_paintable(&InitialsPaintable::glyph(text, fg, scale));
     picture.set_content_fit(gtk::ContentFit::Fill);
     picture.set_can_shrink(true);
-    picture.set_hexpand(true);
-    picture.set_vexpand(true);
+    picture.set_size_request(size, size);
+    picture.set_halign(gtk::Align::Center);
+    picture.set_valign(gtk::Align::Center);
     picture
 }
 
