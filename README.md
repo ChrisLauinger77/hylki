@@ -471,8 +471,13 @@ down the deletes that failed on Zimbra, both in 1.22; to
 attachments, [**yioannides**](https://github.com/yioannides) for Empty Trash,
 the reply-panel fields and the single-message card, and
 [**EmmanuelP**](https://github.com/EmmanuelP) for the quote-folding and
-Quote-button reports, all in 1.25; and to everyone who files issues and
-ideas.
+Quote-button reports, all in 1.25; to
+[**yioannides**](https://github.com/yioannides) for the sidebar
+consolidation proposal, picture avatars and the reply-target and menu
+reports, [**7system7**](https://github.com/7system7) for the preview
+charset and tag-refresh reports, [**Peter Weiss**](https://github.com/peterweissdk)
+for the Move To button and [**frenchy82**](https://github.com/frenchy82) for
+Not Spam, all in 1.27; and to everyone who files issues and ideas.
 
 Pull requests are welcome. There's no CLA — by opening one you agree your
 contribution ships under the [AGPL-3.0-or-later](LICENSE), and it may be adapted

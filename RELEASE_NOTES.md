@@ -2,6 +2,62 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.27.0
+
+**Move To.** The reader toolbar has a folder button. It opens a list of the account's folders, indented as in the sidebar, with a search box; type a few letters and press Enter to file the message, or click a folder. With several messages selected it moves them all. Requested by [@peterweissdk](https://github.com/peterweissdk) (#164).
+
+**Reply answers the latest message.** Replying to a conversation from the toolbar used to answer its oldest message. With "Newest first" on it now answers the newest message from someone else, so you never answer your own last reply by accident; with oldest first it answers the first message, as the pane shows it. Clicking a message's card still answers that message. Reported by [@yioannides](https://github.com/yioannides) (#165).
+
+**Tags set elsewhere show up.** A tag put on a message from another computer did not appear in the tag's list here until the folder holding the message was opened. Opening a tag's list, or refreshing while it is open, now asks the server for every tagged message. Reported by [@7system7](https://github.com/7system7) (#166).
+
+**A picture for your account.** The account editor can take a photo or logo from your computer for the sidebar circle, in place of the emoji or initials. The editor shows the circle as it will look, above the settings that shape it, with a toggle between "Initials or emoji" and "Picture" and an "Account accent color" of its own. Requested by [@yioannides](https://github.com/yioannides) (#162).
+
+**The Actions Palette as a menu.** Settings, Reading has "Actions Palette as a menu": the ⋯ on a message row then opens the same menu a right-click shows, instead of sliding the palette out.
+
+**Smaller things.** The Send Later menu's rows are no longer bold (reported by [@yioannides](https://github.com/yioannides), #167). Find in message sits beside Print and greys out when nothing is open rather than disappearing, so the toolbar keeps its layout. Add Alias… looks like the other panels' add buttons.
+
+**Find your tags.** Settings, Tags has "Find Tags…". It reads every mailbox on every account for the tags other clients have already set, Thunderbird's built-ins included, and lists the ones not set up here with a proposed name and colour. Import them all, or tick the ones you want. Microsoft 365 accounts offer their categories, colours and all.
+
+**Not Spam.** In Junk, everywhere that offered "Mark as Spam" now offers "Not Spam": the right-click menu, the bulk bar, the row's action palette, the reader toolbar and the spam shortcut. The server is told the message is wanted and it goes back to the Inbox. Reported by [@frenchy82](https://github.com/frenchy82) (#168).
+
+**Sender logos at full size.** Vireo only ever asked a site for its root favicon, so many senders showed a tiny icon scaled up. It now reads the icons the site's home page and web manifest declare and takes the largest. Logos already on disk refresh within a week; delete `~/.local/share/vireo/logos` to see the difference at once.
+
+**Initials, centred.** The letters in the message list's circles, the sidebar's account circles and the reader cards' circles are centred by the ink they draw, so a lone letter no longer drifts and pairs no longer lean. Colours are unchanged.
+
+**Composing in a narrow pane.** When the reader pane is too narrow for the full compose toolbar, the actions fold into a ⋯ menu so Cancel, Send and the window's close button always fit. The Send button's label, Delete Draft and the cloud button also now update as they should while composing.
+
+**Tags in the menu.** The right-click menu keeps its tags behind a "Tags ›" row that opens its own page, so a long list of tags never makes the menu taller than the screen.
+
+**Sidebar.** Collapsing to the icon rail, or expanding back, no longer flashes stretched icons. The unified Inboxes chip counts the inboxes only; folders a filter files into keep their own chips under Filters. Right-clicking a conversation's top row reliably opens its menu.
+
+**Settings.** Add Account…, Add Filter…, Add Tag… and Find Tags… are the same kind of button in the same place on every panel.
+
+**Filters.** The unified row is called Filters. Every folder a rule files into is listed there; the section switches on and off as a whole, and the per-rule "Show under All Inboxes" switch is gone. Under each account, a folder that a filter files into is marked in place: a custom folder shows the filter-folder glyph in the account's colour, and a main folder such as Archive keeps its own icon with a small filter mark on the corner in the account's colour. Right-click any of them, under the account or in the Filters row, for "Edit Filter…", which opens that rule. The folder menu is the same wherever the folder appears.
+
+**Tags.** Each account's Tags section sits above its folder list. Right-click a tag anywhere it appears for "Edit Tag…".
+
+**Filters and tags edit in a page.** Adding or editing a filter or a tag slides a page in over the list, like the account and cloud storage editors, with Save in its header. The list cards show a chevron, and the per-card "Count unread" switch moved into the filter's editor.
+
+**Unread counts per row.** Settings, Sidebar, Unified has an "Unread counts" expander with a switch for Inboxes, Starred, Drafts, Archive and Filters. Switch one off and that row shows no unread chip. Chips are also capped: a very large count ends in an ellipsis rather than pushing the row wider than the sidebar.
+
+**Renamed folders.** Renaming the open folder used to leave Vireo asking the server for the old name on every fetch, with a "Could not load" error each minute. The selection now follows the rename.
+
+**Also.** "All Inboxes" is "Inboxes". Archive joins the unified section. Opening a tag shows its cached list at once. The icons under Filters and Tags line up with the header's.
+
+**Previews in the right charset.** The preview line under a subject read every message as UTF-8, so mail sent in a Central European charset showed a row of replacement characters even though the message itself was fine. The preview now reads the charset the message declares, and rows already showing replacement characters clean themselves up. Reported by [@7system7](https://github.com/7system7) (#159).
+
+**The unified section.** All Inboxes has company: Starred, Sent and Drafts rows, each combining that folder across every account. Click a row for the combined list, or open its caret for each account's own folder. Filtered Folders and Tags placed in the unified section are the same kind of row now, and their headers open every filtered folder combined, and every tagged message. Placed above or below the accounts, they keep the heading style they had. Settings, Sidebar, Unified has a switch for each row.
+
+**Every account has its own Filtered Folders and Tags.** Under each account's Folders heading: every folder its rules file into, and every tag scoped to that account. They are there whatever the unified section shows.
+
+**Only the unified section, if you like.** "Accounts in the sidebar" (Settings, Sidebar; also "Show Accounts" in the main menu, or Ctrl+Shift+A) hides the account sections altogether.
+
+**The sidebar remembers itself.** Which accounts, folders and sections are open comes back after a restart. "Remember the sidebar layout" turns that off, in which case every launch starts with everything folded up; "Remember icon rail state" decides separately whether the sidebar reopens as the icon rail.
+
+**The icon rail.** Unread counts can be a dot in the accent colour instead of a number. "Fold up expanded items" makes the items you tick start folded whenever the sidebar collapses to the rail; a long-press in the rail still expands or collapses any of them, and the full sidebar comes back exactly as you left it. The rail has no chevron buttons any more: long-press an icon instead (the full sidebar keeps its chevrons and takes the long-press too). Two headings that sat slightly off-centre in the rail are centred.
+
+**Faster.** Switching folders, including into the combined views, now paints in tens of milliseconds rather than several hundred, whatever the size of the mailbox, and Settings opens in tens of milliseconds rather than a second or more (with many accounts, several seconds). Sent folders no longer show an unread chip, tag rows line up with the filtered folder rows, and the Settings window switches sections without a fade.
+
 ## What's new in 1.26.0
 
 **Choose the sender for new messages.** Settings, Composing has "Send new messages from": the account of the current folder, as before, or any of your accounts or aliases. New messages, messages to a contact, mailto links and files sent from the file manager all start from that address. Replies still answer from the address the original was sent to. Requested by [@7system7](https://github.com/7system7) (#157).

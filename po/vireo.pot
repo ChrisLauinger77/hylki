@@ -58,10 +58,13 @@ msgstr ""
 msgid "Flag"
 msgstr ""
 
+msgid "Print Preview (Ctrl+Shift+P)"
+msgstr ""
+
 msgid "Find in message (Ctrl+F)"
 msgstr ""
 
-msgid "Print Preview (Ctrl+Shift+P)"
+msgid "Not Spam"
 msgstr ""
 
 msgid "Mark as Spam"
@@ -91,6 +94,9 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
+msgid "Show Accounts"
+msgstr ""
+
 msgid "Print Preview…"
 msgstr ""
 
@@ -104,6 +110,9 @@ msgid "Actions"
 msgstr ""
 
 msgid "Tags"
+msgstr ""
+
+msgid "Move To…"
 msgstr ""
 
 msgid "Refresh or long-press for Status Bar"
@@ -364,6 +373,9 @@ msgstr ""
 msgid "No Junk folder available for this account"
 msgstr ""
 
+msgid "No Inbox folder available for this account"
+msgstr ""
+
 msgid "No address book available to add contacts"
 msgstr ""
 
@@ -513,6 +525,9 @@ msgid "Preview it as a PDF first"
 msgstr ""
 
 msgid "Reveal the status bar (also: long-press Refresh)"
+msgstr ""
+
+msgid "Show or hide the accounts in the sidebar"
 msgstr ""
 
 msgid "Console mode (when enabled in Settings)"
@@ -716,23 +731,31 @@ msgstr ""
 msgid "Drag to set the order they appear in the sidebar."
 msgstr ""
 
+msgid "Add Account…"
+msgstr ""
+
 msgid "GNOME Online Accounts"
 msgstr ""
 
 msgid "Mail accounts from GNOME Settings. Toggle one on to use it in Vireo."
 msgstr ""
 
-msgid "Add Account"
-msgstr ""
-
 msgid ""
 "Label messages with one or more coloured tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same "
-"tags. Drag a tag to reorder: the order here is the sidebar's, and the first "
-"nine answer to the 1–9 keys."
+"tags.\n"
+"\n"
+"Drag a tag to reorder: the order here is the sidebar's, and the first nine "
+"answer to the 1–9 keys."
 msgstr ""
 
 msgid "Add Tag…"
+msgstr ""
+
+msgid "Look through every mailbox for tags other clients have set"
+msgstr ""
+
+msgid "Find Tags…"
 msgstr ""
 
 msgid "Search filters"
@@ -887,25 +910,40 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-msgid "How this account is shown in the sidebar and the All Inboxes view."
+msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 
 msgid "Label (defaults to email address)"
 msgstr ""
 
-msgid "Circle color"
+msgid "Account accent color"
+msgstr ""
+
+msgid "The circle, and this account's marks in the sidebar and lists"
+msgstr ""
+
+msgid "Circle shows"
+msgstr ""
+
+msgid "Initials or emoji"
+msgstr ""
+
+msgid "Picture"
 msgstr ""
 
 msgid "Emoji"
 msgstr ""
 
-msgid "Optional — shown instead of initials"
+msgid "Shown in the circle instead of the initials"
+msgstr ""
+
+msgid "Choose…"
 msgstr ""
 
 msgid "Use initials"
 msgstr ""
 
-msgid "Show name initials instead of an emoji"
+msgid "A photo or logo from this computer"
 msgstr ""
 
 msgid "Send-as aliases"
@@ -1001,6 +1039,12 @@ msgid "On"
 msgstr ""
 
 msgid "Off"
+msgstr ""
+
+msgid "Choose a Picture"
+msgstr ""
+
+msgid "Images"
 msgstr ""
 
 msgid "Testing…"
@@ -1115,6 +1159,32 @@ msgstr ""
 msgid "Remove filter"
 msgstr ""
 
+msgid "Searching…"
+msgstr ""
+
+msgid "No New Tags"
+msgstr ""
+
+msgid "No tags were found in your mailboxes that are not already set up here."
+msgstr ""
+
+msgid "Tags Found"
+msgstr ""
+
+msgid ""
+"{n} tags are in use in your mailboxes but not set up here. Import them all, "
+"or choose which to add. Names and colours can be changed afterwards."
+msgstr ""
+
+msgid "Import Selected"
+msgstr ""
+
+msgid "Import All"
+msgstr ""
+
+msgid "{n} messages"
+msgstr ""
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -1204,10 +1274,7 @@ msgstr ""
 msgid "Count unread mail"
 msgstr ""
 
-msgid "Include the folder's unread mail in the unread count and the tray icon"
-msgstr ""
-
-msgid "Show under All Inboxes"
+msgid "Include the folder's unread mail in the tray icon's unread count"
 msgstr ""
 
 msgid "Thumbnail size"
@@ -1281,9 +1348,6 @@ msgstr ""
 msgid "All types"
 msgstr ""
 
-msgid "Images"
-msgstr ""
-
 msgid "PDFs"
 msgstr ""
 
@@ -1354,9 +1418,6 @@ msgid ""
 "\n"
 "Supported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and "
 "Seafile."
-msgstr ""
-
-msgid "Add Account…"
 msgstr ""
 
 msgid "No cloud accounts yet."
@@ -1783,19 +1844,25 @@ msgstr ""
 msgid "Add website"
 msgstr ""
 
+msgid "Search folders"
+msgstr ""
+
 msgid "Mark as read"
+msgstr ""
+
+msgid "Star"
+msgstr ""
+
+msgid "Not spam"
+msgstr ""
+
+msgid "Add sender to Contacts"
 msgstr ""
 
 msgid "Mark as unread"
 msgstr ""
 
 msgid "Remove star"
-msgstr ""
-
-msgid "Star"
-msgstr ""
-
-msgid "Add sender to Contacts"
 msgstr ""
 
 msgid "Show conversation"
@@ -2257,6 +2324,22 @@ msgstr ""
 msgid "Backup"
 msgstr ""
 
+msgid "Save the filter?"
+msgstr ""
+
+msgid ""
+"The filter editor is open. Save what you changed, or discard it, before "
+"moving on."
+msgstr ""
+
+msgid "Save the tag?"
+msgstr ""
+
+msgid ""
+"The tag editor is open. Save what you changed, or discard it, before moving "
+"on."
+msgstr ""
+
 msgid "Save the account?"
 msgstr ""
 
@@ -2308,51 +2391,20 @@ msgstr ""
 msgid "The view shown first when Settings is opened from the menu."
 msgstr ""
 
-msgid "All Inboxes"
+msgid "Accounts in the sidebar"
 msgstr ""
 
 msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-
-msgid "All Inboxes unread count"
-msgstr ""
-
-msgid ""
-"Show the combined unread chip next to All Inboxes while its per-account list "
-"is folded up."
-msgstr ""
-
-msgid "Filtered Folders section"
-msgstr ""
-
-msgid ""
-"List the folders your filter rules file into in a collapsible section. Each "
-"rule chooses whether its folder appears there; this switch hides the section "
-"altogether."
-msgstr ""
-
-msgid "Filtered Folders placement"
-msgstr ""
-
-msgid ""
-"Inside All Inboxes, folding away with it, or in the scrolling sidebar above "
-"or below the accounts."
-msgstr ""
-
-msgid "Tags placement"
-msgstr ""
-
-msgid "Where the Tags section sits, with the same choices."
+"Each account's own section: its folders, filtered folders and tags. Off "
+"leaves the unified section alone. Also in the main menu, and Ctrl+Shift+A."
 msgstr ""
 
 msgid "Chevron placement"
 msgstr ""
 
 msgid ""
-"Which side of All Inboxes and the account rows their expand/collapse "
-"chevrons sit on."
+"Which side of Inboxes and the account rows their expand/collapse chevrons "
+"sit on."
 msgstr ""
 
 msgid "Attachments in the sidebar"
@@ -2377,6 +2429,138 @@ msgid ""
 "Whenever the sidebar is collapsed to its icon rail, hovering it floats the "
 "full sidebar out over the panes; it folds back a moment after the pointer "
 "leaves."
+msgstr ""
+
+msgid "Remember the sidebar layout"
+msgstr ""
+
+msgid ""
+"Reopen with the accounts, folders and sections as you left them. Off starts "
+"every launch with everything folded up."
+msgstr ""
+
+msgid "Remember icon rail state"
+msgstr ""
+
+msgid ""
+"Reopen with icon rail in the last used state. Off starts every launch with "
+"the full sidebar."
+msgstr ""
+
+msgid "Unified"
+msgstr ""
+
+msgid ""
+"The section at the top of the sidebar that combines every account. Only "
+"shown with more than one account."
+msgstr ""
+
+msgid "Inboxes"
+msgstr ""
+
+msgid ""
+"A unified inbox combining every account, at the top of the sidebar. Only "
+"shown with more than one account."
+msgstr ""
+
+msgid "Starred"
+msgstr ""
+
+msgid ""
+"Every account's starred folder as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's sent mail as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's drafts as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's archive as one list, opening to each account's own."
+msgstr ""
+
+msgid ""
+"List every folder your filter rules file into in a collapsible section of "
+"the unified view."
+msgstr ""
+
+msgid ""
+"The tags, each showing every account's mail with it. Each account keeps its "
+"own Tags section either way."
+msgstr ""
+
+msgid "Unread counts"
+msgstr ""
+
+msgid ""
+"Which unified rows show their combined unread chip while folded up. "
+"Expanded, the rows beneath carry the counts. Sent never shows one."
+msgstr ""
+
+msgid "Filters placement"
+msgstr ""
+
+msgid ""
+"In the unified section, as a row like Inboxes whose caret opens the folders; "
+"or above or below the accounts as a heading with its own list."
+msgstr ""
+
+msgid "Tags placement"
+msgstr ""
+
+msgid ""
+"The same choices for the Tags section: a unified row, or a heading above or "
+"below the accounts."
+msgstr ""
+
+msgid "Icon rail"
+msgstr ""
+
+msgid "The sidebar collapsed to icons, by its button or in a narrow window."
+msgstr ""
+
+msgid "Unread dots instead of counts"
+msgstr ""
+
+msgid ""
+"Mark folders and accounts that have unread mail with a dot in the accent "
+"colour rather than the number of messages. The count stays in the tooltip."
+msgstr ""
+
+msgid "Fold up expanded items"
+msgstr ""
+
+msgid ""
+"When the sidebar collapses to the icon rail, the items switched on below "
+"start folded up. A long-press in the rail still expands or collapses any of "
+"them, and the full sidebar comes back exactly as you left it."
+msgstr ""
+
+msgid "All accounts"
+msgstr ""
+
+msgid "Every account's folder list."
+msgstr ""
+
+msgid "The account list under Inboxes."
+msgstr ""
+
+msgid "The account list under the unified Starred row."
+msgstr ""
+
+msgid "The account list under the unified Sent row."
+msgstr ""
+
+msgid "The account list under the unified Drafts row."
+msgstr ""
+
+msgid "The account list under the unified Archive row."
+msgstr ""
+
+msgid "The folders under the Filters row."
+msgstr ""
+
+msgid "The tags under the Tags row."
 msgstr ""
 
 msgid "Sender avatars"
@@ -2410,6 +2594,14 @@ msgstr ""
 msgid ""
 "The message list's ⋯ palette slides open by itself while the pointer rests "
 "on a row."
+msgstr ""
+
+msgid "Actions Palette as a menu"
+msgstr ""
+
+msgid ""
+"The ⋯ opens the row's menu, the same one a right-click shows, instead of "
+"sliding the palette out."
 msgstr ""
 
 msgid "Swipe actions"
@@ -2723,7 +2915,7 @@ msgid ""
 "backup carries."
 msgstr ""
 
-msgid "Inside All Inboxes"
+msgid "In the unified section"
 msgstr ""
 
 msgid "Above the accounts"
@@ -2854,6 +3046,9 @@ msgstr ""
 msgid "Insert"
 msgstr ""
 
+msgid "Folder"
+msgstr ""
+
 msgid "Add account"
 msgstr ""
 
@@ -2863,22 +3058,19 @@ msgstr ""
 msgid "No accounts yet"
 msgstr ""
 
-msgid "Show each inbox"
-msgstr ""
-
-msgid "Refresh"
-msgstr ""
-
-msgid "Account Settings…"
-msgstr ""
-
 msgid "Outbox"
 msgstr ""
 
 msgid "Mark Inbox as Read"
 msgstr ""
 
+msgid "Refresh"
+msgstr ""
+
 msgid "New Folder…"
+msgstr ""
+
+msgid "Account Settings…"
 msgstr ""
 
 msgid "Remove Account…"
@@ -2896,7 +3088,22 @@ msgstr ""
 msgid "Add Folder"
 msgstr ""
 
-msgid "Filtered Folders"
+msgid "Show each inbox"
+msgstr ""
+
+msgid "Show each account"
+msgstr ""
+
+msgid "Show each folder"
+msgstr ""
+
+msgid "Show each tag"
+msgstr ""
+
+msgid "Long-press to expand or collapse"
+msgstr ""
+
+msgid "Edit Filter…"
 msgstr ""
 
 msgid "Rename Folder…"
@@ -2909,6 +3116,9 @@ msgid "Empty Trash…"
 msgstr ""
 
 msgid "Empty Junk…"
+msgstr ""
+
+msgid "Edit Tag…"
 msgstr ""
 
 msgid "Welcome to Vireo"
@@ -3142,6 +3352,12 @@ msgstr ""
 msgid "Could not mark as spam: {e}"
 msgstr ""
 
+msgid "Could not mark as not spam: {e}"
+msgstr ""
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr ""
+
 msgid "Could not move message: {e}"
 msgstr ""
 
@@ -3269,7 +3485,7 @@ msgstr ""
 msgid "Features:"
 msgstr ""
 
-msgid "Multiple IMAP and POP3 accounts, with a unified All Inboxes view"
+msgid "Multiple IMAP and POP3 accounts, with a unified Inboxes view"
 msgstr ""
 
 msgid ""

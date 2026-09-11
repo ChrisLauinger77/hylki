@@ -64,11 +64,14 @@ msgstr "Marquer comme non lu"
 msgid "Flag"
 msgstr "Suivre"
 
+msgid "Print Preview (Ctrl+Shift+P)"
+msgstr "Aperçu avant impression (Ctrl+Maj+P)"
+
 msgid "Find in message (Ctrl+F)"
 msgstr "Rechercher dans le message (Ctrl+F)"
 
-msgid "Print Preview (Ctrl+Shift+P)"
-msgstr "Aperçu avant impression (Ctrl+Maj+P)"
+msgid "Not Spam"
+msgstr ""
 
 msgid "Mark as Spam"
 msgstr "Marquer comme indésirable"
@@ -97,6 +100,10 @@ msgstr "Télécharger…"
 msgid "Settings"
 msgstr "Paramètres"
 
+#, fuzzy
+msgid "Show Accounts"
+msgstr "Comptes"
+
 msgid "Print Preview…"
 msgstr "Aperçu avant impression…"
 
@@ -111,6 +118,10 @@ msgstr "Actions"
 
 msgid "Tags"
 msgstr "Mots-clés"
+
+#, fuzzy
+msgid "Move To…"
+msgstr "Déplacer vers"
 
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualiser ou appuyer longuement pour la barre d'état"
@@ -389,6 +400,10 @@ msgstr "Vider"
 msgid "No Junk folder available for this account"
 msgstr "Aucun dossier Indésirables disponible pour ce compte"
 
+#, fuzzy
+msgid "No Inbox folder available for this account"
+msgstr "Aucun dossier Indésirables disponible pour ce compte"
+
 msgid "No address book available to add contacts"
 msgstr "Aucun carnet d'adresses disponible pour ajouter des contacts"
 
@@ -543,6 +558,10 @@ msgstr "Commencez par le prévisualiser au format PDF"
 
 msgid "Reveal the status bar (also: long-press Refresh)"
 msgstr "Afficher la barre d'état (ou appui long sur Actualiser)"
+
+#, fuzzy
+msgid "Show or hide the accounts in the sidebar"
+msgstr "Contacts dans la barre latérale"
 
 msgid "Console mode (when enabled in Settings)"
 msgstr "Mode console (si activé dans les paramètres)"
@@ -764,6 +783,9 @@ msgid "Drag to set the order they appear in the sidebar."
 msgstr ""
 "Faites glisser pour modifier l'ordre d'affichage dans la barre latérale."
 
+msgid "Add Account…"
+msgstr "Ajouter un compte…"
+
 msgid "GNOME Online Accounts"
 msgstr "GNOME Comptes en ligne"
 
@@ -772,17 +794,28 @@ msgstr ""
 "Comptes e-mail issus des Paramètres de GNOME. Activez-en un pour l'utiliser "
 "dans Vireo."
 
-msgid "Add Account"
-msgstr "Ajouter un compte"
-
+#, fuzzy
 msgid ""
 "Label messages with one or more coloured tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same "
-"tags. Drag a tag to reorder: the order here is the sidebar's, and the first "
-"nine answer to the 1–9 keys."
+"tags.\n"
+"\n"
+"Drag a tag to reorder: the order here is the sidebar's, and the first nine "
+"answer to the 1–9 keys."
 msgstr ""
+"Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
+"étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
+"clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
+"étiquettes."
 
 msgid "Add Tag…"
+msgstr "Ajouter un tag…"
+
+msgid "Look through every mailbox for tags other clients have set"
+msgstr ""
+
+#, fuzzy
+msgid "Find Tags…"
 msgstr "Ajouter un tag…"
 
 msgid "Search filters"
@@ -957,7 +990,8 @@ msgstr "Tester la connexion"
 msgid "Appearance"
 msgstr "Apparence"
 
-msgid "How this account is shown in the sidebar and the All Inboxes view."
+#, fuzzy
+msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Comment ce compte est affiché dans la barre latérale et dans la vue Toutes "
 "les boîtes de réception."
@@ -965,20 +999,38 @@ msgstr ""
 msgid "Label (defaults to email address)"
 msgstr "Étiquette (adresse e-mail par défaut)"
 
-msgid "Circle color"
+msgid "Account accent color"
+msgstr ""
+
+msgid "The circle, and this account's marks in the sidebar and lists"
+msgstr ""
+
+#, fuzzy
+msgid "Circle shows"
 msgstr "Couleur du cercle"
+
+msgid "Initials or emoji"
+msgstr ""
+
+#, fuzzy
+msgid "Picture"
+msgstr "Signature"
 
 msgid "Emoji"
 msgstr "Émoji"
 
-msgid "Optional — shown instead of initials"
+#, fuzzy
+msgid "Shown in the circle instead of the initials"
 msgstr "Optionnel — affiché à la place des initiales"
+
+msgid "Choose…"
+msgstr ""
 
 msgid "Use initials"
 msgstr "Utiliser les initiales"
 
-msgid "Show name initials instead of an emoji"
-msgstr "Afficher les initiales du nom au lieu d'un émoji"
+msgid "A photo or logo from this computer"
+msgstr ""
 
 msgid "Send-as aliases"
 msgstr "Alias d'expédition"
@@ -1088,6 +1140,12 @@ msgstr "Activé"
 
 msgid "Off"
 msgstr "Désactivé"
+
+msgid "Choose a Picture"
+msgstr ""
+
+msgid "Images"
+msgstr "Images"
 
 msgid "Testing…"
 msgstr "Test en cours…"
@@ -1206,6 +1264,36 @@ msgstr ", marqué {tag}"
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
 
+#, fuzzy
+msgid "Searching…"
+msgstr "Synchronisation…"
+
+msgid "No New Tags"
+msgstr ""
+
+msgid "No tags were found in your mailboxes that are not already set up here."
+msgstr ""
+
+msgid "Tags Found"
+msgstr ""
+
+msgid ""
+"{n} tags are in use in your mailboxes but not set up here. Import them all, "
+"or choose which to add. Names and colours can be changed afterwards."
+msgstr ""
+
+#, fuzzy
+msgid "Import Selected"
+msgstr "Importer des paramètres"
+
+#, fuzzy
+msgid "Import All"
+msgstr "Importer la clé"
+
+#, fuzzy
+msgid "{n} messages"
+msgstr "Supprimer {n} messages"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -1300,13 +1388,11 @@ msgstr "Aucun"
 msgid "Count unread mail"
 msgstr "Compter les messages non lus"
 
-msgid "Include the folder's unread mail in the unread count and the tray icon"
+#, fuzzy
+msgid "Include the folder's unread mail in the tray icon's unread count"
 msgstr ""
 "Inclure les e-mails non lus du dossier dans le compteur global et l'icône de "
 "la zone de notification"
-
-msgid "Show under All Inboxes"
-msgstr "Afficher sous Toutes les boîtes"
 
 msgid "Thumbnail size"
 msgstr "Taille des vignettes"
@@ -1382,9 +1468,6 @@ msgstr "Afficher uniquement ce type"
 msgid "All types"
 msgstr "Tous les types"
 
-msgid "Images"
-msgstr "Images"
-
 msgid "PDFs"
 msgstr "Fichiers PDF"
 
@@ -1456,9 +1539,6 @@ msgid ""
 "Supported providers: Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and "
 "Seafile."
 msgstr ""
-
-msgid "Add Account…"
-msgstr "Ajouter un compte…"
 
 msgid "No cloud accounts yet."
 msgstr "Aucun compte cloud pour le moment."
@@ -1960,20 +2040,27 @@ msgstr "Ajouter un numéro de téléphone"
 msgid "Add website"
 msgstr "Ajouter un site web"
 
+#, fuzzy
+msgid "Search folders"
+msgstr "Filtres de recherche"
+
 msgid "Mark as read"
 msgstr "Marquer comme lu"
+
+msgid "Star"
+msgstr "Ajouter une étoile"
+
+msgid "Not spam"
+msgstr ""
+
+msgid "Add sender to Contacts"
+msgstr "Ajouter l'expéditeur aux contacts"
 
 msgid "Mark as unread"
 msgstr "Marquer comme non lu"
 
 msgid "Remove star"
 msgstr "Retirer l'étoile"
-
-msgid "Star"
-msgstr "Ajouter une étoile"
-
-msgid "Add sender to Contacts"
-msgstr "Ajouter l'expéditeur aux contacts"
 
 msgid "Show conversation"
 msgstr "Afficher la conversation"
@@ -2471,6 +2558,30 @@ msgstr "Système"
 msgid "Backup"
 msgstr "Sauvegarde"
 
+#, fuzzy
+msgid "Save the filter?"
+msgstr "Enregistrer le compte ?"
+
+#, fuzzy
+msgid ""
+"The filter editor is open. Save what you changed, or discard it, before "
+"moving on."
+msgstr ""
+"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-les "
+"avant de continuer."
+
+#, fuzzy
+msgid "Save the tag?"
+msgstr "Enregistrer le compte ?"
+
+#, fuzzy
+msgid ""
+"The tag editor is open. Save what you changed, or discard it, before moving "
+"on."
+msgstr ""
+"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-les "
+"avant de continuer."
+
 msgid "Save the account?"
 msgstr "Enregistrer le compte ?"
 
@@ -2532,62 +2643,22 @@ msgstr ""
 "La vue affichée en premier lorsque les Paramètres sont ouverts depuis le "
 "menu."
 
-msgid "All Inboxes"
-msgstr "Toutes les boîtes"
+#, fuzzy
+msgid "Accounts in the sidebar"
+msgstr "Contacts dans la barre latérale"
 
 msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
+"Each account's own section: its folders, filtered folders and tags. Off "
+"leaves the unified section alone. Also in the main menu, and Ctrl+Shift+A."
 msgstr ""
-"Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
-"latérale. Affichée uniquement si vous avez plusieurs comptes."
-
-msgid "All Inboxes unread count"
-msgstr "Nombre de non lus dans Toutes les boîtes"
-
-msgid ""
-"Show the combined unread chip next to All Inboxes while its per-account list "
-"is folded up."
-msgstr ""
-"Afficher la pastille des messages non lus à côté de Toutes les boîtes de "
-"réception lorsque la liste par compte est repliée."
-
-msgid "Filtered Folders section"
-msgstr "Section « Dossiers filtrés »"
-
-msgid ""
-"List the folders your filter rules file into in a collapsible section. Each "
-"rule chooses whether its folder appears there; this switch hides the section "
-"altogether."
-msgstr ""
-"Répertoriez les dossiers vers lesquels votre fichier de règles de filtrage "
-"redirige dans une section repliable. Chaque règle détermine si son dossier "
-"apparaît dans cette section ; ce bouton permet de masquer complètement la "
-"section."
-
-msgid "Filtered Folders placement"
-msgstr "Emplacement des dossiers filtrés"
-
-msgid ""
-"Inside All Inboxes, folding away with it, or in the scrolling sidebar above "
-"or below the accounts."
-msgstr ""
-"Dans toutes les boîtes de réception, repliées à côté, ou dans la barre "
-"latérale défilante située au-dessus ou en dessous des comptes."
-
-msgid "Tags placement"
-msgstr "Emplacement des balises"
-
-msgid "Where the Tags section sits, with the same choices."
-msgstr ""
-"À l'endroit où se trouve la section « Balises », avec les mêmes options."
 
 msgid "Chevron placement"
 msgstr "Emplacement des chevrons"
 
+#, fuzzy
 msgid ""
-"Which side of All Inboxes and the account rows their expand/collapse "
-"chevrons sit on."
+"Which side of Inboxes and the account rows their expand/collapse chevrons "
+"sit on."
 msgstr ""
 "De quel côté des boîtes de réception et des lignes de compte se trouvent les "
 "«flèches » permettant de les développer ou de les réduire."
@@ -2621,6 +2692,154 @@ msgstr ""
 "Lorsque la barre latérale est réduite à sa barre d'icônes, la survoler "
 "affiche la barre complète en superposition ; elle se replie peu après le "
 "retrait du pointeur."
+
+msgid "Remember the sidebar layout"
+msgstr ""
+
+msgid ""
+"Reopen with the accounts, folders and sections as you left them. Off starts "
+"every launch with everything folded up."
+msgstr ""
+
+msgid "Remember icon rail state"
+msgstr ""
+
+msgid ""
+"Reopen with icon rail in the last used state. Off starts every launch with "
+"the full sidebar."
+msgstr ""
+
+msgid "Unified"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The section at the top of the sidebar that combines every account. Only "
+"shown with more than one account."
+msgstr ""
+"Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
+"latérale. Affichée uniquement si vous avez plusieurs comptes."
+
+#, fuzzy
+msgid "Inboxes"
+msgstr "Boîte de réception"
+
+msgid ""
+"A unified inbox combining every account, at the top of the sidebar. Only "
+"shown with more than one account."
+msgstr ""
+"Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
+"latérale. Affichée uniquement si vous avez plusieurs comptes."
+
+#, fuzzy
+msgid "Starred"
+msgstr "Ajouter une étoile"
+
+msgid ""
+"Every account's starred folder as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's sent mail as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's drafts as one list, opening to each account's own."
+msgstr ""
+
+msgid "Every account's archive as one list, opening to each account's own."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"List every folder your filter rules file into in a collapsible section of "
+"the unified view."
+msgstr ""
+"Répertoriez les dossiers vers lesquels votre fichier de règles de filtrage "
+"redirige dans une section repliable. Chaque règle détermine si son dossier "
+"apparaît dans cette section ; ce bouton permet de masquer complètement la "
+"section."
+
+msgid ""
+"The tags, each showing every account's mail with it. Each account keeps its "
+"own Tags section either way."
+msgstr ""
+
+#, fuzzy
+msgid "Unread counts"
+msgstr "Non lus en premier"
+
+msgid ""
+"Which unified rows show their combined unread chip while folded up. "
+"Expanded, the rows beneath carry the counts. Sent never shows one."
+msgstr ""
+
+#, fuzzy
+msgid "Filters placement"
+msgstr "Emplacement des dossiers filtrés"
+
+msgid ""
+"In the unified section, as a row like Inboxes whose caret opens the folders; "
+"or above or below the accounts as a heading with its own list."
+msgstr ""
+
+msgid "Tags placement"
+msgstr "Emplacement des balises"
+
+msgid ""
+"The same choices for the Tags section: a unified row, or a heading above or "
+"below the accounts."
+msgstr ""
+
+msgid "Icon rail"
+msgstr ""
+
+msgid "The sidebar collapsed to icons, by its button or in a narrow window."
+msgstr ""
+
+msgid "Unread dots instead of counts"
+msgstr ""
+
+msgid ""
+"Mark folders and accounts that have unread mail with a dot in the accent "
+"colour rather than the number of messages. The count stays in the tooltip."
+msgstr ""
+
+msgid "Fold up expanded items"
+msgstr ""
+
+msgid ""
+"When the sidebar collapses to the icon rail, the items switched on below "
+"start folded up. A long-press in the rail still expands or collapses any of "
+"them, and the full sidebar comes back exactly as you left it."
+msgstr ""
+
+#, fuzzy
+msgid "All accounts"
+msgstr "Comptes"
+
+msgid "Every account's folder list."
+msgstr ""
+
+#, fuzzy
+msgid "The account list under Inboxes."
+msgstr "Afficher sous Toutes les boîtes"
+
+msgid "The account list under the unified Starred row."
+msgstr ""
+
+msgid "The account list under the unified Sent row."
+msgstr ""
+
+msgid "The account list under the unified Drafts row."
+msgstr ""
+
+msgid "The account list under the unified Archive row."
+msgstr ""
+
+msgid "The folders under the Filters row."
+msgstr ""
+
+msgid "The tags under the Tags row."
+msgstr ""
 
 msgid "Sender avatars"
 msgstr "Avatars de l'expéditeur"
@@ -2664,6 +2883,15 @@ msgid ""
 msgstr ""
 "La palette ⋯ de la liste des messages s'ouvre automatiquement lorsque le "
 "pointeur s'arrête sur une ligne."
+
+#, fuzzy
+msgid "Actions Palette as a menu"
+msgstr "Délai d'expiration de la palette d'actions"
+
+msgid ""
+"The ⋯ opens the row's menu, the same one a right-click shows, instead of "
+"sliding the palette out."
+msgstr ""
 
 msgid "Swipe actions"
 msgstr "Actions par glissement"
@@ -3066,8 +3294,8 @@ msgstr ""
 "vos comptes au préalable : leur suppression efface aussi leurs mots de passe "
 "du trousseau, qu'aucune sauvegarde ne contient."
 
-msgid "Inside All Inboxes"
-msgstr "Dans toutes les boîtes de réception"
+msgid "In the unified section"
+msgstr ""
 
 msgid "Above the accounts"
 msgstr "Au-dessus des comptes"
@@ -3199,6 +3427,10 @@ msgstr "Insérer un lien"
 msgid "Insert"
 msgstr "Insérer"
 
+#, fuzzy
+msgid "Folder"
+msgstr "Dossiers"
+
 msgid "Add account"
 msgstr "Ajouter un compte"
 
@@ -3208,23 +3440,20 @@ msgstr "Ajouter un premier compte"
 msgid "No accounts yet"
 msgstr "Aucun compte pour le moment"
 
-msgid "Show each inbox"
-msgstr "Afficher chaque boîte de réception"
-
-msgid "Refresh"
-msgstr "Actualiser"
-
-msgid "Account Settings…"
-msgstr "Paramètres du compte…"
-
 msgid "Outbox"
 msgstr "Boîte d'envoi"
 
 msgid "Mark Inbox as Read"
 msgstr "Marquer la boîte de réception comme lue"
 
+msgid "Refresh"
+msgstr "Actualiser"
+
 msgid "New Folder…"
 msgstr "Nouveau dossier…"
+
+msgid "Account Settings…"
+msgstr "Paramètres du compte…"
 
 msgid "Remove Account…"
 msgstr "Supprimer le compte…"
@@ -3241,8 +3470,27 @@ msgstr "Dossiers ({len})"
 msgid "Add Folder"
 msgstr "Ajouter un dossier"
 
-msgid "Filtered Folders"
-msgstr "Dossiers filtrés"
+msgid "Show each inbox"
+msgstr "Afficher chaque boîte de réception"
+
+#, fuzzy
+msgid "Show each account"
+msgstr "Afficher chaque boîte de réception"
+
+#, fuzzy
+msgid "Show each folder"
+msgstr "Afficher chaque boîte de réception"
+
+#, fuzzy
+msgid "Show each tag"
+msgstr "Afficher chaque boîte de réception"
+
+msgid "Long-press to expand or collapse"
+msgstr ""
+
+#, fuzzy
+msgid "Edit Filter…"
+msgstr "Modifier le filtre"
 
 msgid "Rename Folder…"
 msgstr "Renommer le dossier…"
@@ -3255,6 +3503,10 @@ msgstr "Vider la Corbeille…"
 
 msgid "Empty Junk…"
 msgstr "Vider les Indésirables…"
+
+#, fuzzy
+msgid "Edit Tag…"
+msgstr "Modifier la balise"
 
 msgid "Welcome to Vireo"
 msgstr "Bienvenue dans Vireo"
@@ -3511,6 +3763,14 @@ msgstr "Impossible de marquer le dossier comme lu : {e}"
 msgid "Could not mark as spam: {e}"
 msgstr "Impossible de marquer comme indésirable : {e}"
 
+#, fuzzy
+msgid "Could not mark as not spam: {e}"
+msgstr "Impossible de marquer comme indésirable : {e}"
+
+#, fuzzy
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Impossible de déplacer {len} messages : {e}"
+
 msgid "Could not move message: {e}"
 msgstr "Impossible de déplacer le message : {e}"
 
@@ -3650,7 +3910,8 @@ msgstr ""
 msgid "Features:"
 msgstr "Fonctionnalités :"
 
-msgid "Multiple IMAP and POP3 accounts, with a unified All Inboxes view"
+#, fuzzy
+msgid "Multiple IMAP and POP3 accounts, with a unified Inboxes view"
 msgstr ""
 "Gestion de plusieurs comptes IMAP et POP3, avec une vue unifiée Toutes les "
 "boîtes"
@@ -3693,6 +3954,45 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Add Account"
+#~ msgstr "Ajouter un compte"
+
+#~ msgid "Show name initials instead of an emoji"
+#~ msgstr "Afficher les initiales du nom au lieu d'un émoji"
+
+#~ msgid "All Inboxes"
+#~ msgstr "Toutes les boîtes"
+
+#~ msgid "All Inboxes unread count"
+#~ msgstr "Nombre de non lus dans Toutes les boîtes"
+
+#~ msgid ""
+#~ "Show the combined unread chip next to All Inboxes while its per-account "
+#~ "list is folded up."
+#~ msgstr ""
+#~ "Afficher la pastille des messages non lus à côté de Toutes les boîtes de "
+#~ "réception lorsque la liste par compte est repliée."
+
+#~ msgid "Filtered Folders section"
+#~ msgstr "Section « Dossiers filtrés »"
+
+#~ msgid ""
+#~ "Inside All Inboxes, folding away with it, or in the scrolling sidebar "
+#~ "above or below the accounts."
+#~ msgstr ""
+#~ "Dans toutes les boîtes de réception, repliées à côté, ou dans la barre "
+#~ "latérale défilante située au-dessus ou en dessous des comptes."
+
+#~ msgid "Where the Tags section sits, with the same choices."
+#~ msgstr ""
+#~ "À l'endroit où se trouve la section « Balises », avec les mêmes options."
+
+#~ msgid "Inside All Inboxes"
+#~ msgstr "Dans toutes les boîtes de réception"
+
+#~ msgid "Filtered Folders"
+#~ msgstr "Dossiers filtrés"
+
 #~ msgid "Remove Account"
 #~ msgstr "Supprimer le compte"
 
@@ -3702,16 +4002,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Les comptes et préférences dans un seul fichier. Les mots de passe "
 #~ "restent dans le trousseau de clés du système et ne sont jamais exportés."
-
-#~ msgid ""
-#~ "Label messages with one or more coloured tags. Tags are stored on the "
-#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
-#~ "same tags."
-#~ msgstr ""
-#~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
-#~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
-#~ "clés IMAP ; ainsi, Thunderbird et les autres clients affichent les mêmes "
-#~ "étiquettes."
 
 #~ msgid "Nextcloud, ownCloud or OpenCloud"
 #~ msgstr "Nextcloud, ownCloud ou OpenCloud"

@@ -20,6 +20,8 @@ const CONTRIBUTORS: &[(&str, &str)] = &[
     ("frenchy82", "frenchy82"),
     ("Yiannis Ioannides", "yioannides"),
     ("p-mitana", "p-mitana"),
+    ("Laszlo Lang", "7system7"),
+    ("Peter Weiss", "peterweissdk"),
 ];
 
 // The message list's opening width now comes from config (the remembered pane

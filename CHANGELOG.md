@@ -1,5 +1,334 @@
 # Changelog
 
+## 1.27.0 — 2026-09-11
+
+The unified section grows into its own thing and the sidebar remembers
+itself; the message list and the Settings window open in tens of
+milliseconds; a Move To… button, "Not Spam", a tag finder, a picture as
+the account avatar, list previews in the charset they were sent in, and
+the Actions Palette as a menu. Everything from the 1.27.0 betas is in.
+
+- **Move To… button** (#164, @peterweissdk). The reader toolbar has a
+  folder button between Spam and Find: `ui::folder_picker` is a popover
+  listing the account's folders in the sidebar's order and indentation
+  (`sidebar::folder_depth`), with a search entry that filters them and
+  files into the first match on Enter. It acts on the reader's target
+  (`move_to_path`) or, with several rows selected, on the whole
+  selection through `drop_move` (grouped by source folder, undoable,
+  foreign accounts reported), listing the first selected message's
+  account (`AppMsg::MoveToMenu` / `MoveSelectionTo`). The folded ⋯ menu
+  has the same entry; `VIREO_SHOWCASE_MOVE=1` opens the picker in the
+  demo.
+- **Reply addresses the latest message** (#165, @yioannides). With only
+  the list row selected over a conversation, the reply target is the
+  thread's head (its oldest message). Reply, Reply All and Forward now go
+  through `compose_target`: with "Newest first" on, the newest message
+  from someone else (never the user's own reply; the newest of all when
+  every message is theirs), and the head otherwise, matching what the
+  pane shows at the top. A highlighted card is still addressed as
+  itself; Archive, star, read and delete keep their thread-head rules.
+- **Tag views re-read the server** (#166, @7system7). A tag view lists
+  what the on-disk index holds, and the index only learned a folder's
+  flags when that folder synced, so a tag set on another device stayed
+  out of the view until its folder was opened here. Opening a tag view,
+  and Refresh while one is open, send each account in scope
+  `MailRequest::RefreshKeywords { keywords }` (`App::sync_tag_keywords`,
+  an account scanned in the last 15 s is skipped): IMAP examines every
+  folder and sets a `UID SEARCH KEYWORD` per configured tag against
+  `Cache::uids_with_keyword` (`refresh_keywords`; `Cache::set_keyword`
+  reports whether a row changed); Microsoft 365 re-lists every folder,
+  whose listings carry the categories. `WorkerEvent::KeywordsSynced
+  { paths }` re-reads the open tag view and re-syncs the open folder if
+  it is among them. POP3 and the demo answer with nothing.
+- **Send Later rows at regular weight** (#167, @yioannides). The rows
+  under the Send button's caret were plain flat buttons, which GTK sets
+  in bold; they carry the context-menu classes.
+- **Actions Palette as a menu.** Settings → Reading → "Actions Palette as
+  a menu" (`list_palette_menu`, off): a row's ⋯ opens the same menu a
+  right-click shows, hung under the button
+  (`MessageRowInput::ChevronClicked` → `MessageRowOutput::ActionsMenu
+  { index, x, y }` in the list's coordinates, since a factory output
+  cannot carry a widget → `show_context_menu`), instead of sliding the
+  palette out; hover-to-open stands down while it is on.
+- **A picture as the account avatar** (#162, @yioannides).
+  `AccountConfig.avatar` holds the file name of a scaled copy under the
+  data directory's `avatars/` (`config::avatars_dir`, `avatar_path`).
+  The account editor imports a chosen image (`import_avatar_file`:
+  EXIF orientation, the shorter side scaled to 256px, centre-cropped,
+  saved as PNG); `config::save` prunes pictures no account refers to,
+  leaving files under ten minutes old for an editor still open. The
+  sidebar draws it in both disc sizes through
+  `ui::initials::avatar_picture` — a `gtk::Image` at the disc's pixel
+  size, since a `gtk::Picture`'s natural size is the texture's and the
+  disc box would grow to it — clipped by the disc's rounded corners
+  (`set_overflow(Hidden)`); textures are cached by path and modification
+  time. Precedence: picture, emoji, initials. GOA reconciliation leaves
+  it alone, like the colour and emoji.
+- **Account editor: Appearance.** The group opens with a row holding the
+  circle as the sidebar will draw it (`preview_disc`, 72px, its colour a
+  stylesheet the editor rewrites through `preview_css`), redrawn as the
+  colour button, name, label and email change (`refresh_preview`,
+  initials from the label, else the name, else the email, as the sidebar
+  derives them). "Account accent color" stands on its own; "Circle shows"
+  is a linked toggle pair, initials or emoji against a picture
+  (`picture_mode`), and only that side's row is shown (Emoji: Choose…
+  and Use initials; Picture: Choose… and Remove) and saved
+  (`saved_emoji` / `saved_avatar`); the other side's choice stays in the
+  editor. Add Alias… is a regular 130px button at its group's end like
+  the other panels' add buttons.
+- **Reader toolbar.** Find in message moves to the right, left of Print,
+  and greys out with no message open rather than hiding, so the toolbar
+  never shifts.
+- **Tag finder** (Settings → Tags → "Find Tags…"). Every account is
+  asked for the keywords in use across all its folders
+  (`MailRequest::FindKeywords` → `WorkerEvent::KeywordsFound`, fanned
+  out and counted in `App::tag_scan`, with a two-minute safety net for
+  an account that never answers). IMAP: EXAMINE per folder reads the
+  mailbox's FLAGS line and a `UID SEARCH KEYWORD` per candidate gives
+  the count (an unused keyword is dropped; `worker::is_system_keyword`
+  leaves out `$Junk`, `$Forwarded`, `$MailFlagBit…` and the like).
+  Microsoft 365: the mailbox's master categories with their names and
+  preset colours (`graph_preset_color`), counts from the cache
+  (`Cache::count_with_keyword`). POP3 has nothing to find; the demo
+  answers with a fixed set. Findings merge by keyword across accounts,
+  known tags are dropped, and each keyword gets a proposed name and
+  colour (`Tag::name_for_keyword` / `color_for_keyword`: Thunderbird's
+  `$label1`–`$label5` become Important, Work, Personal, To Do and Later
+  in Thunderbird's colours; anything else reads as words and takes the
+  next free palette colour). The report (`AccountsInput::TagFindings`,
+  an `adw::MessageDialog` checklist) offers Import All or Import
+  Selected; the button shows a spinner and "Searching…" meanwhile.
+- **Not Spam** (#168). In Junk, the row menu, bulk menu and bar, the row
+  palette, the reader's toolbar button, its folded ⋯ menu and the spam
+  shortcut read "Not Spam": `MailRequest::MarkHam` / `MarkHamMany` set
+  `$NotJunk`, clear `$Junk` (best-effort, as marking spam is) and move
+  the messages back to the Inbox in one round (`mark_ham`); Microsoft
+  365 moves them. `MessageListInput::SetInJunk` beside `SetRestorable`,
+  `RowAction::NotSpam` / `BulkAction::NotSpam`, `RowInit.in_junk` for
+  the palette; the unified views clear the state too. Icon
+  `mail-mark-notjunk-symbolic` joins the bundled set; the demo's Junk
+  folder holds two messages.
+- **Sender logos at the size the site publishes** (`logo::discover`).
+  Only the two root paths were tried, so most senders got the 16–48px
+  favicon.ico. The domain's home page (first 512KB, browser-ish
+  User-Agent) and its web manifest are read for `<link rel="icon">`,
+  `apple-touch-icon` and manifest icons, ranked by claimed size with the
+  root `apple-touch-icon.png` (180) and `favicon.ico` (32); SVG and mask
+  icons are skipped. Decoding still downsizes to 160px for the cache.
+- **Initials centred by their ink** (`ui::initials::InitialsPaintable`).
+  The message list's avatars, the sidebar's account circles and the
+  reader cards' circles are drawn from the ink extents of the laid-out
+  text rather than a label's logical box: a lone letter and a pair both
+  sit exactly in the middle. The list keeps libadwaita's fourteen avatar
+  gradients and its name hash, so every sender keeps their colour; the
+  sidebar's `glyph_picture` (sized to the circle, expanding nothing)
+  replaces the label and its optical-nudge CSS; the reader embeds each
+  circle as a PNG rendered at the screen's scale (`png_data_uri`, cached
+  per initial and tint) with the per-address hue as before.
+- **Compose folds in a narrow pane.** An inline composer (new message,
+  reply, forward) in a narrow reader pushed the window's close button
+  off the canvas. The composer's root is an `adw::BreakpointBin` (360px
+  floor); the full header is measured on first map, and below that
+  width everything but Cancel, Send and the fields chevron folds into a
+  ⋯ menu (`ComposeInput::SetNarrow` / `OverflowMenu`, the OpenPGP
+  toggles ticked when on). The compose header shares the reader
+  toolbar's tighter spacing; the compose window opens 720px wide. Fixed
+  alongside: `Compose::update_with_view` never called `update_view`, so
+  every `#[watch]` in the composer (the Send/Schedule label, Delete
+  Draft, the cloud button) held its init value.
+- **Tags in a submenu.** The row context menu and the reader's folded
+  ⋯ menu put the tag toggles behind a "Tags ›" row
+  (`context_menu::MenuEntry::submenu`: the popover is a `gtk::Stack` of
+  pages with a back row; a page taller than 420px scrolls). The
+  palette's and the reader toolbar's tag menus stay flat.
+- **Sidebar rail toggle without the smear.** The freeze-frame snapshot
+  over a rebuild was a `ContentFit::Fill` picture, stretched by the
+  200ms width animation of a rail toggle. It now keeps the width it was
+  taken at (halign Start, clipped by the overlay) and fades out over the
+  same 200ms during a toggle (`built_collapsed` tells a toggle from an
+  in-place refresh); other rebuilds keep the 80ms lift.
+- **Row context menu in the capture phase.** The list's secondary-button
+  gesture runs in the capture phase and claims the sequence, so no
+  widget inside a row can take the press first; a miss on the row band
+  falls back to picking the row under the pointer.
+- **Inboxes chip.** The unified Inboxes chip counts the inboxes alone
+  (`App::inboxes_unread`); a filter destination has its own row and chip
+  under Filters. The rule's "Count unread mail" switch keeps feeding the
+  tray icon and the Background Apps status, and says so.
+- **Settings.** Add Account… (no longer a pill at the foot of the list),
+  Add Filter…, Add Tag… and Find Tags… are regular 130px buttons at
+  their group's end, stacked where a group has two. The Tags description
+  breaks before "Drag a tag to reorder".
+- Showcase hooks: `VIREO_SHOWCASE_FIND_TAGS`, `VIREO_SHOWCASE_ROW_MENU` +
+  `VIREO_SHOWCASE_MENU=main|<submenu>`.
+- **Filters in the sidebar.** The unified "Filtered Folders" row is
+  "Filters" (`row_title`, the heading-style section, and the Settings →
+  Sidebar rows that name it). The per-rule "Show under All Inboxes"
+  switch is gone: `FilterRule.show_in_unified` is removed (older
+  `filters.toml` files still load; the key is ignored) and the unified
+  Filters section lists every rule's destination
+  (`unified_folder_refs`), switched on or off as a whole. Each account's
+  own Filtered Folders section is gone too; instead a destination folder
+  is marked in place in the account's hierarchy (`filter_icon` →
+  `FolderGlyph`): a custom folder wears the filter-folder glyph in the
+  account's colour (`filtered_folder_icon`, `acct-tint-{id}`), a main
+  folder (Archive, Junk…) keeps its grey glyph with a 9px
+  `filter-symbolic` mark on the icon's corner in the account's colour
+  (`FolderGlyph::Marked`, `.filter-mark`; bottom-right in the rail, where
+  the unread badge has the top). The unified Filters rows show the
+  kind's glyph tinted. `co.hyprlab.Vireo-filter-symbolic` (GNOME's
+  three-bar filter) joins the bundled icon set.
+- **Tags under each account** sit between the essential folders and the
+  "Folders (N)" list.
+- **One folder context menu** (`folder_menu_items(id, &Folder,
+  filtered)`) wherever a folder is listed — under its account, as a
+  unified Filters row, or in a heading-style filtered section: Mark as
+  Read, Refresh, "Edit Filter…" for a filter destination
+  (`CtxAction::EditFilter { account_id, path }` opens Settings on the
+  Filters page with that rule's editor), Rename/Delete for custom
+  folders, Empty for Trash and Junk. The unified rows drop their extra
+  "Account Settings…" item. Every tag row (unified, heading-style,
+  per-account) takes a right-click: "Edit Tag…"
+  (`attach_tag_context_menu`, `CtxAction::EditTag(keyword)`).
+- **Filter and tag editors are pages.** `open_filter_page` /
+  `open_tag_page` push an `adw::NavigationPage` (tags `filter` / `tag`)
+  on the accounts panel's navigation view, like the account and cloud
+  editors: a header with Save and the window's close button, Enter in a
+  field saves (`push_form_page`, `form_save`). `AccountsOutput::EditorOpen`
+  carries the settings page that owns the open editor
+  (`Option<&'static str>`), so the leave-editor prompt says filter or
+  tag and saves through the open page (`AccountsInput::SaveOpenPage`);
+  `CloseEditor` pops any of the three. The colour chooser parents to the
+  active window. The Filters and Tags list cards lose their pencil (and
+  the filter cards their "Count unread" switch, which lives in the
+  editor) for a chevron, like the account and cloud cards.
+- **Unread chips per unified row** (Settings → Sidebar → Unified →
+  "Unread counts", an expander with a switch each for Inboxes, Starred,
+  Drafts, Archive and Filters): `UnifiedChips` in `privacy.toml`
+  (`[unified_chips]`, all on; the old `unified_chip` still counts for the
+  Inboxes row through `load_unified_chips`), read by the sidebar's
+  `chip_shown(row)` at every chip site, rail dots included.
+- **Chips never overflow.** `style_badge(label, max_chars)` is the one
+  way to make an unread chip: ellipsized past five digits (four in the
+  rail's corner badges), and the unified header titles ellipsize, so a
+  wide chip shortens the title rather than pushing the chevron out.
+- **Unified glyphs aligned.** Rows under Filters and Tags no longer take
+  the `.unified-subrow` 2px pull-in that centres the 21px account pills
+  (`build_unified_sub_row(..., pill)`), so their 16px icons and discs sit
+  on the header's icon column; their label gives up the same 2px.
+- **Renamed folder follows the selection.** `apply_folder_rename` left
+  `selected` on the old path, so every auto-fetch asked the server for a
+  mailbox that no longer existed ("Could not load Vreo" every minute
+  after Vreo → Vireo). The selection (and any child path) moves with the
+  rename, the sidebar row is reselected, and a `LoadMessages` is queued
+  behind the `RenameFolder` on the worker so the cleared view refills.
+- **"All Inboxes" is "Inboxes"**, in the sidebar, Settings, README and
+  the metainfo feature list.
+- **Archive row** in the unified section (`UnifiedKinds.archive`,
+  `archive_expanded`, rail fold-up and unread-chip switches).
+- **Tag views cached.** Opening a tag shows the cached list at once
+  (`tag_view_cache`) and reads the index off the main thread
+  (`AppMsg::TagViewLoaded`).
+- **List previews in the right charset** (#159, @7system7). The preview
+  line under a subject read the first part's bytes as UTF-8, so an
+  `iso-8859-2` body showed a replacement character per accented letter
+  while the reader was fine. The summary fetch now asks for
+  `BODY.PEEK[1.MIME]` alongside the slice; `preview_from_part` works on
+  bytes, transfer-decodes first and reads the text in the declared
+  charset through mail-parser's table (`decode_text`), UTF-8 and ASCII
+  directly. Parts inside a nested multipart use their own Content-Type
+  (folded headers unfolded, `mime_header`). A slice cut mid-character
+  drops the fragment; undeclared 8-bit text falls back to Windows-1252.
+  A first part that is a file (photo mail) yields an empty preview and
+  hands off to the `BODY[TEXT]` retry (`retry_missing_previews`, now
+  shared), which tolerates a MIME preamble; cached rows still holding
+  replacement characters are re-read up to 12 per folder load
+  (`redecode_garbled_previews`).
+- **Unified section.** Starred, Sent and Drafts rows join All Inboxes,
+  each built by one builder (`UnifiedRow`, `build_unified_row`): the
+  header opens the merged view, the caret (or a long-press) opens the
+  accounts' own folders of that kind. The unified view merges a set of
+  (account, folder) slices (`UnifiedView::{Kind, Filtered}`,
+  `unified_slices`) rather than one folder per account, carried through
+  load, refresh, mark-read, index and background-sync paths. Filtered
+  Folders and Tags placed "In the unified section" are unified rows too;
+  their headers open every rule's folder merged and every tagged message
+  (`tag_view` keyword `None`). "Above" and "Below the accounts" keep the
+  heading style. Sent wears no unread chip anywhere. The section heads
+  the scrolling sidebar rather than the pinned area (it can stand taller
+  than a short window), and its rows stack with no gap (`.unified-item`).
+- **Per-account Filtered Folders and Tags** under each account's Folders
+  heading, whatever the unified section shows: every rule's destination
+  (`account_filtered_folders`) and every tag scoped to that account
+  (`TagSelected { account }`; the cache's keyword query was already
+  per-account). Section widgets are keyed by `Slot::{Unified,
+  Account(id)}`.
+- **Settings → Sidebar** is three groups. "Sidebar": "Accounts in the
+  sidebar" (`show_accounts`, also the main menu's "Show Accounts" check
+  item, a stateful `app.show-accounts` action, and Ctrl+Shift+A), chevron
+  placement, Attachments/Contacts rows, hover-expand, "Remember the
+  sidebar layout" (`remember_sidebar`; off starts every launch with every
+  account and section folded, accounts folded as they arrive in
+  `SetAccount`) and "Remember icon rail state" (`remember_rail`).
+  "Unified": a switch per row (`unified_kinds`, `unified_tags`) plus the
+  unread-count switch and the two placement combos. "Icon rail": unread
+  dots (`rail_dots`, a `.rail-dots` style on the rail's containers) and
+  "Fold up expanded items" (`RailFold { enabled, accounts, all_inboxes,
+  starred, sent, drafts, filtered, tags }`), an expander row whose enable
+  switch is the master. Everything defaults to on.
+- **Sidebar layout persisted.** `sidebar.toml` gains `unified_expanded`,
+  `filtered_expanded`, `tags_expanded`, `starred_expanded`,
+  `sent_expanded`, `drafts_expanded`, `filtered_expanded_accounts` and
+  `tags_expanded_accounts`, reported by `SidebarOutput::SectionsOpen` and
+  the per-account toggles.
+- **Icon rail.** The Filtered Folders and Tags headings sat 2px left of
+  every other rail item (a padding rule meant for the full sidebar);
+  fixed with a rail-scoped rule. "Fold up expanded items" is a view of
+  the rail, not a change to what is saved: while collapsed, ticked items
+  start folded; anything opened or folded in the rail — a long-press on a
+  unified row, a click on an account avatar — lands in the rail's own
+  `rail_open`/`rail_open_accounts` states, cleared whenever the sidebar
+  changes width, so the full sidebar comes back exactly as it was left.
+  The rail carries no chevron buttons any more; the tooltip says
+  "Long-press to expand or collapse", and the long-press works in the
+  full sidebar too, alongside the chevrons.
+- **Tag rows** indent like the Filtered Folders rows (the same leaf
+  expander slot) and use regular weight.
+- **Message list speed.** Measured with a 15,000-message demo mailbox
+  (`VIREO_DEMO_BULK`), a switch into a unified view took 300–600ms: 200
+  row widgets built at 1.5ms each, the previous 200 destroyed first, two
+  or three times per switch. Now: rebuild requests coalesce
+  (`queue_rebuild`, one rebuild per main-loop pass ahead of GTK's
+  layout); the first 20 rows build synchronously and the rest in idle
+  chunks (`fill_rows`, `row_send` guards indices, `flush_rows` before
+  structural edits); a page switch hands the pane a fresh list box and
+  retires the old rows at idle (`discard_rows`, `wire_list`); the row's
+  eleven action-palette buttons build on first open (`build_palette`,
+  0.9ms per row from 1.5); "load more" appends when the existing rows are
+  unchanged (`row_sigs`). An arriving folder list identical to the held
+  one no longer re-threads or re-emits; a unified view seeds missing
+  slices from the on-disk index when it opens. Warm switch ≈55ms, cold
+  ≈40ms. `VIREO_SHOWCASE_UNIFIED=sent|starred|drafts|filtered|tags`
+  drives the rows in the showcase; timings log at debug level.
+- **Settings window speed.** Opening took about a second (reportedly
+  several with eight or more accounts): every account's passwords were
+  read from the keyring first, the icon gallery decoded the catalogue,
+  the dictionary list read directories, the OpenPGP page ran gpg, the
+  signature editor's WebKit view was created, and the stack measured
+  every page. Passwords load when an account's editor opens, off the
+  main thread (`AccountSecrets`, with a sync fallback at Save); the
+  gallery (`app_icon::texture` now cached), dictionaries and gpg probe
+  run after the first paint at low priority; the signature editor and
+  the editor page mount on first use; the stacks are non-homogeneous and
+  unshown pages join after the first paint; the window is built hidden
+  1.5 s after startup and kept (`set_hide_on_close`), the accounts panel
+  rebuilt on reopen only when its inputs changed (`accounts_seed`). First
+  open ≈170ms, reopen ≈70ms. The settings and account section stacks
+  switch without a crossfade.
+- **Showcase hooks**: `VIREO_SHOWCASE_SETTINGS_REOPEN`, `VIREO_SHOWCASE_RAIL`,
+  `VIREO_SHOWCASE_TOGGLE`; `FolderKind` derives `Hash`, `Message`
+  derives `PartialEq`.
+
 ## 1.26.0 — 2026-09-10
 
 A default sender for new messages and number keys for tags (#157), the
