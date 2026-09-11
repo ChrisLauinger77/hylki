@@ -3483,6 +3483,7 @@ impl SimpleComponent for AppModel {
                     view == UnifiedView::Kind(FolderKind::Sent),
                 ));
                 self.message_list.emit(MessageListInput::SetRestorable(false));
+                self.message_list.emit(MessageListInput::SetInJunk(false));
                 let reqs = self.unified_targets();
                 // Keep every account's last known slice and top it up from the
                 // folder caches, the way opening a single folder does. This used
@@ -5855,6 +5856,7 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::ResetPaging);
                 self.message_list.emit(MessageListInput::SetShowRecipient(false));
                 self.message_list.emit(MessageListInput::SetRestorable(false));
+                self.message_list.emit(MessageListInput::SetInJunk(false));
                 self.show_tag_view();
                 self.refresh_tag_view(&sender);
                 self.push_index_complete();
