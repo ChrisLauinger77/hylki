@@ -1003,17 +1003,22 @@ impl Component for AccountsWindow {
                                 },
                             },
 
-                            // The sidebar circle as it will look, above the
-                            // rows that shape it: the accent colour, and the
-                            // picture, emoji or initials it shows.
-                            // No title and no margins of its own: the page
-                            // already spaces its groups, and the circle
-                            // should not sit in a band of nothing.
                             add = &adw::PreferencesGroup {
+                                set_title: &i18n("Appearance"),
+                                set_description: Some(
+                                    i18n("How this account is shown in the sidebar and \
+                                     the Inboxes view.").as_str()
+                                ),
+
+                                // The sidebar circle as it will look, at the
+                                // top of the group (a non-row child sits
+                                // above the rows): the accent colour, and
+                                // the picture, emoji or initials it shows.
                                 gtk::Box {
                                     set_orientation: gtk::Orientation::Vertical,
                                     set_spacing: 2,
                                     set_halign: gtk::Align::Center,
+                                    set_margin_bottom: 6,
 
                                     #[name = "preview_disc"]
                                     gtk::Box {
@@ -1031,14 +1036,6 @@ impl Component for AccountsWindow {
                                         set_justify: gtk::Justification::Center,
                                     },
                                 },
-                            },
-
-                            add = &adw::PreferencesGroup {
-                                set_title: &i18n("Appearance"),
-                                set_description: Some(
-                                    i18n("How this account is shown in the sidebar and \
-                                     the Inboxes view.").as_str()
-                                ),
 
                                 #[name = "label_row"]
                                 adw::EntryRow {
