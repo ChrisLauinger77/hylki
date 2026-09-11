@@ -1273,19 +1273,22 @@ pub struct UnifiedKinds {
     pub sent: bool,
     #[serde(default = "default_on")]
     pub drafts: bool,
+    #[serde(default = "default_on")]
+    pub archive: bool,
 }
 
 impl Default for UnifiedKinds {
     fn default() -> Self {
-        UnifiedKinds { starred: true, sent: true, drafts: true }
+        UnifiedKinds { starred: true, sent: true, drafts: true, archive: true }
     }
 }
 
 impl UnifiedKinds {
-    pub const NONE: UnifiedKinds = UnifiedKinds { starred: false, sent: false, drafts: false };
+    pub const NONE: UnifiedKinds =
+        UnifiedKinds { starred: false, sent: false, drafts: false, archive: false };
 
     pub fn any(self) -> bool {
-        self.starred || self.sent || self.drafts
+        self.starred || self.sent || self.drafts || self.archive
     }
 
     /// Whether the row for `kind` is on (only Starred, Sent and Drafts have
@@ -1296,6 +1299,7 @@ impl UnifiedKinds {
             Starred => self.starred,
             Sent => self.sent,
             Drafts => self.drafts,
+            Archive => self.archive,
             _ => false,
         }
     }
@@ -1303,7 +1307,7 @@ impl UnifiedKinds {
     /// The kinds with a row, in sidebar order.
     pub fn listed(self) -> Vec<crate::models::FolderKind> {
         use crate::models::FolderKind::*;
-        [Starred, Sent, Drafts].into_iter().filter(|k| self.has(*k)).collect()
+        [Starred, Sent, Drafts, Archive].into_iter().filter(|k| self.has(*k)).collect()
     }
 }
 
@@ -1805,6 +1809,8 @@ pub struct RailFold {
     pub sent: bool,
     #[serde(default = "default_on")]
     pub drafts: bool,
+    #[serde(default = "default_on")]
+    pub archive: bool,
     /// The Filtered Folders section.
     #[serde(default = "default_on")]
     pub filtered: bool,
@@ -1826,6 +1832,7 @@ impl Default for RailFold {
             starred: true,
             sent: true,
             drafts: true,
+            archive: true,
             filtered: true,
             tags: true,
         }
@@ -1848,6 +1855,7 @@ impl RailFold {
                 Starred => self.starred,
                 Sent => self.sent,
                 Drafts => self.drafts,
+                Archive => self.archive,
                 _ => false,
             }
     }
@@ -2095,6 +2103,8 @@ struct SidebarFile {
     sent_expanded: bool,
     #[serde(default)]
     drafts_expanded: bool,
+    #[serde(default)]
+    archive_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open
     /// (closed by default, like their custom folders).
     #[serde(default)]
@@ -2130,6 +2140,7 @@ pub struct SidebarState {
     pub starred_expanded: bool,
     pub sent_expanded: bool,
     pub drafts_expanded: bool,
+    pub archive_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open.
     pub filtered_expanded_accounts: Vec<String>,
     pub tags_expanded_accounts: Vec<String>,
@@ -2155,6 +2166,7 @@ pub fn load_sidebar_state() -> SidebarState {
             starred_expanded: s.starred_expanded,
             sent_expanded: s.sent_expanded,
             drafts_expanded: s.drafts_expanded,
+            archive_expanded: s.archive_expanded,
             filtered_expanded_accounts: s.filtered_expanded_accounts,
             tags_expanded_accounts: s.tags_expanded_accounts,
         })
@@ -2180,6 +2192,7 @@ pub fn save_sidebar_state(state: &SidebarState) {
         starred_expanded: state.starred_expanded,
         sent_expanded: state.sent_expanded,
         drafts_expanded: state.drafts_expanded,
+        archive_expanded: state.archive_expanded,
         filtered_expanded_accounts: state.filtered_expanded_accounts.clone(),
         tags_expanded_accounts: state.tags_expanded_accounts.clone(),
     };

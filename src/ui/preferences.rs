@@ -337,6 +337,7 @@ pub enum PrefInput {
     ToggleUnifiedStarred(bool),
     ToggleUnifiedSent(bool),
     ToggleUnifiedDrafts(bool),
+    ToggleUnifiedArchive(bool),
     ToggleUnifiedTags(bool),
     ToggleShowAccounts(bool),
     /// The main menu flipped "Show Accounts": the switch follows.
@@ -354,6 +355,7 @@ pub enum PrefInput {
     ToggleRailFoldStarred(bool),
     ToggleRailFoldSent(bool),
     ToggleRailFoldDrafts(bool),
+    ToggleRailFoldArchive(bool),
     ToggleRailFoldFiltered(bool),
     ToggleRailFoldTags(bool),
     ChangePreviewLines(u32),
@@ -896,6 +898,15 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "unified_archive_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Archive"),
+                                        set_subtitle: &i18n("Every account's archive as one list, opening to each account's own."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleUnifiedArchive(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "unified_filtered_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Filtered Folders section"),
@@ -1009,6 +1020,14 @@ impl Component for Preferences {
                                             set_subtitle: &i18n("The account list under the unified Drafts row."),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleRailFoldDrafts(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "rail_fold_archive_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Archive"),
+                                            set_subtitle: &i18n("The account list under the unified Archive row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldArchive(row.is_active()));
                                             },
                                         },
                                         #[name = "rail_fold_filtered_row"]
@@ -1684,6 +1703,7 @@ impl Component for Preferences {
         widgets.unified_starred_row.set_active(init.unified_kinds.starred);
         widgets.unified_sent_row.set_active(init.unified_kinds.sent);
         widgets.unified_drafts_row.set_active(init.unified_kinds.drafts);
+        widgets.unified_archive_row.set_active(init.unified_kinds.archive);
         widgets.unified_tags_row.set_active(init.unified_tags);
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
@@ -1708,6 +1728,7 @@ impl Component for Preferences {
         widgets.rail_fold_starred_row.set_active(init.rail_fold.starred);
         widgets.rail_fold_sent_row.set_active(init.rail_fold.sent);
         widgets.rail_fold_drafts_row.set_active(init.rail_fold.drafts);
+        widgets.rail_fold_archive_row.set_active(init.rail_fold.archive);
         widgets.rail_fold_filtered_row.set_active(init.rail_fold.filtered);
         widgets.rail_fold_tags_row.set_active(init.rail_fold.tags);
         let preview_labels_owned = [i18n("Off"), i18n("1 line"), i18n("2 lines"), i18n("3 lines")];
@@ -2237,6 +2258,10 @@ impl Component for Preferences {
                 self.unified_kinds.drafts = on;
                 let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
             }
+            PrefInput::ToggleUnifiedArchive(on) => {
+                self.unified_kinds.archive = on;
+                let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
+            }
             PrefInput::ToggleUnifiedTags(on) => {
                 let _ = sender.output(PrefOutput::SetUnifiedTags(on));
             }
@@ -2302,6 +2327,10 @@ impl Component for Preferences {
             }
             PrefInput::ToggleRailFoldDrafts(on) => {
                 self.rail_fold.drafts = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
+            }
+            PrefInput::ToggleRailFoldArchive(on) => {
+                self.rail_fold.archive = on;
                 let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
             }
             PrefInput::ToggleRailFoldFiltered(on) => {

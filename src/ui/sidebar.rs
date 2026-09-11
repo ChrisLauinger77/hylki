@@ -137,6 +137,7 @@ fn kind_label(kind: FolderKind) -> String {
         FolderKind::Starred => i18n("Starred"),
         FolderKind::Sent => i18n("Sent"),
         FolderKind::Drafts => i18n("Drafts"),
+        FolderKind::Archive => i18n("Archive"),
         _ => i18n("Folder"),
     }
 }
@@ -176,6 +177,7 @@ pub struct SidebarInit {
     pub starred_expanded: bool,
     pub sent_expanded: bool,
     pub drafts_expanded: bool,
+    pub archive_expanded: bool,
     /// Whether the "Attachments" row is shown.
     pub show_attachments: bool,
     /// Whether the "Contacts" row is shown.
@@ -446,6 +448,7 @@ pub enum SidebarOutput {
         starred: bool,
         sent: bool,
         drafts: bool,
+        archive: bool,
     },
     /// A unified Starred / Sent / Drafts row was chosen: every account's
     /// folder of that kind, merged.
@@ -658,6 +661,7 @@ impl Component for Sidebar {
                 (FolderKind::Starred, init.starred_expanded),
                 (FolderKind::Sent, init.sent_expanded),
                 (FolderKind::Drafts, init.drafts_expanded),
+                (FolderKind::Archive, init.archive_expanded),
             ]),
             kind_widgets: HashMap::new(),
             rail_open: HashMap::new(),
@@ -3716,6 +3720,7 @@ impl Sidebar {
             starred: self.kind_open(FolderKind::Starred),
             sent: self.kind_open(FolderKind::Sent),
             drafts: self.kind_open(FolderKind::Drafts),
+            archive: self.kind_open(FolderKind::Archive),
         });
     }
 
