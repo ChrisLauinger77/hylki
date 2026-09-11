@@ -1039,12 +1039,6 @@ impl Component for AccountsWindow {
                                             set_hexpand: false,
                                             set_overflow: gtk::Overflow::Hidden,
                                         },
-                                        #[name = "preview_caption"]
-                                        gtk::Label {
-                                            add_css_class: "dim-label",
-                                            add_css_class: "caption",
-                                            set_justify: gtk::Justification::Center,
-                                        },
                                     },
                                 },
 
@@ -3165,17 +3159,12 @@ impl AccountsWindow {
         };
         let picture = self.saved_avatar().and_then(|n| crate::config::avatar_path(&n));
         let emoji = self.saved_emoji();
-        let (glyph, caption): (gtk::Widget, String) = match (&picture, &emoji) {
-            (Some(path), _) => (crate::ui::initials::avatar_picture(path, 72).upcast(), i18n("Picture")),
-            (None, Some(em)) => (
-                crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast(),
-                i18n("Emoji"),
-            ),
-            _ if self.picture_mode => (initials().upcast(), i18n("Initials until a picture is chosen")),
-            _ => (initials().upcast(), i18n("Initials")),
+        let glyph: gtk::Widget = match (&picture, &emoji) {
+            (Some(path), _) => crate::ui::initials::avatar_picture(path, 72).upcast(),
+            (None, Some(em)) => crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast(),
+            _ => initials().upcast(),
         };
         disc.append(&glyph);
-        widgets.preview_caption.set_label(&caption);
         widgets.emoji_row.set_visible(!self.picture_mode);
         widgets.picture_row.set_visible(self.picture_mode);
         widgets.emoji_clear_btn.set_visible(emoji.is_some());
