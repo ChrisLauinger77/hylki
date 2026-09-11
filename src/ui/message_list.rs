@@ -291,6 +291,9 @@ pub struct MessageRow {
     sender_logos: bool,
     preview_lines: u32,
     avatar_texture: Option<gtk::gdk::Texture>,
+    /// The initials circle drawn when no picture is known, kept per name
+    /// so the view hands the avatar the same object on every refresh.
+    initials_image: std::cell::RefCell<Option<(String, crate::ui::initials::InitialsPaintable)>>,
     ring_class: Option<String>,
     /// Whether the pointer is over this row (drives the chevron fade).
     row_hovered: bool,
@@ -1021,7 +1024,7 @@ impl FactoryComponent for MessageRow {
                 #[watch]
                 set_text: Some(&self.face_name()),
                 #[watch]
-                set_custom_image: self.avatar_texture.as_ref(),
+                set_custom_image: self.avatar_image().as_ref(),
             },
 
             // Faded rather than hidden: a hidden widget gives up its slot in
@@ -1353,6 +1356,7 @@ impl FactoryComponent for MessageRow {
             sender_logos,
             preview_lines,
             avatar_texture: None,
+            initials_image: std::cell::RefCell::new(None),
             ring_class,
             row_hovered: false,
             palette_open: false,
@@ -1749,6 +1753,22 @@ impl MessageRow {
             return addr.clone();
         }
         self.msg.from_addr.clone()
+    }
+
+    /// What the avatar circle shows: the sender's picture when one is known,
+    /// else their initials drawn ink-centred (see `ui::initials`), which
+    /// replaces the avatar's own label. The same paintable is returned for
+    /// the same name, so the avatar sees no change between refreshes.
+    fn avatar_image(&self) -> Option<gtk::gdk::Paintable> {
+        if let Some(tex) = &self.avatar_texture {
+            return Some(tex.clone().upcast());
+        }
+        let name = self.face_name();
+        let mut slot = self.initials_image.borrow_mut();
+        if slot.as_ref().is_none_or(|(n, _)| *n != name) {
+            *slot = crate::ui::initials::InitialsPaintable::for_name(&name).map(|p| (name.clone(), p));
+        }
+        slot.as_ref().map(|(_, p)| p.clone().upcast())
     }
 
     /// Fill the circle: a cached face if one is known, otherwise go and look.
