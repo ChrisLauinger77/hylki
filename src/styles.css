@@ -121,9 +121,12 @@ headerbar.rail-header {
   min-height: 21px;
   border-radius: 10.5px;
 }
-/* The account editor's avatar preview (#162): a 32px disc. */
-.account-avatar-preview {
-  border-radius: 16px;
+/* The account editor's preview circle: a 72px disc whose colour comes
+   from a stylesheet the editor rewrites as the colour button changes. */
+.account-preview-disc {
+  min-width: 72px;
+  min-height: 72px;
+  border-radius: 36px;
 }
 
 /* Inbox rows nested under "All Inboxes": no indent so their account pills

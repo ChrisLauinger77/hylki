@@ -162,6 +162,8 @@ pub struct AccountsWindow {
     /// Avatar picture chosen in the editor (#162): its file name under the
     /// avatars directory.
     avatar: Option<String>,
+    /// The preview circle's colour, as a stylesheet on the display.
+    preview_css: gtk::CssProvider,
     /// WYSIWYG editor for the account signature.
     /// The signature's rich editor — a WebKit view, so it is created when
     /// an account's editor first opens rather than with the panel.
@@ -231,12 +233,14 @@ pub enum AccountsInput {
     /// Open GNOME Settings → Online Accounts (the Google path).
     OpenOnlineAccounts,
     SetEmoji(String),
-    ClearEmoji,
     /// Choose an avatar picture from disk (#162).
     PickAvatar,
     /// A picture was imported under this file name.
     SetAvatar(String),
-    ClearAvatar,
+    /// Back to initials: no emoji, no picture.
+    ClearGlyph,
+    /// Redraw the preview circle from the editor's current values.
+    RefreshPreview,
     TestConnection,
     Save,
     /// Second phase of Save, once the signature HTML has been read from the editor.
@@ -999,6 +1003,43 @@ impl Component for AccountsWindow {
                                      the Inboxes view.").as_str()
                                 ),
 
+                                // The sidebar circle as it will look: the
+                                // colour, and the picture, emoji or initials
+                                // it shows, live as the rows below change.
+                                // (A non-row child of the group sits above
+                                // its list.)
+                                gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_spacing: 6,
+                                    set_halign: gtk::Align::Center,
+                                    set_margin_top: 4,
+                                    set_margin_bottom: 12,
+
+                                    #[name = "preview_disc"]
+                                    gtk::Box {
+                                        add_css_class: "account-circle",
+                                        add_css_class: "account-preview-disc",
+                                        set_size_request: (72, 72),
+                                        set_halign: gtk::Align::Center,
+                                        set_hexpand: false,
+                                        set_overflow: gtk::Overflow::Hidden,
+                                    },
+                                    #[name = "preview_caption"]
+                                    gtk::Label {
+                                        add_css_class: "dim-label",
+                                        add_css_class: "caption",
+                                        set_justify: gtk::Justification::Center,
+                                    },
+                                    #[name = "use_initials_btn"]
+                                    gtk::Button {
+                                        add_css_class: "flat",
+                                        set_halign: gtk::Align::Center,
+                                        set_label: &i18n("Use initials instead"),
+                                        set_visible: false,
+                                        connect_clicked => AccountsInput::ClearGlyph,
+                                    },
+                                },
+
                                 #[name = "label_row"]
                                 adw::EntryRow {
                                     set_title: &i18n("Label (defaults to email address)"),
@@ -1010,17 +1051,25 @@ impl Component for AccountsWindow {
                                     add_suffix = &gtk::ColorDialogButton {
                                         set_valign: gtk::Align::Center,
                                         set_dialog: &gtk::ColorDialog::new(),
+                                        connect_rgba_notify[sender] => move |_| {
+                                            sender.input(AccountsInput::RefreshPreview);
+                                        },
                                     },
                                 },
 
+                                // The circle shows one of three things:
+                                // initials, an emoji or a picture (#162).
+                                // Choosing an emoji or a picture replaces
+                                // whichever was set; "Use initials instead"
+                                // under the preview clears both.
                                 adw::ActionRow {
                                     set_title: &i18n("Emoji"),
-                                    set_subtitle: &i18n("Optional — shown instead of initials"),
+                                    set_subtitle: &i18n("Shown in the circle instead of the initials"),
 
                                     #[name = "emoji_btn"]
                                     add_suffix = &gtk::MenuButton {
                                         set_valign: gtk::Align::Center,
-                                        set_label: &i18n("Add"),
+                                        set_label: &i18n("Choose…"),
                                         #[wrap(Some)]
                                         set_popover = &gtk::EmojiChooser {
                                             connect_emoji_picked[sender] => move |_, text| {
@@ -1028,42 +1077,15 @@ impl Component for AccountsWindow {
                                             },
                                         },
                                     },
-                                    add_suffix = &gtk::Button {
-                                        set_valign: gtk::Align::Center,
-                                        set_label: &i18n("Use initials"),
-                                        set_tooltip_text: Some(i18n("Show name initials instead of an emoji").as_str()),
-                                        connect_clicked => AccountsInput::ClearEmoji,
-                                    },
                                 },
 
-                                // A picture (#162): a photo or logo from disk,
-                                // shown in the disc before the emoji or the
-                                // initials.
                                 adw::ActionRow {
                                     set_title: &i18n("Picture"),
-                                    set_subtitle: &i18n("Optional — an image shown in place of the emoji or initials"),
-
-                                    #[name = "avatar_preview"]
-                                    add_suffix = &gtk::Picture {
-                                        set_valign: gtk::Align::Center,
-                                        set_size_request: (32, 32),
-                                        set_content_fit: gtk::ContentFit::Cover,
-                                        set_can_shrink: true,
-                                        set_overflow: gtk::Overflow::Hidden,
-                                        add_css_class: "account-avatar-preview",
-                                        set_visible: false,
-                                    },
+                                    set_subtitle: &i18n("A photo or logo from this computer, shown in the circle"),
                                     add_suffix = &gtk::Button {
                                         set_valign: gtk::Align::Center,
                                         set_label: &i18n("Choose…"),
                                         connect_clicked => AccountsInput::PickAvatar,
-                                    },
-                                    #[name = "avatar_clear_btn"]
-                                    add_suffix = &gtk::Button {
-                                        set_valign: gtk::Align::Center,
-                                        set_label: &i18n("Remove"),
-                                        set_visible: false,
-                                        connect_clicked => AccountsInput::ClearAvatar,
                                     },
                                 },
                             },
@@ -1239,6 +1261,7 @@ impl Component for AccountsWindow {
             editing: None,
             emoji: None,
             avatar: None,
+            preview_css: gtk::CssProvider::new(),
             sig_editor: None,
             label_synced: String::new(),
             goa,
@@ -1350,6 +1373,20 @@ impl Component for AccountsWindow {
         let es = sender.clone();
         widgets.email_row.connect_changed(move |_| es.input(AccountsInput::EmailChanged));
 
+        // The preview circle follows the name, label and email (its
+        // initials) as they are typed; its colour is a stylesheet.
+        if let Some(display) = gtk::gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &model.preview_css,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+        for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
+            let s = sender.clone();
+            row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
+        }
+
         // Tell the combined settings window when the editor subpage is up —
         // every way in or out (Save, back button, swipe) lands here.
         {
@@ -1420,7 +1457,6 @@ impl Component for AccountsWindow {
                 self.editing = None;
                 self.emoji = None;
                 self.avatar = None;
-                show_avatar(widgets, None);
                 self.label_synced = String::new();
                 self.pending_oauth_refresh = None;
                 self.close_alias_dialog();
@@ -1433,7 +1469,7 @@ impl Component for AccountsWindow {
                 self.apply_provider(widgets);
                 self.sig_editor(widgets).set_html("");
                 widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
-                widgets.emoji_btn.set_label(&i18n("Add"));
+                self.refresh_preview(widgets);
                 widgets.remove_btn.set_visible(false);
                 // A prior GOA edit may have hidden the provider picker.
                 widgets.provider_row.set_visible(true);
@@ -1499,9 +1535,8 @@ impl Component for AccountsWindow {
                     .color_btn
                     .set_rgba(&parse_color(acc.color.as_deref().unwrap_or(DEFAULT_COLOR)));
                 self.emoji = acc.emoji.clone();
-                widgets.emoji_btn.set_label(self.emoji.as_deref().unwrap_or("Add"));
                 self.avatar = acc.avatar.clone();
-                show_avatar(widgets, self.avatar.as_deref());
+                self.refresh_preview(widgets);
                 // GOA accounts: no "Remove" (it lives in the system) — offer an
                 // enable/disable toggle and a shortcut to Online Accounts instead.
                 let is_goa = acc.goa_id.is_some();
@@ -1637,14 +1672,18 @@ impl Component for AccountsWindow {
             }
 
             AccountsInput::SetEmoji(text) => {
-                widgets.emoji_btn.set_label(&text);
                 self.emoji = Some(text);
+                self.avatar = None;
+                self.refresh_preview(widgets);
             }
 
-            AccountsInput::ClearEmoji => {
+            AccountsInput::ClearGlyph => {
                 self.emoji = None;
-                widgets.emoji_btn.set_label(&i18n("Add"));
+                self.avatar = None;
+                self.refresh_preview(widgets);
             }
+
+            AccountsInput::RefreshPreview => self.refresh_preview(widgets),
 
             AccountsInput::PickAvatar => {
                 let dialog = gtk::FileDialog::builder().title(&i18n("Choose a Picture")).build();
@@ -1670,13 +1709,9 @@ impl Component for AccountsWindow {
             }
 
             AccountsInput::SetAvatar(name) => {
-                show_avatar(widgets, Some(&name));
                 self.avatar = Some(name);
-            }
-
-            AccountsInput::ClearAvatar => {
-                self.avatar = None;
-                show_avatar(widgets, None);
+                self.emoji = None;
+                self.refresh_preview(widgets);
             }
 
             AccountsInput::TestConnection => {
@@ -3011,16 +3046,58 @@ fn display_name(acc: &AccountConfig) -> String {
 }
 
 /// Build an `AccountConfig` from the current editor form values.
-/// Show the editor's avatar preview and Remove button for `name`, or hide
-/// them with no picture chosen.
-fn show_avatar(widgets: &AccountsWindowWidgets, name: Option<&str>) {
-    let path = name.and_then(crate::config::avatar_path);
-    match &path {
-        Some(p) => widgets.avatar_preview.set_filename(Some(p)),
-        None => widgets.avatar_preview.set_paintable(None::<&gtk::gdk::Paintable>),
+impl AccountsWindow {
+    /// Redraw the editor's preview circle: the chosen colour, and the
+    /// picture, emoji or initials the sidebar would show — the initials
+    /// from the label, else the name, else the email, as the sidebar
+    /// derives them.
+    fn refresh_preview(&self, widgets: &AccountsWindowWidgets) {
+        let color = crate::color::to_hex(&widgets.color_btn.rgba());
+        self.preview_css.load_from_string(&format!(
+            ".account-preview-disc {{ background-color: {color}; }}"
+        ));
+        let disc = &widgets.preview_disc;
+        while let Some(child) = disc.first_child() {
+            disc.remove(&child);
+        }
+        let picture = self.avatar.as_deref().and_then(crate::config::avatar_path);
+        let (glyph, caption) = match (&picture, &self.emoji) {
+            (Some(path), _) => (
+                crate::ui::initials::avatar_picture(path, 72),
+                i18n("Picture"),
+            ),
+            (None, Some(em)) if !em.is_empty() => (
+                crate::ui::initials::glyph_picture(em, &color, 0.55, 72),
+                i18n("Emoji"),
+            ),
+            _ => {
+                let label = trimmed(&widgets.label_row);
+                let name = trimmed(&widgets.name_row);
+                let email = trimmed(&widgets.email_row);
+                let shown = if !label.is_empty() && label != email {
+                    label
+                } else if name.is_empty() {
+                    email.clone()
+                } else {
+                    name
+                };
+                (
+                    crate::ui::initials::glyph_picture(
+                        &crate::ui::sidebar::account_initials(&shown, &email),
+                        &color,
+                        0.47,
+                        72,
+                    ),
+                    i18n("Initials"),
+                )
+            }
+        };
+        disc.append(&glyph);
+        widgets.preview_caption.set_label(&caption);
+        widgets.use_initials_btn.set_visible(
+            picture.is_some() || self.emoji.as_deref().is_some_and(|e| !e.is_empty()),
+        );
     }
-    widgets.avatar_preview.set_visible(path.is_some());
-    widgets.avatar_clear_btn.set_visible(path.is_some());
 }
 
 /// The side of the square copy an avatar is stored as: sharp in a 30px

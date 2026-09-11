@@ -3782,7 +3782,7 @@ fn attach_folder_context_menu(
     list.add_controller(click);
 }
 
-fn account_initials(name: &str, email: &str) -> String {
+pub(crate) fn account_initials(name: &str, email: &str) -> String {
     let mut it = name.split_whitespace();
     let a = it.next().and_then(|w| w.chars().next());
     let b = it.next().and_then(|w| w.chars().next());
