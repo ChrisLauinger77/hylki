@@ -1010,30 +1010,41 @@ impl Component for AccountsWindow {
                                      the Inboxes view.").as_str()
                                 ),
 
-                                // The sidebar circle as it will look, at the
-                                // top of the group (a non-row child sits
-                                // above the rows): the accent colour, and
-                                // the picture, emoji or initials it shows.
-                                gtk::Box {
-                                    set_orientation: gtk::Orientation::Vertical,
-                                    set_spacing: 2,
-                                    set_halign: gtk::Align::Center,
-                                    set_margin_bottom: 6,
-
-                                    #[name = "preview_disc"]
-                                    gtk::Box {
-                                        add_css_class: "account-circle",
-                                        add_css_class: "account-preview-disc",
-                                        set_size_request: (72, 72),
+                                // The sidebar circle as it will look, as the
+                                // group's first row (a non-row child would
+                                // land below the rows): the accent colour,
+                                // and the picture, emoji or initials it
+                                // shows. Not a button — it neither activates
+                                // nor selects.
+                                adw::PreferencesRow {
+                                    set_activatable: false,
+                                    set_selectable: false,
+                                    set_can_focus: false,
+                                    #[wrap(Some)]
+                                    set_child = &gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 2,
                                         set_halign: gtk::Align::Center,
-                                        set_hexpand: false,
-                                        set_overflow: gtk::Overflow::Hidden,
-                                    },
-                                    #[name = "preview_caption"]
-                                    gtk::Label {
-                                        add_css_class: "dim-label",
-                                        add_css_class: "caption",
-                                        set_justify: gtk::Justification::Center,
+                                        set_margin_top: 10,
+                                        set_margin_bottom: 10,
+                                        set_margin_start: 10,
+                                        set_margin_end: 10,
+
+                                        #[name = "preview_disc"]
+                                        gtk::Box {
+                                            add_css_class: "account-circle",
+                                            add_css_class: "account-preview-disc",
+                                            set_size_request: (72, 72),
+                                            set_halign: gtk::Align::Center,
+                                            set_hexpand: false,
+                                            set_overflow: gtk::Overflow::Hidden,
+                                        },
+                                        #[name = "preview_caption"]
+                                        gtk::Label {
+                                            add_css_class: "dim-label",
+                                            add_css_class: "caption",
+                                            set_justify: gtk::Justification::Center,
+                                        },
                                     },
                                 },
 
