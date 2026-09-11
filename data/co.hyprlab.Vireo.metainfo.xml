@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.27.3" date="2026-09-11">
+      <description>
+        <p>The narrow-window sidebar slides in over the icon rail as its own panel; the rail no longer changes underneath it, and the rare vanished-rail case is gone.</p>
+      </description>
+    </release>
     <release version="1.27.2" date="2026-09-11">
       <description>
         <p>Inbox and Archive use GNOME's inbox and shoe-box icons in the sidebar, toolbars and menus.</p>

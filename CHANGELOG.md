@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.27.3 — 2026-09-11
+
+The narrow-window sidebar peek is its own panel over an untouched rail.
+
+- **Peek panel as a second sidebar.** The peek used to be the one sidebar
+  widget flipped into the account split view's overlay mode: opening it
+  collapsed the split, stood a snapshot in for the docked rail and rebuilt
+  the rows expanded, so the rail's column was covered and redrawn by the
+  panel's content as it slid over, and its menu and refresh appeared to
+  jump. The rail is now never touched. A permanently collapsed
+  `adw::OverlaySplitView` wraps the account split view; showing its sidebar
+  slides a second `Sidebar` instance, in its own `ToolbarView` with the
+  expanded layout's header (Refresh top-left, title, menu top-right), in
+  from the window's left edge over the rail and the panes with libadwaita's
+  scrim, shadow and swipe-to-close (edge-swipe-to-open is off so it cannot
+  fight the message list's swipe actions). The rail keeps its rows, header
+  and width throughout. The snapshot, ghost, restore-timer and rail-repaint
+  machinery is gone, and with it the race that could dock the rail while
+  the split view's spring was still settling and leave no sidebar and a
+  dead toggle until the next press (seen on 1.17.1).
+- **Two instances, one state.** Both sidebars receive the same contents,
+  unread counts, busy state and folder rows (`sidebars_emit`); every
+  navigation is pushed to both as a silent highlight change
+  (`SidebarInput::MirrorSelection`), so the row picked in one is
+  highlighted in the other. The second instance is a `mirror` and never
+  picks an opening view on its own. List-box selection signals are muted
+  while rows are selected programmatically: an input they queue is judged
+  later against a selection that may have moved on, which made two
+  instances oscillate through the app.
+- **Hover peek across both panes.** With hover-expand on, the peek opens
+  on the first pointer movement over the rail (not on entering it — GTK
+  synthesises an enter when the rail reappears under a resting pointer as
+  the panel slides away); leaving either the rail or the panel arms the
+  one-second fold-back and entering either cancels it.
+
 ## 1.27.2 — 2026-09-11
 
 Inbox and Archive use GNOME's own icons.

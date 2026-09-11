@@ -16,6 +16,9 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "Refresh or long-press for Status Bar"
+msgstr "Actualiser ou appuyer longuement pour la barre d'état"
+
 msgid "Main Menu"
 msgstr "Menu principal"
 
@@ -120,9 +123,6 @@ msgstr "Mots-clés"
 
 msgid "Move To…"
 msgstr ""
-
-msgid "Refresh or long-press for Status Bar"
-msgstr "Actualiser ou appuyer longuement pour la barre d'état"
 
 msgid "Attachments"
 msgstr "Pièces jointes"
