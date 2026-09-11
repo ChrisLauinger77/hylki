@@ -7,8 +7,14 @@
 //! Colours are libadwaita's own avatar palette (the same fourteen gradients
 //! `adw::Avatar` picks from, chosen by the same hash of the name), so a
 //! sender keeps the colour they have always had.
+//!
+//! The same drawing serves the sidebar's account circles (a glyph alone
+//! over the circle's own colour — see [`glyph_picture`]) and the reader's
+//! cards, where it is rendered to a PNG the document embeds
+//! ([`png_data_uri`]).
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 
 use gtk::{gdk, glib, graphene, gsk, pango, prelude::*, subclass::prelude::*};
 
@@ -65,7 +71,13 @@ mod imp {
     #[derive(Default)]
     pub struct InitialsPaintable {
         pub initials: RefCell<String>,
-        pub color: Cell<usize>,
+        /// The ground: a gradient top and bottom, or nothing (the widget
+        /// beneath paints its own).
+        pub ground: RefCell<Option<(gdk::RGBA, gdk::RGBA)>>,
+        pub fg: RefCell<Option<gdk::RGBA>>,
+        /// Text height as a share of the shorter side; 0 = by the count
+        /// of letters, as the avatar sizes its label.
+        pub scale: Cell<f64>,
     }
 
     #[glib::object_subclass]
@@ -84,24 +96,30 @@ mod imp {
 
         fn snapshot(&self, snapshot: &gdk::Snapshot, width: f64, height: f64) {
             let Some(snapshot) = snapshot.downcast_ref::<gtk::Snapshot>() else { return };
-            let (top, bottom, fg) = PALETTE[self.color.get() % PALETTE.len()];
-            let rgba = |s: &str| gdk::RGBA::parse(s).unwrap_or(gdk::RGBA::BLACK);
             // The circle's ground: the avatar clips this to its disc.
-            snapshot.append_linear_gradient(
-                &graphene::Rect::new(0.0, 0.0, width as f32, height as f32),
-                &graphene::Point::new(0.0, 0.0),
-                &graphene::Point::new(0.0, height as f32),
-                &[gsk::ColorStop::new(0.0, rgba(top)), gsk::ColorStop::new(1.0, rgba(bottom))],
-            );
+            if let Some((top, bottom)) = *self.ground.borrow() {
+                snapshot.append_linear_gradient(
+                    &graphene::Rect::new(0.0, 0.0, width as f32, height as f32),
+                    &graphene::Point::new(0.0, 0.0),
+                    &graphene::Point::new(0.0, height as f32),
+                    &[gsk::ColorStop::new(0.0, top), gsk::ColorStop::new(1.0, bottom)],
+                );
+            }
 
             let initials = self.initials.borrow();
             if initials.is_empty() {
                 return;
             }
+            let fg = self.fg.borrow().unwrap_or(gdk::RGBA::WHITE);
             // Bold, at a size that lets a pair sit comfortably inside the
             // disc: the same weight of presence the avatar's own label has.
             let size = width.min(height);
-            let px = size * if initials.chars().count() > 1 { 0.42 } else { 0.5 };
+            let share = match self.scale.get() {
+                s if s > 0.0 => s,
+                _ if initials.chars().count() > 1 => 0.42,
+                _ => 0.5,
+            };
+            let px = size * share;
             let layout = FONT_SOURCE.with(|l| l.create_pango_layout(Some(initials.as_str())));
             let mut desc = layout.context().font_description().unwrap_or_default();
             desc.set_weight(pango::Weight::Bold);
@@ -119,7 +137,7 @@ mod imp {
             let dy = (height - ink_h) / 2.0 - ink_y;
             snapshot.save();
             snapshot.translate(&graphene::Point::new(dx as f32, dy as f32));
-            snapshot.append_layout(&layout, &rgba(fg));
+            snapshot.append_layout(&layout, &fg);
             snapshot.restore();
         }
     }
@@ -139,11 +157,95 @@ impl InitialsPaintable {
         if initials.is_empty() {
             return None;
         }
+        let (top, bottom, fg) = PALETTE[palette_index(name)];
+        let rgba = |s: &str| gdk::RGBA::parse(s).unwrap_or(gdk::RGBA::BLACK);
         let this: Self = glib::Object::new();
         this.imp().initials.replace(initials);
-        this.imp().color.set(palette_index(name));
+        this.imp().ground.replace(Some((rgba(top), rgba(bottom))));
+        this.imp().fg.replace(Some(rgba(fg)));
         Some(this)
     }
+
+    /// `text` alone (initials, or an emoji) in `fg`, over nothing: for a
+    /// circle that paints its own colour. `scale` is the text height as a
+    /// share of the circle.
+    pub fn glyph(text: &str, fg: gdk::RGBA, scale: f64) -> Self {
+        let this: Self = glib::Object::new();
+        this.imp().initials.replace(text.to_string());
+        this.imp().fg.replace(Some(fg));
+        this.imp().scale.set(scale);
+        this
+    }
+
+    /// `text` in `fg` on a flat `bg`.
+    pub fn solid(text: &str, bg: gdk::RGBA, fg: gdk::RGBA, scale: f64) -> Self {
+        let this = Self::glyph(text, fg, scale);
+        this.imp().ground.replace(Some((bg, bg)));
+        this
+    }
+}
+
+/// A sidebar circle's glyph: `text` ink-centred in the colour that reads
+/// on `bg_hex` (the circle's own ground, painted by its CSS), filling
+/// whatever square it is given.
+pub fn glyph_picture(text: &str, bg_hex: &str, scale: f64) -> gtk::Picture {
+    let fg = gdk::RGBA::parse(crate::color::readable_text(bg_hex)).unwrap_or(gdk::RGBA::WHITE);
+    let picture = gtk::Picture::for_paintable(&InitialsPaintable::glyph(text, fg, scale));
+    picture.set_content_fit(gtk::ContentFit::Fill);
+    picture.set_can_shrink(true);
+    picture.set_hexpand(true);
+    picture.set_vexpand(true);
+    picture
+}
+
+thread_local! {
+    /// Reader-card circles already rendered this session, by what they
+    /// show: a conversation repeats its senders, and every render of the
+    /// document would otherwise draw them again.
+    static PNG_CACHE: RefCell<HashMap<(String, String, i32), String>> = RefCell::new(HashMap::new());
+}
+
+/// `text` on a flat `bg`, as a `data:` PNG for an `<img>` of `size` CSS
+/// pixels — rendered at the screen's scale, so it is as crisp as the
+/// document's own text. Drawn through the window's renderer; `None` before
+/// a window exists.
+pub fn png_data_uri(text: &str, bg: gdk::RGBA, size: i32) -> Option<String> {
+    let key = (text.to_string(), bg.to_string(), size);
+    if let Some(hit) = PNG_CACHE.with(|c| c.borrow().get(&key).cloned()) {
+        return Some(hit);
+    }
+    let window = gtk::Window::list_toplevels().into_iter().find_map(|w| w.downcast::<gtk::Window>().ok())?;
+    let renderer = window.renderer()?;
+    let scale = window.scale_factor().max(1);
+    let px = size * scale;
+    let paintable = InitialsPaintable::solid(text, bg, gdk::RGBA::WHITE, 0.0);
+    let snapshot = gtk::Snapshot::new();
+    paintable.snapshot(&snapshot, f64::from(px), f64::from(px));
+    let node = snapshot.to_node()?;
+    let texture = renderer.render_texture(&node, Some(&graphene::Rect::new(0.0, 0.0, px as f32, px as f32)));
+    let uri = format!("data:image/png;base64,{}", glib::base64_encode(&texture.save_to_png_bytes()));
+    PNG_CACHE.with(|c| {
+        c.borrow_mut().insert(key, uri.clone());
+    });
+    Some(uri)
+}
+
+/// `hsl()` as CSS means it (hue in degrees, the rest as fractions), for the
+/// reader's per-sender tints.
+pub fn hsl(h: f64, s: f64, l: f64) -> gdk::RGBA {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let hp = (h.rem_euclid(360.0)) / 60.0;
+    let x = c * (1.0 - (hp % 2.0 - 1.0).abs());
+    let (r, g, b) = match hp {
+        v if v < 1.0 => (c, x, 0.0),
+        v if v < 2.0 => (x, c, 0.0),
+        v if v < 3.0 => (0.0, c, x),
+        v if v < 4.0 => (0.0, x, c),
+        v if v < 5.0 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let m = l - c / 2.0;
+    gdk::RGBA::new((r + m) as f32, (g + m) as f32, (b + m) as f32, 1.0)
 }
 
 #[cfg(test)]
@@ -161,5 +263,15 @@ mod tests {
         // GLib's djb2, as libadwaita hashes the name for its colour.
         assert_eq!(palette_index(""), (5381u32 % 14) as usize);
         assert!(palette_index("Marcus Chen") < PALETTE.len());
+    }
+
+    #[test]
+    fn hsl_matches_css() {
+        let c = hsl(0.0, 1.0, 0.5);
+        assert!((c.red() - 1.0).abs() < 0.01 && c.green().abs() < 0.01 && c.blue().abs() < 0.01);
+        let c = hsl(120.0, 0.52, 0.45);
+        assert!((c.green() - 0.684).abs() < 0.01 && (c.red() - 0.216).abs() < 0.01);
+        let c = hsl(240.0, 0.52, 0.38);
+        assert!((c.blue() - 0.5776).abs() < 0.01);
     }
 }

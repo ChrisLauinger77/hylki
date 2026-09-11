@@ -2099,11 +2099,18 @@ impl MessageView {
                             .bytes()
                             .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b as u32))
                             % 360;
-                        format!(
-                            "<span class=\"vireo-ava\" style=\"background:hsl({hue},52%,{l}%)\">{}</span>",
-                            escape_text(&initial),
-                            l = if dark { 38 } else { 45 },
-                        )
+                        let l = if dark { 38 } else { 45 };
+                        // Drawn ink-centred by ui::initials and embedded as
+                        // a PNG (the same tint); the markup span stands in
+                        // only before a window exists to render with.
+                        let bg = crate::ui::initials::hsl(f64::from(hue), 0.52, f64::from(l) / 100.0);
+                        match crate::ui::initials::png_data_uri(&initial, bg, 26) {
+                            Some(uri) => format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">"),
+                            None => format!(
+                                "<span class=\"vireo-ava\" style=\"background:hsl({hue},52%,{l}%)\">{}</span>",
+                                escape_text(&initial),
+                            ),
+                        }
                     },
                     addr = if m.from_addr.is_empty() {
                         String::new()

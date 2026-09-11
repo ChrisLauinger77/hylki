@@ -1994,17 +1994,16 @@ impl Sidebar {
             circle.set_halign(gtk::Align::Center);
             circle.set_hexpand(false);
             circle.set_size_request(30, 30);
-            let glyph = gtk::Label::new(None);
-            glyph.set_hexpand(true);
-            glyph.set_halign(gtk::Align::Center);
-            glyph.set_valign(gtk::Align::Center);
-            match &section.emoji {
-                Some(em) if !em.is_empty() => {
-                    glyph.set_text(em);
-                    glyph.add_css_class("account-emoji");
-                }
-                _ => glyph.set_text(&account_initials(&name_str, &section.account.email)),
-            }
+            // Drawn ink-centred (see `ui::initials`), not a label: a lone
+            // letter or an emoji sits exactly in the middle of the disc.
+            let glyph = match &section.emoji {
+                Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.55),
+                _ => crate::ui::initials::glyph_picture(
+                    &account_initials(&name_str, &section.account.email),
+                    &section.color,
+                    0.47,
+                ),
+            };
             circle.append(&glyph);
             // While this account's section is collapsed its Inbox row (and the
             // chip on it) is hidden inside the revealer, so surface the inbox
@@ -3868,17 +3867,14 @@ fn build_unified_inbox_row(
     circle.set_halign(gtk::Align::Center);
     circle.set_hexpand(false);
     circle.set_size_request(21, 21);
-    let glyph = gtk::Label::new(None);
-    glyph.set_hexpand(true);
-    glyph.set_halign(gtk::Align::Center);
-    glyph.set_valign(gtk::Align::Center);
-    match &section.emoji {
-        Some(em) if !em.is_empty() => {
-            glyph.set_text(em);
-            glyph.add_css_class("account-emoji");
-        }
-        _ => glyph.set_text(&account_initials(label, &section.account.email)),
-    }
+    let glyph = match &section.emoji {
+        Some(em) if !em.is_empty() => crate::ui::initials::glyph_picture(em, &section.color, 0.6),
+        _ => crate::ui::initials::glyph_picture(
+            &account_initials(label, &section.account.email),
+            &section.color,
+            0.5,
+        ),
+    };
     circle.append(&glyph);
 
     build_unified_sub_row(&circle, label, label, inbox.unread, collapsed, inset, true)

@@ -112,45 +112,14 @@ headerbar.rail-header {
   border-radius: 15px;
 }
 
-.account-circle label {
-  font-weight: 700;
-  font-size: 0.95em;
-}
-
-/* Optical centring. Glyphs centre by their font's logical box, which sits a
-   little low and left of the visible ink, so each glyph type/size is nudged back
-   up and right independently (initials and emoji tuned separately). */
-
-/* Large header circle — emoji get their own centring: the glyphs sit high
-   in their font box, so unlike initials they need no upward nudge at all. */
-.account-circle label.account-emoji {
-  font-size: 1.05em;
-  font-weight: 400;
-  margin-top: 2px;
-  margin-left: 2px;
-}
+/* The circle's glyph (initials or emoji) is drawn ink-centred by
+   ui::initials, so no label rules or optical nudges are needed here. */
 
 /* Small pill for the "All Inboxes" per-account sub-list. */
 .account-circle-sm {
   min-width: 21px;
   min-height: 21px;
   border-radius: 10.5px;
-}
-
-/* Small-circle initials. */
-.account-circle-sm label {
-  font-weight: 700;
-  font-size: 0.72em;
-  margin-bottom: 1px;
-  margin-left: 1px;
-}
-
-/* Small-circle emoji (overrides the initials rule above for emoji glyphs). */
-.account-circle-sm label.account-emoji {
-  font-size: 0.85em;
-  font-weight: 400;
-  margin-top: 1px;
-  margin-left: 1px;
 }
 
 /* Inbox rows nested under "All Inboxes": no indent so their account pills
