@@ -348,6 +348,7 @@ pub enum PrefInput {
     ToggleRememberSidebar(bool),
     ToggleRememberRail(bool),
     ToggleRailDots(bool),
+    ToggleRailFoldEnabled(bool),
     ToggleRailFoldAccounts(bool),
     ToggleRailFoldAllInboxes(bool),
     ToggleRailFoldStarred(bool),
@@ -957,70 +958,73 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "rail_fold_accounts_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up accounts"),
-                                        set_subtitle: &i18n("Collapse every expanded account when the sidebar \
-                                                       becomes the icon rail; they open again when it \
-                                                       expands."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldAccounts(row.is_active()));
+                                    #[name = "rail_fold_row"]
+                                    adw::ExpanderRow {
+                                        set_title: &i18n("Fold up expanded items"),
+                                        set_subtitle: &i18n("While the sidebar is the icon rail, these show folded \
+                                                       up and stay so; they open again as they were when it \
+                                                       expands. Switch one off to leave it as it is."),
+                                        set_show_enable_switch: true,
+                                        set_expanded: true,
+                                        connect_enable_expansion_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleRailFoldEnabled(row.enables_expansion()));
                                         },
-                                    },
 
-                                    #[name = "rail_fold_all_inboxes_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up All Inboxes"),
-                                        set_subtitle: &i18n("Collapse the account list under All Inboxes in \
-                                                       the icon rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
+                                        #[name = "rail_fold_accounts_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("All accounts"),
+                                            set_subtitle: &i18n("Every account's folder list."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldAccounts(row.is_active()));
+                                            },
                                         },
-                                    },
-
-                                    #[name = "rail_fold_starred_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up Starred"),
-                                        set_subtitle: &i18n("Collapse the account list under the unified Starred row in the icon rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldStarred(row.is_active()));
+                                        #[name = "rail_fold_all_inboxes_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("All Inboxes"),
+                                            set_subtitle: &i18n("The account list under All Inboxes."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
+                                            },
                                         },
-                                    },
-
-                                    #[name = "rail_fold_sent_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up Sent"),
-                                        set_subtitle: &i18n("Collapse the account list under the unified Sent row in the icon rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldSent(row.is_active()));
+                                        #[name = "rail_fold_starred_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Starred"),
+                                            set_subtitle: &i18n("The account list under the unified Starred row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldStarred(row.is_active()));
+                                            },
                                         },
-                                    },
-
-                                    #[name = "rail_fold_drafts_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up Drafts"),
-                                        set_subtitle: &i18n("Collapse the account list under the unified Drafts row in the icon rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldDrafts(row.is_active()));
+                                        #[name = "rail_fold_sent_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Sent"),
+                                            set_subtitle: &i18n("The account list under the unified Sent row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldSent(row.is_active()));
+                                            },
                                         },
-                                    },
-
-                                    #[name = "rail_fold_filtered_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up Filtered Folders"),
-                                        set_subtitle: &i18n("Collapse the Filtered Folders section in the icon \
-                                                       rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldFiltered(row.is_active()));
+                                        #[name = "rail_fold_drafts_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Drafts"),
+                                            set_subtitle: &i18n("The account list under the unified Drafts row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldDrafts(row.is_active()));
+                                            },
                                         },
-                                    },
-
-                                    #[name = "rail_fold_tags_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Fold up Tags"),
-                                        set_subtitle: &i18n("Collapse the Tags section in the icon rail."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleRailFoldTags(row.is_active()));
+                                        #[name = "rail_fold_filtered_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Filtered Folders"),
+                                            set_subtitle: &i18n("The folders under the Filtered Folders row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldFiltered(row.is_active()));
+                                            },
+                                        },
+                                        #[name = "rail_fold_tags_row"]
+                                        add_row = &adw::SwitchRow {
+                                            set_title: &i18n("Tags"),
+                                            set_subtitle: &i18n("The tags under the Tags row."),
+                                            connect_active_notify[sender] => move |row| {
+                                                sender.input(PrefInput::ToggleRailFoldTags(row.is_active()));
+                                            },
                                         },
                                     },
                                 },
@@ -1697,6 +1701,7 @@ impl Component for Preferences {
         widgets.remember_sidebar_row.set_active(init.remember_sidebar);
         widgets.remember_rail_row.set_active(init.remember_rail);
         widgets.rail_dots_row.set_active(init.rail_dots);
+        widgets.rail_fold_row.set_enable_expansion(init.rail_fold.enabled);
         widgets.rail_fold_accounts_row.set_active(init.rail_fold.accounts);
         widgets.rail_fold_all_inboxes_row.set_active(init.rail_fold.all_inboxes);
         widgets.rail_fold_starred_row.set_active(init.rail_fold.starred);
@@ -2273,6 +2278,10 @@ impl Component for Preferences {
             }
             PrefInput::ToggleRailDots(on) => {
                 let _ = sender.output(PrefOutput::SetRailDots(on));
+            }
+            PrefInput::ToggleRailFoldEnabled(on) => {
+                self.rail_fold.enabled = on;
+                let _ = sender.output(PrefOutput::SetRailFold(self.rail_fold));
             }
             PrefInput::ToggleRailFoldAccounts(on) => {
                 self.rail_fold.accounts = on;

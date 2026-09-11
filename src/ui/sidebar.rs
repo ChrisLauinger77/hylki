@@ -231,17 +231,6 @@ pub struct Sidebar {
     /// Icon rail: the sections that fold up by themselves when the sidebar
     /// collapses (Settings → Sidebar → Icon rail).
     rail_fold: crate::config::RailFold,
-    /// What the rail's fold-up closed, to open again when the sidebar
-    /// expands.
-    rail_restore: RailRestore,
-    /// Whether the rail came up by collapsing in this session (as against
-    /// being restored at startup). Only then are accounts arriving later
-    /// folded too: a restored rail shows what was saved.
-    rail_armed: bool,
-    /// Accounts the rail's fold-up has already decided on this time round.
-    /// Accounts arrive one by one at startup, so each SetContents folds the
-    /// newcomers — and leaves alone the ones the user reopened by hand.
-    rail_seen: std::collections::HashSet<u32>,
     /// Per-account widgets, rebuilt on each SetContents.
     revealers: HashMap<u32, gtk::Revealer>,
     chevrons: HashMap<u32, gtk::Image>,
@@ -613,9 +602,6 @@ impl Component for Sidebar {
             chevrons_left: false,
             rail_dots: false,
             rail_fold: crate::config::RailFold::default(),
-            rail_restore: RailRestore::default(),
-            rail_armed: false,
-            rail_seen: std::collections::HashSet::new(),
             revealers: HashMap::new(),
             chevrons: HashMap::new(),
             folder_lists: HashMap::new(),
@@ -718,13 +704,6 @@ impl Component for Sidebar {
                 // list holds indices 0..E, the custom list E..).
                 for s in &mut sections {
                     s.folders.sort_by_key(|f| f.kind == FolderKind::Custom);
-                    // An account the rail folded up stays folded: the app
-                    // may have built these contents before it processed
-                    // that fold's toggle. The user's own reopening takes
-                    // the account off the list (ToggleCollapseLocal).
-                    if self.rail_restore.accounts.contains(&s.account.id) {
-                        s.collapsed = true;
-                    }
                 }
                 // Seed the tree's collapsed nodes from the persisted state;
                 // later chevron clicks flip the local copy.
@@ -739,27 +718,11 @@ impl Component for Sidebar {
                 self.show_unified_chip = unified_chip;
                 self.chevrons_left = chevrons_left;
                 self.rail_dots = rail_dots;
-                // The fold-ups the rail owes while it is up: the switches
-                // just turned on, and — once the rail came up by collapsing
-                // in this session — accounts arriving since (`rail_seen`
-                // guards the ones already decided on, so a sync never
-                // re-folds what the user opened by hand). A restored rail
-                // folds nothing: what was saved is what shows. A switch
-                // turned off while the rail is up gives its section back.
-                let turned_on = rail_fold.gained_since(self.rail_fold);
-                let turned_off = self.rail_fold.gained_since(rail_fold);
+                // "Fold up expanded items" is a view of the rail, not a
+                // change to what is saved: the rebuild below draws the
+                // ticked items folded while the sidebar is collapsed and
+                // as they are once it expands (see `locked_row`).
                 self.rail_fold = rail_fold;
-                if self.collapsed {
-                    if turned_on.accounts {
-                        self.rail_seen.clear();
-                    }
-                    let which = crate::config::RailFold {
-                        accounts: turned_on.accounts || (rail_fold.accounts && self.rail_armed),
-                        ..turned_on
-                    };
-                    self.fold_for_rail(&sender, which);
-                    self.unfold_after_rail(&sender, turned_off);
-                }
                 self.unified_unread = unified_unread;
                 self.unified_folders = unified_folders;
                 self.tags = tags;
@@ -951,21 +914,7 @@ impl Component for Sidebar {
             }
 
             SidebarInput::ToggleUnifiedExpand => {
-                self.unified_expanded = !self.unified_expanded;
-                self.report_sections(&sender);
-                if let Some(rev) = &self.unified_revealer {
-                    rev.set_reveal_child(self.unified_expanded);
-                }
-                // Expanded: the sub-list shows each inbox's count, so the
-                // total chip bows out; it returns when collapsed back up.
-                let show_chip =
-                    self.unified_unread > 0 && !self.unified_expanded && self.show_unified_chip;
-                if let Some(label) = &self.unified_badge {
-                    label.set_visible(show_chip);
-                }
-                if let Some(ch) = &self.unified_chevron {
-                    ch.set_icon_name(Some(if self.unified_expanded { "co.hyprlab.Vireo-pan-down-symbolic" } else { "co.hyprlab.Vireo-pan-end-symbolic" }));
-                }
+                self.toggle_row(UnifiedRow::Kind(FolderKind::Inbox), &sender)
             }
 
             SidebarInput::FilteredRowSelected { slot, index } => {
@@ -1195,7 +1144,9 @@ impl Component for Sidebar {
                 if let Some(label) = &self.unified_badge {
                     label.set_text(&unified.to_string());
                     label.set_visible(
-                        unified > 0 && !self.unified_expanded && self.show_unified_chip,
+                        unified > 0
+                            && !self.row_shown_open(UnifiedRow::Kind(FolderKind::Inbox))
+                            && self.show_unified_chip,
                     );
                 }
                 for (slot, badges) in &self.filtered_badges {
@@ -1209,7 +1160,7 @@ impl Component for Sidebar {
                     let total: u32 = w.row_badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
                     if let Some(b) = &w.badge {
                         b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.row_open(*row) && self.show_unified_chip);
+                        b.set_visible(total > 0 && !self.row_shown_open(*row) && self.show_unified_chip);
                     }
                 }
                 // Keep the avatar-circle badges in sync too. They only show while
@@ -1225,7 +1176,7 @@ impl Component for Sidebar {
                             .copied()
                             .unwrap_or(0);
                         label.set_text(&n.to_string());
-                        label.set_visible(section.collapsed && n > 0);
+                        label.set_visible((section.collapsed || self.locked_accounts()) && n > 0);
                     }
                 }
                 self.unified_unread = unified;
@@ -1294,7 +1245,6 @@ impl Component for Sidebar {
                 // persisted preference.
                 if self.collapsed != collapsed {
                     self.collapsed = collapsed;
-                    self.rail_fold_step(&sender);
                     self.rebuild_normal(
                         &widgets.pinned_box,
                         &widgets.normal_box,
@@ -1307,7 +1257,6 @@ impl Component for Sidebar {
 
             SidebarInput::ToggleCollapsed => {
                 self.collapsed = !self.collapsed;
-                self.rail_fold_step(&sender);
                 self.rebuild_normal(
                     &widgets.pinned_box,
                     &widgets.normal_box,
@@ -1319,6 +1268,11 @@ impl Component for Sidebar {
             }
 
             SidebarInput::ToggleCollapseLocal(id) => {
+                // Folded up for the rail: it stays so until the sidebar
+                // expands (Settings → Sidebar → Icon rail).
+                if self.locked_accounts() {
+                    return;
+                }
                 if let Some(rev) = self.revealers.get(&id) {
                     let expanded = !rev.reveals_child();
                     rev.set_reveal_child(expanded);
@@ -1327,10 +1281,6 @@ impl Component for Sidebar {
                     }
                     if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
                         s.collapsed = !expanded;
-                    }
-                    if expanded {
-                        // Opened by hand: the rail's fold-up lets go of it.
-                        self.rail_restore.accounts.retain(|&a| a != id);
                     }
                     // The Inbox chip lives inside the folder list we just hid/shown,
                     // so mirror it onto the avatar: visible only while collapsed.
@@ -1994,7 +1944,10 @@ impl Sidebar {
             let (circle_overlay, circle_badge) = with_unread_overlay(&circle, inbox_unread);
             circle_overlay.set_halign(gtk::Align::Center);
             circle_overlay.set_hexpand(false);
-            circle_badge.set_visible(section.collapsed && inbox_unread > 0);
+            // Folded for the rail (Settings → Sidebar → Icon rail) reads as
+            // collapsed here, without touching the saved state.
+            let folded = section.collapsed || self.locked_accounts();
+            circle_badge.set_visible(folded && inbox_unread > 0);
             self.account_circle_badges.insert(id, circle_badge);
             if !self.collapsed && self.chevrons_left {
                 // Leaves room for the overlaid disclosure chevron, which
@@ -2008,7 +1961,7 @@ impl Sidebar {
             // leading (overlaid on the header's left edge, reserving no
             // layout space, like the All Inboxes row's) or classic trailing,
             // per Settings → Chevron placement.
-            let chevron = gtk::Image::from_icon_name(if section.collapsed {
+            let chevron = gtk::Image::from_icon_name(if folded {
                 "co.hyprlab.Vireo-pan-end-symbolic"
             } else {
                 "co.hyprlab.Vireo-pan-down-symbolic"
@@ -2118,7 +2071,7 @@ impl Sidebar {
             let revealer = gtk::Revealer::new();
             revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
             revealer.set_transition_duration(0);
-            revealer.set_reveal_child(!section.collapsed);
+            revealer.set_reveal_child(!folded);
 
             // Split folders: essential (Inbox/Sent/Trash/Archive/…) are always
             // shown; user-created "custom" folders are tucked under a collapsible
@@ -2480,7 +2433,8 @@ impl Sidebar {
         // Sent wears no unread chip anywhere: what you sent is not new mail.
         let counted = row_kind != UnifiedRow::Kind(FolderKind::Sent);
         let unread = self.row_unread(row_kind);
-        let expanded = self.row_open(row_kind);
+        let expanded = self.row_shown_open(row_kind);
+        let locked = self.locked_row(row_kind);
         let show_chip = unread > 0 && !expanded && self.show_unified_chip;
         let toggle_tip = match row_kind {
             UnifiedRow::Kind(FolderKind::Inbox) => i18n("Show each inbox"),
@@ -2619,8 +2573,9 @@ impl Sidebar {
         }
         parent.append(&list);
 
-        // The rail's stand-in for the in-row chevron.
-        if self.collapsed {
+        // The rail's stand-in for the in-row chevron — unless the row is
+        // folded up for the rail, in which case it stays so.
+        if self.collapsed && !locked {
             let toggle = gtk::Button::new();
             toggle.add_css_class("flat");
             toggle.add_css_class("chevron-btn");
@@ -2836,6 +2791,28 @@ impl Sidebar {
         }
     }
 
+    /// Whether "Fold up expanded items" holds this row folded: the sidebar
+    /// is the icon rail and the row's switch is on.
+    fn locked_row(&self, row: UnifiedRow) -> bool {
+        self.collapsed
+            && match row {
+                UnifiedRow::Kind(kind) => self.rail_fold.folds_kind(kind),
+                UnifiedRow::Filtered => self.rail_fold.folds_filtered(),
+                UnifiedRow::Tags => self.rail_fold.folds_tags(),
+            }
+    }
+
+    /// Whether "Fold up expanded items" holds the accounts folded.
+    fn locked_accounts(&self) -> bool {
+        self.collapsed && self.rail_fold.folds_accounts()
+    }
+
+    /// Whether a unified row's list shows open: its own state, unless the
+    /// rail holds it folded.
+    fn row_shown_open(&self, row: UnifiedRow) -> bool {
+        self.row_open(row) && !self.locked_row(row)
+    }
+
     fn set_row_open(&mut self, row: UnifiedRow, open: bool) {
         match row {
             UnifiedRow::Kind(FolderKind::Inbox) => self.unified_expanded = open,
@@ -2860,6 +2837,10 @@ impl Sidebar {
     /// Open or fold a unified row's list in place (a click on its chevron,
     /// a double-click on the row), and report the section states.
     fn toggle_row(&mut self, row: UnifiedRow, sender: &ComponentSender<Self>) {
+        // Folded up for the rail: it stays so until the sidebar expands.
+        if self.locked_row(row) {
+            return;
+        }
         let open = !self.row_open(row);
         self.set_row_open(row, open);
         self.report_sections(sender);
@@ -3684,73 +3665,7 @@ fn path_is_under(child: &str, parent: &str) -> bool {
         && matches!(child.as_bytes()[parent.len()], b'/' | b'.' | b'\\')
 }
 
-/// What the icon rail's automatic fold-up closed (Settings → Sidebar → Icon
-/// rail), so expanding the sidebar opens exactly those again — not sections
-/// the user had folded up themselves.
-#[derive(Debug, Default)]
-struct RailRestore {
-    accounts: Vec<u32>,
-    all_inboxes: bool,
-    /// The unified Starred / Sent / Drafts rows folded with All Inboxes.
-    kinds: Vec<FolderKind>,
-    filtered: bool,
-    tags: bool,
-}
-
 impl Sidebar {
-    /// The rail's automatic fold-up on collapse, and its undoing on expand.
-    /// Runs before the rebuild that follows a collapse change, which draws
-    /// the sections from the state set here.
-    fn rail_fold_step(&mut self, sender: &ComponentSender<Self>) {
-        self.rail_armed = self.collapsed;
-        if self.collapsed {
-            self.fold_for_rail(sender, self.rail_fold);
-        } else {
-            self.unfold_after_rail(sender, crate::config::RailFold::ALL);
-        }
-    }
-
-    /// Fold up the sections `which` names that are open, remembering each so
-    /// [`Self::unfold_after_rail`] can open it again. Accounts go through the
-    /// same output as the user's own toggle so the app records the state.
-    fn fold_for_rail(&mut self, sender: &ComponentSender<Self>, which: crate::config::RailFold) {
-        if !which.any() {
-            return;
-        }
-        if which.all_inboxes && self.unified_expanded {
-            self.unified_expanded = false;
-            self.rail_restore.all_inboxes = true;
-        }
-        // The Starred / Sent / Drafts rows, each on its own switch.
-        for (kind, open) in self.kind_expanded.iter_mut() {
-            if *open && which.folds_kind(*kind) {
-                *open = false;
-                self.rail_restore.kinds.push(*kind);
-            }
-        }
-        if which.filtered && self.unified_folders_expanded {
-            self.unified_folders_expanded = false;
-            self.rail_restore.filtered = true;
-        }
-        if which.tags && self.tags_expanded {
-            self.tags_expanded = false;
-            self.rail_restore.tags = true;
-        }
-        if which.accounts {
-            for s in self
-                .sections
-                .iter_mut()
-                .filter(|s| !s.collapsed && !self.rail_seen.contains(&s.account.id))
-            {
-                s.collapsed = true;
-                self.rail_restore.accounts.push(s.account.id);
-                let _ = sender.output(SidebarOutput::ToggleCollapse(s.account.id));
-            }
-            self.rail_seen.extend(self.sections.iter().map(|s| s.account.id));
-        }
-        self.report_sections(sender);
-    }
-
     /// Tell the app how the three sections stand, for the saved layout.
     fn report_sections(&self, sender: &ComponentSender<Self>) {
         let _ = sender.output(SidebarOutput::SectionsOpen {
@@ -3763,40 +3678,6 @@ impl Sidebar {
         });
     }
 
-    /// Open again what the fold-up closed, for the sections `which` names.
-    fn unfold_after_rail(&mut self, sender: &ComponentSender<Self>, which: crate::config::RailFold) {
-        if !which.any() {
-            return;
-        }
-        if which.all_inboxes && std::mem::take(&mut self.rail_restore.all_inboxes) {
-            self.unified_expanded = true;
-        }
-        let kinds = std::mem::take(&mut self.rail_restore.kinds);
-        for kind in kinds {
-            if which.folds_kind(kind) {
-                self.kind_expanded.insert(kind, true);
-            } else {
-                self.rail_restore.kinds.push(kind);
-            }
-        }
-        if which.filtered && std::mem::take(&mut self.rail_restore.filtered) {
-            self.unified_folders_expanded = true;
-        }
-        if which.tags && std::mem::take(&mut self.rail_restore.tags) {
-            self.tags_expanded = true;
-        }
-        if which.accounts {
-            self.rail_seen.clear();
-            for id in std::mem::take(&mut self.rail_restore.accounts) {
-                // Still folded: the user may have opened it in the rail.
-                if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id && s.collapsed) {
-                    s.collapsed = false;
-                    let _ = sender.output(SidebarOutput::ToggleCollapse(id));
-                }
-            }
-        }
-        self.report_sections(sender);
-    }
 }
 
 /// Whether a folder row is hidden because some ancestor node is collapsed.

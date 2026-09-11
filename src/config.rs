@@ -1782,13 +1782,17 @@ pub fn load_rail_fold() -> RailFold {
     load_privacy().rail_fold
 }
 
-/// Which sidebar sections fold up by themselves when the sidebar collapses
-/// to its icon rail (Settings → Sidebar → Icon rail), and open again when it
-/// expands. Each has its own switch so the rail is just the way the user
-/// wants it; all are on until switched off.
+/// "Fold up expanded items" (Settings → Sidebar → Icon rail): while the
+/// sidebar is collapsed to its icon rail, the items ticked here show folded
+/// up and stay so — their saved expansion is untouched and returns when the
+/// sidebar expands. Each item has its own switch under the master; all are
+/// on until switched off.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RailFold {
-    /// Every expanded account's folder list.
+    /// The master switch: off, nothing folds for the rail.
+    #[serde(default = "default_on")]
+    pub enabled: bool,
+    /// Every account's folder list.
     #[serde(default = "default_on")]
     pub accounts: bool,
     /// The per-account inbox list under All Inboxes.
@@ -1815,54 +1819,45 @@ fn default_on() -> bool {
 
 impl Default for RailFold {
     fn default() -> Self {
-        RailFold::ALL
+        RailFold {
+            enabled: true,
+            accounts: true,
+            all_inboxes: true,
+            starred: true,
+            sent: true,
+            drafts: true,
+            filtered: true,
+            tags: true,
+        }
     }
 }
 
 impl RailFold {
-    /// Every section.
-    pub const ALL: RailFold = RailFold {
-        accounts: true,
-        all_inboxes: true,
-        starred: true,
-        sent: true,
-        drafts: true,
-        filtered: true,
-        tags: true,
-    };
-
-    /// The switches on here that were off in `before`.
-    pub fn gained_since(self, before: RailFold) -> RailFold {
-        RailFold {
-            accounts: self.accounts && !before.accounts,
-            all_inboxes: self.all_inboxes && !before.all_inboxes,
-            starred: self.starred && !before.starred,
-            sent: self.sent && !before.sent,
-            drafts: self.drafts && !before.drafts,
-            filtered: self.filtered && !before.filtered,
-            tags: self.tags && !before.tags,
-        }
+    /// Whether the accounts fold for the rail.
+    pub fn folds_accounts(self) -> bool {
+        self.enabled && self.accounts
     }
 
-    pub fn any(self) -> bool {
-        self.accounts
-            || self.all_inboxes
-            || self.starred
-            || self.sent
-            || self.drafts
-            || self.filtered
-            || self.tags
-    }
-
-    /// Whether the unified row for `kind` (Starred, Sent or Drafts) folds.
+    /// Whether the unified row for `kind` folds for the rail (Inbox is All
+    /// Inboxes; only Starred, Sent and Drafts have rows besides it).
     pub fn folds_kind(self, kind: crate::models::FolderKind) -> bool {
         use crate::models::FolderKind::*;
-        match kind {
-            Starred => self.starred,
-            Sent => self.sent,
-            Drafts => self.drafts,
-            _ => false,
-        }
+        self.enabled
+            && match kind {
+                Inbox => self.all_inboxes,
+                Starred => self.starred,
+                Sent => self.sent,
+                Drafts => self.drafts,
+                _ => false,
+            }
+    }
+
+    pub fn folds_filtered(self) -> bool {
+        self.enabled && self.filtered
+    }
+
+    pub fn folds_tags(self) -> bool {
+        self.enabled && self.tags
     }
 }
 
