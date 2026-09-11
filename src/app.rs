@@ -203,6 +203,9 @@ pub struct AppModel {
     reader_overflow_btn: gtk::Button,
     /// The toolbar's tag button (#71) — the anchor its menu pops from.
     reader_tag_btn: gtk::Button,
+    /// The reader toolbar's Move To… button (#164): the folder picker
+    /// anchors to it.
+    reader_move_btn: gtk::Button,
     /// Cache of fetched attachments, keyed by (account_id, message_id), so
     /// revisiting a message doesn't re-download them. Byte-bounded — raw
     /// attachment bytes for every message ever opened added up to hundreds of
@@ -991,6 +994,11 @@ pub enum AppMsg {
     MoveToInbox,
     /// Pop the tag menu on the reader toolbar's tag button.
     ReaderTagMenu,
+    /// Open the Move To… folder picker (#164) for the reader's target, or
+    /// the whole list selection.
+    MoveToMenu,
+    /// The picker's answer: file the target or selection into `dest`.
+    MoveSelectionTo { account_id: u32, dest: String },
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
@@ -1531,6 +1539,20 @@ impl SimpleComponent for AppModel {
                                     #[watch]
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::Archive),
+                                },
+                                // Move To… (#164), left of Archive: a folder
+                                // picker for the target, or the whole list
+                                // selection.
+                                pack_end = &gtk::Box {
+                                    #[local_ref]
+                                    reader_move_btn -> gtk::Button {
+                                        #[watch]
+                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
+                                            && model.reader_compose.is_none(),
+                                        #[watch]
+                                        set_sensitive: model.reply_target().is_some()
+                                            || model.list_selection.len() > 1,
+                                    },
                                 },
                                 pack_end = &gtk::Spinner {
                                     set_valign: gtk::Align::Center,
@@ -2076,6 +2098,12 @@ impl SimpleComponent for AppModel {
                 b.add_css_class("flat");
                 b
             },
+            reader_move_btn: {
+                let b = gtk::Button::from_icon_name("co.hyprlab.Vireo-folder-symbolic");
+                b.set_tooltip_text(Some(i18n("Move To…").as_str()));
+                b.add_css_class("flat");
+                b
+            },
             attachment_cache: crate::ram_cache::RamCache::new(ATTACHMENT_CACHE_BUDGET),
             unified: false,
             unified_view: UnifiedView::Kind(FolderKind::Inbox),
@@ -2355,6 +2383,7 @@ impl SimpleComponent for AppModel {
         // The app-wide theme choice must be in force before the first frame.
         apply_app_theme(model.app_theme);
         let reader_tag_btn = model.reader_tag_btn.clone();
+        let reader_move_btn = model.reader_move_btn.clone();
         let widgets = view_output!();
         let _ = model.reader_header.set(widgets.reader_header.clone());
         // Collapse the reader header's actions into the overflow menu when the
@@ -2440,6 +2469,10 @@ impl SimpleComponent for AppModel {
             let s = sender.input_sender().clone();
             model.reader_tag_btn.connect_clicked(move |_| {
                 let _ = s.send(AppMsg::ReaderTagMenu);
+            });
+            let s = sender.input_sender().clone();
+            model.reader_move_btn.connect_clicked(move |_| {
+                let _ = s.send(AppMsg::MoveToMenu);
             });
         }
         // The inline compose/reply pane is an overlay over the WHOLE reader
@@ -3103,6 +3136,14 @@ impl SimpleComponent for AppModel {
                     let ml = model.message_list.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
                         let _ = ml.send(MessageListInput::ContextMenu { x: 120.0, y: 40.0 });
+                    });
+                }
+                // VIREO_SHOWCASE_MOVE=1 opens the Move To… picker at 5s
+                // (it captures itself a second later).
+                if std::env::var("VIREO_SHOWCASE_MOVE").is_ok() {
+                    let s = sender.input_sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let _ = s.send(AppMsg::MoveToMenu);
                     });
                 }
                 // VIREO_SHOWCASE_RAIL=1 collapses the sidebar to the rail
@@ -5938,6 +5979,61 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::MoveToMenu => {
+                // A multi-selection lists the folders of its first message's
+                // account (the move reports anything from another account);
+                // otherwise the target's. The picker leaves out the folder
+                // the mail already sits in.
+                let (account_id, exclude) = if self.list_selection.len() > 1 {
+                    (self.list_selection[0].0, None)
+                } else {
+                    match self.reply_target() {
+                        Some(m) => (m.account_id, self.resolve_folder_path(&m)),
+                        None => return,
+                    }
+                };
+                let folders = self.folders.get(&account_id).cloned().unwrap_or_default();
+                if folders.is_empty() {
+                    return;
+                }
+                // Anchored to the toolbar button, or to the overflow button
+                // when the toolbar has folded into it.
+                let btn = if self.reader_move_btn.is_mapped() {
+                    self.reader_move_btn.clone()
+                } else {
+                    self.reader_overflow_btn.clone()
+                };
+                let s = sender.input_sender().clone();
+                crate::ui::folder_picker::show_folder_picker(
+                    &btn,
+                    (btn.width() / 2) as f64,
+                    btn.height() as f64,
+                    folders,
+                    exclude,
+                    move |dest| {
+                        let _ = s.send(AppMsg::MoveSelectionTo { account_id, dest });
+                    },
+                );
+            }
+
+            AppMsg::MoveSelectionTo { account_id, dest } => {
+                if self.list_selection.len() > 1 {
+                    // The same path a drag onto the sidebar takes: grouped by
+                    // source folder, undoable, foreign accounts reported.
+                    let items: Vec<(u32, u32, u32, u32)> = self
+                        .list_selection
+                        .iter()
+                        .filter_map(|(aid, id)| {
+                            self.find_cached_message(*aid, *id)
+                                .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
+                        })
+                        .collect();
+                    self.drop_move(account_id, dest, items);
+                } else if let Some(m) = self.reply_target() {
+                    self.move_to_path(m, dest);
+                }
+            }
+
             AppMsg::OpenListSearch => {
                 // Ctrl+F routes by focus (#102/#103): in the reader it finds
                 // within the message, everywhere else it searches the list.
@@ -8654,6 +8750,12 @@ impl AppModel {
                     } else {
                         section.push(entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts));
                     }
+                    section.push(entry!(
+                        i18n("Move To…"),
+                        "folder",
+                        AppMsg::MoveToMenu,
+                        acts || self.list_selection.len() > 1
+                    ));
                     section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts));
                     section.push(entry!(
                         i18n("Delete"),

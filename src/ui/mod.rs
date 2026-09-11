@@ -6,6 +6,7 @@ pub mod compose;
 pub mod contacts_browser;
 pub mod contacts_page;
 pub mod context_menu;
+pub mod folder_picker;
 pub mod grab_pill;
 pub mod icon_picker;
 pub mod initials;

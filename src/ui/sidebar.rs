@@ -4002,7 +4002,7 @@ fn with_unread_overlay(
 /// list, while "INBOX.Clients.Acme" is one level down because "INBOX.Clients"
 /// is. The delimiter itself never reaches the UI, so any of the common ones is
 /// accepted at the boundary.
-fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
+pub(crate) fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
     all.iter()
         .filter(|g| {
             g.id != folder.id
