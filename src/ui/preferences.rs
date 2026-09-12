@@ -149,7 +149,7 @@ const DATE_STYLES: &[(&str, DateStyle)] = &[
 /// The Language row's choices: (label, locale code). The system's own
 /// first, then English (the source language), then every catalogue in
 /// po/LINGUAS by its own name (#179).
-fn language_choices() -> Vec<(String, String)> {
+pub fn language_choices() -> Vec<(String, String)> {
     let mut out = vec![(i18n("System"), String::new()), ("English".to_string(), "en".to_string())];
     for code in include_str!("../../po/LINGUAS").lines() {
         let code = code.trim();

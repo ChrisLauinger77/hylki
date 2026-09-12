@@ -828,6 +828,9 @@ pub enum AppMsg {
     SetClockStyle(crate::config::ClockStyle),
     /// Settings: the interface language code, "" for the system's (#179).
     SetLanguage(String),
+    /// The welcome wizard's first page picked a language: save it and
+    /// come back in it.
+    WizardLanguage(String),
     SetThreading(bool),
     SetThreadExpansion(bool),
     SetConfirmThreadDelete(bool),
@@ -4977,6 +4980,34 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::WizardLanguage(code) => {
+                // The drop-down also notifies as it is set up; only a real
+                // change counts. Saved, then Vireo restarts through the same
+                // helper the icon change uses, so every window — the wizard
+                // first, since it is not completed yet — comes up in the
+                // chosen language. Should the helper fail, the wizard alone
+                // is rebuilt in it (gettext reads LANGUAGE on every lookup).
+                if config::load_language() == code {
+                    return;
+                }
+                config::save_language(&code);
+                match crate::app_icon::launch_restart_helper() {
+                    Ok(()) => relm4::main_application().activate_action("quit", None),
+                    Err(e) => {
+                        tracing::warn!("restart for the wizard's language failed: {e}");
+                        if code.is_empty() {
+                            std::env::remove_var("LANGUAGE");
+                        } else {
+                            std::env::set_var("LANGUAGE", &code);
+                        }
+                        if let Some(old) = self.welcome.take() {
+                            old.widget().set_visible(false);
+                        }
+                        self.open_wizard(&sender);
+                    }
+                }
+            }
+
             AppMsg::SetClockStyle(style) => {
                 if self.clock_style != style {
                     self.clock_style = style;
@@ -8278,6 +8309,7 @@ impl AppModel {
                 WelcomeOutput::ImportGoa(account) => AppMsg::ImportGoaAccount(account),
                 WelcomeOutput::Prefs(p) => AppMsg::ApplyWelcomePrefs(p),
                 WelcomeOutput::Done => AppMsg::PresentWindow,
+                WelcomeOutput::Language(code) => AppMsg::WizardLanguage(code),
             });
         welcome.widget().set_transient_for(Some(&self.window));
         welcome.widget().set_modal(true);
