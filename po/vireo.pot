@@ -285,6 +285,15 @@ msgstr ""
 msgid "Message Source"
 msgstr ""
 
+msgid "Remove Star"
+msgstr ""
+
+msgid "Star"
+msgstr ""
+
+msgid "Add Sender to Contacts"
+msgstr ""
+
 msgid "Delete {n} messages"
 msgstr ""
 
@@ -1859,13 +1868,21 @@ msgstr ""
 msgid "Add website"
 msgstr ""
 
+msgid "Whole conversation"
+msgstr ""
+
+msgid "{n} message"
+msgid_plural "{n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Search folders"
 msgstr ""
 
 msgid "Mark as read"
 msgstr ""
 
-msgid "Star"
+msgid "Move to…"
 msgstr ""
 
 msgid "Not spam"
@@ -1910,16 +1927,10 @@ msgstr ""
 msgid "Star Conversation"
 msgstr ""
 
-msgid "Remove Star"
-msgstr ""
-
 msgid "Mark All as Read"
 msgstr ""
 
 msgid "Mark All as Unread"
-msgstr ""
-
-msgid "Add Sender to Contacts"
 msgstr ""
 
 msgid "Fetch the sender's key"
@@ -1996,6 +2007,9 @@ msgstr ""
 msgid "Copied"
 msgstr ""
 
+msgid "Double-click to open in a new window"
+msgstr ""
+
 #. Same order as the reader toolbar and the list's
 #. Actions Palette, View Source closing the line.
 msgid "Reply to this message"
@@ -2011,6 +2025,9 @@ msgid "Mark as read or unread"
 msgstr ""
 
 msgid "Flag this message"
+msgstr ""
+
+msgid "Move this message to a folder"
 msgstr ""
 
 msgid "Archive this message"

@@ -297,6 +297,15 @@ msgstr "Nyomtatási előnézet"
 msgid "Message Source"
 msgstr "Üzenetforrás"
 
+msgid "Remove Star"
+msgstr "Csillag eltávolítása"
+
+msgid "Star"
+msgstr "Csillagozás"
+
+msgid "Add Sender to Contacts"
+msgstr "Feladó hozzáadása a névjegyekhez"
+
 msgid "Delete {n} messages"
 msgstr "{n} üzenet törlése"
 
@@ -2001,14 +2010,25 @@ msgstr "Telefonszám hozzáadása"
 msgid "Add website"
 msgstr "Webhely hozzáadása"
 
+#, fuzzy
+msgid "Whole conversation"
+msgstr "Beszélgetés megjelenítése"
+
+#, fuzzy
+msgid "{n} message"
+msgid_plural "{n} messages"
+msgstr[0] "{n} olvasatlan üzenet"
+msgstr[1] "{n} olvasatlan üzenet"
+
 msgid "Search folders"
 msgstr ""
 
 msgid "Mark as read"
 msgstr "Megjelölés olvasottként"
 
-msgid "Star"
-msgstr "Csillagozás"
+#, fuzzy
+msgid "Move to…"
+msgstr "Áthelyezés ide"
 
 msgid "Not spam"
 msgstr ""
@@ -2052,17 +2072,11 @@ msgstr "Csillagok eltávolítása"
 msgid "Star Conversation"
 msgstr "Beszélgetés csillagozása"
 
-msgid "Remove Star"
-msgstr "Csillag eltávolítása"
-
 msgid "Mark All as Read"
 msgstr "Összes megjelölése olvasottként"
 
 msgid "Mark All as Unread"
 msgstr "Összes megjelölése olvasatlanként"
-
-msgid "Add Sender to Contacts"
-msgstr "Feladó hozzáadása a névjegyekhez"
 
 msgid "Fetch the sender's key"
 msgstr "Feladó kulcsának lekérése"
@@ -2146,6 +2160,9 @@ msgstr ""
 msgid "Copied"
 msgstr "Másolva"
 
+msgid "Double-click to open in a new window"
+msgstr ""
+
 #. Same order as the reader toolbar and the list's
 #. Actions Palette, View Source closing the line.
 msgid "Reply to this message"
@@ -2162,6 +2179,10 @@ msgstr "Megjelölés olvasottként vagy olvasatlanként"
 
 msgid "Flag this message"
 msgstr "Üzenet megjelölése"
+
+#, fuzzy
+msgid "Move this message to a folder"
+msgstr "Minden melléklet mentése egy mappába"
 
 msgid "Archive this message"
 msgstr "Üzenet archiválása"
