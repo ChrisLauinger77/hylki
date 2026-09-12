@@ -773,6 +773,11 @@ pub enum AppMsg {
     SetReaderToolbar(config::ReaderToolbar),
     /// Showcase only: open a drop gap in the Settings toolbar editor.
     ShowcaseToolbarGap { zone: usize, index: usize },
+    /// A right-click on the reader header's empty space: the menu that
+    /// leads to the toolbar editor.
+    ReaderToolbarMenu { x: f64, y: f64 },
+    /// Open Settings on the Appearance page (its Toolbar section).
+    CustomizeToolbar,
     /// The window controls were re-measured (decoration layout changed).
     ReaderControlsChanged(i32),
     /// The collapsed header's ⋯ button was clicked — pop its menu.
@@ -2440,6 +2445,31 @@ impl SimpleComponent for AppModel {
         let reader_move_btn = model.reader_move_btn.clone();
         let widgets = view_output!();
         let _ = model.reader_header.set(widgets.reader_header.clone());
+        // Right-click on the header's empty space (not a button) offers
+        // the way to the toolbar editor.
+        {
+            let click = gtk::GestureClick::new();
+            click.set_button(3);
+            let header: gtk::Widget = widgets.reader_header.clone().upcast();
+            let s = sender.input_sender().clone();
+            click.connect_pressed(move |g, _, x, y| {
+                // Anything clickable under the pointer keeps its own
+                // right-click (or lack of one).
+                let mut w = header.pick(x, y, gtk::PickFlags::DEFAULT);
+                while let Some(cur) = w {
+                    if cur == header {
+                        break;
+                    }
+                    if cur.is::<gtk::Button>() || cur.is::<gtk::WindowControls>() {
+                        return;
+                    }
+                    w = cur.parent();
+                }
+                g.set_state(gtk::EventSequenceState::Claimed);
+                let _ = s.send(AppMsg::ReaderToolbarMenu { x, y });
+            });
+            widgets.reader_header.add_controller(click);
+        }
         // Collapse the reader header's actions into the overflow menu when the
         // pane can no longer fit the full row — squeezing it further must never
         // push the window controls off the right edge. The threshold is
@@ -3234,6 +3264,19 @@ impl SimpleComponent for AppModel {
                             });
                         }
                     }
+                }
+                // VIREO_SHOWCASE_TOOLBAR_MENU=1 opens the header's right-click
+                // menu (Customize Toolbar…) at 5s, as a click on its empty
+                // middle would.
+                if std::env::var("VIREO_SHOWCASE_TOOLBAR_MENU").is_ok() {
+                    let s = sender.input_sender().clone();
+                    let header: gtk::Widget = widgets.reader_header.clone().upcast();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let _ = s.send(AppMsg::ReaderToolbarMenu {
+                            x: header.width() as f64 / 2.0,
+                            y: header.height() as f64 / 2.0,
+                        });
+                    });
                 }
                 // VIREO_SHOWCASE_READER_MENU=1 opens the reader header's ⋯
                 // overflow menu at 5s (pair with VIREO_SHOWCASE_MENU to
@@ -5531,6 +5574,23 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowSettingsPage(id) => {
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::ShowPageById(id));
+                }
+            }
+            AppMsg::ReaderToolbarMenu { x, y } => {
+                use crate::ui::context_menu::{show_context_menu, MenuEntry};
+                if let Some(header) = self.reader_header.get() {
+                    let s = sender.input_sender().clone();
+                    let entry = MenuEntry::new(i18n("Customize Toolbar…"), move || {
+                        let _ = s.send(AppMsg::CustomizeToolbar);
+                    })
+                    .icon("co.hyprlab.Vireo-preferences-desktop-appearance-symbolic");
+                    show_context_menu(header, x, y, vec![vec![entry]]);
+                }
+            }
+            AppMsg::CustomizeToolbar => {
+                self.open_settings_window(&sender, false, false);
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::ShowPageById("appearance".to_string()));
                 }
             }
             AppMsg::ShowcaseToolbarGap { zone, index } => {
