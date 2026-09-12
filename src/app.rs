@@ -1050,6 +1050,13 @@ pub enum AppMsg {
     /// The picker's answer: file the target or selection into `dest` —
     /// or, with `whole`, the open conversation entire (#171).
     MoveSelectionTo { account_id: u32, dest: String, whole: bool },
+    /// "Move To…" from the message list's right-click menu: open the
+    /// picker at window point (`x`, `y`) for `messages` (with
+    /// `offer_whole`, a conversation row and its members: the picker
+    /// offers all of them, or the row's own message alone).
+    ListMoveTo { messages: Vec<Message>, offer_whole: bool, x: f64, y: f64 },
+    /// That picker's answer.
+    MoveMessagesTo { account_id: u32, dest: String, messages: Vec<Message> },
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
@@ -1952,6 +1959,9 @@ impl SimpleComponent for AppModel {
                     }
                     MessageListOutput::Bulk { action, messages } => {
                         AppMsg::Bulk { action, messages }
+                    }
+                    MessageListOutput::MoveTo { messages, offer_whole, x, y } => {
+                        AppMsg::ListMoveTo { messages, offer_whole, x, y }
                     }
                     MessageListOutput::SelectionCleared => AppMsg::ClearReader,
                     MessageListOutput::SearchActive(active) => AppMsg::SearchActive(active),
@@ -6170,6 +6180,44 @@ impl SimpleComponent for AppModel {
                         let _ = s.send(AppMsg::MoveSelectionTo { account_id, dest, whole });
                     },
                 );
+            }
+
+            AppMsg::ListMoveTo { messages, offer_whole, x, y } => {
+                let Some(first) = messages.first() else { return };
+                let account_id = first.account_id;
+                let folders = self.folders.get(&account_id).cloned().unwrap_or_default();
+                if folders.is_empty() {
+                    return;
+                }
+                // Leave out the folder the mail sits in, when it is one.
+                let exclude = self
+                    .resolve_folder_path(first)
+                    .filter(|p| messages.iter().all(|m| self.resolve_folder_path(m).as_ref() == Some(p)));
+                let conversation = offer_whole.then_some(messages.len());
+                let s = sender.input_sender().clone();
+                let window = self.window.clone();
+                crate::ui::folder_picker::show_folder_picker(
+                    &window,
+                    x,
+                    y,
+                    folders,
+                    exclude,
+                    conversation,
+                    move |dest, whole| {
+                        let picked = if offer_whole && !whole {
+                            messages[..1].to_vec()
+                        } else {
+                            messages.clone()
+                        };
+                        let _ = s.send(AppMsg::MoveMessagesTo { account_id, dest, messages: picked });
+                    },
+                );
+            }
+
+            AppMsg::MoveMessagesTo { account_id, dest, messages } => {
+                let items: Vec<(u32, u32, u32, u32)> =
+                    messages.iter().map(|m| (m.account_id, m.folder_id, m.uid, m.id)).collect();
+                self.drop_move(account_id, dest, items);
             }
 
             AppMsg::MoveSelectionTo { account_id, dest, whole } => {

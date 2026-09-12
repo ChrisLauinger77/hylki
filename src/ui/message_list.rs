@@ -2448,6 +2448,11 @@ pub enum MessageListOutput {
     SetTag { message: Box<Message>, keyword: String, add: bool },
     /// A bulk action chosen for every currently-selected message.
     Bulk { action: BulkAction, messages: Vec<Message> },
+    /// "Move To…" from a row's menu: open the folder picker for `messages`
+    /// at window point (`x`, `y`). With `offer_whole`, the first message is
+    /// the clicked conversation row and the rest its members: the picker
+    /// offers moving them all (#171), or just the first.
+    MoveTo { messages: Vec<Message>, offer_whole: bool, x: f64, y: f64 },
     /// Delete requested on a lone selected row that heads a whole conversation:
     /// every member of the thread, for the app to confirm and delete.
     DeleteThread { messages: Vec<Message> },
@@ -3811,6 +3816,27 @@ impl MessageList {
         let members = self.thread_members(msg);
         let is_thread_head =
             members.first().is_some_and(|h| (h.account_id, h.id) == (msg.account_id, msg.id));
+        // Move To…: the clicked message, then (for a conversation row) the
+        // rest of its members, at the click's point in the window so the
+        // app can anchor the picker there.
+        let move_entry = {
+            let mut messages = vec![msg.clone()];
+            let offer_whole = is_thread_head && members.len() > 1;
+            if offer_whole {
+                messages.extend(members.iter().filter(|m| (m.account_id, m.id) != (msg.account_id, msg.id)).cloned());
+            }
+            let (wx, wy) = self.window_point(x, y);
+            let s = sender.clone();
+            MenuEntry::new(&i18n("Move To…"), move || {
+                let _ = s.output(MessageListOutput::MoveTo {
+                    messages: messages.clone(),
+                    offer_whole,
+                    x: wx,
+                    y: wy,
+                });
+            })
+            .icon("co.hyprlab.Vireo-folder-symbolic")
+        };
         if is_thread_head {
             let any_unread = members.iter().any(|m| m.unread);
             let s = sender.clone();
@@ -3887,6 +3913,7 @@ impl MessageList {
                     }
                     section.push(item(RowAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 }
+                section.push(move_entry);
                 section.push(item(RowAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
                 section.push(item(RowAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
                 section
@@ -3925,6 +3952,29 @@ impl MessageList {
                     }
                     section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "co.hyprlab.Vireo-mail-mark-junk-symbolic"));
                 }
+                {
+                    // Move To… for the whole selection.
+                    let messages: Vec<Message> = self
+                        .rows
+                        .widget()
+                        .selected_rows()
+                        .iter()
+                        .filter_map(|r| self.shown.get(r.index() as usize).cloned())
+                        .collect();
+                    let (wx, wy) = self.window_point(x, y);
+                    let s = sender.clone();
+                    section.push(
+                        MenuEntry::new(&i18n("Move To…"), move || {
+                            let _ = s.output(MessageListOutput::MoveTo {
+                                messages: messages.clone(),
+                                offer_whole: false,
+                                x: wx,
+                                y: wy,
+                            });
+                        })
+                        .icon("co.hyprlab.Vireo-folder-symbolic"),
+                    );
+                }
                 section.push(item(BulkAction::Archive, &i18n("Archive"), "co.hyprlab.Vireo-mail-archive-symbolic"));
                 section.push(item(BulkAction::Delete, &i18n("Delete"), "co.hyprlab.Vireo-user-trash-symbolic"));
                 section
@@ -3938,6 +3988,18 @@ impl MessageList {
             Some(&format!("{} selected", self.selection_count)),
             sections,
         );
+    }
+
+    /// A point in the rows list, in the window's coordinates (the app
+    /// anchors popovers on the window; falls back to the point as given).
+    fn window_point(&self, x: f64, y: f64) -> (f64, f64) {
+        let list = self.rows.widget();
+        list.root()
+            .and_then(|root| {
+                let root: gtk::Widget = root.upcast();
+                list.compute_point(&root, &gtk::graphene::Point::new(x as f32, y as f32))
+            })
+            .map_or((x, y), |p| (p.x() as f64, p.y() as f64))
     }
 
     /// Toolbar count: total matches, noting when more exist than are shown.
