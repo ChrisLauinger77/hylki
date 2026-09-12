@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-12 11:47+0200\n"
+"PO-Revision-Date: 2026-09-12 16:42+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -180,7 +180,7 @@ msgid "Undoing move…"
 msgstr "Annulation du déplacement…"
 
 msgid "Customize Toolbar…"
-msgstr ""
+msgstr "Personnaliser la barre d'outils…"
 
 msgid "No message with the ID {id} was found"
 msgstr "Aucun message portant l'identifiant {id} n'a été trouvé."
@@ -296,13 +296,22 @@ msgid "Move to Inbox"
 msgstr "Déplacer vers la boîte de réception"
 
 msgid "Find in Message"
-msgstr ""
+msgstr "Rechercher dans le message"
 
 msgid "Print Preview"
 msgstr "Aperçu avant impression"
 
 msgid "Message Source"
 msgstr "Code source du message"
+
+msgid "Remove Star"
+msgstr "Retirer l'étoile"
+
+msgid "Star"
+msgstr "Ajouter une étoile"
+
+msgid "Add Sender to Contacts"
+msgstr "Ajouter l'expéditeur aux contacts"
 
 msgid "Delete {n} messages"
 msgstr "Supprimer {n} messages"
@@ -596,19 +605,19 @@ msgstr[0] "{n} message non lu"
 msgstr[1] "{n} messages non lus"
 
 msgid "Spam"
-msgstr ""
+msgstr "Spam"
 
 msgid "Read/Unread"
-msgstr ""
+msgstr "Lu/Non lu"
 
 msgid "Move To"
-msgstr ""
+msgstr "Passer à"
 
 msgid "Find"
-msgstr ""
+msgstr "Trouver"
 
 msgid "Print"
-msgstr ""
+msgstr "Imprimer"
 
 msgid "On This Computer"
 msgstr "Sur cet ordinateur"
@@ -2067,14 +2076,22 @@ msgstr "Ajouter un numéro de téléphone"
 msgid "Add website"
 msgstr "Ajouter un site web"
 
+msgid "Whole conversation"
+msgstr "Conversation entière"
+
+msgid "{n} message"
+msgid_plural "{n} messages"
+msgstr[0] "{n} message"
+msgstr[1] "{n} messages"
+
 msgid "Search folders"
 msgstr "Rechercher des dossiers"
 
 msgid "Mark as read"
 msgstr "Marquer comme lu"
 
-msgid "Star"
-msgstr "Ajouter une étoile"
+msgid "Move to…"
+msgstr "Déplacer vers…"
 
 msgid "Not spam"
 msgstr "Marquer comme acceptable"
@@ -2118,17 +2135,11 @@ msgstr "Supprimer les marquages"
 msgid "Star Conversation"
 msgstr "Marquer la conversation"
 
-msgid "Remove Star"
-msgstr "Retirer l'étoile"
-
 msgid "Mark All as Read"
 msgstr "Tout marquer comme lu"
 
 msgid "Mark All as Unread"
 msgstr "Marquer tout comme non lu"
-
-msgid "Add Sender to Contacts"
-msgstr "Ajouter l'expéditeur aux contacts"
 
 msgid "Fetch the sender's key"
 msgstr "Récupérer la clé de l'expéditeur"
@@ -2214,6 +2225,9 @@ msgstr ""
 msgid "Copied"
 msgstr "Copié"
 
+msgid "Double-click to open in a new window"
+msgstr ""
+
 #. Same order as the reader toolbar and the list's
 #. Actions Palette, View Source closing the line.
 msgid "Reply to this message"
@@ -2230,6 +2244,9 @@ msgstr "Marquer comme lu ou non lu"
 
 msgid "Flag this message"
 msgstr "Marquer ce message"
+
+msgid "Move this message to a folder"
+msgstr "Déplacer ce message vers un dossier"
 
 msgid "Archive this message"
 msgstr "Archiver ce message"
@@ -2555,25 +2572,25 @@ msgid "Every 30 minutes"
 msgstr "Toutes les 30 minutes"
 
 msgid "Left group"
-msgstr ""
+msgstr "Groupe de gauche"
 
 msgid "Always shown"
-msgstr ""
+msgstr "Toujours affiché"
 
 msgid "Right group"
-msgstr ""
+msgstr "Groupe de droite"
 
 msgid "Folds into ⋯ when narrow"
-msgstr ""
+msgstr "Se plie en ⋯ lorsqu'il est étroit"
 
 msgid "Not shown"
-msgstr ""
+msgstr "Non affiché"
 
 msgid "Drop a button here to hide it"
-msgstr ""
+msgstr "Déposez un bouton ici pour le masquer"
 
 msgid "Drag to move"
-msgstr ""
+msgstr "Faites glisser pour déplacer"
 
 msgid "Senders"
 msgstr "Expéditeurs"
@@ -2687,7 +2704,7 @@ msgstr ""
 "menu."
 
 msgid "Toolbar"
-msgstr ""
+msgstr "Barre d'outils"
 
 msgid ""
 "The buttons above the reading pane. Drag them between the groups and into "
@@ -2695,9 +2712,13 @@ msgid ""
 "group folds into a ⋯ menu when the reading pane is narrow. Changes apply at "
 "once."
 msgstr ""
+"Les boutons au-dessus du volet de lecture. Faites-les glisser entre les "
+"groupes et dans l'ordre souhaité. Le groupe de gauche reste toujours sur la "
+"barre d'outils ; le groupe de droite se replie en un menu ⋯ lorsque le volet "
+"de lecture est étroit. Les modifications s’appliquent immédiatement."
 
 msgid "Restore Defaults"
-msgstr ""
+msgstr "Restaurer les paramètres par défaut"
 
 msgid "Accounts in the sidebar"
 msgstr "Comptes dans la barre latérale"
