@@ -448,6 +448,8 @@ upstream — their work ships in the app and is credited in the About window:
   [#134](https://github.com/hyprlab/vireo/pull/134)) — the French translation,
   Vireo's first, and the report that found the labels the app was showing in
   English despite having the translation.
+- [**Laszlo Lang**](https://github.com/7system7) ([#169](https://github.com/hyprlab/vireo/pull/169)) — the
+  Hungarian translation.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/vireo/pull/7),
   [#8](https://github.com/hyprlab/vireo/pull/8)) — sender avatars from GNOME
   Contacts photos, and GNOME Online Accounts refinements: custom server ports
