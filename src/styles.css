@@ -1713,9 +1713,6 @@ textview.console-view text selection {
   border-color: @accent_color;
   background: alpha(@accent_bg_color, 0.08);
 }
-.toolbar-zone flowboxchild {
-  padding: 0;
-}
 .toolbar-chip {
   padding: 6px 10px;
   border-radius: 8px;

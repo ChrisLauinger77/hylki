@@ -771,6 +771,8 @@ pub enum AppMsg {
     SetReaderActionsCollapsed(bool),
     /// A new reader toolbar layout from Settings: save, re-pack, re-fold.
     SetReaderToolbar(config::ReaderToolbar),
+    /// Showcase only: open a drop gap in the Settings toolbar editor.
+    ShowcaseToolbarGap { zone: usize, index: usize },
     /// The window controls were re-measured (decoration layout changed).
     ReaderControlsChanged(i32),
     /// The collapsed header's ⋯ button was clicked — pop its menu.
@@ -3219,6 +3221,20 @@ impl SimpleComponent for AppModel {
                         let _ = ml.send(MessageListInput::ContextMenu { x: 120.0, y: 40.0 });
                     });
                 }
+                // VIREO_SHOWCASE_TOOLBAR_GAP=<zone>:<index> opens a drop gap
+                // in the Settings toolbar editor at 6s (pair with
+                // VIREO_SHOWCASE_SETTINGS=appearance), as a hovering drag
+                // would.
+                if let Ok(spec) = std::env::var("VIREO_SHOWCASE_TOOLBAR_GAP") {
+                    if let Some((z, i)) = spec.split_once(':') {
+                        if let (Ok(zone), Ok(index)) = (z.parse::<usize>(), i.parse::<usize>()) {
+                            let s = sender.input_sender().clone();
+                            gtk::glib::timeout_add_seconds_local_once(6, move || {
+                                let _ = s.send(AppMsg::ShowcaseToolbarGap { zone, index });
+                            });
+                        }
+                    }
+                }
                 // VIREO_SHOWCASE_READER_MENU=1 opens the reader header's ⋯
                 // overflow menu at 5s (pair with VIREO_SHOWCASE_MENU to
                 // capture it; the window must be narrow enough to collapse).
@@ -5515,6 +5531,11 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowSettingsPage(id) => {
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::ShowPageById(id));
+                }
+            }
+            AppMsg::ShowcaseToolbarGap { zone, index } => {
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::ToolbarGapPreview { zone, index });
                 }
             }
             AppMsg::ReloadBody(m) => {

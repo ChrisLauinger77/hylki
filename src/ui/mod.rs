@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod attachment_drawer;
 pub mod attachments_gallery;
+pub mod chip_flow;
 pub mod cloud_accounts;
 pub mod compose;
 pub mod contacts_browser;

@@ -6,6 +6,8 @@ use adw::prelude::*;
 use relm4::prelude::*;
 
 use crate::config::{AppTheme, ClockStyle, DateStyle, MessageTheme, ReaderToolbar, ToolbarItem, ToolbarSide, TrayIcon};
+use crate::ui::chip_flow::ChipFlow;
+use std::rc::Rc;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 
 /// Initial data for the settings window.
@@ -264,14 +266,18 @@ pub struct Preferences {
 }
 
 /// The reader toolbar editor (Settings → Appearance): one drop zone per
-/// side plus a "not shown" pool, each a wrapping row of draggable chips.
+/// side plus a "not shown" pool, each a wrapping row of draggable chips
+/// that slide apart under a drag to show where the drop will land.
 struct ToolbarEditor {
     zones: Vec<ToolbarZone>,
+    /// The size of the chip being dragged (zero when none), written by the
+    /// chip's drag source and read by every zone for its gap.
+    drag_size: Rc<std::cell::Cell<(i32, i32)>>,
 }
 
 struct ToolbarZone {
     side: Option<ToolbarSide>,
-    flow: gtk::FlowBox,
+    flow: ChipFlow,
     /// Shown while the zone is empty, so there is still something to aim at.
     empty: gtk::Label,
 }
@@ -279,6 +285,10 @@ struct ToolbarZone {
 impl ToolbarEditor {
     fn build(host: &gtk::Box, sender: &ComponentSender<Preferences>) -> Self {
         let mut zones = Vec::new();
+        // One chip's size, learnt from whichever zone has chips, so an
+        // empty zone opens a gap of the right size too.
+        let chip_size = Rc::new(std::cell::Cell::new((0, 0)));
+        let drag_size = Rc::new(std::cell::Cell::new((0, 0)));
         for (side, title, hint) in [
             (Some(ToolbarSide::Left), i18n("Left group"), i18n("Always shown")),
             (Some(ToolbarSide::Right), i18n("Right group"), i18n("Folds into ⋯ when narrow")),
@@ -298,18 +308,10 @@ impl ToolbarEditor {
             heading.append(&hint);
             column.append(&heading);
 
-            let flow = gtk::FlowBox::new();
-            flow.set_selection_mode(gtk::SelectionMode::None);
-            flow.set_homogeneous(false);
-            flow.set_min_children_per_line(1);
-            flow.set_max_children_per_line(12);
-            flow.set_row_spacing(6);
-            flow.set_column_spacing(6);
+            let flow = ChipFlow::new(chip_size.clone(), drag_size.clone());
             flow.set_halign(gtk::Align::Fill);
             flow.set_valign(gtk::Align::Start);
-            flow.set_activate_on_single_click(false);
             flow.add_css_class("toolbar-zone");
-            flow.set_size_request(-1, 60);
 
             let empty = gtk::Label::new(Some(&i18n("Empty")));
             empty.add_css_class("dim-label");
@@ -322,60 +324,54 @@ impl ToolbarEditor {
             column.append(&overlay);
             host.append(&column);
 
-            // The zone takes a chip from any zone (itself included) and
-            // works out where among its own chips the pointer landed:
-            // every chip fully above the drop, or on its row and left of
-            // its middle, comes before it. The dragged chip itself (still
-            // in place while the drag runs) is not counted.
+            // The zone takes a chip from any zone (itself included). While
+            // the drag moves over it, a gap opens at the slot the pointer
+            // is nearest and the other chips slide aside; the drop takes
+            // that slot. The dragged chip is hidden in its own zone for
+            // the duration, so the hole it left closes the same way.
             let drop = gtk::DropTarget::new(gtk::glib::Type::STRING, gtk::gdk::DragAction::MOVE);
             let input = sender.input_sender().clone();
             let fb = flow.clone();
+            let empty_label = empty.clone();
             drop.connect_drop(move |_, value, x, y| {
                 let Ok(key) = value.get::<String>() else {
                     return false;
                 };
-                let mut index = 0;
-                let mut child = fb.first_child();
-                while let Some(c) = child {
-                    child = c.next_sibling();
-                    let dragged = c
-                        .downcast_ref::<gtk::FlowBoxChild>()
-                        .and_then(|fc| fc.child())
-                        .is_some_and(|w| w.widget_name() == key);
-                    if dragged {
-                        continue;
-                    }
-                    let Some(r) = c.compute_bounds(&fb) else {
-                        continue;
-                    };
-                    let above = (r.y() + r.height()) as f64 <= y;
-                    let same_row = (r.y() as f64) <= y && y < (r.y() + r.height()) as f64;
-                    let left = (r.x() + r.width() / 2.0) as f64 <= x;
-                    if above || (same_row && left) {
-                        index += 1;
-                    }
-                }
+                let index = fb.insertion_index(x, y);
+                fb.set_gap(None);
                 let _ = input.send(PrefInput::ToolbarDrop { key, side, index });
                 true
             });
             let fb = flow.clone();
-            drop.connect_enter(move |_, _, _| {
+            drop.connect_enter(move |_, x, y| {
                 fb.add_css_class("drop-active");
+                fb.set_gap(Some(fb.insertion_index(x, y)));
+                gtk::gdk::DragAction::MOVE
+            });
+            let fb = flow.clone();
+            let el = empty_label.clone();
+            drop.connect_motion(move |_, x, y| {
+                el.set_visible(false);
+                fb.set_gap(Some(fb.insertion_index(x, y)));
                 gtk::gdk::DragAction::MOVE
             });
             let fb = flow.clone();
             drop.connect_leave(move |_| {
                 fb.remove_css_class("drop-active");
+                fb.set_gap(None);
+                // The "Empty" caption comes back with the next rebuild if
+                // the zone is still empty (see rebuild_toolbar_chips).
+                empty_label.set_visible(fb.first_child().is_none());
             });
             flow.add_controller(drop);
 
             zones.push(ToolbarZone { side, flow, empty });
         }
-        ToolbarEditor { zones }
+        ToolbarEditor { zones, drag_size }
     }
 
     /// One draggable chip: the button's icon over its name.
-    fn chip(item: ToolbarItem) -> gtk::Box {
+    fn chip(item: ToolbarItem, drag_size: &Rc<std::cell::Cell<(i32, i32)>>) -> gtk::Box {
         let chip = gtk::Box::new(gtk::Orientation::Vertical, 4);
         chip.add_css_class("toolbar-chip");
         chip.set_widget_name(item.key());
@@ -390,12 +386,35 @@ impl ToolbarEditor {
         let drag = gtk::DragSource::new();
         drag.set_actions(gtk::gdk::DragAction::MOVE);
         let key = item.key();
-        drag.connect_prepare(move |_, _, _| Some(gtk::gdk::ContentProvider::for_value(&key.to_value())));
+        // The chip's likeness is taken while it is still on screen: it is
+        // hidden once the drag is under way, and a hidden widget paints
+        // nothing.
+        let likeness: Rc<std::cell::RefCell<Option<gtk::gdk::Paintable>>> = Rc::new(std::cell::RefCell::new(None));
         let c = chip.clone();
+        let l = likeness.clone();
+        let ds = drag_size.clone();
+        drag.connect_prepare(move |_, _, _| {
+            *l.borrow_mut() = Some(gtk::WidgetPaintable::new(Some(&c)).current_image());
+            // The zones open their gap at this chip's own size.
+            ds.set((c.width(), c.height()));
+            Some(gtk::gdk::ContentProvider::for_value(&key.to_value()))
+        });
+        let c = chip.clone();
+        let l = likeness.clone();
         drag.connect_drag_begin(move |source, _| {
-            // The chip itself rides along under the pointer.
-            let paintable = gtk::WidgetPaintable::new(Some(&c));
-            source.set_icon(Some(&paintable), c.width() / 2, c.height() / 2);
+            if let Some(p) = l.borrow().as_ref() {
+                source.set_icon(Some(p), c.width() / 2, c.height() / 2);
+            }
+            // Lifted out of its row; the neighbours close the hole.
+            c.set_visible(false);
+        });
+        let c = chip.clone();
+        let ds = drag_size.clone();
+        drag.connect_drag_end(move |_, _, _| {
+            ds.set((0, 0));
+            // Dropped nowhere (or somewhere that rebuilt the zones, in
+            // which case this widget is already gone): back in place.
+            c.set_visible(true);
         });
         chip.add_controller(drag);
         chip
@@ -409,9 +428,7 @@ impl Preferences {
             return;
         };
         for zone in &editor.zones {
-            while let Some(c) = zone.flow.first_child() {
-                zone.flow.remove(&c);
-            }
+            zone.flow.remove_all();
             let items: Vec<ToolbarItem> = match zone.side {
                 Some(ToolbarSide::Left) => self.toolbar.left.clone(),
                 Some(ToolbarSide::Right) => self.toolbar.right.clone(),
@@ -419,13 +436,7 @@ impl Preferences {
             };
             zone.empty.set_visible(items.is_empty());
             for item in items {
-                let chip = ToolbarEditor::chip(item);
-                zone.flow.insert(&chip, -1);
-                // The chip is the thing to grab, not a focusable cell.
-                if let Some(cell) = chip.parent() {
-                    cell.set_focusable(false);
-                    cell.set_can_focus(false);
-                }
+                zone.flow.append(&ToolbarEditor::chip(item, &editor.drag_size));
             }
         }
     }
@@ -536,6 +547,9 @@ pub enum PrefInput {
     /// the zone (None = not shown), `index` its place in that zone.
     ToolbarDrop { key: String, side: Option<ToolbarSide>, index: usize },
     ToolbarRestore,
+    /// The showcase's stand-in for a drag hovering a zone: open the gap at
+    /// `index` of the zone (0 left, 1 right, 2 not shown).
+    ToolbarGapPreview { zone: usize, index: usize },
     ToggleRailFoldEnabled(bool),
     ToggleRailFoldAccounts(bool),
     ToggleRailFoldAllInboxes(bool),
@@ -2606,6 +2620,19 @@ impl Component for Preferences {
                     self.toolbar.place(item, side, index);
                     self.rebuild_toolbar_chips();
                     let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
+                }
+            }
+            PrefInput::ToolbarGapPreview { zone, index } => {
+                if let Some(editor) = &self.toolbar_editor {
+                    // A gap the size of the first chip found, as a drag of
+                    // it would open.
+                    if let Some(chip) = editor.zones.iter().find_map(|z| z.flow.first_child()) {
+                        editor.drag_size.set((chip.width(), chip.height()));
+                    }
+                    if let Some(z) = editor.zones.get(zone) {
+                        z.flow.add_css_class("drop-active");
+                        z.flow.set_gap(Some(index));
+                    }
                 }
             }
             PrefInput::ToolbarRestore => {
