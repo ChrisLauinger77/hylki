@@ -93,6 +93,10 @@ pub struct MessageView {
     /// document (scroll resets to 0) and can reflow everything above — an
     /// element anchor survives that where a raw pixel offset lands short.
     saved_anchor: Option<(u32, u32, u32)>,
+    /// The saved anchor is a card to reveal (a reply that just arrived):
+    /// the render lands it below the page's top gutter, not flush at the
+    /// top the way a place the user scrolled to is restored.
+    anchor_gutter: bool,
     /// What each message's frame measured last time it was shown, so reopening a
     /// conversation lays out right away instead of settling into place.
     frame_heights: std::collections::HashMap<(u32, u32), u32>,
@@ -453,6 +457,9 @@ pub enum MessageViewInput {
     /// the viewport top and the offset into it — kept so a re-render can put
     /// the reader back where they were.
     ScrollAnchor { account_id: u32, id: u32, offset: u32 },
+    /// Bring this card into view at the next render, with the gutter above
+    /// it (a reply that just arrived for the conversation on screen).
+    RevealCard { account_id: u32, id: u32 },
 }
 
 /// How a click on a conversation card changes the selection, mirroring what the
@@ -860,6 +867,7 @@ impl Component for MessageView {
             shown_fingerprint: None,
             did_autoscroll: false,
             saved_anchor: None,
+            anchor_gutter: false,
             frame_heights: std::collections::HashMap::new(),
             instant: false,
             selected_cards: Vec::new(),
@@ -1795,6 +1803,11 @@ impl Component for MessageView {
             }
             MessageViewInput::ScrollAnchor { account_id, id, offset } => {
                 self.saved_anchor = Some((account_id, id, offset));
+                self.anchor_gutter = false;
+            }
+            MessageViewInput::RevealCard { account_id, id } => {
+                self.saved_anchor = Some((account_id, id, 0));
+                self.anchor_gutter = true;
             }
             MessageViewInput::CardContact { account_id, id } => {
                 if let Some(m) = self
@@ -1888,7 +1901,10 @@ impl MessageView {
         let noscroll = if self.did_autoscroll {
             let anchor = self
                 .saved_anchor
-                .map(|(a, i, o)| format!(" data-vireo-anchor=\"{a}:{i}:{o}\""))
+                .map(|(a, i, o)| {
+                    let g = if self.anchor_gutter { ":g" } else { "" };
+                    format!(" data-vireo-anchor=\"{a}:{i}:{o}{g}\"")
+                })
                 .unwrap_or_default();
             format!(" data-vireo-noscroll=\"1\"{anchor}")
         } else {
@@ -4344,17 +4360,17 @@ function ready(){if(rdy)return;rdy=true;\
 try{window.webkit.messageHandlers.vireo.postMessage('ready:0:0');}catch(_){}\
 var bd=document.body.dataset;\
 if(bd.vireoNoscroll){var a=(bd.vireoAnchor||'').split(':');\
-if(a.length===3){var el=document.querySelector('.vireo-msg[data-key=\"'+a[0]+':'+a[1]+'\"]');\
-if(el){hold={el:el,off:parseInt(a[2],10)||0};\
+if(a.length>=3){var el=document.querySelector('.vireo-msg[data-key=\"'+a[0]+':'+a[1]+'\"]');\
+if(el){hold={el:el,off:parseInt(a[2],10)||0,g:a[3]==='g'};\
 if(el.querySelector('.vireo-dot'))follow=el;\
 setTimeout(pin,0);}}return;}\
 var ds=document.querySelectorAll('.vireo-msg .vireo-dot');\
 var d=ds.length?ds[0]:null;\
 if(d){var m=d.closest('.vireo-msg');\
-if(m)setTimeout(function(){try{follow=m;m.scrollIntoView({block:'start'});}catch(_){}},0);}\
+if(m)setTimeout(function(){try{follow=m;reveal(m);}catch(_){}},0);}\
 else if(bd.vireoNewest){\
 var nm=document.querySelector('.vireo-msg[data-key=\"'+bd.vireoNewest+'\"]');\
-if(nm)setTimeout(function(){try{follow=nm;nm.scrollIntoView({block:'start'});}catch(_){}},0);}}\
+if(nm)setTimeout(function(){try{follow=nm;reveal(nm);}catch(_){}},0);}}\
 setTimeout(markClipped,0);setTimeout(markClipped,400);\
 if(!pend)ready();\
 for(var i=0;i<fs.length;i++){(function(f){var counted=false;\
@@ -4551,9 +4567,11 @@ p.textContent=b.dataset.vireoCopied||'Copied';\
 void p.offsetHeight;p.classList.add('on');clearTimeout(p._t);\
 p._t=setTimeout(function(){p.classList.remove('on');},1400);}\
 window.addEventListener('keydown',copySel,true);\
-function chase(){if(!follow)return;try{follow.scrollIntoView({block:'start'});}catch(_){}}\
+function gutter(){try{return parseFloat(getComputedStyle(document.body).paddingTop)||0;}catch(_){return 0;}}\
+function reveal(el){var r=el.getBoundingClientRect();var d=Math.round(r.top-gutter());if(d)window.scrollBy(0,d);}\
+function chase(){if(!follow)return;try{reveal(follow);}catch(_){}}\
 function pin(){if(follow||!hold)return;try{var r=hold.el.getBoundingClientRect();\
-var d=Math.round(r.top+hold.off);if(d)window.scrollBy(0,d);}catch(_){}}\
+var d=Math.round(r.top+hold.off-(hold.g?gutter():0));if(d)window.scrollBy(0,d);}catch(_){}}\
 ['wheel','touchstart','mousedown','keydown'].forEach(function(ev){\
 window.addEventListener(ev,function(){follow=null;hold=null;},{passive:true,capture:true});});\
 window.addEventListener('blur',function(){setTimeout(function(){\

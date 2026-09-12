@@ -4436,8 +4436,7 @@ impl SimpleComponent for AppModel {
                     .max_by_key(|tm| tm.timestamp)
                     .map(|tm| (tm.account_id, tm.id));
                 if let Some((account_id, id)) = newest {
-                    self.message_view
-                        .emit(MessageViewInput::ScrollAnchor { account_id, id, offset: 0 });
+                    self.message_view.emit(MessageViewInput::RevealCard { account_id, id });
                 }
                 let to_load: Vec<MissingBody> = self
                     .current_thread
@@ -9209,11 +9208,15 @@ impl AppModel {
     /// row's menu, for that one message), anchored on the window at (x, y).
     fn show_card_menu(&self, m: Message, x: f64, y: f64, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
+        // Through the card path: a reply started from a card belongs in the
+        // pane's inline composer, like the card's own buttons — the row path
+        // would open a compose window. Every other action falls through to
+        // the row behaviour there.
         let item = |action: RowAction, label: String, icon: &str| -> MenuEntry {
             let s = sender.input_sender().clone();
             let message = m.clone();
             MenuEntry::new(label, move || {
-                let _ = s.send(AppMsg::RowAction { action, message: Box::new(message.clone()) });
+                let _ = s.send(AppMsg::CardAction { action, message: Box::new(message.clone()) });
             })
             .icon(format!("co.hyprlab.Vireo-{icon}-symbolic"))
         };
