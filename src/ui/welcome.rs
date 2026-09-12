@@ -228,7 +228,7 @@ fn entrance(widgets: &[gtk::Widget]) {
 
 /// Hero and shrunk geometry for the floating wordmark.
 const HERO_TOP: i32 = 150;
-const HERO_SIZE: f64 = 300.0;
+const HERO_SIZE: f64 = 240.0;
 const SMALL_TOP: f64 = 6.0;
 const SMALL_BOTTOM: f64 = 16.0;
 const SMALL_SIZE: f64 = 100.0;
@@ -337,7 +337,9 @@ impl Component for Welcome {
         lang_row.set_halign(gtk::Align::Center);
         lang_row.set_margin_top(4);
         let lang_label = gtk::Label::new(Some(i18n("Language").as_str()));
-        lang_label.add_css_class("dim-label");
+        // On the yellow, text is always dark (the theme's dim grey turns
+        // white in dark mode).
+        lang_label.add_css_class("welcome-hint");
         lang_row.append(&lang_label);
         let choices = crate::ui::preferences::language_choices();
         let choice_labels: Vec<&str> = choices.iter().map(|(l, _)| l.as_str()).collect();
@@ -354,7 +356,7 @@ impl Component for Welcome {
         let lang_note = gtk::Label::new(Some(
             i18n("Choosing another language restarts Vireo: it closes for a moment and this wizard comes back in that language.").as_str(),
         ));
-        lang_note.add_css_class("dim-label");
+        lang_note.add_css_class("welcome-hint");
         lang_note.add_css_class("caption");
         lang_note.set_wrap(true);
         lang_note.set_justify(gtk::Justification::Center);

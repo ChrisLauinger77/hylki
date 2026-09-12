@@ -5017,11 +5017,7 @@ impl SimpleComponent for AppModel {
                     Err(e) => {
                         std::env::remove_var(crate::WIZARD_AGAIN_VAR);
                         tracing::warn!("restart for the wizard's language failed: {e}");
-                        if code.is_empty() {
-                            std::env::remove_var("LANGUAGE");
-                        } else {
-                            std::env::set_var("LANGUAGE", &code);
-                        }
+                        crate::i18n::apply_language(&code);
                         if let Some(old) = self.welcome.take() {
                             old.widget().set_visible(false);
                         }

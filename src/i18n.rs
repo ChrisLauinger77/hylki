@@ -28,9 +28,7 @@ pub fn init() {
     // locale of its own still gets the chosen language via C.UTF-8 for
     // messages. Single-threaded here, so setting the environment is safe.
     let chosen = crate::config::load_language();
-    if !chosen.is_empty() {
-        std::env::set_var("LANGUAGE", &chosen);
-    }
+    apply_language(&chosen);
     // SAFETY: called once at the very start of main, before any other
     // thread exists (setlocale is not thread-safe).
     unsafe { gettextrs::setlocale(LocaleCategory::LcAll, "") };
@@ -51,6 +49,29 @@ pub fn init() {
     match bound {
         Ok(_) => tracing::debug!("translations bound to {}", dir.display()),
         Err(e) => tracing::debug!("translations not bound: {e}"),
+    }
+}
+
+/// What LANGUAGE was before this app set it, kept in the environment so a
+/// restarted instance (which inherits the environment) can put it back:
+/// otherwise a language once chosen followed the app through every
+/// restart, even after the choice went back to the system's.
+const LANGUAGE_ORIG: &str = "VIREO_LANGUAGE_ORIG";
+
+/// Point gettext at `code` ("" = the system's): restore the LANGUAGE the
+/// session had, then set the choice over it.
+pub fn apply_language(code: &str) {
+    if let Some(orig) = std::env::var_os(LANGUAGE_ORIG) {
+        if orig.is_empty() {
+            std::env::remove_var("LANGUAGE");
+        } else {
+            std::env::set_var("LANGUAGE", orig);
+        }
+    } else {
+        std::env::set_var(LANGUAGE_ORIG, std::env::var_os("LANGUAGE").unwrap_or_default());
+    }
+    if !code.is_empty() {
+        std::env::set_var("LANGUAGE", code);
     }
 }
 

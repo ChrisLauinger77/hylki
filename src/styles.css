@@ -1460,10 +1460,20 @@ window.welcome-window,
   margin-left: 6px;
 }
 
-/* Content cards: the app's own surface colour, lifted off the yellow. */
+/* Content cards: an opaque surface of the theme's own, lifted off the
+   yellow — white in light, the popover grey in dark. The list's usual card
+   colour is translucent in dark mode and only tinted the yellow lighter. */
 .welcome-card {
   border-radius: 14px;
+  background-color: @popover_bg_color;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+/* The first page's language drop-down: a field on the yellow, so the same
+   opaque surface as the cards rather than the theme's translucent button. */
+.welcome-window dropdown > button {
+  background-color: @popover_bg_color;
+  color: @window_fg_color;
 }
 
 .welcome-pill {
