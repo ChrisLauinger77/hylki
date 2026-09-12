@@ -388,7 +388,7 @@ impl Component for Compose {
                                         add_css_class: "flat",
                                         add_css_class: "context-menu-item",
                                         #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n("Tomorrow morning (8:00)"), set_halign: gtk::Align::Start },
+                                        set_child = &gtk::Label { set_label: &i18n_f("Tomorrow morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
                                             b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
                                             sender.input(ComposeInput::SendAt(preset_time(1, 8)));
@@ -398,7 +398,7 @@ impl Component for Compose {
                                         add_css_class: "flat",
                                         add_css_class: "context-menu-item",
                                         #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n("Tomorrow afternoon (13:00)"), set_halign: gtk::Align::Start },
+                                        set_child = &gtk::Label { set_label: &i18n_f("Tomorrow afternoon ({time})", &[("time", &crate::datefmt::clock_label(13))]), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
                                             b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
                                             sender.input(ComposeInput::SendAt(preset_time(1, 13)));
@@ -408,7 +408,7 @@ impl Component for Compose {
                                         add_css_class: "flat",
                                         add_css_class: "context-menu-item",
                                         #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n("Monday morning (8:00)"), set_halign: gtk::Align::Start },
+                                        set_child = &gtk::Label { set_label: &i18n_f("Monday morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                         connect_clicked[sender] => move |b| {
                                             b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
                                             sender.input(ComposeInput::SendAt(next_monday(8)));

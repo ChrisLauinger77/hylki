@@ -17,7 +17,7 @@
 use crate::config::{ClockStyle, DateStyle};
 use gtk::glib;
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 /// The user's choice, when they have made one: dates and the clock can each be
 /// pinned regardless of the locale (#32). Held as plain atomics so formatting
@@ -143,7 +143,70 @@ fn ampm() -> bool {
     system_ampm()
 }
 
+/// The system's clock: the desktop's own setting first (GNOME's Time
+/// Format, which the locale knows nothing about, #173), then what the
+/// locale writes. Re-read now and then so a change in Settings shows up
+/// without a restart.
 fn system_ampm() -> bool {
+    static CACHE: Mutex<Option<(std::time::Instant, bool)>> = Mutex::new(None);
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((at, v)) = *cache {
+        if at.elapsed() < std::time::Duration::from_secs(30) {
+            return v;
+        }
+    }
+    let v = desktop_ampm().unwrap_or_else(locale_ampm);
+    *cache = Some((std::time::Instant::now(), v));
+    v
+}
+
+/// The desktop's clock format: `org.gnome.desktop.interface clock-format`
+/// ("12h" / "24h"), read through the settings portal — which works inside
+/// the Flatpak sandbox and on the host alike — or, outside the sandbox
+/// when there is no portal, straight from GSettings when the schema is
+/// installed. `None` where neither answers (another desktop).
+fn desktop_ampm() -> Option<bool> {
+    fn from_value(v: zbus::zvariant::Value<'_>) -> Option<bool> {
+        match v {
+            zbus::zvariant::Value::Value(inner) => from_value(*inner),
+            zbus::zvariant::Value::Str(s) => match s.as_str() {
+                "12h" => Some(true),
+                "24h" => Some(false),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    let portal = (|| -> Option<bool> {
+        let conn = zbus::blocking::Connection::session().ok()?;
+        let reply = conn
+            .call_method(
+                Some("org.freedesktop.portal.Desktop"),
+                "/org/freedesktop/portal/desktop",
+                Some("org.freedesktop.portal.Settings"),
+                "ReadOne",
+                &("org.gnome.desktop.interface", "clock-format"),
+            )
+            .ok()?;
+        let body = reply.body();
+        let v: zbus::zvariant::OwnedValue = body.deserialize().ok()?;
+        from_value(v.into())
+    })();
+    if portal.is_some() || std::env::var_os("FLATPAK_ID").is_some() {
+        return portal;
+    }
+    let source = gtk::gio::SettingsSchemaSource::default()?;
+    source.lookup("org.gnome.desktop.interface", true)?;
+    use gtk::gio::prelude::SettingsExt;
+    let settings = gtk::gio::Settings::new("org.gnome.desktop.interface");
+    match settings.string("clock-format").as_str() {
+        "12h" => Some(true),
+        "24h" => Some(false),
+        _ => None,
+    }
+}
+
+fn locale_ampm() -> bool {
     static AMPM: OnceLock<bool> = OnceLock::new();
     *AMPM.get_or_init(|| {
         // Ask for one o'clock in the afternoon in the locale's own time format.
@@ -156,6 +219,19 @@ fn system_ampm() -> bool {
             .unwrap_or_default();
         ampm_from_probe(&probe)
     })
+}
+
+/// A whole hour on the clock in use: "8:00" or "8:00 AM", for labels
+/// that name a time of day (Send Later's presets).
+pub fn clock_label(hour: u32) -> String {
+    let Ok(dt) = glib::DateTime::from_local(2026, 1, 1, hour as i32, 0, 0.0) else {
+        return format!("{hour}:00");
+    };
+    if ampm() {
+        fmt(&dt, "%-I:%M %p")
+    } else {
+        fmt(&dt, "%H:%M")
+    }
 }
 
 fn ampm_from_probe(probe: &str) -> bool {
