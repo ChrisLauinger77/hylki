@@ -811,6 +811,11 @@ async fn run_imap(
     // folders that changed between sweeps.
     let mut sweep_baseline: std::collections::HashMap<String, (u32, Option<u32>)> =
         std::collections::HashMap::new();
+    // The unread sweep's place (folders still to count) and whether one is
+    // owed: IDLE waking, or a sweep a request interrupted. It runs from the
+    // idle chain below, after the new mail's body prefetch, never inline.
+    let mut sweep_pending: Vec<crate::models::Folder> = Vec::new();
+    let mut sweep_due = false;
     // Set after prefetching; triggers one re-sync (to catch mail that arrived
     // while the connection was busy) before settling into the long IDLE.
     let mut pending_resync = false;
@@ -894,15 +899,18 @@ async fn run_imap(
                     // folder a watcher. Also the first accurate (searched,
                     // not STATUSed) chip pass for servers where STATUS lies.
                     if let Some(sess) = session.as_mut() {
-                        let changed = refresh_unread_counts(
+                        let (changed, complete) = refresh_unread_counts(
                             account_id,
                             sess,
                             cache.as_ref(),
                             idle_folder.as_ref().map(|(_, p)| p.as_str()),
                             &mut sweep_baseline,
+                            &mut sweep_pending,
+                            &rx,
                             &emit,
                         )
                         .await;
+                        sweep_due = !complete;
                         last_unread_sweep = Some(std::time::Instant::now());
                         watch_changed_folders(&mut watchers, &account, &changed, &emit);
                         auto_empty_imap(account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit)
@@ -937,6 +945,28 @@ async fn run_imap(
                         &emit,
                     )
                     .await;
+                    continue;
+                } else if sweep_due && session.is_some() {
+                    // The unread chips' re-count, owed since IDLE last woke
+                    // (or left half done by a request): folder by folder,
+                    // yielding to whatever arrives, its place kept.
+                    let sess = session.as_mut().unwrap();
+                    let (changed, complete) = refresh_unread_counts(
+                        account_id,
+                        sess,
+                        cache.as_ref(),
+                        idle_folder.as_ref().map(|(_, p)| p.as_str()),
+                        &mut sweep_baseline,
+                        &mut sweep_pending,
+                        &rx,
+                        &emit,
+                    )
+                    .await;
+                    watch_changed_folders(&mut watchers, &account, &changed, &emit);
+                    if complete {
+                        sweep_due = false;
+                        last_unread_sweep = Some(std::time::Instant::now());
+                    }
                     continue;
                 } else if !prefetch.is_empty() {
                     run_one_prefetch(
@@ -1073,22 +1103,13 @@ async fn run_imap(
                             // IDLE surfaces — on new mail, and on the quiet
                             // timeout, which is the only clock a push-only
                             // (manual-fetch) account has.
+                            // Owed, not run here: the idle chain runs it
+                            // after the new mail's body is prefetched, and
+                            // any request that arrives meanwhile goes first.
                             if last_unread_sweep
                                 .map_or(true, |t| t.elapsed() >= UNREAD_SWEEP_MIN)
                             {
-                                if let Some(sess) = session.as_mut() {
-                                    let changed = refresh_unread_counts(
-                                        account_id,
-                                        sess,
-                                        cache.as_ref(),
-                                        Some(fpath.as_str()),
-                                        &mut sweep_baseline,
-                                        &emit,
-                                    )
-                                    .await;
-                                    last_unread_sweep = Some(std::time::Instant::now());
-                                    watch_changed_folders(&mut watchers, &account, &changed, &emit);
-                                }
+                                sweep_due = true;
                             }
                             continue;
                         }
@@ -1514,15 +1535,18 @@ async fn run_imap(
 
             MailRequest::RefreshUnread => {
                 let sess = session.as_mut().unwrap();
-                let changed = refresh_unread_counts(
+                let (changed, complete) = refresh_unread_counts(
                     account_id,
                     sess,
                     cache.as_ref(),
                     idle_folder.as_ref().map(|(_, p)| p.as_str()),
                     &mut sweep_baseline,
+                    &mut sweep_pending,
+                    &rx,
                     &emit,
                 )
                 .await;
+                sweep_due = !complete;
                 last_unread_sweep = Some(std::time::Instant::now());
                 watch_changed_folders(&mut watchers, &account, &changed, &emit);
                 auto_empty_imap(account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit)
@@ -5265,17 +5289,35 @@ async fn refresh_keywords(
     changed
 }
 
+/// Re-count every folder's unread chip (EXAMINE + SEARCH each), one folder
+/// at a time — and only while nothing is waiting on the worker. Each folder
+/// costs two round trips, so a dozen folders on a slow link hold the
+/// session for seconds; a message the user just opened would wait behind
+/// the whole walk (a notification click did exactly that). `pending` is the
+/// walk's place: empty starts a fresh pass over the cached folder list, and
+/// what is left when a request interrupts is resumed by the next call.
+/// Returns the folders whose counts moved and whether the pass finished.
 async fn refresh_unread_counts(
     account_id: u32,
     session: &mut ImapSession,
     cache: Option<&Cache>,
     selected: Option<&str>,
     baseline: &mut std::collections::HashMap<String, (u32, Option<u32>)>,
+    pending: &mut Vec<crate::models::Folder>,
+    rx: &mpsc::UnboundedReceiver<MailRequest>,
     emit: &impl Fn(WorkerEvent),
-) -> Vec<(FolderKind, String)> {
+) -> (Vec<(FolderKind, String)>, bool) {
     let mut changed = Vec::new();
-    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
-    for f in &folders {
+    if pending.is_empty() {
+        *pending = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+        pending.reverse(); // popped from the back, so walked in list order
+    }
+    while let Some(f) = pending.last().cloned() {
+        if !rx.is_empty() {
+            tracing::debug!("sweep: paused with {} folders left", pending.len());
+            return (changed, false);
+        }
+        pending.pop();
         if Some(f.path.as_str()) == selected {
             continue;
         }
@@ -5302,7 +5344,7 @@ async fn refresh_unread_counts(
             changed.iter().map(|(_, p)| p.as_str()).collect::<Vec<_>>()
         );
     }
-    changed
+    (changed, true)
 }
 
 /// Whether a folder's sidebar chip counts every message rather than unread
