@@ -30,6 +30,37 @@ const COMPOSE_MIN_WIDTH: i32 = 360;
 /// Fallback fold threshold when the toolbar could not be measured at init.
 const COMPOSE_ACTIONS_BREAKPOINT: f64 = 620.0;
 
+/// The width a header bar's rows need side by side: the natural widths of
+/// its centre box's children (start row, title, end row) summed — what the
+/// bar itself reports doubles the wider side to keep the title centred.
+/// `None` when the bar's insides are not the expected shape.
+fn header_rows_width(header: &gtk::Widget) -> Option<i32> {
+    fn find_center_box(w: &gtk::Widget, depth: u32) -> Option<gtk::Widget> {
+        if w.type_().name() == "GtkCenterBox" {
+            return Some(w.clone());
+        }
+        if depth == 0 {
+            return None;
+        }
+        let mut c = w.first_child();
+        while let Some(child) = c {
+            if let Some(found) = find_center_box(&child, depth - 1) {
+                return Some(found);
+            }
+            c = child.next_sibling();
+        }
+        None
+    }
+    let cb = find_center_box(header, 6)?;
+    let mut total = 0;
+    let mut c = cb.first_child();
+    while let Some(w) = c {
+        total += w.measure(gtk::Orientation::Horizontal, -1).1;
+        c = w.next_sibling();
+    }
+    Some(total)
+}
+
 /// Size the pane for its host. Both hosts impose a definite height now — the
 /// reader-covering overlay inline (it fills the whole pane), the window itself
 /// popped out — so the editor always expands to fill whatever it is given.
@@ -334,6 +365,16 @@ impl Component for Compose {
                         set_label: &i18n("Cancel"),
                         connect_clicked => ComposeInput::Cancel,
                     },
+                    // Folded, Save Draft stays — as an icon, to fit beside
+                    // Cancel and Send; it is the one action worth a click
+                    // in a hurry.
+                    pack_start = &gtk::Button {
+                        set_icon_name: "co.hyprlab.Vireo-document-save-symbolic",
+                        set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
+                        #[watch]
+                        set_visible: model.narrow,
+                        connect_clicked => ComposeInput::SaveDraft,
+                    },
                     pack_start = &gtk::Button {
                         set_label: &i18n("Save Draft"),
                         set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
@@ -458,6 +499,16 @@ impl Component for Compose {
                             sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
                         },
                     },
+                    #[name = "sign_btn"]
+                    pack_end = &gtk::ToggleButton {
+                        set_icon_name: "co.hyprlab.Vireo-security-high-symbolic",
+                        set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
+                        #[watch]
+                        set_visible: crate::pgp::available() && !model.narrow,
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::ToggleSign(b.is_active()));
+                        },
+                    },
                     // Plain text (#180): send without formatting.
                     #[name = "plain_btn"]
                     pack_end = &gtk::ToggleButton {
@@ -468,16 +519,6 @@ impl Component for Compose {
                         set_visible: !model.narrow,
                         connect_toggled[sender] => move |b| {
                             sender.input(ComposeInput::TogglePlain(b.is_active()));
-                        },
-                    },
-                    #[name = "sign_btn"]
-                    pack_end = &gtk::ToggleButton {
-                        set_icon_name: "co.hyprlab.Vireo-security-high-symbolic",
-                        set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
-                        #[watch]
-                        set_visible: crate::pgp::available() && !model.narrow,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::ToggleSign(b.is_active()));
                         },
                     },
                     pack_end = &gtk::Button {
@@ -763,8 +804,17 @@ impl Component for Compose {
                 if measured.replace(true) {
                     return;
                 }
+                // Not the bar's own natural width: a header bar keeps its
+                // title centred, so it asks for twice its wider side, and
+                // this bar's end row is much wider than its start — every
+                // button added there counted double and the fold came far
+                // too soon. The centre box's rows, summed, are what has to
+                // fit.
                 let full = header.measure(gtk::Orientation::Horizontal, -1).1;
-                let threshold = if full <= 0 { COMPOSE_ACTIONS_BREAKPOINT } else { full as f64 + 24.0 };
+                let rows = header_rows_width(&header);
+                tracing::debug!("compose fold: header natural {full}, rows {rows:?}");
+                let need = rows.unwrap_or(full);
+                let threshold = if need <= 0 { COMPOSE_ACTIONS_BREAKPOINT } else { need as f64 + 24.0 };
                 let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
                     adw::BreakpointConditionLengthType::MaxWidth,
                     threshold,
