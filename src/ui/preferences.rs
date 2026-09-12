@@ -20,6 +20,8 @@ pub struct PrefInit {
     pub sender_logos: bool,
     pub date_style: DateStyle,
     pub clock_style: ClockStyle,
+    /// The chosen interface language code; empty = the system's (#179).
+    pub language: String,
     pub fetch_interval_secs: u64,
     pub push: bool,
     pub palette_collapse_secs: u64,
@@ -144,6 +146,48 @@ const DATE_STYLES: &[(&str, DateStyle)] = &[
 ];
 
 /// Clock options, in combo order.
+/// The Language row's choices: (label, locale code). The system's own
+/// first, then English (the source language), then every catalogue in
+/// po/LINGUAS by its own name (#179).
+fn language_choices() -> Vec<(String, String)> {
+    let mut out = vec![(i18n("System"), String::new()), ("English".to_string(), "en".to_string())];
+    for code in include_str!("../../po/LINGUAS").lines() {
+        let code = code.trim();
+        if code.is_empty() || code.starts_with('#') || code == "en" {
+            continue;
+        }
+        out.push((native_language_name(code).to_string(), code.to_string()));
+    }
+    out
+}
+
+/// A language's name in itself, for the Language row.
+fn native_language_name(code: &str) -> &str {
+    match code {
+        "fr" => "Français",
+        "hu" => "Magyar",
+        "ru" => "Русский",
+        "de" => "Deutsch",
+        "es" => "Español",
+        "it" => "Italiano",
+        "pt" | "pt_BR" => "Português",
+        "nl" => "Nederlands",
+        "pl" => "Polski",
+        "cs" => "Čeština",
+        "sv" => "Svenska",
+        "da" => "Dansk",
+        "nb" | "no" => "Norsk",
+        "fi" => "Suomi",
+        "tr" => "Türkçe",
+        "uk" => "Українська",
+        "ja" => "日本語",
+        "zh_CN" => "简体中文",
+        "zh_TW" => "繁體中文",
+        "ko" => "한국어",
+        other => other,
+    }
+}
+
 const CLOCK_STYLES: &[(&str, ClockStyle)] = &[
     (i18n_noop("Follow system"), ClockStyle::System),
     (i18n_noop("12-hour (5:40 PM)"), ClockStyle::Twelve),
@@ -509,6 +553,7 @@ pub enum PrefInput {
     ToggleSenderLogos(bool),
     ChangeDateStyle(u32),
     ChangeClockStyle(u32),
+    ChangeLanguage(u32),
     ToggleThreading(bool),
     ToggleThreadsExpanded(bool),
     ToggleThreadNewestFirst(bool),
@@ -625,6 +670,8 @@ pub enum PrefOutput {
     SetSenderLogos(bool),
     SetDateStyle(DateStyle),
     SetClockStyle(ClockStyle),
+    /// The interface language code chosen, "" for the system's (#179).
+    SetLanguage(String),
     SetThreading(bool),
     SetThreadsExpanded(bool),
     SetThreadNewestFirst(bool),
@@ -1771,6 +1818,17 @@ impl Component for Preferences {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("System"),
 
+                                    #[name = "language_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Language"),
+                                        set_subtitle: &i18n("The language Vireo is shown in. \"System\" follows \
+                                                       the desktop, with English where no translation exists. \
+                                                       A change applies the next time Vireo starts."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeLanguage(row.selected()));
+                                        },
+                                    },
+
                                     #[name = "background_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Keep running in the background"),
@@ -1972,10 +2030,19 @@ impl Component for Preferences {
             &widgets.tray_icon_row,
             &widgets.date_style_row,
             &widgets.clock_style_row,
+            &widgets.language_row,
             &widgets.chevron_side_row,
         ] {
             no_truncate(row);
         }
+
+        // Language combo: the system's, then every catalogue shipped.
+        let choices = language_choices();
+        let lang_labels: Vec<&str> = choices.iter().map(|(l, _)| l.as_str()).collect();
+        widgets.language_row.set_model(Some(&gtk::StringList::new(&lang_labels)));
+        widgets.language_row.set_selected(
+            choices.iter().position(|(_, c)| *c == init.language).unwrap_or(0) as u32,
+        );
 
         widgets.auto_remote_content_row.set_active(init.auto_remote_content);
         widgets.show_remote_banner_row.set_active(init.show_remote_banner);
@@ -2441,6 +2508,11 @@ impl Component for Preferences {
             PrefInput::ChangeClockStyle(i) => {
                 if let Some((_, style)) = CLOCK_STYLES.get(i as usize) {
                     let _ = sender.output(PrefOutput::SetClockStyle(*style));
+                }
+            }
+            PrefInput::ChangeLanguage(i) => {
+                if let Some((_, code)) = language_choices().get(i as usize) {
+                    let _ = sender.output(PrefOutput::SetLanguage(code.clone()));
                 }
             }
             PrefInput::ToggleAvatars(on) => {

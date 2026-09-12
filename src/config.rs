@@ -82,6 +82,33 @@ pub fn config_base() -> Option<PathBuf> {
     shared_base(dirs::config_dir, "config")
 }
 
+/// The interface language the user chose in Settings, as a locale code
+/// ("fr", "en"); empty = the system's own (#179). Its own small file
+/// rather than a preference in privacy.toml: it is read before anything
+/// else starts, when no TOML has been parsed yet.
+pub fn load_language() -> String {
+    language_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+pub fn save_language(lang: &str) {
+    let Some(path) = language_path() else { return };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if lang.trim().is_empty() {
+        let _ = std::fs::remove_file(&path);
+    } else {
+        let _ = std::fs::write(&path, format!("{}\n", lang.trim()));
+    }
+}
+
+fn language_path() -> Option<PathBuf> {
+    Some(config_base()?.join("vireo").join("language"))
+}
+
 pub fn cache_base() -> Option<PathBuf> {
     shared_base(dirs::cache_dir, "cache")
 }

@@ -22,9 +22,28 @@ const DOMAIN: &str = "vireo";
 /// Bind the text domain. Called once, first thing in `main`, before GTK
 /// (which would otherwise set the locale without our domain in place).
 pub fn init() {
+    // A language chosen in Settings (#179) goes to gettext through
+    // LANGUAGE, which it consults on every lookup, ahead of the locale.
+    // Under the C locale gettext ignores LANGUAGE, so a system without a
+    // locale of its own still gets the chosen language via C.UTF-8 for
+    // messages. Single-threaded here, so setting the environment is safe.
+    let chosen = crate::config::load_language();
+    if !chosen.is_empty() {
+        std::env::set_var("LANGUAGE", &chosen);
+    }
     // SAFETY: called once at the very start of main, before any other
     // thread exists (setlocale is not thread-safe).
     unsafe { gettextrs::setlocale(LocaleCategory::LcAll, "") };
+    if !chosen.is_empty() {
+        let bare = ["LC_ALL", "LC_MESSAGES", "LANG"]
+            .iter()
+            .filter_map(|k| std::env::var(k).ok())
+            .find(|v| !v.is_empty())
+            .is_none_or(|v| v == "C" || v == "POSIX");
+        if bare {
+            unsafe { gettextrs::setlocale(LocaleCategory::LcMessages, "C.UTF-8") };
+        }
+    }
     let Some(dir) = locale_dir() else { return };
     let bound = gettextrs::bindtextdomain(DOMAIN, dir.clone())
         .and_then(|_| gettextrs::bind_textdomain_codeset(DOMAIN, "UTF-8"))

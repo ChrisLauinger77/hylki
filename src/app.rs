@@ -826,6 +826,8 @@ pub enum AppMsg {
     SetSenderLogos(bool),
     SetDateStyle(crate::config::DateStyle),
     SetClockStyle(crate::config::ClockStyle),
+    /// Settings: the interface language code, "" for the system's (#179).
+    SetLanguage(String),
     SetThreading(bool),
     SetThreadExpansion(bool),
     SetConfirmThreadDelete(bool),
@@ -4959,6 +4961,19 @@ impl SimpleComponent for AppModel {
                     self.date_style = style;
                     self.save_settings();
                     self.apply_date_style();
+                }
+            }
+
+            AppMsg::SetLanguage(code) => {
+                // The combo also notifies as its model is set; only a real
+                // change is saved and announced.
+                if config::load_language() != code {
+                    config::save_language(&code);
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("The language applies the next time Vireo starts."),
+                        error: false,
+                        connectivity: false,
+                    });
                 }
             }
 
@@ -11712,6 +11727,7 @@ impl AppModel {
             sender_logos: self.sender_logos,
             date_style: self.date_style,
             clock_style: self.clock_style,
+            language: config::load_language(),
             fetch_interval_secs: self.fetch_interval_secs,
             push: self.push,
             palette_collapse_secs: self.palette_collapse_secs,
@@ -11797,6 +11813,7 @@ impl AppModel {
                 PrefOutput::SetSenderLogos(on) => AppMsg::SetSenderLogos(on),
                 PrefOutput::SetDateStyle(style) => AppMsg::SetDateStyle(style),
                 PrefOutput::SetClockStyle(style) => AppMsg::SetClockStyle(style),
+                PrefOutput::SetLanguage(code) => AppMsg::SetLanguage(code),
                 PrefOutput::SetThreading(on) => AppMsg::SetThreading(on),
                 PrefOutput::SetThreadExpansion(on) => AppMsg::SetThreadExpansion(on),
                 PrefOutput::SetConfirmThreadDelete(on) => {
