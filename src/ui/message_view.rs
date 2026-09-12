@@ -93,9 +93,10 @@ pub struct MessageView {
     /// document (scroll resets to 0) and can reflow everything above — an
     /// element anchor survives that where a raw pixel offset lands short.
     saved_anchor: Option<(u32, u32, u32)>,
-    /// The saved anchor is a card to reveal (a reply that just arrived):
-    /// the render lands it below the page's top gutter, not flush at the
-    /// top the way a place the user scrolled to is restored.
+    /// The saved anchor was set by the app, not by a scroll: the render
+    /// lands it below the page's top gutter (where an unscrolled pane has
+    /// its first card), not flush at the top the way a place the user
+    /// scrolled to is restored.
     anchor_gutter: bool,
     /// What each message's frame measured last time it was shown, so reopening a
     /// conversation lays out right away instead of settling into place.
@@ -457,9 +458,12 @@ pub enum MessageViewInput {
     /// the viewport top and the offset into it — kept so a re-render can put
     /// the reader back where they were.
     ScrollAnchor { account_id: u32, id: u32, offset: u32 },
-    /// Bring this card into view at the next render, with the gutter above
-    /// it (a reply that just arrived for the conversation on screen).
-    RevealCard { account_id: u32, id: u32 },
+    /// Keep the pane where it is through the next render (a reply just
+    /// arrived for the conversation on screen): when no scrolled-to place
+    /// is recorded yet, the card at the top of the pane is pinned there,
+    /// below the gutter, so a card inserted above it does not move what is
+    /// on screen. A recorded place is kept as it is.
+    HoldPlace { account_id: u32, id: u32 },
 }
 
 /// How a click on a conversation card changes the selection, mirroring what the
@@ -1805,9 +1809,11 @@ impl Component for MessageView {
                 self.saved_anchor = Some((account_id, id, offset));
                 self.anchor_gutter = false;
             }
-            MessageViewInput::RevealCard { account_id, id } => {
-                self.saved_anchor = Some((account_id, id, 0));
-                self.anchor_gutter = true;
+            MessageViewInput::HoldPlace { account_id, id } => {
+                if self.saved_anchor.is_none() {
+                    self.saved_anchor = Some((account_id, id, 0));
+                    self.anchor_gutter = true;
+                }
             }
             MessageViewInput::CardContact { account_id, id } => {
                 if let Some(m) = self

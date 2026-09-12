@@ -4425,18 +4425,21 @@ impl SimpleComponent for AppModel {
                 self.thread_painted = true;
                 self.thread_related_pending = false;
                 self.remember_thread();
-                // The new message is what the sync brought: bring it into
-                // view — at the top with newest first, appended otherwise.
-                // The render keeps the reader's place through its saved
-                // anchor; pointing that at the new card is the scroll.
-                let newest = self
-                    .current_thread
-                    .iter()
-                    .filter(|tm| !existing.iter().any(|e| (e.account_id, e.id) == (tm.account_id, tm.id)))
-                    .max_by_key(|tm| tm.timestamp)
-                    .map(|tm| (tm.account_id, tm.id));
-                if let Some((account_id, id)) = newest {
-                    self.message_view.emit(MessageViewInput::RevealCard { account_id, id });
+                // What is on screen stays where it is: the render keeps the
+                // reader's place through its saved anchor, and when none is
+                // recorded yet (no scroll since the conversation opened) the
+                // card that was at the top of the pane is pinned there — so
+                // with newest first, the new card slots in above it unseen,
+                // and is marked read only once the user scrolls up to it.
+                let top = if self.thread_newest_first {
+                    existing.iter().max_by_key(|tm| tm.timestamp)
+                } else {
+                    existing.first()
+                }
+                .map(|tm| (tm.account_id, tm.id))
+                .or_else(|| self.current.as_ref().map(|c| (c.account_id, c.id)));
+                if let Some((account_id, id)) = top {
+                    self.message_view.emit(MessageViewInput::HoldPlace { account_id, id });
                 }
                 let to_load: Vec<MissingBody> = self
                     .current_thread
