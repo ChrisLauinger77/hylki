@@ -1704,6 +1704,9 @@ msgstr ""
 msgid "Sign with your OpenPGP key"
 msgstr ""
 
+msgid "Plain text: send without formatting"
+msgstr ""
+
 msgid "Attach files"
 msgstr ""
 
@@ -1744,6 +1747,12 @@ msgid "More"
 msgstr ""
 
 msgid "Show Cc, Bcc and Reply-To"
+msgstr ""
+
+msgid "Send with formatting"
+msgstr ""
+
+msgid "Send as plain text"
 msgstr ""
 
 msgid "Upload to Cloud Storage"
@@ -2772,6 +2781,20 @@ msgid ""
 "take the accent colour."
 msgstr ""
 
+msgid "Plain-text messages in monospace"
+msgstr ""
+
+msgid ""
+"Show messages sent as plain text in a fixed-width font, so columns and code "
+"line up. Formatted messages are not affected."
+msgstr ""
+
+msgid "Monospace font"
+msgstr ""
+
+msgid "The system's monospace font unless another is chosen."
+msgstr ""
+
 msgid "Message card actions"
 msgstr ""
 
@@ -2822,6 +2845,15 @@ msgstr ""
 msgid ""
 "Pasting into a message strips the clipboard's formatting. Off, a paste keeps "
 "its formatting. Right-clicking the editor always offers both."
+msgstr ""
+
+msgid "Compose in plain text"
+msgstr ""
+
+msgid ""
+"New messages, replies and forwards start as plain text, sent without "
+"formatting. The composer's Plain text button switches either way for one "
+"message."
 msgstr ""
 
 msgid "Spelling"

@@ -484,7 +484,12 @@ consolidation proposal, picture avatars and the reply-target and menu
 reports, [**7system7**](https://github.com/7system7) for the preview
 charset and tag-refresh reports, [**Peter Weiss**](https://github.com/peterweissdk)
 for the Move To button and [**frenchy82**](https://github.com/frenchy82) for
-Not Spam, all in 1.27; and to everyone who files issues and ideas.
+Not Spam, all in 1.27; to [**yioannides**](https://github.com/yioannides)
+for the Inboxes and notification report, [**Peter Weiss**](https://github.com/peterweissdk)
+for conversation moves, [**taprobane99**](https://github.com/taprobane99)
+for the clock-format report and [**somePaulo**](https://github.com/somepaulo)
+for the language chooser, plain-text composing and monospace requests,
+all in 1.28; and to everyone who files issues and ideas.
 
 Pull requests are welcome. There's no CLA — by opening one you agree your
 contribution ships under the [AGPL-3.0-or-later](LICENSE), and it may be adapted

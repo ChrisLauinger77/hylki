@@ -1867,6 +1867,10 @@ msgstr "Зашифровать с помощью OpenPGP для каждого �
 msgid "Sign with your OpenPGP key"
 msgstr "Подписать вашим ключом OpenPGP"
 
+#, fuzzy
+msgid "Plain text: send without formatting"
+msgstr "Вставить с форматированием"
+
 msgid "Attach files"
 msgstr "Прикрепить файлы"
 
@@ -1908,6 +1912,14 @@ msgstr "Ещё"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Показать «Копия», «Скрытая копия» и «Адрес для ответа»"
+
+#, fuzzy
+msgid "Send with formatting"
+msgstr "Вставить с форматированием"
+
+#, fuzzy
+msgid "Send as plain text"
+msgstr "Вставлять как обычный текст"
 
 msgid "Upload to Cloud Storage"
 msgstr "Загрузить в облачное хранилище"
@@ -3039,6 +3051,22 @@ msgstr ""
 "читались в единой чёрной или белой гамме. Изображения сохраняются, а ссылки "
 "окрашиваются в акцентный цвет."
 
+msgid "Plain-text messages in monospace"
+msgstr ""
+
+msgid ""
+"Show messages sent as plain text in a fixed-width font, so columns and code "
+"line up. Formatted messages are not affected."
+msgstr ""
+
+#, fuzzy
+msgid "Monospace font"
+msgstr "Шрифт сообщений"
+
+#, fuzzy
+msgid "The system's monospace font unless another is chosen."
+msgstr "Шрифт интерфейса, если не выбран другой."
+
 msgid "Message card actions"
 msgstr "Действия на карточке сообщения"
 
@@ -3108,6 +3136,16 @@ msgstr ""
 "При вставке в письмо форматирование из буфера обмена удаляется. Если "
 "отключено, форматирование сохраняется. Правый клик в редакторе всегда "
 "предлагает оба варианта."
+
+#, fuzzy
+msgid "Compose in plain text"
+msgstr "Вставлять как обычный текст"
+
+msgid ""
+"New messages, replies and forwards start as plain text, sent without "
+"formatting. The composer's Plain text button switches either way for one "
+"message."
+msgstr ""
 
 msgid "Spelling"
 msgstr "Орфография"

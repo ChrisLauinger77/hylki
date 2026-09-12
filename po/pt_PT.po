@@ -1900,6 +1900,10 @@ msgstr "Encriptar com a chave OpenPGP de cada destinatário"
 msgid "Sign with your OpenPGP key"
 msgstr "Assinar com a sua chave OpenPGP"
 
+#, fuzzy
+msgid "Plain text: send without formatting"
+msgstr "Colar com formatação"
+
 msgid "Attach files"
 msgstr "Anexar ficheiros"
 
@@ -1941,6 +1945,14 @@ msgstr "Mais"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Mostrar Cc, Bcc e Responder a"
+
+#, fuzzy
+msgid "Send with formatting"
+msgstr "Colar com formatação"
+
+#, fuzzy
+msgid "Send as plain text"
+msgstr "Colar como texto simples"
 
 msgid "Upload to Cloud Storage"
 msgstr "Carregar para o armazenamento na nuvem"
@@ -3108,6 +3120,22 @@ msgstr ""
 "fundo do leitor. As imagens são mantidas; as ligações utilizam a cor de "
 "destaque."
 
+msgid "Plain-text messages in monospace"
+msgstr ""
+
+msgid ""
+"Show messages sent as plain text in a fixed-width font, so columns and code "
+"line up. Formatted messages are not affected."
+msgstr ""
+
+#, fuzzy
+msgid "Monospace font"
+msgstr "Tipo de letra das mensagens"
+
+#, fuzzy
+msgid "The system's monospace font unless another is chosen."
+msgstr "O tipo de letra da interface, a menos que seja escolhido outro."
+
 msgid "Message card actions"
 msgstr "Ações nos cartões de mensagens"
 
@@ -3178,6 +3206,16 @@ msgstr ""
 "Colar numa mensagem remove a formatação da área de transferência. Quando "
 "desativada, a formatação é mantida. O menu de contexto do editor "
 "disponibiliza sempre ambas as opções."
+
+#, fuzzy
+msgid "Compose in plain text"
+msgstr "Colar como texto simples"
+
+msgid ""
+"New messages, replies and forwards start as plain text, sent without "
+"formatting. The composer's Plain text button switches either way for one "
+"message."
+msgstr ""
 
 msgid "Spelling"
 msgstr "Ortografia"

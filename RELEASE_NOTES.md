@@ -2,6 +2,28 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.28.0
+
+**Arrange the reader toolbar.** Settings, Appearance, Toolbar lets you drag the reading pane's buttons between a left group, a right group and "Not shown", in the order you want. On a narrow pane only the right group folds into the ⋯ menu; the left group is always there. Right-click the empty part of the toolbar for "Customize Toolbar…".
+
+**The slide-over sidebar stays open.** In a narrow window the sidebar panel no longer folds away when the pointer leaves it, so its menu can be used. Click outside the panel to close it.
+
+**Notifications open the right place, fast.** Clicking a new-mail notification now opens the message in Inboxes when the sidebar has that row, or in the account's own Inbox with the account unfolded so the highlight shows. The message itself appears at once instead of waiting behind the folder's sync, and Inboxes picks up new mail on polled accounts without waiting for the next poll. The unread count no longer flickers back after the message is read. Reported by [@yioannides](https://github.com/yioannides) (#170).
+
+**Move a whole conversation.** With a conversation open, Move To… offers a "Whole conversation" switch, on by default, so one pick files every message in it. Dragging a conversation row to a folder takes the whole conversation too, as deleting it does. Move To… is also in the message list's right-click menu, on the row's action palette and on each reader card's action row. Requested by [@peterweissdk](https://github.com/peterweissdk) (#171).
+
+**Right-click a message card.** Anywhere on a card in the reading pane, its header or its text, opens the same menu a message has in the list: reply, star, read, tags, spam, move, archive, delete, add the sender, view source. Replies from it open in the pane.
+
+**New replies join the open conversation.** When a reply arrives for the conversation you are reading, it appears in the reading pane without moving what you are looking at; scroll to it and it is marked read, like any other. You no longer have to click away and back.
+
+**Plain text, both ways.** The composer has a Plain text toggle, and Settings, Composing a switch to start every message that way: no formatting toolbar, and the message goes out as plain text only. In the reader, Settings, Reading can show plain-text messages in a monospace font, the system's or one you pick. Both requested by [@somepaulo](https://github.com/somepaulo) (#180, #181).
+
+**The clock follows the desktop.** With the clock set to follow the system, Vireo now honours GNOME's own 12-hour or 24-hour setting rather than the locale's habit, in the message list and in Send Later's presets. Reported by [@taprobane99](https://github.com/taprobane99) (#173).
+
+**Choose the language.** Settings, System has a Language row, and so does the welcome wizard's first page: System, English, or any of the shipped translations. A pick in the wizard restarts Vireo into that language. Requested by [@somepaulo](https://github.com/somepaulo) (#179).
+
+**Three more languages.** Hungarian by [@7system7](https://github.com/7system7) (#169), Russian by [@iliasen](https://github.com/iliasen) (#176, who also made two reader tooltips translatable) and Portuguese by [@somepaulo](https://github.com/somepaulo) (#178). French is complete again, by [@frenchy82](https://github.com/frenchy82) (#172, #175). Thank you all.
+
 ## What's new in 1.27.3
 
 **A steadier sidebar in narrow windows.** When the window is too narrow for the full sidebar, opening it now slides a panel in over the icon rail without the rail changing underneath: its menu, refresh and folder icons stay exactly where they are while the panel opens and closes. This also removes a rare case where the rail vanished after the sidebar slid closed and the button stopped working until pressed again.

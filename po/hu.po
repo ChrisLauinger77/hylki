@@ -1840,6 +1840,10 @@ msgstr "Titkosítás OpenPGP-vel minden címzett kulcsára"
 msgid "Sign with your OpenPGP key"
 msgstr "Aláírás a saját OpenPGP-kulccsal"
 
+#, fuzzy
+msgid "Plain text: send without formatting"
+msgstr "Beillesztés formázással"
+
 msgid "Attach files"
 msgstr "Fájlok csatolása"
 
@@ -1881,6 +1885,14 @@ msgstr "Továbbiak"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Másolat, titkos másolat és válaszcím megjelenítése"
+
+#, fuzzy
+msgid "Send with formatting"
+msgstr "Beillesztés formázással"
+
+#, fuzzy
+msgid "Send as plain text"
+msgstr "Beillesztés egyszerű szövegként"
 
 msgid "Upload to Cloud Storage"
 msgstr "Feltöltés felhőtárhelyre"
@@ -2993,6 +3005,22 @@ msgstr ""
 "hogy minden üzenet azonos fekete vagy fehér színnel jelenjen meg az olvasó "
 "hátterén. A képek megmaradnak; a hivatkozások kiemelőszínt kapnak."
 
+msgid "Plain-text messages in monospace"
+msgstr ""
+
+msgid ""
+"Show messages sent as plain text in a fixed-width font, so columns and code "
+"line up. Formatted messages are not affected."
+msgstr ""
+
+#, fuzzy
+msgid "Monospace font"
+msgstr "Üzenet betűtípusa"
+
+#, fuzzy
+msgid "The system's monospace font unless another is chosen."
+msgstr "A kezelőfelület betűtípusa, hacsak nincs más kiválasztva."
+
 msgid "Message card actions"
 msgstr "Üzenetkártya-műveletek"
 
@@ -3058,6 +3086,16 @@ msgstr ""
 "Az üzenetbe beillesztés eltávolítja a vágólap formázását. Kikapcsolva a "
 "beillesztés megőrzi a formázást. A szerkesztő jobb kattintásos menüje mindig "
 "mindkettőt felajánlja."
+
+#, fuzzy
+msgid "Compose in plain text"
+msgstr "Beillesztés egyszerű szövegként"
+
+msgid ""
+"New messages, replies and forwards start as plain text, sent without "
+"formatting. The composer's Plain text button switches either way for one "
+"message."
+msgstr ""
 
 msgid "Spelling"
 msgstr "Helyesírás"

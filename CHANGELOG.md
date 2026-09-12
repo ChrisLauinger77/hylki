@@ -1,5 +1,180 @@
 # Changelog
 
+## 1.28.0 — 2026-09-12
+
+An arrangeable reader toolbar, a slide-over sidebar that stays open,
+notification clicks that land in Inboxes and open at once,
+conversations that move as one and take in new replies while open, a
+right-click menu on reader cards, plain-text composing and monospace
+reading, the clock following the desktop, a language chooser, and
+Hungarian, Russian and Portuguese.
+
+- **Reader toolbar layout** (Settings → Appearance → Toolbar). The
+  reading pane's header buttons are arrangeable in two groups, plus a
+  "Not shown" zone. Default: left = Reply, Reply All, Forward, Star,
+  Archive, Delete; right = Tags, Read/Unread, Spam, Move To, Find in
+  Message, Print. Only the right group folds into the ⋯ overflow menu on
+  a narrow pane (in its own order); the left group stays at every width,
+  and the fold threshold is recomputed from the button count. Stored in
+  `~/.config/vireo/toolbar.toml` (`left` / `right` key lists;
+  `config::ReaderToolbar`, `App::relayout_reader_toolbar`). The editor
+  (`ToolbarEditor` in preferences.rs, three `ChipFlow` drop zones: a
+  widget that lays chips out wrapping and eases each to its slot) opens
+  a gap the size of the dragged chip under the pointer and slides the
+  others aside; every drop autosaves. Right-clicking the header's empty
+  space offers "Customize Toolbar…", which opens that page. The section
+  is a raised card on the Appearance page.
+- **Sidebar peek stays open.** The narrow-window slide-over panel folded
+  back one second after the pointer left the rail or the panel, and the
+  panel's menu popover is its own surface, so opening it counted as
+  leaving: the panel slid away under the menu. The leave timer is gone;
+  a click outside the panel (the scrim), a swipe or a navigation closes
+  it. The hover-expand preference's text says so.
+- **Three more languages.** Hungarian (PR #169, Laszlo Lang, 953
+  strings), Russian (PR #176, Ilya Semenkovich, 1040 strings — with the
+  reader card header's "Double-click to open in a new window" and the ⋯
+  toggle's "Actions" made translatable, which they were not) and
+  Portuguese (Portugal) (PR #178, Paulo Fino, 1048 strings), each merged
+  against the current template and listed in `po/LINGUAS`. French is
+  complete again (PRs #172 and #175, frenchy82). The strings added late
+  in this cycle (Send Later's clock labels, the Language row, the
+  wizard's caption, the plain-text settings) are untranslated
+  everywhere.
+- **Language chooser** (#179). Settings → System has a Language row:
+  System (the desktop's language, English where no translation exists),
+  English, and every catalogue in `po/LINGUAS` by its own name
+  (`preferences::language_choices`, `native_language_name`). The choice
+  is kept in `~/.config/vireo/language` — its own small file, read
+  before any TOML — and applied at startup through LANGUAGE, which
+  gettext consults on every lookup ahead of the locale; under a bare C
+  locale, where gettext ignores LANGUAGE, messages are set to C.UTF-8
+  (`i18n::apply_language`). What LANGUAGE was before the app touched it
+  is kept in `VIREO_LANGUAGE_ORIG` and restored first, so a restarted
+  instance does not inherit a choice since undone. The welcome wizard's
+  first page has the same drop-down under the tagline, with a caption
+  saying a pick restarts Vireo: the choice is saved, the instance exits
+  in place once the restart helper is up, and a one-shot
+  `VIREO_WIZARD_AGAIN` flag has the returning instance open the wizard
+  again whatever mode it runs in (init clears it). The wizard in dark
+  mode: text on the yellow is always dark, and its cards and the
+  drop-down are the theme's opaque popover surface rather than the
+  translucent card colour that only tinted the yellow; the hero wordmark
+  is 240px wide with 64px to the language row.
+- **Clock follows the desktop** (#173). "Follow system" probed what the
+  locale writes for one in the afternoon, so GNOME's own Time Format,
+  which the locale knows nothing about, was ignored. The desktop's
+  `org.gnome.desktop.interface clock-format` is asked first — through
+  the settings portal, which works in the Flatpak sandbox and on the
+  host (`desktop::setting`), or GSettings outside the sandbox — with the
+  locale probe as the fallback, re-read every 30 s. Send Later's presets
+  name their hour on the clock in use (`datefmt::clock_label`).
+- **Plain-text messages in monospace** (#181). Settings → Reading:
+  "Plain-text messages in monospace" and a font row, the desktop's
+  monospace font (`monospace-font-name`, same portal) unless another is
+  chosen. `ReaderStyle.plain_font` lands on the `.vireo-plain` wrapper
+  every plain-text part is rendered in — and on a body that arrives with
+  no markup at all — after the message font and one class more
+  specific. Formatted messages are untouched.
+- **Plain-text composing** (#180). The composer's header has a Plain
+  text toggle (between Attach files and the OpenPGP buttons; in the ⋯
+  menu when folded), and Settings → Composing a "Compose in plain text"
+  switch that starts every message that way. Plain text hides the
+  formatting toolbar (`RichEditor::set_formatting_visible`) and sends
+  the message as text/plain only (the HTML part is dropped at send and
+  at draft save). The text/plain alternative of every message is now a
+  real rendering of the body (`window.__vireoBodyText`) rather than
+  innerText: quoted blocks carry "> " on each line, nested quotes stack
+  them, list items their dashes, links their address, preformatted text
+  its spacing, block boundaries become line breaks.
+- **Compose toolbar.** The fold threshold was the header bar's own
+  natural width, which doubles the wider side to keep the (empty) title
+  centred, so every button on the end row counted twice and the toolbar
+  folded far too soon (880px asked for a row needing 641); it is now the
+  sum of the bar's rows (`header_rows_width`). Folded, Save Draft stays,
+  label and all, beside Cancel.
+- **Notification clicks** (#170). A click on a new-mail notification
+  opened the message's folder and, when that account's section was
+  folded in the sidebar, highlighted nothing. Now: mail that landed in
+  an inbox opens in the unified Inboxes whenever the sidebar has that
+  row (`App::open_unified`, the old `UnifiedSelected` body); otherwise,
+  or for mail a filter filed elsewhere, its folder opens and the sidebar
+  unfolds the account (`Sidebar::reveal_account`, on every programmatic
+  folder highlight, so "Go to Message" from the gallery gets it too).
+  Underneath, four things were fixed:
+  - The list builds its rows on an idle since the coalesced-rebuild
+    speed-up, so a `SelectAndLoad` queued in the same pass as the
+    folder's list found no rows and the notified message was never
+    selected. It now waits for the queued rebuild (`pending_select`); a
+    reply inside a conversation, which has no row of its own, selects
+    its thread head (`thread_head_for`).
+  - An inbox open in the unified view was skipped when its unread count
+    moved, on the assumption that the worker's IDLE would deliver the
+    new list; only push accounts IDLE, so a polled account's Inboxes
+    slice waited a poll interval for mail its chip already counted
+    (`sync_background_folder` no longer skips open folders).
+  - The message took seconds to show: the account's worker serves one
+    request at a time, and the body request sat behind the inbox list
+    fetch opening Inboxes asked for, and behind the unread sweep that
+    IDLE waking ran inline (an EXAMINE and a SEARCH per folder, 13
+    folders at 165 ms a round trip). The notification handler asks for
+    the body first; the IMAP worker moves reader loads (body, bodies,
+    source, attachment downloads) ahead of queued list fetches
+    (`reorder_reader_loads`, never past a move, a flag change or a
+    reconnect); and the sweep keeps its place in `sweep_pending`, stops
+    before the next folder whenever a request is waiting, and runs from
+    the idle chain after the new mail's body prefetch (`sweep_due`)
+    rather than inline.
+  - After the message was read, the Inboxes chip came back for a
+    moment: lists and counts the worker had fetched ahead of the queued
+    STORE still reported it unread. A read/unread change now stays in
+    `pending_seen` until the worker reports it stored (new
+    `WorkerEvent::SeenSettled` from the IMAP, Graph and POP3 workers;
+    entries expire after 20 s); meanwhile that folder's server-reported
+    counts are ignored and a fetched list has the pending state overlaid.
+- **Conversations move as one** (#171). With a conversation open in the
+  reading pane, the Move To… picker starts with a "Whole conversation"
+  switch showing the member count, on by default; picking a folder then
+  moves every member the way a dragged multi-selection does
+  (`drop_move`: grouped by source folder, undoable, members from
+  another account reported). Move To… is also in the message list's
+  right-click menu (row and multi-selection, between Mark as Spam and
+  Archive; the list hands the click's point over in window coordinates
+  and the app anchors the picker on the window), on the row's action
+  palette, and on the reader card's action row (the page reports the
+  button's place in CSS pixels with its width, so a zoomed page still
+  lands it). A drag that starts on a conversation row carries every
+  member, as its Delete does (`ThreadDragKeys`, published with the row
+  keys; a multi-selection of several conversations expands each). The
+  picker has 10px above its contents.
+- **Reader cards.** A right-click anywhere on a card — its header, or its
+  body frame, which never reports events to the page — opens that
+  message's full menu, the list row's: reply, star, read, tags, spam,
+  Move To…, archive, delete, contacts, source. WebKit's context-menu
+  signal says what was hit but not where, so a capture-phase gesture on
+  the webview records the pointer and the page is asked which card holds
+  it (`elementFromPoint`, in CSS pixels); links, selected text, images
+  and editable fields keep WebKit's own menus. Reply, Reply All and
+  Forward from that menu open the pane's inline composer, like the
+  card's own buttons. The card's action buttons are centred flex boxes:
+  the read toggle's nested spans rode the button's text line and sat
+  high.
+- **A reply arriving for the open conversation** used to mark its row
+  and nothing else. After each rebuild the list compares the selected
+  head's conversation with the one it last handed the app
+  (`emitted_thread`) and reports growth (`MessageListOutput::ThreadGrew`);
+  the app merges the new members into the painted conversation,
+  chronologically, with bodies from the cache and the rest requested
+  (the Body handler repaints as they land). Nothing on screen moves: the
+  render keeps the reader's recorded place, and when none is recorded
+  yet the card at the top of the pane is pinned there
+  (`MessageViewInput::HoldPlace`), so with newest first the new card
+  slots in above it out of view and is marked read once scrolled up to,
+  by the same visibility rule as any unread card. A card brought into
+  view — the unread mark on open, the newest message — lands below the
+  page's top gutter rather than flush at the viewport edge; a place the
+  user scrolled to is still restored exactly. `VIREO_DEMO_ARRIVAL=<secs>`
+  has the demo's mock worker deliver such a reply.
+
 ## 1.27.3 — 2026-09-11
 
 The narrow-window sidebar peek is its own panel over an untouched rail.
