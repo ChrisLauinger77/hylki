@@ -137,6 +137,9 @@ pub struct ComposeInit {
     /// subject row and shows just the editor — popping out to a window brings
     /// the full fields back.
     pub compact: bool,
+    /// Start as plain text (#180): no formatting toolbar, and the message
+    /// goes out as text/plain only.
+    pub plain: bool,
 }
 
 pub struct Compose {
@@ -185,6 +188,9 @@ pub struct Compose {
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
+    /// Plain text (#180): the formatting toolbar is hidden and the message
+    /// is sent as text/plain only, whatever the editor holds.
+    plain: bool,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
@@ -239,6 +245,8 @@ pub enum ComposeInput {
     DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
     ToggleSign(bool),
+    /// The Plain text toggle (#180).
+    TogglePlain(bool),
     /// The OpenPGP Encrypt toggle; encrypting turns signing on too.
     ToggleEncrypt(bool),
     /// The editor's HTML + plain text came back asynchronously — finish sending.
@@ -450,6 +458,18 @@ impl Component for Compose {
                             sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
                         },
                     },
+                    // Plain text (#180): send without formatting.
+                    #[name = "plain_btn"]
+                    pack_end = &gtk::ToggleButton {
+                        set_icon_name: "co.hyprlab.Vireo-text-x-generic-symbolic",
+                        set_tooltip_text: Some(i18n("Plain text: send without formatting").as_str()),
+                        set_active: model.plain,
+                        #[watch]
+                        set_visible: !model.narrow,
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::TogglePlain(b.is_active()));
+                        },
+                    },
                     #[name = "sign_btn"]
                     pack_end = &gtk::ToggleButton {
                         set_icon_name: "co.hyprlab.Vireo-security-high-symbolic",
@@ -642,6 +662,7 @@ impl Component for Compose {
             windowed,
             can_toggle,
             compact,
+            plain,
         } = init;
         let in_reply_to = prefill.in_reply_to.clone();
         let references = prefill.references.clone();
@@ -669,6 +690,9 @@ impl Component for Compose {
             content.push_str(&sig_html(&current_sig));
         }
         let editor = RichEditor::new(&content);
+        if plain {
+            editor.set_formatting_visible(false);
+        }
         // "Send as Attachment Instead" on an inline image: the editor lifts
         // it to a temp file and it joins the attachment chips here.
         {
@@ -704,6 +728,7 @@ impl Component for Compose {
             narrow: false,
             fields_dirty: false,
             sign: false,
+            plain,
             encrypt: false,
             send_at,
             cloud_accounts: crate::cloud::load_enabled_accounts(),
@@ -1027,6 +1052,18 @@ impl Component for Compose {
                     );
                 }
                 let mut host = Vec::new();
+                {
+                    // Through its button, so the toggled handler keeps the
+                    // model and the button agreeing.
+                    let plain = widgets.plain_btn.clone();
+                    host.push(
+                        MenuEntry::new(
+                            &if self.plain { i18n("Send with formatting") } else { i18n("Send as plain text") },
+                            move || plain.set_active(!plain.is_active()),
+                        )
+                        .icon("co.hyprlab.Vireo-text-x-generic-symbolic"),
+                    );
+                }
                 if self.can_toggle {
                     host.push(if self.windowed {
                         entry(i18n("Collapse into reader"), "view-restore", || ComposeInput::ToggleWindowed)
@@ -1364,6 +1401,10 @@ impl Component for Compose {
             }
 
             ComposeInput::ToggleSign(on) => self.sign = on,
+            ComposeInput::TogglePlain(on) => {
+                self.plain = on;
+                self.editor.set_formatting_visible(!on);
+            }
             ComposeInput::ToggleEncrypt(on) => {
                 self.encrypt = on;
                 if on && !self.sign {
@@ -1426,6 +1467,9 @@ impl Component for Compose {
             }
 
             ComposeInput::SendBody { html, text, to, cc, bcc, reply_to, subject, from_account_id, from_alias } => {
+                // Plain text (#180): no HTML part, so the mail goes as
+                // text/plain only.
+                let html = if self.plain { String::new() } else { html };
                 let out = self
                     .build_outgoing(from_account_id, from_alias, to, cc, bcc, reply_to, subject, text, html);
                 let _ = sender.output(ComposeOutput::Send(Box::new(out)));
@@ -1459,6 +1503,7 @@ impl Component for Compose {
             }
 
             ComposeInput::SaveDraftBody { html, text, to, cc, bcc, reply_to, subject, from_account_id, from_alias } => {
+                let html = if self.plain { String::new() } else { html };
                 let out = self
                     .build_outgoing(from_account_id, from_alias, to, cc, bcc, reply_to, subject, text, html);
                 let _ = sender.output(ComposeOutput::SaveDraft(Box::new(out)));

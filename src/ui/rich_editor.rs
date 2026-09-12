@@ -14,6 +14,9 @@ pub struct RichEditor {
     /// The toolbar + editor, ready to be placed in a container.
     pub widget: gtk::Box,
     webview: webkit6::WebView,
+    /// The formatting toolbar, hidden while a message is composed as plain
+    /// text (#180).
+    toolbar: gtk::Box,
     /// Where "Send as Attachment Instead" delivers the lifted image, as a
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
@@ -388,6 +391,7 @@ impl RichEditor {
         RichEditor {
             widget: bx,
             webview,
+            toolbar,
             attach_cb,
             _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
         }
@@ -445,6 +449,12 @@ impl RichEditor {
         );
     }
 
+    /// Show or hide the formatting toolbar: hidden while the message is
+    /// composed as plain text (#180), where formatting would go nowhere.
+    pub fn set_formatting_visible(&self, on: bool) {
+        self.toolbar.set_visible(on);
+    }
+
     /// Read the current body HTML asynchronously.
     pub fn extract_html(&self, cb: impl FnOnce(String) + 'static) {
         self.webview.evaluate_javascript(
@@ -471,7 +481,7 @@ impl RichEditor {
 
     fn read_body(&self, reader: &str, cb: impl FnOnce(String, String) + 'static) {
         self.webview.evaluate_javascript(
-            &format!("{reader} + '\\u0000' + document.body.innerText"),
+            &format!("{reader} + '\\u0000' + window.__vireoBodyText()"),
             None,
             None,
             gtk::gio::Cancellable::NONE,
@@ -1193,6 +1203,43 @@ const PASTE_SCRIPT: &str = r#"<script>
     Array.prototype.forEach.call(c.querySelectorAll('[data-vireo-ui]'),
       function(n){ n.remove(); });
     return c.innerHTML;
+  };
+  /* The plain-text rendering of the body, for the text/plain alternative
+     and for a message composed as plain text (#180): quoted blocks carry
+     "> " on every line, lists their dashes, links their address, and
+     block boundaries become line breaks. innerText knew none of that. */
+  function vireoTxt(node, pre){
+    if(node.nodeType === 3){
+      var v = node.nodeValue;
+      return pre ? v : v.replace(/[ \t\r\n]+/g, ' ');
+    }
+    if(node.nodeType !== 1) return '';
+    if(node.hasAttribute('data-vireo-ui')) return '';
+    var tag = node.tagName.toLowerCase();
+    if(tag === 'br') return '\n';
+    if(tag === 'img') return node.getAttribute('alt') || '';
+    if(tag === 'style' || tag === 'script') return '';
+    var s = '';
+    var inPre = pre || tag === 'pre';
+    for(var i = 0; i < node.childNodes.length; i++) s += vireoTxt(node.childNodes[i], inPre);
+    if(tag === 'a'){
+      var h = node.getAttribute('href') || '';
+      if(h && h !== s.trim() && h.indexOf('mailto:') !== 0) s += ' <' + h + '>';
+    }
+    if(tag === 'li') return '- ' + s.replace(/^[ \n]+/, '') + '\n';
+    if(tag === 'hr') return '\n----\n';
+    if(tag === 'blockquote'){
+      var lines = s.replace(/^\n+|\n+$/g, '').split('\n');
+      return '\n' + lines.map(function(l){ return '> ' + l; }).join('\n') + '\n';
+    }
+    if(/^(p|div|h[1-6]|pre|tr|ul|ol|table|section|article|header|footer)$/.test(tag)) return '\n' + s + '\n';
+    return s;
+  }
+  window.__vireoBodyText = function(){
+    return vireoTxt(document.body, false)
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\n+|\n+$/g, '');
   };
   /* Sending, and only sending: recut first, then read with the marks taken
      out. A draft is saved through the plain reader above, so quality is
