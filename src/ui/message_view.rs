@@ -4054,6 +4054,18 @@ fn reader_style_css(style: &crate::config::ReaderStyle, dark: bool, accent: &str
             code = of(":is(pre,code,kbd,samp,tt)"),
         ));
     }
+    // Plain-text messages (#181): their parts are wrapped in `.vireo-plain`
+    // when the body is rendered, so the fixed-width font lands on exactly
+    // them. After the message font above, and one class more specific, so
+    // it wins where both apply.
+    if let Some(font) = &style.plain_font {
+        let (family, size, face) = css_font(font);
+        css.push_str(&format!(
+            "{p},{p} :not(#vireo-a):not(#vireo-b):not(#vireo-c)\
+             {{font-family:{family} !important;font-size:{size} !important;{face}}}",
+            p = of(".vireo-plain"),
+        ));
+    }
     if style.colors {
         let fg = if dark { "#e6e6e6" } else { "#1a1a1a" };
         css.push_str(&format!(
@@ -4925,7 +4937,7 @@ fn body_html(body: &str) -> String {
             "<!doctype html><html><head><meta charset=\"utf-8\"><style>\
              body{{margin:0;padding:20px;font:14px/1.5 system-ui,sans-serif;\
              white-space:pre-wrap;word-wrap:break-word}}\
-             </style></head><body>{}</body></html>",
+             </style></head><body class=\"vireo-plain\">{}</body></html>",
             body.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
         )
     }
@@ -5096,7 +5108,7 @@ mod tests {
     /// and code kept monospaced.
     #[test]
     fn reader_font_lands_after_the_senders_css() {
-        let style = crate::config::ReaderStyle { font: Some("DejaVu Serif 12".into()), colors: false };
+        let style = crate::config::ReaderStyle { font: Some("DejaVu Serif 12".into()), colors: false, plain_font: None };
         let body = "<html><head><style>p{font-family:Comic Sans MS}</style></head>\
                     <body><p style=\"font-size:30px\">x</p></body></html>";
         let frame = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
@@ -5116,7 +5128,7 @@ mod tests {
     /// skipped, since the sender's colours are not shown anyway.
     #[test]
     fn reader_colours_force_text_and_links() {
-        let style = crate::config::ReaderStyle { font: None, colors: true };
+        let style = crate::config::ReaderStyle { font: None, colors: true, plain_font: None };
         let body = r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
         let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
         assert!(light.contains("color:#1a1a1a !important;-webkit-text-fill-color:#1a1a1a !important;background-color:transparent !important;background-image:none !important"), "{light}");
@@ -5160,7 +5172,7 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         b.body = "<p>two</p>".into();
-        let style = crate::config::ReaderStyle { font: Some("Cantarell 11".into()), colors: false };
+        let style = crate::config::ReaderStyle { font: Some("Cantarell 11".into()), colors: false, plain_font: None };
         let mut escaped = std::collections::HashSet::new();
         escaped.insert((a.account_id, a.id));
         let doc = MessageView::conversation_document(

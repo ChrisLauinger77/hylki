@@ -13,6 +13,7 @@ mod config;
 mod console_log;
 mod contacts;
 mod datefmt;
+mod desktop;
 mod goa;
 mod i18n;
 mod logo;

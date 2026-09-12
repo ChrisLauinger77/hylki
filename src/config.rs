@@ -723,15 +723,18 @@ pub struct ReaderStyle {
     pub font: Option<String>,
     /// Ignore the sender's text and background colours.
     pub colors: bool,
+    /// Pango description of the font plain-text messages are set in
+    /// (#181); `None` leaves them in the reader's default.
+    pub plain_font: Option<String>,
 }
 
 impl ReaderStyle {
     /// The sender's formatting stands entirely.
-    pub const NONE: ReaderStyle = ReaderStyle { font: None, colors: false };
+    pub const NONE: ReaderStyle = ReaderStyle { font: None, colors: false, plain_font: None };
 
     /// Whether anything of the sender's is overridden.
     pub fn active(&self) -> bool {
-        self.font.is_some() || self.colors
+        self.font.is_some() || self.colors || self.plain_font.is_some()
     }
 }
 
@@ -844,6 +847,12 @@ struct PrivacyFile {
     /// Ignore the sender's text and background colours (#56).
     #[serde(default)]
     override_colors: bool,
+    /// Show plain-text messages in a monospace font (#181).
+    #[serde(default)]
+    plain_monospace: bool,
+    /// That font, as a Pango description; empty = the desktop's monospace font.
+    #[serde(default)]
+    plain_font: String,
     /// Whether to post desktop notifications (new mail, error alerts).
     #[serde(default = "default_notifications")]
     notifications: bool,
@@ -915,6 +924,9 @@ struct PrivacyFile {
     /// menu always offers both, whichever way this is set.
     #[serde(default = "default_paste_plain")]
     paste_plain: bool,
+    /// New messages start as plain text, without formatting (#180).
+    #[serde(default)]
+    compose_plain: bool,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_spellcheck")]
     spellcheck: bool,
@@ -1172,6 +1184,8 @@ impl Default for PrivacyFile {
             override_fonts: false,
             reader_font: String::new(),
             override_colors: false,
+            plain_monospace: false,
+            plain_font: String::new(),
             notifications: default_notifications(),
             notification_content: default_notification_content(),
             show_attachments: default_show_attachments(),
@@ -1189,6 +1203,7 @@ impl Default for PrivacyFile {
             compose_default_from: String::new(),
             single_card_default_applied: false,
             paste_plain: default_paste_plain(),
+            compose_plain: false,
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -1856,6 +1871,17 @@ pub fn load_reader_override() -> (bool, String, bool) {
     (p.override_fonts, p.reader_font, p.override_colors)
 }
 
+/// Plain-text messages in monospace (#181): the switch and the font.
+pub fn load_plain_style() -> (bool, String) {
+    let p = load_privacy();
+    (p.plain_monospace, p.plain_font)
+}
+
+/// Whether new messages start as plain text (#180).
+pub fn load_compose_plain() -> bool {
+    load_privacy().compose_plain
+}
+
 /// Whether desktop notifications (new mail, error alerts) are enabled.
 pub fn load_notifications() -> bool {
     load_privacy().notifications
@@ -2112,6 +2138,8 @@ pub fn save_privacy(
     override_fonts: bool,
     reader_font: String,
     override_colors: bool,
+    plain_monospace: bool,
+    plain_font: String,
     notifications: bool,
     notification_content: bool,
     show_attachments: bool,
@@ -2128,6 +2156,7 @@ pub fn save_privacy(
     reply_fields: bool,
     compose_default_from: &str,
     paste_plain: bool,
+    compose_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
     preview_lines: u32,
@@ -2185,6 +2214,8 @@ pub fn save_privacy(
         override_fonts,
         reader_font,
         override_colors,
+        plain_monospace,
+        plain_font,
         notifications,
         notification_content,
         show_attachments,
@@ -2201,6 +2232,7 @@ pub fn save_privacy(
         reply_fields,
         compose_default_from: compose_default_from.to_string(),
         paste_plain,
+        compose_plain,
         spellcheck,
         // Every save is after the first load, which applied it.
         single_card_default_applied: true,

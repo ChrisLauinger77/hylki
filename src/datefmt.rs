@@ -160,46 +160,10 @@ fn system_ampm() -> bool {
     v
 }
 
-/// The desktop's clock format: `org.gnome.desktop.interface clock-format`
-/// ("12h" / "24h"), read through the settings portal — which works inside
-/// the Flatpak sandbox and on the host alike — or, outside the sandbox
-/// when there is no portal, straight from GSettings when the schema is
-/// installed. `None` where neither answers (another desktop).
+/// The desktop's clock format (GNOME's Time Format): `None` where the
+/// desktop has no such setting.
 fn desktop_ampm() -> Option<bool> {
-    fn from_value(v: zbus::zvariant::Value<'_>) -> Option<bool> {
-        match v {
-            zbus::zvariant::Value::Value(inner) => from_value(*inner),
-            zbus::zvariant::Value::Str(s) => match s.as_str() {
-                "12h" => Some(true),
-                "24h" => Some(false),
-                _ => None,
-            },
-            _ => None,
-        }
-    }
-    let portal = (|| -> Option<bool> {
-        let conn = zbus::blocking::Connection::session().ok()?;
-        let reply = conn
-            .call_method(
-                Some("org.freedesktop.portal.Desktop"),
-                "/org/freedesktop/portal/desktop",
-                Some("org.freedesktop.portal.Settings"),
-                "ReadOne",
-                &("org.gnome.desktop.interface", "clock-format"),
-            )
-            .ok()?;
-        let body = reply.body();
-        let v: zbus::zvariant::OwnedValue = body.deserialize().ok()?;
-        from_value(v.into())
-    })();
-    if portal.is_some() || std::env::var_os("FLATPAK_ID").is_some() {
-        return portal;
-    }
-    let source = gtk::gio::SettingsSchemaSource::default()?;
-    source.lookup("org.gnome.desktop.interface", true)?;
-    use gtk::gio::prelude::SettingsExt;
-    let settings = gtk::gio::Settings::new("org.gnome.desktop.interface");
-    match settings.string("clock-format").as_str() {
+    match crate::desktop::setting("org.gnome.desktop.interface", "clock-format")?.as_str() {
         "12h" => Some(true),
         "24h" => Some(false),
         _ => None,

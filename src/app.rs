@@ -558,6 +558,8 @@ pub struct AppModel {
     /// folder's account.
     compose_default_from: String,
     paste_plain: bool,
+    /// New messages start as plain text (#180).
+    compose_plain: bool,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -568,6 +570,10 @@ pub struct AppModel {
     reader_font: String,
     /// Ignore the senders' text and background colours (#56).
     override_colors: bool,
+    /// Plain-text messages in monospace (#181), and the font ("" = the
+    /// desktop's monospace font).
+    plain_monospace: bool,
+    plain_font: String,
     /// The repeating auto-fetch timer, if armed.
     auto_fetch_source: Option<gtk::glib::SourceId>,
     notifications: Controller<NotificationCenter>,
@@ -954,6 +960,11 @@ pub enum AppMsg {
     SetOverrideFonts(bool),
     SetReaderFont(String),
     SetOverrideColors(bool),
+    /// Settings: plain-text messages in monospace (#181), and the font.
+    SetPlainMonospace(bool),
+    SetPlainFont(String),
+    /// Settings: new messages start as plain text (#180).
+    SetComposePlain(bool),
     /// Fetch a message's body again: its OpenPGP verdict changed (#133).
     ReloadBody(Box<crate::models::Message>),
     /// Select a settings category by id (the showcase hook).
@@ -2125,6 +2136,7 @@ impl SimpleComponent for AppModel {
         }
 
         let reader_override = config::load_reader_override();
+        let plain_style = config::load_plain_style();
         let mut model = AppModel {
             workers: HashMap::new(),
             mid_searches: HashMap::new(),
@@ -2364,12 +2376,15 @@ impl SimpleComponent for AppModel {
             reply_fields: config::load_reply_fields(),
             compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
+            compose_plain: config::load_compose_plain(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
             override_fonts: reader_override.0,
             reader_font: reader_override.1,
             override_colors: reader_override.2,
+            plain_monospace: plain_style.0,
+            plain_font: plain_style.1,
             auto_fetch_source: None,
             notifications,
             welcome: None,
@@ -5724,6 +5739,26 @@ impl SimpleComponent for AppModel {
                     self.push_reader_style();
                 }
             }
+            AppMsg::SetPlainMonospace(on) => {
+                if self.plain_monospace != on {
+                    self.plain_monospace = on;
+                    self.save_settings();
+                    self.push_reader_style();
+                }
+            }
+            AppMsg::SetPlainFont(font) => {
+                if self.plain_font != font {
+                    self.plain_font = font;
+                    self.save_settings();
+                    self.push_reader_style();
+                }
+            }
+            AppMsg::SetComposePlain(on) => {
+                if self.compose_plain != on {
+                    self.compose_plain = on;
+                    self.save_settings();
+                }
+            }
             AppMsg::SetOverrideColors(on) => {
                 if self.override_colors != on {
                     self.override_colors = on;
@@ -7621,7 +7656,14 @@ impl AppModel {
                 self.reader_font.clone()
             }
         });
-        config::ReaderStyle { font, colors: self.override_colors }
+        let plain_font = self.plain_monospace.then(|| {
+            if self.plain_font.trim().is_empty() {
+                crate::desktop::monospace_font()
+            } else {
+                self.plain_font.clone()
+            }
+        });
+        config::ReaderStyle { font, colors: self.override_colors, plain_font }
     }
 
     /// Hand the current reader style to the reader and every popped-out window.
@@ -7657,6 +7699,8 @@ impl AppModel {
             self.override_fonts,
             self.reader_font.clone(),
             self.override_colors,
+            self.plain_monospace,
+            self.plain_font.clone(),
             self.notifications_enabled,
             self.notification_content,
             self.show_attachments,
@@ -7673,6 +7717,7 @@ impl AppModel {
             self.reply_fields,
             &self.compose_default_from,
             self.paste_plain,
+            self.compose_plain,
             self.spellcheck,
             self.spellcheck_langs.clone(),
             self.preview_lines,
@@ -10106,6 +10151,7 @@ impl AppModel {
             windowed,
             can_toggle,
             compact: false,
+            plain: self.compose_plain,
         };
         (id, init)
     }
@@ -11793,6 +11839,9 @@ impl AppModel {
             override_fonts: self.override_fonts,
             reader_font: self.reader_font.clone(),
             override_colors: self.override_colors,
+            plain_monospace: self.plain_monospace,
+            plain_font: self.plain_font.clone(),
+            compose_plain: self.compose_plain,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             show_attachments: self.show_attachments,
@@ -11936,6 +11985,9 @@ impl AppModel {
                 PrefOutput::SetOverrideFonts(on) => AppMsg::SetOverrideFonts(on),
                 PrefOutput::SetReaderFont(font) => AppMsg::SetReaderFont(font),
                 PrefOutput::SetOverrideColors(on) => AppMsg::SetOverrideColors(on),
+                PrefOutput::SetPlainMonospace(on) => AppMsg::SetPlainMonospace(on),
+                PrefOutput::SetPlainFont(font) => AppMsg::SetPlainFont(font),
+                PrefOutput::SetComposePlain(on) => AppMsg::SetComposePlain(on),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(

@@ -67,6 +67,12 @@ pub struct PrefInit {
     pub reader_font: String,
     /// Ignore the senders' text and background colours (#56).
     pub override_colors: bool,
+    /// Plain-text messages in monospace (#181), and the font ("" = the
+    /// desktop's monospace font).
+    pub plain_monospace: bool,
+    pub plain_font: String,
+    /// New messages start as plain text (#180).
+    pub compose_plain: bool,
     pub app_theme: AppTheme,
     pub notifications: bool,
     pub notification_content: bool,
@@ -639,6 +645,9 @@ pub enum PrefInput {
     ToggleOverrideFonts(bool),
     ChangeReaderFont(String),
     ToggleOverrideColors(bool),
+    TogglePlainMonospace(bool),
+    ChangePlainFont(String),
+    ToggleComposePlain(bool),
     ChangeAppTheme(u32),
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
@@ -735,6 +744,9 @@ pub enum PrefOutput {
     SetOverrideFonts(bool),
     SetReaderFont(String),
     SetOverrideColors(bool),
+    SetPlainMonospace(bool),
+    SetPlainFont(String),
+    SetComposePlain(bool),
     Closed,
 }
 
@@ -1610,6 +1622,37 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "plain_mono_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Plain-text messages in monospace"),
+                                        set_subtitle: &i18n("Show messages sent as plain text in a fixed-width \
+                                                       font, so columns and code line up. Formatted \
+                                                       messages are not affected."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::TogglePlainMonospace(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "plain_font_row"]
+                                    adw::ActionRow {
+                                        set_title: &i18n("Monospace font"),
+                                        set_subtitle: &i18n("The system's monospace font unless another is chosen."),
+                                        #[name = "plain_font_button"]
+                                        add_suffix = &gtk::FontDialogButton {
+                                            set_valign: gtk::Align::Center,
+                                            set_dialog: &gtk::FontDialog::new(),
+                                            set_level: gtk::FontLevel::Font,
+                                            set_use_font: true,
+                                            connect_font_desc_notify[sender] => move |button| {
+                                                let font = button
+                                                    .font_desc()
+                                                    .map(|d| d.to_string())
+                                                    .unwrap_or_default();
+                                                sender.input(PrefInput::ChangePlainFont(font));
+                                            },
+                                        },
+                                    },
+
                                     #[name = "card_actions_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Message card actions"),
@@ -1689,6 +1732,18 @@ impl Component for Preferences {
                                                        the editor always offers both."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::TogglePastePlain(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "compose_plain_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Compose in plain text"),
+                                        set_subtitle: &i18n("New messages, replies and forwards start as plain \
+                                                       text, sent without formatting. The composer's \
+                                                       Plain text button switches either way for one \
+                                                       message."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleComposePlain(row.is_active()));
                                         },
                                     },
                                 },
@@ -2252,6 +2307,7 @@ impl Component for Preferences {
             widen_combo_value(&widgets.default_from_row, 50);
         }
         widgets.paste_plain_row.set_active(init.paste_plain);
+        widgets.compose_plain_row.set_active(init.compose_plain);
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language dropdown offers exactly what checking can use: the
         // installed dictionaries, behind a "System language" default. Typed
@@ -2393,6 +2449,24 @@ impl Component for Preferences {
         }
         widgets.override_fonts_row.set_active(init.override_fonts);
         widgets.override_colors_row.set_active(init.override_colors);
+        // Plain-text messages in monospace (#181): the font button shows
+        // the desktop's monospace font until another is chosen.
+        {
+            let desc = if init.plain_font.trim().is_empty() {
+                crate::desktop::monospace_font()
+            } else {
+                init.plain_font.clone()
+            };
+            widgets
+                .plain_font_button
+                .set_font_desc(&gtk::pango::FontDescription::from_string(&desc));
+            widgets.plain_font_row.set_sensitive(init.plain_monospace);
+            let font_row = widgets.plain_font_row.clone();
+            widgets.plain_mono_row.connect_active_notify(move |row| {
+                font_row.set_sensitive(row.is_active());
+            });
+        }
+        widgets.plain_mono_row.set_active(init.plain_monospace);
 
         // Hover-palette delay spinner (0–3000ms, step 50).
         // Actions Palette timeout: 1–30 seconds.
@@ -2876,6 +2950,15 @@ impl Component for Preferences {
             }
             PrefInput::ToggleOverrideColors(on) => {
                 let _ = sender.output(PrefOutput::SetOverrideColors(on));
+            }
+            PrefInput::TogglePlainMonospace(on) => {
+                let _ = sender.output(PrefOutput::SetPlainMonospace(on));
+            }
+            PrefInput::ChangePlainFont(font) => {
+                let _ = sender.output(PrefOutput::SetPlainFont(font));
+            }
+            PrefInput::ToggleComposePlain(on) => {
+                let _ = sender.output(PrefOutput::SetComposePlain(on));
             }
         }
     }
