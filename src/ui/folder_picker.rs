@@ -10,14 +10,19 @@ use crate::models::Folder;
 
 /// Open the picker below the point (`x`, `y`) of `parent`, listing
 /// `folders` less the one at `exclude` (the message's own). `on_pick` gets
-/// the chosen folder's path.
+/// the chosen folder's path and whether the whole conversation goes with
+/// it: when the message is one of a conversation of `conversation`
+/// messages (#171), a switch at the top offers moving them all, on by
+/// default — the reading pane is showing the conversation, and that is
+/// what a move from it most likely means.
 pub fn show_folder_picker(
     parent: &impl IsA<gtk::Widget>,
     x: f64,
     y: f64,
     folders: Vec<Folder>,
     exclude: Option<String>,
-    on_pick: impl Fn(String) + 'static,
+    conversation: Option<usize>,
+    on_pick: impl Fn(String, bool) + 'static,
 ) {
     let popover = gtk::Popover::new();
     popover.set_has_arrow(false);
@@ -26,6 +31,33 @@ pub fn show_folder_picker(
 
     let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
     column.add_css_class("context-menu-list");
+
+    let whole = conversation.filter(|n| *n > 1).map(|n| {
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        row.set_margin_start(6);
+        row.set_margin_end(6);
+        let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        text.set_hexpand(true);
+        let title = gtk::Label::new(Some(i18n("Whole conversation").as_str()));
+        title.set_xalign(0.0);
+        text.append(&title);
+        let count = gtk::Label::new(Some(
+            crate::i18n::ni18n_f("{n} message", "{n} messages", n as u32, &[("n", &n.to_string())])
+                .as_str(),
+        ));
+        count.set_xalign(0.0);
+        count.add_css_class("dim-label");
+        count.add_css_class("caption");
+        text.append(&count);
+        row.append(&text);
+        let switch = gtk::Switch::new();
+        switch.set_active(true);
+        switch.set_valign(gtk::Align::Center);
+        row.append(&switch);
+        column.append(&row);
+        column.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        switch
+    });
 
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some(i18n("Search folders").as_str()));
@@ -69,12 +101,14 @@ pub fn show_folder_picker(
     {
         let popover = popover.clone();
         let on_pick = on_pick.clone();
+        let whole = whole.clone();
         list.connect_row_activated(move |_, row| {
             let path: Option<std::ptr::NonNull<String>> = unsafe { row.data("folder-path") };
             if let Some(path) = path {
                 let path = unsafe { path.as_ref() }.clone();
+                let all = whole.as_ref().is_some_and(|w| w.is_active());
                 popover.popdown();
-                on_pick(path);
+                on_pick(path, all);
             }
         });
     }

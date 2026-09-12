@@ -1047,8 +1047,9 @@ pub enum AppMsg {
     /// Open the Move To… folder picker (#164) for the reader's target, or
     /// the whole list selection.
     MoveToMenu,
-    /// The picker's answer: file the target or selection into `dest`.
-    MoveSelectionTo { account_id: u32, dest: String },
+    /// The picker's answer: file the target or selection into `dest` —
+    /// or, with `whole`, the open conversation entire (#171).
+    MoveSelectionTo { account_id: u32, dest: String, whole: bool },
     /// Second stage of ImportSettings: the chosen file, applied on a clean
     /// main-loop turn (working inside the chooser's completion callback froze
     /// the app when the confirmation dialog presented there).
@@ -6145,6 +6146,11 @@ impl SimpleComponent for AppModel {
                 if folders.is_empty() {
                     return;
                 }
+                // The reading pane shows a conversation (its row was opened,
+                // not one reply of it): offer to move the whole of it.
+                let conversation = (self.list_selection.len() <= 1
+                    && self.current_thread.len() > 1)
+                    .then_some(self.current_thread.len());
                 // Anchored to the toolbar button, or to the overflow button
                 // when the toolbar has folded into it.
                 let btn = if self.reader_move_btn.is_mapped() {
@@ -6159,14 +6165,26 @@ impl SimpleComponent for AppModel {
                     btn.height() as f64,
                     folders,
                     exclude,
-                    move |dest| {
-                        let _ = s.send(AppMsg::MoveSelectionTo { account_id, dest });
+                    conversation,
+                    move |dest, whole| {
+                        let _ = s.send(AppMsg::MoveSelectionTo { account_id, dest, whole });
                     },
                 );
             }
 
-            AppMsg::MoveSelectionTo { account_id, dest } => {
-                if self.list_selection.len() > 1 {
+            AppMsg::MoveSelectionTo { account_id, dest, whole } => {
+                if whole && self.current_thread.len() > 1 {
+                    // The whole conversation, the way a dragged selection
+                    // moves: grouped by source folder, undoable, and any
+                    // member from another account (a conversation merged
+                    // across accounts in a unified view) reported.
+                    let items: Vec<(u32, u32, u32, u32)> = self
+                        .current_thread
+                        .iter()
+                        .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
+                        .collect();
+                    self.drop_move(account_id, dest, items);
+                } else if self.list_selection.len() > 1 {
                     // The same path a drag onto the sidebar takes: grouped by
                     // source folder, undoable, foreign accounts reported.
                     let items: Vec<(u32, u32, u32, u32)> = self
