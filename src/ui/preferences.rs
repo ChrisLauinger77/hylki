@@ -5,7 +5,7 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::config::{AppTheme, ClockStyle, DateStyle, MessageTheme, TrayIcon};
+use crate::config::{AppTheme, ClockStyle, DateStyle, MessageTheme, ReaderToolbar, ToolbarItem, ToolbarSide, TrayIcon};
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 
 /// Initial data for the settings window.
@@ -84,6 +84,8 @@ pub struct PrefInit {
     pub remember_rail: bool,
     pub rail_dots: bool,
     pub rail_fold: crate::config::RailFold,
+    /// The reader header's buttons, per side and in order.
+    pub reader_toolbar: ReaderToolbar,
     pub preview_lines: u32,
     pub single_key_shortcuts: bool,
     pub run_in_background: bool,
@@ -212,6 +214,10 @@ pub struct Preferences {
     /// The icon rail's fold-up switches, kept whole so each toggle can hand
     /// the app the full set.
     rail_fold: crate::config::RailFold,
+    /// The reader toolbar layout being edited (the app applies every drop).
+    toolbar: ReaderToolbar,
+    /// The three drop zones of the toolbar editor, filled from `toolbar`.
+    toolbar_editor: Option<ToolbarEditor>,
     /// Whether swipe actions are on (the reverse switch follows it).
     swipe_enabled: bool,
     /// Mirrors the threading switch, so the "threaded message list" row below
@@ -255,6 +261,174 @@ pub struct Preferences {
     editor_open: bool,
     /// Which side page's editor is up: "accounts" or "cloud".
     editor_page: &'static str,
+}
+
+/// The reader toolbar editor (Settings → Appearance): one drop zone per
+/// side plus a "not shown" pool, each a wrapping row of draggable chips.
+struct ToolbarEditor {
+    zones: Vec<ToolbarZone>,
+}
+
+struct ToolbarZone {
+    side: Option<ToolbarSide>,
+    flow: gtk::FlowBox,
+    /// Shown while the zone is empty, so there is still something to aim at.
+    empty: gtk::Label,
+}
+
+impl ToolbarEditor {
+    fn build(host: &gtk::Box, sender: &ComponentSender<Preferences>) -> Self {
+        let mut zones = Vec::new();
+        for (side, title, hint) in [
+            (Some(ToolbarSide::Left), i18n("Left group"), i18n("Always shown")),
+            (Some(ToolbarSide::Right), i18n("Right group"), i18n("Folds into ⋯ when narrow")),
+            (None, i18n("Not shown"), i18n("Drop a button here to hide it")),
+        ] {
+            let column = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            let heading = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            let label = gtk::Label::new(Some(&title));
+            label.add_css_class("heading");
+            label.set_halign(gtk::Align::Start);
+            heading.append(&label);
+            let hint = gtk::Label::new(Some(&hint));
+            hint.add_css_class("dim-label");
+            hint.add_css_class("caption");
+            hint.set_halign(gtk::Align::Start);
+            hint.set_valign(gtk::Align::Baseline);
+            heading.append(&hint);
+            column.append(&heading);
+
+            let flow = gtk::FlowBox::new();
+            flow.set_selection_mode(gtk::SelectionMode::None);
+            flow.set_homogeneous(false);
+            flow.set_min_children_per_line(1);
+            flow.set_max_children_per_line(12);
+            flow.set_row_spacing(6);
+            flow.set_column_spacing(6);
+            flow.set_halign(gtk::Align::Fill);
+            flow.set_valign(gtk::Align::Start);
+            flow.set_activate_on_single_click(false);
+            flow.add_css_class("toolbar-zone");
+            flow.set_size_request(-1, 60);
+
+            let empty = gtk::Label::new(Some(&i18n("Empty")));
+            empty.add_css_class("dim-label");
+            empty.set_can_target(false);
+            empty.set_halign(gtk::Align::Center);
+            empty.set_valign(gtk::Align::Center);
+            let overlay = gtk::Overlay::new();
+            overlay.set_child(Some(&flow));
+            overlay.add_overlay(&empty);
+            column.append(&overlay);
+            host.append(&column);
+
+            // The zone takes a chip from any zone (itself included) and
+            // works out where among its own chips the pointer landed:
+            // every chip fully above the drop, or on its row and left of
+            // its middle, comes before it. The dragged chip itself (still
+            // in place while the drag runs) is not counted.
+            let drop = gtk::DropTarget::new(gtk::glib::Type::STRING, gtk::gdk::DragAction::MOVE);
+            let input = sender.input_sender().clone();
+            let fb = flow.clone();
+            drop.connect_drop(move |_, value, x, y| {
+                let Ok(key) = value.get::<String>() else {
+                    return false;
+                };
+                let mut index = 0;
+                let mut child = fb.first_child();
+                while let Some(c) = child {
+                    child = c.next_sibling();
+                    let dragged = c
+                        .downcast_ref::<gtk::FlowBoxChild>()
+                        .and_then(|fc| fc.child())
+                        .is_some_and(|w| w.widget_name() == key);
+                    if dragged {
+                        continue;
+                    }
+                    let Some(r) = c.compute_bounds(&fb) else {
+                        continue;
+                    };
+                    let above = (r.y() + r.height()) as f64 <= y;
+                    let same_row = (r.y() as f64) <= y && y < (r.y() + r.height()) as f64;
+                    let left = (r.x() + r.width() / 2.0) as f64 <= x;
+                    if above || (same_row && left) {
+                        index += 1;
+                    }
+                }
+                let _ = input.send(PrefInput::ToolbarDrop { key, side, index });
+                true
+            });
+            let fb = flow.clone();
+            drop.connect_enter(move |_, _, _| {
+                fb.add_css_class("drop-active");
+                gtk::gdk::DragAction::MOVE
+            });
+            let fb = flow.clone();
+            drop.connect_leave(move |_| {
+                fb.remove_css_class("drop-active");
+            });
+            flow.add_controller(drop);
+
+            zones.push(ToolbarZone { side, flow, empty });
+        }
+        ToolbarEditor { zones }
+    }
+
+    /// One draggable chip: the button's icon over its name.
+    fn chip(item: ToolbarItem) -> gtk::Box {
+        let chip = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        chip.add_css_class("toolbar-chip");
+        chip.set_widget_name(item.key());
+        chip.set_tooltip_text(Some(&i18n("Drag to move")));
+        let icon = gtk::Image::from_icon_name(item.icon());
+        icon.set_pixel_size(16);
+        chip.append(&icon);
+        let label = gtk::Label::new(Some(&i18n(item.label())));
+        label.add_css_class("caption");
+        chip.append(&label);
+
+        let drag = gtk::DragSource::new();
+        drag.set_actions(gtk::gdk::DragAction::MOVE);
+        let key = item.key();
+        drag.connect_prepare(move |_, _, _| Some(gtk::gdk::ContentProvider::for_value(&key.to_value())));
+        let c = chip.clone();
+        drag.connect_drag_begin(move |source, _| {
+            // The chip itself rides along under the pointer.
+            let paintable = gtk::WidgetPaintable::new(Some(&c));
+            source.set_icon(Some(&paintable), c.width() / 2, c.height() / 2);
+        });
+        chip.add_controller(drag);
+        chip
+    }
+}
+
+impl Preferences {
+    /// Refill the editor's zones from the layout being edited.
+    fn rebuild_toolbar_chips(&self) {
+        let Some(editor) = &self.toolbar_editor else {
+            return;
+        };
+        for zone in &editor.zones {
+            while let Some(c) = zone.flow.first_child() {
+                zone.flow.remove(&c);
+            }
+            let items: Vec<ToolbarItem> = match zone.side {
+                Some(ToolbarSide::Left) => self.toolbar.left.clone(),
+                Some(ToolbarSide::Right) => self.toolbar.right.clone(),
+                None => self.toolbar.hidden(),
+            };
+            zone.empty.set_visible(items.is_empty());
+            for item in items {
+                let chip = ToolbarEditor::chip(item);
+                zone.flow.insert(&chip, -1);
+                // The chip is the thing to grab, not a focusable cell.
+                if let Some(cell) = chip.parent() {
+                    cell.set_focusable(false);
+                    cell.set_can_focus(false);
+                }
+            }
+        }
+    }
 }
 
 /// One sidebar entry (#141): the stack child it shows, and whether that
@@ -358,6 +532,10 @@ pub enum PrefInput {
     ToggleRememberSidebar(bool),
     ToggleRememberRail(bool),
     ToggleRailDots(bool),
+    /// A reader toolbar chip was dropped: `key` names the button, `side`
+    /// the zone (None = not shown), `index` its place in that zone.
+    ToolbarDrop { key: String, side: Option<ToolbarSide>, index: usize },
+    ToolbarRestore,
     ToggleRailFoldEnabled(bool),
     ToggleRailFoldAccounts(bool),
     ToggleRailFoldAllInboxes(bool),
@@ -461,6 +639,7 @@ pub enum PrefOutput {
     SetRememberSidebar(bool),
     SetRememberRail(bool),
     SetRailDots(bool),
+    SetReaderToolbar(ReaderToolbar),
     SetRailFold(crate::config::RailFold),
     SetAppTheme(AppTheme),
     /// The "this window opens to" choice changed (true = Accounts).
@@ -777,6 +956,32 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                },
+
+                                // The reader toolbar's buttons: three drop zones
+                                // (left group, right group, not shown) of
+                                // draggable chips, filled in init from the saved
+                                // layout. Every drop is applied and saved at once.
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Reader toolbar"),
+                                    set_description: Some(
+                                        &i18n("Drag the buttons between the groups and into the order \
+                                               you want. The left group always stays on the toolbar; \
+                                               the right group folds into a ⋯ menu when the reading \
+                                               pane is narrow. Changes apply at once."),
+                                    ),
+                                    #[wrap(Some)]
+                                    set_header_suffix = &gtk::Button {
+                                        set_label: &i18n("Restore Defaults"),
+                                        set_valign: gtk::Align::Center,
+                                        connect_clicked => PrefInput::ToolbarRestore,
+                                    },
+
+                                    #[name = "toolbar_editor_box"]
+                                    gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 12,
+                                    },
                                 },
                             },
 
@@ -1674,6 +1879,8 @@ impl Component for Preferences {
         let t_init = std::time::Instant::now();
         let mut model = Preferences {
             notifications: init.notifications,
+            toolbar: init.reader_toolbar.clone(),
+            toolbar_editor: None,
             show_unified: init.show_unified,
             unified_kinds: init.unified_kinds,
             unified_chips: init.unified_chips,
@@ -2150,6 +2357,8 @@ impl Component for Preferences {
         root.add_breakpoint(narrow);
         model.panels_stack = Some(widgets.panels_stack.clone());
         model.accounts_slot = Some(widgets.accounts_slot.clone());
+        model.toolbar_editor = Some(ToolbarEditor::build(&widgets.toolbar_editor_box, &sender));
+        model.rebuild_toolbar_chips();
         tracing::debug!("settings window: prefs tail E (sidebar rows built) at {:?}", t_init.elapsed());
         model.side_list = Some(widgets.side_list.clone());
         model.content_page = Some(widgets.content_page.clone());
@@ -2391,6 +2600,20 @@ impl Component for Preferences {
             }
             PrefInput::ToggleRememberRail(on) => {
                 let _ = sender.output(PrefOutput::SetRememberRail(on));
+            }
+            PrefInput::ToolbarDrop { key, side, index } => {
+                if let Some(item) = ToolbarItem::from_key(&key) {
+                    self.toolbar.place(item, side, index);
+                    self.rebuild_toolbar_chips();
+                    let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
+                }
+            }
+            PrefInput::ToolbarRestore => {
+                if self.toolbar != ReaderToolbar::default() {
+                    self.toolbar = ReaderToolbar::default();
+                    self.rebuild_toolbar_chips();
+                    let _ = sender.output(PrefOutput::SetReaderToolbar(self.toolbar.clone()));
+                }
             }
             PrefInput::ToggleRailDots(on) => {
                 let _ = sender.output(PrefOutput::SetRailDots(on));

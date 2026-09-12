@@ -1702,3 +1702,26 @@ textview.console-view text selection {
 .fields-chevron:checked image {
   -gtk-icon-transform: rotate(180deg);
 }
+
+/* Settings → Appearance → Reader toolbar: the drag-and-drop editor. */
+.toolbar-zone {
+  border: 1px dashed alpha(currentColor, 0.25);
+  border-radius: 10px;
+  padding: 6px;
+}
+.toolbar-zone.drop-active {
+  border-color: @accent_color;
+  background: alpha(@accent_bg_color, 0.08);
+}
+.toolbar-zone flowboxchild {
+  padding: 0;
+}
+.toolbar-chip {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: alpha(currentColor, 0.06);
+  min-width: 48px;
+}
+.toolbar-chip:hover {
+  background: alpha(currentColor, 0.12);
+}

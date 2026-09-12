@@ -28,16 +28,17 @@ const CONTRIBUTORS: &[(&str, &str)] = &[
 // width, #28); its floor lives with the pane in message_list.rs
 // (LIST_MIN_WIDTH).
 
-/// The narrowest the reader pane may be squeezed. The header's actions
-/// collapse into the overflow menu below READER_ACTIONS_BREAKPOINT, so the
-/// floor only needs a usable body width. Kept modest on purpose: the window's
+/// The narrowest the reader pane may be squeezed. The header's right-hand
+/// actions collapse into the overflow menu below READER_ACTIONS_BREAKPOINT
+/// (the left group — Reply … Delete — stays), so the floor only needs a
+/// usable body width plus that left group. Kept modest on purpose: the window's
 /// total minimum width must stay under half of a 1920px screen, or GNOME
 /// refuses to tile the window to the left/right screen edge (it only offers
 /// the top-edge maximize).
 const READER_MIN_WIDTH: i32 = 400;
 
-/// Fallback threshold for folding the reader header's actions into the
-/// overflow menu. Normally the threshold is *measured* at startup from the
+/// Fallback threshold for folding the reader header's right-hand actions
+/// into the overflow menu. Normally the threshold is *measured* at startup from the
 /// real row (see the breakpoint in init) so it tracks the user's decoration
 /// layout; this value only stands in if that measurement comes back empty.
 const READER_ACTIONS_BREAKPOINT: f64 = 490.0;
@@ -51,6 +52,22 @@ const SIDEBAR_RAIL_WIDTH: f64 = 80.0;
 /// the SQLite cache.
 const BODY_CACHE_BUDGET: usize = 64 << 20;
 const ATTACHMENT_CACHE_BUDGET: usize = 128 << 20;
+
+/// The reader header's action buttons and fold breakpoint, kept for
+/// re-packing when the layout changes (see relayout_reader_toolbar).
+struct ReaderToolbarWidgets {
+    buttons: Vec<(config::ToolbarItem, gtk::Widget)>,
+    spinner: gtk::Widget,
+    bin: adw::BreakpointBin,
+    breakpoint: adw::Breakpoint,
+    /// The row's cost with every action button gone (padding, spacing…).
+    base: i32,
+    /// One action button's natural width.
+    button_w: i32,
+    /// The window controls' width (re-measured when the decoration layout
+    /// changes).
+    controls: std::cell::Cell<i32>,
+}
 
 relm4::new_action_group!(WindowActionGroup, "win");
 relm4::new_stateless_action!(AccountsAction, WindowActionGroup, "accounts");
@@ -198,11 +215,17 @@ pub struct AppModel {
     attachments: Vec<Attachment>,
     /// True while the current message's attachments are downloading.
     attachments_loading: bool,
-    /// The reader header's actions are collapsed into the overflow menu
+    /// The reader header's right-hand actions are collapsed into the overflow menu
     /// (pane squeezed under READER_ACTIONS_BREAKPOINT).
     reader_actions_collapsed: bool,
     /// The collapsed header's ⋯ button — the anchor its menu pops from.
     reader_overflow_btn: gtk::Button,
+    /// The reader header's layout: which buttons, which side, what order
+    /// (Settings → Appearance → Reader toolbar).
+    reader_toolbar: config::ReaderToolbar,
+    /// The header's action buttons and their breakpoint, for re-packing when
+    /// the layout changes. Set once after the view is built.
+    reader_toolbar_widgets: std::cell::OnceCell<ReaderToolbarWidgets>,
     /// The toolbar's tag button (#71) — the anchor its menu pops from.
     reader_tag_btn: gtk::Button,
     /// The reader toolbar's Move To… button (#164): the folder picker
@@ -746,6 +769,10 @@ pub enum AppMsg {
     /// The reader pane crossed the actions breakpoint (true = collapse the
     /// header's buttons into the overflow menu).
     SetReaderActionsCollapsed(bool),
+    /// A new reader toolbar layout from Settings: save, re-pack, re-fold.
+    SetReaderToolbar(config::ReaderToolbar),
+    /// The window controls were re-measured (decoration layout changed).
+    ReaderControlsChanged(i32),
     /// The collapsed header's ⋯ button was clicked — pop its menu.
     ReaderOverflowMenu,
     SetGravatar(bool),
@@ -1400,7 +1427,7 @@ impl SimpleComponent for AppModel {
                                     set_tooltip_text: Some(i18n("Edit this message").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: model.showing_outbox && !model.reader_actions_collapsed
+                                    set_visible: model.showing_outbox
                                         && model.reader_compose.is_none(),
                                     #[watch]
                                     set_sensitive: model.current.is_some(),
@@ -1411,7 +1438,7 @@ impl SimpleComponent for AppModel {
                                     set_tooltip_text: Some(i18n("Try to send this message now").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: model.showing_outbox && !model.reader_actions_collapsed
+                                    set_visible: model.showing_outbox
                                         && model.reader_compose.is_none(),
                                     #[watch]
                                     set_sensitive: model.current.is_some(),
@@ -1421,17 +1448,24 @@ impl SimpleComponent for AppModel {
                                     set_label: &i18n("Send all"),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: model.showing_outbox && !model.reader_actions_collapsed
+                                    set_visible: model.showing_outbox
                                         && model.reader_compose.is_none(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::RetryAllOutbox),
                                 },
+                                // ---- The action buttons. Declared here in the
+                                // default order, then re-packed in init (and on
+                                // every change) in the user's saved order — see
+                                // relayout_reader_toolbar. The left group stays
+                                // at every width; the right group folds into
+                                // the ⋯ overflow. Default left group: Reply,
+                                // Reply All, Forward, Star, Archive, Delete.
+                                #[name = "tb_reply"]
                                 pack_start = &gtk::Button {
                                     set_icon_name: "co.hyprlab.Vireo-mail-reply-sender-symbolic",
                                     set_tooltip_text: Some(i18n("Reply").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Reply),
                                     // In a conversation these act on the one
                                     // highlighted card; with none (or several)
                                     // highlighted they grey out — no way to say
@@ -1440,29 +1474,140 @@ impl SimpleComponent for AppModel {
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::Reply),
                                 },
+                                #[name = "tb_reply_all"]
                                 pack_start = &gtk::Button {
                                     set_icon_name: "co.hyprlab.Vireo-mail-reply-all-symbolic",
                                     set_tooltip_text: Some(i18n("Reply All").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::ReplyAll),
                                     #[watch]
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::ReplyAll),
                                 },
+                                #[name = "tb_forward"]
                                 pack_start = &gtk::Button {
                                     set_icon_name: "co.hyprlab.Vireo-mail-forward-symbolic",
                                     set_tooltip_text: Some(i18n("Forward").as_str()),
                                     add_css_class: "flat",
                                     #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Forward),
                                     #[watch]
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::Forward),
                                 },
+                                #[name = "tb_star"]
                                 pack_start = &gtk::Button {
+                                    set_tooltip_text: Some(i18n("Flag").as_str()),
+                                    // One glyph in both states, like every other
+                                    // icon; the flagged state carries colour only.
+                                    set_icon_name: "co.hyprlab.Vireo-non-starred-symbolic",
+                                    #[watch]
+                                    set_css_classes: if model.toolbar_star_lit() {
+                                        &["flat", "star-active"]
+                                    } else {
+                                        &["flat"]
+                                    },
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Star),
+                                    #[watch]
+                                    set_sensitive: model.reply_target().is_some(),
+                                    connect_clicked[sender] => move |_| sender.input(AppMsg::ToggleStar),
+                                },
+                                #[name = "tb_archive"]
+                                pack_start = &gtk::Button {
+                                    set_icon_name: "co.hyprlab.Vireo-mail-archive-symbolic",
+                                    set_tooltip_text: Some(i18n("Archive").as_str()),
+                                    add_css_class: "flat",
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Archive),
+                                    #[watch]
+                                    set_sensitive: model.reply_target().is_some(),
+                                    connect_clicked[sender] => move |_| sender.input(AppMsg::Archive),
+                                },
+                                #[name = "tb_delete"]
+                                pack_start = &gtk::Button {
+                                    set_icon_name: "co.hyprlab.Vireo-user-trash-symbolic",
+                                    #[watch]
+                                    set_tooltip_text: Some(&model.delete_tooltip()),
+                                    add_css_class: "flat",
+                                    // Shown for the Outbox too (a queued message
+                                    // can still be binned) — see toolbar_visible.
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Delete),
+                                    #[watch]
+                                    set_sensitive: model.reply_target().is_some()
+                                        || model.list_selection.len() > 1,
+                                    connect_clicked[sender] => move |_| sender.input(AppMsg::Delete),
+                                },
+                                // ---- Default right group, left to right: Tags,
+                                // Read/Unread, Spam, Move To, Find, Print.
+                                // (The sender-check seal lives in the
+                                // message header now — #88; no Add-to-Contacts
+                                // button either: right-click any address in a
+                                // message header.)
+                                #[name = "tb_print"]
+                                pack_end = &gtk::Button {
+                                    set_icon_name: "co.hyprlab.Vireo-printer-symbolic",
+                                    set_tooltip_text: Some(i18n("Print Preview (Ctrl+Shift+P)").as_str()),
+                                    add_css_class: "flat",
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Print),
+                                    #[watch]
+                                    set_sensitive: model.current.is_some(),
+                                    // The preview, not the print dialog: the button
+                                    // shows what will come out and prints from
+                                    // there, so nobody spends paper to find out.
+                                    connect_clicked[sender] => move |_| sender.input(AppMsg::PrintPreview),
+                                },
+                                // In-message find (#103).
+                                #[name = "tb_find"]
+                                pack_end = &gtk::Button {
+                                    set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
+                                    set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
+                                    add_css_class: "flat",
+                                    // Greyed out, not hidden, with no message
+                                    // open: the toolbar must not shift.
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Find),
+                                    #[watch]
+                                    set_sensitive: model.current.is_some(),
+                                    connect_clicked[sender] => move |_| {
+                                        sender.input(AppMsg::OpenReaderFind);
+                                    },
+                                },
+                                // Move To… (#164): a folder picker for the
+                                // target, or the whole list selection.
+                                #[name = "tb_move"]
+                                pack_end = &gtk::Box {
+                                    #[local_ref]
+                                    reader_move_btn -> gtk::Button {
+                                        #[watch]
+                                        set_visible: model.toolbar_visible(config::ToolbarItem::MoveTo),
+                                        #[watch]
+                                        set_sensitive: model.reply_target().is_some()
+                                            || model.list_selection.len() > 1,
+                                    },
+                                },
+                                #[name = "tb_spam"]
+                                pack_end = &gtk::Button {
+                                    #[watch]
+                                    set_icon_name: if model.target_in_junk() {
+                                        "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"
+                                    } else {
+                                        "co.hyprlab.Vireo-mail-mark-junk-symbolic"
+                                    },
+                                    #[watch]
+                                    set_tooltip_text: Some(if model.target_in_junk() { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
+                                    add_css_class: "flat",
+                                    #[watch]
+                                    set_visible: model.toolbar_visible(config::ToolbarItem::Spam),
+                                    #[watch]
+                                    set_sensitive: model.reply_target().is_some(),
+                                    connect_clicked[sender] => move |_| sender.input(AppMsg::MarkSpam),
+                                },
+                                #[name = "tb_read"]
+                                pack_end = &gtk::Button {
                                     add_css_class: "flat",
                                     #[watch]
                                     set_visible: !model.showing_outbox && !model.reader_actions_collapsed
@@ -1481,131 +1626,19 @@ impl SimpleComponent for AppModel {
                                     set_sensitive: model.reply_target().is_some(),
                                     connect_clicked[sender] => move |_| sender.input(AppMsg::ToggleReadCurrent),
                                 },
-                                pack_start = &gtk::Button {
-                                    set_tooltip_text: Some(i18n("Flag").as_str()),
-                                    // One glyph in both states, like every other
-                                    // icon; the flagged state carries colour only.
-                                    set_icon_name: "co.hyprlab.Vireo-non-starred-symbolic",
-                                    #[watch]
-                                    set_css_classes: if model.toolbar_star_lit() {
-                                        &["flat", "star-active"]
-                                    } else {
-                                        &["flat"]
-                                    },
-                                    #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
-                                    #[watch]
-                                    set_sensitive: model.reply_target().is_some(),
-                                    connect_clicked[sender] => move |_| sender.input(AppMsg::ToggleStar),
-                                },
-                                // Tags (#71), right of the star: a menu of the
-                                // tags, ticked where the target carries them.
-                                // Only once a tag exists.
-                                pack_start = &gtk::Box {
+                                // Tags (#71): a menu of the tags, ticked where
+                                // the target carries them. Only once a tag exists.
+                                #[name = "tb_tags"]
+                                pack_end = &gtk::Box {
                                     #[local_ref]
                                     reader_tag_btn -> gtk::Button {
                                         #[watch]
-                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                            && model.reader_compose.is_none() && !model.tags.is_empty(),
+                                        set_visible: model.toolbar_visible(config::ToolbarItem::Tags) && !model.tags.is_empty(),
                                         #[watch]
                                         set_sensitive: model.reply_target().is_some(),
                                     },
                                 },
-                                // In-message find (#103), right of the star.
-                                // (No Add-to-Contacts button here: the action
-                                // lives on the address itself — right-click any
-                                // address in a message header.)
-                                // pack_end fills right-to-left, so these are declared
-                                // in reverse of their visual order. Left to right:
-                                // Archive, Delete, Spam, Move To, Find, Print. (The
-                                // sender-check seal lives in the message header
-                                // now — #88.)
-                                                                pack_end = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-printer-symbolic",
-                                    set_tooltip_text: Some(i18n("Print Preview (Ctrl+Shift+P)").as_str()),
-                                    add_css_class: "flat",
-                                    #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
-                                    #[watch]
-                                    set_sensitive: model.current.is_some(),
-                                    // The preview, not the print dialog: the button
-                                    // shows what will come out and prints from
-                                    // there, so nobody spends paper to find out.
-                                    connect_clicked[sender] => move |_| sender.input(AppMsg::PrintPreview),
-                                },
-                                pack_end = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
-                                    set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
-                                    add_css_class: "flat",
-                                    // Greyed out, not hidden, with no message
-                                    // open: the toolbar must not shift.
-                                    #[watch]
-                                    set_visible: !model.showing_outbox
-                                        && model.reader_compose.is_none()
-                                        && !model.reader_actions_collapsed,
-                                    #[watch]
-                                    set_sensitive: model.current.is_some(),
-                                    connect_clicked[sender] => move |_| {
-                                        sender.input(AppMsg::OpenReaderFind);
-                                    },
-                                },
-                                // Move To… (#164), between Find and Spam: a
-                                // folder picker for the target, or the whole
-                                // list selection.
-                                pack_end = &gtk::Box {
-                                    #[local_ref]
-                                    reader_move_btn -> gtk::Button {
-                                        #[watch]
-                                        set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                            && model.reader_compose.is_none(),
-                                        #[watch]
-                                        set_sensitive: model.reply_target().is_some()
-                                            || model.list_selection.len() > 1,
-                                    },
-                                },
-                                pack_end = &gtk::Button {
-                                    #[watch]
-                                    set_icon_name: if model.target_in_junk() {
-                                        "co.hyprlab.Vireo-mail-mark-notjunk-symbolic"
-                                    } else {
-                                        "co.hyprlab.Vireo-mail-mark-junk-symbolic"
-                                    },
-                                    #[watch]
-                                    set_tooltip_text: Some(if model.target_in_junk() { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
-                                    add_css_class: "flat",
-                                    #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
-                                    #[watch]
-                                    set_sensitive: model.reply_target().is_some(),
-                                    connect_clicked[sender] => move |_| sender.input(AppMsg::MarkSpam),
-                                },
-                                pack_end = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-user-trash-symbolic",
-                                    #[watch]
-                                    set_tooltip_text: Some(&model.delete_tooltip()),
-                                    add_css_class: "flat",
-                                    #[watch]
-                                    set_visible: !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
-                                    #[watch]
-                                    set_sensitive: model.reply_target().is_some()
-                                        || model.list_selection.len() > 1,
-                                    connect_clicked[sender] => move |_| sender.input(AppMsg::Delete),
-                                },
-                                pack_end = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Vireo-mail-archive-symbolic",
-                                    set_tooltip_text: Some(i18n("Archive").as_str()),
-                                    add_css_class: "flat",
-                                    #[watch]
-                                    set_visible: !model.showing_outbox && !model.reader_actions_collapsed
-                                        && model.reader_compose.is_none(),
-                                    #[watch]
-                                    set_sensitive: model.reply_target().is_some(),
-                                    connect_clicked[sender] => move |_| sender.input(AppMsg::Archive),
-                                },
+                                #[name = "tb_spinner"]
                                 pack_end = &gtk::Spinner {
                                     set_valign: gtk::Align::Center,
                                     set_tooltip_text: Some(i18n("Downloading attachments…").as_str()),
@@ -2094,6 +2127,8 @@ impl SimpleComponent for AppModel {
             lightbox_scroller: None,
             attachments_loading: false,
             reader_actions_collapsed: false,
+            reader_toolbar: config::load_reader_toolbar(),
+            reader_toolbar_widgets: std::cell::OnceCell::new(),
             reader_overflow_btn: {
                 let b = gtk::Button::from_icon_name(
                     "co.hyprlab.Vireo-view-more-horizontal-symbolic",
@@ -2430,23 +2465,37 @@ impl SimpleComponent for AppModel {
             let full = header.measure(gtk::Orientation::Horizontal, -1).1;
             let mut controls = 0;
             measure_controls(&header, &mut controls);
-            // The actions' share of the row is layout-independent; slack keeps
-            // the fold a step ahead of an actual squeeze.
-            let actions = full - controls;
-            let threshold = move |controls: i32| {
-                if full <= 0 {
-                    READER_ACTIONS_BREAKPOINT
-                } else {
-                    (actions + controls) as f64 + 24.0
+            use config::ToolbarItem as T;
+            let buttons: Vec<(T, gtk::Widget)> = vec![
+                (T::Reply, widgets.tb_reply.clone().upcast()),
+                (T::ReplyAll, widgets.tb_reply_all.clone().upcast()),
+                (T::Forward, widgets.tb_forward.clone().upcast()),
+                (T::Star, widgets.tb_star.clone().upcast()),
+                (T::Archive, widgets.tb_archive.clone().upcast()),
+                (T::Delete, widgets.tb_delete.clone().upcast()),
+                (T::Spam, widgets.tb_spam.clone().upcast()),
+                (T::ReadUnread, widgets.tb_read.clone().upcast()),
+                (T::Tags, widgets.tb_tags.clone().upcast()),
+                (T::MoveTo, widgets.tb_move.clone().upcast()),
+                (T::Find, widgets.tb_find.clone().upcast()),
+                (T::Print, widgets.tb_print.clone().upcast()),
+            ];
+            // One button's cost, from the buttons themselves (a hidden one —
+            // Tags before any tag exists — measures 0 and is skipped); what
+            // is left of the row after them and the controls is the base.
+            let mut visible_sum = 0;
+            let mut button_w = 0;
+            for (_, w) in &buttons {
+                let nat = w.measure(gtk::Orientation::Horizontal, -1).1;
+                if nat > 0 {
+                    visible_sum += nat;
+                    button_w = button_w.max(nat);
                 }
-            };
-            tracing::info!(
-                "reader toolbar: actions {actions}px + controls {controls}px → collapse below {:.0}px",
-                threshold(controls)
-            );
+            }
+            let base = if full <= 0 { 0 } else { full - controls - visible_sum };
             let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
                 adw::BreakpointConditionLengthType::MaxWidth,
-                threshold(controls),
+                READER_ACTIONS_BREAKPOINT,
                 adw::LengthUnit::Px,
             ));
             let s = sender.input_sender().clone();
@@ -2458,24 +2507,28 @@ impl SimpleComponent for AppModel {
                 let _ = s.send(AppMsg::SetReaderActionsCollapsed(false));
             });
             widgets.reader_bin.add_breakpoint(bp.clone());
+            let _ = model.reader_toolbar_widgets.set(ReaderToolbarWidgets {
+                buttons,
+                spinner: widgets.tb_spinner.clone().upcast(),
+                bin: widgets.reader_bin.clone(),
+                breakpoint: bp,
+                base,
+                button_w,
+                controls: std::cell::Cell::new(controls),
+            });
+            // Packs the saved order and sets the real threshold.
+            model.relayout_reader_toolbar();
             if let Some(settings) = gtk::Settings::default() {
+                let s = sender.input_sender().clone();
                 settings.connect_notify_local(Some("gtk-decoration-layout"), move |_, _| {
                     // Re-measure in an idle: the headerbar's own controls
                     // rebuild on this same notify, in unspecified order.
-                    let bp = bp.clone();
                     let header = header.clone();
+                    let s = s.clone();
                     gtk::glib::idle_add_local_once(move || {
                         let mut controls = 0;
                         measure_controls(&header, &mut controls);
-                        tracing::info!(
-                            "reader toolbar: decoration layout changed, controls {controls}px → collapse below {:.0}px",
-                            threshold(controls)
-                        );
-                        bp.set_condition(Some(&adw::BreakpointCondition::new_length(
-                            adw::BreakpointConditionLengthType::MaxWidth,
-                            threshold(controls),
-                            adw::LengthUnit::Px,
-                        )));
+                        let _ = s.send(AppMsg::ReaderControlsChanged(controls));
                     });
                 });
             }
@@ -3164,6 +3217,15 @@ impl SimpleComponent for AppModel {
                     let ml = model.message_list.sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
                         let _ = ml.send(MessageListInput::ContextMenu { x: 120.0, y: 40.0 });
+                    });
+                }
+                // VIREO_SHOWCASE_READER_MENU=1 opens the reader header's ⋯
+                // overflow menu at 5s (pair with VIREO_SHOWCASE_MENU to
+                // capture it; the window must be narrow enough to collapse).
+                if std::env::var("VIREO_SHOWCASE_READER_MENU").is_ok() {
+                    let s = sender.input_sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let _ = s.send(AppMsg::ReaderOverflowMenu);
                     });
                 }
                 // VIREO_SHOWCASE_MOVE=1 opens the Move To… picker at 5s
@@ -4743,7 +4805,27 @@ impl SimpleComponent for AppModel {
 
             AppMsg::SetReaderActionsCollapsed(on) => {
                 self.reader_actions_collapsed = on;
-                self.reader_overflow_btn.set_visible(on);
+                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+            }
+
+            AppMsg::SetReaderToolbar(layout) => {
+                if self.reader_toolbar != layout {
+                    self.reader_toolbar = layout;
+                    config::save_reader_toolbar(&self.reader_toolbar);
+                    self.relayout_reader_toolbar();
+                    // Not while the inline composer covers the header: that
+                    // path hides the ⋯ by hand and restores it on close.
+                    if !self.reader_compose.as_ref().is_some_and(|r| r.window.is_none()) {
+                        self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
+                    }
+                }
+            }
+
+            AppMsg::ReaderControlsChanged(controls) => {
+                if let Some(tb) = self.reader_toolbar_widgets.get() {
+                    tb.controls.set(controls);
+                }
+                self.refresh_reader_breakpoint();
             }
 
             AppMsg::ReaderOverflowMenu => self.show_reader_overflow_menu(&sender),
@@ -8602,8 +8684,6 @@ impl AppModel {
         });
     }
 
-    /// The collapsed reader header's overflow menu: every action the full row
-    /// of buttons offers, same icons, enabled under the same conditions.
     /// The tag entries of the reader's menus (#71): one per tag, its swatch
     /// filled where the reader's target message carries it. None without a
     /// target or a tag.
@@ -8621,6 +8701,9 @@ impl AppModel {
         }))
     }
 
+    /// The collapsed reader header's overflow menu: the right group of the
+    /// toolbar (Tags, Read/Unread, Spam, Move To, Find, Print), same icons,
+    /// enabled under the same conditions. The left group never folds.
     fn show_reader_overflow_menu(&self, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
@@ -8638,85 +8721,77 @@ impl AppModel {
 
         let has_current = self.current.is_some();
         let sections = if self.showing_outbox {
-            vec![
-                vec![
-                    entry!(i18n("Edit"), "document-edit", AppMsg::EditCurrentOutbox, has_current),
-                    entry!(i18n("Send Now"), "mail-send", AppMsg::SendCurrentOutbox, has_current),
-                    entry!(i18n("Send All"), "mail-send", AppMsg::RetryAllOutbox, true),
-                ],
-                vec![
-                    entry!(i18n("View Source"), "code", AppMsg::ViewSource, has_current),
-                    entry!(i18n("Delete"), "user-trash", AppMsg::Delete, has_current),
-                ],
-            ]
+            // The Outbox's own buttons (Edit, Send, Send all, Delete) sit in
+            // the always-visible left group; only View Source is left to
+            // fold here (queued rows have no context menu to carry it).
+            vec![vec![entry!(i18n("View Source"), "code", AppMsg::ViewSource, has_current)]]
         } else {
-            // Per-message actions act on the reply target: the open message,
-            // or — in a conversation — the one highlighted card. With none
-            // (or several) highlighted they grey out.
+            // Only the right group folds in here, in its own order; the left
+            // group stays on the bar at every width. Per-message actions act
+            // on the reply target: the open message, or — in a conversation —
+            // the one highlighted card. With none (or several) highlighted
+            // they grey out.
+            use config::ToolbarItem as T;
             let target = self.reply_target();
             let acts = target.is_some();
+            let many = acts || self.list_selection.len() > 1;
             let starred = target.as_ref().is_some_and(|m| m.starred);
             let target_unread = target.as_ref().is_some_and(|m| m.unread);
-            vec![
-                vec![
-                    entry!(i18n("Reply"), "mail-reply-sender", AppMsg::Reply, acts),
-                    entry!(i18n("Reply All"), "mail-reply-all", AppMsg::ReplyAll, acts),
-                    entry!(i18n("Forward"), "mail-forward", AppMsg::Forward, acts),
-                ],
-                vec![
-                    if target_unread {
-                        entry!(i18n("Mark as Read"), "mail-read", AppMsg::ToggleReadCurrent, acts)
-                    } else {
-                        entry!(i18n("Mark as Unread"), "mail-unread", AppMsg::ToggleReadCurrent, acts)
-                    },
-                    if starred {
+            let restorable = target.as_ref().is_some_and(|m| {
+                self.folder_kind(m.account_id, m.folder_id)
+                    .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk))
+            });
+            let mut section = Vec::new();
+            for item in &self.reader_toolbar.right {
+                match item {
+                    T::Reply => section.push(entry!(i18n("Reply"), "mail-reply-sender", AppMsg::Reply, acts)),
+                    T::ReplyAll => section.push(entry!(i18n("Reply All"), "mail-reply-all", AppMsg::ReplyAll, acts)),
+                    T::Forward => section.push(entry!(i18n("Forward"), "mail-forward", AppMsg::Forward, acts)),
+                    T::Star => section.push(if starred {
                         entry!(i18n("Remove Flag"), "non-starred", AppMsg::ToggleStar, acts)
                     } else {
                         entry!(i18n("Flag"), "starred", AppMsg::ToggleStar, acts)
-                    },
-                ],
-                // Tags (#71), where there are any and something to tag —
-                // behind a submenu, as in the message list's menu.
-                self.reader_tag_entries(sender)
-                    .map(|entries| {
-                        vec![MenuEntry::submenu(i18n("Tags"), vec![entries])
-                            .icon("co.hyprlab.Vireo-tag-symbolic")]
-                    })
-                    .unwrap_or_default(),
-                // View Source is deliberately absent: it lives in the message
-                // list's context menu only (the Outbox variant above keeps it —
-                // queued rows have no such menu).
-                vec![entry!(i18n("Print Preview"), "printer", AppMsg::PrintPreview, has_current)],
-                {
-                    let mut section = Vec::new();
-                    let restorable = target.as_ref().is_some_and(|m| {
-                        self.folder_kind(m.account_id, m.folder_id)
-                            .is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk))
-                    });
-                    if restorable {
-                        section.push(entry!(i18n("Move to Inbox"), "mail-inbox", AppMsg::MoveToInbox, acts));
-                    }
-                    if self.target_in_junk() {
-                        section.push(entry!(i18n("Not Spam"), "mail-mark-notjunk", AppMsg::MarkSpam, acts));
+                    }),
+                    T::Archive => section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts)),
+                    T::Delete => section.push(entry!(i18n("Delete"), "user-trash", AppMsg::Delete, many)),
+                    T::Spam => section.push(if self.target_in_junk() {
+                        entry!(i18n("Not Spam"), "mail-mark-notjunk", AppMsg::MarkSpam, acts)
                     } else {
-                        section.push(entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts));
+                        entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts)
+                    }),
+                    T::ReadUnread => section.push(if target_unread {
+                        entry!(i18n("Mark as Read"), "mail-read", AppMsg::ToggleReadCurrent, acts)
+                    } else {
+                        entry!(i18n("Mark as Unread"), "mail-unread", AppMsg::ToggleReadCurrent, acts)
+                    }),
+                    // Tags (#71), where there are any and something to tag —
+                    // behind a submenu, as in the message list's menu.
+                    T::Tags => {
+                        if let Some(entries) = self.reader_tag_entries(sender) {
+                            section.push(
+                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic"),
+                            );
+                        }
                     }
-                    section.push(entry!(
-                        i18n("Move To…"),
-                        "folder",
-                        AppMsg::MoveToMenu,
-                        acts || self.list_selection.len() > 1
-                    ));
-                    section.push(entry!(i18n("Archive"), "mail-archive", AppMsg::Archive, acts));
-                    section.push(entry!(
-                        i18n("Delete"),
-                        "user-trash",
-                        AppMsg::Delete,
-                        acts || self.list_selection.len() > 1
-                    ));
-                    section
-                },
-            ]
+                    T::MoveTo => {
+                        if restorable {
+                            section.push(entry!(i18n("Move to Inbox"), "mail-inbox", AppMsg::MoveToInbox, acts));
+                        }
+                        section.push(entry!(i18n("Move To…"), "folder", AppMsg::MoveToMenu, many));
+                    }
+                    T::Find => section.push(entry!(
+                        i18n("Find in Message"),
+                        "loupe-with-arrow",
+                        AppMsg::OpenReaderFind,
+                        has_current
+                    )),
+                    // View Source is deliberately absent: it lives in the
+                    // message list's context menu only (the Outbox variant
+                    // above keeps it — queued rows have no such menu).
+                    T::Print => section.push(entry!(i18n("Print Preview"), "printer", AppMsg::PrintPreview, has_current)),
+                }
+            }
+            vec![section]
         };
 
         let btn = &self.reader_overflow_btn;
@@ -9161,6 +9236,88 @@ impl AppModel {
 
     /// Tooltip for the toolbar's trash button: says when it will delete the
     /// whole multi-selection rather than just the open message.
+    /// Whether the reader header shows `item` right now: it must be in the
+    /// saved layout, and a right-group button also needs the pane wide
+    /// enough (the left group never folds). Delete alone also serves the
+    /// Outbox; the inline composer hides the whole row.
+    fn toolbar_visible(&self, item: config::ToolbarItem) -> bool {
+        use config::ToolbarSide;
+        self.reader_compose.is_none()
+            && (item == config::ToolbarItem::Delete || !self.showing_outbox)
+            && match self.reader_toolbar.side(item) {
+                Some(ToolbarSide::Left) => true,
+                Some(ToolbarSide::Right) => !self.reader_actions_collapsed,
+                None => false,
+            }
+    }
+
+    /// The ⋯ overflow stands in for the folded right group: only while
+    /// collapsed, and only when that group has something to offer (the
+    /// Outbox keeps View Source there regardless).
+    fn reader_overflow_wanted(&self) -> bool {
+        self.reader_actions_collapsed && (self.showing_outbox || !self.reader_toolbar.right.is_empty())
+    }
+
+    /// Pack the header's action buttons in the saved order: the left group
+    /// via pack_start, the right group via pack_end (which fills right to
+    /// left, so in reverse), then the attachments spinner so it keeps the
+    /// innermost slot of the right group. Buttons on neither side are left
+    /// unpacked. Re-folds the row for the new count afterwards.
+    fn relayout_reader_toolbar(&self) {
+        let (Some(header), Some(tb)) = (self.reader_header.get(), self.reader_toolbar_widgets.get()) else {
+            return;
+        };
+        for (_, w) in &tb.buttons {
+            if w.parent().is_some() {
+                header.remove(w);
+            }
+        }
+        if tb.spinner.parent().is_some() {
+            header.remove(&tb.spinner);
+        }
+        let find = |item: config::ToolbarItem| tb.buttons.iter().find(|(i, _)| *i == item).map(|(_, w)| w);
+        for item in &self.reader_toolbar.left {
+            if let Some(w) = find(*item) {
+                header.pack_start(w);
+            }
+        }
+        for item in self.reader_toolbar.right.iter().rev() {
+            if let Some(w) = find(*item) {
+                header.pack_end(w);
+            }
+        }
+        header.pack_end(&tb.spinner);
+        self.refresh_reader_breakpoint();
+    }
+
+    /// Point the fold breakpoint at the width the current layout needs: the
+    /// row's fixed cost, the window controls, and one button's worth per
+    /// shown item (hidden-for-now buttons like Tags without tags count too —
+    /// that slack keeps the fold a step ahead of a squeeze).
+    fn refresh_reader_breakpoint(&self) {
+        let Some(tb) = self.reader_toolbar_widgets.get() else {
+            return;
+        };
+        let shown = (self.reader_toolbar.left.len() + self.reader_toolbar.right.len()) as i32;
+        let threshold = if tb.button_w <= 0 {
+            READER_ACTIONS_BREAKPOINT
+        } else {
+            (tb.base + tb.controls.get() + shown * tb.button_w) as f64 + 24.0
+        };
+        tracing::info!(
+            "reader toolbar: {shown} buttons × {}px + base {}px + controls {}px → collapse below {threshold:.0}px",
+            tb.button_w,
+            tb.base,
+            tb.controls.get()
+        );
+        tb.breakpoint.set_condition(Some(&adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            threshold,
+            adw::LengthUnit::Px,
+        )));
+        tb.bin.queue_resize();
+    }
+
     fn delete_tooltip(&self) -> String {
         match self.list_selection.len() {
             n if n > 1 => i18n_f("Delete {n} messages", &[("n", &n.to_string())]),
@@ -9806,7 +9963,7 @@ impl AppModel {
                 } else {
                     self.animate_cover_close();
                 }
-                self.reader_overflow_btn.set_visible(self.reader_actions_collapsed);
+                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
                 r.controller.emit(ComposeInput::SaveDraftIfDirty);
                 self.draining_composers.push((r.id, r.controller));
             }
@@ -9828,7 +9985,7 @@ impl AppModel {
             None => {
                 // inline → window: unparent from the revealer, then host in a window.
                 self.clear_compose_slots();
-                self.reader_overflow_btn.set_visible(self.reader_actions_collapsed);
+                self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
                 let window = self.compose_window_host(&widget, id, sender);
                 r.window = Some(window);
                 r.controller.emit(ComposeInput::SetWindowed(true));
@@ -9876,7 +10033,7 @@ impl AppModel {
                     } else {
                         self.animate_cover_close();
                     }
-                    self.reader_overflow_btn.set_visible(self.reader_actions_collapsed);
+                    self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
                 }
             }
             return;
@@ -11148,6 +11305,7 @@ impl AppModel {
             remember_rail: self.remember_rail,
             rail_dots: self.rail_dots,
             rail_fold: self.rail_fold,
+            reader_toolbar: self.reader_toolbar.clone(),
             card_actions_hover: self.card_actions_hover,
             card_actions_auto: self.card_actions_auto,
             list_palette: self.list_palette,
@@ -11249,6 +11407,7 @@ impl AppModel {
                 PrefOutput::SetRememberSidebar(on) => AppMsg::SetRememberSidebar(on),
                 PrefOutput::SetRememberRail(on) => AppMsg::SetRememberRail(on),
                 PrefOutput::SetRailDots(on) => AppMsg::SetRailDots(on),
+                PrefOutput::SetReaderToolbar(layout) => AppMsg::SetReaderToolbar(layout),
                 PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
                 PrefOutput::SetSettingsOpenAccounts(on) => {

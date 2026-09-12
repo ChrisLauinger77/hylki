@@ -2975,3 +2975,268 @@ mod filter_tests {
         assert_eq!(back.rules, rules);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Reader toolbar layout: which buttons the reading pane's header shows, on
+// which side, in what order (Settings → Appearance → Reader toolbar).
+// ---------------------------------------------------------------------------
+
+/// One button of the reader header. The left group stays on the bar at every
+/// width; the right group folds into the ⋯ overflow menu when the pane is
+/// narrow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ToolbarItem {
+    Reply,
+    ReplyAll,
+    Forward,
+    Star,
+    Archive,
+    Delete,
+    Spam,
+    ReadUnread,
+    Tags,
+    MoveTo,
+    Find,
+    Print,
+}
+
+impl ToolbarItem {
+    pub const ALL: [ToolbarItem; 12] = [
+        ToolbarItem::Reply,
+        ToolbarItem::ReplyAll,
+        ToolbarItem::Forward,
+        ToolbarItem::Star,
+        ToolbarItem::Archive,
+        ToolbarItem::Delete,
+        ToolbarItem::Spam,
+        ToolbarItem::ReadUnread,
+        ToolbarItem::Tags,
+        ToolbarItem::MoveTo,
+        ToolbarItem::Find,
+        ToolbarItem::Print,
+    ];
+
+    /// The stable name written to `toolbar.toml`.
+    pub fn key(self) -> &'static str {
+        match self {
+            ToolbarItem::Reply => "reply",
+            ToolbarItem::ReplyAll => "reply_all",
+            ToolbarItem::Forward => "forward",
+            ToolbarItem::Star => "star",
+            ToolbarItem::Archive => "archive",
+            ToolbarItem::Delete => "delete",
+            ToolbarItem::Spam => "spam",
+            ToolbarItem::ReadUnread => "read_unread",
+            ToolbarItem::Tags => "tags",
+            ToolbarItem::MoveTo => "move_to",
+            ToolbarItem::Find => "find",
+            ToolbarItem::Print => "print",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<ToolbarItem> {
+        ToolbarItem::ALL.iter().copied().find(|i| i.key() == key)
+    }
+
+    /// The symbolic icon the button (and the settings chip) wears.
+    pub fn icon(self) -> &'static str {
+        match self {
+            ToolbarItem::Reply => "co.hyprlab.Vireo-mail-reply-sender-symbolic",
+            ToolbarItem::ReplyAll => "co.hyprlab.Vireo-mail-reply-all-symbolic",
+            ToolbarItem::Forward => "co.hyprlab.Vireo-mail-forward-symbolic",
+            ToolbarItem::Star => "co.hyprlab.Vireo-non-starred-symbolic",
+            ToolbarItem::Archive => "co.hyprlab.Vireo-mail-archive-symbolic",
+            ToolbarItem::Delete => "co.hyprlab.Vireo-user-trash-symbolic",
+            ToolbarItem::Spam => "co.hyprlab.Vireo-mail-mark-junk-symbolic",
+            ToolbarItem::ReadUnread => "co.hyprlab.Vireo-mail-unread-symbolic",
+            ToolbarItem::Tags => "co.hyprlab.Vireo-tag-symbolic",
+            ToolbarItem::MoveTo => "co.hyprlab.Vireo-folder-symbolic",
+            ToolbarItem::Find => "co.hyprlab.Vireo-loupe-with-arrow-symbolic",
+            ToolbarItem::Print => "co.hyprlab.Vireo-printer-symbolic",
+        }
+    }
+
+    /// The untranslated label (callers pass it through `i18n`).
+    pub fn label(self) -> &'static str {
+        match self {
+            ToolbarItem::Reply => crate::i18n::i18n_noop("Reply"),
+            ToolbarItem::ReplyAll => crate::i18n::i18n_noop("Reply All"),
+            ToolbarItem::Forward => crate::i18n::i18n_noop("Forward"),
+            ToolbarItem::Star => crate::i18n::i18n_noop("Flag"),
+            ToolbarItem::Archive => crate::i18n::i18n_noop("Archive"),
+            ToolbarItem::Delete => crate::i18n::i18n_noop("Delete"),
+            ToolbarItem::Spam => crate::i18n::i18n_noop("Spam"),
+            ToolbarItem::ReadUnread => crate::i18n::i18n_noop("Read/Unread"),
+            ToolbarItem::Tags => crate::i18n::i18n_noop("Tags"),
+            ToolbarItem::MoveTo => crate::i18n::i18n_noop("Move To"),
+            ToolbarItem::Find => crate::i18n::i18n_noop("Find"),
+            ToolbarItem::Print => crate::i18n::i18n_noop("Print"),
+        }
+    }
+}
+
+/// Which side of the reader header a button sits on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolbarSide {
+    Left,
+    Right,
+}
+
+/// The reader header's layout. A button absent from both lists is hidden.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReaderToolbar {
+    pub left: Vec<ToolbarItem>,
+    pub right: Vec<ToolbarItem>,
+}
+
+impl Default for ReaderToolbar {
+    fn default() -> Self {
+        ReaderToolbar {
+            left: vec![
+                ToolbarItem::Reply,
+                ToolbarItem::ReplyAll,
+                ToolbarItem::Forward,
+                ToolbarItem::Star,
+                ToolbarItem::Archive,
+                ToolbarItem::Delete,
+            ],
+            right: vec![
+                ToolbarItem::Tags,
+                ToolbarItem::ReadUnread,
+                ToolbarItem::Spam,
+                ToolbarItem::MoveTo,
+                ToolbarItem::Find,
+                ToolbarItem::Print,
+            ],
+        }
+    }
+}
+
+impl ReaderToolbar {
+    /// The side an item sits on, or None when it is hidden.
+    pub fn side(&self, item: ToolbarItem) -> Option<ToolbarSide> {
+        if self.left.contains(&item) {
+            Some(ToolbarSide::Left)
+        } else if self.right.contains(&item) {
+            Some(ToolbarSide::Right)
+        } else {
+            None
+        }
+    }
+
+    /// The items on neither side, in canonical order.
+    pub fn hidden(&self) -> Vec<ToolbarItem> {
+        ToolbarItem::ALL
+            .iter()
+            .copied()
+            .filter(|i| self.side(*i).is_none())
+            .collect()
+    }
+
+    /// Drop repeats (an item may sit on one side only, once).
+    fn sanitize(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        self.left.retain(|i| seen.insert(*i));
+        self.right.retain(|i| seen.insert(*i));
+    }
+
+    /// Take `item` out of wherever it is and put it at `index` of `side`
+    /// (clamped); `side` None hides it.
+    pub fn place(&mut self, item: ToolbarItem, side: Option<ToolbarSide>, index: usize) {
+        self.left.retain(|i| *i != item);
+        self.right.retain(|i| *i != item);
+        let list = match side {
+            Some(ToolbarSide::Left) => &mut self.left,
+            Some(ToolbarSide::Right) => &mut self.right,
+            None => return,
+        };
+        let index = index.min(list.len());
+        list.insert(index, item);
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct ToolbarFile {
+    #[serde(default)]
+    left: Vec<String>,
+    #[serde(default)]
+    right: Vec<String>,
+}
+
+fn toolbar_path() -> Option<PathBuf> {
+    Some(config_base()?.join("vireo").join("toolbar.toml"))
+}
+
+/// The saved reader toolbar layout, or the default when there is none.
+/// Unknown names (a newer Vireo's buttons) are skipped, not fatal.
+pub fn load_reader_toolbar() -> ReaderToolbar {
+    let Some(text) = toolbar_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
+        return ReaderToolbar::default();
+    };
+    let Ok(file) = toml::from_str::<ToolbarFile>(&text) else {
+        return ReaderToolbar::default();
+    };
+    let mut layout = ReaderToolbar {
+        left: file.left.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+        right: file.right.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+    };
+    layout.sanitize();
+    layout
+}
+
+pub fn save_reader_toolbar(layout: &ReaderToolbar) {
+    let Some(path) = toolbar_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let file = ToolbarFile {
+        left: layout.left.iter().map(|i| i.key().to_string()).collect(),
+        right: layout.right.iter().map(|i| i.key().to_string()).collect(),
+    };
+    if let Ok(toml) = toml::to_string_pretty(&file) {
+        let _ = std::fs::write(&path, toml);
+    }
+}
+
+#[cfg(test)]
+mod toolbar_tests {
+    use super::*;
+
+    #[test]
+    fn place_moves_between_and_within_sides() {
+        let mut t = ReaderToolbar::default();
+        // Right → left, at the front.
+        t.place(ToolbarItem::Print, Some(ToolbarSide::Left), 0);
+        assert_eq!(t.left[0], ToolbarItem::Print);
+        assert!(!t.right.contains(&ToolbarItem::Print));
+        // Within the left group: Reply (now index 1) to the end.
+        t.place(ToolbarItem::Reply, Some(ToolbarSide::Left), 99);
+        assert_eq!(t.left.last(), Some(&ToolbarItem::Reply));
+        assert_eq!(t.left.len(), 7);
+        // Hidden: on neither side, listed under hidden().
+        t.place(ToolbarItem::Spam, None, 0);
+        assert_eq!(t.side(ToolbarItem::Spam), None);
+        assert_eq!(t.hidden(), vec![ToolbarItem::Spam]);
+        // Back from hidden into the right group's middle.
+        t.place(ToolbarItem::Spam, Some(ToolbarSide::Right), 1);
+        assert_eq!(t.right[1], ToolbarItem::Spam);
+        assert!(t.hidden().is_empty());
+    }
+
+    #[test]
+    fn file_round_trip_skips_unknown_names() {
+        let file: ToolbarFile = toml::from_str("left = [\"reply\", \"bogus\", \"delete\"]\nright = [\"print\"]\n").unwrap();
+        let mut layout = ReaderToolbar {
+            left: file.left.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+            right: file.right.iter().filter_map(|k| ToolbarItem::from_key(k)).collect(),
+        };
+        layout.sanitize();
+        assert_eq!(layout.left, vec![ToolbarItem::Reply, ToolbarItem::Delete]);
+        assert_eq!(layout.right, vec![ToolbarItem::Print]);
+        for item in ToolbarItem::ALL {
+            assert_eq!(ToolbarItem::from_key(item.key()), Some(item));
+        }
+    }
+}
