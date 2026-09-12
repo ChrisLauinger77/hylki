@@ -21,6 +21,7 @@ const CONTRIBUTORS: &[(&str, &str)] = &[
     ("Yiannis Ioannides", "yioannides"),
     ("p-mitana", "p-mitana"),
     ("Laszlo Lang", "7system7"),
+    ("Ilya Semenkovich", "iliasen"),
     ("Peter Weiss", "peterweissdk"),
 ];
 
