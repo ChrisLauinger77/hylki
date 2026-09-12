@@ -365,21 +365,11 @@ impl Component for Compose {
                         set_label: &i18n("Cancel"),
                         connect_clicked => ComposeInput::Cancel,
                     },
-                    // Folded, Save Draft stays — as an icon, to fit beside
-                    // Cancel and Send; it is the one action worth a click
-                    // in a hurry.
-                    pack_start = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Vireo-document-save-symbolic",
-                        set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
-                        #[watch]
-                        set_visible: model.narrow,
-                        connect_clicked => ComposeInput::SaveDraft,
-                    },
+                    // Save Draft stays, label and all, however narrow the
+                    // pane: it is the one action worth a click in a hurry.
                     pack_start = &gtk::Button {
                         set_label: &i18n("Save Draft"),
                         set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
-                        #[watch]
-                        set_visible: !model.narrow,
                         connect_clicked => ComposeInput::SaveDraft,
                     },
                     // Only while editing an existing draft: the message is
