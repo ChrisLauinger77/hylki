@@ -1186,6 +1186,9 @@ impl Sidebar {
                     self.select_folder(account_id, &path);
                     self.quiet.set(false);
                 }
+                // A highlight inside a folded account shows nothing (#170:
+                // a notification click seemed to land nowhere); unfold it.
+                self.reveal_account(account_id, &sender);
             }
 
             SidebarInput::SetUnread { folders, unified } => {
@@ -1419,18 +1422,7 @@ impl Sidebar {
 
             SidebarInput::ExpandForDrop(id) => {
                 // Expand a collapsed account so its folders become drop targets.
-                if let Some(rev) = self.revealers.get(&id) {
-                    if !rev.reveals_child() {
-                        rev.set_reveal_child(true);
-                        if let Some(ch) = self.chevrons.get(&id) {
-                            ch.set_icon_name(Some("co.hyprlab.Vireo-pan-down-symbolic"));
-                        }
-                        if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
-                            s.collapsed = false;
-                        }
-                        let _ = sender.output(SidebarOutput::ToggleCollapse(id));
-                    }
-                }
+                self.reveal_account(id, &sender);
             }
 
             SidebarInput::DropOnFolder { account_id: dest_account, path: dest, payload } => {
@@ -3699,6 +3691,33 @@ impl Sidebar {
             if let Some(row) = list.row_at_index(idx as i32) {
                 list.select_row(Some(&row));
             }
+        }
+    }
+
+    /// Unfold an account's section if it is folded, the way its chevron
+    /// would: the rail keeps its own fold state, the full sidebar's is
+    /// reported (and persisted) as a toggle. Nothing happens to an account
+    /// already open.
+    fn reveal_account(&mut self, id: u32, sender: &ComponentSender<Self>) {
+        let Some(rev) = self.revealers.get(&id) else { return };
+        if rev.reveals_child() {
+            return;
+        }
+        rev.set_reveal_child(true);
+        if let Some(ch) = self.chevrons.get(&id) {
+            ch.set_icon_name(Some("co.hyprlab.Vireo-pan-down-symbolic"));
+        }
+        if self.collapsed {
+            self.rail_open_accounts.insert(id, true);
+        } else if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
+            s.collapsed = false;
+        }
+        // The avatar badge stands in for the Inbox chip only while folded.
+        if let Some(label) = self.account_circle_badges.get(&id) {
+            label.set_visible(false);
+        }
+        if !self.collapsed {
+            let _ = sender.output(SidebarOutput::ToggleCollapse(id));
         }
     }
 

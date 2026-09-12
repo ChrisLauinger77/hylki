@@ -2088,6 +2088,11 @@ pub struct MessageList {
     /// copy, fresh thread links, a view switch's flag changes) collapse into
     /// one rebuild instead of one each.
     rebuild_queued: Option<bool>,
+    /// A `SelectAndLoad` that arrived while a rebuild was queued: the rows it
+    /// must find are not built yet, so it waits for that rebuild and runs
+    /// after it (a notification click follows the folder's list into the
+    /// channel in the same pass, and the list is only built on the idle).
+    pending_select: Option<(u32, u32)>,
     /// All messages for the current folder (full searchable index).
     all: Vec<Message>,
     /// Every folder's messages (all accounts), supplied by the app while a search
@@ -2717,6 +2722,7 @@ impl SimpleComponent for MessageList {
             retire_scheduled: false,
             row_sigs: Vec::new(),
             rebuild_queued: None,
+            pending_select: None,
             all: Vec::new(),
             search_pool: Vec::new(),
             scope: SearchScope::AllFolders,
@@ -2899,6 +2905,10 @@ impl SimpleComponent for MessageList {
                     } else {
                         self.rebuild();
                     }
+                }
+                // The rows exist now: run the selection that waited for them.
+                if let Some(key) = self.pending_select.take() {
+                    let _ = self.input.send(MessageListInput::SelectAndLoad(key));
                 }
             }
             MessageListInput::SetThreadLinks(links) => {
@@ -3652,6 +3662,22 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::SelectAndLoad(key) => {
+                // Rows not built yet (the list landed in this same pass):
+                // wait for the queued rebuild rather than find nothing.
+                if self.rebuild_queued.is_some() {
+                    self.pending_select = Some(key);
+                    return;
+                }
+                // A reply inside a conversation has no row of its own: its
+                // thread head does, and opening that shows the whole thread,
+                // the reply included.
+                let key = match self.shown.iter().any(|m| (m.account_id, m.id) == key) {
+                    true => key,
+                    false => match self.thread_head_for(key) {
+                        Some(head) => head,
+                        None => key,
+                    },
+                };
                 if let Some(m) = self.shown.iter().find(|m| (m.account_id, m.id) == key).cloned() {
                     self.selected_id = Some(key);
                     self.selected_ids = vec![key];
@@ -4670,6 +4696,22 @@ impl MessageList {
             .iter()
             .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
             .collect();
+    }
+
+    /// The shown row (a thread head) whose conversation holds the message
+    /// `key`, when `key` is in the index but has no row of its own.
+    fn thread_head_for(&self, key: (u32, u32)) -> Option<(u32, u32)> {
+        if !self.threading {
+            return None;
+        }
+        let source = self.active_source();
+        source.iter().find(|m| (m.account_id, m.id) == key)?;
+        let keys = compute_thread_keys(source, &self.thread_links);
+        let thread = keys.get(&key)?;
+        self.shown
+            .iter()
+            .find(|m| keys.get(&(m.account_id, m.id)) == Some(thread))
+            .map(|m| (m.account_id, m.id))
     }
 
     /// Every on-screen member of `m`'s conversation (oldest first) — from any

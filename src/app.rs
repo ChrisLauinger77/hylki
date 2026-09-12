@@ -3619,97 +3619,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::UnifiedSelected(view) => {
-                let t_open = std::time::Instant::now();
-                self.close_sidebar_peek();
-                self.mirror_selection(match view {
-                    UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
-                    UnifiedView::Kind(kind) => crate::ui::sidebar::Sel::UnifiedKind(kind),
-                    UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
-                });
-                self.leave_gallery();
-                self.showing_contacts = false;
-                self.showing_outbox = false;
-                // Another view's slices are another view's: start afresh
-                // (the loads below refill them).
-                if self.unified_view != view {
-                    self.unified_slices.clear();
-                    self.unified_boot_requested.clear();
-                }
-                self.unified_view = view;
-                self.unified = true;
-                self.tag_view = None;
-                self.selected = None;
-                self.current = None;
-                self.current_thread.clear();
-                self.attachments.clear();
-                self.attachments_loading = false;
-                self.sync_attachment_drawer();
-                self.show_message(None, false);
-                self.message_list.emit(MessageListInput::SetSelected(None));
-                self.message_list.emit(MessageListInput::SetColorize(true));
-                self.message_list.emit(MessageListInput::ResetPaging);
-                // A Sent view's rows all come from you — name the recipients.
-                self.message_list.emit(MessageListInput::SetShowRecipient(
-                    view == UnifiedView::Kind(FolderKind::Sent),
-                ));
-                self.message_list.emit(MessageListInput::SetRestorable(false));
-                self.message_list.emit(MessageListInput::SetInJunk(false));
-                let reqs = self.unified_targets();
-                // Keep every account's last known slice and top it up from the
-                // folder caches, the way opening a single folder does. This used
-                // to clear the lot and wait: an account whose worker was slow to
-                // answer — busy backfilling a large mailbox, reconnecting, or
-                // offline — was simply absent from "All Inboxes", while its own
-                // Inbox, served from cache, still listed its mail. Each account's
-                // slice is replaced when its load lands.
-                for (account_id, folder_id, path) in &reqs {
-                    // A folder not seen since launch (only inboxes are primed
-                    // at startup): the on-disk index has it as last synced,
-                    // so the view opens at once — and after a restart — rather
-                    // than waiting on the worker.
-                    let seen = self
-                        .message_cache
-                        .get(&(*account_id, *folder_id))
-                        .is_some_and(|c| !c.is_empty());
-                    if !seen {
-                        let from_disk = self
-                            .cache
-                            .as_ref()
-                            .map(|c| c.load_messages(*account_id, path, *folder_id))
-                            .unwrap_or_default();
-                        if !from_disk.is_empty() {
-                            let from_disk = self.merge_local_tags(*account_id, from_disk);
-                            self.message_cache.insert((*account_id, *folder_id), from_disk);
-                        }
-                    }
-                    if let Some(cached) = self.message_cache.get(&(*account_id, *folder_id)) {
-                        if !cached.is_empty() {
-                            self.unified_slices.insert((*account_id, *folder_id), cached.clone());
-                        }
-                    }
-                }
-                // Forget folders that no longer contribute (an account
-                // removed or disabled, a rule gone, since the last visit).
-                let live: std::collections::HashSet<(u32, u32)> =
-                    reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
-                self.unified_slices.retain(|k, _| live.contains(k));
-                if self.unified_slices.is_empty() {
-                    self.message_list
-                        .emit(MessageListInput::SetLoading);
-                } else {
-                    self.emit_unified();
-                }
-                // Request every account's inbox; each result replaces that
-                // account's slice as it arrives.
-                for (account_id, folder_id, path) in reqs {
-                    self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
-                }
-                self.push_index_complete();
-                tracing::info!(
-                    "unified {view:?}: opened in {:?} with {} cached messages",
-                    t_open.elapsed(),
-                    self.unified_slices.values().map(Vec::len).sum::<usize>()
-                );
+                self.open_unified(view);
             }
 
             AppMsg::FolderSelected { account_id, folder_id, name, path } => {
@@ -3722,15 +3632,31 @@ impl SimpleComponent for AppModel {
                 // that account's mail, so clear its toast, then navigate to the
                 // message's folder and open it in the reader.
                 crate::notify::withdraw_mail(account_id);
-                if let Some((name, path)) = self
+                tracing::info!(
+                    "notification: open account {account_id} folder {folder_id} message {message_id} (unified row: {})",
+                    self.unified_inboxes_shown()
+                );
+                if let Some((name, path, kind)) = self
                     .folders
                     .get(&account_id)
                     .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-                    .map(|f| (f.name.clone(), f.path.clone()))
+                    .map(|f| (f.name.clone(), f.path.clone(), f.kind))
                 {
-                    // select_folder emits the (cached) list synchronously, so the
-                    // subsequent SelectAndLoad finds the row and opens it.
-                    self.select_folder(account_id, folder_id, name, path);
+                    // Mail that landed in an inbox opens in the unified
+                    // Inboxes when the sidebar has that row (the view the
+                    // app opens with; the account's own Inbox row may sit
+                    // inside a folded section, where a highlight has nowhere
+                    // to show). Without the row — one account, or the
+                    // preference off — or when a filter filed the message
+                    // elsewhere, its folder opens directly and the sidebar
+                    // unfolds the account to show where that is. Both emit
+                    // the (cached) list synchronously, so the SelectAndLoad
+                    // that follows finds the row and opens it.
+                    if kind == FolderKind::Inbox && self.unified_inboxes_shown() {
+                        self.open_unified(UnifiedView::Kind(FolderKind::Inbox));
+                    } else {
+                        self.select_folder(account_id, folder_id, name, path);
+                    }
                     self.message_list
                         .emit(MessageListInput::SelectAndLoad((account_id, message_id)));
                 }
@@ -8584,11 +8510,8 @@ impl AppModel {
         // single-account — its default selection then landed on that account's
         // inbox (possibly inside a collapsed section, so nothing visibly
         // highlighted) instead of the "All Inboxes" the app should open with.
-        let multi_account = self.config.iter().filter(|c| c.enabled).count() > 1
-            // The demo has no config-file accounts, but its two mock accounts
-            // deserve the same All Inboxes opening as a real multi-account setup.
-            || (demo_mode() && self.accounts.len() > 1);
-        let show_unified = self.show_unified_pref && multi_account;
+        let multi_account = self.multi_account();
+        let show_unified = self.unified_inboxes_shown();
         // The other unified rows are as pointless with one account.
         let unified_kinds =
             if multi_account { self.unified_kinds } else { config::UnifiedKinds::NONE };
@@ -8940,6 +8863,123 @@ impl AppModel {
             self.gallery_by_account.clear();
             self.gallery.emit(GalleryInput::SetItems(Vec::new()));
         }
+    }
+
+    /// More than one account is switched on. Counted from config, not from
+    /// the workers that have reported in: at startup the accounts stream in
+    /// one by one, and counting only the connected ones made the first
+    /// sidebar build look single-account — its default selection then
+    /// landed on that account's inbox (possibly inside a collapsed section,
+    /// so nothing visibly highlighted) instead of the "All Inboxes" the app
+    /// should open with.
+    fn multi_account(&self) -> bool {
+        self.config.iter().filter(|c| c.enabled).count() > 1
+            // The demo has no config-file accounts, but its two mock accounts
+            // deserve the same All Inboxes opening as a real multi-account setup.
+            || (demo_mode() && self.accounts.len() > 1)
+    }
+
+    /// The sidebar has an Inboxes row: the preference is on and there is
+    /// more than one account to merge.
+    fn unified_inboxes_shown(&self) -> bool {
+        self.show_unified_pref && self.multi_account()
+    }
+
+    /// Open a unified view (Inboxes, Starred, Sent, …, Filtered): the merged
+    /// list of every account's folder of that kind. What clicking the
+    /// sidebar row does; a notification click lands here too.
+    fn open_unified(&mut self, view: UnifiedView) {
+        let t_open = std::time::Instant::now();
+        self.close_sidebar_peek();
+        self.mirror_selection(match view {
+            UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
+            UnifiedView::Kind(kind) => crate::ui::sidebar::Sel::UnifiedKind(kind),
+            UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
+        });
+        self.leave_gallery();
+        self.showing_contacts = false;
+        self.showing_outbox = false;
+        // Another view's slices are another view's: start afresh
+        // (the loads below refill them).
+        if self.unified_view != view {
+            self.unified_slices.clear();
+            self.unified_boot_requested.clear();
+        }
+        self.unified_view = view;
+        self.unified = true;
+        self.tag_view = None;
+        self.selected = None;
+        self.current = None;
+        self.current_thread.clear();
+        self.attachments.clear();
+        self.attachments_loading = false;
+        self.sync_attachment_drawer();
+        self.show_message(None, false);
+        self.message_list.emit(MessageListInput::SetSelected(None));
+        self.message_list.emit(MessageListInput::SetColorize(true));
+        self.message_list.emit(MessageListInput::ResetPaging);
+        // A Sent view's rows all come from you — name the recipients.
+        self.message_list.emit(MessageListInput::SetShowRecipient(
+            view == UnifiedView::Kind(FolderKind::Sent),
+        ));
+        self.message_list.emit(MessageListInput::SetRestorable(false));
+        self.message_list.emit(MessageListInput::SetInJunk(false));
+        let reqs = self.unified_targets();
+        // Keep every account's last known slice and top it up from the
+        // folder caches, the way opening a single folder does. This used
+        // to clear the lot and wait: an account whose worker was slow to
+        // answer — busy backfilling a large mailbox, reconnecting, or
+        // offline — was simply absent from "All Inboxes", while its own
+        // Inbox, served from cache, still listed its mail. Each account's
+        // slice is replaced when its load lands.
+        for (account_id, folder_id, path) in &reqs {
+            // A folder not seen since launch (only inboxes are primed
+            // at startup): the on-disk index has it as last synced,
+            // so the view opens at once — and after a restart — rather
+            // than waiting on the worker.
+            let seen = self
+                .message_cache
+                .get(&(*account_id, *folder_id))
+                .is_some_and(|c| !c.is_empty());
+            if !seen {
+                let from_disk = self
+                    .cache
+                    .as_ref()
+                    .map(|c| c.load_messages(*account_id, path, *folder_id))
+                    .unwrap_or_default();
+                if !from_disk.is_empty() {
+                    let from_disk = self.merge_local_tags(*account_id, from_disk);
+                    self.message_cache.insert((*account_id, *folder_id), from_disk);
+                }
+            }
+            if let Some(cached) = self.message_cache.get(&(*account_id, *folder_id)) {
+                if !cached.is_empty() {
+                    self.unified_slices.insert((*account_id, *folder_id), cached.clone());
+                }
+            }
+        }
+        // Forget folders that no longer contribute (an account
+        // removed or disabled, a rule gone, since the last visit).
+        let live: std::collections::HashSet<(u32, u32)> =
+            reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
+        self.unified_slices.retain(|k, _| live.contains(k));
+        if self.unified_slices.is_empty() {
+            self.message_list
+                .emit(MessageListInput::SetLoading);
+        } else {
+            self.emit_unified();
+        }
+        // Request every account's inbox; each result replaces that
+        // account's slice as it arrives.
+        for (account_id, folder_id, path) in reqs {
+            self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+        }
+        self.push_index_complete();
+        tracing::info!(
+            "unified {view:?}: opened in {:?} with {} cached messages",
+            t_open.elapsed(),
+            self.unified_slices.values().map(Vec::len).sum::<usize>()
+        );
     }
 
     /// Switch the message list to a folder: reset the view, show its cached
@@ -12583,14 +12623,14 @@ impl AppModel {
         else {
             return;
         };
-        let open = (self.unified && self.is_unified_target(account_id, folder_id))
-            || self
-                .selected
-                .as_ref()
-                .is_some_and(|s| s.account_id == account_id && s.folder_id == folder_id);
-        if open {
-            return;
-        }
+        // A folder that is open — on its own or as part of a unified view —
+        // is not skipped (#170). It used to be, on the assumption that the
+        // worker's IDLE on it would deliver the new list; but only push
+        // accounts IDLE, and a polled account's Inboxes slice then waited a
+        // whole poll interval for mail its unread chip already counted.
+        // When IDLE did deliver it, this re-fetch of the first page comes
+        // back identical and changes nothing (the Messages handler skips an
+        // unchanged list).
         let path = folder.path.clone();
         self.send_to(account_id, MailRequest::SyncFolder { folder_id, path });
     }
