@@ -2450,6 +2450,10 @@ impl SimpleComponent for AppModel {
         {
             let click = gtk::GestureClick::new();
             click.set_button(3);
+            // Capture phase: the header's own window handle (a child, so
+            // earlier in the bubble phase) would otherwise take the click
+            // for the compositor's window menu and never let it through.
+            click.set_propagation_phase(gtk::PropagationPhase::Capture);
             let header: gtk::Widget = widgets.reader_header.clone().upcast();
             let s = sender.input_sender().clone();
             click.connect_pressed(move |g, _, x, y| {

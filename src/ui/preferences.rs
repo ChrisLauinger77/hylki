@@ -289,12 +289,22 @@ impl ToolbarEditor {
         // empty zone opens a gap of the right size too.
         let chip_size = Rc::new(std::cell::Cell::new((0, 0)));
         let drag_size = Rc::new(std::cell::Cell::new((0, 0)));
+        // The zones are rows of one raised card, like the rows of the
+        // groups around it, not loose elements on the page.
+        let list = gtk::ListBox::new();
+        list.add_css_class("boxed-list");
+        list.set_selection_mode(gtk::SelectionMode::None);
+        host.append(&list);
         for (side, title, hint) in [
             (Some(ToolbarSide::Left), i18n("Left group"), i18n("Always shown")),
             (Some(ToolbarSide::Right), i18n("Right group"), i18n("Folds into ⋯ when narrow")),
             (None, i18n("Not shown"), i18n("Drop a button here to hide it")),
         ] {
-            let column = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+            column.set_margin_top(10);
+            column.set_margin_bottom(12);
+            column.set_margin_start(12);
+            column.set_margin_end(12);
             let heading = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             let label = gtk::Label::new(Some(&title));
             label.add_css_class("heading");
@@ -322,7 +332,12 @@ impl ToolbarEditor {
             overlay.set_child(Some(&flow));
             overlay.add_overlay(&empty);
             column.append(&overlay);
-            host.append(&column);
+            let row = gtk::ListBoxRow::new();
+            row.set_activatable(false);
+            row.set_selectable(false);
+            row.set_can_focus(false);
+            row.set_child(Some(&column));
+            list.append(&row);
 
             // The zone takes a chip from any zone (itself included). While
             // the drag moves over it, a gap opens at the slot the pointer
