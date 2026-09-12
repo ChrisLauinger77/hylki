@@ -414,6 +414,9 @@ pub enum MessageViewInput {
     /// A right-click landed on one card (header or body) at webview point
     /// (x, y): the app shows that message's menu.
     CardMenuAt { account_id: u32, id: u32, x: f64, y: f64 },
+    /// A card's Move to… button, at page point (x, y) in CSS pixels of a
+    /// page `page_width` wide: the app opens the folder picker there.
+    CardMoveAt { account_id: u32, id: u32, x: f64, y: f64, page_width: f64 },
     /// Preferences: how card actions show — behind the ⋯ toggle, automatically
     /// on hover, or always.
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
@@ -487,6 +490,9 @@ pub enum MessageViewOutput {
     /// A right-click on a card: the app shows the message's full menu (the
     /// list row's) at window point (x, y).
     CardMenu { message: Box<Message>, x: f64, y: f64 },
+    /// A card's Move to… button: the folder picker for that message, at
+    /// window point (x, y).
+    CardMoveTo { message: Box<Message>, x: f64, y: f64 },
     /// An email address in a card header was clicked — open a composer to it.
     ComposeTo(String),
     /// "Add to Contacts" picked on an address's right-click menu.
@@ -1070,6 +1076,22 @@ impl Component for MessageView {
                         account_id,
                         id,
                     }),
+                    // Move to… on a card: extra is the button's bottom-centre
+                    // and the page width, in CSS pixels (see "senderinfo").
+                    "moveto" => {
+                        let nums: Vec<f64> = extra
+                            .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
+                            .unwrap_or_default();
+                        if let [x, y, vw] = nums[..] {
+                            open_sender.input(MessageViewInput::CardMoveAt {
+                                account_id,
+                                id,
+                                x,
+                                y,
+                                page_width: vw,
+                            });
+                        }
+                    }
                     "delete" => open_sender.input(MessageViewInput::CardAction {
                         action: RowAction::Delete,
                         account_id,
@@ -1545,6 +1567,27 @@ impl Component for MessageView {
                 });
                 let (wx, wy) = point.map_or((x, y), |p| (p.x() as f64, p.y() as f64));
                 let _ = sender.output(MessageViewOutput::CardMenu { message: Box::new(m), x: wx, y: wy });
+            }
+            MessageViewInput::CardMoveAt { account_id, id, x, y, page_width } => {
+                let Some(m) = self
+                    .thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .cloned()
+                else {
+                    return;
+                };
+                // CSS pixels → widget pixels (the page may be zoomed), then
+                // → window.
+                let ratio = self.webview.width() as f64 / page_width.max(1.0);
+                let (vx, vy) = (x * ratio, y * ratio);
+                let point = self.webview.root().and_then(|root| {
+                    let root: gtk::Widget = root.upcast();
+                    self.webview
+                        .compute_point(&root, &gtk::graphene::Point::new(vx as f32, vy as f32))
+                });
+                let (wx, wy) = point.map_or((vx, vy), |p| (p.x() as f64, p.y() as f64));
+                let _ = sender.output(MessageViewOutput::CardMoveTo { message: Box::new(m), x: wx, y: wy });
             }
             MessageViewInput::SetCardActionsMode { hover_toggle, hover_auto } => {
                 if self.card_actions_hover != hover_toggle
@@ -2059,7 +2102,7 @@ impl MessageView {
                     acts = if !thread.is_empty() {
                         let key = (m.account_id, m.id);
                         format!(
-                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}</span>",
+                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}{}</span>",
                             // Same order as the reader toolbar and the list's
                             // Actions Palette, View Source closing the line.
                             card_action_button(key, "reply", "mail-reply-sender-symbolic", &i18n("Reply to this message")),
@@ -2092,6 +2135,7 @@ impl MessageView {
                                 id = key.1,
                                 svg = inline_icon_svg("non-starred-symbolic"),
                             ),
+                            card_action_button(key, "moveto", "folder-symbolic", &i18n("Move this message to a folder")),
                             card_action_button(key, "archive", "mail-archive-symbolic", &i18n("Archive this message")),
                             card_action_button(key, "delete", "user-trash-symbolic", &i18n("Delete this message")),
                             card_action_button(key, "spam", "mail-mark-junk-symbolic", &i18n("Mark as Spam")),
@@ -2468,6 +2512,8 @@ impl MessageView {
                .vireo-msg:not(.unread) .vireo-act[data-act=\"toggleread\"] .tr-when-read{{display:inline-flex;}}\
                .vireo-act{{color:inherit;background:none;border:none;border-radius:6px;\
                  padding:5px 8px;cursor:pointer;opacity:0.7;\
+                 display:inline-flex;align-items:center;justify-content:center;\
+                 vertical-align:middle;line-height:0;\
                  transition:opacity 120ms ease,background 120ms ease;}}\
                .vireo-act:hover{{opacity:1;background:rgba(128,128,128,0.18);}}\
                .vireo-act:active{{background:rgba(128,128,128,0.3);}}\
@@ -4416,7 +4462,9 @@ var as=document.querySelectorAll('.vireo-act');\
 for(var k=0;k<as.length;k++){as[k].addEventListener('click',function(e){\
 e.stopPropagation();e.preventDefault();reportPos();\
 if(this.dataset.act==='star')this.classList.toggle('on');\
-try{window.webkit.messageHandlers.vireo.postMessage(this.dataset.act+':'+this.dataset.key);}catch(_){}});\
+var extra='';if(this.dataset.act==='moveto'){var br=this.getBoundingClientRect();\
+extra=':'+(br.left+br.width/2)+','+br.bottom+','+window.innerWidth;}\
+try{window.webkit.messageHandlers.vireo.postMessage(this.dataset.act+':'+this.dataset.key+extra);}catch(_){}});\
 as[k].addEventListener('dblclick',function(e){e.stopPropagation();});}\
 });\
 function markClipped(){var as=document.querySelectorAll('.vireo-addr');\

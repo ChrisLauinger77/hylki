@@ -1991,6 +1991,12 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::CardMenu { message, x, y } => {
                         AppMsg::CardMenu { message, x, y }
                     }
+                    MessageViewOutput::CardMoveTo { message, x, y } => AppMsg::ListMoveTo {
+                        messages: vec![*message],
+                        offer_whole: false,
+                        x,
+                        y,
+                    },
                     MessageViewOutput::MarkSeen { account_id, id } => {
                         AppMsg::ThreadMessageSeen { account_id, id }
                     }
@@ -4419,6 +4425,20 @@ impl SimpleComponent for AppModel {
                 self.thread_painted = true;
                 self.thread_related_pending = false;
                 self.remember_thread();
+                // The new message is what the sync brought: bring it into
+                // view — at the top with newest first, appended otherwise.
+                // The render keeps the reader's place through its saved
+                // anchor; pointing that at the new card is the scroll.
+                let newest = self
+                    .current_thread
+                    .iter()
+                    .filter(|tm| !existing.iter().any(|e| (e.account_id, e.id) == (tm.account_id, tm.id)))
+                    .max_by_key(|tm| tm.timestamp)
+                    .map(|tm| (tm.account_id, tm.id));
+                if let Some((account_id, id)) = newest {
+                    self.message_view
+                        .emit(MessageViewInput::ScrollAnchor { account_id, id, offset: 0 });
+                }
                 let to_load: Vec<MissingBody> = self
                     .current_thread
                     .iter()
