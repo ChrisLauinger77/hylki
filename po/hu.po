@@ -157,6 +157,9 @@ msgstr "Már a névjegyek között van ({name})"
 msgid "Could not add contact: {e}"
 msgstr "A névjegy nem adható hozzá: {e}"
 
+msgid "The language applies the next time Vireo starts."
+msgstr ""
+
 msgid "Save Attachment"
 msgstr "Melléklet mentése"
 
@@ -1816,13 +1819,16 @@ msgstr "Küldés később"
 msgid "Send now"
 msgstr "Küldés most"
 
-msgid "Tomorrow morning (8:00)"
+#, fuzzy
+msgid "Tomorrow morning ({time})"
 msgstr "Holnap délelőtt (8:00)"
 
-msgid "Tomorrow afternoon (13:00)"
+#, fuzzy
+msgid "Tomorrow afternoon ({time})"
 msgstr "Holnap délután (13:00)"
 
-msgid "Monday morning (8:00)"
+#, fuzzy
+msgid "Monday morning ({time})"
 msgstr "Hétfő délelőtt (8:00)"
 
 msgid "Pick a date and time…"
@@ -2481,6 +2487,9 @@ msgstr "2026. aug. 23."
 msgid "2026 Aug 23"
 msgstr "2026. aug. 23."
 
+msgid "System"
+msgstr "Rendszer"
+
 msgid "12-hour (5:40 PM)"
 msgstr "12 órás (17:40)"
 
@@ -2546,9 +2555,6 @@ msgstr "Adatvédelem"
 
 msgid "Date and Time"
 msgstr "Dátum és idő"
-
-msgid "System"
-msgstr "Rendszer"
 
 msgid "Backup"
 msgstr "Biztonsági mentés"
@@ -3151,6 +3157,11 @@ msgstr "Dátumformátum"
 msgid "Clock"
 msgstr "Óra"
 
+msgid ""
+"The language Vireo is shown in. \"System\" follows the desktop, with English "
+"where no translation exists. A change applies the next time Vireo starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Futás a háttérben"
 
@@ -3473,6 +3484,11 @@ msgid ""
 msgstr ""
 "Tiszta, gyors otthon levelei számára.\n"
 "Állítsuk be — körülbelül egy percet vesz igénybe."
+
+msgid ""
+"Choosing another language restarts Vireo: it closes for a moment and this "
+"wizard comes back in that language."
+msgstr ""
 
 msgid "Get Started"
 msgstr "Kezdés"

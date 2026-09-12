@@ -158,6 +158,9 @@ msgstr "Уже есть в контактах ({name})"
 msgid "Could not add contact: {e}"
 msgstr "Не удалось добавить контакт: {e}"
 
+msgid "The language applies the next time Vireo starts."
+msgstr ""
+
 msgid "Save Attachment"
 msgstr "Сохранить вложение"
 
@@ -1843,13 +1846,16 @@ msgstr "Отправить позже"
 msgid "Send now"
 msgstr "Отправить сейчас"
 
-msgid "Tomorrow morning (8:00)"
+#, fuzzy
+msgid "Tomorrow morning ({time})"
 msgstr "Завтра утром (8:00)"
 
-msgid "Tomorrow afternoon (13:00)"
+#, fuzzy
+msgid "Tomorrow afternoon ({time})"
 msgstr "Завтра днем (13:00)"
 
-msgid "Monday morning (8:00)"
+#, fuzzy
+msgid "Monday morning ({time})"
 msgstr "В понедельник утром (8:00)"
 
 msgid "Pick a date and time…"
@@ -2508,6 +2514,9 @@ msgstr "23 авг 2026"
 msgid "2026 Aug 23"
 msgstr "2026 авг 23"
 
+msgid "System"
+msgstr "Система"
+
 msgid "12-hour (5:40 PM)"
 msgstr "12-часовой формат (5:40 PM)"
 
@@ -2573,9 +2582,6 @@ msgstr "Конфиденциальность"
 
 msgid "Date and Time"
 msgstr "Дата и время"
-
-msgid "System"
-msgstr "Система"
 
 msgid "Backup"
 msgstr "Резервное копирование"
@@ -3202,6 +3208,11 @@ msgstr "Формат даты"
 msgid "Clock"
 msgstr "Часы"
 
+msgid ""
+"The language Vireo is shown in. \"System\" follows the desktop, with English "
+"where no translation exists. A change applies the next time Vireo starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Продолжать работу в фоновом режиме"
 
@@ -3527,6 +3538,11 @@ msgid ""
 msgstr ""
 "Простой и быстрый почтовый клиент.\n"
 "Давайте всё настроим — это займёт около минуты."
+
+msgid ""
+"Choosing another language restarts Vireo: it closes for a moment and this "
+"wizard comes back in that language."
+msgstr ""
 
 msgid "Get Started"
 msgstr "Перейти к почте"

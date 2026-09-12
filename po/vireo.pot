@@ -154,6 +154,9 @@ msgstr ""
 msgid "Could not add contact: {e}"
 msgstr ""
 
+msgid "The language applies the next time Vireo starts."
+msgstr ""
+
 msgid "Save Attachment"
 msgstr ""
 
@@ -1683,13 +1686,13 @@ msgstr ""
 msgid "Send now"
 msgstr ""
 
-msgid "Tomorrow morning (8:00)"
+msgid "Tomorrow morning ({time})"
 msgstr ""
 
-msgid "Tomorrow afternoon (13:00)"
+msgid "Tomorrow afternoon ({time})"
 msgstr ""
 
-msgid "Monday morning (8:00)"
+msgid "Monday morning ({time})"
 msgstr ""
 
 msgid "Pick a date and time…"
@@ -2305,6 +2308,9 @@ msgstr ""
 msgid "2026 Aug 23"
 msgstr ""
 
+msgid "System"
+msgstr ""
+
 msgid "12-hour (5:40 PM)"
 msgstr ""
 
@@ -2369,9 +2375,6 @@ msgid "Privacy"
 msgstr ""
 
 msgid "Date and Time"
-msgstr ""
-
-msgid "System"
 msgstr ""
 
 msgid "Backup"
@@ -2898,6 +2901,11 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
+msgid ""
+"The language Vireo is shown in. \"System\" follows the desktop, with English "
+"where no translation exists. A change applies the next time Vireo starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr ""
 
@@ -3192,6 +3200,11 @@ msgstr ""
 msgid ""
 "A clean, fast home for your mail.\n"
 "Let's set things up — it takes about a minute."
+msgstr ""
+
+msgid ""
+"Choosing another language restarts Vireo: it closes for a moment and this "
+"wizard comes back in that language."
 msgstr ""
 
 msgid "Get Started"
