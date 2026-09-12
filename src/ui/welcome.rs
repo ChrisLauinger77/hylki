@@ -335,7 +335,8 @@ impl Component for Welcome {
         // rest of the wizard reads in the chosen language.
         let lang_row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         lang_row.set_halign(gtk::Align::Center);
-        lang_row.set_margin_top(4);
+        // 48px below the tagline: the hero's 18px spacing plus this.
+        lang_row.set_margin_top(30);
         let lang_label = gtk::Label::new(Some(i18n("Language").as_str()));
         // On the yellow, text is always dark (the theme's dim grey turns
         // white in dark mode).
