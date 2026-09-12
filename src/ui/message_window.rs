@@ -283,6 +283,8 @@ impl Component for MessageWindow {
                 }
                 MessageViewOutput::ContactSender(m) => MessageWindowInput::ContactFor(m),
                 MessageViewOutput::MarkSeen { .. } => MessageWindowInput::Ignore,
+                // The standalone window has no list menu to mirror.
+                MessageViewOutput::CardMenu { .. } => MessageWindowInput::Ignore,
                 MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
                 MessageViewOutput::ComposeTo(addr) => MessageWindowInput::ComposeTo(addr),
                 MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),

@@ -760,6 +760,9 @@ pub enum AppMsg {
     CardAction { action: RowAction, message: Box<Message> },
     /// A card's "Add sender to Contacts" button.
     CardContact(Box<Message>),
+    /// A right-click on a reader card: that message's full menu (the list
+    /// row's) at window point (x, y).
+    CardMenu { message: Box<Message>, x: f64, y: f64 },
     /// The reader toolbar's Mark as Read/Unread toggle for the open message.
     ToggleReadCurrent,
     /// A bulk action applied to every selected message.
@@ -1979,6 +1982,9 @@ impl SimpleComponent for AppModel {
                         AppMsg::CardAction { action, message }
                     }
                     MessageViewOutput::ContactSender(m) => AppMsg::CardContact(m),
+                    MessageViewOutput::CardMenu { message, x, y } => {
+                        AppMsg::CardMenu { message, x, y }
+                    }
                     MessageViewOutput::MarkSeen { account_id, id } => {
                         AppMsg::ThreadMessageSeen { account_id, id }
                     }
@@ -6182,6 +6188,10 @@ impl SimpleComponent for AppModel {
                 );
             }
 
+            AppMsg::CardMenu { message, x, y } => {
+                self.show_card_menu(*message, x, y, &sender);
+            }
+
             AppMsg::ListMoveTo { messages, offer_whole, x, y } => {
                 let Some(first) = messages.first() else { return };
                 let account_id = first.account_id;
@@ -9102,6 +9112,87 @@ impl AppModel {
             t_open.elapsed(),
             self.unified_slices.values().map(Vec::len).sum::<usize>()
         );
+    }
+
+    /// The menu a right-click on a reader card opens (the message list
+    /// row's menu, for that one message), anchored on the window at (x, y).
+    fn show_card_menu(&self, m: Message, x: f64, y: f64, sender: &ComponentSender<Self>) {
+        use crate::ui::context_menu::{show_context_menu, MenuEntry};
+        let item = |action: RowAction, label: String, icon: &str| -> MenuEntry {
+            let s = sender.input_sender().clone();
+            let message = m.clone();
+            MenuEntry::new(label, move || {
+                let _ = s.send(AppMsg::RowAction { action, message: Box::new(message.clone()) });
+            })
+            .icon(format!("co.hyprlab.Vireo-{icon}-symbolic"))
+        };
+        let kind = self.folder_kind(m.account_id, m.folder_id);
+        let in_junk = kind == Some(FolderKind::Junk);
+        let restorable = matches!(kind, Some(FolderKind::Trash | FolderKind::Junk));
+        let mut sections = vec![
+            vec![
+                item(RowAction::Reply, i18n("Reply"), "mail-reply-sender"),
+                item(RowAction::ReplyAll, i18n("Reply All"), "mail-reply-all"),
+                item(RowAction::Forward, i18n("Forward"), "mail-forward"),
+            ],
+            vec![
+                if m.starred {
+                    item(RowAction::ToggleStar, i18n("Remove Star"), "non-starred")
+                } else {
+                    item(RowAction::ToggleStar, i18n("Star"), "starred")
+                },
+                if m.unread {
+                    item(RowAction::ToggleRead, i18n("Mark as Read"), "mail-read")
+                } else {
+                    item(RowAction::ToggleRead, i18n("Mark as Unread"), "mail-unread")
+                },
+            ],
+        ];
+        if !self.tags.is_empty() {
+            let s = sender.input_sender().clone();
+            let message = m.clone();
+            let entries =
+                crate::ui::message_list::tag_menu_entries(&self.tags, &m, move |keyword, add| {
+                    let _ = s.send(AppMsg::SetTag {
+                        message: Box::new(message.clone()),
+                        keyword,
+                        add,
+                    });
+                });
+            sections.push(vec![
+                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic"),
+            ]);
+        }
+        let mut acts = Vec::new();
+        if in_junk {
+            acts.push(item(RowAction::NotSpam, i18n("Not Spam"), "mail-mark-notjunk"));
+        } else {
+            if restorable {
+                acts.push(item(RowAction::MoveToInbox, i18n("Move to Inbox"), "mail-inbox"));
+            }
+            acts.push(item(RowAction::Spam, i18n("Mark as Spam"), "mail-mark-junk"));
+        }
+        {
+            let s = sender.input_sender().clone();
+            let message = m.clone();
+            acts.push(
+                MenuEntry::new(i18n("Move To…"), move || {
+                    let _ = s.send(AppMsg::ListMoveTo {
+                        messages: vec![message.clone()],
+                        offer_whole: false,
+                        x,
+                        y,
+                    });
+                })
+                .icon("co.hyprlab.Vireo-folder-symbolic"),
+            );
+        }
+        acts.push(item(RowAction::Archive, i18n("Archive"), "mail-archive"));
+        acts.push(item(RowAction::Delete, i18n("Delete"), "user-trash"));
+        sections.push(acts);
+        sections.push(vec![item(RowAction::AddContact, i18n("Add Sender to Contacts"), "contact-new")]);
+        sections.push(vec![item(RowAction::ViewSource, i18n("View Source"), "code")]);
+        show_context_menu(&self.window, x, y, sections);
     }
 
     /// Whether a read/unread change for a message in `path` is still on its

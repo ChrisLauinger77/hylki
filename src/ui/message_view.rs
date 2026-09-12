@@ -411,6 +411,9 @@ pub enum MessageViewInput {
     },
     /// The card's "Add sender to Contacts" button.
     CardContact { account_id: u32, id: u32 },
+    /// A right-click landed on one card (header or body) at webview point
+    /// (x, y): the app shows that message's menu.
+    CardMenuAt { account_id: u32, id: u32, x: f64, y: f64 },
     /// Preferences: how card actions show — behind the ⋯ toggle, automatically
     /// on hover, or always.
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
@@ -481,6 +484,9 @@ pub enum MessageViewOutput {
     },
     /// A card's "Add sender to Contacts" button — add this message's sender.
     ContactSender(Box<Message>),
+    /// A right-click on a card: the app shows the message's full menu (the
+    /// list row's) at window point (x, y).
+    CardMenu { message: Box<Message>, x: f64, y: f64 },
     /// An email address in a card header was clicked — open a composer to it.
     ComposeTo(String),
     /// "Add to Contacts" picked on an address's right-click menu.
@@ -880,6 +886,55 @@ impl Component for MessageView {
                 });
             }
         });
+
+        // A right-click anywhere on a card — its header, or its body frame,
+        // which never reports events to the page — shows the message's own
+        // menu, the same one the list row has. WebKit says what the click
+        // hit but not where the pointer is, so a capture-phase gesture
+        // records the point first; the page is then asked which card holds
+        // it (in CSS pixels: the page may be zoomed under a text scaling
+        // factor, so the widget width recovers the ratio). Links, selected
+        // text, images and editable fields keep WebKit's own menus.
+        {
+            let point = std::rc::Rc::new(std::cell::Cell::new((0.0f64, 0.0f64)));
+            let click = gtk::GestureClick::new();
+            click.set_button(3);
+            click.set_propagation_phase(gtk::PropagationPhase::Capture);
+            {
+                let point = point.clone();
+                click.connect_pressed(move |_, _, x, y| point.set((x, y)));
+            }
+            model.webview.add_controller(click);
+            let menu_sender = sender.clone();
+            model.webview.connect_context_menu(move |view, _menu, hit| {
+                if hit.context_is_link()
+                    || hit.context_is_image()
+                    || hit.context_is_media()
+                    || hit.context_is_editable()
+                    || hit.context_is_selection()
+                {
+                    return false;
+                }
+                let (x, y) = point.get();
+                let width = view.width().max(1);
+                let js = format!(
+                    "(function(){{var r=window.innerWidth/{width};\
+                     var el=document.elementFromPoint({x}*r,{y}*r);\
+                     var m=el&&el.closest?el.closest('.vireo-msg'):null;\
+                     return (m&&m.dataset&&m.dataset.key)||'';}})()"
+                );
+                let s = menu_sender.clone();
+                view.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, move |r| {
+                    let key = r.ok().map(|v| v.to_str().to_string()).unwrap_or_default();
+                    if let Some((a, i)) = key.split_once(':') {
+                        if let (Ok(account_id), Ok(id)) = (a.parse::<u32>(), i.parse::<u32>()) {
+                            s.input(MessageViewInput::CardMenuAt { account_id, id, x, y });
+                        }
+                    }
+                });
+                true
+            });
+        }
 
         // Double-click on a conversation header → open that message's window.
         if let Some(ucm) = model.webview.user_content_manager() {
@@ -1473,6 +1528,23 @@ impl Component for MessageView {
                         message: Box::new(m.clone()),
                     });
                 }
+            }
+            MessageViewInput::CardMenuAt { account_id, id, x, y } => {
+                let Some(m) = self
+                    .thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .cloned()
+                else {
+                    return;
+                };
+                let point = self.webview.root().and_then(|root| {
+                    let root: gtk::Widget = root.upcast();
+                    self.webview
+                        .compute_point(&root, &gtk::graphene::Point::new(x as f32, y as f32))
+                });
+                let (wx, wy) = point.map_or((x, y), |p| (p.x() as f64, p.y() as f64));
+                let _ = sender.output(MessageViewOutput::CardMenu { message: Box::new(m), x: wx, y: wy });
             }
             MessageViewInput::SetCardActionsMode { hover_toggle, hover_auto } => {
                 if self.card_actions_hover != hover_toggle
