@@ -758,6 +758,9 @@ pub enum AppMsg {
     /// A conversation card's own action pill. Reply/Reply all/Forward open the
     /// reader's inline composer (like the toolbar); the rest act like RowAction.
     CardAction { action: RowAction, message: Box<Message> },
+    /// The open conversation gained a member (a reply synced in while it
+    /// was on screen): show it in place, without a re-selection.
+    ThreadGrew { message: Box<Message>, thread: Vec<Message> },
     /// A card's "Add sender to Contacts" button.
     CardContact(Box<Message>),
     /// A right-click on a reader card: that message's full menu (the list
@@ -1949,6 +1952,9 @@ impl SimpleComponent for AppModel {
                     MessageListOutput::SelectionKeys(keys) => AppMsg::SelectionKeys(keys),
                     MessageListOutput::DeleteThread { messages } => {
                         AppMsg::DeleteThread(messages)
+                    }
+                    MessageListOutput::ThreadGrew { message, thread } => {
+                        AppMsg::ThreadGrew { message: Box::new(message), thread }
                     }
                     MessageListOutput::CountChanged(text) => AppMsg::ListCount(text),
                     MessageListOutput::Activated { message, thread } => {
@@ -4364,6 +4370,71 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
+            }
+
+            AppMsg::ThreadGrew { message: m, thread } => {
+                // Only for the conversation on screen: the reader's primary
+                // is that head. A reply of the user's own filed in Sent is
+                // not in the folder's list and stays as the related lookup
+                // left it — kept below.
+                let key = (m.account_id, m.id);
+                if self.current.as_ref().map(|c| (c.account_id, c.id)) != Some(key) {
+                    return;
+                }
+                let existing = std::mem::take(&mut self.current_thread);
+                let mut conv: Vec<Message> = existing.clone();
+                for tm in &thread {
+                    let k = (tm.account_id, tm.id);
+                    if conv.iter().any(|e| (e.account_id, e.id) == k) {
+                        continue;
+                    }
+                    let mut tm = tm.clone();
+                    if k == key {
+                        tm.unread = false;
+                        if let Some(c) = self.current.as_ref().filter(|c| !c.body.is_empty()) {
+                            tm.body = c.body.clone();
+                        }
+                    } else if tm.body.is_empty() {
+                        if let Some(b) = self.body_cache.get(&k) {
+                            tm.body = b.clone();
+                        }
+                    }
+                    conv.push(tm);
+                }
+                // Chronological, as a conversation is stored (display order
+                // is show_thread's business).
+                conv.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
+                tracing::info!(
+                    "conversation on screen grew: {} -> {} messages",
+                    existing.len(),
+                    conv.len()
+                );
+                self.current_thread = conv;
+                self.thread_key = Some(key);
+                // The conversation is already painted: the new card joins it
+                // in place. Its body, when not prefetched, is asked for and
+                // the render follows its arrival (the Body handler repaints a
+                // conversation as bodies land) rather than showing an empty
+                // card first.
+                self.thread_painted = true;
+                self.thread_related_pending = false;
+                self.remember_thread();
+                let to_load: Vec<MissingBody> = self
+                    .current_thread
+                    .iter()
+                    .filter(|tm| tm.body.is_empty())
+                    .filter_map(|tm| {
+                        self.resolve_folder_path(tm).map(|p| (tm.account_id, tm.id, tm.uid, p))
+                    })
+                    .collect();
+                if to_load.is_empty() {
+                    self.show_thread();
+                } else {
+                    for ((aid, path), items) in batch_bodies_by_folder(to_load) {
+                        self.send_to(aid, MailRequest::LoadBodies { items, path });
+                    }
+                }
+                self.load_thread_attachments();
             }
 
             AppMsg::OpenMessageWindow { message: m, thread } => {

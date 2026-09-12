@@ -2198,6 +2198,10 @@ pub struct MessageList {
     /// Every selected message key, so the whole selection survives list rebuilds
     /// (background syncs) until the user clicks away.
     selected_ids: Vec<(u32, u32)>,
+    /// The conversation the last `Selected` carried, as keys: after a
+    /// rebuild, a selected head whose conversation now holds more is
+    /// reported (`ThreadGrew`) so the reader shows the new reply at once.
+    emitted_thread: Vec<(u32, u32)>,
     /// Selection changes still expected from a reader-driven selection, and what
     /// that selection is. GTK reports each `select_row`/`unselect_all` separately
     /// and a rebuild adds more, so a single flag would be consumed by the first
@@ -2501,6 +2505,9 @@ pub enum MessageListOutput {
     /// the clicked conversation row and the rest its members: the picker
     /// offers moving them all (#171), or just the first.
     MoveTo { messages: Vec<Message>, offer_whole: bool, x: f64, y: f64 },
+    /// The selected conversation gained a member since it was opened (a
+    /// reply synced in): the head and the whole conversation as it now is.
+    ThreadGrew { message: Message, thread: Vec<Message> },
     /// Delete requested on a lone selected row that heads a whole conversation:
     /// every member of the thread, for the app to confirm and delete.
     DeleteThread { messages: Vec<Message> },
@@ -2815,6 +2822,7 @@ impl SimpleComponent for MessageList {
             thread_drag: ThreadDragKeys::default(),
             selected_id: None,
             selected_ids: Vec::new(),
+            emitted_thread: Vec::new(),
             selection_count: 0,
             nav_direction: 1,
             from_reader: 0,
@@ -2928,6 +2936,7 @@ impl SimpleComponent for MessageList {
                 // Folder switch: drop any active search, back to the first page,
                 // scrolled to the top.
                 self.clear_search();
+                self.emitted_thread.clear();
                 self.render_limit = RENDER_CAP;
                 if let Some(s) = &self.scroller {
                     s.vadjustment().set_value(0.0);
@@ -2964,6 +2973,7 @@ impl SimpleComponent for MessageList {
                 if let Some(key) = self.pending_select.take() {
                     let _ = self.input.send(MessageListInput::SelectAndLoad(key));
                 }
+                self.report_thread_growth(&sender);
             }
             MessageListInput::SetThreadLinks(links) => {
                 if self.thread_links != links {
@@ -3233,6 +3243,8 @@ impl SimpleComponent for MessageList {
                                 .cloned()
                             {
                                 let (thread, solo) = self.conversation_for(&m);
+                                self.emitted_thread =
+                                    thread.iter().map(|t| (t.account_id, t.id)).collect();
                                 let _ = sender.output(MessageListOutput::Selected {
                                     message: m,
                                     thread,
@@ -3763,6 +3775,7 @@ impl SimpleComponent for MessageList {
                         });
                     }
                     let (thread, solo) = self.conversation_for(&m);
+                    self.emitted_thread = thread.iter().map(|t| (t.account_id, t.id)).collect();
                     let _ = sender.output(MessageListOutput::Selected { message: m, thread, solo });
                 }
             }
@@ -4037,6 +4050,32 @@ impl MessageList {
             Some(&format!("{} selected", self.selection_count)),
             sections,
         );
+    }
+
+    /// After a rebuild: a lone selected conversation head whose thread has
+    /// gained members since it was opened (a reply just synced in) is
+    /// reported, so the reader can show the new message without a
+    /// re-selection. Members lost (deleted elsewhere) are left to the
+    /// vanish handling.
+    fn report_thread_growth(&mut self, sender: &ComponentSender<Self>) {
+        if !self.threading || self.selected_ids.len() != 1 {
+            return;
+        }
+        let Some(key) = self.selected_id else { return };
+        let Some(m) = self.shown.iter().find(|m| (m.account_id, m.id) == key).cloned() else {
+            return;
+        };
+        let (thread, solo) = self.conversation_for(&m);
+        if solo || thread.len() <= 1 {
+            return;
+        }
+        let keys: Vec<(u32, u32)> = thread.iter().map(|t| (t.account_id, t.id)).collect();
+        let grew = keys.len() > self.emitted_thread.len()
+            && self.emitted_thread.iter().all(|k| keys.contains(k));
+        if grew {
+            self.emitted_thread = keys;
+            let _ = sender.output(MessageListOutput::ThreadGrew { message: m, thread });
+        }
     }
 
     /// What a Move To… on `msg` offers: the message, then — when it heads a

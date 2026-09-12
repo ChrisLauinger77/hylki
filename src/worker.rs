@@ -7546,7 +7546,7 @@ async fn pop3_delete(account: &AccountConfig, uid: u32) -> Result<(), String> {
 async fn run_mock(
     account_id: u32,
     mut rx: mpsc::UnboundedReceiver<MailRequest>,
-    emit: impl Fn(WorkerEvent),
+    emit: impl Fn(WorkerEvent) + Clone + 'static,
 ) {
     let backend = MockBackend::new();
 
@@ -7554,6 +7554,22 @@ async fn run_mock(
         emit(WorkerEvent::Account(account));
     }
     emit(WorkerEvent::Folders(backend.folders(account_id)));
+    // VIREO_DEMO_ARRIVAL=<secs>: a reply lands in account 1's Inbox
+    // conversation after that long, as a sync would bring it — for
+    // watching an open conversation take in a new message.
+    if account_id == 1 {
+        if let Some(secs) =
+            std::env::var("VIREO_DEMO_ARRIVAL").ok().and_then(|v| v.parse::<u64>().ok())
+        {
+            let emit = emit.clone();
+            let mut messages = backend.messages(1);
+            tokio::task::spawn_local(async move {
+                tokio::time::sleep(Duration::from_secs(secs)).await;
+                messages.insert(0, crate::backend::demo_arrival());
+                emit(WorkerEvent::Messages { folder_id: 1, messages });
+            });
+        }
+    }
 
     while let Some(req) = rx.recv().await {
         match req {

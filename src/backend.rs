@@ -182,6 +182,32 @@ fn build(s: &Spec) -> Message {
     }
 }
 
+/// A late reply into the demo's deep conversation (account 1's Inbox):
+/// what a sync brings in while that thread is open. `VIREO_DEMO_ARRIVAL=<s>`
+/// has the mock worker deliver it after that many seconds.
+pub fn demo_arrival() -> Message {
+    let mut m = build(&Spec {
+        id: 90,
+        account_id: 1,
+        folder_id: 1,
+        from_name: "Priya Sharma",
+        from_addr: "priya@studio.dev",
+        to: "jason@vireo.hyprlab.co",
+        subject: "Re: Reader redesign: final review",
+        preview: "One more thing: the dark-mode cards need a hair more contrast on the sender line…",
+        body: "One more thing: the dark-mode cards need a hair more contrast on the sender line. I've pushed a tweak to the branch.\n\nPriya",
+        date: "Just now",
+        unread: true,
+        starred: false,
+        keywords: &[],
+        has_attachment: false,
+        in_reply_to: Some(6),
+    });
+    // Newer than anything the demo ships with.
+    m.timestamp = 1_760_000_000 + 3600;
+    m
+}
+
 fn sample_messages() -> Vec<Message> {
     const ME: &str = "jason@vireo.hyprlab.co";
     const LAB: &str = "hello@hyprlab.dev";
