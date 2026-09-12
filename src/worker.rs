@@ -362,6 +362,9 @@ pub enum WorkerEvent {
     /// list changes, but a path stays true for as long as the folder exists.
     /// The app resolves it against whatever list it currently holds.
     FolderUnreadByPath { path: String, unread: u32 },
+    /// A `SetSeen` has been stored (or failed): the app stops holding its own
+    /// read state for that message over what the server reports.
+    SeenSettled { path: String, uid: u32 },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
@@ -1460,6 +1463,7 @@ async fn run_imap(
                 } else if let Some(c) = cache.as_ref() {
                     c.set_unread(account_id, &path, uid, !seen);
                 }
+                emit(WorkerEvent::SeenSettled { path, uid });
             }
 
             MailRequest::SetFlagged {
@@ -7310,6 +7314,7 @@ async fn run_pop3(
                 if let Some(c) = cache.as_ref() {
                     c.set_unread(account_id, INBOX, uid, !seen);
                 }
+                emit(WorkerEvent::SeenSettled { path: INBOX.to_string(), uid });
             }
             MailRequest::SetFlagged { uid, flagged, .. } => {
                 if let Some(c) = cache.as_ref() {
@@ -8881,6 +8886,7 @@ async fn run_graph(
                     &emit,
                 )
                 .await;
+                emit(WorkerEvent::SeenSettled { path, uid });
             }
 
             MailRequest::SetFlagged { path, uid, flagged } => {

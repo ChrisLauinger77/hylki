@@ -37,6 +37,11 @@ const CONTRIBUTORS: &[(&str, &str)] = &[
 /// the top-edge maximize).
 const READER_MIN_WIDTH: i32 = 400;
 
+/// How long a read/unread change sent to a worker keeps overriding what the
+/// server reports for its message and folder, should the worker's
+/// confirmation never come (a dropped connection mid-request).
+const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Fallback threshold for folding the reader header's right-hand actions
 /// into the overflow menu. Normally the threshold is *measured* at startup from the
 /// real row (see the breakpoint in init) so it tracks the user's decoration
@@ -284,6 +289,12 @@ pub struct AppModel {
     /// (account_id, folder_id) → server-side unread count, accurate beyond the
     /// loaded window (from IMAP STATUS/SEARCH). Drives the sidebar badges.
     folder_unread: HashMap<(u32, u32), u32>,
+    /// Read/unread changes sent to a worker and not stored yet, keyed by
+    /// (account, folder path, uid) → (seen, when sent). The worker serves
+    /// one request at a time, so a folder list or unread count it fetched
+    /// ahead of the STORE still shows the old state; while an entry is
+    /// young the app's own state for that message and folder wins over it.
+    pending_seen: HashMap<(u32, String, u32), (bool, std::time::Instant)>,
     /// The account-list split view, narrowed to icon-only width when collapsed.
     sidebar_split: Option<adw::OverlaySplitView>,
     /// The "Vireo" title label, hidden while the sidebar is collapsed.
@@ -1070,6 +1081,9 @@ pub enum AppMsg {
     /// From a per-folder IDLE watcher, which knows its folder only by path —
     /// folder ids are positional and may have shifted since it was spawned.
     FolderUnreadByPath { account_id: u32, path: String, unread: u32 },
+    /// The worker stored (or failed to store) a read/unread change the app
+    /// had applied ahead of it.
+    SeenSettled { account_id: u32, path: String, uid: u32 },
     /// `path` is the folder the body was read from — a UID only identifies a
     /// message within its own folder, so applying a body to a message means
     /// checking the folder too.
@@ -2175,6 +2189,7 @@ impl SimpleComponent for AppModel {
             related_id_seq: u32::MAX,
             related_ids: HashMap::new(),
             folder_unread: HashMap::new(),
+            pending_seen: HashMap::new(),
             sidebar_split: None,
             app_title: None,
             sidebar_menu: None,
@@ -6623,6 +6638,12 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::FolderUnread { account_id, folder_id, unread } => {
+                // A count fetched ahead of a read mark still in the worker's
+                // queue: the app's own count (adjusted when the mark was
+                // made) stands until the mark is stored.
+                if self.pending_seen_in_folder(account_id, folder_id) {
+                    return;
+                }
                 let prev = self.folder_unread.insert((account_id, folder_id), unread);
                 if prev != Some(unread) {
                     self.sync_background_folder(account_id, folder_id);
@@ -6630,7 +6651,15 @@ impl SimpleComponent for AppModel {
                 self.push_unread_counts();
             }
 
+            AppMsg::SeenSettled { account_id, path, uid } => {
+                self.pending_seen.remove(&(account_id, path, uid));
+                self.pending_seen.retain(|_, (_, at)| at.elapsed() < PENDING_SEEN_MAX);
+            }
+
             AppMsg::FolderUnreadByPath { account_id, path, unread } => {
+                if self.pending_seen_in(account_id, &path) {
+                    return;
+                }
                 // Resolve against the current list; a path the app no longer
                 // knows (folder deleted/renamed under a live watcher) is
                 // dropped rather than guessed at.
@@ -6655,6 +6684,9 @@ impl SimpleComponent for AppModel {
                 // else sees them.
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
                 let (messages, filed) = self.apply_filters(account_id, folder_id, messages);
+                // A list fetched ahead of a read mark still in the worker's
+                // queue shows the message unread again; keep the app's state.
+                let messages = self.apply_pending_seen(account_id, folder_id, messages);
                 // Did this sync remove the message currently open in the reader
                 // (deleted/moved on another device)? Scope the check to the reader's
                 // own folder so a folder switch or another folder's sync doesn't
@@ -9004,6 +9036,50 @@ impl AppModel {
             t_open.elapsed(),
             self.unified_slices.values().map(Vec::len).sum::<usize>()
         );
+    }
+
+    /// Whether a read/unread change for a message in `path` is still on its
+    /// way to the server (and not so old that the worker must have lost it).
+    fn pending_seen_in(&self, account_id: u32, path: &str) -> bool {
+        self.pending_seen.iter().any(|((a, p, _), (_, at))| {
+            *a == account_id && p == path && at.elapsed() < PENDING_SEEN_MAX
+        })
+    }
+
+    fn pending_seen_in_folder(&self, account_id: u32, folder_id: u32) -> bool {
+        self.folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+            .is_some_and(|f| self.pending_seen_in(account_id, &f.path))
+    }
+
+    /// Overlay the read/unread changes still on their way to the server on
+    /// a folder list the worker fetched before storing them.
+    fn apply_pending_seen(
+        &self,
+        account_id: u32,
+        folder_id: u32,
+        mut messages: Vec<Message>,
+    ) -> Vec<Message> {
+        let Some(path) = self
+            .folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+            .map(|f| f.path.clone())
+        else {
+            return messages;
+        };
+        if !self.pending_seen_in(account_id, &path) {
+            return messages;
+        }
+        for m in messages.iter_mut() {
+            if let Some((seen, at)) = self.pending_seen.get(&(account_id, path.clone(), m.uid)) {
+                if at.elapsed() < PENDING_SEEN_MAX {
+                    m.unread = !seen;
+                }
+            }
+        }
+        messages
     }
 
     /// Switch the message list to a folder: reset the view, show its cached
@@ -12092,6 +12168,8 @@ impl AppModel {
         let Some(path) = self.resolve_folder_path(m) else {
             return;
         };
+        self.pending_seen
+            .insert((m.account_id, path.clone(), m.uid), (read, std::time::Instant::now()));
         self.send_to(m.account_id, MailRequest::SetSeen { path, uid: m.uid, seen: read });
         if read {
             // The mail was read (or marked read) in the app — the desktop
@@ -13715,6 +13793,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::FolderUnreadByPath { path, unread } => {
             AppMsg::FolderUnreadByPath { account_id, path, unread }
         }
+        WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
         WorkerEvent::RefsRepaired { folder_id } => {
             AppMsg::RefsRepaired { account_id, folder_id }
         }
