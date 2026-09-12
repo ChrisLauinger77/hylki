@@ -2427,8 +2427,7 @@ msgstr ""
 
 msgid ""
 "Whenever the sidebar is collapsed to its icon rail, hovering it floats the "
-"full sidebar out over the panes; it folds back a moment after the pointer "
-"leaves."
+"full sidebar out over the panes; it stays out until you click outside it."
 msgstr ""
 
 msgid "Remember the sidebar layout"

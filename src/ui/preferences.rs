@@ -1066,8 +1066,7 @@ impl Component for Preferences {
                                         set_title: &i18n("Expand the sidebar on hover"),
                                         set_subtitle: &i18n("Whenever the sidebar is collapsed to its icon rail, \
                                                        hovering it floats the full sidebar out over the \
-                                                       panes; it folds back a moment after the pointer \
-                                                       leaves."),
+                                                       panes; it stays out until you click outside it."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSidebarHoverExpand(row.is_active()));
                                         },
