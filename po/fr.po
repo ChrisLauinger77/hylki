@@ -58,14 +58,11 @@ msgstr "Répondre à tous"
 msgid "Forward"
 msgstr "Transférer"
 
-msgid "Mark as Read"
-msgstr "Marquer comme lu"
-
-msgid "Mark as Unread"
-msgstr "Marquer comme non lu"
-
 msgid "Flag"
 msgstr "Suivre"
+
+msgid "Archive"
+msgstr "Archiver"
 
 msgid "Print Preview (Ctrl+Shift+P)"
 msgstr "Aperçu avant impression (Ctrl+Maj+P)"
@@ -79,8 +76,11 @@ msgstr ""
 msgid "Mark as Spam"
 msgstr "Marquer comme indésirable"
 
-msgid "Archive"
-msgstr "Archiver"
+msgid "Mark as Read"
+msgstr "Marquer comme lu"
+
+msgid "Mark as Unread"
+msgstr "Marquer comme non lu"
 
 msgid "Downloading attachments…"
 msgstr "Téléchargement des pièces jointes…"
@@ -178,6 +178,10 @@ msgstr "Rien à annuler"
 
 msgid "Undoing move…"
 msgstr "Annulation du déplacement…"
+
+#, fuzzy
+msgid "Customize Toolbar…"
+msgstr "Couleur personnalisée…"
 
 msgid "No message with the ID {id} was found"
 msgstr "Aucun message portant l'identifiant {id} n'a été trouvé."
@@ -280,29 +284,24 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Redémarrer maintenant"
 
-msgid "Edit"
-msgstr "Modifier"
-
-msgid "Send Now"
-msgstr "Envoyer maintenant"
-
-msgid "Send All"
-msgstr "Tout envoyer"
-
 msgid "View Source"
 msgstr "Afficher le code source"
-
-msgid "Delete"
-msgstr "Supprimer"
 
 msgid "Remove Flag"
 msgstr "Retirer le drapeau"
 
-msgid "Print Preview"
-msgstr "Aperçu avant impression"
+msgid "Delete"
+msgstr "Supprimer"
 
 msgid "Move to Inbox"
 msgstr "Déplacer vers la boîte de réception"
+
+#, fuzzy
+msgid "Find in Message"
+msgstr "Rechercher dans le message"
+
+msgid "Print Preview"
+msgstr "Aperçu avant impression"
 
 msgid "Message Source"
 msgstr "Code source du message"
@@ -597,6 +596,23 @@ msgid "{n} unread message"
 msgid_plural "{n} unread messages"
 msgstr[0] "{n} message non lu"
 msgstr[1] "{n} messages non lus"
+
+msgid "Spam"
+msgstr ""
+
+msgid "Read/Unread"
+msgstr ""
+
+#, fuzzy
+msgid "Move To"
+msgstr "Déplacer vers"
+
+msgid "Find"
+msgstr ""
+
+#, fuzzy
+msgid "Print"
+msgstr "Imprimer…"
 
 msgid "On This Computer"
 msgstr "Sur cet ordinateur"
@@ -2010,6 +2026,9 @@ msgstr "Nom"
 msgid "Delete Contact?"
 msgstr "Supprimer le contact ?"
 
+msgid "Edit"
+msgstr "Modifier"
+
 msgid "Delete…"
 msgstr "Supprimer…"
 
@@ -2521,6 +2540,29 @@ msgstr "Toutes les 15 minutes"
 msgid "Every 30 minutes"
 msgstr "Toutes les 30 minutes"
 
+msgid "Left group"
+msgstr ""
+
+#, fuzzy
+msgid "Always shown"
+msgstr "Toujours afficher les destinataires"
+
+#, fuzzy
+msgid "Right group"
+msgstr "Droite"
+
+msgid "Folds into ⋯ when narrow"
+msgstr ""
+
+msgid "Not shown"
+msgstr ""
+
+msgid "Drop a button here to hide it"
+msgstr ""
+
+msgid "Drag to move"
+msgstr ""
+
 msgid "Senders"
 msgstr "Expéditeurs"
 
@@ -2627,6 +2669,20 @@ msgid "The view shown first when Settings is opened from the menu."
 msgstr ""
 "La vue affichée en premier lorsque les Paramètres sont ouverts depuis le "
 "menu."
+
+msgid "Toolbar"
+msgstr ""
+
+msgid ""
+"The buttons above the reading pane. Drag them between the groups and into "
+"the order you want. The left group always stays on the toolbar; the right "
+"group folds into a ⋯ menu when the reading pane is narrow. Changes apply at "
+"once."
+msgstr ""
+
+#, fuzzy
+msgid "Restore Defaults"
+msgstr "Par défaut"
 
 msgid "Accounts in the sidebar"
 msgstr ""
@@ -3915,6 +3971,12 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Send Now"
+#~ msgstr "Envoyer maintenant"
+
+#~ msgid "Send All"
+#~ msgstr "Tout envoyer"
 
 #~ msgid "Add Account"
 #~ msgstr "Ajouter un compte"

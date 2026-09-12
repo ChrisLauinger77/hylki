@@ -52,13 +52,10 @@ msgstr ""
 msgid "Forward"
 msgstr ""
 
-msgid "Mark as Read"
-msgstr ""
-
-msgid "Mark as Unread"
-msgstr ""
-
 msgid "Flag"
+msgstr ""
+
+msgid "Archive"
 msgstr ""
 
 msgid "Print Preview (Ctrl+Shift+P)"
@@ -73,7 +70,10 @@ msgstr ""
 msgid "Mark as Spam"
 msgstr ""
 
-msgid "Archive"
+msgid "Mark as Read"
+msgstr ""
+
+msgid "Mark as Unread"
 msgstr ""
 
 msgid "Downloading attachments…"
@@ -171,6 +171,9 @@ msgstr ""
 msgid "Undoing move…"
 msgstr ""
 
+msgid "Customize Toolbar…"
+msgstr ""
+
 msgid "No message with the ID {id} was found"
 msgstr ""
 
@@ -261,28 +264,22 @@ msgstr ""
 msgid "Restart Now"
 msgstr ""
 
-msgid "Edit"
-msgstr ""
-
-msgid "Send Now"
-msgstr ""
-
-msgid "Send All"
-msgstr ""
-
 msgid "View Source"
-msgstr ""
-
-msgid "Delete"
 msgstr ""
 
 msgid "Remove Flag"
 msgstr ""
 
-msgid "Print Preview"
+msgid "Delete"
 msgstr ""
 
 msgid "Move to Inbox"
+msgstr ""
+
+msgid "Find in Message"
+msgstr ""
+
+msgid "Print Preview"
 msgstr ""
 
 msgid "Message Source"
@@ -559,6 +556,21 @@ msgid "{n} unread message"
 msgid_plural "{n} unread messages"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Spam"
+msgstr ""
+
+msgid "Read/Unread"
+msgstr ""
+
+msgid "Move To"
+msgstr ""
+
+msgid "Find"
+msgstr ""
+
+msgid "Print"
+msgstr ""
 
 msgid "On This Computer"
 msgstr ""
@@ -1820,6 +1832,9 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr ""
 
+msgid "Edit"
+msgstr ""
+
 msgid "Delete…"
 msgstr ""
 
@@ -2294,6 +2309,27 @@ msgstr ""
 msgid "Every 30 minutes"
 msgstr ""
 
+msgid "Left group"
+msgstr ""
+
+msgid "Always shown"
+msgstr ""
+
+msgid "Right group"
+msgstr ""
+
+msgid "Folds into ⋯ when narrow"
+msgstr ""
+
+msgid "Not shown"
+msgstr ""
+
+msgid "Drop a button here to hide it"
+msgstr ""
+
+msgid "Drag to move"
+msgstr ""
+
 msgid "Senders"
 msgstr ""
 
@@ -2389,6 +2425,19 @@ msgid "This window opens to"
 msgstr ""
 
 msgid "The view shown first when Settings is opened from the menu."
+msgstr ""
+
+msgid "Toolbar"
+msgstr ""
+
+msgid ""
+"The buttons above the reading pane. Drag them between the groups and into "
+"the order you want. The left group always stays on the toolbar; the right "
+"group folds into a ⋯ menu when the reading pane is narrow. Changes apply at "
+"once."
+msgstr ""
+
+msgid "Restore Defaults"
 msgstr ""
 
 msgid "Accounts in the sidebar"
