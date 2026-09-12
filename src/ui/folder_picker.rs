@@ -31,6 +31,7 @@ pub fn show_folder_picker(
 
     let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
     column.add_css_class("context-menu-list");
+    column.set_margin_top(10);
 
     let whole = conversation.filter(|n| *n > 1).map(|n| {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
