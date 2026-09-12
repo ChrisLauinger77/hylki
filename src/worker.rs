@@ -615,6 +615,67 @@ async fn run(
     }
 }
 
+/// A request that puts mail in front of the reader: what the user is
+/// waiting on right now.
+fn is_reader_load(req: &MailRequest) -> bool {
+    matches!(
+        req,
+        MailRequest::LoadBody { .. }
+            | MailRequest::LoadBodies { .. }
+            | MailRequest::LoadSource { .. }
+            | MailRequest::LoadAttachments { download: true, .. }
+    )
+}
+
+/// A folder list fetch: work the reader's loads may go ahead of.
+fn is_list_load(req: &MailRequest) -> bool {
+    matches!(req, MailRequest::LoadMessages { .. } | MailRequest::SyncFolder { .. })
+}
+
+/// Take everything else already queued behind `first` and move the reader's
+/// loads ahead of the list syncs they sit behind, keeping every other order.
+///
+/// The worker serves one request at a time, so a message opened right after
+/// a view that loads its folder (a notification click into Inboxes, which
+/// asks every account for its inbox, then opens the mail) waited for the
+/// whole list fetch — and the IDLE hand-off before it — before its body was
+/// even asked for. The body is what the user is looking at; the list can
+/// follow. A reader load only overtakes list fetches: it never passes a
+/// move, a flag change or a reconnect, so what it reads is what the
+/// requests before it left.
+fn reorder_reader_loads(
+    first: MailRequest,
+    rx: &mut mpsc::UnboundedReceiver<MailRequest>,
+    backlog: &mut std::collections::VecDeque<MailRequest>,
+) -> MailRequest {
+    let mut queue: Vec<MailRequest> = Vec::with_capacity(backlog.len() + 2);
+    queue.push(first);
+    queue.extend(backlog.drain(..));
+    while let Ok(req) = rx.try_recv() {
+        queue.push(req);
+    }
+    if queue.len() > 1 {
+        let mut ordered: Vec<MailRequest> = Vec::with_capacity(queue.len());
+        for req in queue {
+            if is_reader_load(&req) {
+                // Slot in ahead of the run of list fetches at the tail.
+                let mut at = ordered.len();
+                while at > 0 && is_list_load(&ordered[at - 1]) {
+                    at -= 1;
+                }
+                ordered.insert(at, req);
+            } else {
+                ordered.push(req);
+            }
+        }
+        queue = ordered;
+    }
+    let mut it = queue.into_iter();
+    let first = it.next().expect("queue holds at least the request taken");
+    backlog.extend(it);
+    first
+}
+
 // ---------------------------------------------------------------------------
 // IMAP path
 // ---------------------------------------------------------------------------
@@ -725,6 +786,9 @@ async fn run_imap(
     // older build carries only its In-Reply-To, and threading reads References.
     let mut refs_repair: std::collections::VecDeque<(u32, String)> =
         std::collections::VecDeque::new();
+    // Requests already queued when one was taken, reordered so the reader's
+    // loads come before list syncs (see `reorder_reader_loads`).
+    let mut backlog: std::collections::VecDeque<MailRequest> = std::collections::VecDeque::new();
     // IMAP IDLE push: watch the most recently loaded folder for new mail.
     // The account's own setting wins over the global switch (#91).
     let push_enabled = account.push.unwrap_or_else(crate::config::load_push);
@@ -856,7 +920,7 @@ async fn run_imap(
         // push is on — re-sync once to catch any mail that arrived while busy, then
         // sit in a long IMAP IDLE for instant delivery. Without push, block for the
         // next request.
-        let req = match rx.try_recv() {
+        let req = match backlog.pop_front().map_or_else(|| rx.try_recv(), Ok) {
             Ok(req) => req,
             Err(mpsc::error::TryRecvError::Disconnected) => break,
             Err(mpsc::error::TryRecvError::Empty) => {
@@ -1038,6 +1102,7 @@ async fn run_imap(
                 }
             }
         };
+        let req = reorder_reader_loads(req, &mut rx, &mut backlog);
 
         if matches!(req, MailRequest::Reconnect) {
             session = connect_and_list(account_id, &account, cache.as_ref(), &emit).await;

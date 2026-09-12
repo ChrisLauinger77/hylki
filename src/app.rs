@@ -3642,6 +3642,30 @@ impl SimpleComponent for AppModel {
                     .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
                     .map(|f| (f.name.clone(), f.path.clone(), f.kind))
                 {
+                    // Ask for the body before anything else goes to the
+                    // account's worker. Opening Inboxes below asks every
+                    // account for its inbox list, and the worker serves one
+                    // request at a time: the body request the selection
+                    // sends afterwards would wait behind that whole fetch
+                    // (and the IDLE hand-off before it), so the message the
+                    // user clicked sat on a spinner while the list loaded.
+                    // Sent first, it comes back into the body cache, which
+                    // the selection reads before fetching. A body already
+                    // there (prefetched on arrival) needs nothing.
+                    if !self.body_cache.contains_key(&(account_id, message_id)) {
+                        let uid = self
+                            .message_cache
+                            .get(&(account_id, folder_id))
+                            .and_then(|msgs| msgs.iter().find(|m| m.id == message_id))
+                            .map(|m| m.uid);
+                        if let Some(uid) = uid {
+                            self.send_to(account_id, MailRequest::LoadBody {
+                                message_id,
+                                path: path.clone(),
+                                uid,
+                            });
+                        }
+                    }
                     // Mail that landed in an inbox opens in the unified
                     // Inboxes when the sidebar has that row (the view the
                     // app opens with; the account's own Inbox row may sit
