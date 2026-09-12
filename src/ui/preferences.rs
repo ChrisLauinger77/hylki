@@ -265,7 +265,7 @@ pub struct Preferences {
     editor_page: &'static str,
 }
 
-/// The reader toolbar editor (Settings → Reading): one drop zone per
+/// The reader toolbar editor (Settings → Appearance → Toolbar): one drop zone per
 /// side plus a "not shown" pool, each a wrapping row of draggable chips
 /// that slide apart under a drag to show where the drop will land.
 struct ToolbarEditor {
@@ -972,6 +972,31 @@ impl Component for Preferences {
 
                                 },
 
+                                // The reader toolbar's buttons: three drop zones
+                                // (left group, right group, not shown) of
+                                // draggable chips, filled in init from the saved
+                                // layout. Every drop is applied and saved at once.
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Toolbar"),
+                                    set_description: Some(
+                                        &i18n("The buttons above the reading pane. Drag them between the \
+                                               groups and into the order you want. The left group always stays on the toolbar; \
+                                               the right group folds into a ⋯ menu when the reading \
+                                               pane is narrow. Changes apply at once."),
+                                    ),
+                                    #[wrap(Some)]
+                                    set_header_suffix = &gtk::Button {
+                                        set_label: &i18n("Restore Defaults"),
+                                        set_valign: gtk::Align::Center,
+                                        connect_clicked => PrefInput::ToolbarRestore,
+                                    },
+
+                                    #[name = "toolbar_editor_box"]
+                                    gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 12,
+                                    },
+                                },
                             },
 
                             add_named[Some("sidebar")] = &adw::PreferencesPage {
@@ -1394,32 +1419,6 @@ impl Component for Preferences {
                             },
 
                             add_named[Some("reading")] = &adw::PreferencesPage {
-                                // The reader toolbar's buttons: three drop zones
-                                // (left group, right group, not shown) of
-                                // draggable chips, filled in init from the saved
-                                // layout. Every drop is applied and saved at once.
-                                add = &adw::PreferencesGroup {
-                                    set_title: &i18n("Reader toolbar"),
-                                    set_description: Some(
-                                        &i18n("Drag the buttons between the groups and into the order \
-                                               you want. The left group always stays on the toolbar; \
-                                               the right group folds into a ⋯ menu when the reading \
-                                               pane is narrow. Changes apply at once."),
-                                    ),
-                                    #[wrap(Some)]
-                                    set_header_suffix = &gtk::Button {
-                                        set_label: &i18n("Restore Defaults"),
-                                        set_valign: gtk::Align::Center,
-                                        connect_clicked => PrefInput::ToolbarRestore,
-                                    },
-
-                                    #[name = "toolbar_editor_box"]
-                                    gtk::Box {
-                                        set_orientation: gtk::Orientation::Vertical,
-                                        set_spacing: 12,
-                                    },
-                                },
-
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Conversations"),
 

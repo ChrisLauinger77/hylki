@@ -221,7 +221,7 @@ pub struct AppModel {
     /// The collapsed header's ⋯ button — the anchor its menu pops from.
     reader_overflow_btn: gtk::Button,
     /// The reader header's layout: which buttons, which side, what order
-    /// (Settings → Reading → Reader toolbar).
+    /// (Settings → Appearance → Toolbar).
     reader_toolbar: config::ReaderToolbar,
     /// The header's action buttons and their breakpoint, for re-packing when
     /// the layout changes. Set once after the view is built.

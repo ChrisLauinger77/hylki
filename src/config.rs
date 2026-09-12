@@ -2978,7 +2978,7 @@ mod filter_tests {
 
 // ---------------------------------------------------------------------------
 // Reader toolbar layout: which buttons the reading pane's header shows, on
-// which side, in what order (Settings → Reading → Reader toolbar).
+// which side, in what order (Settings → Appearance → Toolbar).
 // ---------------------------------------------------------------------------
 
 /// One button of the reader header. The left group stays on the bar at every
