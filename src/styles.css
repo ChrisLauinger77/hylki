@@ -1703,7 +1703,7 @@ textview.console-view text selection {
   -gtk-icon-transform: rotate(180deg);
 }
 
-/* Settings → Appearance → Reader toolbar: the drag-and-drop editor. */
+/* Settings → Reading → Reader toolbar: the drag-and-drop editor. */
 .toolbar-zone {
   border: 1px dashed alpha(currentColor, 0.25);
   border-radius: 10px;

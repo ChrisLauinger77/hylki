@@ -1,5 +1,5 @@
 //! A wrapping row of chips whose positions animate: the drop zones of the
-//! reader toolbar editor (Settings → Appearance). While a chip is dragged
+//! reader toolbar editor (Settings → Reading). While a chip is dragged
 //! over a zone, the zone opens a gap under the pointer and the other chips
 //! slide out of the way; move along the row and the gap follows. The
 //! dragged chip's own zone closes the hole it left the same way.
