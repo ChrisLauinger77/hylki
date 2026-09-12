@@ -452,6 +452,9 @@ upstream — their work ships in the app and is credited in the About window:
   Hungarian translation.
 - [**Ilya Semenkovich**](https://github.com/iliasen) ([#176](https://github.com/hyprlab/vireo/pull/176)) — the
   Russian translation, and two reader tooltips that could not be translated.
+- [**Paulo Fino**](https://github.com/somepaulo) ([#178](https://github.com/hyprlab/vireo/pull/178),
+  [#179](https://github.com/hyprlab/vireo/issues/179)) — the Portuguese (Portugal)
+  translation, and the request for a language chooser.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/vireo/pull/7),
   [#8](https://github.com/hyprlab/vireo/pull/8)) — sender avatars from GNOME
   Contacts photos, and GNOME Online Accounts refinements: custom server ports
