@@ -2432,13 +2432,21 @@ impl SimpleComponent for AppModel {
         // With no accounts, no worker events will populate the sidebar, so render
         // its empty state (the "Add first account" prompt) up front — and greet
         // a first run with the welcome wizard (src/ui/welcome.rs).
-        if model.config.is_empty() || std::env::var("VIREO_WELCOME").is_ok() {
+        // A restart the wizard's language pick asked for: the wizard comes
+        // back once, whatever mode this is; the flag must not reach a
+        // later restart (the icon change's), so it is cleared here.
+        let wizard_again = std::env::var_os(crate::WIZARD_AGAIN_VAR).is_some();
+        if wizard_again {
+            std::env::remove_var(crate::WIZARD_AGAIN_VAR);
+        }
+        if model.config.is_empty() || std::env::var("VIREO_WELCOME").is_ok() || wizard_again {
             model.rebuild_sidebar();
             // VIREO_WELCOME=1 forces the wizard over an existing config, for
             // design review and screenshots. A wizard already completed once
             // (Start Reading pressed, even with no account added) doesn't
             // come back on its own — a restart right after it must not loop.
             if std::env::var("VIREO_WELCOME").is_ok()
+                || wizard_again
                 || (!demo_mode() && !config::wizard_completed())
             {
                 model.open_wizard(&sender);
@@ -4991,9 +4999,23 @@ impl SimpleComponent for AppModel {
                     return;
                 }
                 config::save_language(&code);
+                tracing::info!("wizard: language {code:?} saved, restarting");
+                // The instance that comes back must open the wizard again,
+                // review mode or not: the helper drops the review switch on
+                // purpose, so a one-shot flag of its own goes along (init
+                // takes it and clears it, so it never outlives that start).
+                std::env::set_var(crate::WIZARD_AGAIN_VAR, "1");
                 match crate::app_icon::launch_restart_helper() {
-                    Ok(()) => relm4::main_application().activate_action("quit", None),
+                    Ok(()) => {
+                        // The quit action's own teardown, inline: nothing to
+                        // look up, nothing to wait for.
+                        tracing::info!("wizard: restart helper up, exiting");
+                        let (w, h, maximized) = crate::config::load_window_state();
+                        crate::config::save_window_state(w, h, maximized);
+                        std::process::exit(0);
+                    }
                     Err(e) => {
+                        std::env::remove_var(crate::WIZARD_AGAIN_VAR);
                         tracing::warn!("restart for the wizard's language failed: {e}");
                         if code.is_empty() {
                             std::env::remove_var("LANGUAGE");

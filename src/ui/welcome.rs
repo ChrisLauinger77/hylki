@@ -350,6 +350,16 @@ impl Component for Welcome {
             lang.connect_selected_notify(move |d| s.input(WelcomeInput::LanguageChanged(d.selected())));
         }
         lang_row.append(&lang);
+        // Fair warning: a pick restarts the app.
+        let lang_note = gtk::Label::new(Some(
+            i18n("Choosing another language restarts Vireo: it closes for a moment and this wizard comes back in that language.").as_str(),
+        ));
+        lang_note.add_css_class("dim-label");
+        lang_note.add_css_class("caption");
+        lang_note.set_wrap(true);
+        lang_note.set_justify(gtk::Justification::Center);
+        lang_note.set_max_width_chars(46);
+        lang_note.set_margin_top(2);
         let start = pill(&i18n("Get Started"));
         start.set_margin_top(10);
         {
@@ -358,6 +368,7 @@ impl Component for Welcome {
         }
         hero.append(&tag);
         hero.append(&lang_row);
+        hero.append(&lang_note);
         hero.append(&start);
         let hero_page = page(&hero);
         hero_page.set_valign(gtk::Align::Start);
@@ -367,8 +378,15 @@ impl Component for Welcome {
             wordmark_overlay.clone().upcast(),
             tag.clone().upcast(),
             lang_row.clone().upcast(),
+            lang_note.clone().upcast(),
             start.clone().upcast(),
         ]);
+        // VIREO_SHOWCASE_WIZARD_LANG=<n> picks choice n on the drop-down
+        // after 4 s, what a click there does (for testing the restart).
+        if let Some(n) = std::env::var("VIREO_SHOWCASE_WIZARD_LANG").ok().and_then(|v| v.parse::<u32>().ok()) {
+            let lang = lang.clone();
+            gtk::glib::timeout_add_seconds_local_once(4, move || lang.set_selected(n));
+        }
 
         // ---- Page 2: account ----
         let acct = gtk::Box::new(gtk::Orientation::Vertical, 14);
