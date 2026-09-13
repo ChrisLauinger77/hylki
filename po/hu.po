@@ -249,6 +249,9 @@ msgstr "Konzol"
 msgid "Keyboard Shortcuts"
 msgstr "Billentyűparancsok"
 
+msgid "About"
+msgstr ""
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
 "Appearance."
@@ -745,14 +748,22 @@ msgstr "A gpg nem titkosította az üzenetet."
 msgid "Open Vireo"
 msgstr "Vireo megnyitása"
 
-msgid "No unread mail"
-msgstr "Nincs olvasatlan levél"
-
-msgid "View all {n} unread…"
+#, fuzzy
+msgid "View all {n} unread in Inboxes…"
 msgstr "Mind a(z) {n} olvasatlan megtekintése…"
 
 msgid "Accounts"
 msgstr "Fiókok"
+
+#, fuzzy
+msgid "No unread mail in Inboxes"
+msgstr "Nincs olvasatlan levél"
+
+#, fuzzy
+msgid "{n} unread in Inboxes"
+msgid_plural "{n} unread in Inboxes"
+msgstr[0] "{n} olvasatlan üzenet"
+msgstr[1] "{n} olvasatlan üzenet"
 
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr "Alkalmazásjelszó szükséges (nem a szokásos bejelentkezési jelszava)."
@@ -1219,10 +1230,14 @@ msgstr "SMTP-jelszó"
 msgid "Test SMTP"
 msgstr "SMTP tesztelése"
 
+msgid "GOA"
+msgstr ""
+
 msgid "Vireo"
 msgstr "Vireo"
 
-msgid "Imported from GNOME Online Accounts"
+#, fuzzy
+msgid "Imported GNOME Online Account"
 msgstr "Importálva a GNOME Online-fiókokból"
 
 msgid "Added directly in Vireo"
@@ -1244,6 +1259,29 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] "{n} nap múlva"
 msgstr[1] "{n} nap múlva"
+
+msgid "Google (Gmail)"
+msgstr ""
+
+msgid "Microsoft 365 / Outlook"
+msgstr ""
+
+msgid "Proton Mail"
+msgstr ""
+
+msgid "Custom OAuth"
+msgstr ""
+
+#, fuzzy
+msgid "IMAP/POP3 account"
+msgstr "Fiók hozzáadása"
+
+msgid "IMAP/POP3 account on {host}"
+msgstr ""
+
+#, fuzzy
+msgid "Mail account"
+msgstr "Levelezési fiók"
 
 msgid ", tagged {tag}"
 msgstr ", {tag} címkével"
@@ -2526,13 +2564,14 @@ msgstr "30 percenként"
 msgid "Left group"
 msgstr ""
 
-msgid "Always shown"
-msgstr ""
+#, fuzzy
+msgid "Always shown · up to 6"
+msgstr "Címzettek mindig jelenjenek meg"
 
 msgid "Right group"
 msgstr ""
 
-msgid "Folds into ⋯ when narrow"
+msgid "Folds into ⋯ when narrow · up to 6"
 msgstr ""
 
 msgid "Not shown"

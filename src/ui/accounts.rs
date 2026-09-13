@@ -164,6 +164,9 @@ pub struct AccountsWindow {
     avatar: Option<String>,
     /// The preview circle's colour, as a stylesheet on the display.
     preview_css: gtk::CssProvider,
+    /// The account list's per-row disc colours (`.acct-list-color-N`),
+    /// rewritten on every rebuild.
+    list_css: gtk::CssProvider,
     /// The "Circle shows" toggle: a picture, or initials/emoji. Only the
     /// chosen side is saved; the other side's choice stays in the editor
     /// so flipping back and forth loses nothing.
@@ -1312,6 +1315,7 @@ impl Component for AccountsWindow {
             emoji: None,
             avatar: None,
             preview_css: gtk::CssProvider::new(),
+            list_css: gtk::CssProvider::new(),
             picture_mode: false,
             sig_editor: None,
             label_synced: String::new(),
@@ -1430,6 +1434,11 @@ impl Component for AccountsWindow {
             gtk::style_context_add_provider_for_display(
                 &display,
                 &model.preview_css,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+            gtk::style_context_add_provider_for_display(
+                &display,
+                &model.list_css,
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
@@ -2729,6 +2738,7 @@ impl AccountsWindow {
             list.remove(&child);
         }
 
+        let mut css = String::new();
         for (pos, acc) in self.accounts.iter().enumerate() {
             let row = gtk::ListBoxRow::new();
             row.set_activatable(true);
@@ -2740,8 +2750,51 @@ impl AccountsWindow {
             handle.add_css_class("dim-label");
             hbox.append(&handle);
 
-            // The provider's mark, left of the name and address.
-            hbox.append(&crate::brand::image_or(brand_for_account(acc), 28, crate::brand::GENERIC_MAIL));
+            // The account's circle, as the sidebar draws it: its colour (or
+            // the palette accent it would get), and its picture, emoji or
+            // initials — the label first, then the name, then the address.
+            let account_id = pos as u32 + 1;
+            let color = acc
+                .color
+                .clone()
+                .unwrap_or_else(|| crate::worker::accent_for(account_id).to_string());
+            css.push_str(&format!(
+                ".acct-list-color-{account_id} {{ background-color: {color}; }}\n"
+            ));
+            let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            circle.add_css_class("account-circle");
+            circle.add_css_class(&format!("acct-list-color-{account_id}"));
+            circle.set_valign(gtk::Align::Center);
+            circle.set_halign(gtk::Align::Center);
+            circle.set_hexpand(false);
+            circle.set_size_request(30, 30);
+            let shown = match acc.label.as_deref().map(str::trim) {
+                Some(l) if !l.is_empty() && l != acc.email => l.to_string(),
+                _ => display_name(acc),
+            };
+            let picture = acc
+                .avatar
+                .as_deref()
+                .and_then(crate::config::avatar_path)
+                .filter(|p| p.exists());
+            let glyph: gtk::Widget = match (&picture, acc.emoji.as_deref()) {
+                (Some(path), _) => {
+                    circle.set_overflow(gtk::Overflow::Hidden);
+                    crate::ui::initials::avatar_picture(path, 30).upcast()
+                }
+                (None, Some(em)) if !em.is_empty() => {
+                    crate::ui::initials::glyph_picture(em, &color, 0.55, 30).upcast()
+                }
+                _ => crate::ui::initials::glyph_picture(
+                    &crate::ui::sidebar::account_initials(&shown, &acc.email),
+                    &color,
+                    0.47,
+                    30,
+                )
+                .upcast(),
+            };
+            circle.append(&glyph);
+            hbox.append(&circle);
 
             let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
             vbox.set_hexpand(true);
@@ -2758,16 +2811,22 @@ impl AccountsWindow {
             vbox.append(&email);
             hbox.append(&vbox);
 
+            // The provider's mark, right of the name and address, named on
+            // hover.
+            let brand = brand_for_account(acc);
+            let mark = crate::brand::image_or(brand, 24, crate::brand::GENERIC_MAIL);
+            mark.set_tooltip_text(Some(&provider_name(brand, acc)));
+            hbox.append(&mark);
+
             // Source badge: is this account from GNOME Online Accounts, or added
             // directly in Vireo?
             let from_goa = acc.goa_id.is_some();
-            let badge =
-                gtk::Label::new(Some(if from_goa { i18n("GNOME Online Account") } else { i18n("Vireo") }.as_str()));
+            let badge = gtk::Label::new(Some(if from_goa { i18n("GOA") } else { i18n("Vireo") }.as_str()));
             badge.set_valign(gtk::Align::Center);
             badge.add_css_class("account-source-badge");
             if from_goa {
                 badge.add_css_class("goa");
-                badge.set_tooltip_text(Some(i18n("Imported from GNOME Online Accounts").as_str()));
+                badge.set_tooltip_text(Some(i18n("Imported GNOME Online Account").as_str()));
             } else {
                 badge.set_tooltip_text(Some(i18n("Added directly in Vireo").as_str()));
             }
@@ -2827,6 +2886,7 @@ impl AccountsWindow {
 
             list.append(&row);
         }
+        self.list_css.load_from_string(&css);
     }
 
     /// Un-import a GNOME Online Account: drop it from Vireo (the app removes
@@ -3557,6 +3617,31 @@ fn brand_for_account(acc: &AccountConfig) -> &'static str {
         return "proton";
     }
     provider_at(preset_index_for_host(&host)).brand
+}
+
+/// What the account list's provider mark says on hover: the provider's
+/// name as the picker lists it, without the picker's own hints ("sign in",
+/// "Bridge"); a plain IMAP/POP3 account names its server instead.
+fn provider_name(brand: &str, acc: &AccountConfig) -> String {
+    match brand {
+        "gmail" => i18n("Google (Gmail)"),
+        "outlook" => i18n("Microsoft 365 / Outlook"),
+        "proton" => i18n("Proton Mail"),
+        "mail-oauth" => i18n("Custom OAuth"),
+        "mail" => {
+            let host = acc.imap_host.trim();
+            if host.is_empty() {
+                i18n("IMAP/POP3 account")
+            } else {
+                i18n_f("IMAP/POP3 account on {host}", &[("host", host)])
+            }
+        }
+        other => PROVIDERS
+            .iter()
+            .find(|p| p.brand == other)
+            .map(|p| i18n(p.label))
+            .unwrap_or_else(|| i18n("Mail account")),
+    }
 }
 
 fn parse_color(hex: &str) -> gtk::gdk::RGBA {

@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.28.1 — 2026-09-13
+
+A white flash between messages fixed, account circles and provider marks
+in the accounts list, a wider toolbar editor with six buttons a side, a
+tray count that names what it counts, the chosen language reaching the
+Flatpak and the RPM, and Brazilian Portuguese.
+
+- **No white strip between messages.** Switching messages in dark mode
+  showed a white bar with rounded corners under the card header for a
+  frame or two. Each body is a sandboxed `srcdoc` iframe; before its
+  document arrives the frame holds the initial `about:blank` page, whose
+  colour scheme is light inside a dark frame element, and WebKit paints
+  a scheme-mismatched frame's canvas opaque white. The wrapper's ready
+  loop took that blank page for a complete document, sized the frame to
+  it (8px, the empty body's margins) and counted it toward `ready`. The
+  sizing script and the ready loop now skip a frame whose document is
+  `about:blank` (the real one is `about:srcdoc`), frames are
+  `visibility:hidden` until sized (`.vireo-live`), and an unmeasured
+  frame opens at `height:0px` rather than the browser's 150px default.
+  Present since the card layout; not a 1.28.0 regression.
+- **Accounts list rows** (Settings → Mail Accounts). The account's
+  30px circle, as the sidebar draws it (picture, emoji or initials on
+  its colour or the palette accent it would get; `worker::accent_for`
+  is now crate-visible), sits left of the name; the provider mark moves
+  to the right at 24px with a tooltip naming the provider
+  (`accounts::provider_name`; a plain account names its server). The
+  source badge reads "GOA" with the tooltip "Imported GNOME Online
+  Account". Colours come from a per-list `CssProvider`
+  (`.acct-list-color-N`).
+- **Toolbar editor.** The Appearance page's content column is 640px
+  (`preferences::widen_page` finds the page's `AdwClamp`), so a row of
+  six chips fits. Each side holds at most six buttons
+  (`config::TOOLBAR_SIDE_MAX`): `ReaderToolbar::place` refuses a
+  seventh, the drop zones open no gap and take no drop when full
+  (`zone_has_room`), a saved layout is trimmed on load, and the zone
+  headings say "up to 6".
+- **Tray count is the inboxes'.** The tray icon's dot, tooltip and menu
+  counted and listed every counted folder (inbox plus counting filter
+  destinations); they now use `inboxes_unread` and the inboxes' unread
+  mail only, and the menu says so: a disabled heading "N unread in
+  Inboxes" (or "No unread mail in Inboxes"), "View all N unread in
+  Inboxes…". The sidebar badges and the Background Apps status keep the
+  counted total.
+- **Chosen language reaches the Flatpak** (#183). flatpak-builder moved
+  `/app/share/locale` into a `.Locale` extension with `locale-subset`,
+  of which Flatpak installs only the system's languages, so a language
+  picked in Settings had no catalogue unless it was also the system's
+  and fell back to English. `separate-locales: false` keeps the
+  catalogues in the app. Reported by Paulo Fino.
+- **RPM ships the translations.** The package script already compiled
+  every catalogue into the payload; the spec now installs them under
+  `/usr/share/locale` and lists them with `%find_lang`.
+- **Translations.** Russian updated to 1.28.0 (PR #185, Ilya
+  Semenkovich), with "About {app}" made translatable: it was a bare
+  literal in the help menu, the About window's title and its main page.
+  French complete against 1.28.0 (PR #184, frenchy82). Portuguese
+  (Portugal) updated, and Brazilian Portuguese added and listed in
+  `po/LINGUAS` (PR #182, Paulo Fino). The template was refreshed
+  (1097 strings); this release's new strings (the GOA badge and provider
+  tooltips, the "up to 6" hints, the tray headings, "About") are
+  untranslated everywhere.
+- **Harness.** `VIREO_SHOWCASE_SCROLL_WIDTH` overrides the settings
+  capture's 720px width.
+
 ## 1.28.0 — 2026-09-12
 
 An arrangeable reader toolbar, a slide-over sidebar that stays open,

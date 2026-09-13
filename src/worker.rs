@@ -409,7 +409,7 @@ pub enum WorkerEvent {
 type ImapSession = Session<TlsStream<TcpStream>>;
 
 /// A distinct accent colour per account (cycles through a small palette).
-fn accent_for(account_id: u32) -> &'static str {
+pub(crate) fn accent_for(account_id: u32) -> &'static str {
     const PALETTE: [&str; 6] = [
         "#3584e4", "#2ec27e", "#e5a50a", "#e66100", "#9141ac", "#c01c28",
     ];

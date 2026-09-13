@@ -3141,6 +3141,9 @@ pub enum ToolbarSide {
     Right,
 }
 
+/// How many buttons one side of the reader toolbar holds at most.
+pub const TOOLBAR_SIDE_MAX: usize = 6;
+
 /// The reader header's layout. A button absent from both lists is hidden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReaderToolbar {
@@ -3192,16 +3195,33 @@ impl ReaderToolbar {
             .collect()
     }
 
-    /// Drop repeats (an item may sit on one side only, once).
+    /// Drop repeats (an item may sit on one side only, once), and anything
+    /// past a side's room.
     fn sanitize(&mut self) {
         let mut seen = std::collections::HashSet::new();
         self.left.retain(|i| seen.insert(*i));
         self.right.retain(|i| seen.insert(*i));
+        self.left.truncate(TOOLBAR_SIDE_MAX);
+        self.right.truncate(TOOLBAR_SIDE_MAX);
+    }
+
+    /// Whether `side` has room for one more button that is not already on
+    /// it (`None`, the hidden zone, always has).
+    pub fn has_room(&self, side: Option<ToolbarSide>, item: ToolbarItem) -> bool {
+        let list = match side {
+            Some(ToolbarSide::Left) => &self.left,
+            Some(ToolbarSide::Right) => &self.right,
+            None => return true,
+        };
+        list.contains(&item) || list.len() < TOOLBAR_SIDE_MAX
     }
 
     /// Take `item` out of wherever it is and put it at `index` of `side`
-    /// (clamped); `side` None hides it.
+    /// (clamped); `side` None hides it. A full side is left as it is.
     pub fn place(&mut self, item: ToolbarItem, side: Option<ToolbarSide>, index: usize) {
+        if !self.has_room(side, item) {
+            return;
+        }
         self.left.retain(|i| *i != item);
         self.right.retain(|i| *i != item);
         let list = match side {

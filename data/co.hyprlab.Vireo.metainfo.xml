@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.28.1" date="2026-09-13">
+      <description>
+        <p>A white flash between messages in dark mode fixed, account circles and provider marks in the accounts list, a wider toolbar editor with six buttons a side, a tray count that names what it counts, the chosen language now applying in the Flatpak and shipping in the RPM, and updated Russian, French and Portuguese translations plus Brazilian Portuguese.</p>
+      </description>
+    </release>
     <release version="1.28.0" date="2026-09-12">
       <description>
         <p>An arrangeable reader toolbar, a slide-over sidebar that stays open, notification clicks that open in Inboxes at once, conversations that move as one and take in new replies while open, a right-click menu on reader cards, plain-text composing and monospace reading, the clock following the desktop, a language chooser, and Hungarian, Russian and Portuguese translations.</p>

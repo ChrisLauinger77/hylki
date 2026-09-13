@@ -29,7 +29,7 @@ use ksni::{Category, Icon, Status, ToolTip, Tray};
 
 use crate::app::AppMsg;
 use crate::config::TrayIcon;
-use crate::i18n::{i18n, i18n_f};
+use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// One unread message as the tray menu shows it (issue #116): a card-like
 /// row with the sender's picture, which opens it in the reader. A DBusMenu
@@ -168,7 +168,7 @@ impl Tray for VireoTray {
     fn tool_tip(&self) -> ToolTip {
         ToolTip {
             title: "Vireo".to_string(),
-            description: crate::background::status_text(self.unread),
+            description: inbox_status_text(self.unread),
             ..Default::default()
         }
     }
@@ -188,21 +188,21 @@ impl Tray for VireoTray {
         .into()];
         if let Some(mail) = &self.mail {
             items.push(MenuItem::Separator);
-            if mail.items.is_empty() {
-                items.push(
-                    StandardItem {
-                        label: i18n("No unread mail"),
-                        enabled: false,
-                        ..Default::default()
-                    }
-                    .into(),
-                );
-            }
+            // The section names what it counts: the inboxes, not the
+            // folders that filters file into.
+            items.push(
+                StandardItem {
+                    label: inbox_status_text(mail.unread),
+                    enabled: false,
+                    ..Default::default()
+                }
+                .into(),
+            );
             items.extend(mail.items.iter().map(mail_item));
             if mail.unread as usize > mail.items.len() {
                 items.push(
                     StandardItem {
-                        label: i18n_f("View all {n} unread…", &[("n", &mail.unread.to_string())]),
+                        label: i18n_f("View all {n} unread in Inboxes…", &[("n", &mail.unread.to_string())]),
                         activate: Box::new(|t: &mut Self| {
                             let _ = t.sender.send(AppMsg::PresentWindow);
                             let _ = t.sender.send(AppMsg::TrayViewUnread);
@@ -246,6 +246,15 @@ impl Tray for VireoTray {
             .into(),
         ]);
         items
+    }
+}
+
+/// What the tooltip and the menu's heading say the count is: unread mail
+/// in the inboxes alone.
+fn inbox_status_text(unread: u32) -> String {
+    match unread {
+        0 => i18n("No unread mail in Inboxes"),
+        n => ni18n_f("{n} unread in Inboxes", "{n} unread in Inboxes", n, &[("n", &n.to_string())]),
     }
 }
 

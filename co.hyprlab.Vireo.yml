@@ -16,6 +16,12 @@ sdk: org.gnome.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
 command: vireo
+# Keep the message catalogues in the app itself. By default flatpak-builder
+# moves /app/share/locale into a .Locale extension of which Flatpak installs
+# only the user's configured languages, so a language chosen in Settings
+# (#179) had no catalogue unless it was also the system's (#183). The
+# catalogues are small; the spell-check dictionaries are unaffected.
+separate-locales: false
 
 finish-args:
   - --share=ipc
@@ -132,7 +138,7 @@ modules:
       - cargo --offline build --release --verbose
       - install -Dm755 target/release/vireo /app/bin/vireo
       # Translations: each po/<lang>.po becomes a message catalogue under
-      # /app/share/locale (which Flatpak splits into the .Locale extension),
+      # /app/share/locale (kept in the app: separate-locales above),
       # and the launcher and metainfo get their translated fields merged in
       # (see po/README.md).
       - for po in po/*.po; do [ -e "$po" ] || continue; lang=$(basename "$po" .po); install -d /app/share/locale/$lang/LC_MESSAGES; msgfmt -o /app/share/locale/$lang/LC_MESSAGES/vireo.mo "$po"; done

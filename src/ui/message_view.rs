@@ -2399,7 +2399,9 @@ impl MessageView {
                :root{{color-scheme:{scheme};}}\
                body{{margin:0;padding:0;background:{page};font:14px/1.55 system-ui,sans-serif;}}\
                body.vireo-conv{{padding:14px;}}\
-               iframe.vireo-frame{{width:100%;border:0;display:block;background:{bg};}}\
+               iframe.vireo-frame{{width:100%;border:0;display:block;background:{bg};\
+                 visibility:hidden;}}\
+               iframe.vireo-frame.vireo-live{{visibility:visible;}}\
                .vireo-pan{{overflow-x:auto;}}\
                iframe.vireo-frame.anim{{transition:height 240ms cubic-bezier(0.4,0,0.2,1);}}\
                @media (prefers-reduced-motion:reduce){{iframe.vireo-frame.anim{{transition:none;}}}}\
@@ -4290,7 +4292,8 @@ fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
 // the wrapper window — caught there, the focused frame names the card, and
 // focus is handed straight back so the next click fires again.
 const SIZE_SCRIPT: &str = "\
-function s(f){if(f._s)return;f._s=1;try{var d=f.contentDocument;if(!d)return;\
+function s(f){if(f._s)return;f._s=1;try{var d=f.contentDocument;if(!d||d.URL==='about:blank')return;\
+f.classList.add('vireo-live');\
 var b=d.body,e=d.documentElement;\
 var sy=window.scrollY;var _r=f.getBoundingClientRect();\
 var above=_r.bottom<=0;var old=_r.height||0;\
@@ -4397,7 +4400,7 @@ setTimeout(markClipped,0);setTimeout(markClipped,400);\
 if(!pend)ready();\
 for(var i=0;i<fs.length;i++){(function(f){var counted=false;\
 function tick(){if(counted)return;counted=true;if(--pend<=0)ready();}\
-if(f.contentDocument&&f.contentDocument.readyState==='complete'){init(f);tick();}\
+if(f.contentDocument&&f.contentDocument.readyState==='complete'&&f.contentDocument.URL!=='about:blank'){init(f);tick();}\
 f.addEventListener('load',function(){init(f);tick();});})(fs[i]);}\
 setTimeout(ready,450);\
 var hs=document.querySelectorAll('.vireo-msg-hdr');\
@@ -4654,7 +4657,9 @@ fn message_frame(
         id = key.1,
         style = match height {
             Some(h) => format!(" style=\"height:{h}px\""),
-            None => String::new(),
+            // Never measured: nothing to show until the document is in, so
+            // no 150px default block for the card to shrink from.
+            None => " style=\"height:0px\"".to_string(),
         },
         doc = attr_escape(&doc)
     )
@@ -5478,7 +5483,10 @@ mod tests {
             &Default::default(),
         );
         assert!(doc.contains("style=\"height:640px\""), "known height used: {doc}");
-        assert_eq!(doc.matches("style=\"height:").count(), 1, "only the known one");
+        // The unmeasured one opens collapsed rather than at the browser's
+        // 150px default, so its card shows nothing until its document is in.
+        assert_eq!(doc.matches("style=\"height:0px\"").count(), 1, "unknown one collapsed: {doc}");
+        assert_eq!(doc.matches("style=\"height:").count(), 2, "one each");
         // Keyed per message, so a height can't be applied to the wrong frame.
         assert!(doc.contains("data-key=\"1:2\""), "{doc}");
     }

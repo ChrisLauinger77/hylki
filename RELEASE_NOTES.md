@@ -2,6 +2,20 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.28.1
+
+**No more white flash between messages.** In dark mode, switching from one message to the next briefly showed a white bar with rounded corners under the card header. The reading pane now hides each message frame until its content is ready.
+
+**Account circles in Settings.** The Mail Accounts list shows each account's circle, with its picture, emoji or initials, where the provider icon was. The provider icon sits on the other side of the name and address and names the provider when hovered. The "GNOME Online Account" badge is now "GOA", with the full wording in its tooltip.
+
+**A roomier toolbar editor.** The Appearance page is a little wider so all six buttons of a group fit on one row, and each side of the reader toolbar holds at most six buttons.
+
+**The tray counts inboxes.** The tray icon's dot, tooltip and menu now count and list unread mail in your inboxes only, and the menu says "unread in Inboxes" so the number is clear. Folders that filters file into still count in the sidebar.
+
+**The language you choose now applies in the Flatpak.** Picking a language in Settings saved the choice but the Flatpak only carried the translation for the system's own language, so anything else fell back to English. Every translation now ships inside the app, and the RPM includes them too. Reported by [@somepaulo](https://github.com/somepaulo) (#183).
+
+**Translations.** Russian is updated for 1.28.0 by [@iliasen](https://github.com/iliasen) (#185), who also made the About entry translatable. French is complete again by [@frenchy82](https://github.com/frenchy82) (#184). Portuguese (Portugal) is updated and Brazilian Portuguese is new, both by [@somepaulo](https://github.com/somepaulo) (#182). Thank you all.
+
 ## What's new in 1.28.0
 
 **Arrange the reader toolbar.** Settings, Appearance, Toolbar lets you drag the reading pane's buttons between a left group, a right group and "Not shown", in the order you want. On a narrow pane only the right group folds into the ⋯ menu; the left group is always there. Right-click the empty part of the toolbar for "Customize Toolbar…".

@@ -109,9 +109,6 @@ msgstr ""
 msgid "Quit"
 msgstr ""
 
-msgid "About"
-msgstr ""
-
 msgid "Actions"
 msgstr ""
 
@@ -244,6 +241,9 @@ msgid "Console"
 msgstr ""
 
 msgid "Keyboard Shortcuts"
+msgstr ""
+
+msgid "About"
 msgstr ""
 
 msgid ""
@@ -722,14 +722,19 @@ msgstr ""
 msgid "Open Vireo"
 msgstr ""
 
-msgid "No unread mail"
-msgstr ""
-
-msgid "View all {n} unread…"
+msgid "View all {n} unread in Inboxes…"
 msgstr ""
 
 msgid "Accounts"
 msgstr ""
+
+msgid "No unread mail in Inboxes"
+msgstr ""
+
+msgid "{n} unread in Inboxes"
+msgid_plural "{n} unread in Inboxes"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr ""
@@ -1154,10 +1159,13 @@ msgstr ""
 msgid "Test SMTP"
 msgstr ""
 
+msgid "GOA"
+msgstr ""
+
 msgid "Vireo"
 msgstr ""
 
-msgid "Imported from GNOME Online Accounts"
+msgid "Imported GNOME Online Account"
 msgstr ""
 
 msgid "Added directly in Vireo"
@@ -1179,6 +1187,27 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Google (Gmail)"
+msgstr ""
+
+msgid "Microsoft 365 / Outlook"
+msgstr ""
+
+msgid "Proton Mail"
+msgstr ""
+
+msgid "Custom OAuth"
+msgstr ""
+
+msgid "IMAP/POP3 account"
+msgstr ""
+
+msgid "IMAP/POP3 account on {host}"
+msgstr ""
+
+msgid "Mail account"
+msgstr ""
 
 msgid ", tagged {tag}"
 msgstr ""
@@ -2347,13 +2376,13 @@ msgstr ""
 msgid "Left group"
 msgstr ""
 
-msgid "Always shown"
+msgid "Always shown · up to 6"
 msgstr ""
 
 msgid "Right group"
 msgstr ""
 
-msgid "Folds into ⋯ when narrow"
+msgid "Folds into ⋯ when narrow · up to 6"
 msgstr ""
 
 msgid "Not shown"

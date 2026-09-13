@@ -348,8 +348,8 @@ impl ToolbarEditor {
         list.set_selection_mode(gtk::SelectionMode::None);
         host.append(&list);
         for (side, title, hint) in [
-            (Some(ToolbarSide::Left), i18n("Left group"), i18n("Always shown")),
-            (Some(ToolbarSide::Right), i18n("Right group"), i18n("Folds into ⋯ when narrow")),
+            (Some(ToolbarSide::Left), i18n("Left group"), i18n("Always shown · up to 6")),
+            (Some(ToolbarSide::Right), i18n("Right group"), i18n("Folds into ⋯ when narrow · up to 6")),
             (None, i18n("Not shown"), i18n("Drop a button here to hide it")),
         ] {
             let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -404,6 +404,10 @@ impl ToolbarEditor {
                 let Ok(key) = value.get::<String>() else {
                     return false;
                 };
+                if !zone_has_room(&fb, side) {
+                    fb.set_gap(None);
+                    return false;
+                }
                 let index = fb.insertion_index(x, y);
                 fb.set_gap(None);
                 let _ = input.send(PrefInput::ToolbarDrop { key, side, index });
@@ -411,6 +415,10 @@ impl ToolbarEditor {
             });
             let fb = flow.clone();
             drop.connect_enter(move |_, x, y| {
+                // A full side takes nothing: no gap, no drop.
+                if !zone_has_room(&fb, side) {
+                    return gtk::gdk::DragAction::empty();
+                }
                 fb.add_css_class("drop-active");
                 fb.set_gap(Some(fb.insertion_index(x, y)));
                 gtk::gdk::DragAction::MOVE
@@ -418,6 +426,9 @@ impl ToolbarEditor {
             let fb = flow.clone();
             let el = empty_label.clone();
             drop.connect_motion(move |_, x, y| {
+                if !zone_has_room(&fb, side) {
+                    return gtk::gdk::DragAction::empty();
+                }
                 el.set_visible(false);
                 fb.set_gap(Some(fb.insertion_index(x, y)));
                 gtk::gdk::DragAction::MOVE
@@ -486,6 +497,47 @@ impl ToolbarEditor {
         chip.add_controller(drag);
         chip
     }
+}
+
+/// Set the content width of a preferences page: the clamp it lays its
+/// groups out in is not exposed, so it is found among the descendants.
+fn widen_page(page: &gtk::Widget, max: i32) {
+    fn walk(w: &gtk::Widget, max: i32) -> bool {
+        if let Some(clamp) = w.downcast_ref::<adw::Clamp>() {
+            clamp.set_maximum_size(max);
+            return true;
+        }
+        let mut child = w.first_child();
+        while let Some(c) = child {
+            if walk(&c, max) {
+                return true;
+            }
+            child = c.next_sibling();
+        }
+        false
+    }
+    if !walk(page, max) {
+        tracing::warn!("preferences: no clamp found on the page to widen");
+    }
+}
+
+/// Whether a zone can take the chip being dragged: the hidden zone always,
+/// a side while fewer than `TOOLBAR_SIDE_MAX` chips are on it. The chip
+/// being dragged is hidden in its own zone, so it is not counted there and
+/// moving within a full side still works.
+fn zone_has_room(flow: &ChipFlow, side: Option<ToolbarSide>) -> bool {
+    if side.is_none() {
+        return true;
+    }
+    let mut shown = 0;
+    let mut child = flow.first_child();
+    while let Some(c) = child {
+        if c.is_visible() {
+            shown += 1;
+        }
+        child = c.next_sibling();
+    }
+    shown < crate::config::TOOLBAR_SIDE_MAX
 }
 
 impl Preferences {
@@ -1012,6 +1064,7 @@ impl Component for Preferences {
                                 },
                             },
 
+                            #[name = "appearance_page"]
                             add_named[Some("appearance")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
                                     // Rendered as Pango markup — a bare "&" breaks it.
@@ -2529,6 +2582,9 @@ impl Component for Preferences {
         model.panels_stack = Some(widgets.panels_stack.clone());
         model.accounts_slot = Some(widgets.accounts_slot.clone());
         model.toolbar_editor = Some(ToolbarEditor::build(&widgets.toolbar_editor_box, &sender));
+        // The toolbar editor's zones want a row of six chips: the page's
+        // column is 40px wider than the stock preferences clamp allows.
+        widen_page(widgets.appearance_page.upcast_ref(), 640);
         model.rebuild_toolbar_chips();
         tracing::debug!("settings window: prefs tail E (sidebar rows built) at {:?}", t_init.elapsed());
         model.side_list = Some(widgets.side_list.clone());

@@ -116,9 +116,6 @@ msgstr "Imprimir mensagem…"
 msgid "Quit"
 msgstr "Sair"
 
-msgid "About"
-msgstr ""
-
 msgid "Actions"
 msgstr "Ações"
 
@@ -259,6 +256,9 @@ msgstr "Consola"
 
 msgid "Keyboard Shortcuts"
 msgstr "Atalhos de teclado"
+
+msgid "About"
+msgstr ""
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
@@ -770,14 +770,22 @@ msgstr "O gpg não encriptou a mensagem."
 msgid "Open Vireo"
 msgstr "Abrir o Vireo"
 
-msgid "No unread mail"
-msgstr "Nenhuma mensagem não lida"
-
-msgid "View all {n} unread…"
+#, fuzzy
+msgid "View all {n} unread in Inboxes…"
 msgstr "Ver todas as {n} não lidas…"
 
 msgid "Accounts"
 msgstr "Contas"
+
+#, fuzzy
+msgid "No unread mail in Inboxes"
+msgstr "Nenhuma mensagem não lida"
+
+#, fuzzy
+msgid "{n} unread in Inboxes"
+msgid_plural "{n} unread in Inboxes"
+msgstr[0] "{n} mensagem não lida"
+msgstr[1] "{n} mensagens não lidas"
 
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr ""
@@ -1259,10 +1267,14 @@ msgstr "Palavra-passe SMTP"
 msgid "Test SMTP"
 msgstr "Testar SMTP"
 
+msgid "GOA"
+msgstr ""
+
 msgid "Vireo"
 msgstr "Vireo"
 
-msgid "Imported from GNOME Online Accounts"
+#, fuzzy
+msgid "Imported GNOME Online Account"
 msgstr "Importada das Contas online do GNOME"
 
 msgid "Added directly in Vireo"
@@ -1284,6 +1296,29 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] "Ao fim de {n} dia"
 msgstr[1] "Ao fim de {n} dias"
+
+msgid "Google (Gmail)"
+msgstr ""
+
+msgid "Microsoft 365 / Outlook"
+msgstr ""
+
+msgid "Proton Mail"
+msgstr ""
+
+msgid "Custom OAuth"
+msgstr ""
+
+#, fuzzy
+msgid "IMAP/POP3 account"
+msgstr "Adicionar conta"
+
+msgid "IMAP/POP3 account on {host}"
+msgstr ""
+
+#, fuzzy
+msgid "Mail account"
+msgstr "Conta de correio"
 
 msgid ", tagged {tag}"
 msgstr ", com a etiqueta {tag}"
@@ -2585,13 +2620,15 @@ msgstr "A cada 30 minutos"
 msgid "Left group"
 msgstr "Grupo esquerdo"
 
-msgid "Always shown"
+#, fuzzy
+msgid "Always shown · up to 6"
 msgstr "Sempre mostrado"
 
 msgid "Right group"
 msgstr "Grupo direito"
 
-msgid "Folds into ⋯ when narrow"
+#, fuzzy
+msgid "Folds into ⋯ when narrow · up to 6"
 msgstr "Recolhido no menu ⋯ quando há pouco espaço"
 
 msgid "Not shown"
