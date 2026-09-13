@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.28.2 — 2026-09-13
+
+Sender logos from BIMI and a bundled set, wide mail that scrolls again
+in a narrow pane, drafts that are neither read nor unread, an evenly
+spaced Special Folders description, more room above the first account in
+the sidebar, and French.
+
+- **Sender logos, before the site's favicon.** Two sources now come
+  ahead of the 32px favicon a page declares (`src/logo.rs`). BIMI: the
+  SVG a sender publishes for mail clients, named by the DNS TXT record
+  at `default._bimi.<domain>` (the sending host first, then the
+  registrable domain), resolved through GLib and fetched from the
+  sender's own site (https only, 64KB at most, SVG only); a confirmed
+  no-record is remembered for a week, a resolver or network failure is
+  not. A bundled set: `data/logos/`, about 220 sender domains mapped to
+  marks from gilbarbara/logos, Simple Icons and the app's own service
+  marks, built by `tools/fetch-logos.py` into an embedded `logos.toml`
+  and a compiled `logos.gresource` (~316KB), shown with no request at
+  all. Every SVG is re-framed to a 160px square (`square_svg`) and
+  rasterised with `GdkTexture`, which also lets site discovery take the
+  SVG icons a page or manifest declares. Precedence: a stored BIMI logo,
+  a fresh BIMI lookup, a bundled mark, the stored or fetched favicon.
+  Still behind Privacy → "Show sender logos", whose text now says what
+  is and isn't fetched. `VIREO_LOGO_PROBE=<address>` logs which source
+  answers for a sender.
+- **Wide mail scrolls again in a narrow pane.** A message whose layout
+  grows with the frame width (640px tables inside 100% cells) was
+  widened once and then measured wider still, so the frame's own
+  document stayed horizontally scrollable and WebKit latched the wheel
+  to it — vertical scrolling stopped whenever the pane was narrower than
+  the mail. The sizing script now widens repeatedly until the content
+  stops growing (up to eight passes) and every frame document's root is
+  `overflow:hidden`, so whatever is left over is clipped rather than
+  scrollable and a frame can never capture the wheel. Printing keeps
+  overflow visible.
+- **Drafts are neither read nor unread.** A draft is a message being
+  written, so the read/unread toggle is withheld wherever it appeared on
+  a draft — the row's right-click menu and its "Mark All" form, the
+  action palette, the multi-select menu and the bulk bar — when the list
+  shows Drafts, and `set_read` refuses a read change on a draft so
+  nothing reaches the server and the chip is never adjusted. The empty
+  reading pane in Drafts now reads "No draft selected. Choose a draft
+  from the list to edit it here." under a pencil.
+- **Special Folders description.** Its subheading no longer renders with
+  stretched word spacing. libadwaita 1.9 paints a preferences-group
+  description fill-justified when the text is shorter than the label,
+  though `GtkLabel::justify()` reports left; the account editor now
+  left-justifies its wrapping labels. The wording reads "Automatically
+  follows…".
+- **More room in the sidebar.** The first account's header sits 10px
+  below whatever ends the unified block above it (a unified row, Filters
+  or Tags), so the two read as separate groups. Nothing changes when no
+  unified block is shown.
+- **French** is complete again for the 1.28.1 strings by
+  [@frenchy82](https://github.com/frenchy82) (#186): 1096 of 1096,
+  nothing fuzzy.
+
 ## 1.28.1 — 2026-09-13
 
 A white flash between messages fixed, account circles and provider marks

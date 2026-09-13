@@ -2,6 +2,16 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.28.2
+
+**Sender logos.** With "Show sender logos" on (Settings, Privacy), Vireo now shows a sender's real mark where it can: the logo a sender publishes for mail clients (BIMI), or one from a bundled set of about 220 common senders that needs no network request at all, falling back to the site's own icon. Chase, Bank of America, Spotify, Amazon and many others show their brand.
+
+**Wide mail scrolls again.** A message wider than a narrow reading pane could catch the mouse wheel so the page wouldn't scroll up or down. Wide layouts are now fit to the pane and can no longer capture the wheel.
+
+**Drafts aren't read or unread.** A draft is a message you're still writing, so the "Mark as Read" and "Mark as Unread" actions no longer appear on drafts.
+
+**Translations.** French is complete again by [@frenchy82](https://github.com/frenchy82) (#186).
+
 ## What's new in 1.28.1
 
 **No more white flash between messages.** In dark mode, switching from one message to the next briefly showed a white bar with rounded corners under the card header. The reading pane now hides each message frame until its content is ready.

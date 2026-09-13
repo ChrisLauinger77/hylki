@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.28.2" date="2026-09-13">
+      <description>
+        <p>Sender logos from BIMI and a bundled set of common senders, wide mail that scrolls again in a narrow pane, drafts that are neither read nor unread, an evenly spaced Special Folders description, more room above the first account in the sidebar, and an updated French translation.</p>
+      </description>
+    </release>
     <release version="1.28.1" date="2026-09-13">
       <description>
         <p>A white flash between messages in dark mode fixed, account circles and provider marks in the accounts list, a wider toolbar editor with six buttons a side, a tray count that names what it counts, the chosen language now applying in the Flatpak and shipping in the RPM, and updated Russian, French and Portuguese translations plus Brazilian Portuguese.</p>
