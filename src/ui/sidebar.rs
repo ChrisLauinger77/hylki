@@ -2014,7 +2014,7 @@ impl Sidebar {
         // them off, for those who work from the unified section alone.
         let account_sections: Vec<&SectionData> =
             if self.show_accounts { sections.iter().collect() } else { Vec::new() };
-        for section in account_sections {
+        for (section_idx, section) in account_sections.into_iter().enumerate() {
             let id = section.account.id;
 
             // Header: avatar circle + name/email on the left, chevron on the right.
@@ -2200,6 +2200,12 @@ impl Sidebar {
                 }
             });
             header.add_controller(motion);
+            // The first account sits 10px further below the unified block
+            // above it (when there is one), so the two read as separate
+            // groups (Jason, 2026-09-13).
+            if section_idx == 0 && container.first_child().is_some() {
+                header.set_margin_top(10);
+            }
             container.append(&header);
 
             // Animated folder list.
