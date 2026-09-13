@@ -4172,6 +4172,14 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     // ahead of the email's own CSS, so a message that styles its body (a
     // full-bleed design, say) still wins.
     let body_pad = "body{margin:0;padding:20px;box-sizing:border-box;}";
+    // The frame's own document must never scroll: WebKit latches a wheel
+    // gesture to the innermost scrollable area under the pointer, and a
+    // frame document that can scroll sideways (a message wider than the
+    // pane whose width grows as the frame is widened, so the widening
+    // never quite catches it) swallows the vertical deltas the page
+    // needed. The wrapper widens the frame to the content and scrolls it
+    // in `.vireo-pan`; whatever is left over is clipped rather than
+    // scrollable. `scrollWidth`/`scrollHeight` still measure the content.
     // `color-scheme` makes the browser's default colours (for content that sets
     // none of its own) follow the app's light/dark setting; styled emails keep
     // their own colours untouched.
@@ -4180,7 +4188,8 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     let theme = format!(
         "<meta name=\"color-scheme\" content=\"{supported}\">\
          <style>:root{{color-scheme:{scheme};}}{body_pad}\
-         @media print{{:root{{color-scheme:light;}}html,body{{background:#fff !important;}}}}\
+         html{{overflow:hidden !important;}}\
+         @media print{{:root{{color-scheme:light;}}html{{overflow:visible !important;}}html,body{{background:#fff !important;}}}}\
          </style>"
     );
     // `no-referrer` keeps the synthetic `vireo.localhost` base URI from leaking as
@@ -4298,8 +4307,8 @@ var b=d.body,e=d.documentElement;\
 var sy=window.scrollY;var _r=f.getBoundingClientRect();\
 var above=_r.bottom<=0;var old=_r.height||0;\
 f.style.width='';void f.offsetWidth;\
-var w=Math.max(b?b.scrollWidth:0,e?e.scrollWidth:0);\
-if(w>f.clientWidth+1)f.style.width=w+'px';\
+for(var k=0;k<8;k++){var w=Math.max(b?b.scrollWidth:0,e?e.scrollWidth:0);\
+if(w<=f.clientWidth+1)break;f.style.width=w+'px';void f.offsetWidth;}\
 var prev=f.style.height;f.style.height='0px';void f.offsetHeight;\
 var h=Math.max(b?b.scrollHeight:0,e?e.scrollHeight:0,b?b.offsetHeight:0);\
 if(h>0){f.style.height=h+'px';\

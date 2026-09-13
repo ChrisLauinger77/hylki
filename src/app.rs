@@ -3263,6 +3263,16 @@ impl SimpleComponent for AppModel {
                         });
                     });
                 }
+                // VIREO_SHOWCASE_ROW=N selects the list's row N at 4s (with
+                // VIREO_SHOWCASE_STAGE=0), for capturing or probing one message.
+                if let Some(Ok(n)) = std::env::var("VIREO_SHOWCASE_ROW").ok().map(|v| v.parse::<u32>()) {
+                    let list = model.message_list.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(4, move || {
+                        for _ in 0..=n {
+                            let _ = list.send(MessageListInput::MoveSelection(1));
+                        }
+                    });
+                }
                 // VIREO_SHOWCASE_UNIFIED=sent|starred|drafts opens that unified
                 // row at 3s, All Inboxes at 6s and the row again at 9s, so the
                 // timing logs show a cold and a warm open.
