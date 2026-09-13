@@ -31,6 +31,11 @@ const PAGE_SIZE: u32 = 120;
 /// already there by the time the user reaches it.
 const LOAD_MORE_MARGIN: f64 = 700.0;
 
+/// How long typing has to pause before the search runs, in ms. Each search is a
+/// query over the whole archive and a rebuilt grid, so running one per keystroke
+/// would spend most of its time on words half-typed.
+const SEARCH_DEBOUNCE_MS: u32 = 250;
+
 /// One page's worth of question for the cache: everything the database needs to
 /// narrow and order the archive before cutting the page out of it.
 #[derive(Debug, Clone)]
@@ -153,6 +158,8 @@ pub struct AttachmentsGallery {
     included: HashMap<u32, HashMap<String, bool>>,
     /// Debounce for the size slider — one rebuild after the drag settles.
     resize_timer: Option<glib::SourceId>,
+    /// Debounce for the search box — one query after the typing settles.
+    query_timer: Option<glib::SourceId>,
     flow: gtk::FlowBox,
     /// The table view's rows (the grid's sibling stack page).
     table: gtk::ListBox,
@@ -189,7 +196,10 @@ pub enum GalleryInput {
     Fetched { account_id: u32, uid: u32, items: Vec<crate::models::Attachment> },
     /// Filter the grid to items matching this search text (sender, subject,
     /// filename, folder, and type keywords like "pdf" or "spreadsheet").
+    /// Debounced — the query itself runs on [`GalleryInput::ApplyQuery`].
     SetQuery(String),
+    /// The typing settled — run the search.
+    ApplyQuery,
     /// Re-sort the grid; the value is the sort dropdown's selected row index.
     SetSort(u32),
     /// A table column header was clicked: sort by that column, or flip its
@@ -240,6 +250,11 @@ pub enum GalleryInput {
     /// Showcase only (VIREO_SHOWCASE_GALLERY_FOLDERS): drop the footer's
     /// folder popover open so a capture can see it.
     ShowcaseFolders,
+    /// Showcase only (VIREO_SHOWCASE_GALLERY_SEARCH): focus the search box and
+    /// put text in it, as typing would, then report whether the box still has
+    /// the focus once the search has run. Guards the bug where a search that
+    /// matched nothing hid the toolbar the box lives in.
+    ShowcaseSearch(String),
 }
 
 #[derive(Debug)]
@@ -273,8 +288,9 @@ impl Component for AttachmentsGallery {
                     add_css_class: "gallery-toolbar",
                     set_spacing: 8,
                     #[watch]
-                    set_visible: !model.all_items.is_empty(),
+                    set_visible: model.show_chrome(),
 
+                    #[name = "search_entry"]
                     gtk::SearchEntry {
                         set_hexpand: true,
                         set_placeholder_text: Some(i18n("Search by sender, subject, type, filename…").as_str()),
@@ -452,7 +468,7 @@ impl Component for AttachmentsGallery {
                 gtk::ActionBar {
                     add_css_class: "gallery-footer",
                     #[watch]
-                    set_revealed: !model.all_items.is_empty(),
+                    set_revealed: model.show_chrome(),
 
                     pack_start = &gtk::Box {
                         add_css_class: "linked",
@@ -816,6 +832,7 @@ impl Component for AttachmentsGallery {
             overrides,
             included: HashMap::new(),
             resize_timer: None,
+            query_timer: None,
             flow: gtk::FlowBox::new(),
             table: gtk::ListBox::new(),
             folder_list: gtk::ListBox::new(),
@@ -864,25 +881,24 @@ impl Component for AttachmentsGallery {
     ) {
         match msg {
             GalleryInput::Page { items, total, offset } => {
-                // A page for a query that has since changed: the offset no
-                // longer lines up with what is loaded, so it would interleave
-                // rows from two different orderings. Drop it and wait for the
-                // page the current query asked for.
-                if offset as usize != self.all_items.len() {
-                    if offset == 0 {
-                        self.all_items.clear();
-                    } else {
-                        return;
-                    }
+                if offset == 0 {
+                    // The first page of a fresh query replaces everything.
+                    self.all_items = items;
+                } else if offset as usize == self.all_items.len() {
+                    self.all_items.extend(items);
+                } else {
+                    // A page for a query that has since changed: its offset no
+                    // longer lines up with what is loaded, so appending it
+                    // would interleave rows from two different orderings. Drop
+                    // it and wait for the page the current query asked for.
+                    self.loading_more = false;
+                    self.update_view(widgets, sender);
+                    return;
                 }
-                let grew = !items.is_empty();
-                self.all_items.extend(items);
                 self.total = total;
                 self.loading = false;
                 self.loading_more = false;
-                if grew || offset == 0 {
-                    self.rebuild_view(&sender);
-                }
+                self.rebuild_view(&sender);
             }
             GalleryInput::LoadMore => self.load_more(&sender),
             GalleryInput::ScanProgress => {
@@ -919,8 +935,19 @@ impl Component for AttachmentsGallery {
             GalleryInput::SetQuery(q) => {
                 if self.query != q {
                     self.query = q;
-                    self.reload(&sender);
+                    if let Some(t) = self.query_timer.take() {
+                        t.remove();
+                    }
+                    let s = sender.clone();
+                    self.query_timer = Some(glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(SEARCH_DEBOUNCE_MS as u64),
+                        move || s.input(GalleryInput::ApplyQuery),
+                    ));
                 }
+            }
+            GalleryInput::ApplyQuery => {
+                self.query_timer = None;
+                self.reload(&sender);
             }
             GalleryInput::SetSort(i) => {
                 let sort = GallerySort::from_index(i);
@@ -1081,6 +1108,36 @@ impl Component for AttachmentsGallery {
             GalleryInput::ContextMenu { index, x, y } => {
                 self.show_context_menu(index, x, y, &sender)
             }
+            GalleryInput::ShowcaseSearch(text) => {
+                let entry = widgets.search_entry.clone();
+                entry.grab_focus();
+                // Goes through `search-changed`, so this is the same path a
+                // typed character takes, debounce and all.
+                entry.set_text(&text);
+                glib::timeout_add_seconds_local_once(2, move || {
+                    // `has_focus` also needs the window to be the active one,
+                    // which it need not be under a private bus; `is_focus` is
+                    // the question actually being asked — is this still the
+                    // toplevel's focus widget.
+                    let focus = entry
+                        .root()
+                        .and_downcast::<gtk::Window>()
+                        .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w));
+                    // A GtkSearchEntry is composite: the focus widget is the
+                    // GtkText inside it, so ask whether the focus is anywhere
+                    // within the entry rather than whether it *is* the entry.
+                    let kept = focus
+                        .as_ref()
+                        .is_some_and(|f| f == entry.upcast_ref::<gtk::Widget>() || f.is_ancestor(&entry));
+                    tracing::info!(
+                        target: "vireo::showcase",
+                        "gallery search focus: kept={kept} holder={} toolbar_visible={} text={:?}",
+                        focus.map(|w| w.type_().name().to_string()).unwrap_or_else(|| "none".into()),
+                        entry.parent().is_some_and(|p| p.is_visible()),
+                        entry.text()
+                    );
+                });
+            }
             GalleryInput::ShowcaseFolders => {
                 widgets.folders_button.popup();
                 // A popover is its own surface, so the window snapshot never
@@ -1117,6 +1174,14 @@ impl AttachmentsGallery {
         }
     }
 
+    /// Whether the search bar and the footer are on show. They stay up while a
+    /// search narrows the gallery to nothing: the entry being typed into lives
+    /// in the toolbar, and a toolbar that hid itself the moment a query matched
+    /// nothing would take the focus with it mid-word.
+    fn show_chrome(&self) -> bool {
+        !self.all_items.is_empty() || self.is_narrowed() || self.scan_remaining > 0
+    }
+
     /// Whether the user has narrowed the view at all. Used only to choose
     /// between the two empty states, so an archive with no attachments in it
     /// doesn't tell the user to try a different search they never made.
@@ -1127,14 +1192,19 @@ impl AttachmentsGallery {
     /// Ask for the first page again, dropping whatever is loaded: what every
     /// change to the scope, the search, the type filter or the sort has to do,
     /// because all four are applied by the database and not here.
+    /// Ask for the first page again: what every change to the scope, the
+    /// search, the type filter or the sort has to do, because all four are
+    /// applied by the database and not here.
+    ///
+    /// What is already on screen deliberately stays there until the
+    /// replacement page arrives. Emptying the list first would take the
+    /// toolbar and footer down with it — and the search entry lives in the
+    /// toolbar, so a search would lose the focus of whoever was typing it
+    /// after the first letter.
     fn reload(&mut self, sender: &ComponentSender<Self>) {
-        self.all_items.clear();
-        self.total = 0;
         self.preview = None;
         self.preview_texture = None;
         self.loading = true;
-        self.loading_more = false;
-        self.rebuild_view(sender);
         self.request_page(0, sender);
     }
 

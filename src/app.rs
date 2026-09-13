@@ -3394,6 +3394,9 @@ impl SimpleComponent for AppModel {
                             .ok()
                             .and_then(|v| v.parse().ok());
                         let folders = std::env::var("VIREO_SHOWCASE_GALLERY_FOLDERS").is_ok();
+                        // VIREO_SHOWCASE_GALLERY_SEARCH=<text> types into the
+                        // search box and reports whether it keeps the focus.
+                        let search = std::env::var("VIREO_SHOWCASE_GALLERY_SEARCH").ok();
                         // VIREO_SHOWCASE_GALLERY_MORE=<n> pages down n times,
                         // as scrolling to the end would.
                         let more: u32 = std::env::var("VIREO_SHOWCASE_GALLERY_MORE")
@@ -3409,6 +3412,9 @@ impl SimpleComponent for AppModel {
                                 gtk::glib::timeout_add_seconds_local_once(1 + i, move || {
                                     let _ = g.send(GalleryInput::LoadMore);
                                 });
+                            }
+                            if let Some(text) = search {
+                                let _ = g.send(GalleryInput::ShowcaseSearch(text));
                             }
                             if folders {
                                 let _ = g.send(GalleryInput::ShowcaseFolders);
