@@ -408,6 +408,33 @@ struct ConfigFile {
     accounts: Vec<AccountConfig>,
 }
 
+/// Demo mode's edited stand-in accounts (`~/.config/vireo/demo-accounts.toml`):
+/// what the Accounts panel changed on the sample accounts (colour, emoji,
+/// picture, label), kept apart from the real accounts file so the demo
+/// stays a demo. `None` when there is none, or it is empty.
+pub fn load_demo_accounts() -> Option<Vec<AccountConfig>> {
+    let path = demo_accounts_path()?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let cfg = toml::from_str::<ConfigFile>(&text).ok()?;
+    (!cfg.accounts.is_empty()).then_some(cfg.accounts)
+}
+
+pub fn save_demo_accounts(accounts: &[AccountConfig]) -> std::io::Result<()> {
+    use std::io::{Error, ErrorKind};
+    let path =
+        demo_accounts_path().ok_or_else(|| Error::new(ErrorKind::NotFound, "no config directory"))?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let file = ConfigFile { accounts: accounts.to_vec() };
+    let toml = toml::to_string_pretty(&file).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
+    write_private(&path, &toml)
+}
+
+fn demo_accounts_path() -> Option<PathBuf> {
+    Some(config_base()?.join("vireo").join("demo-accounts.toml"))
+}
+
 /// Path to the accounts config file (`~/.config/vireo/accounts.toml`).
 pub fn path() -> Option<PathBuf> {
     Some(config_base()?.join("vireo").join("accounts.toml"))

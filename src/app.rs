@@ -166,6 +166,10 @@ pub struct AppModel {
     /// Counts scans, so a stale timeout cannot end a later one.
     tag_scan_gen: u32,
     config: Vec<AccountConfig>,
+    /// Demo mode's stand-in account configs (the sample accounts live only
+    /// at the backend): what the Accounts panel edits, kept in memory so a
+    /// changed colour, emoji or picture shows without touching disk.
+    demo_config: Vec<AccountConfig>,
     window: adw::ApplicationWindow,
     prefs: Option<Controller<Preferences>>,
     accounts_win: Option<Controller<AccountsWindow>>,
@@ -2143,6 +2147,7 @@ impl SimpleComponent for AppModel {
             mid_searches: HashMap::new(),
             tag_scan: None,
             tag_scan_gen: 0,
+            demo_config: if demo_mode() && config.is_empty() { demo_account_configs_saved() } else { Vec::new() },
             config,
             window: root.clone(),
             prefs: None,
@@ -6095,6 +6100,23 @@ impl SimpleComponent for AppModel {
             AppMsg::AddFirstAccount => self.open_settings_window(&sender, true, true),
 
             AppMsg::AccountSaved { original_email, account } => {
+                // Demo mode: the edit lands on the in-memory stand-in (so a
+                // new colour, emoji or picture shows in the sidebar and the
+                // reader at once) and nothing is written or reconnected.
+                if self.config.is_empty() && demo_mode() {
+                    let slot = original_email
+                        .as_ref()
+                        .and_then(|orig| self.demo_config.iter_mut().find(|c| &c.email == orig));
+                    match slot {
+                        Some(slot) => *slot = *account,
+                        None => self.demo_config.push(*account),
+                    }
+                    if let Err(e) = config::save_demo_accounts(&self.demo_config) {
+                        tracing::warn!("could not save the demo accounts: {e}");
+                    }
+                    self.rebuild_sidebar();
+                    return;
+                }
                 let new_email = account.email.clone();
                 // Remember the secret we expect to persist, so we can verify the
                 // keyring actually stored it (a silent keyring failure would
@@ -8188,7 +8210,7 @@ impl AppModel {
 
     /// Resolved avatar/accent colour for an account (custom, else auto accent).
     fn account_color(&self, account_id: u32) -> String {
-        self.config
+        self.effective_config()
             .get(account_id.saturating_sub(1) as usize)
             .and_then(|c| c.color.clone())
             .or_else(|| {
@@ -8222,8 +8244,18 @@ impl AppModel {
 
     /// An account's avatar picture (#162), when one is set and its file is
     /// still there.
+    /// The configs the UI describes accounts from: the real ones, or the
+    /// demo's in-memory stand-ins while no account is configured.
+    fn effective_config(&self) -> &[AccountConfig] {
+        if self.config.is_empty() && demo_mode() {
+            &self.demo_config
+        } else {
+            &self.config
+        }
+    }
+
     fn account_avatar(&self, account_id: u32) -> Option<std::path::PathBuf> {
-        self.config
+        self.effective_config()
             .get(account_id.saturating_sub(1) as usize)
             .and_then(|c| c.avatar.as_deref())
             .and_then(config::avatar_path)
@@ -8231,16 +8263,9 @@ impl AppModel {
 
     /// Custom avatar emoji for an account, if set.
     fn account_emoji(&self, account_id: u32) -> Option<String> {
-        // Demo mode only: showcase the emoji-avatar feature on the sample accounts.
-        if self.config.is_empty() && demo_mode() {
-            return match account_id {
-                1 => Some("🚀".into()),
-                2 => Some("🦀".into()),
-                3 => Some("🌿".into()),
-                _ => None,
-            };
-        }
-        self.config
+        // In demo mode the sample accounts' emoji come from the stand-in
+        // configs, which the Accounts panel can edit.
+        self.effective_config()
             .get(account_id.saturating_sub(1) as usize)
             .and_then(|c| c.emoji.clone())
     }
@@ -8767,13 +8792,7 @@ impl AppModel {
         let mut map = std::collections::HashMap::new();
         // The demo's accounts live only at the backend, so give the
         // Accounts panel's stand-in configs their folders as well.
-        let demo;
-        let cfgs: &[AccountConfig] = if self.config.is_empty() && demo_mode() {
-            demo = demo_account_configs();
-            &demo
-        } else {
-            &self.config
-        };
+        let cfgs: &[AccountConfig] = self.effective_config();
         for (i, cfg) in cfgs.iter().enumerate() {
             let id = i as u32 + 1;
             let list = self
@@ -12062,7 +12081,7 @@ impl AppModel {
         // the Accounts panel would sit empty in screenshots — hand it
         // matching stand-in configs instead.
         if accounts.is_empty() && demo_mode() {
-            accounts = demo_account_configs();
+            accounts = self.demo_config.clone();
         }
         // The accounts panel component (embedded behind the "Accounts" tab).
         crate::ui::accounts::AccountsInit {
@@ -13573,6 +13592,23 @@ fn focus_matches(window: &adw::ApplicationWindow, include_web_view: bool) -> boo
 /// Stand-in [`AccountConfig`]s mirroring the demo backend's three accounts
 /// (same names, colours and emoji), so the Accounts window has something to
 /// show in demo screenshots.
+/// The demo's stand-in accounts as last edited in the Accounts panel, or
+/// the stock ones. The stand-in secret is not serialised, so it is put
+/// back on load (the editor will not save an account without one).
+fn demo_account_configs_saved() -> Vec<AccountConfig> {
+    match config::load_demo_accounts() {
+        Some(mut saved) => {
+            for a in saved.iter_mut() {
+                if a.password.is_empty() {
+                    a.password = "demo".into();
+                }
+            }
+            saved
+        }
+        None => demo_account_configs(),
+    }
+}
+
 fn demo_account_configs() -> Vec<AccountConfig> {
     let mk = |name: &str, email: &str, color: &str, emoji: &str| AccountConfig {
         name: name.into(),
@@ -13583,7 +13619,9 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         smtp_host: format!("smtp.{}", email.split('@').nth(1).unwrap_or("example.com")),
         smtp_port: 587,
         username: email.into(),
-        password: String::new(),
+        // A stand-in secret: the account editor refuses to save an account
+        // without one, and the demo's private bus has no keyring to ask.
+        password: "demo".into(),
         smtp_separate: false,
         smtp_username: String::new(),
         smtp_password: String::new(),
