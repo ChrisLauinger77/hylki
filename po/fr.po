@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-12 16:42+0200\n"
+"PO-Revision-Date: 2026-09-13 10:40+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -115,6 +115,9 @@ msgstr "Imprimer le message…"
 msgid "Quit"
 msgstr "Quitter"
 
+msgid "About"
+msgstr ""
+
 msgid "Actions"
 msgstr "Actions"
 
@@ -161,7 +164,7 @@ msgid "Could not add contact: {e}"
 msgstr "Impossible d'ajouter le contact : {e}"
 
 msgid "The language applies the next time Vireo starts."
-msgstr ""
+msgstr "La langue s'appliquera au prochain démarrage de Vireo."
 
 msgid "Save Attachment"
 msgstr "Enregistrer la pièce jointe"
@@ -1885,17 +1888,14 @@ msgstr "Envoyer plus tard"
 msgid "Send now"
 msgstr "Envoyer maintenant"
 
-#, fuzzy
 msgid "Tomorrow morning ({time})"
-msgstr "Demain matin (8:00)"
+msgstr "Demain matin ({time})"
 
-#, fuzzy
 msgid "Tomorrow afternoon ({time})"
-msgstr "Demain après-midi (13:00)"
+msgstr "Demain après-midi ({time})"
 
-#, fuzzy
 msgid "Monday morning ({time})"
-msgstr "Lundi matin (8:00)"
+msgstr "Lundi matin ({time})"
 
 msgid "Pick a date and time…"
 msgstr "Choisir une date et une heure…"
@@ -1906,9 +1906,8 @@ msgstr "Chiffrer avec OpenPGP en utilisant la clé de chaque destinataire"
 msgid "Sign with your OpenPGP key"
 msgstr "Signez avec votre clé OpenPGP"
 
-#, fuzzy
 msgid "Plain text: send without formatting"
-msgstr "Coller avec la mise en forme"
+msgstr "Texte brut : envoyer sans formatage"
 
 msgid "Attach files"
 msgstr "Joindre des fichiers"
@@ -1952,13 +1951,11 @@ msgstr "Plus"
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Afficher Cc, Cci et Répondre à"
 
-#, fuzzy
 msgid "Send with formatting"
-msgstr "Coller avec la mise en forme"
+msgstr "Envoyer avec formatage"
 
-#, fuzzy
 msgid "Send as plain text"
-msgstr "Coller comme texte brut"
+msgstr "Envoyer en texte brut"
 
 msgid "Upload to Cloud Storage"
 msgstr "Téléverser vers un stockage en ligne"
@@ -2244,7 +2241,7 @@ msgid "Copied"
 msgstr "Copié"
 
 msgid "Double-click to open in a new window"
-msgstr ""
+msgstr "Double-cliquez pour ouvrir dans une nouvelle fenêtre"
 
 #. Same order as the reader toolbar and the list's
 #. Actions Palette, View Source closing the line.
@@ -3139,21 +3136,21 @@ msgstr ""
 "couleur d'accentuation."
 
 msgid "Plain-text messages in monospace"
-msgstr ""
+msgstr "Messages en texte brut en monospace"
 
 msgid ""
 "Show messages sent as plain text in a fixed-width font, so columns and code "
 "line up. Formatted messages are not affected."
 msgstr ""
+"Affichez les messages envoyés sous forme de texte brut dans une police à "
+"largeur fixe, afin que les colonnes et le code s'alignent. Les messages "
+"formatés ne sont pas affectés."
 
-#, fuzzy
 msgid "Monospace font"
-msgstr "Police du message"
+msgstr "Police monospace"
 
-#, fuzzy
 msgid "The system's monospace font unless another is chosen."
-msgstr ""
-"La police par défaut de l'interface, sauf si une autre est sélectionnée."
+msgstr "La police à espacement fixe du système, sauf si une autre est choisie."
 
 msgid "Message card actions"
 msgstr "Actions sur la carte du message"
@@ -3226,15 +3223,17 @@ msgstr ""
 "Désactivé, le collage conserve sa mise en forme. Un clic droit dans "
 "l'éditeur propose toujours les deux options."
 
-#, fuzzy
 msgid "Compose in plain text"
-msgstr "Coller comme texte brut"
+msgstr "Rédiger en texte brut"
 
 msgid ""
 "New messages, replies and forwards start as plain text, sent without "
 "formatting. The composer's Plain text button switches either way for one "
 "message."
 msgstr ""
+"Les nouveaux messages, réponses et transferts commencent sous forme de texte "
+"brut, envoyé sans formatage. Le bouton Texte brut du compositeur bascule "
+"dans un sens ou dans l'autre pour un message."
 
 msgid "Spelling"
 msgstr "Orthographe"
@@ -3338,6 +3337,9 @@ msgid ""
 "The language Vireo is shown in. \"System\" follows the desktop, with English "
 "where no translation exists. A change applies the next time Vireo starts."
 msgstr ""
+"La langue dans laquelle Vireo est affiché. \"Système\" suit le bureau, avec "
+"l'anglais là où aucune traduction n'existe. Un changement s'appliquera au "
+"prochain démarrage de Vireo."
 
 msgid "Keep running in the background"
 msgstr "Maintenir l'exécution en arrière-plan"
@@ -3673,6 +3675,8 @@ msgid ""
 "Choosing another language restarts Vireo: it closes for a moment and this "
 "wizard comes back in that language."
 msgstr ""
+"Le choix d'une autre langue redémarre Vireo : il se ferme un instant et cet "
+"assistant revient dans cette langue."
 
 msgid "Get Started"
 msgstr "Commencer"
