@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-13 10:40+0200\n"
+"PO-Revision-Date: 2026-09-13 15:29+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -257,7 +257,7 @@ msgid "Keyboard Shortcuts"
 msgstr "Raccourcis clavier"
 
 msgid "About"
-msgstr ""
+msgstr "À propos"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
@@ -772,22 +772,19 @@ msgstr "gpg n'a pas chiffré le message."
 msgid "Open Vireo"
 msgstr "Ouvrir Vireo"
 
-#, fuzzy
 msgid "View all {n} unread in Inboxes…"
-msgstr "Voir les {n} non lus…"
+msgstr "Afficher tous les {n} non lus dans les boîtes de réception…"
 
 msgid "Accounts"
 msgstr "Comptes"
 
-#, fuzzy
 msgid "No unread mail in Inboxes"
-msgstr "Aucun message non lu"
+msgstr "Aucun courrier non lu dans les boîtes de réception"
 
-#, fuzzy
 msgid "{n} unread in Inboxes"
 msgid_plural "{n} unread in Inboxes"
-msgstr[0] "{n} message non lu"
-msgstr[1] "{n} messages non lus"
+msgstr[0] "{n} non lu dans les boîtes de réception"
+msgstr[1] "{n} non lu dans les boîtes de réception"
 
 msgid "Requires an app-specific password (not your normal login password)."
 msgstr ""
@@ -1270,14 +1267,13 @@ msgid "Test SMTP"
 msgstr "Tester le SMTP"
 
 msgid "GOA"
-msgstr ""
+msgstr "GOA"
 
 msgid "Vireo"
 msgstr "Vireo"
 
-#, fuzzy
 msgid "Imported GNOME Online Account"
-msgstr "Importé depuis Comptes en ligne GNOME"
+msgstr "Compte en ligne GNOME importé"
 
 msgid "Added directly in Vireo"
 msgstr "Ajouté directement dans Vireo"
@@ -1300,25 +1296,23 @@ msgstr[0] "Au bout de {n} jour"
 msgstr[1] "Au bout de {n} jours"
 
 msgid "Google (Gmail)"
-msgstr ""
+msgstr "Google (Gmail)"
 
 msgid "Microsoft 365 / Outlook"
-msgstr ""
+msgstr "Microsoft 365 / Outlook"
 
 msgid "Proton Mail"
-msgstr ""
+msgstr "Proton Mail"
 
 msgid "Custom OAuth"
-msgstr ""
+msgstr "OAuth personnalisé"
 
-#, fuzzy
 msgid "IMAP/POP3 account"
-msgstr "Ajouter un compte"
+msgstr "Compte IMAP/POP3"
 
 msgid "IMAP/POP3 account on {host}"
-msgstr ""
+msgstr "Compte IMAP/POP3 sur {host}"
 
-#, fuzzy
 msgid "Mail account"
 msgstr "Compte e-mail"
 
@@ -2627,16 +2621,14 @@ msgstr "Toutes les 30 minutes"
 msgid "Left group"
 msgstr "Groupe de gauche"
 
-#, fuzzy
 msgid "Always shown · up to 6"
-msgstr "Toujours affiché"
+msgstr "Toujours affiché · jusqu'à 6"
 
 msgid "Right group"
 msgstr "Groupe de droite"
 
-#, fuzzy
 msgid "Folds into ⋯ when narrow · up to 6"
-msgstr "Se plie en ⋯ lorsqu'il est étroit"
+msgstr "Se plie en ⋯ lorsqu'il est étroit · jusqu'à 6"
 
 msgid "Not shown"
 msgstr "Non affiché"
