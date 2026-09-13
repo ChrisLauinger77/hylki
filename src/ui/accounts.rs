@@ -1207,7 +1207,9 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Special Folders"),
                                 set_description: Some(
-                                    i18n("Where sent, deleted and junk mail goes. Automatic                                      follows the server's own markings; pick a folder                                      when a role isn't detected or lands wrong.").as_str()
+                                    i18n("Where sent, deleted and junk mail goes. Automatically follows the \
+                                          server's own markings; pick a folder when a role isn't \
+                                          detected or lands wrong.").as_str()
                                 ),
 
                                 #[name = "folder_sent_row"]
@@ -1363,6 +1365,12 @@ impl Component for AccountsWindow {
         senders_box.set_visible(!model.sender_addrs.is_empty());
         blacklist_box.set_visible(!model.blacklist_addrs.is_empty());
         let widgets = view_output!();
+        // Left-justify the editor's wrapping labels (its group descriptions):
+        // libadwaita 1.9 renders a group description fill-justified when its
+        // text does not naturally fill the label's width, stretching the word
+        // gaps (most visible on Special Folders, whose description spans the
+        // full width). Single-line row labels are untouched.
+        left_justify_wrapping_labels(&widgets.editor_page.clone().upcast());
         // The editor's sixty-odd rows stay out of the widget tree until an
         // editor opens, so the Settings window's first layout skips them.
         widgets.nav.remove(&widgets.editor_page);
@@ -3415,6 +3423,23 @@ fn signature_is_empty(html: &str) -> bool {
         out
     };
     stripped.replace("&nbsp;", " ").trim().is_empty()
+}
+
+/// Left-justify every wrapping label under `root`. Works around a libadwaita
+/// 1.9 quirk where an `AdwPreferencesGroup` description renders fill-justified
+/// (stretched word gaps) whenever its text is shorter than the label's width;
+/// row titles and other single-line labels don't wrap, so they're left alone.
+fn left_justify_wrapping_labels(root: &gtk::Widget) {
+    if let Some(label) = root.downcast_ref::<gtk::Label>() {
+        if label.wraps() {
+            label.set_justify(gtk::Justification::Left);
+        }
+    }
+    let mut child = root.first_child();
+    while let Some(c) = child {
+        left_justify_wrapping_labels(&c);
+        child = c.next_sibling();
+    }
 }
 
 /// Put the editor page into the navigation view if it isn't there (it is
