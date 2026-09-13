@@ -450,11 +450,16 @@ upstream — their work ships in the app and is credited in the About window:
   English despite having the translation.
 - [**Laszlo Lang**](https://github.com/7system7) ([#169](https://github.com/hyprlab/vireo/pull/169)) — the
   Hungarian translation.
-- [**Ilya Semenkovich**](https://github.com/iliasen) ([#176](https://github.com/hyprlab/vireo/pull/176)) — the
-  Russian translation, and two reader tooltips that could not be translated.
+- [**Ilya Semenkovich**](https://github.com/iliasen) ([#176](https://github.com/hyprlab/vireo/pull/176),
+  [#185](https://github.com/hyprlab/vireo/pull/185)) — the Russian translation, two
+  reader tooltips that could not be translated, and the About menu entry that
+  could not be either.
 - [**Paulo Fino**](https://github.com/somepaulo) ([#178](https://github.com/hyprlab/vireo/pull/178),
-  [#179](https://github.com/hyprlab/vireo/issues/179)) — the Portuguese (Portugal)
-  translation, and the request for a language chooser.
+  [#179](https://github.com/hyprlab/vireo/issues/179),
+  [#182](https://github.com/hyprlab/vireo/pull/182),
+  [#183](https://github.com/hyprlab/vireo/issues/183)) — the Portuguese (Portugal)
+  and Brazilian Portuguese translations, the request for a language chooser, and
+  the report that the chosen language never reached the Flatpak.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/vireo/pull/7),
   [#8](https://github.com/hyprlab/vireo/pull/8)) — sender avatars from GNOME
   Contacts photos, and GNOME Online Accounts refinements: custom server ports
