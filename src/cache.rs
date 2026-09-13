@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use rusqlite::{params, Connection};
 
-use crate::models::{Attachment, Folder, FolderKind, Message};
+use crate::models::{Attachment, Folder, FolderKind, GallerySort, Message};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS folders (
@@ -110,6 +110,28 @@ CREATE TABLE IF NOT EXISTS attachments_checked (
     uid         INTEGER NOT NULL,
     PRIMARY KEY (account_id, folder_path, uid)
 );
+CREATE TABLE IF NOT EXISTS attachment_meta (
+    account_id  INTEGER NOT NULL,
+    folder_path TEXT NOT NULL,
+    uid         INTEGER NOT NULL,
+    idx         INTEGER NOT NULL,
+    name        TEXT    NOT NULL,
+    mime        TEXT    NOT NULL DEFAULT '',
+    size        INTEGER NOT NULL DEFAULT 0,
+    section     TEXT    NOT NULL DEFAULT '',
+    ext         TEXT    NOT NULL DEFAULT '',
+    bucket      INTEGER NOT NULL DEFAULT 6,
+    keywords    TEXT    NOT NULL DEFAULT '',
+    PRIMARY KEY (account_id, folder_path, uid, idx)
+);
+CREATE TABLE IF NOT EXISTS attachment_scan (
+    account_id  INTEGER NOT NULL,
+    folder_path TEXT NOT NULL,
+    uid         INTEGER NOT NULL,
+    PRIMARY KEY (account_id, folder_path, uid)
+);
+CREATE INDEX IF NOT EXISTS attachment_meta_by_folder
+    ON attachment_meta (account_id, folder_path);
 ";
 
 /// Bump when the table layout changes; older rows are dropped on open.
@@ -129,7 +151,16 @@ CREATE TABLE IF NOT EXISTS attachments_checked (
 /// web-Gmail sender attached, and stored one blob copy per Gmail label. The
 /// checked table remembers those messages as done, so the wrong lists would
 /// survive forever — drop both tables and let attachments re-fetch on demand.
-const SCHEMA_VERSION: i64 = 13;
+/// v14: `attachment_meta`/`attachment_scan` for the gallery — purely additive,
+/// so nothing cached is dropped for it (see [`RENDER_VERSION`]).
+const SCHEMA_VERSION: i64 = 14;
+
+/// The newest version whose change altered how bodies are *rendered* or how
+/// senders are checked. Opening a database older than this drops `bodies` and
+/// `sender_checks` so they rebuild; a later purely-additive bump must not,
+/// or every such release would cost users a full re-fetch of everything they
+/// had read. Raise this only when the rendering itself changes.
+const RENDER_VERSION: i64 = 13;
 
 /// A message's keywords as one column: the server's, then any tag kept
 /// locally for the same Message-ID (POP3, or an IMAP server that refuses
@@ -193,6 +224,128 @@ fn restrict(path: &std::path::Path, mode: u32) {
 #[cfg(not(unix))]
 fn restrict(_path: &std::path::Path, _mode: u32) {}
 
+/// What the attachments gallery is asking for: the scope, the search and the
+/// ordering, all of which have to reach the database — the archive holds far
+/// more attachments than the UI can hold in memory, so filtering after the fact
+/// would page through the wrong set.
+pub struct GalleryQuery<'a> {
+    /// `(account id, folder path)` pairs whose attachments are in scope. Empty
+    /// means "every folder", which is what a gallery opened before the folder
+    /// list arrives should show.
+    pub folders: &'a [(u32, String)],
+    /// Narrow to one account, as the footer's account dropdown does.
+    pub account_id: Option<u32>,
+    /// Search words; a row has to match every one of them somewhere.
+    pub tokens: &'a [String],
+    /// A [`crate::models::type_bucket`] value, or 0 for every type.
+    pub bucket: u32,
+    pub sort: GallerySort,
+    pub limit: u32,
+    pub offset: u32,
+    /// Largest cached file whose bytes ride along with the page.
+    pub data_cap: i64,
+}
+
+impl GalleryQuery<'_> {
+    /// The WHERE clause and its bound values, numbering placeholders from
+    /// `first` so the caller's own leading parameters are not trodden on.
+    fn where_clause(&self, first: usize) -> (String, Vec<rusqlite::types::Value>) {
+        use rusqlite::types::Value;
+        let mut clauses: Vec<String> = Vec::new();
+        let mut params: Vec<Value> = Vec::new();
+        let mut n = first;
+        let mut next = |params: &mut Vec<Value>, v: Value| {
+            params.push(v);
+            let at = n;
+            n += 1;
+            format!("?{at}")
+        };
+
+        if let Some(id) = self.account_id {
+            let p = next(&mut params, Value::Integer(id as i64));
+            clauses.push(format!("am.account_id = {p}"));
+        }
+        if !self.folders.is_empty() {
+            let ors: Vec<String> = self
+                .folders
+                .iter()
+                .map(|(id, path)| {
+                    let a = next(&mut params, Value::Integer(*id as i64));
+                    let f = next(&mut params, Value::Text(path.clone()));
+                    format!("(am.account_id = {a} AND am.folder_path = {f})")
+                })
+                .collect();
+            clauses.push(format!("({})", ors.join(" OR ")));
+        }
+        if self.bucket != 0 {
+            let p = next(&mut params, Value::Integer(self.bucket as i64));
+            clauses.push(format!("am.bucket = {p}"));
+        }
+        // The same columns the old in-memory haystack joined: filename, the
+        // type words stored beside it, sender, subject and folder. The folder
+        // is matched on its raw path rather than its decoded label, so a
+        // non-ASCII mailbox name is searched as the server spells it.
+        for token in self.tokens {
+            let pattern = format!("%{}%", like_escape(&token.to_lowercase()));
+            let fields = [
+                "LOWER(am.name)",
+                "am.keywords",
+                "LOWER(COALESCE(m.from_name, ''))",
+                "LOWER(COALESCE(m.subject, ''))",
+                "LOWER(am.folder_path)",
+            ];
+            let ors: Vec<String> = fields
+                .iter()
+                .map(|f| {
+                    let p = next(&mut params, Value::Text(pattern.clone()));
+                    format!("{f} LIKE {p} ESCAPE '\\'")
+                })
+                .collect();
+            clauses.push(format!("({})", ors.join(" OR ")));
+        }
+
+        let sql = if clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", clauses.join(" AND "))
+        };
+        (sql, params)
+    }
+}
+
+/// Neutralise the wildcards in a user's search word so typing `%` looks for a
+/// percent sign rather than matching everything.
+fn like_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The ORDER BY for a sort criterion. Every one ends with the same tie-break so
+/// a row can never drift between pages: without it two files of equal size (or
+/// date, or name) could swap places between one page and the next and be shown
+/// twice, or not at all.
+fn order_by(sort: GallerySort) -> String {
+    let head = match sort {
+        GallerySort::Newest => "COALESCE(m.ts, 0) DESC",
+        GallerySort::Oldest => "COALESCE(m.ts, 0) ASC",
+        GallerySort::Name => "am.name COLLATE NOCASE ASC",
+        GallerySort::NameDesc => "am.name COLLATE NOCASE DESC",
+        GallerySort::Sender => "COALESCE(m.from_name, '') COLLATE NOCASE ASC",
+        GallerySort::SenderDesc => "COALESCE(m.from_name, '') COLLATE NOCASE DESC",
+        GallerySort::Largest => "am.size DESC",
+        GallerySort::Smallest => "am.size ASC",
+        GallerySort::Type => "am.ext ASC, am.name COLLATE NOCASE ASC",
+        GallerySort::TypeDesc => "am.ext DESC, am.name COLLATE NOCASE DESC",
+    };
+    format!("{head}, am.account_id ASC, am.uid DESC, am.idx ASC")
+}
+
 impl Cache {
     /// Every cached copy of a message with this (normalized: no brackets,
     /// lowercase) Message-ID, as `(account_id, folder_path, uid)`, newest
@@ -213,6 +366,18 @@ impl Cache {
     }
 
     /// Open (creating if needed) the cache DB at `~/.local/share/vireo/cache.db`.
+    /// A cache that lives only in memory, for the offline demo: the demo's
+    /// sample mail must never reach the real `cache.db`, and running it through
+    /// the same schema and the same queries is the point — the gallery's
+    /// paging, search and sort are SQL, so a demo that bypassed them would
+    /// exercise nothing.
+    pub fn in_memory() -> rusqlite::Result<Cache> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(SCHEMA)?;
+        let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
+        Ok(Cache { conn })
+    }
+
     pub fn open() -> rusqlite::Result<Cache> {
         // No `temp_dir` fallback: this database holds message bodies, attachment
         // bytes and the harvested address book, and a shared world-writable
@@ -248,7 +413,7 @@ impl Cache {
                  DROP TABLE IF EXISTS attachments;\
                  DROP TABLE IF EXISTS attachments_checked;",
             );
-        } else if version < SCHEMA_VERSION {
+        } else if version < RENDER_VERSION {
             // The layout is current but `bodies` holds HTML rendered by an older
             // build. `LoadBody` serves that cache without ever re-fetching, so a
             // stale entry would survive forever — drop it and let it re-render on
@@ -318,6 +483,13 @@ impl Cache {
         );
         if upgrading_index {
             Self::redecode_encoded_subjects(&conn);
+        }
+        // `attachment_meta` is the gallery's record of every attachment that
+        // *exists*; `attachments` holds the few whose bytes were downloaded.
+        // Seed the first from the second so files already in hand keep showing
+        // while the scan works back through the archive.
+        if version < 14 {
+            Self::seed_attachment_meta(&conn);
         }
         let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
 
@@ -898,57 +1070,200 @@ impl Cache {
         }
     }
 
-    /// Every cached attachment across an account's folders (newest message
-    /// first), for the attachments gallery — excluding Drafts, Junk and Trash.
-    /// Data is loaded only for files under `data_cap` bytes (so thumbnails/
-    /// previews are instant); larger files carry `None` and are fetched on
-    /// demand. Capped to `limit` rows.
-    pub fn gallery_items(
-        &self,
-        account_id: u32,
-        data_cap: u64,
-        limit: u32,
-    ) -> Vec<crate::models::GalleryItem> {
-        // Drafts(3), Junk(5), Trash(6) — see `kind_to_i64`.
-        let drafts = kind_to_i64(FolderKind::Drafts);
-        let junk = kind_to_i64(FolderKind::Junk);
-        let trash = kind_to_i64(FolderKind::Trash);
+    /// Give every already-downloaded attachment a `attachment_meta` row, and
+    /// mark its message scanned: the bytes are in hand, so there is nothing the
+    /// server could tell us about it. Runs once, on the upgrade to schema v14.
+    fn seed_attachment_meta(conn: &Connection) {
+        let rows: Vec<(u32, String, u32, u32, String, i64)> = {
+            let Ok(mut stmt) = conn.prepare(
+                "SELECT account_id, folder_path, uid, idx, name, LENGTH(data) FROM attachments",
+            ) else {
+                return;
+            };
+            let Ok(mapped) = stmt.query_map([], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?))
+            }) else {
+                return;
+            };
+            mapped.filter_map(|r| r.ok()).collect()
+        };
+        for (account_id, folder_path, uid, idx, name, size) in rows {
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO attachment_meta                  (account_id, folder_path, uid, idx, name, mime, size, section, bucket, keywords)                  VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, '', ?7, ?8)",
+                params![
+                    account_id,
+                    &folder_path,
+                    uid,
+                    idx,
+                    &name,
+                    size,
+                    crate::models::type_bucket(&name),
+                    crate::models::type_keywords(&name),
+                ],
+            );
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO attachment_scan (account_id, folder_path, uid)                  VALUES (?1, ?2, ?3)",
+                params![account_id, &folder_path, uid],
+            );
+        }
+    }
+
+    /// One page of the attachments gallery, filtered and ordered by the
+    /// database rather than in the UI: with two decades of archive indexed
+    /// there are far more attachments than any window can hold, so the scope,
+    /// the search and the sort all have to narrow the rows *before* the page is
+    /// cut, or paging would show an arbitrary slice of the wrong set.
+    ///
+    /// Rows come from `attachment_meta` — everything known to exist — left
+    /// joined to `attachments`, which holds the few whose bytes were actually
+    /// downloaded. Bytes ride along only for a cached file under `data_cap`, so
+    /// a page stays small however far back it reaches.
+    pub fn gallery_page(&self, q: &GalleryQuery) -> Vec<crate::models::GalleryItem> {
+        // Three leading parameters of our own, so the scope starts at ?4.
+        let (where_sql, params) = q.where_clause(4);
+        let sql = format!(
+            "SELECT am.account_id, am.folder_path, am.uid, am.idx, am.name, am.size, \
+                    COALESCE(m.from_name, ''), COALESCE(m.subject, ''), COALESCE(m.ts, 0), \
+                    CASE WHEN a.data IS NOT NULL AND LENGTH(a.data) <= ?1 THEN a.data ELSE NULL END, \
+                    a.uid IS NOT NULL \
+             FROM attachment_meta am \
+             LEFT JOIN messages m \
+               ON m.account_id = am.account_id AND m.folder_path = am.folder_path AND m.uid = am.uid \
+             LEFT JOIN attachments a \
+               ON a.account_id = am.account_id AND a.folder_path = am.folder_path \
+              AND a.uid = am.uid AND a.idx = am.idx \
+             {where_sql} ORDER BY {} LIMIT ?2 OFFSET ?3",
+            order_by(q.sort),
+        );
         let run = || -> rusqlite::Result<Vec<crate::models::GalleryItem>> {
-            let mut stmt = self.conn.prepare(
-                "SELECT a.uid, a.name, length(a.data), \
-                        CASE WHEN length(a.data) <= ?2 THEN a.data ELSE NULL END, \
-                        COALESCE(m.from_name, ''), COALESCE(m.subject, ''), COALESCE(m.ts, 0), \
-                        a.folder_path \
-                 FROM attachments a \
-                 JOIN folders f ON f.account_id = a.account_id AND f.path = a.folder_path \
-                 LEFT JOIN messages m \
-                   ON m.account_id = a.account_id AND m.folder_path = a.folder_path AND m.uid = a.uid \
-                 WHERE a.account_id = ?1 AND f.kind NOT IN (?3, ?4, ?5) \
-                 ORDER BY m.ts DESC, a.uid DESC, a.idx ASC \
-                 LIMIT ?6",
-            )?;
-            let rows = stmt.query_map(
-                params![account_id, data_cap as i64, drafts, junk, trash, limit],
-                |row| {
-                    Ok(crate::models::GalleryItem {
-                        account_id,
-                        uid: row.get(0)?,
-                        name: row.get(1)?,
-                        size: row.get::<_, i64>(2)? as u64,
-                        data: row.get(3)?,
-                        from_name: row.get(4)?,
-                        subject: row.get(5)?,
-                        timestamp: row.get(6)?,
-                        folder_path: row.get(7)?,
-                    })
-                },
-            )?;
+            let mut stmt = self.conn.prepare(&sql)?;
+            let mut bound: Vec<&dyn rusqlite::ToSql> = vec![&q.data_cap, &q.limit, &q.offset];
+            bound.extend(params.iter().map(|p| p as &dyn rusqlite::ToSql));
+            let rows = stmt.query_map(bound.as_slice(), |row| {
+                Ok(crate::models::GalleryItem {
+                    account_id: row.get(0)?,
+                    folder_path: row.get(1)?,
+                    uid: row.get(2)?,
+                    name: row.get(4)?,
+                    size: row.get::<_, i64>(5)?.max(0) as u64,
+                    from_name: row.get(6)?,
+                    subject: row.get(7)?,
+                    timestamp: row.get(8)?,
+                    data: row.get(9)?,
+                    downloaded: row.get(10)?,
+                })
+            })?;
             rows.collect()
         };
         run().unwrap_or_else(|e| {
-            tracing::warn!("cache gallery_items failed: {e}");
+            tracing::warn!("cache gallery_page failed: {e}");
             Vec::new()
         })
+    }
+
+    /// How many attachments the same query matches in total — what the footer
+    /// counts up to, and how the UI knows whether another page exists.
+    pub fn gallery_total(&self, q: &GalleryQuery) -> u32 {
+        let (where_sql, params) = q.where_clause(1);
+        let sql = format!(
+            "SELECT COUNT(*) FROM attachment_meta am \
+             LEFT JOIN messages m \
+               ON m.account_id = am.account_id AND m.folder_path = am.folder_path AND m.uid = am.uid \
+             {where_sql}"
+        );
+        let run = || -> rusqlite::Result<i64> {
+            let bound: Vec<&dyn rusqlite::ToSql> =
+                params.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
+            self.conn.query_row(&sql, bound.as_slice(), |r| r.get(0))
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache gallery_total failed: {e}");
+            0
+        }) as u32
+    }
+
+    /// Record what a message's attachments are, without their bytes: one row
+    /// per attachment plus a scan mark, so a message with none is never asked
+    /// about again. Replaces any earlier answer for that message.
+    pub fn save_attachment_meta(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        uid: u32,
+        metas: &[crate::models::AttachmentMeta],
+    ) {
+        let _ = self.conn.execute(
+            "DELETE FROM attachment_meta WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+            params![account_id, folder_path, uid],
+        );
+        for m in metas {
+            if let Err(e) = self.conn.execute(
+                "INSERT OR REPLACE INTO attachment_meta \
+                 (account_id, folder_path, uid, idx, name, mime, size, section, ext, bucket, keywords) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![
+                    account_id,
+                    folder_path,
+                    uid,
+                    m.idx,
+                    &m.name,
+                    &m.mime,
+                    m.size as i64,
+                    &m.section,
+                    crate::models::ext_of(&m.name),
+                    crate::models::type_bucket(&m.name),
+                    crate::models::type_keywords(&m.name),
+                ],
+            ) {
+                tracing::warn!("cache save_attachment_meta failed: {e}");
+            }
+        }
+        let _ = self.conn.execute(
+            "INSERT OR IGNORE INTO attachment_scan (account_id, folder_path, uid) VALUES (?1, ?2, ?3)",
+            params![account_id, folder_path, uid],
+        );
+    }
+
+    /// The next `limit` messages in a folder that carry an attachment and have
+    /// not been scanned yet, newest first — the gallery's backfill work queue.
+    pub fn unscanned_attachment_uids(
+        &self,
+        account_id: u32,
+        folder_path: &str,
+        limit: u32,
+    ) -> Vec<u32> {
+        let run = || -> rusqlite::Result<Vec<u32>> {
+            let mut stmt = self.conn.prepare(
+                "SELECT m.uid FROM messages m \
+                 WHERE m.account_id = ?1 AND m.folder_path = ?2 AND m.has_attachment = 1 \
+                   AND NOT EXISTS (SELECT 1 FROM attachment_scan s \
+                       WHERE s.account_id = m.account_id AND s.folder_path = m.folder_path \
+                         AND s.uid = m.uid) \
+                 ORDER BY m.ts DESC LIMIT ?3",
+            )?;
+            let rows = stmt.query_map(params![account_id, folder_path, limit], |r| r.get(0))?;
+            rows.collect()
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache unscanned_attachment_uids failed: {e}");
+            Vec::new()
+        })
+    }
+
+    /// How many attachment-carrying messages in a folder are still unscanned —
+    /// what the gallery reports as work outstanding.
+    pub fn unscanned_attachment_count(&self, account_id: u32, folder_path: &str) -> u32 {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM messages m \
+                 WHERE m.account_id = ?1 AND m.folder_path = ?2 AND m.has_attachment = 1 \
+                   AND NOT EXISTS (SELECT 1 FROM attachment_scan s \
+                       WHERE s.account_id = m.account_id AND s.folder_path = m.folder_path \
+                         AND s.uid = m.uid)",
+                params![account_id, folder_path],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap_or(0) as u32
     }
 
     pub fn load_attachments(&self, account_id: u32, folder_path: &str, uid: u32) -> Vec<Attachment> {
@@ -1481,14 +1796,6 @@ fn kind_from_i64(v: i64) -> FolderKind {
 mod tests {
     use super::*;
 
-    impl Cache {
-        fn in_memory() -> Cache {
-            let conn = Connection::open_in_memory().unwrap();
-            conn.execute_batch(SCHEMA).unwrap();
-            Cache { conn }
-        }
-    }
-
     /// The cache holds message bodies, attachment bytes and the address book, so
     /// it should be no more readable than `accounts.toml` is.
     ///
@@ -1539,7 +1846,7 @@ mod tests {
 
     #[test]
     fn outbox_round_trips_a_queued_message() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         let rcpts = vec!["ada@example.com".to_string(), "bcc@example.com".to_string()];
         let id = c
             .queue_outbox(
@@ -1588,7 +1895,7 @@ mod tests {
     /// message queued to go now has none.
     #[test]
     fn outbox_keeps_a_scheduled_time() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         let rcpts = vec!["ada@example.com".to_string()];
         let later = c
             .queue_outbox(1, "me@example.com", &rcpts, "ada", "Later", "", b"raw", None, "", Some(1_900_000_000))
@@ -1605,7 +1912,7 @@ mod tests {
 
     #[test]
     fn outbox_keeps_the_order_messages_were_queued_in() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         for (subject, at) in [("second", 200), ("first", 100), ("third", 300)] {
             c.conn
                 .execute(
@@ -1640,34 +1947,251 @@ mod tests {
         ).unwrap();
     }
 
+    /// Describe an attachment without downloading it, as the scan does.
+    fn add_meta(c: &Cache, folder: &str, uid: u32, idx: u32, name: &str, size: u64) {
+        c.save_attachment_meta(
+            1,
+            folder,
+            uid,
+            &[crate::models::AttachmentMeta {
+                idx,
+                name: name.to_string(),
+                mime: String::new(),
+                size,
+                section: format!("{}", idx + 1),
+            }],
+        );
+    }
+
+    /// A query over everything, ordered newest first.
+    fn all(sort: GallerySort, limit: u32, offset: u32) -> GalleryQuery<'static> {
+        GalleryQuery {
+            folders: &[],
+            account_id: None,
+            tokens: &[],
+            bucket: 0,
+            sort,
+            limit,
+            offset,
+            data_cap: 10,
+        }
+    }
+
+    /// The gallery lists what the scan found, whether or not the bytes were
+    /// ever downloaded — the whole point of the metadata tier.
     #[test]
-    fn gallery_items_spans_folders_excluding_trash_junk_drafts() {
-        let c = Cache::in_memory();
+    fn the_gallery_lists_attachments_that_were_never_downloaded() {
+        let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
         add_folder(&c, "Archive", FolderKind::Archive);
-        add_folder(&c, "Trash", FolderKind::Trash);
         add_msg(&c, "INBOX", 1, "Alice", "Hi", 100);
         add_msg(&c, "Archive", 2, "Bob", "Report", 200);
-        add_msg(&c, "Trash", 3, "Carol", "Old", 300);
-        add_att(&c, "INBOX", 1, 0, "a.png", &[0u8; 4]); // small → data kept
-        add_att(&c, "Archive", 2, 0, "big.bin", &[0u8; 20]); // over cap → data dropped
-        add_att(&c, "Trash", 3, 0, "x.pdf", &[0u8; 4]); // Trash → excluded
+        add_meta(&c, "INBOX", 1, 0, "a.png", 4);
+        add_meta(&c, "Archive", 2, 0, "old.pdf", 900_000);
+        // Only the inbox one has ever been fetched.
+        add_att(&c, "INBOX", 1, 0, "a.png", &[0u8; 4]);
 
-        let items = c.gallery_items(1, 10, 50);
-        assert_eq!(items.len(), 2, "inbox + archive, not trash");
-        // Newest message first (ts DESC): Archive/Bob (200) before Inbox/Alice (100).
-        assert_eq!(items[0].name, "big.bin");
-        assert_eq!(items[0].folder_path, "Archive");
-        assert_eq!(items[0].from_name, "Bob");
-        assert!(items[0].data.is_none(), "over the cap → no bytes");
+        let items = c.gallery_page(&all(GallerySort::Newest, 50, 0));
+        assert_eq!(items.len(), 2);
+        // Newest message first: Archive/Bob (200) before Inbox/Alice (100).
+        assert_eq!(items[0].name, "old.pdf");
+        assert!(!items[0].downloaded, "never fetched");
+        assert!(items[0].data.is_none());
+        assert_eq!(items[0].size, 900_000, "size comes from the scan, not the blob");
         assert_eq!(items[1].name, "a.png");
-        assert_eq!(items[1].folder_path, "INBOX");
+        assert!(items[1].downloaded);
         assert_eq!(items[1].data.as_deref(), Some(&[0u8; 4][..]));
+    }
+
+    /// A cached file bigger than the page's cap is listed, and known to be
+    /// downloaded, but its bytes stay behind — a page has to stay small however
+    /// far back it reaches.
+    #[test]
+    fn a_cached_file_over_the_cap_is_listed_without_its_bytes() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "Alice", "Hi", 100);
+        add_meta(&c, "INBOX", 1, 0, "big.bin", 20);
+        add_att(&c, "INBOX", 1, 0, "big.bin", &[0u8; 20]);
+
+        let items = c.gallery_page(&all(GallerySort::Newest, 50, 0));
+        assert_eq!(items.len(), 1);
+        assert!(items[0].downloaded, "the bytes are in the cache");
+        assert!(items[0].data.is_none(), "but over the cap, so not carried");
+    }
+
+    /// Paging must not drop or repeat a row. Every item has the same timestamp
+    /// here, so only the tie-break keeps the order stable.
+    #[test]
+    fn paging_covers_every_row_exactly_once_even_when_the_sort_key_ties() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        for uid in 1..=10 {
+            add_msg(&c, "INBOX", uid, "X", "S", 500);
+            add_meta(&c, "INBOX", uid, 0, "f.png", 2);
+        }
+        let mut seen: Vec<(u32, String)> = Vec::new();
+        for page in 0..4 {
+            for item in c.gallery_page(&all(GallerySort::Newest, 3, page * 3)) {
+                seen.push((item.uid, item.name.clone()));
+            }
+        }
+        assert_eq!(seen.len(), 10, "every row, once");
+        let mut uids: Vec<u32> = seen.iter().map(|(u, _)| *u).collect();
+        uids.sort_unstable();
+        uids.dedup();
+        assert_eq!(uids.len(), 10, "no row served twice");
+        assert_eq!(c.gallery_total(&all(GallerySort::Newest, 3, 0)), 10);
+    }
+
+    /// The scope reaches the query, so a page is cut from the right set rather
+    /// than filtered afterwards.
+    #[test]
+    fn the_folder_scope_narrows_the_query_itself() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_folder(&c, "Sent", FolderKind::Sent);
+        add_msg(&c, "INBOX", 1, "Alice", "Hi", 100);
+        add_msg(&c, "Sent", 2, "Me", "Out", 200);
+        add_meta(&c, "INBOX", 1, 0, "in.png", 2);
+        add_meta(&c, "Sent", 2, 0, "out.png", 2);
+
+        let inbox_only = [(1u32, "INBOX".to_string())];
+        let q = GalleryQuery { folders: &inbox_only, ..all(GallerySort::Newest, 50, 0) };
+        let items = c.gallery_page(&q);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "in.png");
+        assert_eq!(c.gallery_total(&q), 1, "the count follows the same scope");
+    }
+
+    /// Search matches the filename, the sender, the subject and the type words
+    /// stored beside each row — and every word has to match something.
+    #[test]
+    fn search_matches_across_the_row_and_its_message() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "Dana Whitfield", "Quarter review", 100);
+        add_meta(&c, "INBOX", 1, 0, "budget.xlsx", 2);
+        add_msg(&c, "INBOX", 2, "Bob", "Holiday", 200);
+        add_meta(&c, "INBOX", 2, 0, "beach.png", 2);
+
+        let hit = |tokens: &[String]| {
+            c.gallery_page(&GalleryQuery { tokens, ..all(GallerySort::Newest, 50, 0) }).len()
+        };
+        assert_eq!(hit(&["budget".to_string()]), 1, "filename");
+        assert_eq!(hit(&["whitfield".to_string()]), 1, "sender");
+        assert_eq!(hit(&["quarter".to_string()]), 1, "subject");
+        assert_eq!(hit(&["spreadsheet".to_string()]), 1, "type keyword");
+        assert_eq!(hit(&["image".to_string()]), 1, "type keyword, other row");
+        assert_eq!(
+            hit(&["dana".to_string(), "spreadsheet".to_string()]),
+            1,
+            "both words have to match"
+        );
+        assert_eq!(hit(&["dana".to_string(), "holiday".to_string()]), 0);
+    }
+
+    /// A search word is matched literally: SQL's own wildcards are not the
+    /// user's to type by accident.
+    #[test]
+    fn a_search_word_cannot_smuggle_in_a_wildcard() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "A", "S", 100);
+        add_meta(&c, "INBOX", 1, 0, "report.pdf", 2);
+
+        let wild = ["%".to_string()];
+        let q = GalleryQuery { tokens: &wild, ..all(GallerySort::Newest, 50, 0) };
+        assert_eq!(c.gallery_page(&q).len(), 0, "% matches a literal percent sign");
+    }
+
+    /// The type filter and the type sort both read the bucket stored with the
+    /// row, so they agree with the UI's own dropdown.
+    #[test]
+    fn the_type_filter_uses_the_stored_bucket() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "A", "S", 100);
+        add_meta(&c, "INBOX", 1, 0, "shot.png", 2);
+        add_msg(&c, "INBOX", 2, "B", "T", 200);
+        add_meta(&c, "INBOX", 2, 0, "doc.pdf", 2);
+
+        let images = GalleryQuery { bucket: 1, ..all(GallerySort::Newest, 50, 0) };
+        let items = c.gallery_page(&images);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "shot.png");
+        assert_eq!(c.gallery_total(&images), 1);
+    }
+
+    /// Each sort criterion orders by what it says it does.
+    #[test]
+    fn every_sort_criterion_orders_the_page() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "Zoe", "S", 100);
+        add_meta(&c, "INBOX", 1, 0, "apple.pdf", 900);
+        add_msg(&c, "INBOX", 2, "Adam", "T", 200);
+        add_meta(&c, "INBOX", 2, 0, "zebra.png", 50);
+
+        let first = |sort| c.gallery_page(&all(sort, 50, 0))[0].name.clone();
+        assert_eq!(first(GallerySort::Newest), "zebra.png");
+        assert_eq!(first(GallerySort::Oldest), "apple.pdf");
+        assert_eq!(first(GallerySort::Name), "apple.pdf");
+        assert_eq!(first(GallerySort::NameDesc), "zebra.png");
+        assert_eq!(first(GallerySort::Largest), "apple.pdf");
+        assert_eq!(first(GallerySort::Smallest), "zebra.png");
+        assert_eq!(first(GallerySort::Sender), "zebra.png", "Adam before Zoe");
+        assert_eq!(first(GallerySort::SenderDesc), "apple.pdf");
+        assert_eq!(first(GallerySort::Type), "apple.pdf", "pdf before png");
+        assert_eq!(first(GallerySort::TypeDesc), "zebra.png");
+    }
+
+    /// Re-describing a message replaces what was known about it, so a message
+    /// re-scanned after an edit does not accumulate ghost rows.
+    #[test]
+    fn rescanning_a_message_replaces_its_attachments() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "A", "S", 100);
+        add_meta(&c, "INBOX", 1, 0, "first.pdf", 2);
+        add_meta(&c, "INBOX", 1, 0, "second.pdf", 2);
+        let items = c.gallery_page(&all(GallerySort::Newest, 50, 0));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "second.pdf");
+    }
+
+    /// The scan's work queue: messages flagged as carrying an attachment that
+    /// have not been described. A message with nothing in it is still marked,
+    /// or it would be asked about on every pass forever.
+    #[test]
+    fn the_scan_queue_empties_even_for_messages_holding_nothing() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "A", "S", 100);
+        add_msg(&c, "INBOX", 2, "B", "T", 200);
+        // A third with no paperclip: never in the queue.
+        c.conn
+            .execute(
+                "INSERT INTO messages (account_id, folder_path, uid, from_name, from_addr, \
+                 subject, date, ts, unread, starred, has_attachment) \
+                 VALUES (1, 'INBOX', 3, 'C', '', 'U', '', 300, 0, 0, 0)",
+                [],
+            )
+            .unwrap();
+
+        assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 2);
+        assert_eq!(c.unscanned_attachment_uids(1, "INBOX", 10), vec![2, 1], "newest first");
+
+        c.save_attachment_meta(1, "INBOX", 2, &[]); // described, holds nothing
+        assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 1);
+        add_meta(&c, "INBOX", 1, 0, "x.pdf", 2);
+        assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 0);
+        assert!(c.unscanned_attachment_uids(1, "INBOX", 10).is_empty());
     }
 
     #[test]
     fn redecode_encoded_subjects_fixes_raw_encoded_words_in_place() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_folder(&c, "INBOX", FolderKind::Inbox);
         // A subject an older build stored raw after aborting on the over-long word.
         let raw = "=?utf-8?Q?92=2Dyear=2Dold=20artist=20Sheila=20Hicks?=";
@@ -1690,17 +2214,6 @@ mod tests {
             .query_row("SELECT subject FROM messages WHERE uid = 2", [], |r| r.get(0))
             .unwrap();
         assert_eq!(plain, "Already fine");
-    }
-
-    #[test]
-    fn gallery_items_respects_limit() {
-        let c = Cache::in_memory();
-        add_folder(&c, "INBOX", FolderKind::Inbox);
-        for uid in 1..=5 {
-            add_msg(&c, "INBOX", uid, "X", "S", uid as i64);
-            add_att(&c, "INBOX", uid, 0, "f.png", &[0u8; 2]);
-        }
-        assert_eq!(c.gallery_items(1, 10, 3).len(), 3);
     }
 
     /// Insert a message carrying threading headers.
@@ -1740,7 +2253,7 @@ mod tests {
     /// between 68k messages and 4k.
     #[test]
     fn only_replies_are_worth_repairing() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         // A reply whose References is the single id an ENVELOPE gives.
         c.conn.execute(
             "INSERT INTO messages (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, message_id, references_) \
@@ -1769,7 +2282,7 @@ mod tests {
     /// asked about once rather than on every pass forever.
     #[test]
     fn the_repair_walks_downwards_and_finishes() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         for uid in [10u32, 20, 30] {
             c.conn.execute(
                 "INSERT INTO messages (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, message_id, references_) \
@@ -1791,7 +2304,7 @@ mod tests {
 
     #[test]
     fn a_conversation_holds_only_messages_that_reference_it() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 1, 500, "root@x", "");
         add_threaded(&c, "Sent", 2, 600, "reply@x", "root@x");
         // Unrelated, but its References contain the digit "1" — the account id.
@@ -1809,7 +2322,7 @@ mod tests {
     /// as a "Load attachments" button rather than the files themselves.
     #[test]
     fn a_body_cached_under_one_gmail_label_answers_for_the_others() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 42, 500, "same@x", "");
         add_threaded(&c, "[Gmail]/All Mail", 900, 500, "same@x", "");
         c.save_body(1, "[Gmail]/All Mail", 900, "the real body");
@@ -1824,7 +2337,7 @@ mod tests {
 
     #[test]
     fn attachments_downloaded_under_one_label_answer_for_the_others() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 42, 500, "same@x", "");
         add_threaded(&c, "Paratype", 7, 500, "same@x", "");
         c.save_attachments(
@@ -1844,7 +2357,7 @@ mod tests {
     /// fetching the others only stores the same blobs again.
     #[test]
     fn attachments_fetched_under_one_label_count_as_fetched_for_the_others() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 42, 500, "same@x", "");
         add_threaded(&c, "Work", 7, 500, "same@x", "");
         c.mark_attachments_checked(1, "Work", 7);
@@ -1855,7 +2368,7 @@ mod tests {
     /// The reach stops at the message: an unrelated mail is still unfetched.
     #[test]
     fn another_message_being_fetched_does_not_count_as_this_one() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 42, 500, "mine@x", "");
         add_threaded(&c, "Work", 7, 500, "someone-else@x", "");
         c.mark_attachments_checked(1, "Work", 7);
@@ -1867,7 +2380,7 @@ mod tests {
     /// keys on Message-ID, and a message that has none has nothing to match.
     #[test]
     fn a_different_message_never_answers_for_this_one() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 42, 500, "mine@x", "");
         add_threaded(&c, "[Gmail]/All Mail", 900, 500, "someone-else@x", "");
         c.save_body(1, "[Gmail]/All Mail", 900, "not yours");
@@ -1889,7 +2402,7 @@ mod tests {
     /// agree too.
     #[test]
     fn a_reused_message_id_from_a_different_sender_answers_for_nothing() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_from(&c, "INBOX", 42, 500, "dup@x", "me@real.example");
         add_from(&c, "Archive", 900, 500, "dup@x", "spammer@fake.example");
         c.save_body(1, "Archive", 900, "not the same mail");
@@ -1907,7 +2420,7 @@ mod tests {
     /// sent, so every member belongs to the conversation regardless of age.
     #[test]
     fn a_conversation_holds_its_members_however_old_they_are() {
-        let c = Cache::in_memory();
+        let c = Cache::in_memory().unwrap();
         add_threaded(&c, "INBOX", 1, 500, "root@x", "");
         add_threaded(&c, "Sent", 2, 400, "old-reply@x", "root@x");
         add_threaded(&c, "Sent", 3, 600, "new-reply@x", "root@x");

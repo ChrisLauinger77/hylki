@@ -55,11 +55,10 @@ const BACKFILL_CHUNK: usize = 1_000;
 /// older attachment messages download on demand (with a spinner) when opened.
 const PREFETCH_LIMIT: usize = 25;
 
-/// Attachments gallery: cap on how many items to load per inbox, and the largest
-/// file whose bytes are loaded eagerly (for instant thumbnails/preview). Bigger
-/// files carry no bytes in the gallery and are fetched on demand when opened.
-const GALLERY_LIMIT: u32 = 300;
-const GALLERY_DATA_CAP: u64 = 6 * 1024 * 1024;
+/// How many messages one attachment scan describes. One FETCH per chunk, so
+/// bigger means fewer round trips; small enough that a chunk lands quickly and
+/// the gallery fills in visibly while the user is looking at it.
+const SCAN_CHUNK: u32 = 200;
 
 /// How many messages one body fetch asks for.
 ///
@@ -133,7 +132,6 @@ pub enum MailRequest {
     /// to be opened.
     SyncFolder { folder_id: u32, path: String },
     /// Load cached attachments across the account's folders, for the gallery.
-    LoadGallery,
     /// Load the full body of a single message.
     LoadBody {
         message_id: u32,
@@ -215,6 +213,9 @@ pub enum MailRequest {
     /// Assemble a conversation from the local cache across every folder of the
     /// account: the messages whose Message-ID or references match `ids`. Answers
     /// with [`WorkerEvent::Related`]; never touches the network.
+    /// Work through a folder's attachment-carrying messages that have never
+    /// been described, recording what each one holds without downloading it.
+    ScanAttachments { folder_path: String },
     LoadRelated { message_id: u32, ids: Vec<String> },
     /// Permanently erase messages from `path` (flag `\Deleted` + EXPUNGE), used
     /// when "delete" is asked for in Trash, where there is nowhere left to move to.
@@ -324,6 +325,9 @@ pub struct OutgoingMessage {
 /// An event pushed from the worker back to the UI.
 #[derive(Debug)]
 pub enum WorkerEvent {
+    /// A batch of a folder's attachments was described (not downloaded).
+    /// `remaining` is how many of its messages are still unscanned.
+    AttachmentsScanned { folder_path: String, added: u32, remaining: u32 },
     Account(Account),
     Folders(Vec<Folder>),
     Messages { folder_id: u32, messages: Vec<Message> },
@@ -350,7 +354,6 @@ pub enum WorkerEvent {
     /// cached keywords changed (empty when nothing did).
     KeywordsSynced { paths: Vec<String> },
     /// Cached attachments for an inbox, for the attachments gallery.
-    Gallery { items: Vec<crate::models::GalleryItem> },
     /// The background backfill for a folder finished — its whole index is now
     /// present, so the UI can stop expecting more rows to stream in.
     BackfillDone { folder_id: u32 },
@@ -1150,13 +1153,6 @@ async fn run_imap(
                     }
                 }
             }
-            MailRequest::LoadGallery => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.gallery_items(account_id, GALLERY_DATA_CAP, GALLERY_LIMIT);
-                    emit(WorkerEvent::Gallery { items });
-                }
-                continue; // cache-only, never hits the network
-            }
             MailRequest::LoadRelated { message_id, ids } => {
                 let messages = cache
                     .as_ref()
@@ -1232,7 +1228,7 @@ async fn run_imap(
 
         match req {
             // Served from cache before this network match; never reached here.
-            MailRequest::LoadGallery | MailRequest::LoadRelated { .. } => {}
+            MailRequest::LoadRelated { .. } => {}
             MailRequest::LoadMessages { folder_id, path }
             | MailRequest::SyncFolder { folder_id, path } => {
                 if !background {
@@ -1702,6 +1698,75 @@ async fn run_imap(
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit });
             }
 
+            MailRequest::ScanAttachments { folder_path } => {
+                // Ask the server what a batch of messages holds, without
+                // downloading any of it. BODYSTRUCTURE is a few hundred bytes
+                // per message, so a whole archive costs single-digit megabytes
+                // — the difference between a gallery that reaches back two
+                // decades and one that shows only what has been opened.
+                let Some(c) = cache.as_ref() else { continue };
+                let uids = c.unscanned_attachment_uids(account_id, folder_path.as_str(), SCAN_CHUNK);
+                if uids.is_empty() {
+                    emit(WorkerEvent::AttachmentsScanned {
+                        folder_path: folder_path.clone(),
+                        added: 0,
+                        remaining: 0,
+                    });
+                    continue;
+                }
+                let sess = session.as_mut().unwrap();
+                if sel(sess, folder_path.as_str()).await.is_err() {
+                    continue;
+                }
+                let set = uid_set(&uids);
+                // BODYSTRUCTURE on its own, not beside ENVELOPE: the servers
+                // that make us fall back to raw headers (iCloud) usually choke
+                // on the ENVELOPE half — an unescaped quote in a Message-ID —
+                // so asking for the structure alone often parses where the
+                // combined fetch did not.
+                let fetched: Result<Vec<Fetch>, _> = match fetch_uids(sess, &set, "BODYSTRUCTURE").await {
+                    Ok(stream) => stream.try_collect().await,
+                    Err(e) => Err(e),
+                };
+                let mut added = 0u32;
+                match fetched {
+                    Ok(fetches) => {
+                        // Every UID we asked about is answered, including the
+                        // ones that turn out to hold nothing: an empty list is
+                        // still an answer, and marking it stops the message
+                        // being asked about on every pass forever.
+                        let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+                        for f in &fetches {
+                            let Some(uid) = f.uid else { continue };
+                            seen.insert(uid);
+                            let metas = f
+                                .bodystructure()
+                                .map(structure_attachments)
+                                .unwrap_or_default();
+                            added += metas.len() as u32;
+                            c.save_attachment_meta(account_id, folder_path.as_str(), uid, &metas);
+                        }
+                        for uid in uids.iter().filter(|u| !seen.contains(u)) {
+                            c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
+                        }
+                    }
+                    Err(e) => {
+                        // The structure came back in a shape our parser will
+                        // not take. Record the messages as scanned with nothing
+                        // to show rather than retrying them forever; opening
+                        // one still fetches it in full and lists what it holds.
+                        tracing::warn!("attachment scan of {folder_path} failed to parse: {e}");
+                        for uid in &uids {
+                            c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
+                        }
+                    }
+                }
+                emit(WorkerEvent::AttachmentsScanned {
+                    folder_path: folder_path.clone(),
+                    added,
+                    remaining: c.unscanned_attachment_count(account_id, folder_path.as_str()),
+                });
+            }
             MailRequest::FindKeywords => {
                 // Every folder, read-only: EXAMINE answers with the mailbox's
                 // FLAGS line, which lists the keywords in use there, and a
@@ -6848,6 +6913,119 @@ fn structure_has_attachment(bs: &async_imap::imap_proto::types::BodyStructure) -
     }
 }
 
+/// Every attachment in a BODYSTRUCTURE, with what it is called, how big it is
+/// and which IMAP section holds it — all without downloading a byte of it. This
+/// is what lets the gallery reach back through an archive: the server describes
+/// the files, and only opening one actually fetches it.
+///
+/// What counts as an attachment is [`structure_has_attachment`]'s rule, kept
+/// deliberately identical so a message the list gives a paperclip to is a
+/// message the gallery lists parts for.
+fn structure_attachments(
+    bs: &async_imap::imap_proto::types::BodyStructure,
+) -> Vec<crate::models::AttachmentMeta> {
+    use async_imap::imap_proto::types::{BodyStructure as Bs, ContentEncoding};
+
+    /// A parameter's value, matched case-insensitively as RFC 2045 requires.
+    fn param(params: &async_imap::imap_proto::types::BodyParams, key: &str) -> Option<String> {
+        params.as_ref()?.iter().find_map(|(k, v)| {
+            k.eq_ignore_ascii_case(key).then(|| decode_header(v.as_bytes()))
+        })
+    }
+
+    fn walk(
+        bs: &Bs,
+        section: &str,
+        out: &mut Vec<crate::models::AttachmentMeta>,
+    ) {
+        match bs {
+            Bs::Multipart { bodies, .. } => {
+                for (i, child) in bodies.iter().enumerate() {
+                    let child_section = if section.is_empty() {
+                        format!("{}", i + 1)
+                    } else {
+                        format!("{section}.{}", i + 1)
+                    };
+                    walk(child, &child_section, out);
+                }
+            }
+            Bs::Text { common, other, .. }
+            | Bs::Basic { common, other, .. }
+            | Bs::Message { common, other, .. } => {
+                let declared = common
+                    .disposition
+                    .as_ref()
+                    .is_some_and(|d| d.ty.eq_ignore_ascii_case("attachment"));
+                // BODYSTRUCTURE reports the encoded size; base64 inflates by 4/3.
+                let size = match other.transfer_encoding {
+                    ContentEncoding::Base64 => other.octets as u64 / 4 * 3,
+                    _ => other.octets as u64,
+                };
+                let is_text = matches!(bs, Bs::Text { .. });
+                // A text part is only ever an attachment when it says so; for
+                // the rest, an inline part with a Content-ID is decoration
+                // unless it is big enough to be content (see the constant).
+                let counts = if is_text {
+                    declared
+                } else {
+                    declared || other.id.is_none() || size as usize >= INLINE_ATTACHMENT_MIN
+                };
+                if !counts {
+                    return;
+                }
+                let name = common
+                    .disposition
+                    .as_ref()
+                    .and_then(|d| param(&d.params, "filename"))
+                    .or_else(|| param(&common.ty.params, "name"))
+                    .filter(|n| !n.trim().is_empty())
+                    .unwrap_or_else(|| {
+                        // Unnamed, as Apple Mail's inline photos arrive: give it
+                        // the extension its type implies so the gallery can sort
+                        // and filter it like any other file.
+                        let ext = mime_extension(&common.ty.ty, &common.ty.subtype);
+                        format!("attachment-{}{ext}", out.len() + 1)
+                    });
+                out.push(crate::models::AttachmentMeta {
+                    idx: out.len() as u32,
+                    name,
+                    mime: format!(
+                        "{}/{}",
+                        common.ty.ty.to_lowercase(),
+                        common.ty.subtype.to_lowercase()
+                    ),
+                    size,
+                    section: section.to_string(),
+                });
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    // A message that is not multipart is one part, section 1.
+    walk(bs, if matches!(bs, Bs::Multipart { .. }) { "" } else { "1" }, &mut out);
+    out
+}
+
+/// A filename extension for a MIME type, for parts that arrive unnamed. Only
+/// the types that actually turn up without a filename are worth listing; the
+/// rest get none, and show as a generic file.
+fn mime_extension(ty: &str, subtype: &str) -> &'static str {
+    if !ty.eq_ignore_ascii_case("image") {
+        return "";
+    }
+    match subtype.to_ascii_lowercase().as_str() {
+        "jpeg" | "jpg" => ".jpg",
+        "png" => ".png",
+        "gif" => ".gif",
+        "heic" => ".heic",
+        "heif" => ".heif",
+        "webp" => ".webp",
+        "tiff" => ".tif",
+        _ => "",
+    }
+}
+
 // ---------------------------------------------------------------------------
 // POP3 path
 // ---------------------------------------------------------------------------
@@ -7165,15 +7343,15 @@ async fn run_pop3(
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
             }
+            // POP3 downloads every message in full, so an attachment is either
+            // already in the cache or does not exist: there is nothing a scan
+            // could add.
+            MailRequest::ScanAttachments { folder_path } => {
+                emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
+            }
             // POP3 has no server-side keywords: nothing to find.
             MailRequest::FindKeywords => emit(WorkerEvent::KeywordsFound(Vec::new())),
             MailRequest::RefreshKeywords { .. } => emit(WorkerEvent::KeywordsSynced { paths: Vec::new() }),
-            MailRequest::LoadGallery => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.gallery_items(account_id, GALLERY_DATA_CAP, GALLERY_LIMIT);
-                    emit(WorkerEvent::Gallery { items });
-                }
-            }
             // POP3 keeps everything in the inbox, so a conversation never spans
             // folders and the reader already has all of it.
             MailRequest::LoadRelated { message_id, .. } => {
@@ -7578,6 +7756,12 @@ async fn run_mock(
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
             }
+            // Demo mode seeds its in-memory cache up front (see
+            // `backend::seed_demo_cache`), so every attachment is already
+            // described and there is nothing to ask a server about.
+            MailRequest::ScanAttachments { folder_path } => {
+                emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
+            }
             // What a scan of a lived-in mailbox turns up: Thunderbird's
             // built-ins and a few of the user's own, plus one the demo's tags
             // already know (dropped by the app before the report).
@@ -7596,11 +7780,6 @@ async fn run_mock(
                     f("travel_plans", 4, &["Inbox"]),
                     f("Work", 9, &["Inbox"]),
                 ]));
-            }
-            // The mock backend has no attachment cache, so the gallery gets
-            // sample metadata instead (no bytes, hence no thumbnails).
-            MailRequest::LoadGallery => {
-                emit(WorkerEvent::Gallery { items: crate::backend::demo_gallery(account_id) });
             }
             MailRequest::LoadRelated { message_id, .. } => {
                 emit(WorkerEvent::Related { message_id, messages: Vec::new() });
@@ -8737,15 +8916,19 @@ async fn run_graph(
                 }
                 emit(WorkerEvent::KeywordsSynced { paths });
             }
-            MailRequest::LoadGallery => {
-                if let Some(c) = cache.as_ref() {
-                    let items = c.gallery_items(account_id, GALLERY_DATA_CAP, GALLERY_LIMIT);
-                    emit(WorkerEvent::Gallery { items });
-                }
-            }
 
             // Cache-only, exactly like the IMAP path: assemble the conversation
             // from every folder's cached summaries.
+            // Graph has no equivalent of BODYSTRUCTURE in the shape this path
+            // uses: attachments come out of the raw MIME it downloads, so
+            // describing one costs the same as fetching it. Listing them
+            // through /messages/{id}/attachments would work, but it is a
+            // different call on a backend there is no account here to test
+            // against — so a Microsoft account's gallery still shows what has
+            // been downloaded rather than reaching back through the archive.
+            MailRequest::ScanAttachments { folder_path } => {
+                emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
+            }
             MailRequest::LoadRelated { message_id, ids } => {
                 let messages = cache
                     .as_ref()
