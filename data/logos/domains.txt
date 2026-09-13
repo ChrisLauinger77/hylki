@@ -5,6 +5,10 @@
 # when the automatic match is wrong or missing. Lines starting with # are
 # comments.
 #
+# Mailbox hosts (gmail.com, outlook.com, icloud.com, yahoo.com, proton.me and
+# the rest) are listed below for the provider marks, but src/logo.rs refuses a
+# sender logo for them: an address there belongs to a person, not the provider.
+#
 # Tech and platforms
 apple.com
 google.com
