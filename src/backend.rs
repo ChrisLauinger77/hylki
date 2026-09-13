@@ -182,6 +182,62 @@ fn build(s: &Spec) -> Message {
     }
 }
 
+/// Sample attachments for the demo's gallery, spread over the folder kinds the
+/// gallery can draw on so its folder scope has something to act on. The bytes
+/// are not there — the demo has no attachment cache — so every item draws its
+/// file-type icon rather than a thumbnail.
+pub fn demo_gallery(account_id: u32) -> Vec<crate::models::GalleryItem> {
+    // (folder, filename, sender, subject, KB, days ago)
+    let specs: &[(&str, &str, &str, &str, u64, i64)] = match account_id {
+        1 => &[
+            ("Inbox", "Q3-review.pdf", "Dana Whitfield", "Quarter review pack", 842, 1),
+            ("Inbox", "roadmap.png", "Priya Raman", "Roadmap sketch", 310, 2),
+            ("Inbox", "notes.txt", "Tomas Weber", "Handover notes", 6, 3),
+            ("Inbox", "budget-2026.xlsx", "Dana Whitfield", "Budget draft", 96, 5),
+            ("Archive", "contract-signed.pdf", "Legal", "Countersigned", 1204, 40),
+            ("Archive", "offsite-photos.zip", "Priya Raman", "Offsite photos", 18400, 62),
+            ("Starred", "keys.asc", "Tomas Weber", "My public key", 3, 9),
+            ("Newsletters", "issue-42.pdf", "The Weekly", "Issue 42", 520, 4),
+            ("Newsletters", "banner.jpg", "The Weekly", "Issue 41", 244, 11),
+            ("Sent", "proposal-v3.docx", "Jason M.", "Re: Proposal", 180, 2),
+            ("Sent", "screenshot.png", "Jason M.", "Re: That bug", 420, 6),
+        ],
+        2 => &[
+            ("Inbox", "invoice-1180.pdf", "Northwind Ltd", "Invoice 1180", 88, 1),
+            ("Inbox", "logo-pack.zip", "Studio Kern", "Brand assets", 9600, 3),
+            ("Inbox", "meeting.ics", "Calendar", "Standup", 2, 1),
+            ("Archive", "invoice-1104.pdf", "Northwind Ltd", "Invoice 1104", 86, 95),
+            ("Invoices", "invoice-1172.pdf", "Northwind Ltd", "Invoice 1172", 87, 21),
+            ("Invoices", "invoice-1165.pdf", "Acme Supply", "Invoice 1165", 91, 33),
+            ("Sent", "remittance.pdf", "Hyprlab", "Payment sent", 64, 7),
+        ],
+        _ => &[
+            ("Inbox", "boarding-pass.pdf", "Skyline Air", "Your trip", 140, 2),
+            ("Inbox", "recipe.jpg", "Mum", "That cake", 880, 8),
+            ("Archive", "insurance-2025.pdf", "Cover Direct", "Renewal", 320, 210),
+            ("Orders", "receipt-8841.pdf", "Bookshop", "Your order", 48, 14),
+            ("Sent", "holiday-plan.odt", "Jason", "Re: August", 22, 12),
+        ],
+    };
+    let day = 86_400;
+    let now = crate::datefmt::now();
+    specs
+        .iter()
+        .enumerate()
+        .map(|(i, (folder, name, from, subject, kb, ago))| crate::models::GalleryItem {
+            account_id,
+            folder_path: (*folder).to_string(),
+            uid: 9000 + i as u32,
+            name: (*name).to_string(),
+            size: kb * 1024,
+            from_name: (*from).to_string(),
+            subject: (*subject).to_string(),
+            timestamp: now - ago * day,
+            data: None,
+        })
+        .collect()
+}
+
 /// A late reply into the demo's deep conversation (account 1's Inbox):
 /// what a sync brings in while that thread is open. `VIREO_DEMO_ARRIVAL=<s>`
 /// has the mock worker deliver it after that many seconds.

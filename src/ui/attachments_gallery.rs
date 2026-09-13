@@ -6,18 +6,78 @@
 //! (rendered from their first page) show as thumbnails; other files show a type
 //! icon. Clicking a cell opens a large overlay preview.
 
+use adw::prelude::*;
 use gtk::gdk;
 use gtk::glib;
-use gtk::prelude::*;
 use relm4::prelude::*;
 
-use crate::models::{is_image_name, GalleryItem};
+use std::collections::HashMap;
+
+use crate::models::{is_image_name, FolderKind, GalleryItem};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::i18n::i18n;
 
 /// Width of the table's trailing quick-actions column (three icon buttons);
 /// the header carries a spacer of the same width so the columns line up.
 const TABLE_ACTIONS_WIDTH: i32 = 100;
+
+/// One folder offered in the gallery's folder list.
+#[derive(Debug, Clone)]
+pub struct GalleryFolder {
+    pub path: String,
+    /// Display name, as the sidebar spells it.
+    pub name: String,
+    pub kind: FolderKind,
+}
+
+/// One account's share of the folder list: the account's own label and the
+/// folders whose attachments the gallery could draw on.
+#[derive(Debug, Clone)]
+pub struct GalleryAccount {
+    pub id: u32,
+    pub label: String,
+    pub folders: Vec<GalleryFolder>,
+}
+
+/// Whether a folder of this kind feeds the gallery unless the user says
+/// otherwise. Sent is the one eligible kind that starts off: what you sent is
+/// rarely what you are looking for, and its attachments are usually copies of
+/// files you already have. Drafts, Junk and Trash never reach the gallery at
+/// all (the cache query drops them), so they are not offered here.
+fn kind_default(kind: FolderKind) -> bool {
+    !matches!(kind, FolderKind::Sent)
+}
+
+/// Which master switch governs a folder kind: Archive folders follow "Include
+/// Archive", anything that is neither an inbox nor an archive follows "Include
+/// other folders", and inboxes follow neither (they are always on).
+fn kind_master(kind: FolderKind) -> Option<Master> {
+    match kind {
+        FolderKind::Inbox => None,
+        FolderKind::Archive => Some(Master::Archive),
+        _ => Some(Master::Other),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Master {
+    Archive,
+    Other,
+}
+
+/// Whether a folder's attachments are in scope: its master switch has to be on
+/// *and* it has to be ticked. A master that is off wins over a tick rather than
+/// clearing it, so turning the master back on restores each folder to whatever
+/// the user had chosen. `tick` is the user's own choice, or `None` when they
+/// have not touched this folder and its kind's default stands.
+fn in_scope(kind: FolderKind, include_archive: bool, include_other: bool, tick: Option<bool>) -> bool {
+    let master_on = match kind_master(kind) {
+        Some(Master::Archive) => include_archive,
+        Some(Master::Other) => include_other,
+        None => true,
+    };
+    master_on && tick.unwrap_or_else(|| kind_default(kind))
+}
 
 pub struct AttachmentsGallery {
     /// Full set of attachments, unfiltered — the source for search and sort.
@@ -40,11 +100,33 @@ pub struct AttachmentsGallery {
     thumb_width: i32,
     /// The footer type dropdown's row: 0 = all, then one bucket per row.
     type_filter: u32,
+    /// Show only one account's attachments; `None` shows every account. Unlike
+    /// the folder scope this is a view filter, not a setting, so it resets to
+    /// "All accounts" each time the gallery is opened.
+    account_filter: Option<u32>,
+    /// Every account and the folders it offers, as fed by the app.
+    accounts: Vec<GalleryAccount>,
+    /// Pull from Archive folders (persisted master switch).
+    include_archive: bool,
+    /// Pull from folders that are neither Inbox nor Archive (persisted).
+    include_other: bool,
+    /// The folders the user ticked or unticked by hand, overriding
+    /// [`kind_default`]: account id -> path -> on. Persisted.
+    overrides: HashMap<u32, HashMap<String, bool>>,
+    /// Effective per-folder verdict, recomputed from the master switches and
+    /// `overrides` whenever either changes, so filtering is a lookup.
+    included: HashMap<u32, HashMap<String, bool>>,
     /// Debounce for the size slider — one rebuild after the drag settles.
     resize_timer: Option<glib::SourceId>,
     flow: gtk::FlowBox,
     /// The table view's rows (the grid's sibling stack page).
     table: gtk::ListBox,
+    /// The folder list inside the footer's "Folders" popover, rebuilt whenever
+    /// the account/folder set changes.
+    folder_list: gtk::ListBox,
+    /// The account filter dropdown's model: "All accounts" then one row per
+    /// account, in `accounts` order.
+    account_names: gtk::StringList,
     /// The component's root widget, used to anchor the right-click context menu.
     root: gtk::Widget,
 }
@@ -122,6 +204,17 @@ pub enum GalleryInput {
     ApplyThumbWidth,
     /// Show only one type bucket (the footer type dropdown's row; 0 = all).
     SetTypeFilter(u32),
+    /// The accounts and folders the gallery may draw on, sent by the app when
+    /// the gallery opens. Rebuilds the folder list and the account dropdown.
+    SetAccounts(Vec<GalleryAccount>),
+    /// Show only one account (the footer account dropdown's row; 0 = all).
+    SetAccountFilter(u32),
+    /// Master switch: pull from Archive folders.
+    SetIncludeArchive(bool),
+    /// Master switch: pull from folders that are neither Inbox nor Archive.
+    SetIncludeOther(bool),
+    /// One folder was ticked or unticked in the folder list.
+    SetFolder { account_id: u32, path: String, on: bool },
     /// A grid cell was activated (single click) — open the lightbox on that item.
     Activate(u32),
     Prev,
@@ -144,6 +237,9 @@ pub enum GalleryInput {
     /// A lightbox-size PDF render finished (keyed by content hash) — show it
     /// if that PDF is still the one being previewed.
     PreviewRendered(u64),
+    /// Showcase only (VIREO_SHOWCASE_GALLERY_FOLDERS): drop the footer's
+    /// folder popover open so a capture can see it.
+    ShowcaseFolders,
 }
 
 #[derive(Debug)]
@@ -207,7 +303,7 @@ impl Component for AttachmentsGallery {
                     add_named[Some("noresults")] = &adw::StatusPage {
                         set_icon_name: Some("co.hyprlab.Vireo-system-search-symbolic"),
                         set_title: &i18n("No matching attachments"),
-                        set_description: Some(i18n("Try a different search or clear the filter.").as_str()),
+                        set_description: Some(i18n("Try a different search, or check which accounts and folders the footer is pulling from.").as_str()),
                     },
 
                     add_named[Some("grid")] = &gtk::ScrolledWindow {
@@ -349,6 +445,83 @@ impl Component for AttachmentsGallery {
                             connect_clicked[sender] => move |_| {
                                 sender.input(GalleryInput::SetViewTable(true));
                             } @table_toggle,
+                        },
+                    },
+
+                    // Scope: which account and which folders feed the gallery.
+                    #[name = "account_dropdown"]
+                    pack_start = &gtk::DropDown {
+                        set_tooltip_text: Some(i18n("Show only this account").as_str()),
+                        // Pointless with one account, and it would be the only
+                        // control there that could never change anything.
+                        #[watch]
+                        set_visible: model.accounts.len() > 1,
+                        set_model: Some(&model.account_names),
+                        connect_selected_notify[sender] => move |d| {
+                            sender.input(GalleryInput::SetAccountFilter(d.selected()));
+                        },
+                    },
+
+                    #[name = "folders_button"]
+                    pack_start = &gtk::MenuButton {
+                        set_icon_name: "co.hyprlab.Vireo-folder-symbolic",
+                        set_tooltip_text: Some(i18n("Folders to pull from").as_str()),
+
+                        #[wrap(Some)]
+                        set_popover = &gtk::Popover {
+                            add_css_class: "gallery-folders-popover",
+
+                            #[name = "folders_box"]
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_spacing: 10,
+                                set_width_request: 320,
+
+                                gtk::ListBox {
+                                    add_css_class: "boxed-list",
+                                    set_selection_mode: gtk::SelectionMode::None,
+
+                                    #[name = "archive_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Include Archive"),
+                                        #[watch]
+                                        #[block_signal(archive_toggle)]
+                                        set_active: model.include_archive,
+                                        connect_active_notify[sender] => move |r| {
+                                            sender.input(GalleryInput::SetIncludeArchive(r.is_active()));
+                                        } @archive_toggle,
+                                    },
+                                    #[name = "other_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Include other folders"),
+                                        set_subtitle: &i18n("Everything that is not an inbox or an archive"),
+                                        #[watch]
+                                        #[block_signal(other_toggle)]
+                                        set_active: model.include_other,
+                                        connect_active_notify[sender] => move |r| {
+                                            sender.input(GalleryInput::SetIncludeOther(r.is_active()));
+                                        } @other_toggle,
+                                    },
+                                },
+
+                                gtk::Label {
+                                    set_label: &i18n("Pulling attachments from"),
+                                    set_xalign: 0.0,
+                                    add_css_class: "heading",
+                                },
+
+                                gtk::ScrolledWindow {
+                                    set_hscrollbar_policy: gtk::PolicyType::Never,
+                                    set_propagate_natural_height: true,
+                                    set_max_content_height: 380,
+
+                                    #[local_ref]
+                                    folder_list -> gtk::ListBox {
+                                        add_css_class: "boxed-list",
+                                        set_selection_mode: gtk::SelectionMode::None,
+                                    },
+                                },
+                            },
                         },
                     },
 
@@ -564,6 +737,11 @@ impl Component for AttachmentsGallery {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let (view_table, thumb_width, sort_index) = crate::config::load_gallery_view();
+        let (include_archive, include_other, saved_folders) = crate::config::load_gallery_scope();
+        let mut overrides: HashMap<u32, HashMap<String, bool>> = HashMap::new();
+        for (id, path, on) in saved_folders {
+            overrides.entry(id).or_default().insert(path, on);
+        }
         let model = AttachmentsGallery {
             all_items: Vec::new(),
             items: Vec::new(),
@@ -575,13 +753,22 @@ impl Component for AttachmentsGallery {
             view_table,
             thumb_width,
             type_filter: 0,
+            account_filter: None,
+            accounts: Vec::new(),
+            include_archive,
+            include_other,
+            overrides,
+            included: HashMap::new(),
             resize_timer: None,
             flow: gtk::FlowBox::new(),
             table: gtk::ListBox::new(),
+            folder_list: gtk::ListBox::new(),
+            account_names: gtk::StringList::new(&[i18n("All accounts").as_str()]),
             root: root.clone().upcast(),
         };
         let flow = &model.flow;
         let table = &model.table;
+        let folder_list = &model.folder_list;
         let widgets = view_output!();
 
         // Double-clicking the preview opens the document in its external app.
@@ -706,6 +893,60 @@ impl Component for AttachmentsGallery {
                     self.rebuild_view(&sender);
                 }
             }
+            GalleryInput::SetAccounts(accounts) => {
+                self.accounts = accounts;
+                self.rebuild_account_names();
+                // The dropdown's rows just changed under it; start from "All
+                // accounts" rather than whichever row the old list had there.
+                self.account_filter = None;
+                widgets.account_dropdown.set_selected(0);
+                self.recompute_scope();
+                self.rebuild_folder_list(&sender);
+                self.apply();
+                self.rebuild_view(&sender);
+            }
+            GalleryInput::SetAccountFilter(row) => {
+                // Row 0 is "All accounts"; the rest index `accounts` in order.
+                let filter = (row as usize)
+                    .checked_sub(1)
+                    .and_then(|i| self.accounts.get(i))
+                    .map(|a| a.id);
+                if self.account_filter != filter {
+                    self.account_filter = filter;
+                    // Keeps the dropdown honest when the message came from
+                    // somewhere other than the dropdown itself. Setting it to
+                    // the row it already holds emits nothing, so this cannot
+                    // loop back round.
+                    widgets.account_dropdown.set_selected(row);
+                    self.preview = None;
+                    self.apply();
+                    self.rebuild_view(&sender);
+                }
+            }
+            GalleryInput::SetIncludeArchive(on) => {
+                if self.include_archive != on {
+                    self.include_archive = on;
+                    self.scope_changed(&sender);
+                }
+            }
+            GalleryInput::SetIncludeOther(on) => {
+                if self.include_other != on {
+                    self.include_other = on;
+                    self.scope_changed(&sender);
+                }
+            }
+            GalleryInput::SetFolder { account_id, path, on } => {
+                let entry = self.overrides.entry(account_id).or_default();
+                if entry.insert(path, on) != Some(on) {
+                    // The list already draws this tick; rebuilding it here
+                    // would tear down the check button mid-signal.
+                    self.recompute_scope();
+                    self.save_scope();
+                    self.preview = None;
+                    self.apply();
+                    self.rebuild_view(&sender);
+                }
+            }
             GalleryInput::SetLoading(on) => self.loading = on,
             GalleryInput::Activate(i) => {
                 if (i as usize) < self.items.len() {
@@ -750,6 +991,18 @@ impl Component for AttachmentsGallery {
             GalleryInput::ContextMenu { index, x, y } => {
                 self.show_context_menu(index, x, y, &sender)
             }
+            GalleryInput::ShowcaseFolders => {
+                widgets.folders_button.popup();
+                // A popover is its own surface, so the window snapshot never
+                // has it: capture its contents directly, as the context menu
+                // does (see `ui::context_menu`).
+                if let Ok(path) = std::env::var("VIREO_SHOWCASE") {
+                    let content = widgets.folders_box.clone();
+                    glib::timeout_add_seconds_local_once(1, move || {
+                        crate::app::showcase_capture(content.upcast_ref(), &path);
+                    });
+                }
+            }
         }
         self.update_view(widgets, sender);
     }
@@ -779,6 +1032,8 @@ impl AttachmentsGallery {
             .all_items
             .iter()
             .enumerate()
+            .filter(|(_, it)| self.account_filter.is_none_or(|id| it.account_id == id))
+            .filter(|(_, it)| self.folder_included(it.account_id, &it.folder_path))
             .filter(|(_, it)| self.type_filter == 0 || type_bucket(&it.name) == self.type_filter)
             .filter(|(_, it)| {
                 if tokens.is_empty() {
@@ -791,6 +1046,149 @@ impl AttachmentsGallery {
             .collect();
         sort_indices(&mut items, &self.all_items, self.sort);
         self.items = items;
+    }
+
+    /// Whether attachments from this folder are in scope. A folder the app has
+    /// not listed (a new one on the server, or the list not having arrived yet)
+    /// counts as in scope, matching the worker's own default.
+    fn folder_included(&self, account_id: u32, path: &str) -> bool {
+        self.included
+            .get(&account_id)
+            .and_then(|m| m.get(path))
+            .copied()
+            .unwrap_or(true)
+    }
+
+    /// Recompute the effective per-folder verdict from the two master switches
+    /// and the user's own ticks. A master switch that is off wins over a tick,
+    /// so turning "Include Archive" back on restores each archive folder to
+    /// whatever the user had chosen for it.
+    fn recompute_scope(&mut self) {
+        self.included = self
+            .accounts
+            .iter()
+            .map(|acct| {
+                let ticks = self.overrides.get(&acct.id);
+                let folders = acct
+                    .folders
+                    .iter()
+                    .map(|f| {
+                        let tick = ticks.and_then(|m| m.get(&f.path)).copied();
+                        let on = in_scope(f.kind, self.include_archive, self.include_other, tick);
+                        (f.path.clone(), on)
+                    })
+                    .collect();
+                (acct.id, folders)
+            })
+            .collect();
+    }
+
+    /// The user's own tick for a folder, before the master switches have their
+    /// say — what the folder list shows in its check box.
+    fn folder_ticked(&self, account_id: u32, path: &str, kind: FolderKind) -> bool {
+        self.overrides
+            .get(&account_id)
+            .and_then(|m| m.get(path))
+            .copied()
+            .unwrap_or_else(|| kind_default(kind))
+    }
+
+    /// Rebuild the footer popover's folder list: every account's folders, each
+    /// with a check box, under the account's own label when there is more than
+    /// one account. Rows whose master switch is off are shown insensitive, so
+    /// it is clear the switch and not the tick is what is holding them back.
+    fn rebuild_folder_list(&self, sender: &ComponentSender<Self>) {
+        while let Some(row) = self.folder_list.first_child() {
+            self.folder_list.remove(&row);
+        }
+        let multi = self.accounts.len() > 1;
+        for acct in &self.accounts {
+            if multi {
+                let header = gtk::ListBoxRow::new();
+                header.set_activatable(false);
+                header.set_selectable(false);
+                header.add_css_class("gallery-folder-heading");
+                let label = gtk::Label::new(Some(&acct.label));
+                label.set_xalign(0.0);
+                label.add_css_class("heading");
+                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                header.set_child(Some(&label));
+                self.folder_list.append(&header);
+            }
+            for folder in &acct.folders {
+                let row = adw::ActionRow::new();
+                row.set_title(&glib::markup_escape_text(&folder.name));
+                row.add_prefix(&gtk::Image::from_icon_name(folder.kind.icon()));
+                let check = gtk::CheckButton::new();
+                check.set_active(self.folder_ticked(acct.id, &folder.path, folder.kind));
+                check.set_valign(gtk::Align::Center);
+                let s = sender.clone();
+                let account_id = acct.id;
+                let path = folder.path.clone();
+                check.connect_toggled(move |c| {
+                    s.input(GalleryInput::SetFolder {
+                        account_id,
+                        path: path.clone(),
+                        on: c.is_active(),
+                    });
+                });
+                row.add_suffix(&check);
+                row.set_activatable_widget(Some(&check));
+                // An inbox always counts; the rest answer to a master switch.
+                row.set_sensitive(match kind_master(folder.kind) {
+                    Some(Master::Archive) => self.include_archive,
+                    Some(Master::Other) => self.include_other,
+                    None => true,
+                });
+                self.folder_list.append(&row);
+            }
+        }
+    }
+
+    /// Refill the account dropdown's rows from `accounts`, keeping "All
+    /// accounts" first.
+    fn rebuild_account_names(&self) {
+        while self.account_names.n_items() > 1 {
+            self.account_names.remove(self.account_names.n_items() - 1);
+        }
+        for acct in &self.accounts {
+            self.account_names.append(&acct.label);
+        }
+    }
+
+    /// Persist the folder scope, dropping ticks that agree with their kind's
+    /// default so the file only records genuine choices.
+    fn save_scope(&self) {
+        let kinds: HashMap<(u32, &str), FolderKind> = self
+            .accounts
+            .iter()
+            .flat_map(|a| a.folders.iter().map(move |f| ((a.id, f.path.as_str()), f.kind)))
+            .collect();
+        let mut folders: Vec<(u32, String, bool)> = self
+            .overrides
+            .iter()
+            .flat_map(|(id, m)| m.iter().map(move |(path, on)| (*id, path.clone(), *on)))
+            .filter(|(id, path, on)| {
+                // Keep a tick for a folder we have not been told about: it may
+                // belong to an account that is offline right now.
+                kinds
+                    .get(&(*id, path.as_str()))
+                    .is_none_or(|k| kind_default(*k) != *on)
+            })
+            .collect();
+        folders.sort();
+        crate::config::save_gallery_scope(self.include_archive, self.include_other, &folders);
+    }
+
+    /// Re-apply the scope to the loaded items and repaint both the grid/table
+    /// and the folder list's tick marks.
+    fn scope_changed(&mut self, sender: &ComponentSender<Self>) {
+        self.recompute_scope();
+        self.save_scope();
+        self.preview = None;
+        self.apply();
+        self.rebuild_view(sender);
+        self.rebuild_folder_list(sender);
     }
 
     /// The `GalleryItem` at display position `display` (mapping through the
@@ -2025,6 +2423,49 @@ mod imp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The gallery's default catch: inboxes, archives and custom folders, but
+    /// not Sent.
+    #[test]
+    fn sent_is_the_only_kind_off_by_default() {
+        for kind in [FolderKind::Inbox, FolderKind::Starred, FolderKind::Archive, FolderKind::Custom] {
+            assert!(in_scope(kind, true, true, None), "{kind:?} should be on by default");
+        }
+        assert!(!in_scope(FolderKind::Sent, true, true, None));
+    }
+
+    #[test]
+    fn a_tick_overrides_the_kind_default_either_way() {
+        assert!(in_scope(FolderKind::Sent, true, true, Some(true)));
+        assert!(!in_scope(FolderKind::Custom, true, true, Some(false)));
+    }
+
+    #[test]
+    fn each_master_switch_governs_only_its_own_kinds() {
+        // Archive off takes the archive down and leaves the rest alone.
+        assert!(!in_scope(FolderKind::Archive, false, true, None));
+        assert!(in_scope(FolderKind::Inbox, false, true, None));
+        assert!(in_scope(FolderKind::Custom, false, true, None));
+        // "Other" off takes everything that is neither inbox nor archive.
+        assert!(!in_scope(FolderKind::Custom, true, false, None));
+        assert!(!in_scope(FolderKind::Starred, true, false, None));
+        assert!(in_scope(FolderKind::Inbox, true, false, None));
+        assert!(in_scope(FolderKind::Archive, true, false, None));
+    }
+
+    /// An inbox answers to neither switch: there is always something to show.
+    #[test]
+    fn an_inbox_survives_both_switches_being_off() {
+        assert!(in_scope(FolderKind::Inbox, false, false, None));
+    }
+
+    /// A master switch that is off beats a tick, but does not erase it: the
+    /// tick is what comes back when the switch returns.
+    #[test]
+    fn a_master_switch_outranks_a_tick_without_clearing_it() {
+        assert!(!in_scope(FolderKind::Archive, false, true, Some(true)));
+        assert!(in_scope(FolderKind::Archive, true, true, Some(true)));
+    }
 
     fn item(name: &str, from: &str, subject: &str, folder: &str, ts: i64, size: u64) -> GalleryItem {
         GalleryItem {

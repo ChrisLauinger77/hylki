@@ -1179,6 +1179,19 @@ headerbar.compose-toolbar button.image-button {
 .gallery-footer scale {
   margin-left: 8px;
 }
+/* The folder list's per-account headings. They sit in the same boxed list as
+   the folder rows so the whole thing scrolls as one, so they need the padding
+   a row would otherwise give them. */
+.gallery-folder-heading {
+  padding: 8px 12px 4px 12px;
+}
+.gallery-folder-heading label {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+.gallery-folders-popover label.heading {
+  margin-left: 2px;
+}
 .gallery-table-header {
   padding: 2px 18px;
   border-bottom: 1px solid alpha(currentColor, 0.12);

@@ -7597,9 +7597,10 @@ async fn run_mock(
                     f("Work", 9, &["Inbox"]),
                 ]));
             }
-            // The mock backend has no attachment cache.
+            // The mock backend has no attachment cache, so the gallery gets
+            // sample metadata instead (no bytes, hence no thumbnails).
             MailRequest::LoadGallery => {
-                emit(WorkerEvent::Gallery { items: Vec::new() });
+                emit(WorkerEvent::Gallery { items: crate::backend::demo_gallery(account_id) });
             }
             MailRequest::LoadRelated { message_id, .. } => {
                 emit(WorkerEvent::Related { message_id, messages: Vec::new() });

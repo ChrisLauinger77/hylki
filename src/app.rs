@@ -98,7 +98,7 @@ use crate::ui::message_list::{
     BulkAction, MessageList, MessageListInput, MessageListOutput, RowAction,
 };
 use crate::ui::attachments_gallery::{
-    AttachmentsGallery, GalleryInput, GalleryOutput,
+    AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput,
 };
 use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
 use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput};
@@ -3351,6 +3351,29 @@ impl SimpleComponent for AppModel {
                         let _ = s.send(AppMsg::MoveToMenu);
                     });
                 }
+                // VIREO_SHOWCASE_GALLERY=1 opens the attachments gallery at
+                // 3s; add VIREO_SHOWCASE_GALLERY_FOLDERS=1 to drop its folder
+                // popover open a second later, or VIREO_SHOWCASE_GALLERY_ACCOUNT=<row>
+                // to pick that row of its account filter (0 = all accounts).
+                if std::env::var("VIREO_SHOWCASE_GALLERY").is_ok() {
+                    let s = sender.input_sender().clone();
+                    let g = model.gallery.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                        let _ = s.send(AppMsg::ShowAttachments);
+                        let row: Option<u32> = std::env::var("VIREO_SHOWCASE_GALLERY_ACCOUNT")
+                            .ok()
+                            .and_then(|v| v.parse().ok());
+                        let folders = std::env::var("VIREO_SHOWCASE_GALLERY_FOLDERS").is_ok();
+                        gtk::glib::timeout_add_seconds_local_once(1, move || {
+                            if let Some(row) = row {
+                                let _ = g.send(GalleryInput::SetAccountFilter(row));
+                            }
+                            if folders {
+                                let _ = g.send(GalleryInput::ShowcaseFolders);
+                            }
+                        });
+                    });
+                }
                 // VIREO_SHOWCASE_RAIL=1 collapses the sidebar to the rail
                 // at 3s (the user's own toggle, fold-ups and all).
                 if std::env::var("VIREO_SHOWCASE_RAIL").is_ok() {
@@ -3677,6 +3700,9 @@ impl SimpleComponent for AppModel {
                 // flag, so the other order cancels the spinner it just showed.
                 self.gallery.emit(GalleryInput::SetItems(Vec::new()));
                 self.gallery.emit(GalleryInput::SetLoading(true));
+                // The folder list has to be in place before the items land, or
+                // the first batch is filtered against an empty scope.
+                self.gallery.emit(GalleryInput::SetAccounts(self.gallery_scope()));
                 // Load each account's attachments (across all gallery folders)
                 // from the cache.
                 let ids: Vec<u32> = self.accounts.iter().map(|a| a.id).collect();
@@ -9229,6 +9255,38 @@ impl AppModel {
             .content(&toolbar)
             .build();
         window.present();
+    }
+
+    /// The accounts and folders the attachments gallery may draw on: every
+    /// folder the cache's gallery query can return, which is all of them bar
+    /// Drafts, Junk and Trash. The folders are already in sidebar order.
+    fn gallery_scope(&self) -> Vec<GalleryAccount> {
+        self.accounts
+            .iter()
+            .map(|a| GalleryAccount {
+                id: a.id,
+                label: a.label.clone(),
+                folders: self
+                    .folders
+                    .get(&a.id)
+                    .map(|fs| {
+                        fs.iter()
+                            .filter(|f| {
+                                !matches!(
+                                    f.kind,
+                                    FolderKind::Drafts | FolderKind::Junk | FolderKind::Trash
+                                )
+                            })
+                            .map(|f| GalleryFolder {
+                                path: f.path.clone(),
+                                name: f.name.clone(),
+                                kind: f.kind,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            })
+            .collect()
     }
 
     /// Leave the attachments gallery, dropping its data. The gallery loads

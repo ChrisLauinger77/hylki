@@ -2519,6 +2519,19 @@ struct StateFile {
     /// Attachments gallery sort criterion (the sort dropdown's row index).
     #[serde(default)]
     gallery_sort: u32,
+    /// Attachments gallery: pull from Archive folders.
+    #[serde(default = "default_on")]
+    gallery_archive: bool,
+    /// Attachments gallery: pull from folders that are neither Inbox nor
+    /// Archive (custom folders and Starred).
+    #[serde(default = "default_on")]
+    gallery_other: bool,
+    /// Attachments gallery: folders the user ticked or unticked by hand in the
+    /// folder list, as "<account id>\t<path>\t<0|1>". Only folders that differ
+    /// from their kind's default are stored, so a new folder on the server
+    /// follows the default rather than an entry that predates it.
+    #[serde(default)]
+    gallery_folders: Vec<String>,
     /// Message-list pane width in px (#28 — it reset every launch).
     #[serde(default = "default_list_pane_width")]
     list_pane_width: i32,
@@ -2576,10 +2589,17 @@ fn state_path() -> Option<PathBuf> {
     Some(config_base()?.join("vireo").join("state.toml"))
 }
 
+/// Read the remembered UI state. A missing or unreadable file falls back to
+/// deserializing an empty document, not to `StateFile::default()`: the derived
+/// Default hands every field its type's zero, which is not what the
+/// `#[serde(default = …)]` on each one says a first run should get (a pane
+/// width of 0, a gallery that pulls from nothing). Every field carries a serde
+/// default, so the empty document always parses.
 fn load_state() -> StateFile {
     state_path()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|t| toml::from_str::<StateFile>(&t).ok())
+        .or_else(|| toml::from_str::<StateFile>("").ok())
         .unwrap_or_default()
 }
 
@@ -2745,6 +2765,49 @@ pub fn save_gallery_sort(sort: u32) {
     save_state(&s);
 }
 
+/// One per-folder gallery override as it is stored: "<account id>\t<path>\t<0|1>".
+/// A mailbox path can hold almost any byte a server chooses, but never a tab.
+fn encode_gallery_folder(id: u32, path: &str, on: bool) -> String {
+    format!("{id}\t{path}\t{}", u8::from(on))
+}
+
+/// Read back [`encode_gallery_folder`]; `None` for an entry that is not in that
+/// shape, so a hand-edited or older file loses only the bad line.
+fn decode_gallery_folder(entry: &str) -> Option<(u32, String, bool)> {
+    let mut parts = entry.splitn(3, '\t');
+    let id: u32 = parts.next()?.parse().ok()?;
+    let path = parts.next()?;
+    let on = parts.next()?;
+    if path.is_empty() {
+        return None;
+    }
+    Some((id, path.to_string(), on == "1"))
+}
+
+/// The attachments gallery's remembered folder scope: (pull from Archive,
+/// pull from other folders, per-folder overrides as (account id, path, on)).
+pub fn load_gallery_scope() -> (bool, bool, Vec<(u32, String, bool)>) {
+    let s = load_state();
+    let folders = s
+        .gallery_folders
+        .iter()
+        .filter_map(|e| decode_gallery_folder(e))
+        .collect();
+    (s.gallery_archive, s.gallery_other, folders)
+}
+
+/// Persist the attachments gallery's folder scope.
+pub fn save_gallery_scope(archive: bool, other: bool, folders: &[(u32, String, bool)]) {
+    let mut s = load_state();
+    s.gallery_archive = archive;
+    s.gallery_other = other;
+    s.gallery_folders = folders
+        .iter()
+        .map(|(id, path, on)| encode_gallery_folder(*id, path, *on))
+        .collect();
+    save_state(&s);
+}
+
 /// The About window's height: tall by default, remembering the user's own
 /// vertical resize across restarts.
 /// The split-reply panel's dragged height; 0 when it has never been dragged
@@ -2796,7 +2859,48 @@ pub fn save_contacts_pane_width(width: i32) {
 
 #[cfg(test)]
 mod tests {
-    use super::{ConfigFile, PrivacyFile};
+    use super::{decode_gallery_folder, encode_gallery_folder, ConfigFile, PrivacyFile, StateFile};
+
+    /// Every gallery folder override survives the trip to the file and back,
+    /// including the paths servers really use: dots, slashes, spaces, UTF-7.
+    #[test]
+    fn a_gallery_folder_override_round_trips() {
+        let cases = [
+            (1, "INBOX", true),
+            (2, "INBOX.Sent", false),
+            (3, "Archive/2026", true),
+            (7, "Saved Mail", false),
+            (11, "INBOX.&AMQA5gDo-", true),
+        ];
+        for (id, path, on) in cases {
+            let encoded = encode_gallery_folder(id, path, on);
+            assert_eq!(
+                decode_gallery_folder(&encoded),
+                Some((id, path.to_string(), on)),
+                "{path} did not survive the round trip",
+            );
+        }
+    }
+
+    /// A line that is not in the stored shape is dropped, not guessed at.
+    #[test]
+    fn a_malformed_gallery_override_is_skipped() {
+        for bad in ["", "1", "1\tInbox", "notanid\tInbox\t1", "1\t\t1"] {
+            assert_eq!(decode_gallery_folder(bad), None, "{bad:?} should not decode");
+        }
+    }
+
+    /// A first run with no state file must land on the `#[serde(default = …)]`
+    /// each field declares, not on the zero its type happens to have: the
+    /// gallery's two master switches start on, and the panes have real widths.
+    #[test]
+    fn a_missing_state_file_falls_back_to_the_declared_defaults() {
+        let fresh: StateFile = toml::from_str("").expect("an empty state document must parse");
+        assert!(fresh.gallery_archive);
+        assert!(fresh.gallery_other);
+        assert_eq!(fresh.gallery_thumb_width, super::default_gallery_thumb_width());
+        assert_eq!(fresh.list_pane_width, super::default_list_pane_width());
+    }
 
     #[test]
     fn plain_string_aliases_still_load() {
