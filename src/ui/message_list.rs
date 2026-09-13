@@ -25,7 +25,8 @@ const FILL_CHUNK: usize = 30;
 /// An action chosen from a message's right-click context menu.
 /// The action palette's state-carrying buttons, once built.
 struct PaletteButtons {
-    read: gtk::Button,
+    /// Absent for a draft: a draft is neither read nor unread.
+    read: Option<gtk::Button>,
     star: gtk::Button,
     tag: gtk::Button,
 }
@@ -52,8 +53,12 @@ impl MessageRow {
         action(&reply_all, RowAction::ReplyAll);
         let forward = button("co.hyprlab.Vireo-mail-forward-symbolic", i18n("Forward"));
         action(&forward, RowAction::Forward);
-        let read = button("co.hyprlab.Vireo-mail-read-symbolic", i18n("Mark as read"));
-        action(&read, RowAction::ToggleRead);
+        // A draft is neither read nor unread, so it gets no toggle.
+        let read = (!self.in_drafts).then(|| {
+            let b = button("co.hyprlab.Vireo-mail-read-symbolic", i18n("Mark as read"));
+            action(&b, RowAction::ToggleRead);
+            b
+        });
         let star = button("co.hyprlab.Vireo-non-starred-symbolic", i18n("Star"));
         action(&star, RowAction::ToggleStar);
         let tag = button("co.hyprlab.Vireo-tag-symbolic", i18n("Tags"));
@@ -83,7 +88,7 @@ impl MessageRow {
         action(&contact, RowAction::AddContact);
         let source = button("co.hyprlab.Vireo-code-symbolic", i18n("View Source"));
         action(&source, RowAction::ViewSource);
-        for b in [&reply, &reply_all, &forward, &read, &star, &tag, &moveto, &archive, &delete, &spam, &contact, &source] {
+        for b in [Some(&reply), Some(&reply_all), Some(&forward), read.as_ref(), Some(&star), Some(&tag), Some(&moveto), Some(&archive), Some(&delete), Some(&spam), Some(&contact), Some(&source)].into_iter().flatten() {
             inner.append(b);
         }
         self.palette_buttons.replace(Some(PaletteButtons { read, star, tag }));
@@ -98,12 +103,14 @@ impl MessageRow {
         let Some(b) = buttons.as_ref() else { return };
         // Action-showing icon (read envelope = "mark as read"), like the
         // menus and toolbar.
-        if self.msg.unread {
-            b.read.set_icon_name("co.hyprlab.Vireo-mail-read-symbolic");
-            b.read.set_tooltip_text(Some(i18n("Mark as read").as_str()));
-        } else {
-            b.read.set_icon_name("co.hyprlab.Vireo-mail-unread-symbolic");
-            b.read.set_tooltip_text(Some(i18n("Mark as unread").as_str()));
+        if let Some(read) = &b.read {
+            if self.msg.unread {
+                read.set_icon_name("co.hyprlab.Vireo-mail-read-symbolic");
+                read.set_tooltip_text(Some(i18n("Mark as read").as_str()));
+            } else {
+                read.set_icon_name("co.hyprlab.Vireo-mail-unread-symbolic");
+                read.set_tooltip_text(Some(i18n("Mark as unread").as_str()));
+            }
         }
         let starred = self.msg.starred || self.thread_starred;
         b.star.set_css_classes(if starred { &["flat", "star-active"] } else { &["flat"] });
@@ -159,6 +166,8 @@ pub struct RowInit {
     pub show_palette: bool,
     /// The list shows Junk: the palette's spam button reads "Not Spam".
     pub in_junk: bool,
+    /// The list shows Drafts: no read/unread toggle, a draft is neither.
+    pub in_drafts: bool,
     /// Number of messages in this conversation (only set on a thread head; 1 for
     /// a standalone message).
     pub thread_count: usize,
@@ -342,6 +351,7 @@ pub struct MessageRow {
     /// Whether this row shows the Actions Palette line at all (preference).
     show_palette: bool,
     in_junk: bool,
+    in_drafts: bool,
     /// Conversation size (only meaningful on a thread head).
     thread_count: usize,
     /// Nested reply under a thread head.
@@ -1380,6 +1390,7 @@ impl FactoryComponent for MessageRow {
             tags,
             show_palette,
             in_junk,
+            in_drafts,
             thread_count,
             is_thread_child,
             is_last_child,
@@ -1420,6 +1431,7 @@ impl FactoryComponent for MessageRow {
             tags_rendered: std::cell::RefCell::new(Vec::new()),
             show_palette,
             in_junk,
+            in_drafts,
             thread_count,
             is_thread_child,
             is_last_child,
@@ -2229,6 +2241,9 @@ pub struct MessageList {
     restorable: bool,
     /// The list shows Junk: "Not Spam" stands where "Mark as Spam" would.
     in_junk: bool,
+    /// The list shows Drafts (a folder or the unified row): drafts are
+    /// neither read nor unread, so the toggles are not offered.
+    in_drafts: bool,
     /// Rendered thread membership: message key → conversation key, rebuilt with
     /// the rows. Lets a read-state change on a hidden reply refresh its head.
     msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
@@ -2451,6 +2466,8 @@ pub enum MessageListInput {
     SetRestorable(bool),
     /// The list shows Junk: "Not Spam" replaces "Mark as Spam" (#168).
     SetInJunk(bool),
+    /// The list shows Drafts: read/unread toggles are withheld.
+    SetInDrafts(bool),
     /// Folder switch: reset infinite-scroll paging back to the first page and
     /// scroll to the top (a plain `SetMessages` now preserves paging for refreshes).
     ResetPaging,
@@ -2625,16 +2642,22 @@ impl SimpleComponent for MessageList {
                         set_ellipsize: gtk::pango::EllipsizeMode::End,
                         add_css_class: "bulk-count",
                     },
+                    // Drafts are neither read nor unread: both go when the
+                    // list shows them.
                     gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-read-symbolic",
                         set_tooltip_text: Some(i18n("Mark as Read").as_str()),
                         add_css_class: "flat",
+                        #[watch]
+                        set_visible: !model.in_drafts,
                         connect_clicked => MessageListInput::Bulk(BulkAction::MarkRead),
                     },
                     gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-unread-symbolic",
                         set_tooltip_text: Some(i18n("Mark as Unread").as_str()),
                         add_css_class: "flat",
+                        #[watch]
+                        set_visible: !model.in_drafts,
                         connect_clicked => MessageListInput::Bulk(BulkAction::MarkUnread),
                     },
                     gtk::Button {
@@ -2831,6 +2854,7 @@ impl SimpleComponent for MessageList {
             show_recipient: false,
             restorable: false,
             in_junk: false,
+            in_drafts: false,
             default_expanded: false,
             msg_thread: std::collections::HashMap::new(),
             thread_members: std::collections::HashMap::new(),
@@ -3079,6 +3103,7 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SetRestorable(on) => self.restorable = on,
             MessageListInput::SetInJunk(on) => self.in_junk = on,
+            MessageListInput::SetInDrafts(on) => self.in_drafts = on,
             MessageListInput::ContactPhotosChanged => {
                 // Pointless when the circles aren't drawn; rows check the
                 // fresh index as they are rebuilt.
@@ -3899,7 +3924,9 @@ impl MessageList {
             })
             .icon("co.hyprlab.Vireo-folder-symbolic")
         };
-        if is_thread_head {
+        if self.in_drafts {
+            // A draft is neither read nor unread: no toggle to offer.
+        } else if is_thread_head {
             let any_unread = members.iter().any(|m| m.unread);
             let s = sender.clone();
             flag_section.push(
@@ -3999,11 +4026,16 @@ impl MessageList {
         };
 
         let sections = vec![
-            vec![
-                item(BulkAction::MarkRead, &i18n("Mark as Read"), "co.hyprlab.Vireo-mail-read-symbolic"),
-                item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "co.hyprlab.Vireo-mail-unread-symbolic"),
-                item(BulkAction::Flag, &i18n("Flag"), "co.hyprlab.Vireo-starred-symbolic"),
-            ],
+            {
+                let mut section = Vec::new();
+                // Drafts are neither read nor unread.
+                if !self.in_drafts {
+                    section.push(item(BulkAction::MarkRead, &i18n("Mark as Read"), "co.hyprlab.Vireo-mail-read-symbolic"));
+                    section.push(item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "co.hyprlab.Vireo-mail-unread-symbolic"));
+                }
+                section.push(item(BulkAction::Flag, &i18n("Flag"), "co.hyprlab.Vireo-starred-symbolic"));
+                section
+            },
             {
                 let mut section = Vec::new();
                 if self.in_junk {
@@ -4321,6 +4353,7 @@ impl MessageList {
                         tags: self.tags.clone(),
                         show_palette: self.list_palette,
                         in_junk: self.in_junk,
+                        in_drafts: self.in_drafts,
                         thread_count: 0,
                         is_thread_child: true,
                         is_last_child: i == children.len() - 1,
@@ -4628,6 +4661,7 @@ impl MessageList {
                     tags: self.tags.clone(),
                     show_palette: self.list_palette,
                     in_junk: self.in_junk,
+                    in_drafts: self.in_drafts,
                     thread_count: meta.count,
                     is_thread_child: meta.is_child,
                     is_last_child: meta.is_last,

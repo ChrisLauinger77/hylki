@@ -6308,6 +6308,8 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetShowRecipient(false));
                 self.message_list.emit(MessageListInput::SetRestorable(false));
                 self.message_list.emit(MessageListInput::SetInJunk(false));
+                self.message_list.emit(MessageListInput::SetInDrafts(false));
+                self.message_view.emit(MessageViewInput::SetDraftsView(false));
                 self.show_tag_view();
                 self.refresh_tag_view(&sender);
                 self.sync_tag_keywords();
@@ -9299,6 +9301,10 @@ impl AppModel {
         ));
         self.message_list.emit(MessageListInput::SetRestorable(false));
         self.message_list.emit(MessageListInput::SetInJunk(false));
+        self.message_list
+            .emit(MessageListInput::SetInDrafts(view == UnifiedView::Kind(FolderKind::Drafts)));
+        self.message_view
+            .emit(MessageViewInput::SetDraftsView(view == UnifiedView::Kind(FolderKind::Drafts)));
         let reqs = self.unified_targets();
         // Keep every account's last known slice and top it up from the
         // folder caches, the way opening a single folder does. This used
@@ -9522,6 +9528,8 @@ impl AppModel {
         let restorable = kind.is_some_and(|k| matches!(k, FolderKind::Trash | FolderKind::Junk));
         self.message_list.emit(MessageListInput::SetRestorable(restorable));
         self.message_list.emit(MessageListInput::SetInJunk(kind == Some(FolderKind::Junk)));
+        self.message_list.emit(MessageListInput::SetInDrafts(kind == Some(FolderKind::Drafts)));
+        self.message_view.emit(MessageViewInput::SetDraftsView(kind == Some(FolderKind::Drafts)));
         self.selected = Some(SelectedFolder {
             account_id,
             folder_id,
@@ -12576,6 +12584,11 @@ impl AppModel {
     fn set_read(&mut self, m: &Message, read: bool) {
         // No-op if it's already in the requested state.
         if read != m.unread {
+            return;
+        }
+        // A draft is neither read nor unread, and the Drafts chip counts
+        // drafts, not unread mail: nothing to store, nothing to adjust.
+        if self.is_drafts_folder(m.account_id, m.folder_id) {
             return;
         }
         let Some(path) = self.resolve_folder_path(m) else {
