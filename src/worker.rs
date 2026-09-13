@@ -11545,3 +11545,251 @@ mod uid_set_tests {
         assert_eq!(uid_set(&[]), "");
     }
 }
+
+#[cfg(test)]
+mod attachment_scan_tests {
+    use super::{mime_extension, structure_attachments, INLINE_ATTACHMENT_MIN};
+    use async_imap::imap_proto::types::{
+        BodyContentCommon, BodyContentSinglePart, BodyStructure, ContentDisposition, ContentEncoding,
+        ContentType,
+    };
+    use std::borrow::Cow;
+
+    fn ctype(ty: &'static str, subtype: &'static str, name: Option<&'static str>) -> ContentType<'static> {
+        ContentType {
+            ty: Cow::Borrowed(ty),
+            subtype: Cow::Borrowed(subtype),
+            params: name.map(|n| vec![(Cow::Borrowed("name"), Cow::Borrowed(n))]),
+        }
+    }
+
+    fn disposition(ty: &'static str, filename: Option<&'static str>) -> ContentDisposition<'static> {
+        ContentDisposition {
+            ty: Cow::Borrowed(ty),
+            params: filename.map(|f| vec![(Cow::Borrowed("filename"), Cow::Borrowed(f))]),
+        }
+    }
+
+    fn single(
+        ty: &'static str,
+        subtype: &'static str,
+        octets: u32,
+        encoding: ContentEncoding<'static>,
+        disp: Option<ContentDisposition<'static>>,
+        content_id: Option<&'static str>,
+        name: Option<&'static str>,
+    ) -> BodyStructure<'static> {
+        BodyStructure::Basic {
+            common: BodyContentCommon {
+                ty: ctype(ty, subtype, name),
+                disposition: disp,
+                language: None,
+                location: None,
+            },
+            other: BodyContentSinglePart {
+                id: content_id.map(Cow::Borrowed),
+                md5: None,
+                description: None,
+                transfer_encoding: encoding,
+                octets,
+            },
+            extension: None,
+        }
+    }
+
+    fn text(subtype: &'static str, octets: u32) -> BodyStructure<'static> {
+        BodyStructure::Text {
+            common: BodyContentCommon {
+                ty: ctype("text", subtype, None),
+                disposition: None,
+                language: None,
+                location: None,
+            },
+            other: BodyContentSinglePart {
+                id: None,
+                md5: None,
+                description: None,
+                transfer_encoding: ContentEncoding::SevenBit,
+                octets,
+            },
+            lines: 10,
+            extension: None,
+        }
+    }
+
+    fn multipart(bodies: Vec<BodyStructure<'static>>) -> BodyStructure<'static> {
+        BodyStructure::Multipart {
+            common: BodyContentCommon {
+                ty: ctype("multipart", "mixed", None),
+                disposition: None,
+                language: None,
+                location: None,
+            },
+            bodies,
+            extension: None,
+        }
+    }
+
+    /// The ordinary case: a message with a body and one attached file. The body
+    /// is not an attachment; the file is, named from its disposition, and its
+    /// section is what a FETCH would ask for.
+    #[test]
+    fn a_body_and_one_attachment_yields_just_the_attachment() {
+        let bs = multipart(vec![
+            text("plain", 400),
+            single(
+                "application",
+                "pdf",
+                4000,
+                ContentEncoding::Base64,
+                Some(disposition("attachment", Some("report.pdf"))),
+                None,
+                None,
+            ),
+        ]);
+        let found = structure_attachments(&bs);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "report.pdf");
+        assert_eq!(found[0].mime, "application/pdf");
+        assert_eq!(found[0].section, "2", "the second part of the multipart");
+        assert_eq!(found[0].size, 3000, "base64 inflates by 4/3, so decode it back");
+    }
+
+    /// A newsletter's logo: inline, small, with a Content-ID. Decoration, not a
+    /// file anyone wants in their gallery.
+    #[test]
+    fn a_small_inline_image_with_a_content_id_is_decoration() {
+        let bs = multipart(vec![
+            text("html", 900),
+            single("image", "png", 2000, ContentEncoding::Base64, None, Some("logo@x"), None),
+        ]);
+        assert!(structure_attachments(&bs).is_empty());
+    }
+
+    /// The same shape, but big enough to be a photograph someone sent: Apple
+    /// Mail attaches pictures exactly this way, and they have to be saveable.
+    #[test]
+    fn a_large_inline_image_is_content_however_it_is_labelled() {
+        let octets = (INLINE_ATTACHMENT_MIN as u32 + 1) * 4 / 3 + 8;
+        let bs = multipart(vec![
+            text("plain", 40),
+            single("image", "jpeg", octets, ContentEncoding::Base64, None, Some("img@x"), None),
+        ]);
+        let found = structure_attachments(&bs);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "attachment-1.jpg", "unnamed, so named by its type");
+    }
+
+    /// Nested multiparts number their sections through: this is what an
+    /// alternative body beside an attachment looks like.
+    #[test]
+    fn nested_parts_are_numbered_through() {
+        let bs = multipart(vec![
+            multipart(vec![text("plain", 100), text("html", 200)]),
+            single(
+                "application",
+                "zip",
+                900,
+                ContentEncoding::Base64,
+                Some(disposition("attachment", Some("bundle.zip"))),
+                None,
+                None,
+            ),
+        ]);
+        let found = structure_attachments(&bs);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].section, "2");
+    }
+
+    /// A text part is only an attachment when it says so — otherwise every
+    /// message's own body would turn up in the gallery.
+    #[test]
+    fn a_text_part_counts_only_when_it_declares_itself() {
+        let plain = multipart(vec![text("plain", 500)]);
+        assert!(structure_attachments(&plain).is_empty());
+
+        let attached = multipart(vec![BodyStructure::Text {
+            common: BodyContentCommon {
+                ty: ctype("text", "csv", None),
+                disposition: Some(disposition("attachment", Some("rows.csv"))),
+                language: None,
+                location: None,
+            },
+            other: BodyContentSinglePart {
+                id: None,
+                md5: None,
+                description: None,
+                transfer_encoding: ContentEncoding::SevenBit,
+                octets: 700,
+            },
+            lines: 9,
+            extension: None,
+        }]);
+        let found = structure_attachments(&attached);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "rows.csv");
+        assert_eq!(found[0].size, 700, "not base64, so the octets stand");
+    }
+
+    /// The filename falls back to the content type's own `name` parameter,
+    /// which is where older clients put it.
+    #[test]
+    fn a_name_parameter_is_used_when_there_is_no_filename() {
+        let bs = multipart(vec![
+            text("plain", 10),
+            single(
+                "application",
+                "msword",
+                600,
+                ContentEncoding::SevenBit,
+                Some(disposition("attachment", None)),
+                None,
+                Some("minutes.doc"),
+            ),
+        ]);
+        assert_eq!(structure_attachments(&bs)[0].name, "minutes.doc");
+    }
+
+    /// An RFC 2047 filename is decoded, not shown as the encoded word.
+    #[test]
+    fn an_encoded_filename_is_decoded() {
+        let bs = multipart(vec![
+            text("plain", 10),
+            single(
+                "application",
+                "pdf",
+                600,
+                ContentEncoding::SevenBit,
+                Some(disposition("attachment", Some("=?utf-8?Q?rapport=20final?="))),
+                None,
+                None,
+            ),
+        ]);
+        assert_eq!(structure_attachments(&bs)[0].name, "rapport final");
+    }
+
+    /// A message that is not multipart at all is one part, section 1.
+    #[test]
+    fn a_single_part_message_is_section_one() {
+        let bs = single(
+            "application",
+            "pdf",
+            800,
+            ContentEncoding::SevenBit,
+            Some(disposition("attachment", Some("lone.pdf"))),
+            None,
+            None,
+        );
+        let found = structure_attachments(&bs);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].section, "1");
+    }
+
+    #[test]
+    fn only_image_types_get_a_guessed_extension() {
+        assert_eq!(mime_extension("image", "jpeg"), ".jpg");
+        assert_eq!(mime_extension("IMAGE", "PNG"), ".png");
+        assert_eq!(mime_extension("application", "pdf"), "");
+        assert_eq!(mime_extension("image", "svg+xml"), "");
+    }
+}
