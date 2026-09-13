@@ -1,16 +1,28 @@
-//! Sender logos (opt-in): the brand's own site icon in place of coloured
-//! initials, so mail from Apple, Amazon or PayPal is recognisable at a glance
-//! (#30).
+//! Sender logos (opt-in): the brand's logo in place of coloured initials, so
+//! mail from Apple, Amazon or PayPal is recognisable at a glance (#30).
 //!
-//! The icon comes from the sender's own domain, the largest it declares first:
-//! the icons its home page links (`<link rel="icon" sizes="192x192">`,
-//! `apple-touch-icon`) and the ones in its web manifest — where the 512px
-//! icons usually live — then the well-known paths, `apple-touch-icon.png`
-//! (180px) and `favicon.ico` (16–48px, the last resort). No third-party service
-//! is involved and no per-user identifier is sent, but the requests do tell
-//! that domain your IP address — which is exactly what blocking remote content
-//! avoids. So this is off by default and gated behind a Preferences switch, as
-//! Gravatar is.
+//! Three sources, best first:
+//!
+//! 1. **BIMI** — the logo the sender publishes for mail clients: a DNS TXT
+//!    record at `default._bimi.<domain>` naming an SVG on the sender's own
+//!    site (RFC draft "Brand Indicators for Message Identification"). Vector,
+//!    authoritative, and what Apple Mail and Gmail show. The sending host is
+//!    asked first, then the registrable domain.
+//! 2. **Bundled** — `data/logos/`: a curated map of sender domains to marks
+//!    from gilbarbara/logos (full colour) and Simple Icons (a glyph on the
+//!    brand colour), plus the app's own service marks (`data/brands/`).
+//!    Shipped in the binary, so these show with no request at all.
+//! 3. **The site's own icon**, the largest it declares first: the icons its
+//!    home page links (`<link rel="icon" sizes="192x192">`,
+//!    `apple-touch-icon`, an SVG icon) and the ones in its web manifest —
+//!    where the 512px icons usually live — then the well-known paths,
+//!    `apple-touch-icon.png` (180px) and `favicon.ico` (16–48px, the last
+//!    resort).
+//!
+//! No third-party service is involved and no per-user identifier is sent,
+//! but the BIMI and site requests do tell that domain your IP address —
+//! which is exactly what blocking remote content avoids. So this is off by
+//! default and gated behind a Preferences switch, as Gravatar is.
 //!
 //! One fetch per domain per session, remembered either way: a miss is cached too,
 //! or every row from the same sender would ask again.
@@ -25,6 +37,16 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// The edge every logo is decoded to: drawn at avatar size, kept per
+/// domain for the session (issue #106), and what vector sources are
+/// rasterised at.
+const LOGO_PX: u32 = 160;
+
+/// A BIMI logo is a small SVG (the spec asks for 32KB); anything bigger
+/// is not one.
+const BIMI_MAX_BYTES: u64 = 64 * 1024;
 
 thread_local! {
     static CACHE: RefCell<HashMap<String, gtk::gdk::Texture>> = RefCell::new(HashMap::new());
@@ -49,6 +71,30 @@ fn img_path(domain: &str) -> Option<PathBuf> {
 
 fn miss_path(domain: &str) -> Option<PathBuf> {
     Some(store_dir()?.join(format!("{domain}.miss")))
+}
+
+/// The sender's BIMI logo when it has one (the SVG bytes), or an empty
+/// marker saying it was asked within the week and has none. Kept apart
+/// from the site icon (`.img`) so a bundled mark can outrank a stored
+/// favicon without outranking a stored BIMI logo.
+fn bimi_path(domain: &str) -> Option<PathBuf> {
+    Some(store_dir()?.join(format!("{domain}.bimi")))
+}
+
+fn stored_bimi(domain: &str) -> Option<Vec<u8>> {
+    let p = bimi_path(domain)?;
+    let bytes = std::fs::read(p).ok()?;
+    (!bytes.is_empty()).then_some(bytes)
+}
+
+/// The host part of an address, lowercased — the sending host itself
+/// (`notifications.usbank.com`), as BIMI is looked up on it first.
+fn host_of(email: &str) -> Option<String> {
+    let host = email.rsplit('@').next()?.trim().trim_end_matches('.').to_ascii_lowercase();
+    if host.is_empty() || !host.contains('.') || host.parse::<std::net::IpAddr>().is_ok() {
+        return None;
+    }
+    Some(host)
 }
 
 /// Whether the file at `path` exists and was written within [`REFRESH_AFTER`].
@@ -94,7 +140,10 @@ pub fn cached(email: &str) -> Option<gtk::gdk::Texture> {
     if let Some(tex) = CACHE.with(|c| c.borrow().get(&domain).cloned()) {
         return Some(tex);
     }
-    let bytes = img_path(&domain).and_then(|p| std::fs::read(p).ok())?;
+    // The stored BIMI logo, else a bundled mark, else the stored site icon.
+    let bytes = stored_bimi(&domain)
+        .or_else(|| bundled_entry(email).and_then(bundled_bytes))
+        .or_else(|| img_path(&domain).and_then(|p| std::fs::read(p).ok()))?;
     let tex = decode(&bytes)?;
     CACHE.with(|c| {
         c.borrow_mut().insert(domain, tex.clone());
@@ -110,7 +159,12 @@ pub fn wants_refresh(email: &str) -> bool {
     let Some(domain) = domain_of(email) else {
         return false;
     };
-    let due = img_path(&domain).is_some_and(|p| p.exists() && !fresh(&p));
+    // Due when nothing on disk is within the week: a stale site icon, a
+    // stale BIMI answer, or a bundled mark whose sender has never been
+    // asked for a BIMI logo at all.
+    let bimi_fresh = bimi_path(&domain).is_some_and(|p| fresh(&p));
+    let img_fresh = img_path(&domain).is_some_and(|p| fresh(&p));
+    let due = !bimi_fresh && !img_fresh;
     due && REFRESHED.with(|r| r.borrow_mut().insert(domain))
 }
 
@@ -118,6 +172,9 @@ pub fn wants_refresh(email: &str) -> bool {
 /// A miss remembered on disk expires after a week, so a domain that gains an
 /// icon is eventually found.
 pub fn known_missing(email: &str) -> bool {
+    if bundled_entry(email).is_some() {
+        return false;
+    }
     match domain_of(email) {
         Some(domain) => {
             MISSES.with(|m| m.borrow().contains(&domain))
@@ -135,11 +192,62 @@ pub fn known_missing(email: &str) -> bool {
 /// fails with a stale copy in hand, the stale copy stands (and stays due for
 /// refresh, so it is retried later).
 pub fn fetch(email: &str) -> Option<Vec<u8>> {
+    fetch_from(email).map(|(bytes, _)| bytes)
+}
+
+/// What [`fetch`] would answer for an address and where from, in words —
+/// for the `VIREO_LOGO_PROBE` hook.
+pub fn probe(email: &str) -> String {
+    match fetch_from(email) {
+        Some((bytes, source)) => format!("{source} ({} bytes)", bytes.len()),
+        None => "nothing".to_string(),
+    }
+}
+
+/// The fetch, with the source it answered from: the stored BIMI logo, a
+/// fresh BIMI lookup, a bundled mark, a stored or fetched site icon.
+fn fetch_from(email: &str) -> Option<(Vec<u8>, String)> {
     let domain = domain_of(email)?;
     let img = img_path(&domain);
+    let bimi = bimi_path(&domain);
+    let bimi_fresh = bimi.as_ref().is_some_and(|p| fresh(p));
+    if bimi_fresh {
+        if let Some(bytes) = stored_bimi(&domain) {
+            return Some((bytes, "stored BIMI logo".into()));
+        }
+    } else {
+        // Asked at most once a week: a hit is kept as the logo, a
+        // confirmed miss as an empty marker. A lookup that could not be
+        // made (no network) leaves no marker, so it is tried again.
+        match bimi_logo(email) {
+            Bimi::Logo(bytes) => {
+                if let Some(p) = bimi.as_ref() {
+                    let _ = std::fs::write(p, &bytes);
+                }
+                if let Some(p) = miss_path(&domain) {
+                    let _ = std::fs::remove_file(p);
+                }
+                return Some((bytes, "BIMI logo".into()));
+            }
+            Bimi::None => {
+                if let Some(p) = bimi.as_ref() {
+                    let _ = std::fs::write(p, b"");
+                }
+            }
+            Bimi::Unreachable => {}
+        }
+    }
+    if let Some(entry) = bundled_entry(email) {
+        if let Some(bytes) = bundled_bytes(entry) {
+            if let Some(p) = miss_path(&domain) {
+                let _ = std::fs::remove_file(p);
+            }
+            return Some((bytes, format!("bundled {}:{}", entry.source, entry.file)));
+        }
+    }
     if let Some(p) = img.as_ref().filter(|p| fresh(p)) {
         if let Ok(bytes) = std::fs::read(p) {
-            return Some(bytes);
+            return Some((bytes, "stored site icon".into()));
         }
     }
     if miss_path(&domain).is_some_and(|p| fresh(&p)) {
@@ -153,17 +261,329 @@ pub fn fetch(email: &str) -> Option<Vec<u8>> {
             if let Some(p) = miss_path(&domain) {
                 let _ = std::fs::remove_file(p);
             }
-            return Some(bytes);
+            return Some((bytes, format!("site icon {url}")));
         }
     }
     if let Some(p) = img.as_ref().filter(|p| p.exists()) {
         // Nothing new, but yesterday's icon beats initials.
-        return std::fs::read(p).ok();
+        return std::fs::read(p).ok().map(|b| (b, "stale site icon".into()));
     }
     if let Some(p) = miss_path(&domain) {
         let _ = std::fs::write(p, b"");
     }
     None
+}
+
+// ---------------------------------------------------------------------------
+// BIMI: the logo the sender publishes for mail clients.
+// ---------------------------------------------------------------------------
+
+/// What asking for a sender's BIMI logo came to.
+enum Bimi {
+    /// The logo, as a `LOGO_PX`-square SVG document.
+    Logo(Vec<u8>),
+    /// The sender publishes none (or nothing usable): not asked again for a week.
+    None,
+    /// The question could not be asked (no network, resolver down): asked again next time.
+    Unreachable,
+}
+
+/// The sender's BIMI logo, from the sending host's record or the
+/// registrable domain's. Blocking (DNS, then one HTTPS fetch); call off
+/// the main thread.
+fn bimi_logo(email: &str) -> Bimi {
+    let mut names: Vec<String> = Vec::new();
+    if let Some(host) = host_of(email) {
+        names.push(host);
+    }
+    if let Some(domain) = domain_of(email) {
+        if !names.contains(&domain) {
+            names.push(domain);
+        }
+    }
+    let mut unreachable = false;
+    for name in names {
+        let url = match bimi_record_url(&name) {
+            Ok(Some(url)) => url,
+            Ok(None) => continue,
+            Err(()) => {
+                unreachable = true;
+                continue;
+            }
+        };
+        if let Some(svg) = bimi_fetch(&url) {
+            if let Some(framed) = square_svg(&svg, LOGO_PX, None, 0.0, None) {
+                return Bimi::Logo(framed.into_bytes());
+            }
+        }
+    }
+    if unreachable { Bimi::Unreachable } else { Bimi::None }
+}
+
+/// The logo URL in `default._bimi.<name>`'s TXT record: `Ok(None)` when
+/// the name has no such record, `Err` when the resolver could not say.
+fn bimi_record_url(name: &str) -> Result<Option<String>, ()> {
+    use gtk::gio::prelude::*;
+    let resolver = gtk::gio::Resolver::default();
+    let records = match resolver.lookup_records(
+        &format!("default._bimi.{name}"),
+        gtk::gio::ResolverRecordType::Txt,
+        gtk::gio::Cancellable::NONE,
+    ) {
+        Ok(r) => r,
+        Err(e) if e.kind::<gtk::gio::ResolverError>() == Some(gtk::gio::ResolverError::NotFound) => {
+            tracing::debug!("bimi: no record for {name}");
+            return Ok(None);
+        }
+        Err(e) => {
+            tracing::debug!("bimi: could not look up {name}: {e}");
+            return Err(());
+        }
+    };
+    for record in records {
+        // A TXT record is `(as)`: the strings of one record, to be joined.
+        let text: String = record
+            .child_value(0)
+            .iter()
+            .filter_map(|v| v.str().map(str::to_string))
+            .collect();
+        tracing::debug!("bimi: {name} record {text:?}");
+        if let Some(url) = parse_bimi_record(&text) {
+            return Ok(Some(url));
+        }
+    }
+    Ok(None)
+}
+
+/// The `l=` location of a `v=BIMI1` record, when it is an https URL.
+/// An empty `l=` (a declared opt-out) or any other version is nothing.
+pub(crate) fn parse_bimi_record(txt: &str) -> Option<String> {
+    let mut is_bimi = false;
+    let mut location: Option<String> = None;
+    for tag in txt.split(';') {
+        let Some((k, v)) = tag.split_once('=') else { continue };
+        let (k, v) = (k.trim().to_ascii_lowercase(), v.trim());
+        match k.as_str() {
+            "v" => is_bimi = v.eq_ignore_ascii_case("BIMI1"),
+            "l" => location = Some(v.to_string()),
+            _ => {}
+        }
+    }
+    let url = location.filter(|_| is_bimi)?;
+    url.to_ascii_lowercase().starts_with("https://").then_some(url)
+}
+
+/// The BIMI SVG at `url`: small, served as an image or XML, and an SVG.
+fn bimi_fetch(url: &str) -> Option<String> {
+    use std::io::Read;
+    let resp = match ureq::get(url)
+        .set("User-Agent", USER_AGENT)
+        .set("Accept", "image/svg+xml,*/*;q=0.5")
+        .timeout(std::time::Duration::from_secs(5))
+        .call()
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::debug!("bimi: {url}: {e}");
+            return None;
+        }
+    };
+    let ct = resp.content_type().to_ascii_lowercase();
+    if !(ct.is_empty() || ct.contains("svg") || ct.contains("xml") || ct.contains("octet-stream")) {
+        tracing::debug!("bimi: {url}: not an SVG ({ct})");
+        return None;
+    }
+    let mut buf = Vec::new();
+    resp.into_reader().take(BIMI_MAX_BYTES + 1).read_to_end(&mut buf).ok()?;
+    if buf.is_empty() || buf.len() as u64 > BIMI_MAX_BYTES || !looks_like_svg(&buf) {
+        tracing::debug!("bimi: {url}: {} bytes, not usable", buf.len());
+        return None;
+    }
+    String::from_utf8(buf).ok()
+}
+
+// ---------------------------------------------------------------------------
+// Bundled marks: data/logos/, embedded by build.rs; see tools/fetch-logos.py.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+struct LogoFile {
+    #[serde(default)]
+    logo: Vec<LogoEntry>,
+}
+
+/// One line of `data/logos/logos.toml`: a sender domain and the mark it
+/// gets — `source` is `gilbarbara`, `simple` or `brand` (one of
+/// `data/brands/`), `file` the SVG or mark id, `color` Simple Icons' brand
+/// hex.
+#[derive(serde::Deserialize, Clone)]
+struct LogoEntry {
+    domain: String,
+    source: String,
+    file: String,
+    #[serde(default)]
+    color: Option<String>,
+}
+
+fn bundled_map() -> &'static HashMap<String, LogoEntry> {
+    static MAP: OnceLock<HashMap<String, LogoEntry>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let file: LogoFile = match toml::from_str(include_str!("../data/logos/logos.toml")) {
+            Ok(f) => f,
+            Err(e) => {
+                tracing::warn!("bundled logo map unreadable: {e}");
+                LogoFile { logo: Vec::new() }
+            }
+        };
+        file.logo.into_iter().map(|e| (e.domain.clone(), e)).collect()
+    })
+}
+
+/// The bundled mark for a sender: the sending host's entry first
+/// (`aws.amazon.com`), then the registrable domain's.
+fn bundled_entry(email: &str) -> Option<&'static LogoEntry> {
+    let map = bundled_map();
+    host_of(email)
+        .and_then(|h| map.get(&h))
+        .or_else(|| domain_of(email).and_then(|d| map.get(&d)))
+}
+
+/// Whether a sender has a bundled mark (shown with no request made).
+pub fn has_bundled(email: &str) -> bool {
+    bundled_entry(email).is_some()
+}
+
+/// A bundled mark's bytes: the app's service marks as their PNG, the SVG
+/// sets framed to a `LOGO_PX` square — a Simple Icons glyph in the colour
+/// that reads on its brand colour, over that colour; a gilbarbara mark
+/// over white, inset a little, since many are dark on transparent.
+fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
+    match entry.source.as_str() {
+        "brand" => crate::brand::png(&entry.file).map(<[u8]>::to_vec),
+        "simple" | "gilbarbara" => {
+            let path = format!("/co/hyprlab/Vireo/logos/{}/{}", entry.source, entry.file);
+            let data = gtk::gio::resources_lookup_data(&path, gtk::gio::ResourceLookupFlags::NONE).ok()?;
+            let svg = std::str::from_utf8(&data).ok()?;
+            let framed = if entry.source == "simple" {
+                let bg = entry.color.as_deref().unwrap_or("#000000");
+                let fg = crate::color::readable_text(bg).to_string();
+                square_svg(svg, LOGO_PX, Some(bg), 0.22, Some(&fg))?
+            } else {
+                square_svg(svg, LOGO_PX, Some("#ffffff"), 0.12, None)?
+            };
+            Some(framed.into_bytes())
+        }
+        _ => None,
+    }
+}
+
+/// `svg` re-framed as a `px`-square document: its drawing centred and
+/// scaled to fit, inset by `pad` (a fraction of the edge) on each side,
+/// over `bg` when given, with `fill` as the colour of content that sets
+/// none (Simple Icons' glyphs). The original root's attributes ride on
+/// the nested element, so namespaces, styles and gradients keep working;
+/// a root with no `viewBox` gets one from its width and height. `None`
+/// for anything that is not an SVG document.
+pub(crate) fn square_svg(svg: &str, px: u32, bg: Option<&str>, pad: f32, fill: Option<&str>) -> Option<String> {
+    let lower = svg.to_ascii_lowercase();
+    let start = svg_root_start(&lower)?;
+    let open_end = start + svg[start..].find('>')?;
+    let close = lower.rfind("</svg>")?;
+    if close <= open_end {
+        return None;
+    }
+    let attrs = parse_attrs(svg[start + 4..open_end].trim_end_matches('/'));
+    let content = &svg[open_end + 1..close];
+    let view_box = attrs
+        .iter()
+        .find(|(k, _)| k == "viewbox")
+        .map(|(_, v)| v.trim().to_string())
+        .filter(|v| v.split([' ', ',']).filter(|s| !s.is_empty()).count() == 4)
+        .or_else(|| {
+            let dim = |name: &str| {
+                attrs
+                    .iter()
+                    .find(|(k, _)| k == name)
+                    .and_then(|(_, v)| v.trim().trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%').parse::<f32>().ok())
+                    .filter(|n| *n > 0.0)
+            };
+            Some(format!("0 0 {} {}", dim("width")?, dim("height")?))
+        })?;
+    let inset = (px as f32 * pad).round();
+    let inner = px as f32 - 2.0 * inset;
+    let mut kept = String::new();
+    for (k, v) in &attrs {
+        if matches!(k.as_str(), "width" | "height" | "x" | "y" | "viewbox" | "preserveaspectratio")
+            || (fill.is_some() && k == "fill")
+        {
+            continue;
+        }
+        kept.push(' ');
+        kept.push_str(k);
+        kept.push_str("=\"");
+        kept.push_str(&v.replace('"', "&quot;"));
+        kept.push('"');
+    }
+    let bg_rect = bg
+        .map(|c| format!("<rect width=\"{px}\" height=\"{px}\" fill=\"{c}\"/>"))
+        .unwrap_or_default();
+    let fill_attr = fill.map(|f| format!(" fill=\"{f}\"")).unwrap_or_default();
+    Some(format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{px}\" height=\"{px}\" viewBox=\"0 0 {px} {px}\">\
+         {bg_rect}<svg x=\"{inset}\" y=\"{inset}\" width=\"{inner}\" height=\"{inner}\" viewBox=\"{view_box}\" \
+         preserveAspectRatio=\"xMidYMid meet\"{kept}{fill_attr}>{content}</svg></svg>"
+    ))
+}
+
+/// Where the root `<svg` tag starts in a lowercased document, skipping the
+/// XML declaration, comments and a doctype.
+fn svg_root_start(lower: &str) -> Option<usize> {
+    let mut at = 0;
+    while let Some(i) = lower[at..].find("<svg") {
+        let pos = at + i;
+        let next = lower[pos + 4..].chars().next();
+        if next.is_none_or(|c| c.is_whitespace() || c == '>' || c == '/') {
+            return Some(pos);
+        }
+        at = pos + 4;
+    }
+    None
+}
+
+/// `name="value"` pairs of a tag (names lowercased and kept whole, so
+/// `xmlns:xlink` survives).
+fn parse_attrs(tag: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut rest = tag.trim();
+    while !rest.is_empty() {
+        let name_len = rest.find(|c: char| c == '=' || c.is_whitespace()).unwrap_or(rest.len());
+        let name = rest[..name_len].trim().to_ascii_lowercase();
+        rest = rest[name_len..].trim_start();
+        let mut value = String::new();
+        if let Some(r) = rest.strip_prefix('=') {
+            let r = r.trim_start();
+            if let Some(q) = r.chars().next().filter(|c| *c == '"' || *c == '\'') {
+                let inner = &r[1..];
+                let end = inner.find(q).unwrap_or(inner.len());
+                value = inner[..end].to_string();
+                rest = inner[end..].strip_prefix(q).unwrap_or("").trim_start();
+            } else {
+                let end = r.find(|c: char| c.is_whitespace()).unwrap_or(r.len());
+                value = r[..end].to_string();
+                rest = r[end..].trim_start();
+            }
+        }
+        if !name.is_empty() {
+            out.push((name, value));
+        }
+    }
+    out
+}
+
+/// Whether these bytes are an SVG document (an `<svg` tag near the top).
+fn looks_like_svg(bytes: &[u8]) -> bool {
+    let head: String = bytes.iter().take(1024).map(|b| *b as char).collect::<String>().to_ascii_lowercase();
+    svg_root_start(&head).is_some()
 }
 
 /// Where a site publishes its icon, largest first: what its home page and
@@ -295,19 +715,22 @@ fn is_svg(href: &str, mime: Option<&str>) -> bool {
 }
 
 /// The icon links a page declares, with their claimed (or assumed) sizes.
-/// Vector icons are left out: a pixbuf loader would rasterise them at a
-/// nominal 16px. `mask-icon`s are monochrome silhouettes, not the brand.
+/// A vector icon counts as 256px: it is rasterised at logo size (see
+/// `square_svg`), which beats any bitmap short of the manifest's big ones.
+/// `mask-icon`s are monochrome silhouettes, not the brand.
 fn link_icons(html: &str, base: &str) -> Vec<(u32, String)> {
     let mut out = Vec::new();
     for attrs in link_tags(html) {
         let Some(href) = attr(&attrs, "href").map(str::trim).filter(|h| !h.is_empty()) else { continue };
         let rel = attr(&attrs, "rel").unwrap_or("").to_ascii_lowercase();
         let rels: Vec<&str> = rel.split_whitespace().collect();
-        if is_svg(href, attr(&attrs, "type")) || rels.contains(&"mask-icon") {
+        if rels.contains(&"mask-icon") {
             continue;
         }
         let claimed = largest_size(attr(&attrs, "sizes"));
-        let size = if rels.iter().any(|r| r.starts_with("apple-touch-icon")) {
+        let size = if is_svg(href, attr(&attrs, "type")) && rels.iter().any(|r| *r == "icon" || r.starts_with("apple-touch-icon")) {
+            256
+        } else if rels.iter().any(|r| r.starts_with("apple-touch-icon")) {
             claimed.unwrap_or(180)
         } else if rels.contains(&"fluid-icon") {
             claimed.unwrap_or(128)
@@ -343,10 +766,14 @@ fn manifest_icons(json: &str, base: &str) -> Vec<(u32, String)> {
         .flatten()
         .filter_map(|icon| {
             let src = icon["src"].as_str()?.trim();
-            if src.is_empty() || is_svg(src, icon["type"].as_str()) {
+            if src.is_empty() {
                 return None;
             }
-            let size = largest_size(icon["sizes"].as_str()).unwrap_or(48);
+            let size = if is_svg(src, icon["type"].as_str()) {
+                256
+            } else {
+                largest_size(icon["sizes"].as_str()).unwrap_or(48)
+            };
             Some((size, resolve_url(base, src)?))
         })
         .collect()
@@ -439,6 +866,9 @@ fn looks_like_markup(bytes: &[u8]) -> bool {
         .collect::<String>()
         .trim_start()
         .to_ascii_lowercase();
+    if looks_like_svg(bytes) {
+        return false;
+    }
     head.starts_with("<!doctype") || head.starts_with("<html") || head.starts_with("<?xml")
 }
 
@@ -458,15 +888,21 @@ pub fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Texture> 
             Some(tex)
         }
         None => {
-            // Undecodable bytes: persist the miss (and drop the stored copy)
-            // so the next session doesn't fetch and fail to decode them again.
+            // Undecodable bytes: drop the stored copies, and — unless a
+            // bundled mark stands in — persist the miss so the next
+            // session doesn't fetch and fail to decode them again.
             if let Some(p) = img_path(&domain) {
                 let _ = std::fs::remove_file(p);
             }
-            if let Some(p) = miss_path(&domain) {
+            if let Some(p) = bimi_path(&domain) {
                 let _ = std::fs::write(p, b"");
             }
-            remember_miss(&domain);
+            if bundled_entry(email).is_none() {
+                if let Some(p) = miss_path(&domain) {
+                    let _ = std::fs::write(p, b"");
+                }
+                remember_miss(&domain);
+            }
             None
         }
     }
@@ -489,6 +925,10 @@ fn decode(bytes: &[u8]) -> Option<gtk::gdk::Texture> {
     use gtk::gdk_pixbuf::prelude::*;
     use std::cell::Cell;
     use std::rc::Rc;
+
+    if looks_like_svg(bytes) {
+        return decode_svg(bytes);
+    }
 
     // These textures live in the session-long cache above and are drawn at
     // avatar size, but sites publish `apple-touch-icon`s at up to 1024² — a
@@ -527,6 +967,25 @@ fn decode(bytes: &[u8]) -> Option<gtk::gdk::Texture> {
     }
     let pixbuf = loader.pixbuf()?;
     Some(gtk::gdk::Texture::for_pixbuf(&pixbuf))
+}
+
+/// An SVG rasterised at logo size: framed to a `LOGO_PX` square first, so
+/// the renderer has a definite size whatever the document declares (a
+/// bare `viewBox`, `100%`, or a nominal 16px), then loaded as a texture.
+fn decode_svg(bytes: &[u8]) -> Option<gtk::gdk::Texture> {
+    if bytes.len() > 512 * 1024 {
+        return None;
+    }
+    let text = std::str::from_utf8(bytes).ok()?;
+    let framed = square_svg(text, LOGO_PX, None, 0.0, None)?;
+    let data = gtk::glib::Bytes::from_owned(framed.into_bytes());
+    match gtk::gdk::Texture::from_bytes(&data) {
+        Ok(t) => Some(t),
+        Err(e) => {
+            tracing::debug!("logo svg not rendered: {e}");
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -568,6 +1027,8 @@ mod tests {
                 (32, "https://www.example.com/img/favicon-32x32.png".to_string()),
                 (192, "https://cdn.example.com/icon-192.png?v=2&x=1".to_string()),
                 (180, "https://www.example.com/a/b/touch.png".to_string()),
+                // A vector icon is rasterised at logo size, so it ranks high.
+                (256, "https://www.example.com/icon.svg".to_string()),
             ]
         );
         assert_eq!(link_manifest(html, base).as_deref(), Some("https://www.example.com/a/site.webmanifest"));
@@ -578,6 +1039,7 @@ mod tests {
             manifest_icons(manifest, "https://www.example.com/a/site.webmanifest"),
             vec![
                 (512, "https://www.example.com/i/512.png".to_string()),
+                (256, "https://www.example.com/a/v.svg".to_string()),
                 (48, "https://www.example.com/a/i/any.png".to_string()),
             ]
         );
@@ -612,10 +1074,61 @@ mod tests {
     }
 
     #[test]
+    fn a_bimi_record_names_its_logo() {
+        assert_eq!(
+            parse_bimi_record("v=BIMI1; l=https://www.apple.com/bimi/v2/apple.svg;a=https://www.apple.com/bimi/v2/apple.pem;").as_deref(),
+            Some("https://www.apple.com/bimi/v2/apple.svg")
+        );
+        // Tags in any order, spacing free.
+        assert_eq!(parse_bimi_record("l=https://x.example/l.svg;v=bimi1").as_deref(), Some("https://x.example/l.svg"));
+        // A declared opt-out, a plain-http location, an SPF record.
+        assert_eq!(parse_bimi_record("v=BIMI1; l=;"), None);
+        assert_eq!(parse_bimi_record("v=BIMI1; l=http://x.example/l.svg"), None);
+        assert_eq!(parse_bimi_record("v=spf1 include:spf.example ~all"), None);
+    }
+
+    #[test]
+    fn an_svg_is_reframed_to_a_square_and_keeps_its_root_attributes() {
+        let glyph = r##"<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>PayPal</title><path d="M1 1h22v22H1z"/></svg>"##;
+        let out = square_svg(glyph, 160, Some("#002991"), 0.22, Some("#ffffff")).unwrap();
+        assert!(out.starts_with(r##"<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">"##), "{out}");
+        assert!(out.contains(r##"<rect width="160" height="160" fill="#002991"/>"##), "{out}");
+        assert!(out.contains(r##"<svg x="35" y="35" width="90" height="90" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" role="img" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">"##), "{out}");
+        assert!(out.ends_with(r##"<path d="M1 1h22v22H1z"/></svg></svg>"##), "{out}");
+        // A prologue, a doctype and px-suffixed dimensions in place of a viewBox.
+        let mark = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE svg><svg width=\"256px\" height=\"128px\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><rect width=\"256\" height=\"128\"/></svg>";
+        let out = square_svg(mark, 160, Some("#ffffff"), 0.0, None).unwrap();
+        assert!(out.contains(r##"viewBox="0 0 256 128""##), "{out}");
+        assert!(out.contains(r##"xmlns:xlink="http://www.w3.org/1999/xlink""##), "{out}");
+        // Not an SVG at all.
+        assert_eq!(square_svg("<html><body>no</body></html>", 160, None, 0.0, None), None);
+        assert!(looks_like_svg(b"<?xml version=\"1.0\"?>\n<!-- x -->\n<svg viewBox=\"0 0 1 1\"/>"));
+        assert!(!looks_like_svg(b"<svgfoo>"));
+    }
+
+    #[test]
+    fn the_bundled_map_knows_common_senders_by_host_and_domain() {
+        let paypal = bundled_entry("service@paypal.com").expect("paypal is bundled");
+        assert_eq!(paypal.source, "simple");
+        assert_eq!(paypal.file, "paypal.svg");
+        assert!(paypal.color.is_some());
+        // The sending host wins over the registrable domain when both are listed.
+        assert_eq!(bundled_entry("no-reply@aws.amazon.com").map(|e| e.file.as_str()), Some("aws.svg"));
+        // A subdomain falls back to the registrable domain's mark.
+        assert_eq!(bundled_entry("noreply@mail.spotify.com").map(|e| e.source.as_str()), Some("gilbarbara"));
+        // The app's own service marks cover the mail providers.
+        assert_eq!(bundled_entry("someone@gmail.com").map(|e| (e.source.as_str(), e.file.as_str())), Some(("brand", "gmail")));
+        assert!(bundled_entry("someone@example.org").is_none());
+        assert!(has_bundled("x@paypal.com") && !known_missing("x@paypal.com"));
+    }
+
+    #[test]
     fn a_home_page_served_in_place_of_an_icon_is_rejected() {
         assert!(looks_like_markup(b"<!DOCTYPE html><html>"));
         assert!(looks_like_markup(b"  <html lang=\"en\">"));
-        assert!(looks_like_markup(b"<?xml version=\"1.0\"?><svg"));
+        // An XML prologue is a page unless an SVG follows it.
+        assert!(looks_like_markup(b"<?xml version=\"1.0\"?><html>"));
+        assert!(!looks_like_markup(b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>"));
         assert!(!looks_like_markup(b"\x89PNG\r\n\x1a\n"));
         assert!(!looks_like_markup(b"\x00\x00\x01\x00"));
     }

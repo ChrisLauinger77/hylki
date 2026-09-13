@@ -95,6 +95,15 @@ fn main() {
     // directory and left there. Clear it before anything else runs.
     ui::attachments_gallery::purge_attachment_dir();
     register_resources();
+    // VIREO_LOGO_PROBE=<address>[,<address>…] logs which source answers for a sender's
+    // logo (BIMI, bundled, the site, or none), for checking one by hand.
+    if let Ok(list) = std::env::var("VIREO_LOGO_PROBE") {
+        std::thread::spawn(move || {
+            for email in list.split(',').map(str::trim).filter(|e| !e.is_empty()) {
+                tracing::info!("logo probe {email}: {}", logo::probe(email));
+            }
+        });
+    }
 
     // `--hidden` starts without showing the window: the autostart entry written
     // by the background portal uses it, so logging in leaves Vireo checking mail
@@ -317,5 +326,12 @@ fn register_resources() {
     match gio::Resource::from_data(&bytes) {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled icon resources: {e}"),
+    }
+    // The bundled sender logos (see src/logo.rs), under
+    // /co/hyprlab/Vireo/logos/<source>/<file>.
+    let logos = glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/logos.gresource")));
+    match gio::Resource::from_data(&logos) {
+        Ok(resource) => gio::resources_register(&resource),
+        Err(e) => tracing::error!("failed to register bundled logo resources: {e}"),
     }
 }

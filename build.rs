@@ -12,4 +12,12 @@ fn main() {
         "resources/vireo.gresource.xml",
         "vireo.gresource",
     );
+    // The bundled sender logos (data/logos/, listed by tools/fetch-logos.py).
+    println!("cargo:rerun-if-changed=resources/logos.gresource.xml");
+    println!("cargo:rerun-if-changed=data/logos");
+    glib_build_tools::compile_resources(
+        &["resources"],
+        "resources/logos.gresource.xml",
+        "logos.gresource",
+    );
 }

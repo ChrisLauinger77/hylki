@@ -516,6 +516,10 @@ The Nextcloud, ownCloud, OpenCloud, OneDrive, Dropbox and Seafile marks shown
 in Settings are trademarks of their owners, used only to identify those
 services, and are not covered by that licence (see
 [data/brands/README.md](data/brands/README.md)). Vireo is not affiliated with
-or endorsed by any of them.
+or endorsed by any of them. The same goes for the bundled sender logos that
+can fill a sender's avatar: they come from
+[gilbarbara/logos](https://github.com/gilbarbara/logos) (MIT) and
+[Simple Icons](https://simpleicons.org) (CC0), remain their owners' marks, and
+are listed with their sources in [data/logos/README.md](data/logos/README.md).
 
 © 2026 Hyprlab

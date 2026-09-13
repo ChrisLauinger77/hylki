@@ -13,7 +13,7 @@ use std::collections::HashMap;
 macro_rules! brands {
     ($($id:literal),* $(,)?) => {
         /// The PNG for a brand id, or none for an id we have no mark for.
-        fn png(id: &str) -> Option<&'static [u8]> {
+        pub(crate) fn png(id: &str) -> Option<&'static [u8]> {
             match id {
                 $($id => Some(include_bytes!(concat!("../data/brands/", $id, ".png"))),)*
                 _ => None,

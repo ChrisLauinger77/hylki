@@ -1885,10 +1885,12 @@ impl Component for Preferences {
                                     #[name = "sender_logos_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Show sender logos"),
-                                        set_subtitle: &i18n("Fills the sender's avatar with the brand's own site \
-                                                       icon, fetched from the sender's domain. That domain \
-                                                       learns your IP address, which is what blocking \
-                                                       remote content otherwise avoids."),
+                                        set_subtitle: &i18n("Fills the sender's avatar with the brand's logo: the \
+                                                       one the sender publishes for mail (BIMI), one bundled \
+                                                       with Vireo, or the site's own icon. All but the bundled \
+                                                       ones are fetched from the sender's domain, which then \
+                                                       learns your IP address, as blocking remote content \
+                                                       otherwise avoids."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSenderLogos(row.is_active()));
                                         },
