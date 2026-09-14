@@ -1498,6 +1498,10 @@ msgstr "Modifier le filtre"
 msgid "Add Filter"
 msgstr "Ajouter un filtre"
 
+#, fuzzy
+msgid "Remove condition"
+msgstr "Supprimer le compte"
+
 msgid "Where"
 msgstr "Champ"
 
@@ -1510,10 +1514,10 @@ msgstr ""
 msgid "Text to match"
 msgstr "Texte à rechercher"
 
-msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgid "Searched on the server; nothing is downloaded"
 msgstr ""
 
-msgid "The From address when the sender set no Reply-To"
+msgid "From address when no Reply-To is set"
 msgstr ""
 
 #, fuzzy
@@ -1531,23 +1535,24 @@ msgid "Any one may match"
 msgstr ""
 
 #, fuzzy
+msgid "Condition {n}"
+msgstr "Conversations"
+
+#, fuzzy
 msgid "Or where"
 msgstr "Champ"
 
 msgid "And where"
 msgstr ""
 
-#, fuzzy
-msgid "Remove condition"
-msgstr "Supprimer le compte"
+msgid "Then"
+msgstr ""
 
 msgid "Move to"
 msgstr "Déplacer vers"
 
-msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgid "Leave in Inbox to only tag matching mail"
 msgstr ""
-"Où classer les e-mails correspondants ; ou les laisser dans la boîte de "
-"réception et se contenter de les marquer"
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
 msgid "Leave in Inbox"
@@ -4422,6 +4427,12 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Where matching mail is filed; or leave it in the Inbox and only tag it"
+#~ msgstr ""
+#~ "Où classer les e-mails correspondants ; ou les laisser dans la boîte de "
+#~ "réception et se contenter de les marquer"
 
 #~ msgid "From address"
 #~ msgstr "Adresse de l'expéditeur"

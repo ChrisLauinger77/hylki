@@ -1467,6 +1467,10 @@ msgstr "Szűrő szerkesztése"
 msgid "Add Filter"
 msgstr "Szűrő hozzáadása"
 
+#, fuzzy
+msgid "Remove condition"
+msgstr "Fiók eltávolítása"
+
 msgid "Where"
 msgstr "Hol"
 
@@ -1479,10 +1483,10 @@ msgstr ""
 msgid "Text to match"
 msgstr "Egyeztetendő szöveg"
 
-msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgid "Searched on the server; nothing is downloaded"
 msgstr ""
 
-msgid "The From address when the sender set no Reply-To"
+msgid "From address when no Reply-To is set"
 msgstr ""
 
 #, fuzzy
@@ -1500,23 +1504,24 @@ msgid "Any one may match"
 msgstr ""
 
 #, fuzzy
+msgid "Condition {n}"
+msgstr "Beszélgetések"
+
+#, fuzzy
 msgid "Or where"
 msgstr "Hol"
 
 msgid "And where"
 msgstr ""
 
-#, fuzzy
-msgid "Remove condition"
-msgstr "Fiók eltávolítása"
+msgid "Then"
+msgstr ""
 
 msgid "Move to"
 msgstr "Áthelyezés ide"
 
-msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgid "Leave in Inbox to only tag matching mail"
 msgstr ""
-"Az egyező levelek helye; vagy hagyja őket a Beérkezett üzenetek között, és "
-"csak címkézze őket"
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
 msgid "Leave in Inbox"
@@ -4278,6 +4283,12 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Where matching mail is filed; or leave it in the Inbox and only tag it"
+#~ msgstr ""
+#~ "Az egyező levelek helye; vagy hagyja őket a Beérkezett üzenetek között, "
+#~ "és csak címkézze őket"
 
 #~ msgid "From address"
 #~ msgstr "Feladó címe"

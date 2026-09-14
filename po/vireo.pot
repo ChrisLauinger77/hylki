@@ -1377,6 +1377,9 @@ msgstr ""
 msgid "Add Filter"
 msgstr ""
 
+msgid "Remove condition"
+msgstr ""
+
 msgid "Where"
 msgstr ""
 
@@ -1389,10 +1392,10 @@ msgstr ""
 msgid "Text to match"
 msgstr ""
 
-msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgid "Searched on the server; nothing is downloaded"
 msgstr ""
 
-msgid "The From address when the sender set no Reply-To"
+msgid "From address when no Reply-To is set"
 msgstr ""
 
 msgid "Add Condition"
@@ -1407,19 +1410,22 @@ msgstr ""
 msgid "Any one may match"
 msgstr ""
 
+msgid "Condition {n}"
+msgstr ""
+
 msgid "Or where"
 msgstr ""
 
 msgid "And where"
 msgstr ""
 
-msgid "Remove condition"
+msgid "Then"
 msgstr ""
 
 msgid "Move to"
 msgstr ""
 
-msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgid "Leave in Inbox to only tag matching mail"
 msgstr ""
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".

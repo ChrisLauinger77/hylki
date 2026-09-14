@@ -1493,6 +1493,10 @@ msgstr "Редактировать фильтр"
 msgid "Add Filter"
 msgstr "Добавить фильтр"
 
+#, fuzzy
+msgid "Remove condition"
+msgstr "Удалить аккаунт?"
+
 msgid "Where"
 msgstr "Где искать"
 
@@ -1505,10 +1509,10 @@ msgstr ""
 msgid "Text to match"
 msgstr "Текст для совпадения"
 
-msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgid "Searched on the server; nothing is downloaded"
 msgstr ""
 
-msgid "The From address when the sender set no Reply-To"
+msgid "From address when no Reply-To is set"
 msgstr ""
 
 #, fuzzy
@@ -1526,23 +1530,24 @@ msgid "Any one may match"
 msgstr ""
 
 #, fuzzy
+msgid "Condition {n}"
+msgstr "Обсуждения"
+
+#, fuzzy
 msgid "Or where"
 msgstr "Где искать"
 
 msgid "And where"
 msgstr ""
 
-#, fuzzy
-msgid "Remove condition"
-msgstr "Удалить аккаунт?"
+msgid "Then"
+msgstr ""
 
 msgid "Move to"
 msgstr "Переместить в"
 
-msgid "Where matching mail is filed; or leave it in the Inbox and only tag it"
+msgid "Leave in Inbox to only tag matching mail"
 msgstr ""
-"Куда складывать подходящие письма; либо оставить во «Входящих» и только "
-"присвоить метку"
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
 msgid "Leave in Inbox"
@@ -4383,6 +4388,12 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Where matching mail is filed; or leave it in the Inbox and only tag it"
+#~ msgstr ""
+#~ "Куда складывать подходящие письма; либо оставить во «Входящих» и только "
+#~ "присвоить метку"
 
 #~ msgid "From address"
 #~ msgstr "Адрес отправителя"
