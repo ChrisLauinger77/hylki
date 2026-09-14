@@ -450,6 +450,61 @@ fn http_err(what: &str, e: ureq::Error) -> String {
     }
 }
 
+/// Cloudflare's proxy caps a request body at 100 MB; a bigger upload to a
+/// server behind it comes back as its own 413 page (or the connection is
+/// cut, seen as a 5xx or a transport error), which reads like the server
+/// broke. When that is what happened to a file over the piece size on an
+/// account without the switch, say so and name the switch.
+fn cloudflare_error(account: &CloudAccount, what: &str, name: &str, size: u64, e: &ureq::Error) -> Option<String> {
+    let (status, via_cloudflare) = match e {
+        ureq::Error::Status(code, resp) => {
+            let server = resp.header("server").unwrap_or("").to_ascii_lowercase();
+            (Some(*code), server.contains("cloudflare") || resp.header("cf-ray").is_some())
+        }
+        ureq::Error::Transport(_) => (None, false),
+    };
+    cloudflare_hint(account, what, name, size, status, via_cloudflare)
+}
+
+/// The wording, from what is known: the answer came from Cloudflare
+/// itself (a 413 or a 5xx with its headers), or the connection was cut
+/// while a file over the limit was on its way.
+fn cloudflare_hint(
+    account: &CloudAccount,
+    what: &str,
+    name: &str,
+    size: u64,
+    status: Option<u16>,
+    via_cloudflare: bool,
+) -> Option<String> {
+    if account.cloudflare || size <= CLOUDFLARE_CHUNK {
+        return None;
+    }
+    let switch = format!(
+        "Turn on \"Server is behind Cloudflare\" for this account under Settings → Cloud Storage and try again: the file is then uploaded in {} pieces.",
+        human_size(CLOUDFLARE_CHUNK)
+    );
+    match (status, via_cloudflare) {
+        (Some(413), true) => Some(format!(
+            "{what}: {name} is {}, and Cloudflare, which sits in front of this server, refuses uploads over 100 MB (HTTP 413). {switch}",
+            human_size(size)
+        )),
+        (Some(code), true) if (500..600).contains(&code) => Some(format!(
+            "{what}: Cloudflare, which sits in front of this server, cut off the upload of {name} ({}, HTTP {code}); it refuses uploads over 100 MB. {switch}",
+            human_size(size)
+        )),
+        (Some(413), false) => Some(format!(
+            "{what}: the server refused {name} as too large ({}, HTTP 413). If it is reached through Cloudflare, that is the proxy's 100 MB limit: {switch}",
+            human_size(size)
+        )),
+        (None, _) => Some(format!(
+            "{what}: the connection was cut while uploading {name} ({}). If the server is reached through Cloudflare, that is the proxy's 100 MB limit: {switch}",
+            human_size(size)
+        )),
+        _ => None,
+    }
+}
+
 /// The readable part of an error body: the message field of a JSON error
 /// when there is one, else the first bit of the text.
 fn short_error(body: &str) -> String {
@@ -678,7 +733,9 @@ fn nextcloud_upload_and_share(
             .set("Content-Type", "application/octet-stream")
             .timeout(timeout)
             .send(file)
-            .map_err(|e| http_err("Upload failed", e))?;
+            .map_err(|e| {
+                cloudflare_error(account, "Upload failed", &name, size, &e).unwrap_or_else(|| http_err("Upload failed", e))
+            })?;
     }
 
     // The public link.
@@ -1219,7 +1276,9 @@ fn seafile_upload_and_share(
             .set("Content-Length", &len.to_string())
             .timeout(Duration::from_secs(60 * 60))
             .send(body)
-            .map_err(|e| seafile_err("Upload failed", e))?
+            .map_err(|e| {
+                cloudflare_error(account, "Upload failed", &name, size, &e).unwrap_or_else(|| seafile_err("Upload failed", e))
+            })?
             .into_json()
             .map_err(|e| format!("Upload failed: could not read the answer: {e}"))?
     };
@@ -1556,6 +1615,25 @@ mod tests {
         let total: u64 = chunk_ranges(1_234_567, CLOUDFLARE_CHUNK).iter().map(|(_, l)| l).sum();
         assert_eq!(total, 1_234_567);
         assert!(CLOUDFLARE_CHUNK < 100 * 1000 * 1000);
+    }
+
+    #[test]
+    fn cloudflare_hint_names_the_limit_and_the_switch() {
+        let mut a = CloudAccount::empty();
+        let big = 150 * 1000 * 1000;
+        // Cloudflare's own 413: unmistakable.
+        let m = cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(413), true).unwrap();
+        assert!(m.contains("Cloudflare") && m.contains("100 MB") && m.contains("Server is behind Cloudflare"), "{m}");
+        assert!(m.contains("90.0 MB pieces"), "{m}");
+        // A 502 with Cloudflare's headers: the proxy cut it off.
+        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(502), true).unwrap().contains("cut off"));
+        // Connection dropped, no headers to go by: a "possibly" hint.
+        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, None, false).unwrap().contains("If the server is reached through Cloudflare"));
+        // A small file, or the switch already on, or a plain server error: not this.
+        assert!(cloudflare_hint(&a, "Upload failed", "small.pdf", 1000, Some(413), true).is_none());
+        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(500), false).is_none());
+        a.cloudflare = true;
+        assert!(cloudflare_hint(&a, "Upload failed", "big.iso", big, Some(413), true).is_none());
     }
 
     #[test]

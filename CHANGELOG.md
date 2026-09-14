@@ -41,7 +41,11 @@ to go to cloud storage instead.
   (the WebDAV `uploads` chunking endpoint with a final MOVE; Seafile's
   resumable upload with Content-Range on the same upload link). Smaller
   files and the other services are unchanged. Not tried against a live
-  server behind Cloudflare.
+  server behind Cloudflare. With the switch off, an upload over 90 MB
+  that Cloudflare's proxy refuses (its own 413 page, or a 5xx carrying
+  its headers) or that is cut off mid-way no longer reads as a bare
+  "HTTP 502": the message says the file's size, that Cloudflare's 100 MB
+  limit is the likely cause, and names the switch to turn on.
 
 ## 1.29.2 — 2026-09-14
 
