@@ -4568,7 +4568,7 @@ impl AccountsWindow {
         add_row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Vireo-list-add-symbolic"));
         // All or any (#192); only shown once there is a second condition.
         let combine_row = adw::ComboRow::new();
-        combine_row.set_title(&i18n("Conditions"));
+        combine_row.set_title(&i18n("Condition matching"));
         combine_row.set_model(Some(&gtk::StringList::new(&[
             i18n("All must match").as_str(),
             i18n("Any one may match").as_str(),

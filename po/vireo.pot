@@ -1401,7 +1401,7 @@ msgstr ""
 msgid "Add Condition"
 msgstr ""
 
-msgid "Conditions"
+msgid "Condition matching"
 msgstr ""
 
 msgid "All must match"

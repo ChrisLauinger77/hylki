@@ -1494,7 +1494,7 @@ msgid "Add Condition"
 msgstr "Felhőfiók hozzáadása"
 
 #, fuzzy
-msgid "Conditions"
+msgid "Condition matching"
 msgstr "Beszélgetések"
 
 msgid "All must match"
@@ -4283,6 +4283,10 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Conditions"
+#~ msgstr "Beszélgetések"
 
 #~ msgid ""
 #~ "Where matching mail is filed; or leave it in the Inbox and only tag it"

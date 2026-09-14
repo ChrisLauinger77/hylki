@@ -8,7 +8,7 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **Filters can match the Reply-To address** (#191). *Where* also offers **Reply-To address**: the Reply-To header, or the From address when the sender set none.
 
-**A filter can hold several conditions** (#192, requested by [@yioannides](https://github.com/yioannides)). The filter editor is now a page of groups: the account, one titled group per condition with its own Where, Match and Text rows and a remove button in its header, an **Add Condition** row, and *Then* for what a match does. A **Conditions** chooser, shown once there are two, says whether all must match (the default) or any one may. The Filters list prints every condition of a rule.
+**A filter can hold several conditions** (#192, requested by [@yioannides](https://github.com/yioannides)). The filter editor is now a page of groups: the account, one titled group per condition with its own Where, Match and Text rows and a remove button in its header, an **Add Condition** row, and *Then* for what a match does. A **Condition matching** chooser, shown once there are two, says whether all must match (the default) or any one may. The Filters list prints every condition of a rule.
 
 **A condition can name several alternatives** (#192). Commas separate them in the text to match: `invoice, receipt` matches either, with the whole matcher applied to each. A value that held a comma on purpose now reads as two alternatives.
 

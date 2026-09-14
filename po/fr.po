@@ -1525,7 +1525,7 @@ msgid "Add Condition"
 msgstr "Ajouter un compte cloud"
 
 #, fuzzy
-msgid "Conditions"
+msgid "Condition matching"
 msgstr "Conversations"
 
 msgid "All must match"
@@ -4427,6 +4427,10 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Conditions"
+#~ msgstr "Conversations"
 
 #~ msgid ""
 #~ "Where matching mail is filed; or leave it in the Inbox and only tag it"

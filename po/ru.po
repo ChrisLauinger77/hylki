@@ -1520,7 +1520,7 @@ msgid "Add Condition"
 msgstr "Добавить облачную учётную запись"
 
 #, fuzzy
-msgid "Conditions"
+msgid "Condition matching"
 msgstr "Обсуждения"
 
 msgid "All must match"
@@ -4388,6 +4388,10 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Conditions"
+#~ msgstr "Обсуждения"
 
 #~ msgid ""
 #~ "Where matching mail is filed; or leave it in the Inbox and only tag it"
