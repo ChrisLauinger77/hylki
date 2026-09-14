@@ -2,6 +2,12 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.30.1
+
+**Swipe actions can be tuned to your trackpad.** Settings → Message List gained **Trackpad swipe sensitivity**, a dial from 1 to 10 in half steps. Until now a two-finger swipe had to travel a fixed distance that few trackpads manage in one go, so on some laptops a message never slid far enough to archive or delete. Raise the number if a swipe never gets far enough, lower it if messages slide when you did not mean them to. The default is 3.5, which puts the row roughly under your fingers. Mouse and touchscreen drags follow the pointer exactly as before and are not affected by the setting.
+
+**A swiped message leaves the list properly.** Once a swipe goes far enough to archive or delete, the message carries on off the side you sent it, with the action's colour filling behind it, while the row closes up and the messages below slide into its place. Before, it simply vanished the moment you let go.
+
 ## What's new in 1.30.0
 
 **Filters can match the message body** (#191, requested by [@yioannides](https://github.com/yioannides)). *Where* now offers **Message body**, so a rule that files anything with "unsubscribe" in it into Newsletters is one condition. The text is searched on the server as the Inbox syncs, one search per alternative over the mail just listed, so nothing is downloaded for it; the list preview is checked too. A body condition always means "contains", the only search a server offers, and the editor says so.

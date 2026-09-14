@@ -3148,6 +3148,15 @@ msgstr ""
 "jobbra az archiváláshoz. Bekapcsolva ez felcseréli a kettőt: balra archivál, "
 "jobbra töröl."
 
+msgid "Trackpad swipe sensitivity"
+msgstr ""
+
+msgid ""
+"How readily a two-finger trackpad swipe moves a message. Raise it if a swipe "
+"never gets far enough to archive or delete, lower it if messages slide when "
+"you did not mean them to. Mouse drags are unaffected."
+msgstr ""
+
 msgid "Actions Palette timeout"
 msgstr "Műveletpaletta időkorlátja"
 

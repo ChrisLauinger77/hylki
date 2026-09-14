@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.30.1" date="2026-09-14">
+      <description>
+        <p>Swipe actions can be tuned to the trackpad they are used on (Settings, Message List), and a swipe that goes far enough now flies the message off the side it was sent while the list closes over it, instead of the row vanishing on release.</p>
+      </description>
+    </release>
     <release version="1.30.0" date="2026-09-14">
       <description>
         <p>Filters can match the message body (searched on the server, nothing downloaded) and the Reply-To address, hold several conditions (all or any) laid out as separate groups in the editor, and take comma-separated alternatives per condition (#191, #192); the filter editor's "Move to" list is no longer empty after Settings reopens.</p>
