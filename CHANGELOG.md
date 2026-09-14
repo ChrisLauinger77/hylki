@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.29.1 — 2026-09-14
+
+"Send with Vireo" from GNOME Files now attaches every selected file to
+one message.
+
+- **Multiple files from Files land in one message.** The desktop
+  entry's `Exec` line used `%u`, the single-URL placeholder, so a
+  launch with several files (the Files extension, "Open With Vireo"
+  on a multiple selection) started one Vireo process per file. Each
+  handed its file to the running instance on its own and the composer
+  only ever saw one at a time. The entry now uses `%U`, so GIO passes
+  the whole selection to one launch and they all land in the same
+  message. Flatpak rewrites it the same way (`@@u %U @@`), and the
+  launcher copy the app icon chooser writes mirrors that line; an
+  existing copy is rewritten at the next start.
+
 ## 1.29.0 — 2026-09-14
 
 The attachments gallery now reaches the whole archive and can be scoped

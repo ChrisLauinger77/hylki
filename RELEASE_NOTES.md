@@ -2,6 +2,10 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.29.1
+
+**Send with Vireo attaches every selected file.** Selecting several files in GNOME Files and choosing "Send with Vireo" (or "Open With Vireo") opened one message per file. They now all land in the same message.
+
 ## What's new in 1.29.0
 
 **The attachments gallery reaches your whole archive.** Until now the gallery could only show files that had already been downloaded, which on a large mailbox was a few dozen out of thousands. Vireo now asks the server to describe the attachments in every message it knows of, without downloading them, and lists them all: name, type, size and a thumbnail once opened. Files are still only downloaded when you open them. The gallery loads a page at a time as you scroll, so twenty years of mail is as quick as one. Microsoft 365 accounts still show only what has been downloaded.
