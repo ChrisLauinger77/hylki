@@ -4573,9 +4573,11 @@ impl AccountsWindow {
             i18n("All must match").as_str(),
             i18n("Any one may match").as_str(),
         ])));
-        combine_row.set_visible(false);
         add_group.add(&add_row);
-        add_group.add(&combine_row);
+        // In a group of its own, below Add Condition; hidden with its row.
+        let combine_group = adw::PreferencesGroup::new();
+        combine_group.add(&combine_row);
+        combine_group.set_visible(false);
 
         // Number the groups, title the later Where rows after the combining
         // rule ("And where" / "Or where"), and show the remove buttons and
@@ -4583,6 +4585,7 @@ impl AccountsWindow {
         let relabel = {
             let conds = conds.clone();
             let combine_row = combine_row.clone();
+            let combine_group = combine_group.clone();
             move || {
                 let conds = conds.borrow();
                 let any = combine_row.selected() == 1;
@@ -4598,7 +4601,7 @@ impl AccountsWindow {
                     });
                     c.remove.set_visible(several);
                 }
-                combine_row.set_visible(several);
+                combine_group.set_visible(several);
             }
         };
         {
@@ -4743,6 +4746,7 @@ impl AccountsWindow {
 
         page_box.append(&account_group);
         page_box.append(&add_group);
+        page_box.append(&combine_group);
         page_box.append(&action_group);
         // The condition groups slot in above Add Condition: the rule's own
         // when editing, one blank one otherwise.

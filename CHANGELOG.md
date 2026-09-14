@@ -25,8 +25,8 @@ several conditions, and take several alternatives per condition.
   (*Condition 1*, *Condition 2*…), each its own Where/Match/Text set
   with a remove button in its header; an **Add Condition** row; and
   *Then*, what a match does (Move to, Tag with, Count unread mail). A
-  **Conditions** chooser beside Add Condition, shown once there are
-  two, says whether all must match (the default) or any one may; the
+  **Conditions** group below Add Condition, shown once there are two,
+  says whether all must match (the default) or any one may; the
   later conditions' Where rows read *And where* / *Or where* to match.
   The Filters list prints every condition of a rule.
 - **A condition can name several alternatives** (#192). Commas separate
