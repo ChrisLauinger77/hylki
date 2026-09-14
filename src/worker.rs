@@ -337,6 +337,11 @@ pub enum WorkerEvent {
     Account(Account),
     Folders(Vec<Folder>),
     Messages { folder_id: u32, messages: Vec<Message> },
+    /// What the server found for the "Message body" filter conditions
+    /// (#191) among a folder's just-listed mail: uid → the lowercased
+    /// alternatives it contains. Sent just ahead of the `Messages` it
+    /// describes, and only for an inbox with body rules.
+    BodyHits { folder_id: u32, hits: std::collections::HashMap<u32, Vec<String>> },
     /// Additional indexed message summaries for a folder, produced by the
     /// background backfill. Merged into the existing index without replacing it.
     MessagesAppend { folder_id: u32, messages: Vec<Message> },
@@ -1086,6 +1091,11 @@ async fn run_imap(
                                 cache.as_ref(),
                                 account_id,
                             );
+                            emit_body_hits(
+                                &mut session, &account, account_id, fid, &fpath, &messages,
+                                cache.as_ref(), &emit,
+                            )
+                            .await;
                             emit(WorkerEvent::Messages { folder_id: fid, messages });
                         }
                         continue;
@@ -1303,6 +1313,11 @@ async fn run_imap(
                                 watch_active_folder(&mut watchers, &account, &path, 0, &emit);
                             }
                         }
+                        emit_body_hits(
+                            &mut session, &account, account_id, folder_id, &path, &messages,
+                            cache.as_ref(), &emit,
+                        )
+                        .await;
                         emit(WorkerEvent::Messages { folder_id, messages });
                         // Refresh the true unread count (catches new mail and
                         // reads from other clients beyond the loaded window).
@@ -2778,6 +2793,8 @@ async fn idle_wait(
                     // opening it is instant.
                     queue_body_prefetch(body_prefetch, path, &messages, body_emitted);
                     queue_attachment_prefetch(att_prefetch, path, &messages, cache, account_id);
+                    emit_body_hits(session, account, account_id, folder_id, path, &messages, cache, emit)
+                        .await;
                     emit(WorkerEvent::Messages { folder_id, messages });
                     // Refresh the true unread count too. IDLE only re-synced the
                     // message list; without this the sidebar chip never moves when
@@ -5486,6 +5503,133 @@ async fn selected_chip_count(session: &mut ImapSession, kind: Option<FolderKind>
 }
 
 /// A folder's kind as the cache last saw it, by path.
+/// Answer the "Message body" filter conditions (#191) for an inbox sync on
+/// the server: one `UID SEARCH … BODY` per alternative over the listed
+/// uids, so the rules learn what the server finds without a body coming
+/// down. The answer goes out as [`WorkerEvent::BodyHits`] just ahead of the
+/// messages. Nothing is sent for other folders, without body rules, or for
+/// an empty list; a search the server refuses is logged and skipped, and
+/// that alternative then works off the list preview alone.
+async fn emit_body_hits(
+    session: &mut Option<ImapSession>,
+    account: &AccountConfig,
+    account_id: u32,
+    folder_id: u32,
+    path: &str,
+    messages: &[Message],
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if messages.is_empty() || !is_inbox_path(cache, account_id, path) {
+        return;
+    }
+    let needles = crate::config::filter_body_needles(&account.email);
+    if needles.is_empty() {
+        return;
+    }
+    let Some(sess) = session.as_mut() else { return };
+    let uids: Vec<u32> = messages.iter().map(|m| m.uid).collect();
+    let listed: std::collections::HashSet<u32> = uids.iter().copied().collect();
+    let set = uid_set(&uids);
+    let mut hits: std::collections::HashMap<u32, Vec<String>> = Default::default();
+    for needle in needles {
+        let query = body_search_query(&set, &needle);
+        match search_uids(sess, &query).await {
+            Ok(found) => {
+                for uid in found.into_iter().filter(|u| listed.contains(u)) {
+                    hits.entry(uid).or_default().push(needle.clone());
+                }
+            }
+            Err(e) => tracing::warn!("filter: body search for {needle:?} failed: {e}"),
+        }
+    }
+    tracing::info!("filter: body search over {} messages hit {}", uids.len(), hits.len());
+    emit(WorkerEvent::BodyHits { folder_id, hits });
+}
+
+/// Whether `path` is the account's inbox: by the cached folder list, or by
+/// name when there is no cache to ask.
+fn is_inbox_path(cache: Option<&Cache>, account_id: u32, path: &str) -> bool {
+    match cached_folder_kind(cache, account_id, path) {
+        Some(kind) => kind == FolderKind::Inbox,
+        None => path.eq_ignore_ascii_case("INBOX"),
+    }
+}
+
+/// The `UID SEARCH` keys that find `needle` in the bodies of `set`. A
+/// needle beyond ASCII needs the CHARSET key in front (RFC 3501 §6.4.4),
+/// which must lead the keys; quotes and backslashes are escaped as in any
+/// quoted string, and line breaks can never be in a quoted string at all.
+fn body_search_query(set: &str, needle: &str) -> String {
+    let clean: String = needle.chars().filter(|c| !matches!(c, '\r' | '\n')).collect();
+    let quoted = clean.replace('\\', "\\\\").replace('"', "\\\"");
+    let charset = if clean.is_ascii() { "" } else { "CHARSET UTF-8 " };
+    format!("{charset}UID {set} BODY \"{quoted}\"")
+}
+
+/// Microsoft Graph's side of [`emit_body_hits`]: one `$search="body:…"`
+/// listing per alternative over the inbox, intersected with the listed
+/// messages (Graph ids hash to the uids the app knows).
+async fn emit_graph_body_hits(
+    token: &str,
+    account: &AccountConfig,
+    folder_id: u32,
+    path: &str,
+    messages: &[Message],
+    state: &GraphState,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if messages.is_empty() || state.inbox.as_ref().map(|(_, p)| p.as_str()) != Some(path) {
+        return;
+    }
+    let needles = crate::config::filter_body_needles(&account.email);
+    if needles.is_empty() {
+        return;
+    }
+    let Some((_, gid)) = state.folders.get(path).cloned() else { return };
+    let listed: std::collections::HashSet<u32> = messages.iter().map(|m| m.uid).collect();
+    let mut hits: std::collections::HashMap<u32, Vec<String>> = Default::default();
+    for needle in needles {
+        // KQL: the term in quotes; a quote inside it would end the term.
+        let term = format!("\"body:{}\"", needle.replace('"', " "));
+        let url = format!(
+            "{GRAPH_BASE}/me/mailFolders/{gid}/messages?$search={}&$select=id&$top=250",
+            url_query_encode(&term)
+        );
+        let t = token.to_string();
+        let found = tokio::task::spawn_blocking(move || graph_paged(&t, &url, 250))
+            .await
+            .unwrap_or_else(|_| Err("task failed".into()));
+        match found {
+            Ok(items) => {
+                for uid in items
+                    .iter()
+                    .filter_map(|v| v["id"].as_str())
+                    .map(hash_uid)
+                    .filter(|u| listed.contains(u))
+                {
+                    hits.entry(uid).or_default().push(needle.clone());
+                }
+            }
+            Err(e) => tracing::warn!("filter: Graph body search for {needle:?} failed: {e}"),
+        }
+    }
+    tracing::info!("filter: Graph body search over {} messages hit {}", listed.len(), hits.len());
+    emit(WorkerEvent::BodyHits { folder_id, hits });
+}
+
+/// Percent-encode a URL query value (everything but the unreserved set).
+fn url_query_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 fn cached_folder_kind(cache: Option<&Cache>, account_id: u32, path: &str) -> Option<FolderKind> {
     cache?.load_folders(account_id).into_iter().find(|f| f.path == path).map(|f| f.kind)
 }
@@ -8999,6 +9143,8 @@ async fn run_graph(
                 {
                     Ok(messages) => {
                         let unread = state.chip_count(folder_id, &messages);
+                        emit_graph_body_hits(&token, &account, folder_id, &path, &messages, &state, &emit)
+                            .await;
                         emit(WorkerEvent::Messages { folder_id, messages });
                         emit(WorkerEvent::FolderUnread { folder_id, unread });
                         // Graph loads the whole folder in one pass — there is no
@@ -9649,6 +9795,7 @@ async fn graph_poll_inbox(
         graph_load_folder(&token, account_id, folder_id, &path, cache, state).await
     {
         let unread = messages.iter().filter(|m| m.unread).count() as u32;
+        emit_graph_body_hits(&token, account, folder_id, &path, &messages, state, emit).await;
         emit(WorkerEvent::Messages { folder_id, messages });
         emit(WorkerEvent::FolderUnread { folder_id, unread });
     }
@@ -11442,6 +11589,24 @@ mod tests {
         assert!(body.contains("width=\"420\""), "body was: {body}");
         // The image is rendered in place, so it isn't appended a second time.
         assert_eq!(body.matches("/9j/4AAQSkZJRg==").count(), 1, "body was: {body}");
+    }
+
+    #[test]
+    fn body_search_keys_quote_and_declare_charset() {
+        // #191: ASCII needles go as a plain quoted string over the listed
+        // uids; quotes and backslashes are escaped; anything beyond ASCII
+        // puts CHARSET UTF-8 at the head of the keys; line breaks vanish.
+        assert_eq!(body_search_query("1:5,9", "unsubscribe"), r#"UID 1:5,9 BODY "unsubscribe""#);
+        assert_eq!(body_search_query("1", r#"say "hi" \now"#), r#"UID 1 BODY "say \"hi\" \\now""#);
+        assert_eq!(body_search_query("1", "café"), r#"CHARSET UTF-8 UID 1 BODY "café""#);
+        assert_eq!(body_search_query("1", "a\r\nb"), r#"UID 1 BODY "ab""#);
+    }
+
+    #[test]
+    fn url_query_values_are_percent_encoded() {
+        assert_eq!(url_query_encode("\"body:opt out\""), "%22body%3Aopt%20out%22");
+        assert_eq!(url_query_encode("a-b_c.d~e"), "a-b_c.d~e");
+        assert_eq!(url_query_encode("é"), "%C3%A9");
     }
 
     #[test]

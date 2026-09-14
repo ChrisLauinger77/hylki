@@ -576,6 +576,10 @@ pub struct AppModel {
     /// (the message still showed up in the last sync). A sync racing the
     /// server-side move must neither re-request the move nor re-notify.
     filter_moved: std::collections::HashMap<(u32, u32), std::collections::HashSet<u32>>,
+    /// Per (account, folder): the body-search hits of the last sync (#191),
+    /// uid → lowercased alternatives the server found in the message. What
+    /// [`apply_filters`] consults for "Message body" conditions.
+    body_hits: std::collections::HashMap<(u32, u32), std::collections::HashMap<u32, Vec<String>>>,
     /// Lone messages render as inset cards (#57).
     single_message_card: bool,
     /// Whether conversation rows may expand into their members in the list
@@ -1203,6 +1207,10 @@ pub enum AppMsg {
     SetAccount(Account),
     SetFolders { account_id: u32, folders: Vec<Folder> },
     Messages { account_id: u32, folder_id: u32, messages: Vec<Message> },
+    /// The message-body filter conditions the server confirmed for a folder's
+    /// listed mail (#191): uid → the lowercased alternatives found in it.
+    /// Arrives just ahead of the `Messages` it describes.
+    BodyHits { account_id: u32, folder_id: u32, hits: std::collections::HashMap<u32, Vec<String>> },
     /// Additional indexed summaries from the background backfill (search index).
     MessagesAppend { account_id: u32, folder_id: u32, messages: Vec<Message> },
     UndoRestored { account_id: u32, folder_id: u32, message_ids: Vec<String> },
@@ -2481,6 +2489,7 @@ impl SimpleComponent for AppModel {
                 crate::cache::Cache::open().ok()
             },
             filter_moved: Default::default(),
+            body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
             thread_expansion: config::load_thread_expansion(),
             confirm_thread_delete: config::load_confirm_thread_delete(),
@@ -7396,6 +7405,12 @@ impl SimpleComponent for AppModel {
                     }
                     self.push_unread_counts();
                 }
+            }
+
+            AppMsg::BodyHits { account_id, folder_id, hits } => {
+                // The whole answer for the sync about to land; the previous
+                // one described mail that sync lists again anyway.
+                self.body_hits.insert((account_id, folder_id), hits);
             }
 
             AppMsg::Messages { account_id, folder_id, messages } => {
@@ -13835,11 +13850,24 @@ impl AppModel {
         let mut still_pending = std::collections::HashSet::new();
         let mut kept = Vec::with_capacity(messages.len());
         let mut filed = Vec::new();
+        let hits = self.body_hits.get(&(account_id, folder_id));
         for mut m in messages {
             let recipients = format!("{} {}", m.to, m.cc);
+            let body_hits = hits.and_then(|h| h.get(&m.uid)).map(Vec::as_slice).unwrap_or(&[]);
+            let input = config::FilterInput {
+                from_addr: &m.from_addr,
+                from_name: &m.from_name,
+                subject: &m.subject,
+                recipients: &recipients,
+                reply_to: &m.reply_to,
+                // The list rarely carries a body (the demo's does); the
+                // preview is what a sync brings for every message.
+                body: if m.body.is_empty() { &m.preview } else { &m.body },
+                body_hits,
+            };
             let matching: Vec<&&config::FilterRule> = rules
                 .iter()
-                .filter(|r| r.matches(&m.from_addr, &m.from_name, &m.subject, &recipients))
+                .filter(|r| r.matches(&input))
                 .collect();
             // Tags first (#71), from every matching rule, and only where the
             // message lacks the tag — this runs on every sync, and the flag
@@ -13886,12 +13914,11 @@ impl AppModel {
                         continue;
                     }
                     tracing::info!(
-                        "filter: {} → {} ({:?} {:?} {:?})",
+                        "filter: {} → {} ({:?}{})",
                         m.from_addr,
                         rule.dest_path,
-                        rule.field,
-                        rule.matcher,
-                        rule.value,
+                        rule.conditions(),
+                        if rule.any { ", any" } else { "" },
                     );
                     self.send_to(account_id, MailRequest::MoveMessage {
                         path: src.clone(),
@@ -14663,6 +14690,8 @@ fn demo_filters() -> Vec<config::FilterRule> {
         field,
         matcher,
         value: value.into(),
+        more: Vec::new(),
+        any: false,
         dest_path: dest.into(),
         tag: String::new(),
         count_unread: true,
@@ -15185,6 +15214,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::Messages { folder_id, messages } => {
             AppMsg::Messages { account_id, folder_id, messages }
         }
+        WorkerEvent::BodyHits { folder_id, hits } => AppMsg::BodyHits { account_id, folder_id, hits },
         WorkerEvent::MessagesAppend { folder_id, messages } => {
             AppMsg::MessagesAppend { account_id, folder_id, messages }
         }

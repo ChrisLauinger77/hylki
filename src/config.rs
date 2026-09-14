@@ -1619,14 +1619,29 @@ pub fn load_files_prefs() -> FilesPrefs {
 
 /// A mail filter rule (#47): file matching inbox arrivals into a folder,
 /// Evolution-style, applied client-side whenever Vireo syncs the inbox.
+///
+/// A rule holds one or more conditions (#192). The first lives at the top
+/// level as `field`/`matcher`/`value`, exactly where versions that knew only
+/// one condition read it, so a filters file written here still loads there
+/// (with the rest of the conditions ignored); `more` holds the others.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FilterRule {
     /// The account this rule (and its destination folder) belongs to.
     pub account_email: String,
-    /// Which header the rule inspects.
+    /// The first condition: what it inspects…
     pub field: FilterField,
+    /// …how…
     pub matcher: FilterMatch,
+    /// …and against what. Commas separate alternatives, any one of which
+    /// matches (#192): "invoice, receipt".
     pub value: String,
+    /// The conditions after the first (#192).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub more: Vec<FilterCondition>,
+    /// Whether one matching condition is enough (true) or every condition
+    /// must match (false, the default).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub any: bool,
     /// Destination folder path on the account. Empty leaves the mail where it
     /// is (a rule that only tags, #71).
     #[serde(default)]
@@ -1648,6 +1663,19 @@ fn count_unread_default() -> bool {
     true
 }
 
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// One condition of a [`FilterRule`]: what to look at, how, and for what.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FilterCondition {
+    pub field: FilterField,
+    pub matcher: FilterMatch,
+    /// Commas separate alternatives; any one of them matching is a match.
+    pub value: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterField {
@@ -1655,6 +1683,26 @@ pub enum FilterField {
     FromName,
     Subject,
     Recipients,
+    /// The Reply-To header, or the From address when there is none (#191).
+    ReplyTo,
+    /// The message text (#191). Searched on the server as the inbox syncs
+    /// (IMAP `SEARCH BODY`, Microsoft Graph `$search`), so nothing is
+    /// downloaded for it; the list preview and a cached body are checked
+    /// too. Always a "contains" match, whatever the matcher says: that is
+    /// the only search a server offers.
+    Body,
+}
+
+impl FilterField {
+    /// Every field, in the order the editor lists them.
+    pub const ALL: [FilterField; 6] = [
+        FilterField::FromAddress,
+        FilterField::FromName,
+        FilterField::Subject,
+        FilterField::Recipients,
+        FilterField::ReplyTo,
+        FilterField::Body,
+    ];
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -1666,28 +1714,131 @@ pub enum FilterMatch {
     EndsWith,
 }
 
-impl FilterRule {
-    /// Case-insensitive match against a message's headers. `recipients`
-    /// should combine To and Cc.
-    pub fn matches(&self, from_addr: &str, from_name: &str, subject: &str, recipients: &str) -> bool {
-        let hay = match self.field {
-            FilterField::FromAddress => from_addr,
-            FilterField::FromName => from_name,
-            FilterField::Subject => subject,
-            FilterField::Recipients => recipients,
-        }
-        .to_lowercase();
-        let needle = self.value.to_lowercase();
-        if needle.is_empty() {
+impl FilterMatch {
+    /// Every matcher, in the order the editor lists them.
+    pub const ALL: [FilterMatch; 4] =
+        [FilterMatch::Contains, FilterMatch::Equals, FilterMatch::StartsWith, FilterMatch::EndsWith];
+}
+
+/// What a message offers the conditions to look at.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FilterInput<'a> {
+    pub from_addr: &'a str,
+    pub from_name: &'a str,
+    pub subject: &'a str,
+    /// To and Cc together.
+    pub recipients: &'a str,
+    /// The Reply-To header; empty when absent.
+    pub reply_to: &'a str,
+    /// The message text on hand: the list preview, or the body when the
+    /// list carries it.
+    pub body: &'a str,
+    /// The body alternatives the server confirmed for this message (#191),
+    /// lowercased as [`FilterCondition::alternatives`] hands them out.
+    pub body_hits: &'a [String],
+}
+
+impl FilterCondition {
+    /// The alternatives a value names (#192): its comma-separated pieces,
+    /// trimmed and lowercased, empties dropped. A value without a comma is
+    /// one alternative.
+    pub fn alternatives(value: &str) -> Vec<String> {
+        value
+            .split(',')
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect()
+    }
+
+    /// Case-insensitive match against one message.
+    pub fn matches(&self, input: &FilterInput) -> bool {
+        let alts = Self::alternatives(&self.value);
+        if alts.is_empty() {
             return false;
         }
-        match self.matcher {
-            FilterMatch::Contains => hay.contains(&needle),
-            FilterMatch::Equals => hay == needle,
-            FilterMatch::StartsWith => hay.starts_with(&needle),
-            FilterMatch::EndsWith => hay.ends_with(&needle),
+        if self.field == FilterField::Body {
+            // The server's word (a hit) or the text on hand; a rule set up
+            // on a backend without a search still works off the preview.
+            let text = input.body.to_lowercase();
+            return alts
+                .iter()
+                .any(|a| input.body_hits.iter().any(|h| h == a) || text.contains(a.as_str()));
+        }
+        let hay = match self.field {
+            FilterField::FromAddress => input.from_addr,
+            FilterField::FromName => input.from_name,
+            FilterField::Subject => input.subject,
+            FilterField::Recipients => input.recipients,
+            FilterField::ReplyTo if input.reply_to.trim().is_empty() => input.from_addr,
+            FilterField::ReplyTo => input.reply_to,
+            FilterField::Body => unreachable!(),
+        }
+        .to_lowercase();
+        alts.iter().any(|needle| match self.matcher {
+            FilterMatch::Contains => hay.contains(needle.as_str()),
+            FilterMatch::Equals => hay == *needle,
+            FilterMatch::StartsWith => hay.starts_with(needle.as_str()),
+            FilterMatch::EndsWith => hay.ends_with(needle.as_str()),
+        })
+    }
+}
+
+impl FilterRule {
+    /// Every condition, the first included.
+    pub fn conditions(&self) -> Vec<FilterCondition> {
+        let mut all = Vec::with_capacity(1 + self.more.len());
+        all.push(FilterCondition { field: self.field, matcher: self.matcher, value: self.value.clone() });
+        all.extend(self.more.iter().cloned());
+        all
+    }
+
+    /// Replace the conditions: the first goes to the top level, the rest to
+    /// `more`. Returns false (and changes nothing) when `conds` is empty.
+    pub fn set_conditions(&mut self, mut conds: Vec<FilterCondition>) -> bool {
+        if conds.is_empty() {
+            return false;
+        }
+        let first = conds.remove(0);
+        self.field = first.field;
+        self.matcher = first.matcher;
+        self.value = first.value;
+        self.more = conds;
+        true
+    }
+
+    /// The body alternatives this rule needs a server search for (#191).
+    pub fn body_needles(&self) -> Vec<String> {
+        self.conditions()
+            .iter()
+            .filter(|c| c.field == FilterField::Body)
+            .flat_map(|c| FilterCondition::alternatives(&c.value))
+            .collect()
+    }
+
+    /// Case-insensitive match against a message: every condition must hold,
+    /// or any one of them with `any` set.
+    pub fn matches(&self, input: &FilterInput) -> bool {
+        let conds = self.conditions();
+        if self.any {
+            conds.iter().any(|c| c.matches(input))
+        } else {
+            conds.iter().all(|c| c.matches(input))
         }
     }
+}
+
+/// Every body alternative the rules of `email` search for (#191), lowercased
+/// and deduplicated, read fresh from disk: the worker asks at each inbox
+/// sync, so a rule added in Settings counts from the next sync on.
+pub fn filter_body_needles(email: &str) -> Vec<String> {
+    let mut out: Vec<String> = load_filters()
+        .iter()
+        .filter(|r| r.account_email.eq_ignore_ascii_case(email))
+        .flat_map(|r| r.body_needles())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -3116,10 +3267,26 @@ mod filter_tests {
             field,
             matcher,
             value: value.into(),
+            more: Vec::new(),
+            any: false,
             dest_path: "Archive".into(),
             tag: String::new(),
             count_unread: true,
         }
+    }
+
+    fn cond(field: FilterField, matcher: FilterMatch, value: &str) -> FilterCondition {
+        FilterCondition { field, matcher, value: value.into() }
+    }
+
+    /// The four header fields the original rules looked at.
+    fn headers<'a>(
+        from_addr: &'a str,
+        from_name: &'a str,
+        subject: &'a str,
+        recipients: &'a str,
+    ) -> FilterInput<'a> {
+        FilterInput { from_addr, from_name, subject, recipients, ..Default::default() }
     }
 
     #[test]
@@ -3161,23 +3328,129 @@ mod filter_tests {
     #[test]
     fn filters_match_case_insensitively_per_field() {
         let r = rule(FilterField::FromAddress, FilterMatch::Contains, "NEWS@");
-        assert!(r.matches("news@example.com", "", "", ""));
-        assert!(!r.matches("other@example.com", "News", "News", "News"));
+        assert!(r.matches(&headers("news@example.com", "", "", "")));
+        assert!(!r.matches(&headers("other@example.com", "News", "News", "News")));
 
         let r = rule(FilterField::Subject, FilterMatch::StartsWith, "[list]");
-        assert!(r.matches("", "", "[LIST] hello", ""));
-        assert!(!r.matches("", "", "re: [list] hello", ""));
+        assert!(r.matches(&headers("", "", "[LIST] hello", "")));
+        assert!(!r.matches(&headers("", "", "re: [list] hello", "")));
 
         let r = rule(FilterField::Recipients, FilterMatch::Contains, "team@");
-        assert!(r.matches("", "", "", "me@x.org team@x.org"));
+        assert!(r.matches(&headers("", "", "", "me@x.org team@x.org")));
 
         let r = rule(FilterField::FromName, FilterMatch::Equals, "Bank");
-        assert!(r.matches("", "bank", "", ""));
-        assert!(!r.matches("", "bankster", "", ""));
+        assert!(r.matches(&headers("", "bank", "", "")));
+        assert!(!r.matches(&headers("", "bankster", "", "")));
 
         // An empty needle can never match (a half-filled rule stays inert).
         let r = rule(FilterField::Subject, FilterMatch::Contains, "");
-        assert!(!r.matches("x", "x", "x", "x"));
+        assert!(!r.matches(&headers("x", "x", "x", "x")));
+        let r = rule(FilterField::Subject, FilterMatch::Contains, " , ,");
+        assert!(!r.matches(&headers("x", "x", "x", "x")));
+    }
+
+    #[test]
+    fn filter_values_hold_comma_separated_alternatives() {
+        // #192: "invoice, receipt" matches either; spaces around the commas
+        // and empty pieces are ignored; a comma-free value is one piece.
+        assert_eq!(FilterCondition::alternatives(" Invoice ,receipt,, "), ["invoice", "receipt"]);
+        assert_eq!(FilterCondition::alternatives("plain"), ["plain"]);
+        let r = rule(FilterField::Subject, FilterMatch::Contains, "invoice, receipt");
+        assert!(r.matches(&headers("", "", "Your RECEIPT", "")));
+        assert!(r.matches(&headers("", "", "invoice #12", "")));
+        assert!(!r.matches(&headers("", "", "hello", "")));
+        // Each alternative gets the whole matcher, not just "contains".
+        let r = rule(FilterField::FromAddress, FilterMatch::EndsWith, "@a.org, @b.org");
+        assert!(r.matches(&headers("x@B.org", "", "", "")));
+        assert!(!r.matches(&headers("x@b.org.evil", "", "", "")));
+    }
+
+    #[test]
+    fn filter_rules_combine_conditions_all_or_any() {
+        // #192: a second condition narrows by default…
+        let mut r = rule(FilterField::FromAddress, FilterMatch::EndsWith, "@shop.example");
+        r.more.push(cond(FilterField::Subject, FilterMatch::Contains, "order"));
+        assert!(r.matches(&headers("a@shop.example", "", "Order shipped", "")));
+        assert!(!r.matches(&headers("a@shop.example", "", "Newsletter", "")));
+        assert!(!r.matches(&headers("a@other.example", "", "Order shipped", "")));
+        // …and widens with "any".
+        r.any = true;
+        assert!(r.matches(&headers("a@shop.example", "", "Newsletter", "")));
+        assert!(r.matches(&headers("a@other.example", "", "Order shipped", "")));
+        assert!(!r.matches(&headers("a@other.example", "", "Newsletter", "")));
+        // A condition with nothing to match holds nothing up in "any" mode
+        // and blocks an "all" rule, as an inert rule should.
+        r.more.push(cond(FilterField::Subject, FilterMatch::Contains, ""));
+        assert!(r.matches(&headers("a@shop.example", "", "", "")));
+        r.any = false;
+        assert!(!r.matches(&headers("a@shop.example", "", "Order shipped", "")));
+
+        // The conditions round-trip through the accessors, first one included.
+        let conds = r.conditions();
+        assert_eq!(conds.len(), 3);
+        assert_eq!(conds[0], cond(FilterField::FromAddress, FilterMatch::EndsWith, "@shop.example"));
+        assert!(!r.set_conditions(Vec::new()), "a rule needs a condition");
+        assert!(r.set_conditions(vec![cond(FilterField::FromName, FilterMatch::Equals, "Bank")]));
+        assert_eq!(r.field, FilterField::FromName);
+        assert_eq!(r.value, "Bank");
+        assert!(r.more.is_empty());
+    }
+
+    #[test]
+    fn filter_reply_to_falls_back_to_from() {
+        // #191: Reply-To when the sender set one, From otherwise.
+        let r = rule(FilterField::ReplyTo, FilterMatch::Contains, "sales@");
+        let mut input = headers("noreply@shop.example", "", "", "");
+        input.reply_to = "Sales@shop.example";
+        assert!(r.matches(&input));
+        input.reply_to = "";
+        assert!(!r.matches(&input));
+        input.from_addr = "sales@shop.example";
+        assert!(r.matches(&input));
+    }
+
+    #[test]
+    fn filter_body_matches_hits_or_text_on_hand() {
+        // #191: the server's search result counts, and so does the text the
+        // list carries; the matcher is always "contains".
+        let r = rule(FilterField::Body, FilterMatch::Equals, "unsubscribe, opt out");
+        let hits = vec!["unsubscribe".to_string()];
+        let mut input = headers("", "", "", "");
+        input.body_hits = &hits;
+        assert!(r.matches(&input));
+        input.body_hits = &[];
+        assert!(!r.matches(&input));
+        input.body = "Click here to OPT OUT of these mails";
+        assert!(r.matches(&input));
+        input.body = "nothing of the sort";
+        assert!(!r.matches(&input));
+        assert_eq!(r.body_needles(), ["unsubscribe", "opt out"]);
+        assert!(rule(FilterField::Subject, FilterMatch::Contains, "x").body_needles().is_empty());
+    }
+
+    #[test]
+    fn filter_rules_read_the_single_condition_files() {
+        // A file from before #192 names one condition per rule and none of
+        // the new keys; it must load as a one-condition, all-must-match rule.
+        let text = r#"
+[[rules]]
+account_email = "a@b.c"
+field = "subject"
+matcher = "contains"
+value = "digest"
+dest_path = "Lists"
+"#;
+        let back: FiltersFile = toml::from_str(text).unwrap();
+        assert_eq!(back.rules.len(), 1);
+        let r = &back.rules[0];
+        assert!(r.more.is_empty());
+        assert!(!r.any);
+        assert_eq!(r.conditions(), vec![cond(FilterField::Subject, FilterMatch::Contains, "digest")]);
+        // And a one-condition rule written now carries none of the new keys,
+        // so those versions read it back too.
+        let text = toml::to_string_pretty(&FiltersFile { rules: back.rules.clone() }).unwrap();
+        assert!(!text.contains("more"), "{text}");
+        assert!(!text.contains("any"), "{text}");
     }
 
     #[test]
@@ -3260,7 +3533,10 @@ mod filter_tests {
 
     #[test]
     fn filter_rules_roundtrip_through_toml() {
-        let rules = vec![rule(FilterField::Subject, FilterMatch::EndsWith, "digest")];
+        let mut multi = rule(FilterField::Body, FilterMatch::Contains, "unsubscribe");
+        multi.more.push(cond(FilterField::ReplyTo, FilterMatch::EndsWith, "@list.example"));
+        multi.any = true;
+        let rules = vec![rule(FilterField::Subject, FilterMatch::EndsWith, "digest"), multi];
         let text = toml::to_string_pretty(&FiltersFile { rules: rules.clone() }).unwrap();
         let back: FiltersFile = toml::from_str(&text).unwrap();
         assert_eq!(back.rules, rules);

@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.30.0 — 2026-09-14
+
+Filters can look at the message body and the Reply-To address, hold
+several conditions, and take several alternatives per condition.
+
+- **Filters can match the message body** (#191, requested by
+  [@yioannides](https://github.com/yioannides)). *Where* gained
+  **Message body**: a rule that files anything with "unsubscribe" in it
+  into Newsletters is now one condition. The text is searched on the
+  server as the Inbox syncs (IMAP `SEARCH BODY`, Microsoft Graph
+  `$search`), one search per alternative over the mail just listed, so
+  nothing is downloaded for it; the list preview counts too, which is
+  all a POP3 account or a server that refuses the search has to go on.
+  Body conditions always mean "contains", the only search a server
+  offers, and the editor pins the matcher and says so.
+- **Filters can match the Reply-To address** (#191). *Where* also gained
+  **Reply-To address**: the Reply-To header, or the From address when
+  the sender set none, so a rule on where replies go works for mail
+  from a person and mail from a system alike.
+- **A filter can hold several conditions** (#192, requested by
+  [@yioannides](https://github.com/yioannides)). The filter editor's
+  **Add Condition** row adds another Where/Match/Text trio; each after
+  the first has a remove button. A **Conditions** chooser, shown once
+  there are two, says whether all must match (the default) or any one
+  may; the later conditions are titled *And where* / *Or where* to
+  match. The Filters list prints every condition of a rule.
+- **A condition can name several alternatives** (#192). Commas separate
+  them in the text to match: `invoice, receipt` matches either, with
+  the whole matcher applied to each (`@a.org, @b.org` with *ends with*
+  is two endings). A value with no comma is one alternative as before;
+  a value that held a comma on purpose now reads as two.
+- The filters file keeps the first condition where earlier versions
+  read it, and only writes the new keys when a rule needs them, so a
+  rule with one condition still loads in those versions unchanged.
+
 ## 1.29.3 — 2026-09-14
 
 Files sent from GNOME Files ask where they should go, and big ones offer

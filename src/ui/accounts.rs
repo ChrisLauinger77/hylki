@@ -3890,16 +3890,29 @@ impl AccountsWindow {
             FromName => "From name",
             Subject => "Subject",
             Recipients => "To or Cc",
+            ReplyTo => "Reply-To address",
+            Body => "Message body",
         })
     }
-    fn match_label(m: crate::config::FilterMatch) -> &'static str {
+    fn match_label(m: crate::config::FilterMatch) -> String {
         use crate::config::FilterMatch::*;
-        match m {
+        i18n(match m {
             Contains => "contains",
             Equals => "is exactly",
             StartsWith => "starts with",
             EndsWith => "ends with",
-        }
+        })
+    }
+
+    /// One condition as the rule rows print it: `Subject contains “a, b”`.
+    /// A body condition is always a "contains", whatever it stores (#191).
+    fn condition_label(c: &crate::config::FilterCondition) -> String {
+        let matcher = if c.field == crate::config::FilterField::Body {
+            crate::config::FilterMatch::Contains
+        } else {
+            c.matcher
+        };
+        format!("{} {} \u{201c}{}\u{201d}", Self::field_label(c.field), Self::match_label(matcher), c.value)
     }
 
     /// Re-render the Filters group's rule rows.
@@ -3919,12 +3932,10 @@ impl AccountsWindow {
             row.set_activatable(true);
             let s = sender.clone();
             row.connect_activated(move |_| s.input(AccountsInput::EditFilter(i)));
-            row.set_title(&format!(
-                "{} {} \u{201c}{}\u{201d}",
-                Self::field_label(r.field),
-                Self::match_label(r.matcher),
-                r.value,
-            ));
+            // Every condition, joined the way the rule combines them (#192).
+            let joiner = if r.any { i18n(" or ") } else { i18n(" and ") };
+            let title: Vec<String> = r.conditions().iter().map(Self::condition_label).collect();
+            row.set_title(&title.join(&joiner));
             // "account → folder", "account, tagged Work", or both (#71).
             let mut subtitle = r.account_email.clone();
             if !r.dest_path.is_empty() {
@@ -4448,26 +4459,162 @@ impl AccountsWindow {
         let email_refs: Vec<&str> = emails.iter().map(|s| s.as_str()).collect();
         account_row.set_model(Some(&gtk::StringList::new(&email_refs)));
 
-        let field_row = adw::ComboRow::new();
-        field_row.set_title(&i18n("Where"));
-        field_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("From address").as_str(),
-            i18n("From name").as_str(),
-            i18n("Subject").as_str(),
-            i18n("To or Cc").as_str(),
+        // The conditions (#192): each is a Where/Match/Text trio of rows,
+        // stacked between the account row and the "Add Condition" row. The
+        // first is fixed; the others carry a remove button. Body conditions
+        // (#191) pin the matcher to "contains", the only search a server
+        // offers, and say so.
+        let conds: std::rc::Rc<std::cell::RefCell<Vec<CondRows>>> = Default::default();
+        let field_names: Vec<String> = FilterField::ALL.iter().map(|f| Self::field_label(*f)).collect();
+        let match_names: Vec<String> = FilterMatch::ALL.iter().map(|m| Self::match_label(*m)).collect();
+        let make_cond = {
+            let field_names = field_names.clone();
+            let match_names = match_names.clone();
+            move |init: Option<&crate::config::FilterCondition>| -> CondRows {
+                let field = adw::ComboRow::new();
+                field.set_title(&i18n("Where"));
+                let refs: Vec<&str> = field_names.iter().map(|s| s.as_str()).collect();
+                field.set_model(Some(&gtk::StringList::new(&refs)));
+                let matcher = adw::ComboRow::new();
+                matcher.set_title(&i18n("Match"));
+                matcher.set_subtitle(&i18n("Commas separate alternatives; any one of them counts"));
+                let refs: Vec<&str> = match_names.iter().map(|s| s.as_str()).collect();
+                matcher.set_model(Some(&gtk::StringList::new(&refs)));
+                let value = adw::EntryRow::new();
+                value.set_title(&i18n("Text to match"));
+                if let Some(c) = init {
+                    if let Some(i) = FilterField::ALL.iter().position(|f| *f == c.field) {
+                        field.set_selected(i as u32);
+                    }
+                    if let Some(i) = FilterMatch::ALL.iter().position(|m| *m == c.matcher) {
+                        matcher.set_selected(i as u32);
+                    }
+                    value.set_text(&c.value);
+                }
+                let explain = {
+                    let matcher = matcher.clone();
+                    move |field: &adw::ComboRow| {
+                        let chosen = FilterField::ALL.get(field.selected() as usize).copied();
+                        let body = chosen == Some(FilterField::Body);
+                        if body {
+                            matcher.set_selected(0);
+                        }
+                        matcher.set_sensitive(!body);
+                        field.set_subtitle(&match chosen {
+                            Some(FilterField::Body) => i18n(
+                                "Searched on the server as the Inbox syncs, without downloading anything",
+                            ),
+                            Some(FilterField::ReplyTo) => {
+                                i18n("The From address when the sender set no Reply-To")
+                            }
+                            _ => String::new(),
+                        });
+                    }
+                };
+                explain(&field);
+                field.connect_selected_notify(explain);
+                CondRows { field, matcher, value }
+            }
+        };
+        let add_row = adw::ActionRow::new();
+        add_row.set_title(&i18n("Add Condition"));
+        add_row.set_activatable(true);
+        add_row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Vireo-list-add-symbolic"));
+        // All or any (#192); only shown once there is a second condition.
+        let combine_row = adw::ComboRow::new();
+        combine_row.set_title(&i18n("Conditions"));
+        combine_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("All must match").as_str(),
+            i18n("Any one may match").as_str(),
         ])));
-
-        let match_row = adw::ComboRow::new();
-        match_row.set_title(&i18n("Match"));
-        match_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("contains").as_str(),
-            i18n("is exactly").as_str(),
-            i18n("starts with").as_str(),
-            i18n("ends with").as_str(),
-        ])));
-
-        let value_row = adw::EntryRow::new();
-        value_row.set_title(&i18n("Text to match"));
+        combine_row.set_visible(false);
+        // Retitle the later conditions after the combining rule ("And
+        // where" / "Or where") and show the chooser once it matters.
+        let relabel = {
+            let conds = conds.clone();
+            let combine_row = combine_row.clone();
+            move || {
+                let conds = conds.borrow();
+                let any = combine_row.selected() == 1;
+                for (i, c) in conds.iter().enumerate() {
+                    c.field.set_title(&if i == 0 {
+                        i18n("Where")
+                    } else if any {
+                        i18n("Or where")
+                    } else {
+                        i18n("And where")
+                    });
+                }
+                combine_row.set_visible(conds.len() > 1);
+            }
+        };
+        {
+            let relabel = relabel.clone();
+            combine_row.connect_selected_notify(move |_| relabel());
+        }
+        // Append a condition below the ones there are, just above the
+        // "Add Condition" row; with a remove button unless it is the first.
+        let add_cond = {
+            let conds = conds.clone();
+            let form = form.clone();
+            let add_row = add_row.clone();
+            let relabel = relabel.clone();
+            let make_cond = make_cond.clone();
+            let form_save = self.form_save.clone();
+            let nav = nav.clone();
+            move |init: Option<&crate::config::FilterCondition>| {
+                let c = make_cond(init);
+                let n = conds.borrow().len();
+                // The add row's own index in the list; a row not in one says -1.
+                let mut at = match add_row.index() {
+                    i if i >= 0 => i,
+                    _ => (1 + 3 * n) as i32,
+                };
+                for row in [c.field.upcast_ref::<gtk::Widget>(), c.matcher.upcast_ref(), c.value.upcast_ref()] {
+                    form.insert(row, at);
+                    at += 1;
+                }
+                if n > 0 {
+                    let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
+                    rm.add_css_class("flat");
+                    rm.set_valign(gtk::Align::Center);
+                    rm.set_tooltip_text(Some(i18n("Remove condition").as_str()));
+                    let conds = conds.clone();
+                    let form = form.clone();
+                    let relabel = relabel.clone();
+                    let field = c.field.clone();
+                    rm.connect_clicked(move |_| {
+                        let gone = {
+                            let mut conds = conds.borrow_mut();
+                            conds.iter().position(|c| c.field == field).map(|i| conds.remove(i))
+                        };
+                        if let Some(gone) = gone {
+                            form.remove(&gone.field);
+                            form.remove(&gone.matcher);
+                            form.remove(&gone.value);
+                            relabel();
+                        }
+                    });
+                    c.field.add_suffix(&rm);
+                    // Rows added after the page is up miss its Enter-saves
+                    // wiring; give them the same.
+                    let form_save = form_save.clone();
+                    let nav = nav.clone();
+                    c.value.connect_entry_activated(move |_| {
+                        let saved = form_save.borrow().as_ref().is_some_and(|save| save());
+                        if saved {
+                            nav.pop();
+                        }
+                    });
+                }
+                conds.borrow_mut().push(c);
+                relabel();
+            }
+        };
+        {
+            let add_cond = add_cond.clone();
+            add_row.connect_activated(move |_| add_cond(None));
+        }
 
         let dest_row = adw::ComboRow::new();
         dest_row.set_title(&i18n("Move to"));
@@ -4530,19 +4677,7 @@ impl AccountsWindow {
                 account_row.set_selected(idx as u32);
                 fill_dest(idx);
             }
-            field_row.set_selected(match rule.field {
-                FilterField::FromAddress => 0,
-                FilterField::FromName => 1,
-                FilterField::Subject => 2,
-                FilterField::Recipients => 3,
-            });
-            match_row.set_selected(match rule.matcher {
-                FilterMatch::Contains => 0,
-                FilterMatch::Equals => 1,
-                FilterMatch::StartsWith => 2,
-                FilterMatch::EndsWith => 3,
-            });
-            value_row.set_text(&rule.value);
+            combine_row.set_selected(if rule.any { 1 } else { 0 });
             if let Some(idx) = dest_paths.borrow().iter().position(|p| *p == rule.dest_path) {
                 dest_row.set_selected(idx as u32);
             }
@@ -4553,16 +4688,41 @@ impl AccountsWindow {
         }
 
         form.append(&account_row);
-        form.append(&field_row);
-        form.append(&match_row);
-        form.append(&value_row);
+        form.append(&add_row);
+        form.append(&combine_row);
         form.append(&dest_row);
         form.append(&tag_row);
         form.append(&count_row);
+        // The conditions slot in above the "Add Condition" row: the rule's
+        // own when editing, one blank one otherwise.
+        match &edit {
+            Some((_, rule)) => {
+                for c in rule.conditions() {
+                    add_cond(Some(&c));
+                }
+            }
+            None => add_cond(None),
+        }
 
         let s = sender.clone();
         self.push_form_page(nav, "filter", &title, &verb, &form, move || {
-            let value = value_row.text().trim().to_string();
+            // Every condition with text; a blank extra one is dropped. The
+            // matcher of a body condition is whatever the pinned row says.
+            let conditions: Vec<crate::config::FilterCondition> = conds
+                .borrow()
+                .iter()
+                .filter_map(|c| {
+                    let value = c.value.text().trim().to_string();
+                    if value.is_empty() {
+                        return None;
+                    }
+                    Some(crate::config::FilterCondition {
+                        field: FilterField::ALL[c.field.selected() as usize % FilterField::ALL.len()],
+                        matcher: FilterMatch::ALL[c.matcher.selected() as usize % FilterMatch::ALL.len()],
+                        value,
+                    })
+                })
+                .collect();
             let paths = dest_paths.borrow();
             let (Some(email), Some(dest)) = (
                 emails.get(account_row.selected() as usize),
@@ -4575,28 +4735,21 @@ impl AccountsWindow {
                 i => tags.get(i as usize - 1).map(|t| t.keyword.clone()).unwrap_or_default(),
             };
             // A rule needs something to match and something to do.
-            if value.is_empty() || (dest.is_empty() && tag.is_empty()) {
+            if conditions.is_empty() || (dest.is_empty() && tag.is_empty()) {
                 return false;
             }
-            let rule = FilterRule {
+            let mut rule = FilterRule {
                 account_email: email.clone(),
-                field: match field_row.selected() {
-                    0 => FilterField::FromAddress,
-                    1 => FilterField::FromName,
-                    2 => FilterField::Subject,
-                    _ => FilterField::Recipients,
-                },
-                matcher: match match_row.selected() {
-                    0 => FilterMatch::Contains,
-                    1 => FilterMatch::Equals,
-                    2 => FilterMatch::StartsWith,
-                    _ => FilterMatch::EndsWith,
-                },
-                value,
+                field: FilterField::FromAddress,
+                matcher: FilterMatch::Contains,
+                value: String::new(),
+                more: Vec::new(),
+                any: combine_row.selected() == 1,
                 dest_path: dest.clone(),
                 tag,
                 count_unread: count_row.is_active(),
             };
+            rule.set_conditions(conditions);
             s.input(match edit_index {
                 Some(i) => AccountsInput::FilterEdited(i, rule),
                 None => AccountsInput::FilterAdded(rule),
@@ -4604,6 +4757,13 @@ impl AccountsWindow {
             true
         });
     }
+}
+
+/// One condition of the filter editor (#192): its Where, Match and Text rows.
+struct CondRows {
+    field: adw::ComboRow,
+    matcher: adw::ComboRow,
+    value: adw::EntryRow,
 }
 
 /// The tag dialog's "any colour" disc (#147): a hue wheel while no custom

@@ -2,6 +2,16 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.30.0
+
+**Filters can match the message body** (#191, requested by [@yioannides](https://github.com/yioannides)). *Where* now offers **Message body**, so a rule that files anything with "unsubscribe" in it into Newsletters is one condition. The text is searched on the server as the Inbox syncs, one search per alternative over the mail just listed, so nothing is downloaded for it; the list preview is checked too. A body condition always means "contains", the only search a server offers, and the editor says so.
+
+**Filters can match the Reply-To address** (#191). *Where* also offers **Reply-To address**: the Reply-To header, or the From address when the sender set none.
+
+**A filter can hold several conditions** (#192, requested by [@yioannides](https://github.com/yioannides)). The filter editor's **Add Condition** row adds another Where/Match/Text trio, each with a remove button. A **Conditions** chooser, shown once there are two, says whether all must match (the default) or any one may. The Filters list prints every condition of a rule.
+
+**A condition can name several alternatives** (#192). Commas separate them in the text to match: `invoice, receipt` matches either, with the whole matcher applied to each. A value that held a comma on purpose now reads as two alternatives.
+
 ## What's new in 1.29.3
 
 **Files from GNOME Files go where you say.** *Send with Vireo*, *Open With Vireo* and Files' own *Email…* entry used to open a new message with the files attached, and nothing else was on offer. Now a dialog asks what the files are for: a new message, a draft you pick from every account's drafts, or a reply to a message you pick from a list, with the message you are reading first and a search box for sender, subject or account. A reply to the message on screen splits the reading pane the way Reply does; any other opens in a window. Each dialog has an "Always do this" box.
