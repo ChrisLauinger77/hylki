@@ -1051,6 +1051,15 @@ msgstr "Cor de destaque da conta"
 msgid "The circle, and this account's marks in the sidebar and lists"
 msgstr "O círculo e as marcas desta conta na barra lateral e nas listas"
 
+msgid "Use my Gravatar"
+msgstr ""
+
+msgid ""
+"Show the picture this address has at gravatar.com. Looking it up sends them "
+"a hash of the address, and if there is none, the circle falls back to the "
+"choice below."
+msgstr ""
+
 msgid "Circle shows"
 msgstr "Conteúdo do círculo"
 
@@ -3046,6 +3055,15 @@ msgid ""
 msgstr ""
 "O avatar do remetente junto de cada mensagem, na lista e acima da mensagem. "
 "Desativá-lo dá mais espaço ao remetente e ao assunto."
+
+msgid "Your own mail shows your account circle"
+msgstr ""
+
+msgid ""
+"Messages you sent wear the account's Gravatar, picture or emoji, as its "
+"circle in the sidebar does. Turning it off gives them whatever circle anyone "
+"else's mail would get."
+msgstr ""
 
 msgid "Preview lines"
 msgstr "Linhas de prévia"

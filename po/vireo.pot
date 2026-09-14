@@ -970,6 +970,15 @@ msgstr ""
 msgid "The circle, and this account's marks in the sidebar and lists"
 msgstr ""
 
+msgid "Use my Gravatar"
+msgstr ""
+
+msgid ""
+"Show the picture this address has at gravatar.com. Looking it up sends them "
+"a hash of the address, and if there is none, the circle falls back to the "
+"choice below."
+msgstr ""
+
 msgid "Circle shows"
 msgstr ""
 
@@ -2742,6 +2751,15 @@ msgstr ""
 msgid ""
 "The sender's avatar beside each message, in the list and above the message. "
 "Turning it off gives the sender and subject more room."
+msgstr ""
+
+msgid "Your own mail shows your account circle"
+msgstr ""
+
+msgid ""
+"Messages you sent wear the account's Gravatar, picture or emoji, as its "
+"circle in the sidebar does. Turning it off gives them whatever circle anyone "
+"else's mail would get."
 msgstr ""
 
 msgid "Preview lines"

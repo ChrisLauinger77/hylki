@@ -2,6 +2,16 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.29.2
+
+**Your own messages show your mailbox's face** (#189, reported by [@yioannides](https://github.com/yioannides)). The picture you choose for a mailbox in Accounts now appears on the messages you sent too, in the conversation and in the message list, not only in the sidebar. An account with an emoji instead shows the emoji on its colour, as the sidebar does.
+
+**Or keep it the old way.** Settings → Message List → "Your own mail shows your account circle" is on by default; off, your own messages get the same circle as anyone else's mail: their contact photo, their Gravatar when that is on, else initials.
+
+**Use your Gravatar.** Each account's editor has a "Use my Gravatar" switch under Appearance. On, the picture registered for that address at gravatar.com is shown everywhere the account's face appears, ahead of its picture or emoji, and an address with no Gravatar simply falls back to them. It is off by default because the lookup sends gravatar.com a hash of the address.
+
+**Leaving a settings editor goes where you asked.** With an account editor open, choosing another settings category and answering Save or Discard highlighted the category but left the window in Mail Accounts. It now shows the page you chose. And an editor you opened without changing anything no longer asks whether to save.
+
 ## What's new in 1.29.1
 
 **Send with Vireo attaches every selected file.** Selecting several files in GNOME Files and choosing "Send with Vireo" (or "Open With Vireo") opened one message per file. They now all land in the same message.

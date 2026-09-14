@@ -1,5 +1,66 @@
 # Changelog
 
+## 1.29.2 — 2026-09-14
+
+A mailbox's own face reaches the mail it sent, with a Settings switch to
+have it the old way and a per-account Gravatar option, and the settings
+window leaves an open account editor properly.
+
+- **Your own messages wear your mailbox's face** (#189, reported by
+  [@yioannides](https://github.com/yioannides)). Choosing a picture for
+  a mailbox in Accounts changed the sidebar circle and nothing else:
+  the conversation cards you wrote yourself, and your own rows in the
+  message list, still carried the plain initials circle every other
+  sender gets. Every address a user sends from — each account's own and
+  its send-as aliases (#34) — now carries the picture or emoji its
+  account was given (`avatar::OwnFace`, refreshed with the sidebar),
+  and both views draw it. The reader embeds the picture in the card as
+  a PNG scaled to twice its 26px circle (the stored copy is 256px
+  square and a conversation would otherwise carry one full-size copy
+  per card of yours); the list hands its avatar the texture the sidebar
+  already holds. An account showing its initials is left out of the
+  map, so nobody else's circle changes.
+- **"Your own mail shows your account circle"** (Settings → Message
+  List, on by default) chooses between that and the old way: off,
+  a message you sent gets whatever circle anyone else's mail would —
+  their contact photo, their Gravatar when that is on, else initials.
+  The switch is about messages only; the sidebar circle and the
+  account editor's preview always show the account's face.
+- **"Use my Gravatar"** in the account editor's Appearance group (off
+  by default). On, the address is looked up at gravatar.com and that
+  picture leads everywhere the account's face is drawn — the sidebar,
+  the list, the cards, the editor's own preview; an address with no
+  Gravatar falls through to the picture, emoji or initials below it.
+  One request per address per session, off the main thread, made when
+  the accounts are read and again when an account is saved, the switch
+  moves or the machine wakes; a lookup that failed is forgotten rather
+  than cached, so it is retried rather than repeated. The lookup sends
+  gravatar.com a hash of the address, which is why it is the account
+  owner's choice; the Privacy switch still governs other people's mail.
+  The editor looks the address up the moment the switch is flipped, so
+  its preview answers before the account is saved.
+- **Leaving a settings editor goes where you asked.** With an account
+  editor open, choosing another category asked about saving, but Save
+  and Discard then put the sidebar selection back on the row that was
+  clicked — which the click had already selected, so the list emitted
+  nothing and the window stayed in Mail Accounts with another category
+  highlighted. Both answers now show the page outright.
+- **An untouched editor no longer asks.** The account editor records
+  what it opened with and compares before answering: an unchanged form
+  closes itself and the window moves on. The keyring's passwords arrive
+  after the editor opens, so the record is re-taken when they land on a
+  form nobody has touched; the signature's own dirty flag is consulted
+  before the verdict. Filter and tag editors keep no such record and
+  still ask.
+- The reader's document builder no longer asks GTK for its toplevels
+  before GTK is initialised (it panicked rather than answered), so its
+  fifteen conversation tests run without a display.
+- Showcase hooks for captures: `VIREO_SHOWCASE_ACCOUNT=N` opens an
+  account's editor, `VIREO_SHOWCASE_EDITOR_DIRTY=1` types into its
+  Label field, `VIREO_SHOWCASE_SETTINGS_GO=<category>` picks a sidebar
+  category the way a click does, `VIREO_SHOWCASE_DIALOG=save|discard|cancel`
+  answers the prompt on screen.
+
 ## 1.29.1 — 2026-09-14
 
 "Send with Vireo" from GNOME Files now attaches every selected file to

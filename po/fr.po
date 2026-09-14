@@ -1060,6 +1060,15 @@ msgstr ""
 "Le cercle, ainsi que les marques de ce compte dans la barre latérale et les "
 "listes"
 
+msgid "Use my Gravatar"
+msgstr ""
+
+msgid ""
+"Show the picture this address has at gravatar.com. Looking it up sends them "
+"a hash of the address, and if there is none, the circle falls back to the "
+"choice below."
+msgstr ""
+
 msgid "Circle shows"
 msgstr "Le cercle affiche"
 
@@ -3069,6 +3078,15 @@ msgstr ""
 "L'avatar de l'expéditeur à côté de chaque message, dans la liste et au-"
 "dessus du message. Désactiver cette option donne plus de place à "
 "l'expéditeur et à l'objet."
+
+msgid "Your own mail shows your account circle"
+msgstr ""
+
+msgid ""
+"Messages you sent wear the account's Gravatar, picture or emoji, as its "
+"circle in the sidebar does. Turning it off gives them whatever circle anyone "
+"else's mail would get."
+msgstr ""
 
 msgid "Preview lines"
 msgstr "Lignes d'aperçu"
