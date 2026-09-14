@@ -56,6 +56,8 @@ pub struct PrefInit {
     /// "New message" composes inline over the reading pane (vs a window).
     pub compose_inline: bool,
     pub reply_fields: bool,
+    /// Settings → System → GNOME Files: what handed-in files open into.
+    pub files: crate::config::FilesPrefs,
     /// The identity new messages are sent from (#157); empty = the open
     /// folder's account. One of `identities`' addresses.
     pub compose_default_from: String,
@@ -326,6 +328,14 @@ pub struct Preferences {
     /// this machine, for the copyable row; `None` on a distribution whose
     /// package manager is not known.
     nautilus_cmd: Option<&'static str>,
+    /// What files handed in from Files open into, and the size limit.
+    files: crate::config::FilesPrefs,
+    /// Those rows, for the app to move when a hand-off dialog's "always
+    /// do this" changes the preference while the window is up. Set only
+    /// when they differ: a combo row set to its current value is a no-op,
+    /// but one set from `#[watch]` on every update hung GTK's list-item
+    /// manager in the pre-warmed (unmapped) window.
+    files_rows: Option<(adw::ComboRow, adw::ComboRow, adw::SpinRow)>,
 }
 
 /// The reader toolbar editor (Settings → Appearance → Toolbar): one drop zone per
@@ -612,6 +622,26 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
 ];
 
 /// The Files extension row's subtitle: where it stands, and where it lives.
+/// The GNOME Files combo rows' positions for each preference value.
+fn files_action_index(a: crate::config::FilesAction) -> u32 {
+    use crate::config::FilesAction as A;
+    match a {
+        A::Ask => 0,
+        A::New => 1,
+        A::Draft => 2,
+        A::Reply => 3,
+    }
+}
+
+fn files_large_index(l: crate::config::FilesLarge) -> u32 {
+    use crate::config::FilesLarge as L;
+    match l {
+        L::Ask => 0,
+        L::Attach => 1,
+        L::Cloud => 2,
+    }
+}
+
 fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String {
     use crate::nautilus_ext::Status;
     let state_text = match state.status {
@@ -684,6 +714,13 @@ pub enum PrefInput {
     NautilusInstall,
     NautilusRemove,
     NautilusRestartFiles,
+    /// The GNOME Files hand-off rows: destination, over-the-limit action,
+    /// and the limit in MB.
+    ChangeFilesAction(u32),
+    ChangeFilesLarge(u32),
+    ChangeFilesLimit(u32),
+    /// The app changed the Files preferences (a dialog's "always do this").
+    SetFilesPrefs(crate::config::FilesPrefs),
     /// Re-read the extension's state (the System page came into view; Files
     /// may have loaded the extension since).
     NautilusRefresh,
@@ -830,6 +867,7 @@ pub enum PrefOutput {
     SetSwipeReversed(bool),
     SetComposeInline(bool),
     SetReplyFields(bool),
+    SetFilesPrefs(crate::config::FilesPrefs),
     SetComposeDefaultFrom(String),
     SetPastePlain(bool),
     SetSpellcheck(bool),
@@ -2200,6 +2238,39 @@ impl Component for Preferences {
                                             connect_clicked => PrefInput::NautilusRestartFiles,
                                         },
                                     },
+
+                                    // What the handed-in files open into, and
+                                    // what happens when they are big.
+                                    #[name = "files_action_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Files sent from Files go into"),
+                                        set_subtitle: &i18n("What Send with Vireo, Open With Vireo and Email… open \
+                                                       with the files. Asking offers all three each time."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFilesAction(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "files_large_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Files over the size limit"),
+                                        set_subtitle: &i18n("Uploading needs a cloud storage account (Settings → \
+                                                       Cloud Storage); without one the files are attached."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFilesLarge(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "files_limit_row"]
+                                    adw::SpinRow {
+                                        set_title: &i18n("Size limit"),
+                                        set_subtitle: &i18n("In MB, for all the files together."),
+                                        set_adjustment: Some(&gtk::Adjustment::new(20.0, 1.0, 5000.0, 1.0, 10.0, 0.0)),
+                                        set_numeric: true,
+                                        connect_value_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFilesLimit(row.value().round() as u32));
+                                        },
+                                    },
                                 },
                             },
 
@@ -2253,6 +2324,8 @@ impl Component for Preferences {
         let mut model = Preferences {
             nautilus: crate::nautilus_ext::State::read(),
             nautilus_cmd: crate::platform::nautilus_python_install_command(),
+            files: init.files,
+            files_rows: None,
             notifications: init.notifications,
             toolbar: init.reader_toolbar.clone(),
             toolbar_editor: None,
@@ -2519,6 +2592,27 @@ impl Component for Preferences {
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
         widgets.reply_fields_row.set_active(init.reply_fields);
+        widgets.files_action_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("Ask each time").as_str(),
+            i18n("A new message").as_str(),
+            i18n("A draft you pick").as_str(),
+            i18n("A reply to a message you pick").as_str(),
+        ])));
+        no_truncate(&widgets.files_action_row);
+        widgets.files_action_row.set_selected(files_action_index(init.files.action));
+        widgets.files_large_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("Ask each time").as_str(),
+            i18n("Attach them anyway").as_str(),
+            i18n("Upload to cloud storage and link them").as_str(),
+        ])));
+        no_truncate(&widgets.files_large_row);
+        widgets.files_large_row.set_selected(files_large_index(init.files.large));
+        widgets.files_limit_row.set_value(init.files.limit_mb as f64);
+        model.files_rows = Some((
+            widgets.files_action_row.clone(),
+            widgets.files_large_row.clone(),
+            widgets.files_limit_row.clone(),
+        ));
         // "Send new messages from": the open folder's account, then every
         // enabled account and alias, labelled as the composer's From row
         // labels them. Only meaningful with more than one identity.
@@ -2846,6 +2940,52 @@ impl Component for Preferences {
                     report(root, &i18n("Could not remove the extension"), &e);
                 }
                 self.nautilus = crate::nautilus_ext::State::read();
+            }
+            PrefInput::ChangeFilesAction(idx) => {
+                use crate::config::FilesAction as A;
+                let action = match idx {
+                    1 => A::New,
+                    2 => A::Draft,
+                    3 => A::Reply,
+                    _ => A::Ask,
+                };
+                if self.files.action != action {
+                    self.files.action = action;
+                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
+                }
+            }
+            PrefInput::ChangeFilesLarge(idx) => {
+                use crate::config::FilesLarge as L;
+                let large = match idx {
+                    1 => L::Attach,
+                    2 => L::Cloud,
+                    _ => L::Ask,
+                };
+                if self.files.large != large {
+                    self.files.large = large;
+                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
+                }
+            }
+            PrefInput::ChangeFilesLimit(mb) => {
+                let mb = mb.max(1);
+                if self.files.limit_mb != mb {
+                    self.files.limit_mb = mb;
+                    let _ = sender.output(PrefOutput::SetFilesPrefs(self.files));
+                }
+            }
+            PrefInput::SetFilesPrefs(p) => {
+                self.files = p;
+                if let Some((action, large, limit)) = self.files_rows.as_ref() {
+                    if action.selected() != files_action_index(p.action) {
+                        action.set_selected(files_action_index(p.action));
+                    }
+                    if large.selected() != files_large_index(p.large) {
+                        large.set_selected(files_large_index(p.large));
+                    }
+                    if limit.value().round() as u32 != p.limit_mb {
+                        limit.set_value(p.limit_mb as f64);
+                    }
+                }
             }
             PrefInput::NautilusRestartFiles => {
                 if let Err(e) = crate::nautilus_ext::quit_files() {

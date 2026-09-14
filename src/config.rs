@@ -1074,6 +1074,14 @@ struct PrivacyFile {
     /// Read-marking policy (#100).
     #[serde(default)]
     read_mark: ReadMark,
+    /// GNOME Files hand-off (#188 follow-up): what the files open into,
+    /// what happens over the size limit, and the limit itself in MB.
+    #[serde(default)]
+    files_action: FilesAction,
+    #[serde(default)]
+    files_large: FilesLarge,
+    #[serde(default = "default_files_limit_mb")]
+    files_limit_mb: u32,
 }
 
 fn default_chevrons_left() -> bool {
@@ -1207,6 +1215,9 @@ impl Default for PrivacyFile {
             chevrons_left: default_chevrons_left(),
             console_mode: false,
             read_mark: ReadMark::default(),
+            files_action: FilesAction::default(),
+            files_large: FilesLarge::default(),
+            files_limit_mb: default_files_limit_mb(),
             gravatar: false,
             avatars: default_avatars(),
             own_mailbox_face: default_own_mailbox_face(),
@@ -1542,6 +1553,67 @@ pub enum ReadMark {
 
 pub fn load_read_mark() -> ReadMark {
     load_privacy().read_mark
+}
+
+/// What a hand-off of files from GNOME Files ("Send with Vireo", "Open
+/// With Vireo", "Email…") opens them into.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilesAction {
+    /// A dialog offers the three below, every time.
+    #[default]
+    Ask,
+    /// A new message with the files attached.
+    New,
+    /// Pick one of the saved drafts and attach the files to it.
+    Draft,
+    /// Pick a message to reply to, with the files attached.
+    Reply,
+}
+
+/// What happens to handed-in files that add up to more than the limit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilesLarge {
+    /// A dialog asks, every time.
+    #[default]
+    Ask,
+    /// Attach them regardless.
+    Attach,
+    /// Upload them to cloud storage and put the links in the message.
+    Cloud,
+}
+
+/// The GNOME Files hand-off preferences (Settings → System → GNOME Files).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FilesPrefs {
+    pub action: FilesAction,
+    pub large: FilesLarge,
+    /// The size, in MB (decimal, like the sizes the composer shows), that
+    /// the files together must stay under to be attached without a word.
+    pub limit_mb: u32,
+}
+
+impl Default for FilesPrefs {
+    fn default() -> Self {
+        Self { action: FilesAction::Ask, large: FilesLarge::Ask, limit_mb: default_files_limit_mb() }
+    }
+}
+
+impl FilesPrefs {
+    /// The limit in bytes.
+    pub fn limit_bytes(&self) -> u64 {
+        self.limit_mb as u64 * 1_000_000
+    }
+}
+
+fn default_files_limit_mb() -> u32 {
+    20
+}
+
+pub fn load_files_prefs() -> FilesPrefs {
+    let f = load_privacy();
+    FilesPrefs { action: f.files_action, large: f.files_large, limit_mb: f.files_limit_mb.max(1) }
 }
 
 
@@ -2234,6 +2306,7 @@ pub fn save_privacy(
     chevrons_left: bool,
     console_mode: bool,
     read_mark: ReadMark,
+    files: FilesPrefs,
 ) {
     let Some(path) = privacy_path() else {
         return;
@@ -2314,6 +2387,9 @@ pub fn save_privacy(
         chevrons_left,
         console_mode,
         read_mark,
+        files_action: files.action,
+        files_large: files.large,
+        files_limit_mb: files.limit_mb,
     };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
@@ -3473,5 +3549,32 @@ mod toolbar_tests {
         for item in ToolbarItem::ALL {
             assert_eq!(ToolbarItem::from_key(item.key()), Some(item));
         }
+    }
+}
+
+#[cfg(test)]
+mod files_prefs_tests {
+    use super::*;
+
+    #[test]
+    fn missing_keys_default_to_asking() {
+        let file: PrivacyFile = toml::from_str("compose_inline = true\n").unwrap();
+        assert_eq!(file.files_action, FilesAction::Ask);
+        assert_eq!(file.files_large, FilesLarge::Ask);
+        assert_eq!(file.files_limit_mb, 20);
+    }
+
+    #[test]
+    fn keys_round_trip_by_name() {
+        let file: PrivacyFile =
+            toml::from_str("files_action = \"reply\"\nfiles_large = \"cloud\"\nfiles_limit_mb = 50\n").unwrap();
+        assert_eq!(file.files_action, FilesAction::Reply);
+        assert_eq!(file.files_large, FilesLarge::Cloud);
+        assert_eq!(file.files_limit_mb, 50);
+        let text = toml::to_string(&file).unwrap();
+        assert!(text.contains("files_action = \"reply\""), "{text}");
+        assert!(text.contains("files_large = \"cloud\""), "{text}");
+        let prefs = FilesPrefs { action: FilesAction::New, large: FilesLarge::Attach, limit_mb: 3 };
+        assert_eq!(prefs.limit_bytes(), 3_000_000);
     }
 }

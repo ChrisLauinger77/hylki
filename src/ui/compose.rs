@@ -147,6 +147,10 @@ pub struct ComposePrefill {
     /// Send Later (#145): a queued message's scheduled time, kept while it is
     /// edited so Send re-queues it for the same moment.
     pub send_at: Option<i64>,
+    /// Files handed in from GNOME Files that were too big to attach: the
+    /// composer opens its cloud upload dialog on them as soon as it is up,
+    /// so the links land in the body instead.
+    pub cloud_uploads: Vec<std::path::PathBuf>,
 }
 
 /// Everything the compose pane needs to open.
@@ -889,6 +893,17 @@ impl Component for Compose {
         widgets.subject_row.set_text(&prefill.subject);
         if !model.attachments.is_empty() {
             model.rebuild_attachments(&widgets.attach_box, &sender);
+        }
+
+        // Files handed in over the size limit (Settings → System → GNOME
+        // Files): straight into the upload dialog, once the composer has a
+        // window for it to be transient for.
+        if !prefill.cloud_uploads.is_empty() {
+            let s = sender.clone();
+            let paths = prefill.cloud_uploads.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+                s.input(ComposeInput::CloudPicked(paths));
+            });
         }
 
         // VIREO_SHOWCASE_CLOUD_DIALOG opens the cloud upload dialog on a

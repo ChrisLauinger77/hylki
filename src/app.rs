@@ -158,6 +158,45 @@ struct ReaderCompose {
     window: Option<adw::Window>,
 }
 
+/// Files handed in from outside the app (GNOME Files' "Send with Vireo",
+/// "Open With Vireo", a mailto: with attach=), on their way to a composer.
+#[derive(Debug, Default)]
+pub struct FileHandOff {
+    /// The composer's other fields (a mailto's recipient, subject, body):
+    /// used when the files go into a new message.
+    base: ComposePrefill,
+    /// The readable files.
+    files: Vec<std::path::PathBuf>,
+    /// The ones that were named but could not be read (reported once).
+    dropped: Vec<std::path::PathBuf>,
+}
+
+/// Where a hand-off's files are going, once decided.
+#[derive(Debug)]
+pub enum HandOffTarget {
+    New,
+    Draft(Message),
+    Reply(Message),
+}
+
+/// A hand-off's files split by how the composer takes them: attached, or
+/// uploaded to cloud storage and linked (the ones over the size limit).
+#[derive(Debug, Default, Clone)]
+pub struct HandOffFiles {
+    attach: Vec<std::path::PathBuf>,
+    cloud: Vec<std::path::PathBuf>,
+}
+
+impl HandOffFiles {
+    fn of(files: Vec<std::path::PathBuf>, cloud: bool) -> Self {
+        if cloud {
+            Self { attach: Vec::new(), cloud: files }
+        } else {
+            Self { attach: files, cloud: Vec::new() }
+        }
+    }
+}
+
 pub struct AppModel {
     /// One mail worker per account (account_id → request sender).
     workers: HashMap<u32, UnboundedSender<MailRequest>>,
@@ -636,7 +675,16 @@ pub struct AppModel {
     /// A draft awaiting its body before opening in the compose editor.
     /// A draft whose body is being fetched before its editor opens, and
     /// whether that editor goes in the reading pane (true) or a window.
-    pending_draft: Option<(Message, bool)>,
+    pending_draft: Option<(Message, bool, HandOffFiles)>,
+    /// A message whose body is being fetched so a reply to it can open with
+    /// handed-in files (Send with Vireo → Reply to a Message…).
+    pending_reply: Option<(Message, HandOffFiles)>,
+    /// A draft picker waiting for Drafts folders never listed this run
+    /// (the hand-off, and the folders still to answer).
+    pending_draft_pick: Option<(FileHandOff, HashSet<(u32, u32)>)>,
+    /// Settings → System → GNOME Files: what handed-in files open into and
+    /// what happens over the size limit.
+    files_prefs: config::FilesPrefs,
     /// Outstanding bulk MoveMessages requests awaiting a worker `BulkComplete`.
     /// Outstanding server-side bulk operations; while > 0 the refresh spinner
     /// spins and the status bar narrates.
@@ -888,6 +936,19 @@ pub enum AppMsg {
     SetComposeInline(bool),
     /// Reply panel shows its From/To/Subject rows from the start (#154).
     SetReplyFields(bool),
+    /// Settings → System → GNOME Files changed.
+    SetFilesPrefs(config::FilesPrefs),
+    /// A hand-off's files have a destination (the dialog answered, or the
+    /// preference decided); `remember` writes the choice to Settings.
+    HandOffAction { hand_off: FileHandOff, action: config::FilesAction, remember: bool },
+    /// The draft picker answered (None: a new message instead).
+    HandOffDraft { hand_off: FileHandOff, draft: Option<Message> },
+    /// Show the draft picker with whatever Drafts lists have arrived.
+    HandOffDraftPickNow,
+    /// The reply picker answered (None: a new message instead).
+    HandOffReply { hand_off: FileHandOff, message: Option<Message> },
+    /// The size check answered: open the composer, attaching or uploading.
+    HandOffOpen { hand_off: FileHandOff, target: HandOffTarget, cloud: bool, remember: bool },
     /// The identity new messages are sent from (#157); empty = the open
     /// folder's account.
     SetComposeDefaultFrom(String),
@@ -2272,6 +2333,9 @@ impl SimpleComponent for AppModel {
             body_cache: crate::ram_cache::RamCache::new(BODY_CACHE_BUDGET),
             sender_cache: HashMap::new(),
             pending_draft: None,
+            pending_reply: None,
+            pending_draft_pick: None,
+            files_prefs: config::load_files_prefs(),
             popouts: HashMap::new(),
             current_thread: Vec::new(),
             list_selection: Vec::new(),
@@ -3523,6 +3587,17 @@ impl SimpleComponent for AppModel {
                         s.input(AppMsg::Reply);
                     });
                 }
+                // VIREO_SHOWCASE_FILES=/a:/b hands those files in at 4 s,
+                // as GNOME Files' "Send with Vireo" would; with
+                // VIREO_SHOWCASE_TOP=1 the capture takes the newest window
+                // (the dialog asking about them) instead of the main one.
+                if let Ok(list) = std::env::var("VIREO_SHOWCASE_FILES") {
+                    let s = sender.clone();
+                    let paths: Vec<std::path::PathBuf> = list.split(':').filter(|p| !p.is_empty()).map(Into::into).collect();
+                    gtk::glib::timeout_add_seconds_local_once(4, move || {
+                        s.input(AppMsg::OpenWithFiles(paths));
+                    });
+                }
                 if let Ok(flip) = std::env::var("VIREO_SHOWCASE_FLIP") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
@@ -3652,9 +3727,12 @@ impl SimpleComponent for AppModel {
                     });
                 }
                 let win = root.clone();
+                let top = std::env::var_os("VIREO_SHOWCASE_TOP").is_some();
                 gtk::glib::timeout_add_seconds_local_once(delay, move || {
                     let target = settings
                         .as_ref()
+                        .map(|_| ())
+                        .or(top.then_some(()))
                         .and_then(|_| settings_window())
                         .map(|w| w.upcast::<gtk::Widget>())
                         .unwrap_or_else(|| win.clone().upcast::<gtk::Widget>());
@@ -4480,7 +4558,7 @@ impl SimpleComponent for AppModel {
                 // Selecting a draft opens it in the compose editor, in the
                 // reading pane where the message would otherwise show.
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
-                    self.open_draft(m, true, &sender);
+                    self.open_draft(m, true, HandOffFiles::default(), &sender);
                     return;
                 }
                 self.attachments.clear();
@@ -4726,7 +4804,7 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenMessageWindow { message: m, thread } => {
                 // Drafts open in the editor rather than a read-only window.
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
-                    self.open_draft(m, false, &sender);
+                    self.open_draft(m, false, HandOffFiles::default(), &sender);
                 } else {
                     // Popouts follow the reading pane's display order (#70).
                     let mut thread = thread;
@@ -5904,6 +5982,56 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetFilesPrefs(prefs) => {
+                if self.files_prefs != prefs {
+                    self.files_prefs = prefs;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::HandOffAction { hand_off, action, remember } => {
+                if remember && self.files_prefs.action != action {
+                    self.files_prefs.action = action;
+                    self.save_settings();
+                    self.push_files_prefs();
+                }
+                self.hand_off_action(hand_off, action, &sender);
+            }
+
+            AppMsg::HandOffDraftPickNow => {
+                if let Some((hand_off, _)) = self.pending_draft_pick.take() {
+                    self.show_draft_picker(hand_off, &sender);
+                }
+            }
+
+            AppMsg::HandOffDraft { hand_off, draft } => {
+                let target = match draft {
+                    Some(m) => HandOffTarget::Draft(m),
+                    None => HandOffTarget::New,
+                };
+                self.hand_off_size_check(hand_off, target, &sender);
+            }
+
+            AppMsg::HandOffReply { hand_off, message } => {
+                let target = match message {
+                    Some(m) => HandOffTarget::Reply(m),
+                    None => HandOffTarget::New,
+                };
+                self.hand_off_size_check(hand_off, target, &sender);
+            }
+
+            AppMsg::HandOffOpen { hand_off, target, cloud, remember } => {
+                if remember {
+                    let large = if cloud { config::FilesLarge::Cloud } else { config::FilesLarge::Attach };
+                    if self.files_prefs.large != large {
+                        self.files_prefs.large = large;
+                        self.save_settings();
+                        self.push_files_prefs();
+                    }
+                }
+                self.hand_off_open(hand_off, target, cloud, &sender);
+            }
+
             AppMsg::SetComposeDefaultFrom(addr) => {
                 if self.compose_default_from != addr {
                     self.compose_default_from = addr;
@@ -6065,21 +6193,10 @@ impl SimpleComponent for AppModel {
                 if paths.is_empty() {
                     return;
                 }
-                self.leave_gallery();
-                let account = self
-                    .current
-                    .as_ref()
-                    .map(|m| m.account_id)
-                    .unwrap_or_else(|| self.active_account());
-                let prefill = ComposePrefill { attachments: paths, ..Default::default() };
-                let (account, prefill) = self.new_message_from(account, prefill);
-                let attached = prefill.attachments.len();
-                if self.compose_inline {
-                    self.open_inline_reply(account, prefill, None, &sender);
-                } else {
-                    self.open_compose(account, prefill, &sender);
-                }
-                self.after_hand_off(attached, Vec::new());
+                self.begin_hand_off(
+                    FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
+                    &sender,
+                );
             }
 
             AppMsg::CopyReaderSelection => {
@@ -6214,7 +6331,12 @@ impl SimpleComponent for AppModel {
                     attachments.len() + dropped.len(),
                     attachments.len()
                 );
-                prefill.attachments = attachments;
+                if !attachments.is_empty() || !dropped.is_empty() {
+                    // Files came along (Files' own "Email…" entry): the same
+                    // choice of destination as "Send with Vireo".
+                    self.begin_hand_off(FileHandOff { base: prefill, files: attachments, dropped }, &sender);
+                    return;
+                }
                 self.leave_gallery();
                 let account = self
                     .current
@@ -6222,13 +6344,12 @@ impl SimpleComponent for AppModel {
                     .map(|m| m.account_id)
                     .unwrap_or_else(|| self.active_account());
                 let (account, prefill) = self.new_message_from(account, prefill);
-                let attached = prefill.attachments.len();
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
                 } else {
                     self.open_compose(account, prefill, &sender);
                 }
-                self.after_hand_off(attached, dropped);
+                self.after_hand_off(0, Vec::new());
             }
 
             AppMsg::PresentComposers => {
@@ -7383,6 +7504,15 @@ impl SimpleComponent for AppModel {
                 let unchanged = self.message_cache.get(&(account_id, folder_id)) == Some(&messages);
                 self.message_cache
                     .insert((account_id, folder_id), messages.clone());
+                // A draft picker waiting on this folder's list (Send with
+                // Vireo → Continue a Draft…) opens once every Drafts folder
+                // has answered.
+                if let Some((_, waiting)) = self.pending_draft_pick.as_mut() {
+                    waiting.remove(&(account_id, folder_id));
+                    if waiting.is_empty() {
+                        sender.input(AppMsg::HandOffDraftPickNow);
+                    }
+                }
                 if !unchanged {
                     // A sync can add a reply to a conversation already
                     // assembled, so what was stored is no longer necessarily
@@ -7533,12 +7663,21 @@ impl SimpleComponent for AppModel {
                 self.body_cache
                     .insert((account_id, message_id), body.clone());
                 // If this body was fetched to open a draft, open the editor now.
-                if let Some((pd, inline)) = self.pending_draft.take() {
+                if let Some((pd, inline, extra)) = self.pending_draft.take() {
                     if pd.account_id == account_id && pd.id == message_id {
-                        self.compose_from_draft(pd, body, inline, &sender);
+                        self.compose_from_draft(pd, body, inline, extra, &sender);
                         return;
                     }
-                    self.pending_draft = Some((pd, inline));
+                    self.pending_draft = Some((pd, inline, extra));
+                }
+                // Likewise a reply picked for handed-in files.
+                if let Some((mut m, extra)) = self.pending_reply.take() {
+                    if m.account_id == account_id && m.id == message_id {
+                        m.body = body.clone();
+                        self.open_hand_off_reply(m, extra, &sender);
+                        return;
+                    }
+                    self.pending_reply = Some((m, extra));
                 }
                 // A UID is unique only within its folder, and the background
                 // prefetch pushes bodies from every folder it syncs. Matching on
@@ -8087,6 +8226,7 @@ impl AppModel {
             self.chevrons_left,
             self.console_mode,
             self.read_mark,
+            self.files_prefs,
         );
     }
 
@@ -10366,14 +10506,16 @@ impl AppModel {
     /// fetch it and open the editor once it arrives (see the `Body` handler).
     /// `inline` puts the editor in the reading pane (a selected draft);
     /// otherwise it gets a window (a draft opened by double-click or Enter).
-    fn open_draft(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
+    /// `extra` carries files handed in from GNOME Files to attach (or
+    /// upload) on top of the draft's own.
+    fn open_draft(&mut self, m: Message, inline: bool, extra: HandOffFiles, sender: &ComponentSender<Self>) {
         let body = if !m.body.is_empty() {
             Some(m.body.clone())
         } else {
             self.body_cache.get(&(m.account_id, m.id)).cloned()
         };
         match body {
-            Some(html) => self.compose_from_draft(m, html, inline, sender),
+            Some(html) => self.compose_from_draft(m, html, inline, extra, sender),
             None => {
                 if let Some(path) = self.resolve_folder_path(&m) {
                     self.send_to(
@@ -10381,7 +10523,7 @@ impl AppModel {
                         MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
                     );
                 }
-                self.pending_draft = Some((m, inline));
+                self.pending_draft = Some((m, inline, extra));
             }
         }
     }
@@ -10457,6 +10599,7 @@ impl AppModel {
             reply_addressed_to: String::new(),
             from_address: String::new(),
             send_at: item.send_at,
+            cloud_uploads: Vec::new(),
         };
         // The Outbox stays the folder on screen: its list is still what's listed,
         // so its toolbar has to stay too. Leaving it would strand the user in a
@@ -10474,6 +10617,7 @@ impl AppModel {
         m: Message,
         body_html: String,
         inline: bool,
+        extra: HandOffFiles,
         sender: &ComponentSender<Self>,
     ) {
         let path = self.resolve_folder_path(&m).unwrap_or_default();
@@ -10488,6 +10632,8 @@ impl AppModel {
                 path,
                 uid: m.uid,
             }),
+            attachments: extra.attach,
+            cloud_uploads: extra.cloud,
             ..Default::default()
         };
         if inline {
@@ -10697,15 +10843,358 @@ impl AppModel {
             );
             self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
         }
-        let main = self.window.clone();
-        let composer = self.composers.last().map(|h| h.window.clone());
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || {
-            let ours = main.is_active() || composer.as_ref().is_some_and(|w| w.is_active());
+            // Any window of ours in front will do: the composer, the main
+            // window under an inline composer, or the dialog asking where
+            // the files should go.
+            let tops = gtk::Window::toplevels();
+            let ours = (0..tops.n_items())
+                .filter_map(|i| tops.item(i))
+                .filter_map(|o| o.downcast::<gtk::Window>().ok())
+                .any(|w| w.is_active());
             if !ours {
                 tracing::info!("hand-off: window did not get the focus, posting an alert");
                 crate::notify::compose_ready(attached as u32);
             }
         });
+    }
+
+    /// Files handed in from outside (Send with Vireo, Open With, Email…):
+    /// the first step. Reports the unreadable ones, then goes where
+    /// Settings → System → GNOME Files says: straight into a new message, a
+    /// draft or a reply, or a dialog offering the three.
+    fn begin_hand_off(&mut self, hand_off: FileHandOff, sender: &ComponentSender<Self>) {
+        self.leave_gallery();
+        let dropped = hand_off.dropped.clone();
+        let attached = hand_off.files.len();
+        // The focus watch runs from here: whichever window opens next (the
+        // dialog or the composer) is the one that should come to the front.
+        self.after_hand_off(attached, dropped);
+        let action = self.files_prefs.action;
+        if action == config::FilesAction::Ask {
+            self.ask_hand_off_action(hand_off, sender);
+        } else {
+            self.hand_off_action(hand_off, action, sender);
+        }
+    }
+
+    /// Hand the current Files preferences to an open Settings window, so a
+    /// "remember this" choice in a dialog shows there at once.
+    fn push_files_prefs(&self) {
+        if let Some(p) = self.prefs.as_ref() {
+            p.emit(PrefInput::SetFilesPrefs(self.files_prefs));
+        }
+    }
+
+    /// The "what should these files go into" dialog.
+    fn ask_hand_off_action(&self, hand_off: FileHandOff, sender: &ComponentSender<Self>) {
+        let n = hand_off.files.len() as u32;
+        let names = hand_off_names(&hand_off.files);
+        let size = crate::cloud::human_size(hand_off_size(&hand_off.files));
+        let dialog = adw::MessageDialog::new(
+            Some(&self.window),
+            Some(ni18n_f("Send {n} file with Vireo", "Send {n} files with Vireo", n, &[("n", &n.to_string())]).as_str()),
+            Some(i18n_f("{names} ({size}). What should the files go into?", &[("names", &names), ("size", &size)]).as_str()),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("reply", &i18n("Reply to a Message…"));
+        dialog.add_response("draft", &i18n("Continue a Draft…"));
+        dialog.add_response("new", &i18n("New Message"));
+        dialog.set_response_appearance("new", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("new"));
+        dialog.set_close_response("cancel");
+        let remember = remember_check();
+        dialog.set_extra_child(Some(&remember));
+        let hand_off = std::rc::Rc::new(std::cell::RefCell::new(Some(hand_off)));
+        let s = sender.clone();
+        dialog.connect_response(None, move |_, resp| {
+            let Some(hand_off) = hand_off.borrow_mut().take() else { return };
+            let action = match resp {
+                "new" => config::FilesAction::New,
+                "draft" => config::FilesAction::Draft,
+                "reply" => config::FilesAction::Reply,
+                _ => {
+                    tracing::info!("file hand-off: cancelled");
+                    return;
+                }
+            };
+            s.input(AppMsg::HandOffAction { hand_off, action, remember: remember.is_active() });
+        });
+        dialog.present();
+    }
+
+    /// A destination is known: a new message goes on to the size check;
+    /// a draft or reply first needs one picked.
+    fn hand_off_action(&mut self, hand_off: FileHandOff, action: config::FilesAction, sender: &ComponentSender<Self>) {
+        match action {
+            config::FilesAction::Ask | config::FilesAction::New => {
+                self.hand_off_size_check(hand_off, HandOffTarget::New, sender);
+            }
+            config::FilesAction::Draft => {
+                // Drafts folders never listed this run are fetched first,
+                // so the picker does not miss a draft the cache has not
+                // seen; a worker that stays silent is given three seconds.
+                let mut waiting = HashSet::new();
+                for (account_id, drafts) in self.drafts_folders() {
+                    if !self.message_cache.contains_key(&(account_id, drafts.id)) {
+                        waiting.insert((account_id, drafts.id));
+                        self.send_to(account_id, MailRequest::SyncFolder { folder_id: drafts.id, path: drafts.path.clone() });
+                    }
+                }
+                if waiting.is_empty() {
+                    self.show_draft_picker(hand_off, sender);
+                } else {
+                    self.pending_draft_pick = Some((hand_off, waiting));
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::HandOffDraftPickNow));
+                }
+            }
+            config::FilesAction::Reply => {
+                let messages = self.messages_for_pick();
+                let s = sender.clone();
+                show_message_picker(
+                    self.window.upcast_ref(),
+                    &i18n("Reply to a Message"),
+                    &i18n("The files go into a reply to the message you pick."),
+                    &i18n("No messages to reply to yet."),
+                    &i18n("Reply With the Files"),
+                    messages,
+                    hand_off,
+                    move |hand_off, message| s.input(AppMsg::HandOffReply { hand_off, message }),
+                );
+            }
+        }
+    }
+
+    /// Over the size limit, with cloud storage set up: attach anyway, or
+    /// upload and link, per the preference or a dialog.
+    fn hand_off_size_check(&mut self, hand_off: FileHandOff, target: HandOffTarget, sender: &ComponentSender<Self>) {
+        let total = hand_off_size(&hand_off.files);
+        let limit = self.files_prefs.limit_bytes();
+        let cloud_ready = !crate::cloud::load_enabled_accounts().is_empty();
+        if total <= limit || !cloud_ready {
+            if total > limit {
+                tracing::info!("file hand-off: {total} bytes over the {limit} limit, but no cloud storage is set up");
+            }
+            self.hand_off_open(hand_off, target, false, sender);
+            return;
+        }
+        match self.files_prefs.large {
+            config::FilesLarge::Attach => self.hand_off_open(hand_off, target, false, sender),
+            config::FilesLarge::Cloud => self.hand_off_open(hand_off, target, true, sender),
+            config::FilesLarge::Ask => {
+                let n = hand_off.files.len() as u32;
+                let names = hand_off_names(&hand_off.files);
+                let dialog = adw::MessageDialog::new(
+                    Some(&self.window),
+                    Some(i18n("Large files").as_str()),
+                    Some(
+                        ni18n_f(
+                            "{names} is {size}, over the {limit} limit. Upload it to cloud storage and put a download link in the message instead?",
+                            "{names} add up to {size}, over the {limit} limit. Upload them to cloud storage and put download links in the message instead?",
+                            n,
+                            &[
+                                ("names", &names),
+                                ("size", &crate::cloud::human_size(total)),
+                                ("limit", &crate::cloud::human_size(limit)),
+                            ],
+                        )
+                        .as_str(),
+                    ),
+                );
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("attach", &i18n("Attach Anyway"));
+                dialog.add_response("cloud", &i18n("Upload to Cloud Storage"));
+                dialog.set_response_appearance("cloud", adw::ResponseAppearance::Suggested);
+                dialog.set_default_response(Some("cloud"));
+                dialog.set_close_response("cancel");
+                let remember = remember_check();
+                dialog.set_extra_child(Some(&remember));
+                let pending = std::rc::Rc::new(std::cell::RefCell::new(Some((hand_off, target))));
+                let s = sender.clone();
+                dialog.connect_response(None, move |_, resp| {
+                    let Some((hand_off, target)) = pending.borrow_mut().take() else { return };
+                    let cloud = match resp {
+                        "cloud" => true,
+                        "attach" => false,
+                        _ => {
+                            tracing::info!("file hand-off: cancelled at the size check");
+                            return;
+                        }
+                    };
+                    s.input(AppMsg::HandOffOpen { hand_off, target, cloud, remember: remember.is_active() });
+                });
+                dialog.present();
+            }
+        }
+    }
+
+    /// The last step: open the composer the files were meant for.
+    fn hand_off_open(&mut self, hand_off: FileHandOff, target: HandOffTarget, cloud: bool, sender: &ComponentSender<Self>) {
+        let files = HandOffFiles::of(hand_off.files, cloud);
+        tracing::info!(
+            "file hand-off: {} to attach, {} to upload, into {}",
+            files.attach.len(),
+            files.cloud.len(),
+            match &target {
+                HandOffTarget::New => "a new message",
+                HandOffTarget::Draft(_) => "a draft",
+                HandOffTarget::Reply(_) => "a reply",
+            }
+        );
+        match target {
+            HandOffTarget::New => {
+                let account = self
+                    .current
+                    .as_ref()
+                    .map(|m| m.account_id)
+                    .unwrap_or_else(|| self.active_account());
+                let mut prefill = hand_off.base;
+                prefill.attachments = files.attach;
+                prefill.cloud_uploads = files.cloud;
+                let (account, prefill) = self.new_message_from(account, prefill);
+                if self.compose_inline {
+                    self.open_inline_reply(account, prefill, None, sender);
+                } else {
+                    self.open_compose(account, prefill, sender);
+                }
+            }
+            HandOffTarget::Draft(m) => {
+                let inline = self.compose_inline;
+                self.open_draft(m, inline, files, sender);
+            }
+            HandOffTarget::Reply(m) => {
+                let body = if !m.body.is_empty() {
+                    Some(m.body.clone())
+                } else {
+                    self.body_cache.get(&(m.account_id, m.id)).cloned()
+                };
+                match body {
+                    Some(html) => {
+                        let mut m = m;
+                        m.body = html;
+                        self.open_hand_off_reply(m, files, sender);
+                    }
+                    None => {
+                        if let Some(path) = self.resolve_folder_path(&m) {
+                            self.send_to(m.account_id, MailRequest::LoadBody { message_id: m.id, path, uid: m.uid });
+                        }
+                        self.pending_reply = Some((m, files));
+                    }
+                }
+            }
+        }
+    }
+
+    /// A reply to `m` (its body loaded) carrying handed-in files. Splits
+    /// the reading pane when `m` is what it is showing, as Reply does; a
+    /// message picked from elsewhere gets its reply in a window, the pane
+    /// left as it was.
+    fn open_hand_off_reply(&mut self, m: Message, files: HandOffFiles, sender: &ComponentSender<Self>) {
+        let mut prefill = self.reply_pgp(&m, reply_prefill(&m));
+        prefill.attachments = files.attach;
+        prefill.cloud_uploads = files.cloud;
+        let on_screen = self
+            .current
+            .as_ref()
+            .is_some_and(|c| c.account_id == m.account_id && c.id == m.id)
+            || self.current_thread.iter().any(|t| t.account_id == m.account_id && t.id == m.id);
+        if on_screen {
+            self.open_inline_reply(m.account_id, prefill, Some((m.account_id, m.id)), sender);
+        } else {
+            self.open_compose(m.account_id, prefill, sender);
+        }
+    }
+
+    /// The "Continue a Draft" picker over every draft the app knows.
+    fn show_draft_picker(&self, hand_off: FileHandOff, sender: &ComponentSender<Self>) {
+        let drafts = self.drafts_for_pick();
+        let s = sender.clone();
+        show_message_picker(
+            self.window.upcast_ref(),
+            &i18n("Continue a Draft"),
+            &i18n("The files go into the draft you pick."),
+            &i18n("No drafts to continue."),
+            &i18n("Attach to This Draft"),
+            drafts,
+            hand_off,
+            move |hand_off, draft| s.input(AppMsg::HandOffDraft { hand_off, draft }),
+        );
+    }
+
+    /// Each account's Drafts folder, in account order.
+    fn drafts_folders(&self) -> Vec<(u32, Folder)> {
+        let mut ids: Vec<u32> = self.folders.keys().copied().collect();
+        ids.sort_unstable();
+        ids.into_iter()
+            .filter_map(|id| {
+                let f = self.folders.get(&id)?.iter().find(|f| f.kind == FolderKind::Drafts)?;
+                Some((id, f.clone()))
+            })
+            .collect()
+    }
+
+    /// Every account's saved drafts, newest first, each with its account's
+    /// name for the picker.
+    fn drafts_for_pick(&self) -> Vec<(Message, String)> {
+        let mut out = Vec::new();
+        for (account_id, drafts) in self.drafts_folders() {
+            let list = match self.message_cache.get(&(account_id, drafts.id)) {
+                Some(l) => l.clone(),
+                None => self
+                    .cache
+                    .as_ref()
+                    .map(|c| c.load_messages(account_id, &drafts.path, drafts.id))
+                    .unwrap_or_default(),
+            };
+            let name = self.account_name(account_id);
+            out.extend(list.into_iter().map(|m| (m, name.clone())));
+        }
+        out.sort_by_key(|(m, _)| std::cmp::Reverse(m.timestamp));
+        out
+    }
+
+    /// Messages a reply could answer: what the reading pane shows first,
+    /// then every account's Inbox (and the other folders listed this
+    /// session, Drafts, Sent, Junk and Trash left out), newest first.
+    fn messages_for_pick(&self) -> Vec<(Message, String)> {
+        let mut seen: HashSet<(u32, u32)> = HashSet::new();
+        let mut out = Vec::new();
+        for m in self.current.iter().chain(self.current_thread.iter()) {
+            if seen.insert((m.account_id, m.id)) {
+                out.push((m.clone(), self.account_name(m.account_id)));
+            }
+        }
+        let mut rest = Vec::new();
+        let mut ids: Vec<u32> = self.folders.keys().copied().collect();
+        ids.sort_unstable();
+        for account_id in ids {
+            let Some(folders) = self.folders.get(&account_id) else { continue };
+            let name = self.account_name(account_id);
+            for f in folders {
+                if matches!(f.kind, FolderKind::Drafts | FolderKind::Sent | FolderKind::Junk | FolderKind::Trash) {
+                    continue;
+                }
+                let list = match self.message_cache.get(&(account_id, f.id)) {
+                    Some(l) => l.clone(),
+                    None if f.kind == FolderKind::Inbox => self
+                        .cache
+                        .as_ref()
+                        .map(|c| c.load_messages(account_id, &f.path, f.id))
+                        .unwrap_or_default(),
+                    None => Vec::new(),
+                };
+                for m in list {
+                    if seen.insert((m.account_id, m.id)) {
+                        rest.push((m, name.clone()));
+                    }
+                }
+            }
+        }
+        rest.sort_by_key(|(m, _)| std::cmp::Reverse(m.timestamp));
+        rest.truncate(500);
+        out.extend(rest);
+        out
     }
 
     /// Open a standalone compose window (New Message, compose-to, edit-draft).
@@ -12383,6 +12872,7 @@ impl AppModel {
             swipe_reversed: self.swipe_reversed,
             compose_inline: self.compose_inline,
             reply_fields: self.reply_fields,
+            files: self.files_prefs,
             compose_default_from: self.compose_default_from.clone(),
             paste_plain: self.paste_plain,
             spellcheck: self.spellcheck,
@@ -12444,6 +12934,7 @@ impl AppModel {
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
                 PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
+                PrefOutput::SetFilesPrefs(p) => AppMsg::SetFilesPrefs(p),
                 PrefOutput::SetComposeDefaultFrom(addr) => AppMsg::SetComposeDefaultFrom(addr),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
                 PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
@@ -14797,6 +15288,149 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
         let apply = apply.clone();
         gtk::glib::idle_add_local_once(move || apply(&provider, dark));
     });
+}
+
+/// The handed-in files' names, joined, for a dialog.
+fn hand_off_names(files: &[std::path::PathBuf]) -> String {
+    files
+        .iter()
+        .map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What the handed-in files add up to on disk.
+fn hand_off_size(files: &[std::path::PathBuf]) -> u64 {
+    files.iter().filter_map(|p| std::fs::metadata(p).ok()).map(|m| m.len()).sum()
+}
+
+/// The "remember this" check a hand-off dialog carries: on, the answer
+/// becomes the Settings → System → GNOME Files preference.
+fn remember_check() -> gtk::CheckButton {
+    let check = gtk::CheckButton::with_label(&i18n("Always do this (change it in Settings → System → GNOME Files)"));
+    check.set_halign(gtk::Align::Start);
+    check.set_margin_top(6);
+    check
+}
+
+/// A dialog listing messages to pick one from (a draft to continue, a
+/// message to reply to) for handed-in files. `items` pairs each message
+/// with its account's name; a search box narrows them by sender, subject
+/// or account. `on_pick` gets the hand-off back with the choice, or
+/// `None` for "a new message instead"; Cancel drops the hand-off.
+#[allow(clippy::too_many_arguments)]
+fn show_message_picker(
+    parent: &gtk::Window,
+    heading: &str,
+    body: &str,
+    empty_text: &str,
+    pick_label: &str,
+    items: Vec<(Message, String)>,
+    hand_off: FileHandOff,
+    on_pick: impl Fn(FileHandOff, Option<Message>) + 'static,
+) {
+    let dialog = adw::MessageDialog::new(Some(parent), Some(heading), Some(body));
+    dialog.add_response("cancel", &i18n("Cancel"));
+    dialog.add_response("new", &i18n("New Message Instead"));
+    dialog.add_response("pick", pick_label);
+    dialog.set_response_appearance("pick", adw::ResponseAppearance::Suggested);
+    dialog.set_response_enabled("pick", false);
+    dialog.set_close_response("cancel");
+
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    column.set_width_request(460);
+    let items = std::rc::Rc::new(items);
+    let list = gtk::ListBox::new();
+    list.add_css_class("boxed-list");
+    list.set_selection_mode(gtk::SelectionMode::Single);
+    if items.is_empty() {
+        let empty = gtk::Label::new(Some(empty_text));
+        empty.add_css_class("dim-label");
+        empty.set_margin_top(12);
+        empty.set_margin_bottom(12);
+        column.append(&empty);
+    } else {
+        let search = gtk::SearchEntry::new();
+        search.set_placeholder_text(Some(i18n("Search by sender, subject or account").as_str()));
+        column.append(&search);
+        for (m, account) in items.iter() {
+            let row = adw::ActionRow::new();
+            let subject = if m.subject.trim().is_empty() { i18n("(no subject)") } else { m.subject.clone() };
+            row.set_title(&gtk::glib::markup_escape_text(&subject));
+            let who = if m.from_name.trim().is_empty() { m.from_addr.clone() } else { m.from_name.clone() };
+            let who = if who.trim().is_empty() { m.to.clone() } else { who };
+            let mut sub = vec![who, m.date.clone()];
+            if !account.trim().is_empty() {
+                sub.push(account.clone());
+            }
+            row.set_subtitle(&gtk::glib::markup_escape_text(&sub.join("  ·  ")));
+            row.set_activatable(true);
+            list.append(&row);
+        }
+        // The search narrows by sender, subject or account, case-folded.
+        let filter_items = items.clone();
+        list.set_filter_func(move |row| {
+            let needle = row
+                .parent()
+                .and_then(|l| l.downcast::<gtk::ListBox>().ok())
+                .and_then(|l| l.prev_sibling())
+                .and_then(|w| w.prev_sibling().or(Some(w)))
+                .and_then(|w| w.downcast::<gtk::SearchEntry>().ok())
+                .map(|e| e.text().to_lowercase())
+                .unwrap_or_default();
+            if needle.trim().is_empty() {
+                return true;
+            }
+            let Some((m, account)) = filter_items.get(row.index().max(0) as usize) else { return true };
+            [&m.from_name, &m.from_addr, &m.subject, &m.to, account]
+                .iter()
+                .any(|f| f.to_lowercase().contains(needle.trim()))
+        });
+        {
+            let list = list.clone();
+            search.connect_search_changed(move |_| list.invalidate_filter());
+        }
+        let scroller = gtk::ScrolledWindow::new();
+        scroller.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scroller.set_min_content_height(120);
+        scroller.set_max_content_height(360);
+        scroller.set_propagate_natural_height(true);
+        scroller.set_child(Some(&list));
+        column.append(&scroller);
+        {
+            let dialog = dialog.clone();
+            list.connect_row_selected(move |_, row| dialog.set_response_enabled("pick", row.is_some()));
+        }
+        // The first row (the message on screen, or the newest draft) starts
+        // selected, so Enter takes the likeliest answer.
+        list.select_row(list.row_at_index(0).as_ref());
+        {
+            let dialog = dialog.clone();
+            list.connect_row_activated(move |l, row| {
+                l.select_row(Some(row));
+                dialog.response("pick");
+                dialog.set_visible(false);
+            });
+        }
+    }
+    dialog.set_extra_child(Some(&column));
+
+    let hand_off = std::rc::Rc::new(std::cell::RefCell::new(Some(hand_off)));
+    dialog.connect_response(None, move |_, resp| {
+        let Some(hand_off) = hand_off.borrow_mut().take() else { return };
+        match resp {
+            "new" => on_pick(hand_off, None),
+            "pick" => {
+                let picked = list.selected_row().and_then(|r| items.get(r.index().max(0) as usize)).map(|(m, _)| m.clone());
+                match picked {
+                    Some(m) => on_pick(hand_off, Some(m)),
+                    None => on_pick(hand_off, None),
+                }
+            }
+            _ => tracing::info!("file hand-off: cancelled at the picker"),
+        }
+    });
+    dialog.present();
 }
 
 fn reply_prefill(m: &Message) -> ComposePrefill {
