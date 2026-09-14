@@ -311,10 +311,66 @@ msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Delete this conversation?"
+msgid "Send {n} file with Vireo"
+msgid_plural "Send {n} files with Vireo"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{names} ({size}). What should the files go into?"
 msgstr ""
 
 msgid "Cancel"
+msgstr ""
+
+msgid "Reply to a Message…"
+msgstr ""
+
+msgid "Continue a Draft…"
+msgstr ""
+
+msgid "Reply to a Message"
+msgstr ""
+
+msgid "The files go into a reply to the message you pick."
+msgstr ""
+
+msgid "No messages to reply to yet."
+msgstr ""
+
+msgid "Reply With the Files"
+msgstr ""
+
+msgid "Large files"
+msgstr ""
+
+msgid ""
+"{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
+"put a download link in the message instead?"
+msgid_plural ""
+"{names} add up to {size}, over the {limit} limit. Upload them to cloud "
+"storage and put download links in the message instead?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Attach Anyway"
+msgstr ""
+
+msgid "Upload to Cloud Storage"
+msgstr ""
+
+msgid "Continue a Draft"
+msgstr ""
+
+msgid "The files go into the draft you pick."
+msgstr ""
+
+msgid "No drafts to continue."
+msgstr ""
+
+msgid "Attach to This Draft"
+msgstr ""
+
+msgid "Delete this conversation?"
 msgstr ""
 
 msgid "Delete Conversation"
@@ -560,6 +616,18 @@ msgid "This list"
 msgstr ""
 
 msgid "Save All Attachments"
+msgstr ""
+
+msgid "Always do this (change it in Settings → System → GNOME Files)"
+msgstr ""
+
+msgid "New Message Instead"
+msgstr ""
+
+msgid "Search by sender, subject or account"
+msgstr ""
+
+msgid "(no subject)"
 msgstr ""
 
 msgid "Default"
@@ -1596,6 +1664,15 @@ msgstr ""
 msgid "Upload folder"
 msgstr ""
 
+msgid "Server is behind Cloudflare"
+msgstr ""
+
+msgid ""
+"Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
+"uploaded in 90 MB pieces the server puts back together. For a self-hosted "
+"server on a Cloudflare domain or tunnel."
+msgstr ""
+
 msgid "Links expire after"
 msgstr ""
 
@@ -1839,9 +1916,6 @@ msgid "Send with formatting"
 msgstr ""
 
 msgid "Send as plain text"
-msgstr ""
-
-msgid "Upload to Cloud Storage"
 msgstr ""
 
 msgid "Not signed in"
@@ -3149,6 +3223,28 @@ msgstr ""
 msgid "Restart"
 msgstr ""
 
+msgid "Files sent from Files go into"
+msgstr ""
+
+msgid ""
+"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
+"offers all three each time."
+msgstr ""
+
+msgid "Files over the size limit"
+msgstr ""
+
+msgid ""
+"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
+"one the files are attached."
+msgstr ""
+
+msgid "Size limit"
+msgstr ""
+
+msgid "In MB, for all the files together."
+msgstr ""
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3209,6 +3305,24 @@ msgid "Shown while hovering"
 msgstr ""
 
 msgid "Always visible"
+msgstr ""
+
+msgid "Ask each time"
+msgstr ""
+
+msgid "A new message"
+msgstr ""
+
+msgid "A draft you pick"
+msgstr ""
+
+msgid "A reply to a message you pick"
+msgstr ""
+
+msgid "Attach them anyway"
+msgstr ""
+
+msgid "Upload to cloud storage and link them"
 msgstr ""
 
 msgid "Account of the current folder"

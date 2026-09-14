@@ -331,11 +331,74 @@ msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Delete this conversation?"
-msgstr "Eliminar esta conversa?"
+msgid "Send {n} file with Vireo"
+msgid_plural "Send {n} files with Vireo"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{names} ({size}). What should the files go into?"
+msgstr ""
 
 msgid "Cancel"
 msgstr "Cancelar"
+
+#, fuzzy
+msgid "Reply to a Message…"
+msgstr "Responder a esta mensagem"
+
+msgid "Continue a Draft…"
+msgstr ""
+
+#, fuzzy
+msgid "Reply to a Message"
+msgstr "Responder a esta mensagem"
+
+msgid "The files go into a reply to the message you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No messages to reply to yet."
+msgstr "Nenhuma mensagem selecionada"
+
+#, fuzzy
+msgid "Reply With the Files"
+msgstr "Responder a esta mensagem"
+
+#, fuzzy
+msgid "Large files"
+msgstr "Maiores primeiro"
+
+msgid ""
+"{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
+"put a download link in the message instead?"
+msgid_plural ""
+"{names} add up to {size}, over the {limit} limit. Upload them to cloud "
+"storage and put download links in the message instead?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Attach Anyway"
+msgstr ""
+
+msgid "Upload to Cloud Storage"
+msgstr "Carregar para o armazenamento na nuvem"
+
+#, fuzzy
+msgid "Continue a Draft"
+msgstr "Continuar"
+
+msgid "The files go into the draft you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No drafts to continue."
+msgstr "Nenhuma mensagem selecionada"
+
+msgid "Attach to This Draft"
+msgstr ""
+
+msgid "Delete this conversation?"
+msgstr "Eliminar esta conversa?"
 
 msgid "Delete Conversation"
 msgstr "Eliminar conversa"
@@ -598,6 +661,21 @@ msgstr "Esta lista"
 
 msgid "Save All Attachments"
 msgstr "Guardar todos os anexos"
+
+msgid "Always do this (change it in Settings → System → GNOME Files)"
+msgstr ""
+
+#, fuzzy
+msgid "New Message Instead"
+msgstr "Nova mensagem"
+
+#, fuzzy
+msgid "Search by sender, subject or account"
+msgstr "Pesquisar por remetente, assunto, tipo, nome de ficheiro…"
+
+#, fuzzy
+msgid "(no subject)"
+msgstr "Assunto"
 
 msgid "Default"
 msgstr "Predefinição"
@@ -1748,6 +1826,15 @@ msgstr "Biblioteca"
 msgid "Upload folder"
 msgstr "Pasta de carregamento"
 
+msgid "Server is behind Cloudflare"
+msgstr ""
+
+msgid ""
+"Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
+"uploaded in 90 MB pieces the server puts back together. For a self-hosted "
+"server on a Cloudflare domain or tunnel."
+msgstr ""
+
 msgid "Links expire after"
 msgstr "As ligações expiram ao fim de"
 
@@ -2051,9 +2138,6 @@ msgstr "Enviar com formatação"
 
 msgid "Send as plain text"
 msgstr "Enviar como texto simples"
-
-msgid "Upload to Cloud Storage"
-msgstr "Carregar para o armazenamento na nuvem"
 
 msgid "Not signed in"
 msgstr "Sessão não iniciada"
@@ -3585,6 +3669,28 @@ msgstr ""
 msgid "Restart"
 msgstr "Reiniciar agora"
 
+msgid "Files sent from Files go into"
+msgstr ""
+
+msgid ""
+"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
+"offers all three each time."
+msgstr ""
+
+msgid "Files over the size limit"
+msgstr ""
+
+msgid ""
+"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
+"one the files are attached."
+msgstr ""
+
+msgid "Size limit"
+msgstr ""
+
+msgid "In MB, for all the files together."
+msgstr ""
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3657,6 +3763,27 @@ msgstr "Apresentado ao passar o ponteiro"
 
 msgid "Always visible"
 msgstr "Sempre visível"
+
+msgid "Ask each time"
+msgstr ""
+
+#, fuzzy
+msgid "A new message"
+msgstr "Nova mensagem"
+
+msgid "A draft you pick"
+msgstr ""
+
+#, fuzzy
+msgid "A reply to a message you pick"
+msgstr "Responder a esta mensagem"
+
+msgid "Attach them anyway"
+msgstr ""
+
+#, fuzzy
+msgid "Upload to cloud storage and link them"
+msgstr "Carregar para o armazenamento na nuvem e partilhar uma ligação"
 
 msgid "Account of the current folder"
 msgstr "Conta da pasta atual"

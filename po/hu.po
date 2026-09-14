@@ -323,11 +323,74 @@ msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Delete this conversation?"
-msgstr "Törli ezt a beszélgetést?"
+msgid "Send {n} file with Vireo"
+msgid_plural "Send {n} files with Vireo"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{names} ({size}). What should the files go into?"
+msgstr ""
 
 msgid "Cancel"
 msgstr "Mégse"
+
+#, fuzzy
+msgid "Reply to a Message…"
+msgstr "Válasz erre az üzenetre"
+
+msgid "Continue a Draft…"
+msgstr ""
+
+#, fuzzy
+msgid "Reply to a Message"
+msgstr "Válasz erre az üzenetre"
+
+msgid "The files go into a reply to the message you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No messages to reply to yet."
+msgstr "Nincs kijelölt üzenet"
+
+#, fuzzy
+msgid "Reply With the Files"
+msgstr "Válasz erre az üzenetre"
+
+#, fuzzy
+msgid "Large files"
+msgstr "Legnagyobb elöl"
+
+msgid ""
+"{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
+"put a download link in the message instead?"
+msgid_plural ""
+"{names} add up to {size}, over the {limit} limit. Upload them to cloud "
+"storage and put download links in the message instead?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Attach Anyway"
+msgstr ""
+
+msgid "Upload to Cloud Storage"
+msgstr "Feltöltés felhőtárhelyre"
+
+#, fuzzy
+msgid "Continue a Draft"
+msgstr "Folytatás"
+
+msgid "The files go into the draft you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No drafts to continue."
+msgstr "Nincs kijelölt üzenet"
+
+msgid "Attach to This Draft"
+msgstr ""
+
+msgid "Delete this conversation?"
+msgstr "Törli ezt a beszélgetést?"
 
 msgid "Delete Conversation"
 msgstr "Beszélgetés törlése"
@@ -581,6 +644,21 @@ msgstr "Ez a lista"
 
 msgid "Save All Attachments"
 msgstr "Összes melléklet mentése"
+
+msgid "Always do this (change it in Settings → System → GNOME Files)"
+msgstr ""
+
+#, fuzzy
+msgid "New Message Instead"
+msgstr "Új üzenet"
+
+#, fuzzy
+msgid "Search by sender, subject or account"
+msgstr "Keresés feladó, tárgy, típus vagy fájlnév alapján…"
+
+#, fuzzy
+msgid "(no subject)"
+msgstr "Tárgy"
 
 msgid "Default"
 msgstr "Alapértelmezett"
@@ -1688,6 +1766,15 @@ msgstr "Könyvtár"
 msgid "Upload folder"
 msgstr "Feltöltési mappa"
 
+msgid "Server is behind Cloudflare"
+msgstr ""
+
+msgid ""
+"Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
+"uploaded in 90 MB pieces the server puts back together. For a self-hosted "
+"server on a Cloudflare domain or tunnel."
+msgstr ""
+
 msgid "Links expire after"
 msgstr "Hivatkozások lejárata"
 
@@ -1993,9 +2080,6 @@ msgstr "Beillesztés formázással"
 #, fuzzy
 msgid "Send as plain text"
 msgstr "Beillesztés egyszerű szövegként"
-
-msgid "Upload to Cloud Storage"
-msgstr "Feltöltés felhőtárhelyre"
 
 msgid "Not signed in"
 msgstr "Nincs bejelentkezve"
@@ -3452,6 +3536,28 @@ msgstr ""
 msgid "Restart"
 msgstr "Újraindítás most"
 
+msgid "Files sent from Files go into"
+msgstr ""
+
+msgid ""
+"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
+"offers all three each time."
+msgstr ""
+
+msgid "Files over the size limit"
+msgstr ""
+
+msgid ""
+"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
+"one the files are attached."
+msgstr ""
+
+msgid "Size limit"
+msgstr ""
+
+msgid "In MB, for all the files together."
+msgstr ""
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3518,6 +3624,27 @@ msgstr "Megjelenítés rámutatáskor"
 
 msgid "Always visible"
 msgstr "Mindig látható"
+
+msgid "Ask each time"
+msgstr ""
+
+#, fuzzy
+msgid "A new message"
+msgstr "Új üzenet"
+
+msgid "A draft you pick"
+msgstr ""
+
+#, fuzzy
+msgid "A reply to a message you pick"
+msgstr "Válasz erre az üzenetre"
+
+msgid "Attach them anyway"
+msgstr ""
+
+#, fuzzy
+msgid "Upload to cloud storage and link them"
+msgstr "Feltöltés felhőtárhelyre és hivatkozás megosztása"
 
 msgid "Account of the current folder"
 msgstr ""

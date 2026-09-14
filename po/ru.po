@@ -328,11 +328,76 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-msgid "Delete this conversation?"
-msgstr "Удалить эту переписку?"
+msgid "Send {n} file with Vireo"
+msgid_plural "Send {n} files with Vireo"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "{names} ({size}). What should the files go into?"
+msgstr ""
 
 msgid "Cancel"
 msgstr "Отмена"
+
+#, fuzzy
+msgid "Reply to a Message…"
+msgstr "Ответить на это сообщение"
+
+msgid "Continue a Draft…"
+msgstr ""
+
+#, fuzzy
+msgid "Reply to a Message"
+msgstr "Ответить на это сообщение"
+
+msgid "The files go into a reply to the message you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No messages to reply to yet."
+msgstr "Сообщение не выбрано"
+
+#, fuzzy
+msgid "Reply With the Files"
+msgstr "Ответить на это сообщение"
+
+#, fuzzy
+msgid "Large files"
+msgstr "Сначала большие"
+
+msgid ""
+"{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
+"put a download link in the message instead?"
+msgid_plural ""
+"{names} add up to {size}, over the {limit} limit. Upload them to cloud "
+"storage and put download links in the message instead?"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Attach Anyway"
+msgstr ""
+
+msgid "Upload to Cloud Storage"
+msgstr "Загрузить в облачное хранилище"
+
+#, fuzzy
+msgid "Continue a Draft"
+msgstr "Продолжить"
+
+msgid "The files go into the draft you pick."
+msgstr ""
+
+#, fuzzy
+msgid "No drafts to continue."
+msgstr "Сообщение не выбрано"
+
+msgid "Attach to This Draft"
+msgstr ""
+
+msgid "Delete this conversation?"
+msgstr "Удалить эту переписку?"
 
 msgid "Delete Conversation"
 msgstr "Удалить переписку"
@@ -591,6 +656,21 @@ msgstr "Этот список"
 
 msgid "Save All Attachments"
 msgstr "Сохранить все вложения"
+
+msgid "Always do this (change it in Settings → System → GNOME Files)"
+msgstr ""
+
+#, fuzzy
+msgid "New Message Instead"
+msgstr "Новое сообщение"
+
+#, fuzzy
+msgid "Search by sender, subject or account"
+msgstr "Поиск по отправителю, теме, типу, имени файла…"
+
+#, fuzzy
+msgid "(no subject)"
+msgstr "Тема"
 
 msgid "Default"
 msgstr "По умолчанию"
@@ -1725,6 +1805,15 @@ msgstr "Библиотека"
 msgid "Upload folder"
 msgstr "Папка для загрузки"
 
+msgid "Server is behind Cloudflare"
+msgstr ""
+
+msgid ""
+"Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
+"uploaded in 90 MB pieces the server puts back together. For a self-hosted "
+"server on a Cloudflare domain or tunnel."
+msgstr ""
+
 msgid "Links expire after"
 msgstr "Срок действия ссылок истекает через"
 
@@ -2027,9 +2116,6 @@ msgstr "Вставить с форматированием"
 #, fuzzy
 msgid "Send as plain text"
 msgstr "Вставлять как обычный текст"
-
-msgid "Upload to Cloud Storage"
-msgstr "Загрузить в облачное хранилище"
 
 msgid "Not signed in"
 msgstr "Вход не выполнен"
@@ -3551,6 +3637,28 @@ msgstr ""
 msgid "Restart"
 msgstr "Перезапустить сейчас"
 
+msgid "Files sent from Files go into"
+msgstr ""
+
+msgid ""
+"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
+"offers all three each time."
+msgstr ""
+
+msgid "Files over the size limit"
+msgstr ""
+
+msgid ""
+"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
+"one the files are attached."
+msgstr ""
+
+msgid "Size limit"
+msgstr ""
+
+msgid "In MB, for all the files together."
+msgstr ""
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3621,6 +3729,27 @@ msgstr "Показывать при наведении"
 
 msgid "Always visible"
 msgstr "Всегда показывать"
+
+msgid "Ask each time"
+msgstr ""
+
+#, fuzzy
+msgid "A new message"
+msgstr "Новое сообщение"
+
+msgid "A draft you pick"
+msgstr ""
+
+#, fuzzy
+msgid "A reply to a message you pick"
+msgstr "Ответить на это сообщение"
+
+msgid "Attach them anyway"
+msgstr ""
+
+#, fuzzy
+msgid "Upload to cloud storage and link them"
+msgstr "Загрузить в облачное хранилище и поделиться ссылкой"
 
 msgid "Account of the current folder"
 msgstr "Учётная запись текущей папки"
