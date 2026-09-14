@@ -381,7 +381,11 @@ Open **Settings → System → GNOME Files** and click **Install**. Vireo writes
 the extension to `~/.local/share/nautilus-python/extensions/vireo-nautilus.py`
 and shows whether the installed copy is this version's. Then click
 **Restart** (or run `nautilus -q`): Files closes its windows, and the next one
-opens with the entry. **Remove** takes it out again the same way.
+opens with the entry. Once Files has loaded the extension the row says so; if
+it still says "not loaded" after a restart, the `nautilus-python` package is
+the usual reason (a native install of Vireo checks for it and tells you; the
+Flatpak cannot see the host's packages). **Remove** takes it out again the
+same way.
 
 Without the app, the same file is in the repository at
 `data/nautilus/vireo-nautilus.py`:

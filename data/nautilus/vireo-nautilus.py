@@ -97,6 +97,26 @@ def _log(*values):
     print("Vireo:", *values, file=sys.stderr)
 
 
+def _mark_loaded():
+    # Vireo's settings cannot tell from the file alone whether Files has
+    # actually loaded it (the nautilus-python bindings may be missing), so
+    # note here that this copy was loaded: a hidden file next to it holding
+    # the SHA-256 of this file, which Vireo compares with its own copy.
+    try:
+        import hashlib
+
+        with open(__file__, "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        marker = os.path.join(os.path.dirname(__file__), ".vireo-nautilus.loaded")
+        with open(marker, "w") as f:
+            f.write(digest + "\n")
+    except OSError as error:
+        _log("could not note the load:", error)
+
+
+_mark_loaded()
+
+
 def _launch_context():
     # Files' own launch context carries an activation token, which is what
     # lets Vireo's window come to the front over Files.

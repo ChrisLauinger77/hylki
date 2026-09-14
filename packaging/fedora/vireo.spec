@@ -13,6 +13,9 @@ Source0:        %{name}-%{version}-bin.tar
 
 # Passwords and OAuth tokens are stored via the Secret Service D-Bus API
 Recommends:     gnome-keyring
+# The GNOME Files right-click entry (Settings -> System -> GNOME Files) is
+# a Python extension; this is the loader Files needs for it.
+Recommends:     nautilus-python
 
 # Renamed from "veem" in 1.6.0 — upgrades replace the old package
 Provides:       veem = %{version}-%{release}

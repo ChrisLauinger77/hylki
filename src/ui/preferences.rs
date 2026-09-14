@@ -315,8 +315,8 @@ pub struct Preferences {
     editor_open: bool,
     /// Which side page's editor is up: "accounts" or "cloud".
     editor_page: &'static str,
-    /// Whether the GNOME Files extension (#188) is installed for this user.
-    nautilus: crate::nautilus_ext::Status,
+    /// The GNOME Files extension (#188): installed, loaded, loader present.
+    nautilus: crate::nautilus_ext::State,
 }
 
 /// The reader toolbar editor (Settings → Appearance → Toolbar): one drop zone per
@@ -603,13 +603,21 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
 ];
 
 /// The Files extension row's subtitle: where it stands, and where it lives.
-fn nautilus_status_text(status: crate::nautilus_ext::Status) -> String {
+fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String {
     use crate::nautilus_ext::Status;
-    let state = match status {
+    let state_text = match state.status {
         Status::NotInstalled => i18n("Not installed"),
-        Status::Installed => i18n("Installed"),
+        Status::Installed if state.loaded => i18n("Installed and loaded by Files"),
+        Status::Installed if state.loader == Some(false) => {
+            i18n("Installed, but the nautilus-python package is missing, so Files cannot load it")
+        }
+        Status::Installed => i18n(
+            "Installed. Files has not loaded it yet: restart Files, and make sure the \
+             nautilus-python package is installed",
+        ),
         Status::Outdated => i18n("Installed, but not this version's copy"),
     };
+    let state = state_text;
     match crate::nautilus_ext::path() {
         Some(p) => {
             let shown = p.display().to_string();
@@ -652,6 +660,9 @@ pub enum PrefInput {
     NautilusInstall,
     NautilusRemove,
     NautilusRestartFiles,
+    /// Re-read the extension's state (the System page came into view; Files
+    /// may have loaded the extension since).
+    NautilusRefresh,
     ToggleThreading(bool),
     ToggleThreadsExpanded(bool),
     ToggleThreadNewestFirst(bool),
@@ -2079,17 +2090,17 @@ impl Component for Preferences {
                                     adw::ActionRow {
                                         set_title: &i18n("Right-click menu entry"),
                                         #[watch]
-                                        set_subtitle: &nautilus_status_text(model.nautilus),
+                                        set_subtitle: &nautilus_status_text(&model.nautilus),
                                         add_suffix = &gtk::Button {
                                             set_label: &i18n("Remove"),
                                             set_valign: gtk::Align::Center,
                                             #[watch]
-                                            set_visible: model.nautilus != crate::nautilus_ext::Status::NotInstalled,
+                                            set_visible: model.nautilus.status != crate::nautilus_ext::Status::NotInstalled,
                                             connect_clicked => PrefInput::NautilusRemove,
                                         },
                                         add_suffix = &gtk::Button {
                                             #[watch]
-                                            set_label: &if model.nautilus == crate::nautilus_ext::Status::Outdated {
+                                            set_label: &if model.nautilus.status == crate::nautilus_ext::Status::Outdated {
                                                 i18n("Update")
                                             } else {
                                                 i18n("Install")
@@ -2097,7 +2108,7 @@ impl Component for Preferences {
                                             set_valign: gtk::Align::Center,
                                             add_css_class: "suggested-action",
                                             #[watch]
-                                            set_visible: model.nautilus != crate::nautilus_ext::Status::Installed,
+                                            set_visible: model.nautilus.status != crate::nautilus_ext::Status::Installed,
                                             connect_clicked => PrefInput::NautilusInstall,
                                         },
                                     },
@@ -2164,7 +2175,7 @@ impl Component for Preferences {
     ) -> ComponentParts<Self> {
         let t_init = std::time::Instant::now();
         let mut model = Preferences {
-            nautilus: crate::nautilus_ext::status(),
+            nautilus: crate::nautilus_ext::State::read(),
             notifications: init.notifications,
             toolbar: init.reader_toolbar.clone(),
             toolbar_editor: None,
@@ -2742,18 +2753,22 @@ impl Component for Preferences {
                 if let Err(e) = crate::nautilus_ext::install() {
                     report(root, &i18n("Could not install the extension"), &e);
                 }
-                self.nautilus = crate::nautilus_ext::status();
+                self.nautilus = crate::nautilus_ext::State::read();
             }
             PrefInput::NautilusRemove => {
                 if let Err(e) = crate::nautilus_ext::remove() {
                     report(root, &i18n("Could not remove the extension"), &e);
                 }
-                self.nautilus = crate::nautilus_ext::status();
+                self.nautilus = crate::nautilus_ext::State::read();
             }
             PrefInput::NautilusRestartFiles => {
                 if let Err(e) = crate::nautilus_ext::quit_files() {
                     report(root, &i18n("Could not restart Files"), &e);
                 }
+                self.nautilus = crate::nautilus_ext::State::read();
+            }
+            PrefInput::NautilusRefresh => {
+                self.nautilus = crate::nautilus_ext::State::read();
             }
             PrefInput::ToggleAvatars(on) => {
                 let _ = sender.output(PrefOutput::SetAvatars(on));
@@ -3078,6 +3093,9 @@ impl Component for Preferences {
                     self.ask_to_leave_editor(&id, &sender);
                 } else {
                     self.show_page(&id);
+                    if id == "system" {
+                        sender.input(PrefInput::NautilusRefresh);
+                    }
                     let _ = sender.output(PrefOutput::PageShown(id));
                 }
             }

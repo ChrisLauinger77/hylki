@@ -12,6 +12,9 @@ use std::path::PathBuf;
 /// The extension, verbatim: `data/nautilus/vireo-nautilus.py`.
 pub const SOURCE: &str = include_str!("../data/nautilus/vireo-nautilus.py");
 const FILE_NAME: &str = "vireo-nautilus.py";
+/// Written by the extension itself when Files loads it: the SHA-256 of the
+/// file it loaded (see `_mark_loaded` in the extension).
+const LOADED_MARKER: &str = ".vireo-nautilus.loaded";
 
 /// Whether (and which) copy of the extension the user's directory holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,6 +53,60 @@ pub fn status() -> Status {
     path().map(|p| status_at(&p)).unwrap_or(Status::NotInstalled)
 }
 
+/// Everything the settings row shows, read in one go.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct State {
+    pub status: Status,
+    /// Files has loaded this very copy (its marker carries our hash).
+    pub loaded: bool,
+    /// Whether the nautilus-python loader is on the system: `None` when that
+    /// cannot be seen from here (inside the Flatpak the host's /usr is not
+    /// mounted).
+    pub loader: Option<bool>,
+}
+
+impl State {
+    pub fn read() -> Self {
+        let status = status();
+        let loaded = status == Status::Installed
+            && path().is_some_and(|p| loaded_at(&p.with_file_name(LOADED_MARKER)));
+        Self { status, loaded, loader: loader_present() }
+    }
+}
+
+fn source_hash() -> String {
+    use sha2::Digest;
+    format!("{:x}", sha2::Sha256::digest(SOURCE.as_bytes()))
+}
+
+fn loaded_at(marker: &std::path::Path) -> bool {
+    std::fs::read_to_string(marker).is_ok_and(|text| text.trim() == source_hash())
+}
+
+/// Whether the nautilus-python bindings (the loader for Python extensions)
+/// are installed, judged by their library in the places distributions put
+/// it. `None` inside the Flatpak, which cannot see the host's /usr.
+pub fn loader_present() -> Option<bool> {
+    if crate::platform::is_flatpak() {
+        return None;
+    }
+    const DIRS: &[&str] = &[
+        "/usr/lib64/nautilus/extensions-4",
+        "/usr/lib/nautilus/extensions-4",
+        "/usr/lib/x86_64-linux-gnu/nautilus/extensions-4",
+        "/usr/lib/aarch64-linux-gnu/nautilus/extensions-4",
+        "/usr/local/lib64/nautilus/extensions-4",
+        "/usr/local/lib/nautilus/extensions-4",
+    ];
+    Some(DIRS.iter().any(|d| {
+        std::fs::read_dir(d).is_ok_and(|entries| {
+            entries.flatten().any(|e| {
+                e.file_name().to_string_lossy().starts_with("libnautilus-python")
+            })
+        })
+    }))
+}
+
 fn status_at(path: &std::path::Path) -> Status {
     match std::fs::read_to_string(path) {
         Err(_) => Status::NotInstalled,
@@ -80,6 +137,7 @@ pub fn remove() -> Result<(), String> {
 }
 
 fn remove_at(path: &std::path::Path) -> Result<(), String> {
+    let _ = std::fs::remove_file(path.with_file_name(LOADED_MARKER));
     match std::fs::remove_file(path) {
         Ok(()) => {
             tracing::info!("nautilus extension removed from {}", path.display());
@@ -145,6 +203,24 @@ mod tests {
         assert_eq!(status_at(&path), Status::NotInstalled);
         // Removing what is not there is not an error.
         remove_at(&path).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn loaded_marker_must_carry_this_copys_hash() {
+        let dir = std::env::temp_dir().join(format!("vireo-nautilus-marker-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let marker = dir.join(LOADED_MARKER);
+        assert!(!loaded_at(&marker));
+        std::fs::write(&marker, "0000\n").unwrap();
+        assert!(!loaded_at(&marker), "another release's load does not count");
+        std::fs::write(&marker, format!("{}\n", source_hash())).unwrap();
+        assert!(loaded_at(&marker));
+        // Removing the extension takes the marker with it.
+        let ext = dir.join(FILE_NAME);
+        install_at(&ext).unwrap();
+        remove_at(&ext).unwrap();
+        assert!(!marker.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
