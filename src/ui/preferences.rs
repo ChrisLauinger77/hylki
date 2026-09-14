@@ -315,6 +315,8 @@ pub struct Preferences {
     editor_open: bool,
     /// Which side page's editor is up: "accounts" or "cloud".
     editor_page: &'static str,
+    /// Whether the GNOME Files extension (#188) is installed for this user.
+    nautilus: crate::nautilus_ext::Status,
 }
 
 /// The reader toolbar editor (Settings → Appearance → Toolbar): one drop zone per
@@ -600,6 +602,37 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
     ),
 ];
 
+/// The Files extension row's subtitle: where it stands, and where it lives.
+fn nautilus_status_text(status: crate::nautilus_ext::Status) -> String {
+    use crate::nautilus_ext::Status;
+    let state = match status {
+        Status::NotInstalled => i18n("Not installed"),
+        Status::Installed => i18n("Installed"),
+        Status::Outdated => i18n("Installed, but not this version's copy"),
+    };
+    match crate::nautilus_ext::path() {
+        Some(p) => {
+            let shown = p.display().to_string();
+            let shown = match std::env::var("HOME") {
+                Ok(home) if !home.is_empty() && shown.starts_with(&home) => {
+                    format!("~{}", &shown[home.len()..])
+                }
+                _ => shown,
+            };
+            format!("{state} — {shown}")
+        }
+        None => state,
+    }
+}
+
+/// A plain error alert over the settings window.
+fn report(parent: &adw::Window, heading: &str, body: &str) {
+    let dialog = adw::MessageDialog::new(Some(parent), Some(heading), Some(body));
+    dialog.add_response("ok", &i18n("OK"));
+    dialog.set_close_response("ok");
+    dialog.present();
+}
+
 fn side_page(id: &str) -> Option<&'static SidePage> {
     SIDE_PAGES.iter().flat_map(|(_, pages)| pages.iter()).find(|p| p.id == id)
 }
@@ -614,6 +647,11 @@ pub enum PrefInput {
     ChangeDateStyle(u32),
     ChangeClockStyle(u32),
     ChangeLanguage(u32),
+    /// The GNOME Files extension (#188): install this build's copy, remove
+    /// the installed one, ask Files to quit so it reloads.
+    NautilusInstall,
+    NautilusRemove,
+    NautilusRestartFiles,
     ToggleThreading(bool),
     ToggleThreadsExpanded(bool),
     ToggleThreadNewestFirst(bool),
@@ -2026,6 +2064,56 @@ impl Component for Preferences {
                                         },
                                     },
                                 },
+
+                                // The Files right-click extension (#188).
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("GNOME Files"),
+                                    set_description: Some(
+                                        i18n("Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): \
+                                              the selected files open in a new message, attached. This installs \
+                                              a small extension in your home folder. It also needs the \
+                                              nautilus-python package (python3-nautilus on Debian and Ubuntu), \
+                                              and Files has to be restarted before the entry appears.").as_str()
+                                    ),
+
+                                    adw::ActionRow {
+                                        set_title: &i18n("Right-click menu entry"),
+                                        #[watch]
+                                        set_subtitle: &nautilus_status_text(model.nautilus),
+                                        add_suffix = &gtk::Button {
+                                            set_label: &i18n("Remove"),
+                                            set_valign: gtk::Align::Center,
+                                            #[watch]
+                                            set_visible: model.nautilus != crate::nautilus_ext::Status::NotInstalled,
+                                            connect_clicked => PrefInput::NautilusRemove,
+                                        },
+                                        add_suffix = &gtk::Button {
+                                            #[watch]
+                                            set_label: &if model.nautilus == crate::nautilus_ext::Status::Outdated {
+                                                i18n("Update")
+                                            } else {
+                                                i18n("Install")
+                                            },
+                                            set_valign: gtk::Align::Center,
+                                            add_css_class: "suggested-action",
+                                            #[watch]
+                                            set_visible: model.nautilus != crate::nautilus_ext::Status::Installed,
+                                            connect_clicked => PrefInput::NautilusInstall,
+                                        },
+                                    },
+
+                                    adw::ActionRow {
+                                        set_title: &i18n("Restart Files"),
+                                        set_subtitle: &i18n("Closes every Files window, the same as \"nautilus -q\". \
+                                                       The next one opens with the entry, or without it once \
+                                                       removed."),
+                                        add_suffix = &gtk::Button {
+                                            set_label: &i18n("Restart"),
+                                            set_valign: gtk::Align::Center,
+                                            connect_clicked => PrefInput::NautilusRestartFiles,
+                                        },
+                                    },
+                                },
                             },
 
                             add_named[Some("backup")] = &adw::PreferencesPage {
@@ -2076,6 +2164,7 @@ impl Component for Preferences {
     ) -> ComponentParts<Self> {
         let t_init = std::time::Instant::now();
         let mut model = Preferences {
+            nautilus: crate::nautilus_ext::status(),
             notifications: init.notifications,
             toolbar: init.reader_toolbar.clone(),
             toolbar_editor: None,
@@ -2629,7 +2718,7 @@ impl Component for Preferences {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
         match message {
             PrefInput::ToggleSenderLogos(on) => {
                 let _ = sender.output(PrefOutput::SetSenderLogos(on));
@@ -2647,6 +2736,23 @@ impl Component for Preferences {
             PrefInput::ChangeLanguage(i) => {
                 if let Some((_, code)) = language_choices().get(i as usize) {
                     let _ = sender.output(PrefOutput::SetLanguage(code.clone()));
+                }
+            }
+            PrefInput::NautilusInstall => {
+                if let Err(e) = crate::nautilus_ext::install() {
+                    report(root, &i18n("Could not install the extension"), &e);
+                }
+                self.nautilus = crate::nautilus_ext::status();
+            }
+            PrefInput::NautilusRemove => {
+                if let Err(e) = crate::nautilus_ext::remove() {
+                    report(root, &i18n("Could not remove the extension"), &e);
+                }
+                self.nautilus = crate::nautilus_ext::status();
+            }
+            PrefInput::NautilusRestartFiles => {
+                if let Err(e) = crate::nautilus_ext::quit_files() {
+                    report(root, &i18n("Could not restart Files"), &e);
                 }
             }
             PrefInput::ToggleAvatars(on) => {

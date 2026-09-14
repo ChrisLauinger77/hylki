@@ -5961,7 +5961,15 @@ impl SimpleComponent for AppModel {
                 // files pre-attached. The relay normalizes every stray
                 // command-line argument into a file URI, so keep only the
                 // ones that name a real file.
-                paths.retain(|p| p.is_file());
+                let named = paths.len();
+                paths.retain(|p| {
+                    let ok = p.is_file();
+                    if !ok {
+                        tracing::warn!("file hand-off ignored (not a readable file): {}", p.display());
+                    }
+                    ok
+                });
+                tracing::info!("file hand-off: {named} named, {} readable", paths.len());
                 if paths.is_empty() {
                     return;
                 }

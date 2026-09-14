@@ -50,6 +50,7 @@ trackers by default — no telemetry, no analytics.
 - **Runs in the background** (optional) — closing the window keeps mail arriving; Vireo appears under *Background Apps* in the GNOME system menu, and can start at login without opening a window.
 - **Privacy-first reading** — remote content blocked by default, per-sender allow/block lists, and a per-message light/dark content theme.
 - **OpenPGP** — read encrypted and signed mail, sign and encrypt what you send, and manage keys from Settings, through the GnuPG already on your computer. See [OpenPGP](#openpgp-encrypted-and-signed-mail) below.
+- **Send from Files** — a *Send with Vireo* entry in the GNOME Files right-click menu opens a new message with the selected files attached (optional; see [below](#send-with-vireo-from-gnome-files)). *Email…* and *Open With Vireo* work too.
 - **GNOME-native** — adaptive three-pane layout, per-account colours and emoji avatars, light/dark following the system, optional GNOME Contacts.
 
 See **[RELEASE_NOTES.md](RELEASE_NOTES.md)** for the full list.
@@ -359,6 +360,46 @@ be decrypted. Click the icon for the details.
   have. Ask the sender to use the public key you exported in step 2.
 - *Nothing to encrypt with for an address*: that person's key is missing;
   see step 3.
+
+### Send with Vireo from GNOME Files
+
+Select files in GNOME Files (Nautilus), right-click, *Send with Vireo*: a new
+message opens with them attached. The entry comes from a small extension that
+Files loads, so it has to live outside the app, in your home folder.
+
+**What you need**
+
+- The `nautilus-python` bindings, which let Files load extensions written in
+  Python: `sudo dnf install nautilus-python` on Fedora, `sudo apt install
+  python3-nautilus` on Debian and Ubuntu, `sudo pacman -S python-nautilus` on
+  Arch.
+- Vireo 1.29 or newer, Flatpak or native.
+
+**Installing it**
+
+Open **Settings → System → GNOME Files** and click **Install**. Vireo writes
+the extension to `~/.local/share/nautilus-python/extensions/vireo-nautilus.py`
+and shows whether the installed copy is this version's. Then click
+**Restart** (or run `nautilus -q`): Files closes its windows, and the next one
+opens with the entry. **Remove** takes it out again the same way.
+
+Without the app, the same file is in the repository at
+`data/nautilus/vireo-nautilus.py`:
+
+```sh
+mkdir -p ~/.local/share/nautilus-python/extensions
+curl -fsSL -o ~/.local/share/nautilus-python/extensions/vireo-nautilus.py \
+  https://raw.githubusercontent.com/hyprlab/vireo/main/data/nautilus/vireo-nautilus.py
+nautilus -q
+```
+
+The extension launches Vireo by its desktop id (`co.hyprlab.Vireo`, then the
+beta's), so it works whichever way Vireo is installed. Folders are skipped;
+files on a mounted share reach the app through their mount path.
+
+Files also has its own *Email…* entry, which sends the selection to whatever
+app handles `mailto:` links; if that is Vireo, it does the same thing without
+the extension.
 
 ## Privacy
 

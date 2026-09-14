@@ -19,6 +19,7 @@ mod i18n;
 mod logo;
 mod models;
 mod mutf7;
+mod nautilus_ext;
 mod notify;
 mod oauth;
 mod pgp;
@@ -127,6 +128,7 @@ fn main() {
             let mut attach_paths = Vec::new();
             for f in files {
                 let uri = f.uri().to_string();
+                tracing::info!("open: {}", if uri.starts_with("mailto:") { "mailto: URI" } else { uri.as_str() });
                 if uri.starts_with("mailto:") {
                     app::queue_mailto(uri);
                 } else if uri.starts_with("mid:") || uri.starts_with("MID:") {

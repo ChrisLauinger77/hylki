@@ -35,6 +35,7 @@ finish-args:
   - --talk-name=org.gnome.evolution.dataserver.*  # GNOME Contacts (Evolution Data Server)
   - --talk-name=org.gnome.Contacts                 # "Open GNOME Contacts" button (D-Bus activation)
   - --talk-name=org.kde.StatusNotifierWatcher      # optional tray icon (#116); absent on plain GNOME
+  - --talk-name=org.gnome.Nautilus                 # "Restart Files" after installing the Files extension (#188)
   # Deliberately NOT --talk-name=org.freedesktop.Flatpak: that permits
   # `flatpak-spawn --host`, i.e. arbitrary command execution outside the
   # sandbox, which would make every other restriction here advisory. The
@@ -59,6 +60,9 @@ finish-args:
   # …and the app's launcher is re-pointed at that icon through a per-user
   # copy of its .desktop entry (the desktop caches app icons by name).
   - --filesystem=xdg-data/applications:create
+  # The GNOME Files right-click extension (#188) is a Python file Nautilus
+  # loads on the host; Settings → System installs the bundled copy there.
+  - --filesystem=xdg-data/nautilus-python/extensions:create
   # A file manager's "Send by email" (Nautilus, #90) hands the files over as
   # attach= paths inside a mailto: URI. Flatpak's file forwarding only
   # exports arguments that are themselves files, so those paths reach the
