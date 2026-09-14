@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.30.0" date="2026-09-14">
+      <description>
+        <p>Filters can match the message body (searched on the server, nothing downloaded) and the Reply-To address, hold several conditions (all or any) laid out as separate groups in the editor, and take comma-separated alternatives per condition (#191, #192); the filter editor's "Move to" list is no longer empty after Settings reopens.</p>
+      </description>
+    </release>
     <release version="1.29.3" date="2026-09-14">
       <description>
         <p>Files sent from GNOME Files now ask whether they go into a new message, a draft or a reply, with an offer to upload big ones to cloud storage instead and defaults under Settings → System → GNOME Files; a "Server is behind Cloudflare" switch uploads to self-hosted Nextcloud-kind and Seafile servers in 90 MB pieces; French updated (PR #193).</p>
