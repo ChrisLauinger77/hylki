@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.29.0" date="2026-09-14">
+      <description>
+        <p>The attachments gallery reaches the whole archive without downloading it and can be scoped to accounts and folders, "Send with Vireo" from the GNOME Files right-click menu, "Send by email" from a file manager works inside the Flatpak, opening the app while it runs in the background no longer leaves the pointer busy, and people on Gmail and other mailbox hosts no longer wear their provider's logo.</p>
+      </description>
+    </release>
     <release version="1.28.2" date="2026-09-13">
       <description>
         <p>Sender logos from BIMI and a bundled set of common senders, wide mail that scrolls again in a narrow pane, drafts that are neither read nor unread, an evenly spaced Special Folders description, more room above the first account in the sidebar, and an updated French translation.</p>

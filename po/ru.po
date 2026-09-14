@@ -322,6 +322,12 @@ msgstr "Удалить {n} сообщений"
 msgid "New Message"
 msgstr "Новое сообщение"
 
+msgid "Could not attach {names}: Vireo cannot read the file."
+msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
 msgid "Delete this conversation?"
 msgstr "Удалить эту переписку?"
 
@@ -695,6 +701,20 @@ msgstr "Запланировано на {when}"
 
 msgid "New message"
 msgstr "Новое сообщение"
+
+#, fuzzy
+msgid "Message ready to send"
+msgstr "Действия на карточке сообщения"
+
+#, fuzzy
+msgid "A new message is open in Vireo."
+msgstr "Сначала откройте сообщение, затем распечатайте его."
+
+msgid "A new message with {n} file attached is open in Vireo."
+msgid_plural "A new message with {n} files attached is open in Vireo."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "GnuPG (gpg) is not installed, so this message cannot be read."
 msgstr "GnuPG (gpg) не установлен, поэтому это сообщение нельзя прочитать."
@@ -1087,11 +1107,10 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Специальные папки"
 
+#, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. "
-"Automatic                                      follows the server's own "
-"markings; pick a folder                                      when a role "
-"isn't detected or lands wrong."
+"Where sent, deleted and junk mail goes. Automatically follows the server's "
+"own markings; pick a folder when a role isn't detected or lands wrong."
 msgstr ""
 "Папки для отправленных, удалённых писем и спама. Автоматический "
 "режим                                      следует меткам сервера; выберите "
@@ -1494,7 +1513,10 @@ msgstr "Вложения из ваших почтовых ящиков появ�
 msgid "No matching attachments"
 msgstr "Вложения не найдены"
 
-msgid "Try a different search or clear the filter."
+#, fuzzy
+msgid ""
+"Try a different search, or check which accounts and folders the footer is "
+"pulling from."
 msgstr "Попробуйте изменить поисковый запрос или сбросить фильтр."
 
 msgid "Thumbnail grid"
@@ -1502,6 +1524,28 @@ msgstr "Сетка миниатюр"
 
 msgid "Table"
 msgstr "Таблица"
+
+#, fuzzy
+msgid "Show only this account"
+msgstr "Показывать только этот тип"
+
+msgid "Folders to pull from"
+msgstr ""
+
+#, fuzzy
+msgid "Include Archive"
+msgstr "Архив"
+
+#, fuzzy
+msgid "Include other folders"
+msgstr "Учётная запись текущей папки"
+
+msgid "Everything that is not an inbox or an archive"
+msgstr ""
+
+#, fuzzy
+msgid "Pulling attachments from"
+msgstr "Загрузить вложения с сервера"
 
 msgid "Show only this type"
 msgstr "Показывать только этот тип"
@@ -1559,6 +1603,18 @@ msgstr "Открыть в приложении по умолчанию"
 
 msgid "Go to Message"
 msgstr "Перейти к сообщению"
+
+msgid "All accounts"
+msgstr "Все учётные записи"
+
+#. Deliberately counts messages, not attachments: until a message has
+#. been described there is no telling how many files it holds.
+#, fuzzy
+msgid "Indexing {n} messages…"
+msgstr "{n} сообщений"
+
+msgid "Loading more…"
+msgstr "Загрузка остальных…"
 
 msgid "The file could not be opened"
 msgstr "Не удалось открыть файл"
@@ -2140,9 +2196,6 @@ msgstr "Эта папка"
 msgid "Clear selection"
 msgstr "Снять выделение"
 
-msgid "Loading more…"
-msgstr "Загрузка остальных…"
-
 msgid "No Messages"
 msgstr "Нет сообщений"
 
@@ -2172,8 +2225,16 @@ msgstr ""
 "Пройденная проверка доказывает лишь, что адрес не подделан, — но не "
 "безопасность письма."
 
+#, fuzzy
+msgid "No draft selected"
+msgstr "Сообщение не выбрано"
+
 msgid "No message selected"
 msgstr "Сообщение не выбрано"
+
+#, fuzzy
+msgid "Choose a draft from the list to edit it here."
+msgstr "Выберите сообщение из списка, чтобы прочитать его здесь."
 
 msgid "Choose a message from the list to read it here."
 msgstr "Выберите сообщение из списка, чтобы прочитать его здесь."
@@ -2642,6 +2703,26 @@ msgstr "Дата и время"
 msgid "Backup"
 msgstr "Резервное копирование"
 
+#, fuzzy
+msgid "Not installed"
+msgstr "Вход не выполнен"
+
+msgid "Installed and loaded by Files"
+msgstr ""
+
+msgid ""
+"Installed, but the nautilus-python package is missing, so Files cannot load "
+"it"
+msgstr ""
+
+msgid ""
+"Installed. Files has not loaded it yet: restart Files, and make sure the "
+"nautilus-python package is installed"
+msgstr ""
+
+msgid "Installed, but not this version's copy"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr "Сохранить фильтр?"
 
@@ -2927,9 +3008,6 @@ msgstr ""
 "будут автоматически сворачиваться. Долгое нажатие на значок всё равно "
 "позволяет раскрыть или свернуть любой из них, а при возврате к полной панеле "
 "её состояние сохранится."
-
-msgid "All accounts"
-msgstr "Все учётные записи"
 
 msgid "Every account's folder list."
 msgstr "Список папок каждой учётной записи."
@@ -3304,10 +3382,12 @@ msgstr ""
 msgid "Show sender logos"
 msgstr "Показывать логотипы отправителей"
 
+#, fuzzy
 msgid ""
-"Fills the sender's avatar with the brand's own site icon, fetched from the "
-"sender's domain. That domain learns your IP address, which is what blocking "
-"remote content otherwise avoids."
+"Fills the sender's avatar with the brand's logo: the one the sender "
+"publishes for mail (BIMI), one bundled with Vireo, or the site's own icon. "
+"All but the bundled ones are fetched from the sender's domain, which then "
+"learns your IP address, as blocking remote content otherwise avoids."
 msgstr ""
 "Отображает на аватаре отправителя иконку сайта бренда, полученную с его "
 "домена. При этом владелец домена узнаёт ваш IP-адрес — то, чего "
@@ -3417,6 +3497,42 @@ msgstr ""
 "Сохранить все записи консоли с момента запуска Vireo для прикрепления к "
 "отчёту об ошибке. Адреса электронной почты сокращаются до домена."
 
+msgid "GNOME Files"
+msgstr ""
+
+msgid ""
+"Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
+"selected files open in a new message, attached. This installs a small "
+"extension in your home folder. It also needs the nautilus-python package "
+"(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
+"before the entry appears."
+msgstr ""
+
+msgid "Right-click menu entry"
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+msgid "Install"
+msgstr ""
+
+msgid "Install the nautilus-python package first: paste this in a terminal"
+msgstr ""
+
+#, fuzzy
+msgid "Restart Files"
+msgstr "Перезапустить Vireo"
+
+msgid ""
+"Closes every Files window, the same as \"nautilus -q\". The next one opens "
+"with the entry, or without it once removed."
+msgstr ""
+
+#, fuzzy
+msgid "Restart"
+msgstr "Перезапустить сейчас"
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3496,6 +3612,18 @@ msgstr "Системный язык — {language}"
 
 msgid "Add a word"
 msgstr "Добавить слово"
+
+#, fuzzy
+msgid "Could not install the extension"
+msgstr "Не удалось подписать ключ: {e}"
+
+#, fuzzy
+msgid "Could not remove the extension"
+msgstr "Не удалось импортировать ключ"
+
+#, fuzzy
+msgid "Could not restart Files"
+msgstr "Не удалось прочитать файл"
 
 msgid "Forget this word"
 msgstr "Удалить это слово"

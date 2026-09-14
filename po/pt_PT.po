@@ -326,6 +326,11 @@ msgstr "Eliminar {n} mensagens"
 msgid "New Message"
 msgstr "Nova mensagem"
 
+msgid "Could not attach {names}: Vireo cannot read the file."
+msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Delete this conversation?"
 msgstr "Eliminar esta conversa?"
 
@@ -703,6 +708,19 @@ msgstr "Agendada para {when}"
 
 msgid "New message"
 msgstr "Nova mensagem"
+
+#, fuzzy
+msgid "Message ready to send"
+msgstr "Ações nos cartões de mensagens"
+
+#, fuzzy
+msgid "A new message is open in Vireo."
+msgstr "Abra primeiro uma mensagem e, em seguida, imprima-a."
+
+msgid "A new message with {n} file attached is open in Vireo."
+msgid_plural "A new message with {n} files attached is open in Vireo."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "GnuPG (gpg) is not installed, so this message cannot be read."
 msgstr ""
@@ -1110,11 +1128,10 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Pastas especiais"
 
+#, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. "
-"Automatic                                      follows the server's own "
-"markings; pick a folder                                      when a role "
-"isn't detected or lands wrong."
+"Where sent, deleted and junk mail goes. Automatically follows the server's "
+"own markings; pick a folder when a role isn't detected or lands wrong."
 msgstr ""
 "O local onde são guardadas as mensagens enviadas, eliminadas e de lixo "
 "eletrónico. A opção Automático segue as marcações do próprio servidor; "
@@ -1517,7 +1534,10 @@ msgstr "Os anexos das suas caixas de entrada irão aparecer aqui."
 msgid "No matching attachments"
 msgstr "Nenhum anexo correspondente"
 
-msgid "Try a different search or clear the filter."
+#, fuzzy
+msgid ""
+"Try a different search, or check which accounts and folders the footer is "
+"pulling from."
 msgstr "Experimente outra pesquisa ou limpe o filtro."
 
 msgid "Thumbnail grid"
@@ -1525,6 +1545,28 @@ msgstr "Grelha de miniaturas"
 
 msgid "Table"
 msgstr "Tabela"
+
+#, fuzzy
+msgid "Show only this account"
+msgstr "Mostrar apenas este tipo"
+
+msgid "Folders to pull from"
+msgstr ""
+
+#, fuzzy
+msgid "Include Archive"
+msgstr "Arquivar"
+
+#, fuzzy
+msgid "Include other folders"
+msgstr "Conta da pasta atual"
+
+msgid "Everything that is not an inbox or an archive"
+msgstr ""
+
+#, fuzzy
+msgid "Pulling attachments from"
+msgstr "Carregar anexos do servidor"
 
 msgid "Show only this type"
 msgstr "Mostrar apenas este tipo"
@@ -1582,6 +1624,18 @@ msgstr "Abrir na aplicação predefinida"
 
 msgid "Go to Message"
 msgstr "Ir para a mensagem"
+
+msgid "All accounts"
+msgstr "Todas as contas"
+
+#. Deliberately counts messages, not attachments: until a message has
+#. been described there is no telling how many files it holds.
+#, fuzzy
+msgid "Indexing {n} messages…"
+msgstr "Mensagens: {n}"
+
+msgid "Loading more…"
+msgstr "A carregar mais…"
 
 msgid "The file could not be opened"
 msgstr "Não foi possível abrir o ficheiro"
@@ -2167,9 +2221,6 @@ msgstr "Esta pasta"
 msgid "Clear selection"
 msgstr "Limpar seleção"
 
-msgid "Loading more…"
-msgstr "A carregar mais…"
-
 msgid "No Messages"
 msgstr "Sem mensagens"
 
@@ -2199,8 +2250,16 @@ msgstr ""
 "Um resultado positivo prova que o endereço não foi falsificado — não que a "
 "mensagem seja segura."
 
+#, fuzzy
+msgid "No draft selected"
+msgstr "Nenhuma mensagem selecionada"
+
 msgid "No message selected"
 msgstr "Nenhuma mensagem selecionada"
+
+#, fuzzy
+msgid "Choose a draft from the list to edit it here."
+msgstr "Escolha uma mensagem da lista para a ler aqui."
 
 msgid "Choose a message from the list to read it here."
 msgstr "Escolha uma mensagem da lista para a ler aqui."
@@ -2667,6 +2726,26 @@ msgstr "Data e hora"
 msgid "Backup"
 msgstr "Cópia de segurança"
 
+#, fuzzy
+msgid "Not installed"
+msgstr "Sessão não iniciada"
+
+msgid "Installed and loaded by Files"
+msgstr ""
+
+msgid ""
+"Installed, but the nautilus-python package is missing, so Files cannot load "
+"it"
+msgstr ""
+
+msgid ""
+"Installed. Files has not loaded it yet: restart Files, and make sure the "
+"nautilus-python package is installed"
+msgstr ""
+
+msgid "Installed, but not this version's copy"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr "Guardar o filtro?"
 
@@ -2956,9 +3035,6 @@ msgstr ""
 "abaixo começam também recolhidos. Uma pressão prolongada na barra continua a "
 "expandir ou recolher qualquer um deles, e a barra lateral completa reaparece "
 "exatamente como a deixou."
-
-msgid "All accounts"
-msgstr "Todas as contas"
 
 msgid "Every account's folder list."
 msgstr "A lista de pastas de cada conta."
@@ -3339,10 +3415,12 @@ msgstr ""
 msgid "Show sender logos"
 msgstr "Mostrar logótipos dos remetentes"
 
+#, fuzzy
 msgid ""
-"Fills the sender's avatar with the brand's own site icon, fetched from the "
-"sender's domain. That domain learns your IP address, which is what blocking "
-"remote content otherwise avoids."
+"Fills the sender's avatar with the brand's logo: the one the sender "
+"publishes for mail (BIMI), one bundled with Vireo, or the site's own icon. "
+"All but the bundled ones are fetched from the sender's domain, which then "
+"learns your IP address, as blocking remote content otherwise avoids."
 msgstr ""
 "Preenche o avatar do remetente com o ícone do site da marca, obtido a partir "
 "do domínio do remetente. Esse domínio fica a conhecer o seu endereço IP, "
@@ -3453,6 +3531,42 @@ msgstr ""
 "anexar a um relatório de erro. Os endereços de e-mail são abreviados para o "
 "respetivo domínio."
 
+msgid "GNOME Files"
+msgstr ""
+
+msgid ""
+"Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
+"selected files open in a new message, attached. This installs a small "
+"extension in your home folder. It also needs the nautilus-python package "
+"(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
+"before the entry appears."
+msgstr ""
+
+msgid "Right-click menu entry"
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+msgid "Install"
+msgstr ""
+
+msgid "Install the nautilus-python package first: paste this in a terminal"
+msgstr ""
+
+#, fuzzy
+msgid "Restart Files"
+msgstr "Reiniciar o Vireo"
+
+msgid ""
+"Closes every Files window, the same as \"nautilus -q\". The next one opens "
+"with the entry, or without it once removed."
+msgstr ""
+
+#, fuzzy
+msgid "Restart"
+msgstr "Reiniciar agora"
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3534,6 +3648,18 @@ msgstr "Idioma do sistema — {language}"
 
 msgid "Add a word"
 msgstr "Adicionar uma palavra"
+
+#, fuzzy
+msgid "Could not install the extension"
+msgstr "Não foi possível assinar a chave: {e}"
+
+#, fuzzy
+msgid "Could not remove the extension"
+msgstr "Não foi possível importar a chave"
+
+#, fuzzy
+msgid "Could not restart Files"
+msgstr "Não foi possível ler o ficheiro"
 
 msgid "Forget this word"
 msgstr "Esquecer esta palavra"

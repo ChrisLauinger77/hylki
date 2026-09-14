@@ -1,5 +1,143 @@
 # Changelog
 
+## 1.29.0 — 2026-09-14
+
+The attachments gallery now reaches the whole archive and can be scoped
+to accounts and folders, "Send with Vireo" from the GNOME Files
+right-click menu, "Send by email" from a file manager works inside the
+Flatpak, opening the app while it runs in the background no longer
+leaves the pointer busy, and people on Gmail and other mailbox hosts no
+longer wear their provider's logo.
+
+- **Attachments gallery reaches the whole archive.** The gallery could
+  only show attachments whose bytes had already been downloaded (the
+  newest 25 attachment-carrying messages per folder sync plus whatever
+  had been opened by hand): on a real mailbox, 45 files out of 17,028
+  messages known to carry one. A new tier sits between the index and
+  the bytes: a scan works back through each folder's undescribed
+  attachment-carrying messages with IMAP `BODYSTRUCTURE`, 200 per
+  FETCH, and records filename, type, size and section per part in
+  `attachment_meta` (a few hundred bytes per message; two decades of
+  archive cost single-digit megabytes). Bytes are still downloaded only
+  when a file is opened, and opening one the gallery knows of but has
+  never held fetches it and fills the thumbnail in place.
+  `BODYSTRUCTURE` is asked for alone rather than beside `ENVELOPE`, so
+  iCloud, whose non-compliance is in the envelope half, parses it. A
+  batch that fails to parse is halved and retried down to the one
+  message responsible, bounded by a per-request budget, and a dropped
+  connection leaves the messages unscanned rather than recorded as
+  empty (cache schema v15 re-queues messages written off that way
+  before). Base64 sizes are decoded back so files do not read a third
+  larger than they are. Scope, search, type filter and sort are now one
+  SQL query against the cache (`cache::GalleryQuery`), served from the
+  app's own cache handle rather than through the account workers; the
+  UI shows 120 rows and loads the next page when the scroll comes
+  within two rows of the end, with a spinner in the footer for that
+  and for the scan. Every `ORDER BY` carries the same tie-break so a
+  row cannot drift between pages; search words are LIKE-escaped.
+  Schema v14 is additive, so `RENDER_VERSION` now gates the drop of
+  `bodies`/`sender_checks` rather than `SCHEMA_VERSION`. Existing
+  downloaded attachments are seeded into `attachment_meta` on upgrade.
+  Microsoft 365 accounts (Graph) still show only what has been
+  downloaded, since their attachments come out of the raw MIME. Demo
+  mode opens an in-memory cache seeded with sample mail;
+  `VIREO_DEMO_ATTACHMENTS=N` pads it, `VIREO_SHOWCASE_GALLERY_MORE=N`
+  pages down. Nine unit tests cover `structure_attachments`.
+- **Gallery search keeps the focus.** Typing in the gallery's search
+  box lost the focus after the first letter: the toolbar was shown only
+  while the loaded list was non-empty, each keystroke cleared the list
+  to ask for a fresh page, and GTK moved the focus out of the widget
+  that was disappearing. A reload now keeps what is on screen until the
+  replacement page arrives, the toolbar and footer stay up whenever the
+  view has been narrowed, and typing is debounced by 250ms.
+  `VIREO_SHOWCASE_GALLERY_SEARCH=<text>` types into the box and reports
+  whether the focus stayed.
+- **Gallery scope: accounts and folders.** The footer carries an
+  account dropdown ("All accounts", then one row per account; transient,
+  hidden with a single account) and a folders button with two master
+  switches, "Include Archive" and "Include other folders", above a
+  per-account checklist of every folder the gallery can draw on.
+  Inboxes answer to neither switch. Sent is listed and starts unticked;
+  Drafts, Junk and Trash are not offered. A switch that is off outranks
+  a tick without clearing it (the rows go insensitive), so turning it
+  back on restores each folder to what was chosen. Only ticks that
+  differ from their kind's default are written to `state.toml`. The
+  scope is a view filter over the cache, not a change to what the
+  background prefetch downloads. Also fixed on the way: `load_state()`
+  fell back to `StateFile::default()` with no state file, handing every
+  field its type's zero instead of its serde default (pane widths and
+  the thumbnail size were landing on 0 and being clamped); it now
+  deserializes an empty document. The demo backend returns sample
+  gallery attachments; `VIREO_SHOWCASE_GALLERY` (+`_FOLDERS`,
+  `_ACCOUNT`) captures it.
+- **Send with Vireo from GNOME Files** (#188, requested by
+  [@7system7](https://github.com/7system7)). A Nautilus extension,
+  `data/nautilus/vireo-nautilus.py`, adds "Send with Vireo" to the
+  right-click menu on selected files: they open in a new message,
+  attached. Folders are skipped; files on a mounted share go by their
+  mount path. It launches Vireo by desktop id (stable, then beta) with
+  Files' own launch context so the window can come to the front, and
+  falls back to the `vireo` command or `flatpak run`; its label and tip
+  carry their own fr/hu/pt/ru strings. Files loads extensions on the
+  host, so the copy bundled in the binary is installed from Settings →
+  System → GNOME Files into `~/.local/share/nautilus-python/extensions/`
+  (`src/nautilus_ext.rs`), with Install, Update and Remove, and a
+  Restart button that asks Files to quit over D-Bus. The extension
+  leaves a marker (the SHA-256 of the file Files loaded) next to itself
+  when loaded, so the row reads "Installed and loaded by Files" once
+  that marker carries this build's hash; until then it says so and
+  names the `nautilus-python` package, a native install also checks for
+  the loader's library, and a read-only field shows the install command
+  for the host's distribution (from os-release through `/run/host`:
+  dnf, apt, pacman, zypper, emerge, apk, xbps) with a copy button. The
+  Fedora RPM recommends `nautilus-python`. The README has a guide,
+  including a curl one-liner. New sandbox permissions:
+  `--filesystem=xdg-data/nautilus-python/extensions:create` and
+  `--talk-name=org.gnome.Nautilus`.
+- **Send by email from a file manager attaches the files and brings the
+  window up.** Nautilus's "Send by email" hands the chosen files over as
+  `attach=` paths inside a `mailto:` URI. Inside the Flatpak the paths
+  were not readable (file forwarding only exports arguments that are
+  themselves files, and the sandbox could not see the home directory),
+  so the composer opened empty. The manifest now grants read-only
+  access to the home directory and removable drives
+  (`--filesystem=home:ro`, `/run/media:ro`, `/media:ro`; the narrower
+  read-write entries still win), and a file that still cannot be read
+  is reported in the app's notification bar instead of disappearing.
+  When the window does not get the focus after a hand-off (a stale or
+  missing token), a desktop notification says the message is ready;
+  clicking it raises the main window and the newest composer. The
+  alert withdraws itself once any window of ours is active. The
+  `mailto:` and file hand-offs log what they received and what they
+  could read.
+- **Opening the app while it runs in the background no longer leaves the
+  pointer busy for 15 s** (#187, reported by
+  [@yioannides](https://github.com/yioannides)). With "Run in
+  Background" on, Vireo is already running when its icon is clicked,
+  and the launch is handed to that instance over D-Bus. GNOME had given
+  the new process an activation token for the window that would
+  appear, but the hand-off never carried it: GTK 4 removes the token
+  from the environment in a library constructor, before `main` runs,
+  and keeps it for GApplication's own use. Without the token on the
+  window, mutter's startup sequence ran to its 15 s timeout, the busy
+  pointer stayed, and GNOME Shell, holding the app in its "starting"
+  state, ignored every further click on the icon until then. The
+  hand-off now goes through a throwaway `GtkApplication` registered as
+  a remote instance, whose `Activate`/`Open` calls carry the stashed
+  token. The `open` handler emits `activate` directly instead of
+  calling `app.activate()`, which GApplication brackets with a
+  `before_emit` carrying no token that wiped the one just installed.
+  The window that comes up now completes the launch and can take the
+  focus from whoever launched it.
+- **Sender logos are for brands, not for people on Gmail.** An address
+  at a mailbox host names a person, so mail from a friend on Gmail was
+  wearing the Gmail mark (from the bundled map) and anyone at
+  hotmail.com got the site's favicon. `logo.rs` keeps a `MAILBOX_HOSTS`
+  list (the freemail and privacy providers, national portals and ISP
+  domains) and refuses an address at one of them in every entry point,
+  so the row keeps its coloured initials and no lookup is scheduled.
+  The provider marks identifying an account in Settings are untouched.
+
 ## 1.28.2 — 2026-09-13
 
 Sender logos from BIMI and a bundled set, wide mail that scrolls again

@@ -318,6 +318,11 @@ msgstr "{n} üzenet törlése"
 msgid "New Message"
 msgstr "Új üzenet"
 
+msgid "Could not attach {names}: Vireo cannot read the file."
+msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Delete this conversation?"
 msgstr "Törli ezt a beszélgetést?"
 
@@ -684,6 +689,19 @@ msgstr "Ütemezve ekkorra: {when}"
 
 msgid "New message"
 msgstr "Új üzenet"
+
+#, fuzzy
+msgid "Message ready to send"
+msgstr "Üzenetkártya-műveletek"
+
+#, fuzzy
+msgid "A new message is open in Vireo."
+msgstr "Előbb nyisson meg egy üzenetet, majd nyomtassa ki."
+
+msgid "A new message with {n} file attached is open in Vireo."
+msgid_plural "A new message with {n} files attached is open in Vireo."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "GnuPG (gpg) is not installed, so this message cannot be read."
 msgstr "A GnuPG (gpg) nincs telepítve, ezért ez az üzenet nem olvasható."
@@ -1072,11 +1090,10 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Speciális mappák"
 
+#, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. "
-"Automatic                                      follows the server's own "
-"markings; pick a folder                                      when a role "
-"isn't detected or lands wrong."
+"Where sent, deleted and junk mail goes. Automatically follows the server's "
+"own markings; pick a folder when a role isn't detected or lands wrong."
 msgstr ""
 "Az elküldött, törölt és levélszemét levelek helye. Az Automatikus a "
 "kiszolgáló saját jelöléseit követi; válasszon mappát, ha egy szerepkör nem "
@@ -1469,7 +1486,10 @@ msgstr "A beérkezett üzenetek mellékletei itt jelennek meg."
 msgid "No matching attachments"
 msgstr "Nincs egyező melléklet"
 
-msgid "Try a different search or clear the filter."
+#, fuzzy
+msgid ""
+"Try a different search, or check which accounts and folders the footer is "
+"pulling from."
 msgstr "Próbáljon másképp keresni, vagy törölje a szűrőt."
 
 msgid "Thumbnail grid"
@@ -1477,6 +1497,27 @@ msgstr "Bélyegképrács"
 
 msgid "Table"
 msgstr "Táblázat"
+
+#, fuzzy
+msgid "Show only this account"
+msgstr "Csak ennek a típusnak a megjelenítése"
+
+msgid "Folders to pull from"
+msgstr ""
+
+#, fuzzy
+msgid "Include Archive"
+msgstr "Archiválás"
+
+msgid "Include other folders"
+msgstr ""
+
+msgid "Everything that is not an inbox or an archive"
+msgstr ""
+
+#, fuzzy
+msgid "Pulling attachments from"
+msgstr "Mellékletek betöltése a kiszolgálóról"
 
 msgid "Show only this type"
 msgstr "Csak ennek a típusnak a megjelenítése"
@@ -1534,6 +1575,18 @@ msgstr "Megnyitás az alapértelmezett alkalmazásban"
 
 msgid "Go to Message"
 msgstr "Ugrás az üzenethez"
+
+msgid "All accounts"
+msgstr ""
+
+#. Deliberately counts messages, not attachments: until a message has
+#. been described there is no telling how many files it holds.
+#, fuzzy
+msgid "Indexing {n} messages…"
+msgstr "{n} üzenet törlése"
+
+msgid "Loading more…"
+msgstr "Továbbiak betöltése…"
 
 msgid "The file could not be opened"
 msgstr "A fájl nem nyitható meg"
@@ -2113,9 +2166,6 @@ msgstr "Ez a mappa"
 msgid "Clear selection"
 msgstr "Kijelölés törlése"
 
-msgid "Loading more…"
-msgstr "Továbbiak betöltése…"
-
 msgid "No Messages"
 msgstr "Nincsenek üzenetek"
 
@@ -2145,8 +2195,16 @@ msgstr ""
 "A sikeres ellenőrzés bizonyítja, hogy a címet nem hamisították meg — azt "
 "nem, hogy az üzenet biztonságos."
 
+#, fuzzy
+msgid "No draft selected"
+msgstr "Nincs kijelölt üzenet"
+
 msgid "No message selected"
 msgstr "Nincs kijelölt üzenet"
+
+#, fuzzy
+msgid "Choose a draft from the list to edit it here."
+msgstr "Válasszon ki egy üzenetet a listából az itteni olvasásához."
 
 msgid "Choose a message from the list to read it here."
 msgstr "Válasszon ki egy üzenetet a listából az itteni olvasásához."
@@ -2610,6 +2668,26 @@ msgstr "Dátum és idő"
 msgid "Backup"
 msgstr "Biztonsági mentés"
 
+#, fuzzy
+msgid "Not installed"
+msgstr "Nincs bejelentkezve"
+
+msgid "Installed and loaded by Files"
+msgstr ""
+
+msgid ""
+"Installed, but the nautilus-python package is missing, so Files cannot load "
+"it"
+msgstr ""
+
+msgid ""
+"Installed. Files has not loaded it yet: restart Files, and make sure the "
+"nautilus-python package is installed"
+msgstr ""
+
+msgid "Installed, but not this version's copy"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr ""
 
@@ -2845,9 +2923,6 @@ msgid ""
 "When the sidebar collapses to the icon rail, the items switched on below "
 "start folded up. A long-press in the rail still expands or collapses any of "
 "them, and the full sidebar comes back exactly as you left it."
-msgstr ""
-
-msgid "All accounts"
 msgstr ""
 
 msgid "Every account's folder list."
@@ -3210,10 +3285,12 @@ msgstr ""
 msgid "Show sender logos"
 msgstr "Feladói logók megjelenítése"
 
+#, fuzzy
 msgid ""
-"Fills the sender's avatar with the brand's own site icon, fetched from the "
-"sender's domain. That domain learns your IP address, which is what blocking "
-"remote content otherwise avoids."
+"Fills the sender's avatar with the brand's logo: the one the sender "
+"publishes for mail (BIMI), one bundled with Vireo, or the site's own icon. "
+"All but the bundled ones are fetched from the sender's domain, which then "
+"learns your IP address, as blocking remote content otherwise avoids."
 msgstr ""
 "A feladó avatárját a márka saját webhelyikonjával tölti ki, a feladó "
 "tartományából lekérve. A tartomány megismeri az IP-címét, amit a távoli "
@@ -3321,6 +3398,42 @@ msgstr ""
 "hibajelentéshez való csatoláshoz. Az e-mail-címek csak a tartományukra "
 "rövidülnek."
 
+msgid "GNOME Files"
+msgstr ""
+
+msgid ""
+"Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
+"selected files open in a new message, attached. This installs a small "
+"extension in your home folder. It also needs the nautilus-python package "
+"(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
+"before the entry appears."
+msgstr ""
+
+msgid "Right-click menu entry"
+msgstr ""
+
+msgid "Update"
+msgstr ""
+
+msgid "Install"
+msgstr ""
+
+msgid "Install the nautilus-python package first: paste this in a terminal"
+msgstr ""
+
+#, fuzzy
+msgid "Restart Files"
+msgstr "A Vireo újraindítása"
+
+msgid ""
+"Closes every Files window, the same as \"nautilus -q\". The next one opens "
+"with the entry, or without it once removed."
+msgstr ""
+
+#, fuzzy
+msgid "Restart"
+msgstr "Újraindítás most"
+
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
@@ -3396,6 +3509,18 @@ msgstr "Rendszernyelv — {language}"
 
 msgid "Add a word"
 msgstr "Szó hozzáadása"
+
+#, fuzzy
+msgid "Could not install the extension"
+msgstr "A kulcs nem írható alá: {e}"
+
+#, fuzzy
+msgid "Could not remove the extension"
+msgstr "A kulcs nem importálható"
+
+#, fuzzy
+msgid "Could not restart Files"
+msgstr "A fájl nem olvasható"
 
 msgid "Forget this word"
 msgstr "Szó elfelejtése"

@@ -2,6 +2,20 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.29.0
+
+**The attachments gallery reaches your whole archive.** Until now the gallery could only show files that had already been downloaded, which on a large mailbox was a few dozen out of thousands. Vireo now asks the server to describe the attachments in every message it knows of, without downloading them, and lists them all: name, type, size and a thumbnail once opened. Files are still only downloaded when you open them. The gallery loads a page at a time as you scroll, so twenty years of mail is as quick as one. Microsoft 365 accounts still show only what has been downloaded.
+
+**Choose where the gallery looks.** Its footer has an account dropdown and a folders button with switches for the Archive and for other folders, above a checklist of every folder per account. Sent is listed but off by default, since what you sent is rarely what you are hunting for. Typing in the gallery's search box no longer loses the focus after the first letter.
+
+**Send with Vireo from GNOME Files** (#188, requested by [@7system7](https://github.com/7system7)). Settings → System → GNOME Files installs a Files extension that adds "Send with Vireo" to the right-click menu on selected files: they open in a new message, attached. The page says whether Files has loaded it and, if the `nautilus-python` package is missing, shows the install command for your distribution with a copy button.
+
+**"Send by email" from a file manager works in the Flatpak.** The chosen files are attached and the window comes to the front. If it cannot, a notification says the message is ready and clicking it raises the composer. The Flatpak now has read-only access to the home directory and removable drives for this.
+
+**No more busy pointer after opening the app** (#187, reported by [@yioannides](https://github.com/yioannides)). With "Run in Background" on, clicking the icon left the mouse pointer spinning for about fifteen seconds, during which clicking the icon again did nothing. The window now completes the launch the moment it appears.
+
+**People on Gmail no longer wear the Gmail logo.** Sender logos are for brands; an address at Gmail, Outlook, iCloud, Proton and the other mailbox hosts keeps its coloured initials.
+
 ## What's new in 1.28.2
 
 **Sender logos.** With "Show sender logos" on (Settings, Privacy), Vireo now shows a sender's real mark where it can: the logo a sender publishes for mail clients (BIMI), or one from a bundled set of about 220 common senders that needs no network request at all, falling back to the site's own icon. Chase, Bank of America, Spotify, Amazon and many others show their brand.
