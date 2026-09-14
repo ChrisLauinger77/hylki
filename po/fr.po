@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-13 15:29+0200\n"
+"PO-Revision-Date: 2026-09-14 18:43+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -330,11 +330,67 @@ msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Delete this conversation?"
-msgstr "Supprimer cette conversation ?"
+msgid "Send {n} file with Vireo"
+msgid_plural "Send {n} files with Vireo"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{names} ({size}). What should the files go into?"
+msgstr ""
 
 msgid "Cancel"
 msgstr "Annuler"
+
+msgid "Reply to a Message…"
+msgstr ""
+
+msgid "Continue a Draft…"
+msgstr ""
+
+msgid "Reply to a Message"
+msgstr ""
+
+msgid "The files go into a reply to the message you pick."
+msgstr ""
+
+msgid "No messages to reply to yet."
+msgstr ""
+
+msgid "Reply With the Files"
+msgstr ""
+
+msgid "Large files"
+msgstr ""
+
+msgid ""
+"{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
+"put a download link in the message instead?"
+msgid_plural ""
+"{names} add up to {size}, over the {limit} limit. Upload them to cloud "
+"storage and put download links in the message instead?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Attach Anyway"
+msgstr ""
+
+msgid "Upload to Cloud Storage"
+msgstr "Téléverser vers un stockage en ligne"
+
+msgid "Continue a Draft"
+msgstr ""
+
+msgid "The files go into the draft you pick."
+msgstr ""
+
+msgid "No drafts to continue."
+msgstr ""
+
+msgid "Attach to This Draft"
+msgstr ""
+
+msgid "Delete this conversation?"
+msgstr "Supprimer cette conversation ?"
 
 msgid "Delete Conversation"
 msgstr "Supprimer la conversation"
@@ -598,6 +654,18 @@ msgstr "Cette liste"
 msgid "Save All Attachments"
 msgstr "Enregistrer toutes les pièces jointes"
 
+msgid "Always do this (change it in Settings → System → GNOME Files)"
+msgstr ""
+
+msgid "New Message Instead"
+msgstr ""
+
+msgid "Search by sender, subject or account"
+msgstr ""
+
+msgid "(no subject)"
+msgstr ""
+
 msgid "Default"
 msgstr "Par défaut"
 
@@ -708,13 +776,11 @@ msgstr "Programmé pour {when}"
 msgid "New message"
 msgstr "Nouveau message"
 
-#, fuzzy
 msgid "Message ready to send"
-msgstr "Actions sur la carte du message"
+msgstr "Message prêt à être envoyé"
 
-#, fuzzy
 msgid "A new message is open in Vireo."
-msgstr "Ouvrez d'abord un message, puis imprimez-le."
+msgstr "Un nouveau message est ouvert dans Vireo."
 
 msgid "A new message with {n} file attached is open in Vireo."
 msgid_plural "A new message with {n} files attached is open in Vireo."
@@ -1061,13 +1127,16 @@ msgstr ""
 "listes"
 
 msgid "Use my Gravatar"
-msgstr ""
+msgstr "Utiliser mon Gravatar"
 
 msgid ""
 "Show the picture this address has at gravatar.com. Looking it up sends them "
 "a hash of the address, and if there is none, the circle falls back to the "
 "choice below."
 msgstr ""
+"Afficher l'image associée à cette adresse sur gravatar.com. La recherche "
+"leur envoie un hachage de l'adresse ; en l'absence d'image, le cercle "
+"utilise le choix ci-dessous."
 
 msgid "Circle shows"
 msgstr "Le cercle affiche"
@@ -1135,14 +1204,13 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
 
-#, fuzzy
 msgid ""
 "Where sent, deleted and junk mail goes. Automatically follows the server's "
 "own markings; pick a folder when a role isn't detected or lands wrong."
 msgstr ""
-"Où vont les messages envoyés, supprimés et indésirables. Automatique suit le "
-"balisage propre au serveur ; choisissez un dossier lorsqu'un rôle n'est pas "
-"détecté ou mal attribué."
+"Là où vont les messages envoyés, supprimés et indésirables. Suit "
+"automatiquement le balisage propre au serveur ; choisissez un dossier "
+"lorsqu'un rôle n'est pas détecté ou mal attribué."
 
 msgid "Sent"
 msgstr "Envoyés"
@@ -1539,11 +1607,12 @@ msgstr "Les pièces jointes de vos boîtes de réception apparaîtront ici."
 msgid "No matching attachments"
 msgstr "Aucune pièce jointe correspondante"
 
-#, fuzzy
 msgid ""
 "Try a different search, or check which accounts and folders the footer is "
 "pulling from."
-msgstr "Essayez une autre recherche ou effacez le filtre."
+msgstr ""
+"Essayez une autre recherche, ou vérifiez quels comptes et dossiers le pied "
+"de page utilise."
 
 msgid "Thumbnail grid"
 msgstr "Grille de vignettes"
@@ -1551,27 +1620,23 @@ msgstr "Grille de vignettes"
 msgid "Table"
 msgstr "Tableau"
 
-#, fuzzy
 msgid "Show only this account"
-msgstr "Afficher uniquement ce type"
+msgstr "Afficher uniquement ce compte"
 
 msgid "Folders to pull from"
-msgstr ""
+msgstr "Dossiers à inclure"
 
-#, fuzzy
 msgid "Include Archive"
-msgstr "Archiver"
+msgstr "Inclure les archives"
 
-#, fuzzy
 msgid "Include other folders"
-msgstr "Informations sur le dossier actuel"
+msgstr "Inclure les autres dossiers"
 
 msgid "Everything that is not an inbox or an archive"
-msgstr ""
+msgstr "Tout ce qui n'est ni une boîte de réception ni une archive"
 
-#, fuzzy
 msgid "Pulling attachments from"
-msgstr "Charger les pièces jointes depuis le serveur"
+msgstr "Récupération des pièces jointes depuis"
 
 msgid "Show only this type"
 msgstr "Afficher uniquement ce type"
@@ -1635,9 +1700,8 @@ msgstr "Tous les comptes"
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
-#, fuzzy
 msgid "Indexing {n} messages…"
-msgstr "{n} messages"
+msgstr "Indexation de {n} messages…"
 
 msgid "Loading more…"
 msgstr "Chargement en cours…"
@@ -1743,6 +1807,15 @@ msgstr "Bibliothèque"
 
 msgid "Upload folder"
 msgstr "Dossier de téléversement"
+
+msgid "Server is behind Cloudflare"
+msgstr ""
+
+msgid ""
+"Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
+"uploaded in 90 MB pieces the server puts back together. For a self-hosted "
+"server on a Cloudflare domain or tunnel."
+msgstr ""
 
 msgid "Links expire after"
 msgstr "Les liens expirent après"
@@ -2049,9 +2122,6 @@ msgstr "Envoyer avec formatage"
 msgid "Send as plain text"
 msgstr "Envoyer en texte brut"
 
-msgid "Upload to Cloud Storage"
-msgstr "Téléverser vers un stockage en ligne"
-
 msgid "Not signed in"
 msgstr "Non connecté"
 
@@ -2256,16 +2326,14 @@ msgstr ""
 "Une validation prouve que l'adresse n'a pas été falsifiée, mais ne garantit "
 "pas que le message soit sans danger."
 
-#, fuzzy
 msgid "No draft selected"
-msgstr "Aucun message sélectionné"
+msgstr "Aucun brouillon sélectionné"
 
 msgid "No message selected"
 msgstr "Aucun message sélectionné"
 
-#, fuzzy
 msgid "Choose a draft from the list to edit it here."
-msgstr "Choisissez un message dans la liste pour le lire ici."
+msgstr "Choisissez un brouillon dans la liste pour le modifier ici."
 
 msgid "Choose a message from the list to read it here."
 msgstr "Choisissez un message dans la liste pour le lire ici."
@@ -2734,25 +2802,28 @@ msgstr "Date et heure"
 msgid "Backup"
 msgstr "Sauvegarde"
 
-#, fuzzy
 msgid "Not installed"
-msgstr "Non connecté"
+msgstr "Non installé"
 
 msgid "Installed and loaded by Files"
-msgstr ""
+msgstr "Installée et chargée par Fichiers"
 
 msgid ""
 "Installed, but the nautilus-python package is missing, so Files cannot load "
 "it"
 msgstr ""
+"Installée, mais le paquet nautilus-python est manquant, donc Fichiers ne "
+"peut pas la charger"
 
 msgid ""
 "Installed. Files has not loaded it yet: restart Files, and make sure the "
 "nautilus-python package is installed"
 msgstr ""
+"Installée. Fichiers ne l'a pas encore chargée : redémarrez Fichiers et "
+"vérifiez que le paquet nautilus-python est installé"
 
 msgid "Installed, but not this version's copy"
-msgstr ""
+msgstr "Installée, mais pas la copie de cette version"
 
 msgid "Save the filter?"
 msgstr "Enregistrer le filtre ?"
@@ -3080,13 +3151,16 @@ msgstr ""
 "l'expéditeur et à l'objet."
 
 msgid "Your own mail shows your account circle"
-msgstr ""
+msgstr "Vos propres messages affichent le cercle de votre compte"
 
 msgid ""
 "Messages you sent wear the account's Gravatar, picture or emoji, as its "
 "circle in the sidebar does. Turning it off gives them whatever circle anyone "
 "else's mail would get."
 msgstr ""
+"Les messages que vous envoyez portent le Gravatar, l'image ou l'emoji du "
+"compte, comme son cercle dans la barre latérale. En désactivant cette "
+"option, ils reçoivent le même cercle que n'importe quel autre message."
 
 msgid "Preview lines"
 msgstr "Lignes d'aperçu"
@@ -3432,16 +3506,17 @@ msgstr ""
 msgid "Show sender logos"
 msgstr "Afficher les logos de l'expéditeur"
 
-#, fuzzy
 msgid ""
 "Fills the sender's avatar with the brand's logo: the one the sender "
 "publishes for mail (BIMI), one bundled with Vireo, or the site's own icon. "
 "All but the bundled ones are fetched from the sender's domain, which then "
 "learns your IP address, as blocking remote content otherwise avoids."
 msgstr ""
-"Remplace l'avatar de l'expéditeur par le favicon officiel de la marque, "
-"récupéré depuis son domaine. Ce domaine prend alors connaissance de votre "
-"adresse IP, ce que le blocage de contenu distant vise à éviter."
+"Remplit l'avatar de l'expéditeur avec le logo de la marque : celui que "
+"l'expéditeur publie pour le courrier (BIMI), un logo fourni avec Vireo, ou "
+"l'icône propre au site. Tous, sauf ceux fournis avec Vireo, sont récupérés "
+"depuis le domaine de l'expéditeur, qui prend alors connaissance de votre "
+"adresse IP, ce que le blocage du contenu distant vise justement à éviter."
 
 msgid ""
 "By default dates follow the system's own arrangement — its field order, "
@@ -3550,7 +3625,7 @@ msgstr ""
 "raccourcies à leur domaine."
 
 msgid "GNOME Files"
-msgstr ""
+msgstr "Fichiers de GNOME"
 
 msgid ""
 "Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
@@ -3559,31 +3634,59 @@ msgid ""
 "(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
 "before the entry appears."
 msgstr ""
+"Ajoute « Envoyer avec Vireo » au menu contextuel de Fichiers (Nautilus) : "
+"les fichiers sélectionnés s'ouvrent en pièce jointe dans un nouveau message. "
+"Cela installe une petite extension dans votre dossier personnel. Le paquet "
+"nautilus-python (python3-nautilus sous Debian et Ubuntu) est également "
+"nécessaire, et Fichiers doit être redémarré pour que l'entrée apparaisse."
 
 msgid "Right-click menu entry"
-msgstr ""
+msgstr "Entrée du menu contextuel"
 
 msgid "Update"
-msgstr ""
+msgstr "Mettre à jour"
 
 msgid "Install"
-msgstr ""
+msgstr "Installer"
 
 msgid "Install the nautilus-python package first: paste this in a terminal"
 msgstr ""
+"Installez d'abord le paquet nautilus-python : collez ceci dans un terminal"
 
-#, fuzzy
 msgid "Restart Files"
-msgstr "Redémarrer Vireo"
+msgstr "Redémarrer Fichiers"
 
 msgid ""
 "Closes every Files window, the same as \"nautilus -q\". The next one opens "
 "with the entry, or without it once removed."
 msgstr ""
+"Ferme toutes les fenêtres de Fichiers, comme « nautilus -q ». La prochaine "
+"s'ouvrira avec l'entrée, ou sans elle une fois supprimée."
 
-#, fuzzy
 msgid "Restart"
-msgstr "Redémarrer maintenant"
+msgstr "Redémarrer"
+
+msgid "Files sent from Files go into"
+msgstr ""
+
+msgid ""
+"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
+"offers all three each time."
+msgstr ""
+
+msgid "Files over the size limit"
+msgstr ""
+
+msgid ""
+"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
+"one the files are attached."
+msgstr ""
+
+msgid "Size limit"
+msgstr ""
+
+msgid "In MB, for all the files together."
+msgstr ""
 
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
@@ -3658,6 +3761,24 @@ msgstr "Affiché au survol"
 msgid "Always visible"
 msgstr "Toujours visible"
 
+msgid "Ask each time"
+msgstr ""
+
+msgid "A new message"
+msgstr ""
+
+msgid "A draft you pick"
+msgstr ""
+
+msgid "A reply to a message you pick"
+msgstr ""
+
+msgid "Attach them anyway"
+msgstr ""
+
+msgid "Upload to cloud storage and link them"
+msgstr ""
+
 msgid "Account of the current folder"
 msgstr "Informations sur le dossier actuel"
 
@@ -3667,17 +3788,14 @@ msgstr "Langue du système — {language}"
 msgid "Add a word"
 msgstr "Ajouter un mot"
 
-#, fuzzy
 msgid "Could not install the extension"
-msgstr "Impossible de signer la clé : {e}"
+msgstr "Impossible d'installer l'extension"
 
-#, fuzzy
 msgid "Could not remove the extension"
-msgstr "Impossible d'importer la clé"
+msgstr "Impossible de supprimer l'extension"
 
-#, fuzzy
 msgid "Could not restart Files"
-msgstr "Le fichier ne peut être lu"
+msgstr "Impossible de redémarrer Fichiers"
 
 msgid "Forget this word"
 msgstr "Oublier ce mot"
