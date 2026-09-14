@@ -2047,14 +2047,22 @@ impl Sidebar {
             circle.set_size_request(30, 30);
             // Drawn ink-centred (see `ui::initials`), not a label: a lone
             // letter or an emoji sits exactly in the middle of the disc.
-            let glyph: gtk::Widget = match (&section.avatar, &section.emoji) {
-                (Some(path), _) => {
+            // The account's own Gravatar leads when it asked for one and the
+            // address has one (#189); the picture and the emoji are what it
+            // falls back to.
+            let gravatar = account_gravatar(&section.account.email);
+            let glyph: gtk::Widget = match (&gravatar, &section.avatar, &section.emoji) {
+                (Some(texture), ..) => {
+                    circle.set_overflow(gtk::Overflow::Hidden);
+                    crate::ui::initials::picture_from_texture(texture, 30).upcast()
+                }
+                (None, Some(path), _) => {
                     // A picture fills the disc; the disc's rounded corners
                     // clip it into a circle.
                     circle.set_overflow(gtk::Overflow::Hidden);
                     crate::ui::initials::avatar_picture(path, 30).upcast()
                 }
-                (None, Some(em)) if !em.is_empty() => {
+                (None, None, Some(em)) if !em.is_empty() => {
                     crate::ui::initials::glyph_picture(em, &section.color, 0.55, 30).upcast()
                 }
                 _ => crate::ui::initials::glyph_picture(
@@ -3916,6 +3924,15 @@ fn attach_folder_context_menu(
     list.add_controller(click);
 }
 
+/// The Gravatar an account asked for (#189), once the app has looked it up.
+/// `None` when it asked for none, when the address has none, or before the
+/// answer is back — in every case the picture, emoji or initials stand.
+fn account_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
+    crate::avatar::account_face(email)
+        .filter(|face| face.gravatar)
+        .and_then(|_| crate::avatar::own_gravatar(email))
+}
+
 pub(crate) fn account_initials(name: &str, email: &str) -> String {
     let mut it = name.split_whitespace();
     let a = it.next().and_then(|w| w.chars().next());
@@ -4012,12 +4029,17 @@ fn build_unified_inbox_row(
     circle.set_halign(gtk::Align::Center);
     circle.set_hexpand(false);
     circle.set_size_request(21, 21);
-    let glyph: gtk::Widget = match (&section.avatar, &section.emoji) {
-        (Some(path), _) => {
+    let gravatar = account_gravatar(&section.account.email);
+    let glyph: gtk::Widget = match (&gravatar, &section.avatar, &section.emoji) {
+        (Some(texture), ..) => {
+            circle.set_overflow(gtk::Overflow::Hidden);
+            crate::ui::initials::picture_from_texture(texture, 21).upcast()
+        }
+        (None, Some(path), _) => {
             circle.set_overflow(gtk::Overflow::Hidden);
             crate::ui::initials::avatar_picture(path, 21).upcast()
         }
-        (None, Some(em)) if !em.is_empty() => {
+        (None, None, Some(em)) if !em.is_empty() => {
             crate::ui::initials::glyph_picture(em, &section.color, 0.6, 21).upcast()
         }
         _ => crate::ui::initials::glyph_picture(

@@ -17,6 +17,8 @@ pub struct PrefInit {
     pub show_remote_banner: bool,
     pub gravatar: bool,
     pub avatars: bool,
+    /// Your own mail wears its mailbox's face, not a sender's circle (#189).
+    pub own_mailbox_face: bool,
     pub sender_logos: bool,
     pub date_style: DateStyle,
     pub clock_style: ClockStyle,
@@ -283,6 +285,9 @@ pub struct Preferences {
     /// Mirrors the list-palette switch, so the hover row under it can grey
     /// out when there is no palette to open.
     list_palette: bool,
+    /// Mirrors the sender-avatars switch: with no circles drawn at all,
+    /// whose face they would show doesn't arise (#189).
+    avatars: bool,
     /// The content stack (one child per category, plus the accounts panel
     /// in its "accounts" slot), driven by the sidebar (#141).
     panels_stack: Option<gtk::Stack>,
@@ -669,6 +674,7 @@ pub enum PrefInput {
     ToggleAutoRemoteContent(bool),
     ToggleGravatar(bool),
     ToggleAvatars(bool),
+    ToggleOwnMailboxFace(bool),
     ToggleSenderLogos(bool),
     ChangeDateStyle(u32),
     ChangeClockStyle(u32),
@@ -797,6 +803,7 @@ pub enum PrefOutput {
     SetShowRemoteBanner(bool),
     SetGravatar(bool),
     SetAvatars(bool),
+    SetOwnMailboxFace(bool),
     SetSenderLogos(bool),
     SetDateStyle(DateStyle),
     SetClockStyle(ClockStyle),
@@ -1531,6 +1538,22 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    // Your own mail (#189): its mailbox's
+                                    // face, or the circle any sender gets.
+                                    #[name = "own_mailbox_face_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.avatars,
+                                        set_title: &i18n("Your own mail shows your mailbox"),
+                                        set_subtitle: &i18n("Messages you sent wear the account's Gravatar, \
+                                                       picture or emoji, the same face its circle in \
+                                                       the sidebar shows. Turning it off gives them \
+                                                       whatever circle anyone else's mail would get."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleOwnMailboxFace(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "preview_lines_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Preview lines"),
@@ -2235,6 +2258,7 @@ impl Component for Preferences {
             threading: init.threading,
             thread_expansion: init.thread_expansion,
             list_palette: init.list_palette,
+            avatars: init.avatars,
             panels_stack: None,
             accounts_slot: None,
             deferred_pages: std::cell::RefCell::new(Vec::new()),
@@ -2311,6 +2335,7 @@ impl Component for Preferences {
         widgets.show_remote_banner_row.set_active(init.show_remote_banner);
         widgets.gravatar_row.set_active(init.gravatar);
         widgets.avatars_row.set_active(init.avatars);
+        widgets.own_mailbox_face_row.set_active(init.own_mailbox_face);
         widgets.sender_logos_row.set_active(init.sender_logos);
 
         // Mail-check interval combo.
@@ -2782,6 +2807,9 @@ impl Component for Preferences {
 
     fn update(&mut self, message: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
         match message {
+            PrefInput::ToggleOwnMailboxFace(on) => {
+                let _ = sender.output(PrefOutput::SetOwnMailboxFace(on));
+            }
             PrefInput::ToggleSenderLogos(on) => {
                 let _ = sender.output(PrefOutput::SetSenderLogos(on));
             }
@@ -2822,6 +2850,7 @@ impl Component for Preferences {
                 self.nautilus = crate::nautilus_ext::State::read();
             }
             PrefInput::ToggleAvatars(on) => {
+                self.avatars = on;
                 let _ = sender.output(PrefOutput::SetAvatars(on));
             }
             PrefInput::ToggleGravatar(on) => {

@@ -1902,15 +1902,19 @@ impl MessageRow {
         if email.is_empty() {
             return;
         }
-        // A mailbox of your own that was given a picture or an emoji (#189):
-        // that is the face, ahead of any contact photo or domain icon — and
-        // your own address is never sent to Gravatar to ask about.
+        // A mailbox of your own with a face of its own (#189): that is what
+        // the circle shows, ahead of any contact photo or domain icon. Its
+        // own Gravatar leads when the account asked for one (the app looks it
+        // up once a session); otherwise the picture, then the emoji, which
+        // `avatar_image` draws.
         if let Some(face) = crate::avatar::own_face(&email) {
             self.avatar_texture = face
-                .picture
-                .as_deref()
-                .and_then(crate::ui::initials::avatar_texture);
-            // No picture means an emoji, which `avatar_image` draws.
+                .gravatar
+                .then(|| crate::avatar::own_gravatar(&email))
+                .flatten()
+                .or_else(|| {
+                    face.picture.as_deref().and_then(crate::ui::initials::avatar_texture)
+                });
             return;
         }
         match crate::avatar::lookup(&email, self.gravatar) {

@@ -213,6 +213,13 @@ pub struct AccountConfig {
     /// the initials when set and the file is present.
     #[serde(default)]
     pub avatar: Option<String>,
+    /// Show this mailbox's own Gravatar (#189), ahead of the picture, the
+    /// emoji and the initials — and fall back to them when the address has
+    /// none. Off by default: looking it up sends a hash of the address to
+    /// Automattic, which is the account owner's own call to make, not a
+    /// default (the separate Privacy switch covers other people's mail).
+    #[serde(default)]
+    pub gravatar: bool,
     /// Composition signature appended to new messages from this account.
     #[serde(default)]
     pub signature: Option<String>,
@@ -813,6 +820,11 @@ struct PrivacyFile {
     /// Whether a sender's site icon may be fetched to fill their circle (#30).
     #[serde(default)]
     sender_logos: bool,
+    /// Whether the mail you sent wears its mailbox's face — the account's
+    /// Gravatar, picture or emoji (#189) — instead of the circle any other
+    /// sender would get.
+    #[serde(default = "default_own_mailbox_face")]
+    own_mailbox_face: bool,
     /// How dates are written (#32).
     #[serde(default)]
     date_style: DateStyle,
@@ -1169,6 +1181,10 @@ fn default_preview_lines() -> u32 {
     1
 }
 
+fn default_own_mailbox_face() -> bool {
+    true
+}
+
 fn default_avatars() -> bool {
     true
 }
@@ -1193,6 +1209,7 @@ impl Default for PrivacyFile {
             read_mark: ReadMark::default(),
             gravatar: false,
             avatars: default_avatars(),
+            own_mailbox_face: default_own_mailbox_face(),
             sender_logos: false,
             date_style: DateStyle::default(),
             clock_style: ClockStyle::default(),
@@ -1308,6 +1325,11 @@ pub fn load_gravatar() -> bool {
 /// Whether the avatars are shown in the list and the reader.
 pub fn load_avatars() -> bool {
     load_privacy().avatars
+}
+
+/// Whether your own messages wear their mailbox's face (#189).
+pub fn load_own_mailbox_face() -> bool {
+    load_privacy().own_mailbox_face
 }
 
 /// Whether sender logos are fetched from senders' own domains.
@@ -2147,6 +2169,7 @@ pub fn save_privacy(
     auto_remote_content: bool,
     gravatar: bool,
     avatars: bool,
+    own_mailbox_face: bool,
     sender_logos: bool,
     date_style: DateStyle,
     clock_style: ClockStyle,
@@ -2223,6 +2246,7 @@ pub fn save_privacy(
         auto_remote_content,
         gravatar,
         avatars,
+        own_mailbox_face,
         sender_logos,
         date_style,
         clock_style,
@@ -3100,6 +3124,7 @@ mod filter_tests {
             color: None,
             emoji: None,
             avatar: None,
+            gravatar: false,
             signature: None,
             signature_html: false,
             label: None,

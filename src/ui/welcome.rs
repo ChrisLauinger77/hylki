@@ -957,6 +957,7 @@ fn blank_account() -> AccountConfig {
         color: None,
         emoji: None,
         avatar: None,
+        gravatar: false,
         signature: None,
         signature_html: false,
         label: None,

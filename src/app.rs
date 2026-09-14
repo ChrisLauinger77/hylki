@@ -392,6 +392,9 @@ pub struct AppModel {
     gravatar: bool,
     /// Whether the coloured avatars are drawn at all (#29).
     avatars: bool,
+    /// Whether the mail you sent wears its mailbox's face rather than the
+    /// circle any other sender would get (#189).
+    own_mailbox_face: bool,
     /// Whether a sender's site icon may fill their circle (#30).
     sender_logos: bool,
     /// How dates are written, and on what clock (#32).
@@ -848,6 +851,14 @@ pub enum AppMsg {
     /// finished) — refresh the avatars that are on screen.
     ContactPhotosChanged,
     SetAvatars(bool),
+    /// Your own mail wears its mailbox's face, or the circle any other sender
+    /// would get (#189).
+    SetOwnMailboxFace(bool),
+    /// A Gravatar one of the accounts asked for came back (#189).
+    OwnGravatarFetched {
+        email: String,
+        outcome: crate::avatar::FetchOutcome,
+    },
     SetSenderLogos(bool),
     SetDateStyle(crate::config::DateStyle),
     SetClockStyle(crate::config::ClockStyle),
@@ -2317,6 +2328,7 @@ impl SimpleComponent for AppModel {
             palette_collapse_secs: config::load_palette_collapse(),
             gravatar: config::load_gravatar(),
             avatars: config::load_avatars(),
+            own_mailbox_face: config::load_own_mailbox_face(),
             sender_logos: config::load_sender_logos(),
             date_style: config::load_date_format().0,
             clock_style: config::load_date_format().1,
@@ -2457,6 +2469,7 @@ impl SimpleComponent for AppModel {
         // cached message is painted: the sidebar refreshes this whenever the
         // accounts change, but nothing has rebuilt it yet at this point.
         model.refresh_own_faces();
+        model.warm_own_gravatars(&sender);
         model.spawn_workers(&sender);
         if model.tray_enabled {
             model.start_tray(&sender);
@@ -3512,6 +3525,15 @@ impl SimpleComponent for AppModel {
                         } else {
                             config::AppTheme::Light
                         }));
+                    });
+                }
+                // VIREO_SHOWCASE_ACCOUNT=N opens account N's editor a beat
+                // after the Settings window (with VIREO_SHOWCASE_SETTINGS),
+                // so the editor itself can be captured.
+                if let Some(Ok(n)) = std::env::var("VIREO_SHOWCASE_ACCOUNT").ok().map(|v| v.parse::<u32>()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        s.input(AppMsg::SidebarContext(CtxAction::OpenAccountSettings(n + 1)));
                     });
                 }
                 // VIREO_SHOWCASE_SETTINGS=accounts|prefs opens the Settings
@@ -5093,6 +5115,28 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetOwnMailboxFace(on) => {
+                if self.own_mailbox_face != on {
+                    self.own_mailbox_face = on;
+                    self.save_settings();
+                    self.refresh_own_faces();
+                    // Switched on, the accounts that want a Gravatar may never
+                    // have been asked about (the switch was off at startup).
+                    if on {
+                        self.warm_own_gravatars(&sender);
+                    }
+                    self.refresh_faces();
+                }
+            }
+
+            AppMsg::OwnGravatarFetched { email, outcome } => {
+                // Nothing to redraw unless the address turned out to have one.
+                if crate::avatar::cache_own_gravatar(&email, outcome) {
+                    self.rebuild_sidebar();
+                    self.refresh_faces();
+                }
+            }
+
             AppMsg::SetSenderLogos(on) => {
                 if self.sender_logos != on {
                     self.sender_logos = on;
@@ -6299,6 +6343,8 @@ impl SimpleComponent for AppModel {
                         tracing::warn!("could not save the demo accounts: {e}");
                     }
                     self.rebuild_sidebar();
+                    self.warm_own_gravatars(&sender);
+                    self.refresh_faces();
                     return;
                 }
                 let new_email = account.email.clone();
@@ -6372,6 +6418,10 @@ impl SimpleComponent for AppModel {
                             }
                         }
                         self.rebuild_sidebar();
+                        // A picture, an emoji or the Gravatar switch may have
+                        // changed with this edit (#189).
+                        self.warm_own_gravatars(&sender);
+                        self.refresh_faces();
                         self.reconnect_all(&sender);
                     }
                     Err(e) => self.notifications.emit(NotifyInput::Push {
@@ -6959,6 +7009,9 @@ impl SimpleComponent for AppModel {
                     let _ = w.send(MailRequest::Reconnect);
                 }
                 sender.input(AppMsg::Refresh);
+                // A Gravatar lookup that failed while the network was down
+                // gets another go now that it is back (#189).
+                self.warm_own_gravatars(&sender);
                 // Realign the auto-fetch timer to now; its monotonic countdown
                 // did not advance during sleep.
                 self.arm_auto_fetch(&sender);
@@ -7907,6 +7960,7 @@ impl AppModel {
             self.auto_remote_content,
             self.gravatar,
             self.avatars,
+            self.own_mailbox_face,
             self.sender_logos,
             self.date_style,
             self.clock_style,
@@ -8473,20 +8527,20 @@ impl AppModel {
     /// not only in the sidebar. Refreshed with the sidebar, which is rebuilt
     /// whenever the accounts change.
     fn refresh_own_faces(&self) {
+        crate::avatar::set_faces_on_own_mail(self.own_mailbox_face);
         let mut faces: Vec<(String, crate::avatar::OwnFace)> = Vec::new();
         for (i, cfg) in self.effective_config().iter().enumerate() {
-            let picture = cfg.avatar.as_deref().and_then(config::avatar_path);
-            let emoji = cfg.emoji.clone().filter(|e| !e.trim().is_empty());
-            // An account showing its initials has nothing to add: the circle
-            // its own messages already get is drawn from the same letters.
-            if picture.is_none() && emoji.is_none() {
-                continue;
-            }
             let face = crate::avatar::OwnFace {
-                picture,
-                emoji,
+                gravatar: cfg.gravatar,
+                picture: cfg.avatar.as_deref().and_then(config::avatar_path),
+                emoji: cfg.emoji.clone().filter(|e| !e.trim().is_empty()),
                 color: self.account_color(i as u32 + 1),
             };
+            // An account showing its initials has nothing to add: the circle
+            // its own messages already get is drawn from the same letters.
+            if !face.is_set() {
+                continue;
+            }
             // Mail sent as a send-as alias (#34) is still from this mailbox.
             let addresses = std::iter::once(cfg.email.clone())
                 .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1));
@@ -8497,6 +8551,43 @@ impl AppModel {
             );
         }
         crate::avatar::set_own_faces(faces);
+    }
+
+    /// Redraw the faces on screen after what a mailbox shows has changed
+    /// (#189): the list rebuilds its rows, and the reader — in the pane and
+    /// in any popped-out window — its cards.
+    fn refresh_faces(&self) {
+        self.message_list.emit(MessageListInput::ContactPhotosChanged);
+        self.message_view.emit(MessageViewInput::FacesChanged);
+        for p in self.popouts.values() {
+            p.controller.emit(MessageWindowInput::FacesChanged);
+        }
+    }
+
+    /// Look up the Gravatars the accounts asked for (#189), one request per
+    /// address per session, off the main thread. Done here rather than where
+    /// a circle is drawn so every view — the sidebar, the list, an open
+    /// conversation — is holding the same answer.
+    fn warm_own_gravatars(&self, sender: &ComponentSender<Self>) {
+        for cfg in self.effective_config() {
+            if !cfg.gravatar {
+                continue;
+            }
+            // An alias is an address of its own, and may have a Gravatar of
+            // its own; each is asked about separately.
+            let addresses = std::iter::once(cfg.email.clone())
+                .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1));
+            for address in addresses.filter(|a| !a.trim().is_empty()) {
+                if !crate::avatar::wants_own_gravatar(&address) {
+                    continue;
+                }
+                let back = sender.input_sender().clone();
+                std::thread::spawn(move || {
+                    let outcome = crate::avatar::fetch_own_gravatar(&address);
+                    let _ = back.send(AppMsg::OwnGravatarFetched { email: address, outcome });
+                });
+            }
+        }
     }
 
     /// A label for an account in messages (name, else email, else "Account N").
@@ -12177,6 +12268,7 @@ impl AppModel {
             show_remote_banner: self.show_remote_banner,
             gravatar: self.gravatar,
             avatars: self.avatars,
+            own_mailbox_face: self.own_mailbox_face,
             sender_logos: self.sender_logos,
             date_style: self.date_style,
             clock_style: self.clock_style,
@@ -12266,6 +12358,7 @@ impl AppModel {
                 PrefOutput::SetShowRemoteBanner(on) => AppMsg::SetShowRemoteBanner(on),
                 PrefOutput::SetGravatar(on) => AppMsg::SetGravatar(on),
                 PrefOutput::SetAvatars(on) => AppMsg::SetAvatars(on),
+                PrefOutput::SetOwnMailboxFace(on) => AppMsg::SetOwnMailboxFace(on),
                 PrefOutput::SetSenderLogos(on) => AppMsg::SetSenderLogos(on),
                 PrefOutput::SetDateStyle(style) => AppMsg::SetDateStyle(style),
                 PrefOutput::SetClockStyle(style) => AppMsg::SetClockStyle(style),
@@ -13961,6 +14054,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         color: Some(color.into()),
         emoji: Some(emoji.into()),
         avatar: None,
+        gravatar: false,
         signature: None,
         signature_html: false,
         label: None,

@@ -350,6 +350,9 @@ pub enum MessageViewInput {
     AllowSenderAlways,
     /// The system/app light-dark preference changed; re-render to match.
     ThemeChanged,
+    /// What one of the user's own mailboxes shows has changed — a Gravatar
+    /// arrived, or the Settings switch moved (#189). Draw the cards again.
+    FacesChanged,
     /// Print the message on screen (issue #16).
     Print,
     /// Render the message to a PDF and open it, so the layout can be checked
@@ -1280,6 +1283,8 @@ impl Component for MessageView {
                     &sanitize_filename(&self.job_name()),
                 );
             }
+
+            MessageViewInput::FacesChanged => self.render(),
 
             MessageViewInput::ThemeChanged => {
                 let dark = self.effective_dark();
@@ -2254,6 +2259,16 @@ impl MessageView {
                         // replies in a conversation wear the face you gave
                         // that mailbox rather than plain initials.
                         let own = crate::avatar::own_face(&m.from_addr).and_then(|face| {
+                            // The account's own Gravatar leads when it asked
+                            // for one and the address has one; the picture and
+                            // the emoji are what it falls back to.
+                            let gravatar = face
+                                .gravatar
+                                .then(|| crate::avatar::own_gravatar_data_uri(&m.from_addr, 26))
+                                .flatten();
+                            if let Some(uri) = gravatar {
+                                return Some(format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">"));
+                            }
                             match (&face.picture, &face.emoji) {
                                 (Some(path), _) => crate::ui::initials::picture_data_uri(path, 26)
                                     .map(|uri| format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">")),
@@ -5384,6 +5399,7 @@ mod tests {
         crate::avatar::set_own_faces([(
             "Me@Example.com".to_string(),
             crate::avatar::OwnFace {
+                gravatar: false,
                 picture: None,
                 emoji: Some("\u{1F98A}".to_string()),
                 color: "#e66100".to_string(),
@@ -5414,6 +5430,7 @@ mod tests {
         crate::avatar::set_own_faces([(
             "me@example.com".to_string(),
             crate::avatar::OwnFace {
+                gravatar: false,
                 picture: Some(path.clone()),
                 emoji: Some("\u{1F98A}".to_string()),
                 color: "#e66100".to_string(),

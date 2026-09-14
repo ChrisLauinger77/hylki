@@ -229,10 +229,20 @@ pub fn avatar_texture(path: &std::path::Path) -> Option<gdk::Texture> {
 /// the texture's, and the disc (a box, whose size request is only a floor)
 /// would grow to it.
 pub fn avatar_picture(path: &std::path::Path, size: i32) -> gtk::Image {
-    let image = match avatar_texture(path) {
-        Some(t) => gtk::Image::from_paintable(Some(&t)),
-        None => gtk::Image::new(),
-    };
+    match avatar_texture(path) {
+        Some(texture) => picture_from_texture(&texture, size),
+        None => {
+            let image = gtk::Image::new();
+            image.set_pixel_size(size);
+            image
+        }
+    }
+}
+
+/// The same, for a picture already in hand rather than on disk — an
+/// account's Gravatar (#189), fetched and decoded elsewhere.
+pub fn picture_from_texture(texture: &gdk::Texture, size: i32) -> gtk::Image {
+    let image = gtk::Image::from_paintable(Some(texture));
     image.set_pixel_size(size);
     image.set_halign(gtk::Align::Center);
     image.set_valign(gtk::Align::Center);

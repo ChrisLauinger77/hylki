@@ -208,6 +208,8 @@ struct AliasDialog {
 
 #[derive(Debug)]
 pub enum AccountsInput {
+    /// The editor's "Use my Gravatar" switch moved (#189).
+    SetOwnGravatar(bool),
     /// The settings sidebar chose one of this component's pages (#141):
     /// "accounts", "tags", "filters" or "senders".
     ShowPage(String),
@@ -394,6 +396,11 @@ pub enum AccountsCmd {
     AliasTested(Result<(), String>),
     /// An account's secrets, read from the keyring for its editor.
     Secrets(AccountSecrets),
+    /// The Gravatar looked up for the address in the editor (#189).
+    OwnGravatar {
+        email: String,
+        outcome: crate::avatar::FetchOutcome,
+    },
 }
 
 /// What the keyring holds for one account: its password, its own SMTP
@@ -1066,6 +1073,21 @@ impl Component for AccountsWindow {
                                     },
                                 },
 
+                                // This mailbox's own Gravatar (#189), ahead
+                                // of everything below — when the address has
+                                // one. Off by default: the lookup tells a
+                                // third party the address is in use here.
+                                #[name = "gravatar_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Use my Gravatar"),
+                                    set_subtitle: &i18n("Show the picture this address has at gravatar.com, \
+                                                   which is sent a hash of it to ask. With no Gravatar \
+                                                   there, the circle shows the choice below."),
+                                    connect_active_notify[sender] => move |row| {
+                                        sender.input(AccountsInput::SetOwnGravatar(row.is_active()));
+                                    },
+                                },
+
                                 // What the circle shows (#162): initials or
                                 // an emoji, or a picture. The row below
                                 // follows the choice.
@@ -1525,6 +1547,7 @@ impl Component for AccountsWindow {
                 self.editing = None;
                 self.emoji = None;
                 self.avatar = None;
+                widgets.gravatar_row.set_active(false);
                 self.picture_mode = false;
                 widgets.mode_glyph_btn.set_active(true);
                 self.label_synced = String::new();
@@ -1606,6 +1629,7 @@ impl Component for AccountsWindow {
                     .set_rgba(&parse_color(acc.color.as_deref().unwrap_or(DEFAULT_COLOR)));
                 self.emoji = acc.emoji.clone();
                 self.avatar = acc.avatar.clone();
+                widgets.gravatar_row.set_active(acc.gravatar);
                 self.picture_mode = acc.avatar.is_some();
                 if self.picture_mode {
                     widgets.mode_picture_btn.set_active(true);
@@ -1757,6 +1781,24 @@ impl Component for AccountsWindow {
                     self.avatar = None;
                 } else {
                     self.emoji = None;
+                }
+                self.refresh_preview(widgets);
+            }
+
+            AccountsInput::SetOwnGravatar(on) => {
+                // Look it up as soon as it is asked for, so the preview can
+                // answer rather than waiting for the account to be saved.
+                let address = trimmed(&widgets.email_row);
+                if on && !address.is_empty() && crate::avatar::wants_own_gravatar(&address) {
+                    sender.oneshot_command(async move {
+                        let outcome = tokio::task::spawn_blocking({
+                            let address = address.clone();
+                            move || crate::avatar::fetch_own_gravatar(&address)
+                        })
+                        .await
+                        .unwrap_or(crate::avatar::FetchOutcome::Retry);
+                        AccountsCmd::OwnGravatar { email: address, outcome }
+                    });
                 }
                 self.refresh_preview(widgets);
             }
@@ -2405,6 +2447,16 @@ impl Component for AccountsWindow {
         _root: &Self::Root,
     ) {
         match result {
+            AccountsCmd::OwnGravatar { email, outcome } => {
+                // Cached for every other circle in the app as well; the
+                // preview only redraws while that address is still in the
+                // editor.
+                let found = crate::avatar::cache_own_gravatar(&email, outcome);
+                if found && trimmed(&widgets.email_row).eq_ignore_ascii_case(&email) {
+                    self.refresh_preview(widgets);
+                }
+            }
+
             AccountsCmd::Secrets(secrets) => {
                 // Still editing that account: fill in what the user hasn't
                 // typed over meanwhile.
@@ -3235,9 +3287,21 @@ impl AccountsWindow {
         };
         let picture = self.saved_avatar().and_then(|n| crate::config::avatar_path(&n));
         let emoji = self.saved_emoji();
-        let glyph: gtk::Widget = match (&picture, &emoji) {
-            (Some(path), _) => crate::ui::initials::avatar_picture(path, 72).upcast(),
-            (None, Some(em)) => crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast(),
+        // The Gravatar this address has, when it was asked for and found
+        // (#189) — the same order the sidebar circle and the cards use.
+        let gravatar = widgets
+            .gravatar_row
+            .is_active()
+            .then(|| crate::avatar::own_gravatar(&trimmed(&widgets.email_row)))
+            .flatten();
+        let glyph: gtk::Widget = match (&gravatar, &picture, &emoji) {
+            (Some(texture), ..) => {
+                crate::ui::initials::picture_from_texture(texture, 72).upcast()
+            }
+            (None, Some(path), _) => crate::ui::initials::avatar_picture(path, 72).upcast(),
+            (None, None, Some(em)) => {
+                crate::ui::initials::glyph_picture(em, &color, 0.55, 72).upcast()
+            }
             _ => initials().upcast(),
         };
         disc.append(&glyph);
@@ -3308,6 +3372,7 @@ fn read_account(
         color: Some(crate::color::to_hex(&widgets.color_btn.rgba())),
         emoji,
         avatar,
+        gravatar: widgets.gravatar_row.is_active(),
         // Filled in by SaveWithSig from the rich-text editor.
         signature: None,
         signature_html: true,

@@ -79,6 +79,8 @@ pub enum MessageWindowInput {
     SetContentTheme(Option<bool>),
     /// The reader's own fonts and colours changed (#56).
     SetReaderStyle(crate::config::ReaderStyle),
+    /// What one of the user's own mailboxes shows changed (#189).
+    FacesChanged,
     // ---- toolbar actions ----
     Reply,
     ReplyAll,
@@ -358,6 +360,9 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetReaderStyle(style) => {
                 self.view.emit(MessageViewInput::SetReaderStyle(style));
+            }
+            MessageWindowInput::FacesChanged => {
+                self.view.emit(MessageViewInput::FacesChanged);
             }
             MessageWindowInput::SetSenderCheck(check) => {
                 // Light the popout's header seal too (#88).

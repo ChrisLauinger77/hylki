@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 
-use gtk::prelude::Cast;
+use gtk::prelude::{Cast, TextureExt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AvatarSource {
@@ -72,10 +72,12 @@ fn key(email: &str) -> String {
 }
 
 /// One of the user's own mailboxes, as its account was set up in Accounts
-/// (#162): the picture or the emoji the sidebar's circle draws for it, and
-/// the colour that emoji sits on.
+/// (#162): what its circle draws, in the order it is tried.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OwnFace {
+    /// The account asked for its own Gravatar (#189). It leads when the
+    /// address has one; when it has none the rest of this still applies.
+    pub gravatar: bool,
     /// The account's avatar picture, when it has one and the file is there.
     pub picture: Option<std::path::PathBuf>,
     /// Its avatar emoji, for an account that chose one instead.
@@ -84,19 +86,32 @@ pub struct OwnFace {
     pub color: String,
 }
 
+impl OwnFace {
+    /// Whether there is anything here to draw. An account that asked for
+    /// nothing shows the initials circle any sender would get.
+    pub fn is_set(&self) -> bool {
+        self.gravatar || self.picture.is_some() || self.emoji.is_some()
+    }
+}
+
 thread_local! {
     /// Every address the user sends from — an account's own and its send-as
-    /// aliases — for the accounts that chose a picture or an emoji. Kept here
-    /// rather than handed down so the reader's cards and the list's rows can
-    /// both ask; the app refreshes it whenever the accounts change.
+    /// aliases — for the accounts that asked for a face of their own. Kept
+    /// here rather than handed down so the sidebar, the reader's cards and
+    /// the list's rows can all ask; the app refreshes it whenever the
+    /// accounts change.
     static OWN_FACES: RefCell<HashMap<String, OwnFace>> = RefCell::new(HashMap::new());
-    /// Bumped whenever that map actually changes, so a view holding on to
-    /// what it last drew (the reader's document) knows to draw it again.
+    /// Whether that face is also worn by the mail the user sent, or only by
+    /// the account itself (Settings; #189). Either way the sidebar circle and
+    /// the account editor show it — this is about messages.
+    static FACES_ON_OWN_MAIL: Cell<bool> = const { Cell::new(true) };
+    /// Bumped whenever any of the above actually changes, so a view holding
+    /// on to what it last drew (the reader's document) knows to draw again.
     static OWN_FACES_GENERATION: Cell<u64> = const { Cell::new(0) };
 }
 
 /// Hand the face chain the mailboxes the user owns, keyed by address. Only
-/// accounts with a picture or an emoji belong here: one showing its initials
+/// accounts that asked for something belong here: one showing its initials
 /// has nothing to add to the circle a sender already gets.
 pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
     let faces: HashMap<String, OwnFace> =
@@ -106,23 +121,135 @@ pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
             return;
         }
         *current.borrow_mut() = faces;
-        OWN_FACES_GENERATION.with(|g| g.set(g.get().wrapping_add(1)));
+        note_faces_changed();
     });
 }
 
-/// What to draw for `email` when it is one of the user's own addresses
-/// (#189): the picture chosen for that mailbox is the face on the messages it
-/// sent — in a conversation's cards and in the list, exactly as in the
-/// sidebar. `None` for everyone else, and for own accounts showing initials.
-pub fn own_face(email: &str) -> Option<OwnFace> {
+/// Whether the mail the user sent wears its mailbox's face, or the circle any
+/// other sender would get (the Settings choice; #189).
+pub fn set_faces_on_own_mail(on: bool) {
+    FACES_ON_OWN_MAIL.with(|flag| {
+        if flag.get() == on {
+            return;
+        }
+        flag.set(on);
+        note_faces_changed();
+    });
+}
+
+/// The face `email`'s own account asked for, whatever the mail setting says:
+/// the sidebar's circle and the account editor's preview draw this.
+pub fn account_face(email: &str) -> Option<OwnFace> {
     let key = key(email);
     OWN_FACES.with(|faces| faces.borrow().get(&key).cloned())
 }
 
-/// How many times [`set_own_faces`] has changed what the user's mailboxes
-/// show — a render token for views that cache their output.
+/// What to draw for `email` when it is one of the user's own addresses and
+/// its face is worn by its mail (#189): the Gravatar, picture or emoji chosen
+/// for that mailbox is the face on the messages it sent, in a conversation's
+/// cards and in the list. `None` for everyone else, for own accounts showing
+/// initials, and for everyone once the Settings switch is off.
+pub fn own_face(email: &str) -> Option<OwnFace> {
+    if !FACES_ON_OWN_MAIL.with(Cell::get) {
+        return None;
+    }
+    account_face(email)
+}
+
+/// Note that what the user's mailboxes show has changed (a Gravatar arrived,
+/// say), so cached renders are rebuilt.
+pub fn note_faces_changed() {
+    OWN_FACES_GENERATION.with(|g| g.set(g.get().wrapping_add(1)));
+}
+
+/// How many times what the user's mailboxes show has changed — a render token
+/// for views that cache their output.
 pub fn own_faces_generation() -> u64 {
     OWN_FACES_GENERATION.with(Cell::get)
+}
+
+
+thread_local! {
+    /// Own addresses whose Gravatar has been asked about this session. A miss
+    /// or a network failure must not become a request on every render.
+    static OWN_GRAVATAR_ASKED: RefCell<std::collections::HashSet<String>> =
+        RefCell::new(std::collections::HashSet::new());
+    /// Own Gravatars already scaled for a reader card, by address and pixels.
+    static OWN_GRAVATAR_URIS: RefCell<HashMap<(String, i32), String>> = RefCell::new(HashMap::new());
+}
+
+/// The Gravatar `email` asked for, once it has been fetched and found (#189).
+/// `None` covers "not looked up yet" and "there isn't one" alike: both mean
+/// the account's picture, emoji or initials are what to draw.
+pub fn own_gravatar(email: &str) -> Option<gtk::gdk::Texture> {
+    let key = key(email);
+    GRAVATAR_CACHE.with(|cache| cache.borrow().get(&key).cloned().flatten())
+}
+
+/// Whether `email`'s Gravatar still wants looking up: true at most once a
+/// session per address, so a miss or a failure costs one request rather than
+/// one per redraw.
+pub fn wants_own_gravatar(email: &str) -> bool {
+    let key = key(email);
+    if GRAVATAR_CACHE.with(|cache| cache.borrow().contains_key(&key)) {
+        return false;
+    }
+    OWN_GRAVATAR_ASKED.with(|asked| asked.borrow_mut().insert(key))
+}
+
+/// Look up one of the user's own Gravatars. Blocking — for a worker thread;
+/// hand what comes back to [`cache_own_gravatar`] on the main thread.
+pub fn fetch_own_gravatar(email: &str) -> FetchOutcome {
+    fetch(email, FetchMode::GravatarOnly)
+}
+
+/// Store what [`fetch_own_gravatar`] found, and say whether it gave the
+/// mailbox a face it did not have — which is when the views must redraw.
+pub fn cache_own_gravatar(email: &str, outcome: FetchOutcome) -> bool {
+    let found = matches!(outcome, FetchOutcome::Found(_));
+    // A request that failed (no network yet at startup, say) settles nothing:
+    // forget that it was asked, so the next thing that would ask — an account
+    // saved, the switch moved, waking from sleep — asks again.
+    if matches!(outcome, FetchOutcome::Retry) {
+        OWN_GRAVATAR_ASKED.with(|asked| asked.borrow_mut().remove(&key(email)));
+    }
+    cache_result(email, crate::contacts::photo_generation(), FetchMode::GravatarOnly, outcome);
+    let key = key(email);
+    OWN_GRAVATAR_URIS.with(|cache| cache.borrow_mut().retain(|(address, _), _| address != &key));
+    if found {
+        note_faces_changed();
+    }
+    found
+}
+
+/// That Gravatar as a `data:` PNG of `size` CSS pixels, for a reader card —
+/// a document cannot be handed a texture. Scaled on the way in and kept, the
+/// same way the account pictures beside it are.
+pub fn own_gravatar_data_uri(email: &str, size: i32) -> Option<String> {
+    // Twice the CSS size, as the account pictures are drawn: enough for a
+    // HiDPI screen without carrying a full-size portrait per card.
+    let px = (size * 2).max(1);
+    let cache_key = (key(email), px);
+    if let Some(hit) = OWN_GRAVATAR_URIS.with(|cache| cache.borrow().get(&cache_key).cloned()) {
+        return Some(hit);
+    }
+    let texture = own_gravatar(email)?;
+    let png = texture.save_to_png_bytes();
+    let stream = gtk::gio::MemoryInputStream::from_bytes(&png);
+    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_stream_at_scale(
+        &stream,
+        px,
+        px,
+        false,
+        None::<&gtk::gio::Cancellable>,
+    )
+    .ok()?;
+    let scaled = pixbuf.save_to_bufferv("png", &[]).ok()?;
+    let uri = format!("data:image/png;base64,{}", gtk::glib::base64_encode(&scaled));
+    OWN_GRAVATAR_URIS.with(|cache| {
+        cache.borrow_mut().insert(cache_key, uri.clone());
+    });
+    Some(uri)
 }
 
 /// Consult the main-thread texture/miss caches without doing I/O.
@@ -498,7 +625,10 @@ fn decode_image(bytes: &[u8]) -> Option<DecodedImage> {
 
 #[cfg(test)]
 mod tests {
-    use super::{own_face, own_faces_generation, set_own_faces, supported_raster, OwnFace};
+    use super::{
+        account_face, own_face, own_faces_generation, set_faces_on_own_mail, set_own_faces,
+        supported_raster, OwnFace,
+    };
 
     #[test]
     fn accepts_common_rasters_but_not_svg() {
@@ -512,6 +642,7 @@ mod tests {
     #[test]
     fn own_mailbox_faces_are_found_by_address() {
         let face = OwnFace {
+            gravatar: false,
             picture: None,
             emoji: Some("\u{1F98A}".to_string()),
             color: "#e66100".to_string(),
@@ -528,5 +659,37 @@ mod tests {
         set_own_faces(std::iter::empty());
         assert_eq!(own_face("ada@example.com"), None);
         assert!(own_faces_generation() > generation, "clearing them is");
+    }
+
+    /// Turning the Settings switch off (#189) takes the mailbox's face off
+    /// its mail — and leaves the account's own circle alone, which is what
+    /// the sidebar and the account editor draw.
+    #[test]
+    fn faces_can_be_kept_off_your_own_mail() {
+        let face = OwnFace {
+            gravatar: true,
+            picture: None,
+            emoji: None,
+            color: "#3584e4".to_string(),
+        };
+        assert!(face.is_set(), "asking for a Gravatar is asking for something");
+        set_own_faces([("ada@example.com".to_string(), face.clone())]);
+
+        set_faces_on_own_mail(false);
+        let generation = own_faces_generation();
+        assert_eq!(own_face("ada@example.com"), None, "her mail is like anyone's");
+        assert_eq!(
+            account_face("ada@example.com").as_ref(),
+            Some(&face),
+            "her account still shows what it was given"
+        );
+
+        set_faces_on_own_mail(false);
+        assert_eq!(own_faces_generation(), generation, "no change, no redraw");
+        set_faces_on_own_mail(true);
+        assert_eq!(own_face("ada@example.com").as_ref(), Some(&face));
+        assert!(own_faces_generation() > generation, "back on, draw it again");
+
+        set_own_faces(std::iter::empty());
     }
 }
