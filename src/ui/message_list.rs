@@ -215,6 +215,9 @@ pub struct RowInit {
     /// Whether the swipe gesture is on at all (preference, shared and read
     /// live: the tracker is enabled or not on each render).
     pub swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
+    /// How sensitive a trackpad's two-finger swipe is (preference, shared and
+    /// pushed into the row's swipe surface on each render).
+    pub swipe_sensitivity: std::rc::Rc<std::cell::Cell<f64>>,
 }
 
 /// A full swipe (#swipe): also `AdwSwipeable`'s reported `distance`, the px
@@ -383,6 +386,8 @@ pub struct MessageRow {
     swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
     /// Shared "swipe at all" preference (#92).
     swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Shared trackpad swipe sensitivity, read live on each render.
+    swipe_sensitivity: std::rc::Rc<std::cell::Cell<f64>>,
     /// Current swipe distance in px (negative = dragged left) — the source
     /// of truth while a gesture is live; reset to 0 the instant a release is
     /// resolved (post_view animates the strip back out of view).
@@ -457,9 +462,9 @@ pub enum MessageRowInput {
     /// The post-release snap-back animation landed (or there was nothing
     /// to animate): the row can drop its `.swiping` geometry again.
     SwipeSettled,
-    /// The swipe preference changed: post_view enables or disables the
-    /// row's tracker accordingly.
-    SwipeEnabledChanged,
+    /// A swipe preference changed: post_view enables or disables the row's
+    /// tracker accordingly, and re-reads the trackpad sensitivity.
+    SwipePrefsChanged,
 }
 
 #[derive(Debug)]
@@ -610,6 +615,22 @@ impl SwipeSurface {
         use gtk::subclass::prelude::ObjectSubclassIsExt;
         self.imp().progress_px.get()
     }
+
+    /// The trackpad sensitivity preference, pushed in by `post_view` so both
+    /// `AdwSwipeable::distance` and the tracker's own callback see the same
+    /// figure.
+    fn set_sensitivity(&self, factor: f64) {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        self.imp().sensitivity.set(factor.clamp(
+            crate::config::SWIPE_SENSITIVITY_MIN,
+            crate::config::SWIPE_SENSITIVITY_MAX,
+        ));
+    }
+
+    fn sensitivity(&self) -> f64 {
+        use gtk::subclass::prelude::ObjectSubclassIsExt;
+        self.imp().sensitivity.get()
+    }
 }
 
 mod swipe_surface_imp {
@@ -619,9 +640,21 @@ mod swipe_surface_imp {
     use gtk::glib;
     use gtk::prelude::*;
 
-    #[derive(Default)]
     pub struct SwipeSurface {
         pub progress_px: Cell<f64>,
+        /// Trackpad sensitivity (see `super::SWIPE_MAX`). Never 0 — that
+        /// would divide by zero in `distance`/`progress` — so this can't
+        /// simply be `#[derive(Default)]`.
+        pub sensitivity: Cell<f64>,
+    }
+
+    impl Default for SwipeSurface {
+        fn default() -> Self {
+            Self {
+                progress_px: Cell::new(0.0),
+                sensitivity: Cell::new(1.0),
+            }
+        }
     }
 
     #[glib::object_subclass]
@@ -727,13 +760,22 @@ mod swipe_surface_imp {
     }
 
     impl SwipeableImpl for SwipeSurface {
-        // One full swipe (progress ±1.0) spans `SWIPE_MAX` px.
+        // What one full swipe (progress ±1.0) costs the pointer: `SWIPE_MAX`
+        // px at sensitivity 1.0, and deliberately *more* the higher the
+        // trackpad sensitivity goes. `AdwSwipeTracker` divides a mouse or
+        // touchscreen drag by this, and `wire_swipe_tracker` multiplies the
+        // progress back by the same factor, so a drag still moves the row
+        // exactly as far as the pointer went, whatever the preference says.
+        // A trackpad's two-finger scroll never reaches here — libadwaita
+        // scales that against a fixed 400px of its own — so the
+        // multiplication is all that path feels, which is exactly the knob
+        // this preference wants.
         fn distance(&self) -> f64 {
-            super::SWIPE_MAX
+            super::SWIPE_MAX * self.sensitivity.get()
         }
 
         fn progress(&self) -> f64 {
-            self.progress_px.get() / super::SWIPE_MAX
+            self.progress_px.get() / (super::SWIPE_MAX * self.sensitivity.get())
         }
 
         fn cancel_progress(&self) -> f64 {
@@ -759,6 +801,15 @@ mod swipe_surface_imp {
     }
 }
 
+/// The px a tracker `progress` reading moves the row: it undoes the
+/// sensitivity `SwipeSurface::distance` folded in (leaving a mouse or
+/// touchscreen drag exactly 1:1 with the pointer, whatever the preference
+/// says), and caps the result at one full swipe so a long trackpad scroll
+/// can't push the row on past the action strip.
+fn swipe_progress_px(progress: f64, sensitivity: f64) -> f64 {
+    (progress * SWIPE_MAX * sensitivity).clamp(-SWIPE_MAX, SWIPE_MAX)
+}
+
 /// Build the `AdwSwipeTracker` driving `surface`'s swipe-to-act gesture
 /// (#swipe): mouse-drag and trackpad both arrive as the same signals.
 /// Called once per row from `post_view`; the tracker must be kept alive by
@@ -779,7 +830,7 @@ fn wire_swipe_tracker(surface: &SwipeSurface, sender: &FactorySender<MessageRow>
         let surface = surface.clone();
         let sender = sender.clone();
         tracker.connect_update_swipe(move |_, progress| {
-            let raw_px = progress * SWIPE_MAX;
+            let raw_px = swipe_progress_px(progress, surface.sensitivity());
             surface.set_progress_px(raw_px);
             sender.input(MessageRowInput::SwipeUpdate(-raw_px));
         });
@@ -1321,6 +1372,9 @@ impl FactoryComponent for MessageRow {
             let tracker = wire_swipe_tracker(&widgets.swipe_surface, &sender);
             self.swipe_tracker.replace(Some(tracker));
         }
+        widgets
+            .swipe_surface
+            .set_sensitivity(self.swipe_sensitivity.get());
         if let Some(t) = self.swipe_tracker.borrow().as_ref() {
             t.set_enabled(self.swipe_enabled.get());
         }
@@ -1408,6 +1462,7 @@ impl FactoryComponent for MessageRow {
             revealed,
             swipe_reversed,
             swipe_enabled,
+            swipe_sensitivity,
         } = init;
         let mut model = Self {
             msg,
@@ -1451,6 +1506,7 @@ impl FactoryComponent for MessageRow {
             palette_anim: std::cell::RefCell::new(None),
             swipe_reversed,
             swipe_enabled,
+            swipe_sensitivity,
             swipe_progress: 0.0,
             swipe_side: 0,
             swipe_dragging: false,
@@ -1617,7 +1673,7 @@ impl FactoryComponent for MessageRow {
                     self.swipe_side = if self.swipe_progress < 0.0 { -1 } else { 1 };
                 }
             }
-            MessageRowInput::SwipeEnabledChanged => {}
+            MessageRowInput::SwipePrefsChanged => {}
             MessageRowInput::SwipeSettled => {
                 // Ignored if a new drag started before the old snap-back
                 // finished — that drag owns the state now.
@@ -2228,6 +2284,8 @@ pub struct MessageList {
     swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
     /// Shared with every row: whether swiping is on at all (#92).
     swipe_enabled: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Shared with every row: how sensitive a trackpad two-finger swipe is.
+    swipe_sensitivity: std::rc::Rc<std::cell::Cell<f64>>,
     /// The message currently being viewed, kept selected across list rebuilds.
     /// Keyed by (account_id, id) since UIDs collide across accounts in the
     /// unified "All Inboxes" view.
@@ -2496,6 +2554,8 @@ pub enum MessageListInput {
     SetSwipeReversed(bool),
     /// Turn the swipe gesture on or off (#92).
     SetSwipeEnabled(bool),
+    /// How far a trackpad two-finger swipe has to travel to fire the action.
+    SetSwipeSensitivity(f64),
     /// The list shows Trash or Junk: menus offer "Move to Inbox" (#138).
     SetRestorable(bool),
     /// The list shows Junk: "Not Spam" replaces "Mark as Spam" (#168).
@@ -2873,6 +2933,9 @@ impl SimpleComponent for MessageList {
             )),
             swipe_enabled: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_swipe_enabled(),
+            )),
+            swipe_sensitivity: std::rc::Rc::new(std::cell::Cell::new(
+                crate::config::load_swipe_sensitivity(),
             )),
             thread_links: Vec::new(),
             drag_keys: DragKeys::default(),
@@ -3753,7 +3816,15 @@ impl SimpleComponent for MessageList {
                 self.swipe_enabled.set(on);
                 // Every mounted row re-renders and flips its tracker.
                 for i in 0..self.rows.len() {
-                    self.row_send(i, MessageRowInput::SwipeEnabledChanged);
+                    self.row_send(i, MessageRowInput::SwipePrefsChanged);
+                }
+            }
+            MessageListInput::SetSwipeSensitivity(factor) => {
+                self.swipe_sensitivity.set(factor);
+                // Same nudge: post_view pushes the new figure into each
+                // mounted row's swipe surface.
+                for i in 0..self.rows.len() {
+                    self.row_send(i, MessageRowInput::SwipePrefsChanged);
                 }
             }
             MessageListInput::SetSelected(id) => {
@@ -4405,6 +4476,7 @@ impl MessageList {
                         revealed: false,
                         swipe_reversed: self.swipe_reversed.clone(),
                         swipe_enabled: self.swipe_enabled.clone(),
+                        swipe_sensitivity: self.swipe_sensitivity.clone(),
                     },
                 );
             }
@@ -4715,6 +4787,7 @@ impl MessageList {
                     revealed: true,
                     swipe_reversed: self.swipe_reversed.clone(),
                     swipe_enabled: self.swipe_enabled.clone(),
+                    swipe_sensitivity: self.swipe_sensitivity.clone(),
                 });
             }
             if !append_only {
@@ -5123,7 +5196,7 @@ impl MessageList {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_thread_keys;
+    use super::{compute_thread_keys, swipe_progress_px, SWIPE_ARM, SWIPE_MAX};
     use crate::models::Message;
 
     fn msg(id: u32, message_id: &str, references: &str) -> Message {
@@ -5237,6 +5310,55 @@ mod tests {
             n,
             "every message belongs to it, however long the thread runs"
         );
+    }
+
+    /// libadwaita's own scale for a touchpad's two-finger scroll: it spends a
+    /// fixed 400px of horizontal delta on a full swipe, whatever the widget's
+    /// `distance` says, which is why the preference exists at all.
+    const TOUCHPAD_BASE: f64 = 400.0;
+
+    #[test]
+    fn mouse_drag_tracks_the_pointer_at_every_sensitivity() {
+        // `AdwSwipeTracker` divides a drag by `SwipeSurface::distance`, which
+        // is SWIPE_MAX * sensitivity, so the row must come back out at the
+        // pointer's own px however the preference is set.
+        for sensitivity in [1.0, 3.5, 10.0] {
+            for dragged in [10.0, 72.0, 120.0] {
+                let progress = dragged / (SWIPE_MAX * sensitivity);
+                assert!(
+                    (swipe_progress_px(progress, sensitivity) - dragged).abs() < 0.001,
+                    "{dragged}px drag at {sensitivity}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sensitivity_shortens_the_trackpad_swipe() {
+        // How much two-finger scroll it takes to reach the commit distance.
+        let travel = |sensitivity: f64| {
+            (1..=2000)
+                .map(|px| px as f64)
+                .find(|px| {
+                    swipe_progress_px(px / TOUCHPAD_BASE, sensitivity).abs() >= SWIPE_ARM
+                })
+                .expect("armed eventually")
+        };
+        // Untuned, a trackpad has to travel further than most can in one go —
+        // the complaint behind the setting.
+        assert_eq!(travel(1.0), 240.0);
+        // The default puts it within a comfortable swipe, and raising it
+        // further keeps shortening it.
+        assert!(travel(3.5) < 70.0, "default is a short swipe");
+        assert!(travel(10.0) < travel(3.5), "higher is always shorter");
+    }
+
+    #[test]
+    fn a_long_swipe_stops_at_the_action_strip() {
+        for sensitivity in [1.0, 10.0] {
+            assert_eq!(swipe_progress_px(1.0, sensitivity), SWIPE_MAX);
+            assert_eq!(swipe_progress_px(-1.0, sensitivity), -SWIPE_MAX);
+        }
     }
 
     #[test]

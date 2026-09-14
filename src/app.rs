@@ -606,6 +606,9 @@ pub struct AppModel {
     swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
     swipe_reversed: bool,
+    /// How far a trackpad two-finger swipe has to travel to fire the action
+    /// (higher = shorter swipe); mouse and touch drags are unaffected.
+    swipe_sensitivity: f64,
     /// "New message" composes inline over the reading pane (vs a window).
     compose_inline: bool,
     reply_fields: bool,
@@ -937,6 +940,7 @@ pub enum AppMsg {
     SetListPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
+    SetSwipeSensitivity(f64),
     SetComposeInline(bool),
     /// Reply panel shows its From/To/Subject rows from the start (#154).
     SetReplyFields(bool),
@@ -2503,6 +2507,7 @@ impl SimpleComponent for AppModel {
             list_palette_menu: config::load_list_palette_menu(),
             swipe_enabled: config::load_swipe_enabled(),
             swipe_reversed: config::load_swipe_reversed(),
+            swipe_sensitivity: config::load_swipe_sensitivity(),
             compose_inline: config::load_compose_inline(),
             reply_fields: config::load_reply_fields(),
             compose_default_from: config::load_compose_default_from(),
@@ -5955,6 +5960,19 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetSwipeSensitivity(factor) => {
+                let factor = factor.clamp(
+                    config::SWIPE_SENSITIVITY_MIN,
+                    config::SWIPE_SENSITIVITY_MAX,
+                );
+                if self.swipe_sensitivity != factor {
+                    self.swipe_sensitivity = factor;
+                    self.save_settings();
+                    self.message_list
+                        .emit(MessageListInput::SetSwipeSensitivity(factor));
+                }
+            }
+
             AppMsg::Undo => {
                 let Some(e) = self.undo_stack.pop() else {
                     self.notifications.emit(NotifyInput::Push {
@@ -8217,6 +8235,7 @@ impl AppModel {
             self.list_palette_menu,
             self.swipe_enabled,
             self.swipe_reversed,
+            self.swipe_sensitivity,
             self.compose_inline,
             self.reply_fields,
             &self.compose_default_from,
@@ -12893,6 +12912,7 @@ impl AppModel {
             list_palette_menu: self.list_palette_menu,
             swipe_enabled: self.swipe_enabled,
             swipe_reversed: self.swipe_reversed,
+            swipe_sensitivity: self.swipe_sensitivity,
             compose_inline: self.compose_inline,
             reply_fields: self.reply_fields,
             files: self.files_prefs,
@@ -12955,6 +12975,7 @@ impl AppModel {
                 PrefOutput::SetListPaletteMenu(on) => AppMsg::SetListPaletteMenu(on),
                 PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
+                PrefOutput::SetSwipeSensitivity(v) => AppMsg::SetSwipeSensitivity(v),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
                 PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
                 PrefOutput::SetFilesPrefs(p) => AppMsg::SetFilesPrefs(p),

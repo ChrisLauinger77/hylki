@@ -53,6 +53,8 @@ pub struct PrefInit {
     pub swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
     pub swipe_reversed: bool,
+    /// How far a trackpad two-finger swipe has to travel to fire the action.
+    pub swipe_sensitivity: f64,
     /// "New message" composes inline over the reading pane (vs a window).
     pub compose_inline: bool,
     pub reply_fields: bool,
@@ -737,6 +739,7 @@ pub enum PrefInput {
     ToggleListPaletteMenu(bool),
     ToggleSwipeEnabled(bool),
     ToggleSwipeReversed(bool),
+    ChangeSwipeSensitivity(f64),
     ToggleComposeInline(bool),
     ToggleReplyFields(bool),
     /// The "Send new messages from" combo: 0 = the open folder's account,
@@ -865,6 +868,7 @@ pub enum PrefOutput {
     SetListPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
+    SetSwipeSensitivity(f64),
     SetComposeInline(bool),
     SetReplyFields(bool),
     SetFilesPrefs(crate::config::FilesPrefs),
@@ -1665,6 +1669,21 @@ impl Component for Preferences {
                                                        on swaps the two: left archives, right deletes."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSwipeReversed(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "swipe_sensitivity_row"]
+                                    adw::SpinRow {
+                                        #[watch]
+                                        set_sensitive: model.swipe_enabled,
+                                        set_title: &i18n("Trackpad swipe sensitivity"),
+                                        set_subtitle: &i18n("How readily a two-finger trackpad swipe moves \
+                                                       a message. Raise it if a swipe never gets far \
+                                                       enough to archive or delete, lower it if messages \
+                                                       slide when you did not mean them to. Mouse drags \
+                                                       are unaffected."),
+                                        connect_value_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeSwipeSensitivity(row.value()));
                                         },
                                     },
 
@@ -2800,6 +2819,19 @@ impl Component for Preferences {
         }
         widgets.plain_mono_row.set_active(init.plain_monospace);
 
+        // Trackpad swipe sensitivity: 1 (libadwaita's own, far too long a
+        // swipe for most trackpads) to 10, in half steps.
+        let adj = gtk::Adjustment::new(
+            init.swipe_sensitivity,
+            crate::config::SWIPE_SENSITIVITY_MIN,
+            crate::config::SWIPE_SENSITIVITY_MAX,
+            0.5,
+            1.0,
+            0.0,
+        );
+        widgets.swipe_sensitivity_row.set_digits(1);
+        widgets.swipe_sensitivity_row.set_adjustment(Some(&adj));
+
         // Hover-palette delay spinner (0–3000ms, step 50).
         // Actions Palette timeout: 1–30 seconds.
         let adj = gtk::Adjustment::new(init.palette_collapse_secs as f64, 1.0, 30.0, 1.0, 5.0, 0.0);
@@ -3056,6 +3088,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleSwipeReversed(on) => {
                 let _ = sender.output(PrefOutput::SetSwipeReversed(on));
+            }
+            PrefInput::ChangeSwipeSensitivity(factor) => {
+                let _ = sender.output(PrefOutput::SetSwipeSensitivity(factor));
             }
             PrefInput::ToggleReplyFields(on) => {
                 let _ = sender.output(PrefOutput::SetReplyFields(on));

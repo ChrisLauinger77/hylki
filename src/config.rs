@@ -940,6 +940,12 @@ struct PrivacyFile {
     /// left to delete and right to archive, on reverses them.
     #[serde(default)]
     swipe_reversed: bool,
+    /// How far a trackpad's two-finger swipe has to travel before a row
+    /// commits (higher = shorter swipe). Trackpads differ enough that one
+    /// fixed figure suits nobody, hence the knob; mouse and touchscreen
+    /// drags follow the finger 1:1 and ignore this.
+    #[serde(default = "default_swipe_sensitivity")]
+    swipe_sensitivity: f64,
     /// Whether "New message" opens inline over the reading pane (like a
     /// reply) rather than in its own window.
     #[serde(default = "default_compose_inline")]
@@ -1253,6 +1259,7 @@ impl Default for PrivacyFile {
             list_palette_menu: false,
             swipe_enabled: default_swipe_enabled(),
             swipe_reversed: false,
+            swipe_sensitivity: default_swipe_sensitivity(),
             compose_inline: default_compose_inline(),
             reply_fields: false,
             compose_default_from: String::new(),
@@ -2217,6 +2224,27 @@ pub fn load_swipe_reversed() -> bool {
     load_privacy().swipe_reversed
 }
 
+/// The narrowest and widest trackpad swipe sensitivity the setting offers,
+/// also the clamp a hand-edited file is held to (0 would divide by zero).
+pub const SWIPE_SENSITIVITY_MIN: f64 = 1.0;
+pub const SWIPE_SENSITIVITY_MAX: f64 = 10.0;
+
+fn default_swipe_sensitivity() -> f64 {
+    // libadwaita spends a fixed 400px of scroll on a full swipe whatever the
+    // row asks for, so at 1.0 a trackpad needs 240px of two-finger travel to
+    // reach the commit distance — more than most touchpads can give in one
+    // go. 3.5 puts the row roughly under the fingers instead.
+    3.5
+}
+
+/// How far a trackpad's two-finger swipe has to travel to fire the action
+/// (higher = shorter swipe).
+pub fn load_swipe_sensitivity() -> f64 {
+    load_privacy()
+        .swipe_sensitivity
+        .clamp(SWIPE_SENSITIVITY_MIN, SWIPE_SENSITIVITY_MAX)
+}
+
 /// Whether "New message" composes inline over the reading pane.
 pub fn load_compose_inline() -> bool {
     load_privacy().compose_inline
@@ -2425,6 +2453,7 @@ pub fn save_privacy(
     list_palette_menu: bool,
     swipe_enabled: bool,
     swipe_reversed: bool,
+    swipe_sensitivity: f64,
     compose_inline: bool,
     reply_fields: bool,
     compose_default_from: &str,
@@ -2503,6 +2532,7 @@ pub fn save_privacy(
         list_palette_menu,
         swipe_enabled,
         swipe_reversed,
+        swipe_sensitivity,
         compose_inline,
         reply_fields,
         compose_default_from: compose_default_from.to_string(),
