@@ -231,7 +231,25 @@ fn relay_to_primary(args: &[String]) {
         }
     };
     let path = format!("/{}", APP_ID.replace('.', "/"));
-    let platform: std::collections::HashMap<String, gtk::glib::Variant> = Default::default();
+    // The same platform data GApplication sends when it hands off to a
+    // primary itself: the launcher's activation token (Wayland) or startup
+    // id (X11). That token is the compositor's permission for the window to
+    // take the focus away from whoever launched us (Nautilus's "Send by
+    // email", a mailto: link in a browser); GTK spends it on the next
+    // `present()`. Without it the primary's window asks for focus with
+    // nothing to show for it and stays behind the launcher, which looks
+    // like nothing happened. Flatpak passes both variables into the sandbox.
+    let mut platform: std::collections::HashMap<String, gtk::glib::Variant> = Default::default();
+    if let Ok(token) = std::env::var("XDG_ACTIVATION_TOKEN") {
+        if !token.is_empty() {
+            platform.insert("activation-token".into(), token.to_variant());
+        }
+    }
+    if let Ok(id) = std::env::var("DESKTOP_STARTUP_ID") {
+        if !id.is_empty() {
+            platform.insert("desktop-startup-id".into(), id.to_variant());
+        }
+    }
     let (method, params) = if uris.is_empty() {
         ("Activate", (platform,).to_variant())
     } else {

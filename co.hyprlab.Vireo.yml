@@ -59,6 +59,16 @@ finish-args:
   # …and the app's launcher is re-pointed at that icon through a per-user
   # copy of its .desktop entry (the desktop caches app icons by name).
   - --filesystem=xdg-data/applications:create
+  # A file manager's "Send by email" (Nautilus, #90) hands the files over as
+  # attach= paths inside a mailto: URI. Flatpak's file forwarding only
+  # exports arguments that are themselves files, so those paths reach the
+  # sandbox as-is and the app has to be able to read them where they are:
+  # the home directory and removable drives, read-only. Everything the app
+  # writes goes through portals or the narrower entries above (a more
+  # specific entry wins over this one).
+  - --filesystem=home:ro
+  - --filesystem=/run/media:ro
+  - --filesystem=/media:ro
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin

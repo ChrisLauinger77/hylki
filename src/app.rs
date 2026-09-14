@@ -1017,6 +1017,9 @@ pub enum AppMsg {
     /// Vireo", or the command line): open a fresh composer with them attached
     /// (Isaac's PR #96).
     OpenWithFiles(Vec<std::path::PathBuf>),
+    /// The click on a "message ready" desktop alert: raise the window and
+    /// the composer it announced.
+    PresentComposers,
     ContactAdded(Result<crate::contacts::AddOutcome, String>),
     ViewSource,
     /// User clicked "Load attachments" for a message whose attachments weren't
@@ -2770,6 +2773,22 @@ impl SimpleComponent for AppModel {
                 win.present();
             });
             app.add_action(&present);
+
+            // "Message ready" alerts (a hand-off whose window stayed behind):
+            // the click raises the composer too, and the alert goes away by
+            // itself once any window of ours has the focus.
+            let present_compose =
+                gtk::gio::SimpleAction::new(crate::notify::PRESENT_COMPOSE_ACTION, None);
+            let psender = sender.clone();
+            present_compose.connect_activate(move |_, _| {
+                psender.input(AppMsg::PresentComposers);
+            });
+            app.add_action(&present_compose);
+            model.window.connect_is_active_notify(|w| {
+                if w.is_active() {
+                    crate::notify::withdraw_compose_ready();
+                }
+            });
 
             let ty = gtk::glib::VariantTy::new("(uuu)").unwrap();
             let open = gtk::gio::SimpleAction::new(crate::notify::OPEN_MESSAGE_ACTION, Some(ty));
@@ -5954,11 +5973,13 @@ impl SimpleComponent for AppModel {
                     .unwrap_or_else(|| self.active_account());
                 let prefill = ComposePrefill { attachments: paths, ..Default::default() };
                 let (account, prefill) = self.new_message_from(account, prefill);
+                let attached = prefill.attachments.len();
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
                 } else {
                     self.open_compose(account, prefill, &sender);
                 }
+                self.after_hand_off(attached, Vec::new());
             }
 
             AppMsg::CopyReaderSelection => {
@@ -6080,14 +6101,20 @@ impl SimpleComponent for AppModel {
                 // exist as regular files. Whatever attaches shows up as a
                 // normal removable chip in the composer, so nothing rides
                 // along invisibly if a web link (rather than Nautilus)
-                // carried the parameter.
-                prefill.attachments.retain(|p| {
-                    let ok = p.is_file();
-                    if !ok {
-                        tracing::info!("mailto attach ignored (not a file): {}", p.display());
-                    }
-                    ok
-                });
+                // carried the parameter. The ones that don't are reported,
+                // not dropped in silence: from inside the Flatpak sandbox a
+                // path the file manager can see may be one Vireo cannot.
+                let (attachments, dropped): (Vec<_>, Vec<_>) =
+                    std::mem::take(&mut prefill.attachments).into_iter().partition(|p| p.is_file());
+                for p in &dropped {
+                    tracing::warn!("mailto attach ignored (not a readable file): {}", p.display());
+                }
+                tracing::info!(
+                    "mailto hand-off: {} attachment(s) named, {} readable",
+                    attachments.len() + dropped.len(),
+                    attachments.len()
+                );
+                prefill.attachments = attachments;
                 self.leave_gallery();
                 let account = self
                     .current
@@ -6095,10 +6122,22 @@ impl SimpleComponent for AppModel {
                     .map(|m| m.account_id)
                     .unwrap_or_else(|| self.active_account());
                 let (account, prefill) = self.new_message_from(account, prefill);
+                let attached = prefill.attachments.len();
                 if self.compose_inline {
                     self.open_inline_reply(account, prefill, None, &sender);
                 } else {
                     self.open_compose(account, prefill, &sender);
+                }
+                self.after_hand_off(attached, dropped);
+            }
+
+            AppMsg::PresentComposers => {
+                self.window.set_visible(true);
+                self.window.present();
+                // The newest standalone composer is the one the alert was
+                // about; transient for the main window, it sits above it.
+                if let Some(h) = self.composers.last() {
+                    h.window.present();
                 }
             }
 
@@ -10426,8 +10465,47 @@ impl AppModel {
             let _ = s.send(AppMsg::ComposeClosed(id));
             gtk::glib::Propagation::Proceed
         });
+        win.connect_is_active_notify(|w| {
+            if w.is_active() {
+                crate::notify::withdraw_compose_ready();
+            }
+        });
         win.present();
         win
+    }
+
+    /// The tail of a composer opened from outside the app (a mailto: link, a
+    /// file manager's "Send by email" or "Open With"): say which files could
+    /// not be attached, and if the window has not come to the front by the
+    /// time the compositor would have let it, post a desktop alert whose
+    /// click brings it up. The activation token a launcher passes along is
+    /// what lets a window take the focus; a stale or missing one (a link
+    /// relayed from a terminal, an older launcher) leaves the window where it
+    /// was, behind whatever the user is looking at, and this is the next
+    /// best thing.
+    fn after_hand_off(&self, attached: usize, dropped: Vec<std::path::PathBuf>) {
+        if !dropped.is_empty() {
+            let names: Vec<String> = dropped
+                .iter()
+                .map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string()))
+                .collect();
+            let text = crate::i18n::ni18n_f(
+                "Could not attach {names}: Vireo cannot read the file.",
+                "Could not attach {n} files (Vireo cannot read them): {names}",
+                dropped.len() as u32,
+                &[("n", &dropped.len().to_string()), ("names", &names.join(", "))],
+            );
+            self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+        }
+        let main = self.window.clone();
+        let composer = self.composers.last().map(|h| h.window.clone());
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || {
+            let ours = main.is_active() || composer.as_ref().is_some_and(|w| w.is_active());
+            if !ours {
+                tracing::info!("hand-off: window did not get the focus, posting an alert");
+                crate::notify::compose_ready(attached as u32);
+            }
+        });
     }
 
     /// Open a standalone compose window (New Message, compose-to, edit-draft).
