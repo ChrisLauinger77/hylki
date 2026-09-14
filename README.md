@@ -384,8 +384,9 @@ and shows whether the installed copy is this version's. Then click
 opens with the entry. Once Files has loaded the extension the row says so; if
 it still says "not loaded" after a restart, the `nautilus-python` package is
 the usual reason (a native install of Vireo checks for it and tells you; the
-Flatpak cannot see the host's packages). **Remove** takes it out again the
-same way.
+Flatpak cannot see the host's packages). Until Files has loaded the extension,
+the group also shows the install command for your distribution, with a copy
+button. **Remove** takes it out again the same way.
 
 Without the app, the same file is in the repository at
 `data/nautilus/vireo-nautilus.py`:

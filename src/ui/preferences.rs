@@ -317,6 +317,10 @@ pub struct Preferences {
     editor_page: &'static str,
     /// The GNOME Files extension (#188): installed, loaded, loader present.
     nautilus: crate::nautilus_ext::State,
+    /// The terminal command that installs the nautilus-python package on
+    /// this machine, for the copyable row; `None` on a distribution whose
+    /// package manager is not known.
+    nautilus_cmd: Option<&'static str>,
 }
 
 /// The reader toolbar editor (Settings → Appearance → Toolbar): one drop zone per
@@ -630,6 +634,20 @@ fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String {
             format!("{state} — {shown}")
         }
         None => state,
+    }
+}
+
+/// Hide the "editable" pencil an `adw::EntryRow` draws whatever its
+/// `editable` says (the icon carries the `edit-icon` style class).
+fn hide_edit_icon(widget: &gtk::Widget) {
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if c.has_css_class("edit-icon") {
+            c.set_visible(false);
+        } else {
+            hide_edit_icon(&c);
+        }
+        child = c.next_sibling();
     }
 }
 
@@ -2113,6 +2131,34 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    // The loader's install command, ready to paste, while
+                                    // there is no sign Files can load the extension.
+                                    #[name = "nautilus_cmd_row"]
+                                    adw::EntryRow {
+                                        set_title: &i18n("Install the nautilus-python package first: paste this in a terminal"),
+                                        set_text: model.nautilus_cmd.unwrap_or_default(),
+                                        set_editable: false,
+                                        add_css_class: "monospace",
+                                        #[watch]
+                                        set_visible: model.nautilus_cmd.is_some()
+                                            && !model.nautilus.loaded
+                                            && model.nautilus.loader != Some(true),
+                                        add_suffix = &gtk::Button {
+                                            set_icon_name: "co.hyprlab.Vireo-edit-copy-symbolic",
+                                            set_valign: gtk::Align::Center,
+                                            set_tooltip_text: Some(i18n("Copy").as_str()),
+                                            add_css_class: "flat",
+                                            connect_clicked[cmd = model.nautilus_cmd.unwrap_or_default().to_string()] => move |b| {
+                                                b.clipboard().set_text(&cmd);
+                                                b.set_icon_name("co.hyprlab.Vireo-verified-checkmark-symbolic");
+                                                let b = b.clone();
+                                                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
+                                                    b.set_icon_name("co.hyprlab.Vireo-edit-copy-symbolic");
+                                                });
+                                            },
+                                        },
+                                    },
+
                                     adw::ActionRow {
                                         set_title: &i18n("Restart Files"),
                                         set_subtitle: &i18n("Closes every Files window, the same as \"nautilus -q\". \
@@ -2176,6 +2222,7 @@ impl Component for Preferences {
         let t_init = std::time::Instant::now();
         let mut model = Preferences {
             nautilus: crate::nautilus_ext::State::read(),
+            nautilus_cmd: crate::platform::nautilus_python_install_command(),
             notifications: init.notifications,
             toolbar: init.reader_toolbar.clone(),
             toolbar_editor: None,
@@ -2247,6 +2294,10 @@ impl Component for Preferences {
         ] {
             no_truncate(row);
         }
+
+        // The install-command field is read-only: the row's pencil, which
+        // says "type here", would be a lie.
+        hide_edit_icon(widgets.nautilus_cmd_row.upcast_ref());
 
         // Language combo: the system's, then every catalogue shipped.
         let choices = language_choices();

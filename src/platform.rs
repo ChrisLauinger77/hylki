@@ -63,9 +63,69 @@ pub fn is_mint_cinnamon() -> bool {
     is_linux_mint() && is_cinnamon()
 }
 
+/// The terminal command that installs the nautilus-python bindings (the
+/// loader GNOME Files needs for the Vireo extension, #188) on this machine,
+/// judged by the host's os-release. `None` for a distribution whose package
+/// manager and package name are not known here.
+pub fn nautilus_python_install_command() -> Option<&'static str> {
+    install_command_for(&os_release())
+}
+
+fn install_command_for(text: &str) -> Option<&'static str> {
+    let id = field_in(text, "ID").unwrap_or_default();
+    let like = field_in(text, "ID_LIKE").unwrap_or_default();
+    // The distribution's own id first, then the family it says it is like
+    // (Mint and Pop!_OS say ubuntu/debian, Nobara says fedora, Manjaro arch).
+    let families = std::iter::once(id.as_str()).chain(like.split_whitespace());
+    for family in families {
+        let cmd = match family {
+            "fedora" | "rhel" | "centos" | "rocky" | "almalinux" | "nobara" | "ultramarine" => {
+                "sudo dnf install nautilus-python"
+            }
+            "debian" | "ubuntu" | "linuxmint" | "pop" | "elementary" | "zorin" | "neon" => {
+                "sudo apt install python3-nautilus"
+            }
+            "arch" | "manjaro" | "endeavouros" | "cachyos" | "garuda" => {
+                "sudo pacman -S python-nautilus"
+            }
+            "opensuse" | "opensuse-tumbleweed" | "opensuse-leap" | "suse" | "sles" => {
+                "sudo zypper install python3-nautilus"
+            }
+            "gentoo" => "sudo emerge dev-python/nautilus-python",
+            "alpine" => "sudo apk add nautilus-python",
+            "void" => "sudo xbps-install nautilus-python",
+            _ => continue,
+        };
+        return Some(cmd);
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{field_in, text_is_mint};
+    use super::{field_in, install_command_for, text_is_mint};
+
+    #[test]
+    fn install_command_follows_the_distribution_family() {
+        assert_eq!(install_command_for(FEDORA), Some("sudo dnf install nautilus-python"));
+        // Mint is not listed itself but says it is like ubuntu/debian… and
+        // is listed anyway; either path gives apt.
+        assert_eq!(install_command_for(MINT), Some("sudo apt install python3-nautilus"));
+        assert_eq!(
+            install_command_for("ID=nobara\nID_LIKE=fedora"),
+            Some("sudo dnf install nautilus-python")
+        );
+        assert_eq!(
+            install_command_for("ID=endeavouros\nID_LIKE=arch"),
+            Some("sudo pacman -S python-nautilus")
+        );
+        assert_eq!(
+            install_command_for("ID=\"opensuse-tumbleweed\"\nID_LIKE=\"opensuse suse\""),
+            Some("sudo zypper install python3-nautilus")
+        );
+        assert_eq!(install_command_for("ID=nixos"), None);
+        assert_eq!(install_command_for(""), None);
+    }
 
     const MINT: &str = r#"NAME="Linux Mint"
 VERSION="22.3 (Zara)"
