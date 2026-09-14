@@ -20,12 +20,15 @@ several conditions, and take several alternatives per condition.
   the sender set none, so a rule on where replies go works for mail
   from a person and mail from a system alike.
 - **A filter can hold several conditions** (#192, requested by
-  [@yioannides](https://github.com/yioannides)). The filter editor's
-  **Add Condition** row adds another Where/Match/Text trio; each after
-  the first has a remove button. A **Conditions** chooser, shown once
-  there are two, says whether all must match (the default) or any one
-  may; the later conditions are titled *And where* / *Or where* to
-  match. The Filters list prints every condition of a rule.
+  [@yioannides](https://github.com/yioannides)). The filter editor is
+  now a page of groups: the account; one titled group per condition
+  (*Condition 1*, *Condition 2*…), each its own Where/Match/Text set
+  with a remove button in its header; an **Add Condition** row; and
+  *Then*, what a match does (Move to, Tag with, Count unread mail). A
+  **Conditions** chooser beside Add Condition, shown once there are
+  two, says whether all must match (the default) or any one may; the
+  later conditions' Where rows read *And where* / *Or where* to match.
+  The Filters list prints every condition of a rule.
 - **A condition can name several alternatives** (#192). Commas separate
   them in the text to match: `invoice, receipt` matches either, with
   the whole matcher applied to each (`@a.org, @b.org` with *ends with*

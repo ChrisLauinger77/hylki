@@ -4385,6 +4385,35 @@ impl AccountsWindow {
         form: &gtk::ListBox,
         save: impl Fn() -> bool + 'static,
     ) {
+        let group = adw::PreferencesGroup::new();
+        group.add(form);
+        let page = adw::PreferencesPage::new();
+        page.add(&group);
+        // Enter in an entry saves, like the dialog's default response did.
+        let mut entries = Vec::new();
+        let mut child = form.first_child();
+        while let Some(c) = child {
+            if let Some(entry) = c.downcast_ref::<adw::EntryRow>() {
+                entries.push(entry.clone());
+            }
+            child = c.next_sibling();
+        }
+        self.push_form_content(nav, tag, title, verb, page.upcast_ref(), entries, save);
+    }
+
+    /// [`push_form_page`] for any content widget: the filter editor builds
+    /// its own page of groups. `entries` are the entry rows whose Enter
+    /// should save.
+    fn push_form_content(
+        &self,
+        nav: &adw::NavigationView,
+        tag: &str,
+        title: &str,
+        verb: &str,
+        content: &gtk::Widget,
+        entries: Vec<adw::EntryRow>,
+        save: impl Fn() -> bool + 'static,
+    ) {
         let save: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(save);
         let header = adw::HeaderBar::new();
         header.set_show_end_title_buttons(true);
@@ -4401,37 +4430,29 @@ impl AccountsWindow {
         }
         header.pack_end(&save_btn);
 
-        let group = adw::PreferencesGroup::new();
-        group.add(form);
-        let page = adw::PreferencesPage::new();
-        page.add(&group);
-
         let view = adw::ToolbarView::new();
         view.add_top_bar(&header);
-        view.set_content(Some(&page));
+        view.set_content(Some(content));
 
         let nav_page = adw::NavigationPage::new(&view, title);
         nav_page.set_tag(Some(tag));
-        // Enter in an entry saves, like the dialog's default response did.
-        let mut child = form.first_child();
-        while let Some(c) = child {
-            if let Some(entry) = c.downcast_ref::<adw::EntryRow>() {
-                let nav = nav.clone();
-                let save = save.clone();
-                entry.connect_entry_activated(move |_| {
-                    if save() {
-                        nav.pop();
-                    }
-                });
-            }
-            child = c.next_sibling();
+        for entry in entries {
+            let nav = nav.clone();
+            let save = save.clone();
+            entry.connect_entry_activated(move |_| {
+                if save() {
+                    nav.pop();
+                }
+            });
         }
         *self.form_save.borrow_mut() = Some(Box::new(move || save()));
         nav.push(&nav_page);
     }
 
-    /// The filter dialog: account, field, match, value, destination, and
-    /// the two per-rule switches. With `edit`, it opens on that existing
+    /// The filter editor, a page of groups: the account; one group per
+    /// condition (#192), each its own Where/Match/Text set with a remove
+    /// button in its header; Add Condition and the all/any chooser; and
+    /// "Then", what a match does. With `edit`, it opens on that existing
     /// rule (prefilled, "Save") and replaces it in place; otherwise it adds.
     fn open_filter_page(
         &self,
@@ -4450,20 +4471,34 @@ impl AccountsWindow {
             (i18n("Add Filter"), i18n("Add Filter"))
         };
 
-        let form = gtk::ListBox::new();
-        form.add_css_class("boxed-list");
-        form.set_selection_mode(gtk::SelectionMode::None);
+        // The page: groups stacked the way an AdwPreferencesPage stacks
+        // them, in a box of our own so condition groups can slot in
+        // between the fixed ones.
+        let page_box = gtk::Box::new(gtk::Orientation::Vertical, 24);
+        page_box.set_margin_top(24);
+        page_box.set_margin_bottom(24);
+        page_box.set_margin_start(12);
+        page_box.set_margin_end(12);
+        let clamp = adw::Clamp::new();
+        clamp.set_maximum_size(600);
+        clamp.set_tightening_threshold(400);
+        clamp.set_child(Some(&page_box));
+        let scrolled = gtk::ScrolledWindow::new();
+        scrolled.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+        scrolled.set_vexpand(true);
+        scrolled.set_child(Some(&clamp));
 
+        let account_group = adw::PreferencesGroup::new();
         let account_row = adw::ComboRow::new();
         account_row.set_title(&i18n("Account"));
         let email_refs: Vec<&str> = emails.iter().map(|s| s.as_str()).collect();
         account_row.set_model(Some(&gtk::StringList::new(&email_refs)));
+        account_group.add(&account_row);
 
-        // The conditions (#192): each is a Where/Match/Text trio of rows,
-        // stacked between the account row and the "Add Condition" row. The
-        // first is fixed; the others carry a remove button. Body conditions
-        // (#191) pin the matcher to "contains", the only search a server
-        // offers, and say so.
+        // The conditions (#192): each a titled group of Where/Match/Text
+        // rows with a remove button in its header (hidden while it is the
+        // only one). Body conditions (#191) pin the matcher to "contains",
+        // the only search a server offers, and say so.
         let conds: std::rc::Rc<std::cell::RefCell<Vec<CondRows>>> = Default::default();
         let field_names: Vec<String> = FilterField::ALL.iter().map(|f| Self::field_label(*f)).collect();
         let match_names: Vec<String> = FilterMatch::ALL.iter().map(|m| Self::match_label(*m)).collect();
@@ -4471,6 +4506,12 @@ impl AccountsWindow {
             let field_names = field_names.clone();
             let match_names = match_names.clone();
             move |init: Option<&crate::config::FilterCondition>| -> CondRows {
+                let group = adw::PreferencesGroup::new();
+                let remove = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
+                remove.add_css_class("flat");
+                remove.set_valign(gtk::Align::Center);
+                remove.set_tooltip_text(Some(i18n("Remove condition").as_str()));
+                group.set_header_suffix(Some(&remove));
                 let field = adw::ComboRow::new();
                 field.set_title(&i18n("Where"));
                 let refs: Vec<&str> = field_names.iter().map(|s| s.as_str()).collect();
@@ -4501,11 +4542,11 @@ impl AccountsWindow {
                         }
                         matcher.set_sensitive(!body);
                         field.set_subtitle(&match chosen {
-                            Some(FilterField::Body) => i18n(
-                                "Searched on the server as the Inbox syncs, without downloading anything",
-                            ),
+                            Some(FilterField::Body) => {
+                                i18n("Searched on the server; nothing is downloaded")
+                            }
                             Some(FilterField::ReplyTo) => {
-                                i18n("The From address when the sender set no Reply-To")
+                                i18n("From address when no Reply-To is set")
                             }
                             _ => String::new(),
                         });
@@ -4513,9 +4554,14 @@ impl AccountsWindow {
                 };
                 explain(&field);
                 field.connect_selected_notify(explain);
-                CondRows { field, matcher, value }
+                group.add(&field);
+                group.add(&matcher);
+                group.add(&value);
+                CondRows { group, remove, field, matcher, value }
             }
         };
+
+        let add_group = adw::PreferencesGroup::new();
         let add_row = adw::ActionRow::new();
         add_row.set_title(&i18n("Add Condition"));
         add_row.set_activatable(true);
@@ -4528,15 +4574,21 @@ impl AccountsWindow {
             i18n("Any one may match").as_str(),
         ])));
         combine_row.set_visible(false);
-        // Retitle the later conditions after the combining rule ("And
-        // where" / "Or where") and show the chooser once it matters.
+        add_group.add(&add_row);
+        add_group.add(&combine_row);
+
+        // Number the groups, title the later Where rows after the combining
+        // rule ("And where" / "Or where"), and show the remove buttons and
+        // the chooser once there is more than one condition.
         let relabel = {
             let conds = conds.clone();
             let combine_row = combine_row.clone();
             move || {
                 let conds = conds.borrow();
                 let any = combine_row.selected() == 1;
+                let several = conds.len() > 1;
                 for (i, c) in conds.iter().enumerate() {
+                    c.group.set_title(&i18n_f("Condition {n}", &[("n", &(i + 1).to_string())]));
                     c.field.set_title(&if i == 0 {
                         i18n("Where")
                     } else if any {
@@ -4544,60 +4596,56 @@ impl AccountsWindow {
                     } else {
                         i18n("And where")
                     });
+                    c.remove.set_visible(several);
                 }
-                combine_row.set_visible(conds.len() > 1);
+                combine_row.set_visible(several);
             }
         };
         {
             let relabel = relabel.clone();
             combine_row.connect_selected_notify(move |_| relabel());
         }
-        // Append a condition below the ones there are, just above the
-        // "Add Condition" row; with a remove button unless it is the first.
+        // Add a condition group below the ones there are, above the Add
+        // Condition group.
         let add_cond = {
             let conds = conds.clone();
-            let form = form.clone();
-            let add_row = add_row.clone();
+            let page_box = page_box.clone();
+            let account_group = account_group.clone();
             let relabel = relabel.clone();
             let make_cond = make_cond.clone();
             let form_save = self.form_save.clone();
             let nav = nav.clone();
             move |init: Option<&crate::config::FilterCondition>| {
                 let c = make_cond(init);
-                let n = conds.borrow().len();
-                // The add row's own index in the list; a row not in one says -1.
-                let mut at = match add_row.index() {
-                    i if i >= 0 => i,
-                    _ => (1 + 3 * n) as i32,
-                };
-                for row in [c.field.upcast_ref::<gtk::Widget>(), c.matcher.upcast_ref(), c.value.upcast_ref()] {
-                    form.insert(row, at);
-                    at += 1;
-                }
-                if n > 0 {
-                    let rm = gtk::Button::from_icon_name("co.hyprlab.Vireo-user-trash-symbolic");
-                    rm.add_css_class("flat");
-                    rm.set_valign(gtk::Align::Center);
-                    rm.set_tooltip_text(Some(i18n("Remove condition").as_str()));
+                let after: gtk::Widget = conds
+                    .borrow()
+                    .last()
+                    .map(|last| last.group.clone().upcast())
+                    .unwrap_or_else(|| account_group.clone().upcast());
+                page_box.insert_child_after(&c.group, Some(&after));
+                {
                     let conds = conds.clone();
-                    let form = form.clone();
+                    let page_box = page_box.clone();
                     let relabel = relabel.clone();
-                    let field = c.field.clone();
-                    rm.connect_clicked(move |_| {
+                    let group = c.group.clone();
+                    c.remove.connect_clicked(move |_| {
                         let gone = {
                             let mut conds = conds.borrow_mut();
-                            conds.iter().position(|c| c.field == field).map(|i| conds.remove(i))
+                            if conds.len() < 2 {
+                                return;
+                            }
+                            conds.iter().position(|c| c.group == group).map(|i| conds.remove(i))
                         };
                         if let Some(gone) = gone {
-                            form.remove(&gone.field);
-                            form.remove(&gone.matcher);
-                            form.remove(&gone.value);
+                            page_box.remove(&gone.group);
                             relabel();
                         }
                     });
-                    c.field.add_suffix(&rm);
-                    // Rows added after the page is up miss its Enter-saves
-                    // wiring; give them the same.
+                }
+                // Enter in the text saves, as in every form page; the save
+                // closure is looked up when pressed, so a condition added
+                // before the page is up gets it too.
+                {
                     let form_save = form_save.clone();
                     let nav = nav.clone();
                     c.value.connect_entry_activated(move |_| {
@@ -4616,9 +4664,12 @@ impl AccountsWindow {
             add_row.connect_activated(move |_| add_cond(None));
         }
 
+        // Then: what a match does.
+        let action_group = adw::PreferencesGroup::new();
+        action_group.set_title(&i18n("Then"));
         let dest_row = adw::ComboRow::new();
         dest_row.set_title(&i18n("Move to"));
-        dest_row.set_subtitle(&i18n("Where matching mail is filed; or leave it in the Inbox and only tag it"));
+        dest_row.set_subtitle(&i18n("Leave in Inbox to only tag matching mail"));
         // The destination list follows the chosen account.
         let folders = std::rc::Rc::new(self.folders_by_email.clone());
         let emails_rc = std::rc::Rc::new(emails.clone());
@@ -4666,6 +4717,9 @@ impl AccountsWindow {
         count_row.set_title(&i18n("Count unread mail"));
         count_row.set_subtitle(&i18n("Include the folder's unread mail in the tray icon's unread count"));
         count_row.set_active(true);
+        action_group.add(&dest_row);
+        action_group.add(&tag_row);
+        action_group.add(&count_row);
 
         // Editing: every field starts from the rule as it stands.
         let edit_index = edit.as_ref().map(|(i, _)| *i);
@@ -4687,14 +4741,11 @@ impl AccountsWindow {
             count_row.set_active(rule.count_unread);
         }
 
-        form.append(&account_row);
-        form.append(&add_row);
-        form.append(&combine_row);
-        form.append(&dest_row);
-        form.append(&tag_row);
-        form.append(&count_row);
-        // The conditions slot in above the "Add Condition" row: the rule's
-        // own when editing, one blank one otherwise.
+        page_box.append(&account_group);
+        page_box.append(&add_group);
+        page_box.append(&action_group);
+        // The condition groups slot in above Add Condition: the rule's own
+        // when editing, one blank one otherwise.
         match &edit {
             Some((_, rule)) => {
                 for c in rule.conditions() {
@@ -4740,9 +4791,19 @@ impl AccountsWindow {
                 });
             });
         }
+        // VIREO_SHOWCASE_ADD_CONDITION=<n> adds that many blank conditions
+        // once the page is up, for a capture of the stacked groups.
+        if let Some(Ok(n)) = std::env::var("VIREO_SHOWCASE_ADD_CONDITION").ok().map(|v| v.parse::<usize>()) {
+            let add_cond = add_cond.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
+                for _ in 0..n {
+                    add_cond(None);
+                }
+            });
+        }
 
         let s = sender.clone();
-        self.push_form_page(nav, "filter", &title, &verb, &form, move || {
+        self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), Vec::new(), move || {
             // Every condition with text; a blank extra one is dropped. The
             // matcher of a body condition is whatever the pinned row says.
             let conditions: Vec<crate::config::FilterCondition> = conds
@@ -4796,8 +4857,11 @@ impl AccountsWindow {
     }
 }
 
-/// One condition of the filter editor (#192): its Where, Match and Text rows.
+/// One condition of the filter editor (#192): its own titled group with a
+/// remove button in the header, holding the Where, Match and Text rows.
 struct CondRows {
+    group: adw::PreferencesGroup,
+    remove: gtk::Button,
     field: adw::ComboRow,
     matcher: adw::ComboRow,
     value: adw::EntryRow,

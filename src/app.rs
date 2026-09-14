@@ -1207,6 +1207,8 @@ pub enum AppMsg {
     SetAccount(Account),
     SetFolders { account_id: u32, folders: Vec<Folder> },
     Messages { account_id: u32, folder_id: u32, messages: Vec<Message> },
+    /// Showcase: open filter rule `i` in the current Accounts panel.
+    ShowcaseEditFilter(usize),
     /// The message-body filter conditions the server confirmed for a folder's
     /// listed mail (#191): uid → the lowercased alternatives found in it.
     /// Arrives just ahead of the `Messages` it describes.
@@ -7407,6 +7409,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::ShowcaseEditFilter(i) => {
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::EditFilter(i));
+                }
+            }
+
             AppMsg::BodyHits { account_id, folder_id, hits } => {
                 // The whole answer for the sync about to land; the previous
                 // one described mail that sync lists again anyway.
@@ -13012,11 +13020,14 @@ impl AppModel {
         ));
         // Showcase hook: VIREO_SHOWCASE_EDIT_FILTER=<index> opens that
         // filter rule's editor once the panel is up, for a capture.
+        // Sent through the app so it reaches whichever panel is current
+        // when it fires: an open right after the pre-warm may have swapped
+        // in a fresh one.
         if let Some(Ok(i)) = std::env::var("VIREO_SHOWCASE_EDIT_FILTER").ok().map(|v| v.parse::<usize>()) {
             if demo_mode() {
-                let a = accounts.sender().clone();
+                let s = sender.clone();
                 gtk::glib::timeout_add_seconds_local_once(2, move || {
-                    let _ = a.send(crate::ui::accounts::AccountsInput::EditFilter(i));
+                    s.input(AppMsg::ShowcaseEditFilter(i));
                 });
             }
         }
