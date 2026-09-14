@@ -34,6 +34,12 @@ several conditions, and take several alternatives per condition.
 - The filters file keeps the first condition where earlier versions
   read it, and only writes the new keys when a rule needs them, so a
   rule with one condition still loads in those versions unchanged.
+- **The filter editor's "Move to" list is no longer empty after Settings
+  reopens.** Since 1.27.0, reopening Settings after an account, filter,
+  tag or sender changed built a fresh Accounts panel that was never told
+  the accounts' folders, so "Move to" offered only *Leave in Inbox* and
+  an existing rule's folder showed as that. The panel now gets the
+  folders as the first one does.
 
 ## 1.29.3 — 2026-09-14
 

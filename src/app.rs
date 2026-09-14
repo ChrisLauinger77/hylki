@@ -13219,6 +13219,12 @@ impl AppModel {
                 }
             } else {
                 let accounts = Self::launch_accounts_panel(init, sender);
+                // A fresh panel knows no folders until told: without this
+                // the filter editor's "Move to" list held only "Leave in
+                // Inbox" whenever Settings reopened after a change.
+                accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
+                    self.folder_choice_map(),
+                ));
                 self.accounts_seed = Some(seed);
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::SetAccountsPanel {

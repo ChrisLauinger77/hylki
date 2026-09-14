@@ -4704,6 +4704,43 @@ impl AccountsWindow {
             None => add_cond(None),
         }
 
+        // Showcase hook: VIREO_SHOWCASE_OPEN_ROW=dest|tag|where|match|account
+        // activates that combo row once the page is up and logs whether its
+        // popover opened and how many choices it holds, the way a click would
+        // (the "Move to" list was found empty this way, 2026-09-14).
+        if let Ok(which) = std::env::var("VIREO_SHOWCASE_OPEN_ROW") {
+            let row: adw::ComboRow = match which.as_str() {
+                "dest" => dest_row.clone(),
+                "tag" => tag_row.clone(),
+                "where" => conds.borrow()[0].field.clone(),
+                "match" => conds.borrow()[0].matcher.clone(),
+                _ => account_row.clone(),
+            };
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(3), move || {
+                gtk::prelude::WidgetExt::activate(&row);
+                gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
+                    fn find_popover(w: &gtk::Widget) -> Option<gtk::Popover> {
+                        if let Some(p) = w.downcast_ref::<gtk::Popover>() {
+                            return Some(p.clone());
+                        }
+                        let mut c = w.first_child();
+                        while let Some(child) = c {
+                            if let Some(p) = find_popover(&child) {
+                                return Some(p);
+                            }
+                            c = child.next_sibling();
+                        }
+                        None
+                    }
+                    tracing::info!(
+                        "showcase: {which} row choices={} popover visible={:?}",
+                        row.model().map(|m| m.n_items()).unwrap_or(0),
+                        find_popover(row.upcast_ref()).map(|p| p.is_visible()),
+                    );
+                });
+            });
+        }
+
         let s = sender.clone();
         self.push_form_page(nav, "filter", &title, &verb, &form, move || {
             // Every condition with text; a blank extra one is dropped. The

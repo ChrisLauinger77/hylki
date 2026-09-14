@@ -12,6 +12,8 @@ Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita
 
 **A condition can name several alternatives** (#192). Commas separate them in the text to match: `invoice, receipt` matches either, with the whole matcher applied to each. A value that held a comma on purpose now reads as two alternatives.
 
+**Fixed: the filter editor's "Move to" list was empty after Settings reopened.** Since 1.27.0, reopening Settings after an account, filter, tag or sender changed left the list with only *Leave in Inbox*. It lists the folders again.
+
 ## What's new in 1.29.3
 
 **Files from GNOME Files go where you say.** *Send with Vireo*, *Open With Vireo* and Files' own *Email…* entry used to open a new message with the files attached, and nothing else was on offer. Now a dialog asks what the files are for: a new message, a draft you pick from every account's drafts, or a reply to a message you pick from a list, with the message you are reading first and a search box for sender, subject or account. A reply to the message on screen splits the reading pane the way Reply does; any other opens in a window. Each dialog has an "Always do this" box.
