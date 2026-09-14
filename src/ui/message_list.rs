@@ -235,6 +235,17 @@ const THREAD_NODE_REACH: f32 = 8.0;
 /// release, factoring in velocity too.
 const SWIPE_ARM: f64 = 72.0;
 
+/// The commit exit (#swipe): a released swipe that cleared `SWIPE_ARM` flies
+/// the row off the side it was dragged to over this long, while the row's
+/// Revealer closes its height over the same span — so the strip fills, the
+/// message leaves, and the list shuts over the gap in one movement instead of
+/// the row blinking out. Matches the Revealer's own transition duration.
+const SWIPE_EXIT_MS: u32 = 200;
+/// An action that leaves the row where it is (no Archive folder configured,
+/// say) would strand it collapsed and off-screen, so the exit is put back
+/// this long after the action if the row is still here.
+const SWIPE_RESTORE_MS: u64 = 600;
+
 /// The shown rows' (account, folder, uid, id) keys, in list order — rebuilt with
 /// the list and read live when a drag starts.
 pub type DragKeys = std::rc::Rc<std::cell::RefCell<Vec<(u32, u32, u32, u32)>>>;
@@ -398,6 +409,13 @@ pub struct MessageRow {
     swipe_side: i8,
     /// A mouse-button or trackpad gesture is actively dragging this row.
     swipe_dragging: bool,
+    /// The row is committing (#swipe): the release cleared the commit
+    /// distance, so it is flying out to `swipe_side` while its Revealer
+    /// closes. Cleared only if the action leaves the row in place.
+    swipe_committing: bool,
+    /// The exit animation has been started — `post_view` can run again
+    /// before the row is removed, and it must not restart mid-flight.
+    swipe_exit_started: std::cell::Cell<bool>,
     /// The row is mid-swipe: from the first drag until the snap-back
     /// animation lands — the `.swiping` class squares the pill off and
     /// drops its margins for that whole span, so the content and the strip
@@ -465,6 +483,10 @@ pub enum MessageRowInput {
     /// A swipe preference changed: post_view enables or disables the row's
     /// tracker accordingly, and re-reads the trackpad sensitivity.
     SwipePrefsChanged,
+    /// The commit exit has landed: fire the action it committed to.
+    SwipeCommitted(RowAction),
+    /// The action left the row in place — put the exit back.
+    SwipeRestore,
 }
 
 #[derive(Debug)]
@@ -1376,7 +1398,8 @@ impl FactoryComponent for MessageRow {
             .swipe_surface
             .set_sensitivity(self.swipe_sensitivity.get());
         if let Some(t) = self.swipe_tracker.borrow().as_ref() {
-            t.set_enabled(self.swipe_enabled.get());
+            // A committing row takes no new gestures — it is on its way out.
+            t.set_enabled(self.swipe_enabled.get() && !self.swipe_committing);
         }
 
         // A live drag already tracks 1:1 — `wire_swipe_tracker`'s
@@ -1387,7 +1410,49 @@ impl FactoryComponent for MessageRow {
             if let Some(a) = self.swipe_anim.borrow_mut().take() {
                 a.pause();
             }
-        } else {
+        } else if self.swipe_committing && !self.swipe_exit_started.get() {
+            // The exit: carry the content clear off the row's own side while
+            // the Revealer (already told to close) shuts the height. Started
+            // exactly once — post_view runs again on any later change, and a
+            // restart mid-flight would stutter.
+            self.swipe_exit_started.set(true);
+            let span = (widgets.swipe_surface.width() as f64).max(SWIPE_MAX * 2.0);
+            // Negated into `AdwSwipeTracker`'s convention, like the snap-back.
+            let target = if self.swipe_side < 0 { span } else { -span };
+            let surface = widgets.swipe_surface.clone();
+            let setter = {
+                let surface = surface.clone();
+                adw::CallbackAnimationTarget::new(move |v| surface.set_progress_px(v))
+            };
+            let anim = adw::TimedAnimation::new(
+                &widgets.row_overlay,
+                surface.progress_px(),
+                target,
+                SWIPE_EXIT_MS,
+                setter,
+            );
+            // Carries the drag's own momentum on rather than starting over.
+            anim.set_easing(adw::Easing::EaseOutCubic);
+            // The action fires as the exit lands, so the removal that follows
+            // has nothing left to hide. Tied to the animation rather than a
+            // timer: a row removed mid-flight takes the animation with it.
+            // Sent fallibly all the same — libadwaita holds its own reference
+            // to a playing animation, so `done` can still arrive after the
+            // row is gone, and `input` would panic on a dead runtime.
+            {
+                let tx = sender.input_sender().clone();
+                let action = self.swipe_action();
+                anim.connect_done(move |_| {
+                    let _ = tx.send(MessageRowInput::SwipeCommitted(action));
+                });
+            }
+            if let Some(old) = self.swipe_anim.replace(Some(anim)) {
+                old.pause();
+            }
+            if let Some(a) = self.swipe_anim.borrow().as_ref() {
+                a.play();
+            }
+        } else if !self.swipe_committing {
             // Negated back to `AdwSwipeTracker`'s own convention, matching
             // `size_allocate`'s translation.
             let target = -self.swipe_progress;
@@ -1417,8 +1482,10 @@ impl FactoryComponent for MessageRow {
                 // The pill only rounds off and re-insets once the content
                 // has fully slid back over the strip.
                 if self.swipe_progress == 0.0 {
-                    let sender = sender.clone();
-                    anim.connect_done(move |_| sender.input(MessageRowInput::SwipeSettled));
+                    let tx = sender.input_sender().clone();
+                    anim.connect_done(move |_| {
+                        let _ = tx.send(MessageRowInput::SwipeSettled);
+                    });
                 }
                 if let Some(old) = self.swipe_anim.replace(Some(anim)) {
                     old.pause();
@@ -1509,6 +1576,8 @@ impl FactoryComponent for MessageRow {
             swipe_sensitivity,
             swipe_progress: 0.0,
             swipe_side: 0,
+            swipe_committing: false,
+            swipe_exit_started: std::cell::Cell::new(false),
             swipe_dragging: false,
             swipe_active: false,
             swipe_tracker: std::cell::RefCell::new(None),
@@ -1666,6 +1735,11 @@ impl FactoryComponent for MessageRow {
             MessageRowInput::SetRevealed(revealed) => self.revealed = revealed,
             MessageRowInput::SetThreadExpanded(expanded) => self.thread_expanded = expanded,
             MessageRowInput::SwipeUpdate(offset) => {
+                // A row already flying out ignores further gesture events —
+                // its exit owns the surface until the action lands.
+                if self.swipe_committing {
+                    return;
+                }
                 self.swipe_dragging = true;
                 self.swipe_active = true;
                 self.swipe_progress = offset.clamp(-SWIPE_MAX, SWIPE_MAX);
@@ -1684,9 +1758,35 @@ impl FactoryComponent for MessageRow {
             MessageRowInput::SwipeEnd => {
                 self.swipe_dragging = false;
                 if self.swipe_progress.abs() >= SWIPE_ARM {
-                    sender.input(MessageRowInput::Action(self.swipe_action()));
+                    self.commit_swipe();
+                } else {
+                    self.swipe_progress = 0.0;
                 }
-                self.swipe_progress = 0.0;
+            }
+            MessageRowInput::SwipeCommitted(action) => {
+                if self.swipe_committing {
+                    sender.input(MessageRowInput::Action(action));
+                    // Most actions take the row with them, so this timer
+                    // usually fires into a component that is already gone —
+                    // hence the fallible sender (`input` would panic).
+                    let tx = sender.input_sender().clone();
+                    gtk::glib::timeout_add_local_once(
+                        std::time::Duration::from_millis(SWIPE_RESTORE_MS),
+                        move || {
+                            let _ = tx.send(MessageRowInput::SwipeRestore);
+                        },
+                    );
+                }
+            }
+            MessageRowInput::SwipeRestore => {
+                if self.swipe_committing {
+                    // Still here: the action did not remove the row, so it
+                    // slides back in and the Revealer reopens.
+                    self.swipe_committing = false;
+                    self.swipe_exit_started.set(false);
+                    self.swipe_progress = 0.0;
+                    self.revealed = true;
+                }
             }
         }
     }
@@ -1774,10 +1874,15 @@ impl MessageRow {
     fn arm_collapse(&mut self, sender: &FactorySender<Self>) {
         self.cancel_collapse();
         let secs = self.palette_collapse_secs.get().max(1);
-        let s = sender.clone();
+        // Fallible send: nothing removes this timer when the row is dropped
+        // (a list rebuild while a palette is open), and `input` aborts the
+        // process on a shut-down runtime rather than returning an error.
+        let tx = sender.input_sender().clone();
         self.collapse_timer = Some(gtk::glib::timeout_add_seconds_local_once(
             secs as u32,
-            move || s.input(MessageRowInput::CollapsePalette),
+            move || {
+                let _ = tx.send(MessageRowInput::CollapsePalette);
+            },
         ));
     }
 
@@ -1849,6 +1954,19 @@ impl MessageRow {
             RowAction::Delete => i18n("Delete"),
             _ => i18n("Archive"),
         }
+    }
+
+    /// A released swipe that cleared the commit distance (#swipe): the row
+    /// flies out the side it was dragged to while its Revealer closes over
+    /// the same 200ms, and the action fires as the two land. The strip stays
+    /// pinned at full commit for the whole exit, so the colour and icon it
+    /// leaves under are the ones the release chose.
+    fn commit_swipe(&mut self) {
+        self.swipe_committing = true;
+        self.swipe_active = true;
+        self.swipe_progress = if self.swipe_side < 0 { -SWIPE_MAX } else { SWIPE_MAX };
+        // post_view starts the exit and hangs the action off its landing.
+        self.revealed = false;
     }
 
     /// The indicator panel's classes: coloured for whichever action is
@@ -2514,6 +2632,10 @@ pub enum MessageListInput {
     /// Showcase staging: open row N's Actions Palette (screenshot hook only —
     /// see VIREO_SHOWCASE_PALETTE in app.rs).
     DebugOpenPalette(usize),
+    /// Showcase only (VIREO_SHOWCASE_SWIPE): drive row `index` through a full
+    /// swipe and release, so the commit exit can be caught in stills — there
+    /// is no way to inject a real gesture on this desktop.
+    DebugSwipe { index: usize, left: bool },
     /// A row's palette opened; fold every other row's.
     PaletteOpened(usize),
     /// Expand/collapse a conversation thread.
@@ -3849,6 +3971,11 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::DebugOpenPalette(idx) => {
                 self.row_send(idx, MessageRowInput::TogglePalette);
+            }
+            MessageListInput::DebugSwipe { index, left } => {
+                let px = if left { -SWIPE_MAX } else { SWIPE_MAX };
+                self.row_send(index, MessageRowInput::SwipeUpdate(px));
+                self.row_send(index, MessageRowInput::SwipeEnd);
             }
             MessageListInput::PaletteOpened(idx) => {
                 for i in 0..self.shown.len() {

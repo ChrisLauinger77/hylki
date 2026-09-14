@@ -3415,6 +3415,39 @@ impl SimpleComponent for AppModel {
                         });
                     });
                 }
+                // VIREO_SHOWCASE_SWIPE=N[:left|right] swipes row N fully and
+                // releases it at 7s, with VIREO_SHOWCASE_BURST=<path> writing
+                // stills through the commit exit — the only way to see the
+                // gesture's animation here (no input injection).
+                if let Ok(spec) = std::env::var("VIREO_SHOWCASE_SWIPE") {
+                    let (idx, side) = spec.split_once(':').unwrap_or((spec.as_str(), "left"));
+                    let index: usize = idx.trim().parse().unwrap_or(0);
+                    let left = side != "right";
+                    let list = model.message_list.sender().clone();
+                    let burst = std::env::var("VIREO_SHOWCASE_BURST").ok();
+                    let win = root.clone();
+                    {
+                        // An occluded window's frame clock is suspended, so
+                        // raise it well before the animation runs.
+                        let win = win.clone();
+                        gtk::glib::timeout_add_seconds_local_once(5, move || win.present());
+                    }
+                    gtk::glib::timeout_add_seconds_local_once(7, move || {
+                        let _ = list.send(MessageListInput::DebugSwipe { index, left });
+                        if let Some(base) = burst.clone() {
+                            for (i, ms) in [40u64, 120, 200, 300, 500].iter().enumerate() {
+                                let win = win.clone();
+                                let path = format!("{base}.{i}.png");
+                                gtk::glib::timeout_add_local_once(
+                                    std::time::Duration::from_millis(*ms),
+                                    move || {
+                                        showcase_capture(win.upcast_ref::<gtk::Widget>(), &path);
+                                    },
+                                );
+                            }
+                        }
+                    });
+                }
                 // VIREO_SHOWCASE_ROW=N selects the list's row N at 4s (with
                 // VIREO_SHOWCASE_STAGE=0), for capturing or probing one message.
                 if let Some(Ok(n)) = std::env::var("VIREO_SHOWCASE_ROW").ok().map(|v| v.parse::<u32>()) {
