@@ -33,6 +33,15 @@ to go to cloud storage instead.
 - Under the hood: the hand-off's "did the window come to the front"
   check now counts any Vireo window, so the dialog asking about the
   files does not trigger the "message ready" desktop alert.
+- **Cloud storage behind Cloudflare.** A self-hosted Nextcloud, ownCloud,
+  OpenCloud or Seafile reached through a Cloudflare domain or tunnel
+  rejected any upload over 100 MB (the proxy's request limit). The
+  account editor has a "Server is behind Cloudflare" switch: with it on,
+  files over 90 MB go up in 90 MB pieces the server puts back together
+  (the WebDAV `uploads` chunking endpoint with a final MOVE; Seafile's
+  resumable upload with Content-Range on the same upload link). Smaller
+  files and the other services are unchanged. Not tried against a live
+  server behind Cloudflare.
 
 ## 1.29.2 — 2026-09-14
 

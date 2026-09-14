@@ -570,6 +570,12 @@ fn build_editor(
     let folder = adw::EntryRow::new();
     folder.set_title(&i18n("Upload folder"));
     folder.set_text(&account.folder);
+    let cloudflare = adw::SwitchRow::new();
+    cloudflare.set_title(&i18n("Server is behind Cloudflare"));
+    cloudflare.set_subtitle(&i18n(
+        "Cloudflare's proxy refuses a request over 100 MB, so bigger files are uploaded in 90 MB pieces the server puts back together. For a self-hosted server on a Cloudflare domain or tunnel.",
+    ));
+    cloudflare.set_active(account.cloudflare);
     let expire = adw::SpinRow::with_range(0.0, 365.0, 1.0);
     expire.set_title(&i18n("Links expire after"));
     expire.set_subtitle(&i18n("Days; 0 keeps the link indefinitely"));
@@ -588,6 +594,7 @@ fn build_editor(
     group.add(&app_key);
     group.add(&library);
     group.add(&folder);
+    group.add(&cloudflare);
     // The link terms: the defaults for this account, changeable for each
     // upload in the composer's upload dialog.
     let defaults = adw::PreferencesGroup::new();
@@ -708,6 +715,7 @@ fn build_editor(
             goa_row.clone(),
             goa_hint.clone(),
         );
+        let cloudflare = cloudflare.clone();
         let editing = index.is_some();
         let fill_goa = fill_goa.clone();
         let apply_terms = apply_terms.clone();
@@ -726,6 +734,9 @@ fn build_editor(
             library.set_visible(k == CloudKind::Seafile);
             code.set_visible(k == CloudKind::Seafile);
             seafile_hint.set_visible(k == CloudKind::Seafile);
+            // Self-hosted kinds only: Dropbox and OneDrive are not behind
+            // anyone's proxy.
+            cloudflare.set_visible(!dropbox && !goa);
             if goa {
                 fill_goa(k);
                 check.set_label(&i18n("Check Connection"));
@@ -801,6 +812,7 @@ fn build_editor(
             expire.clone(),
             protect.clone(),
         );
+        let cloudflare = cloudflare.clone();
         let selected_service = selected_service.clone();
         let dropbox_login = dropbox_login.clone();
         let existing = account.clone();
@@ -837,6 +849,7 @@ fn build_editor(
                 link_expiry: None,
                 link_password: None,
                 link_note: String::new(),
+                cloudflare: !kind.via_goa() && kind != CloudKind::Dropbox && cloudflare.is_active(),
             };
             let probed = link_terms.borrow().clone();
             match probed {

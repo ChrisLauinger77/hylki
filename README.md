@@ -235,6 +235,13 @@ of the generated one.
 - **Nextcloud, ownCloud, OpenCloud** — the server URL, your user name and an
   app password (made under *Security* in the server's personal settings).
   Uploads go over WebDAV; links come from the files-sharing API.
+- **Behind Cloudflare** (Nextcloud-kind and Seafile accounts) — a
+  self-hosted server reached through a Cloudflare domain or tunnel cannot
+  take a request over 100 MB, Cloudflare's proxy limit. Switch on *Server
+  is behind Cloudflare* in the account's editor and files bigger than 90 MB
+  go up in 90 MB pieces the server stitches back together (Nextcloud's
+  chunked-upload endpoint, Seafile's resumable upload); smaller files go
+  as one request as before.
 - **Seafile** — the server URL, your e-mail and your password. If the
   account uses two-step verification, also enter the current code from your
   authenticator app: Vireo signs in with it once, gets an API token from the
