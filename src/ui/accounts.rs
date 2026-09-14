@@ -171,6 +171,11 @@ pub struct AccountsWindow {
     /// chosen side is saved; the other side's choice stays in the editor
     /// so flipping back and forth loses nothing.
     picture_mode: bool,
+    /// What the account editor held when it opened, so leaving an untouched
+    /// one asks nothing. `None` while no editor is open — or when something
+    /// filled the form without recording it, where the safe answer is that
+    /// it was touched.
+    editor_seed: Option<String>,
     /// WYSIWYG editor for the account signature.
     /// The signature's rich editor — a WebKit view, so it is created when
     /// an account's editor first opens rather than with the panel.
@@ -210,6 +215,14 @@ struct AliasDialog {
 pub enum AccountsInput {
     /// The editor's "Use my Gravatar" switch moved (#189).
     SetOwnGravatar(bool),
+    /// Showcase only (VIREO_SHOWCASE_EDITOR_DIRTY): type into the open
+    /// editor's Label field, the way a capture cannot.
+    DebugEditLabel(String),
+    /// The settings sidebar wants to show another category while an editor
+    /// is open. The answer (below) says whether anything would be lost.
+    LeaveRequest(String),
+    /// What the open editor answered: leave quietly, or ask the user first.
+    LeaveVerdict { page: String, touched: bool },
     /// The settings sidebar chose one of this component's pages (#141):
     /// "accounts", "tags", "filters" or "senders".
     ShowPage(String),
@@ -357,6 +370,12 @@ pub enum AccountsOutput {
     SetTags(Vec<crate::config::Tag>),
     /// The tag finder wants every account scanned for keywords in use.
     FindTags,
+    /// The editor was left with nothing changed in it: it is already closed,
+    /// and the settings window can show `page` without asking anything.
+    LeftEditor(String),
+    /// The editor holds unsaved changes: the settings window should ask
+    /// before showing `page`.
+    LeaveNeedsPrompt(String),
 }
 
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
@@ -1080,9 +1099,10 @@ impl Component for AccountsWindow {
                                 #[name = "gravatar_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Use my Gravatar"),
-                                    set_subtitle: &i18n("Show the picture this address has at gravatar.com, \
-                                                   which is sent a hash of it to ask. With no Gravatar \
-                                                   there, the circle shows the choice below."),
+                                    set_subtitle: &i18n("Show the picture this address has at gravatar.com. \
+                                                   Looking it up sends them a hash of the address, and \
+                                                   if there is none, the circle falls back to the \
+                                                   choice below."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input(AccountsInput::SetOwnGravatar(row.is_active()));
                                     },
@@ -1341,6 +1361,7 @@ impl Component for AccountsWindow {
             preview_css: gtk::CssProvider::new(),
             list_css: gtk::CssProvider::new(),
             picture_mode: false,
+            editor_seed: None,
             sig_editor: None,
             label_synced: String::new(),
             goa,
@@ -1522,6 +1543,43 @@ impl Component for AccountsWindow {
                     widgets.nav.pop();
                 }
             }
+            AccountsInput::DebugEditLabel(text) => widgets.label_row.set_text(&text),
+
+            AccountsInput::LeaveRequest(page) => {
+                match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
+                    // The account editor knows what it was opened with, so it
+                    // can tell an edited form from an untouched one. The
+                    // signature lives in a WebView and only answers when
+                    // asked, so that answer arrives separately.
+                    Some("editor") => {
+                        if self.editor_touched(widgets) {
+                            sender.input(AccountsInput::LeaveVerdict { page, touched: true });
+                        } else {
+                            let s = sender.clone();
+                            self.sig_editor(widgets).is_dirty(move |touched| {
+                                s.input(AccountsInput::LeaveVerdict { page, touched });
+                            });
+                        }
+                    }
+                    // Nothing records what a filter or a tag was opened with,
+                    // so those are always worth asking about.
+                    Some("filter") | Some("tag") => {
+                        sender.input(AccountsInput::LeaveVerdict { page, touched: true })
+                    }
+                    _ => sender.input(AccountsInput::LeaveVerdict { page, touched: false }),
+                }
+            }
+
+            AccountsInput::LeaveVerdict { page, touched } => {
+                if touched {
+                    let _ = sender.output(AccountsOutput::LeaveNeedsPrompt(page));
+                    return;
+                }
+                // Nothing to lose: close the editor and let the window move on.
+                sender.input(AccountsInput::CloseEditor);
+                let _ = sender.output(AccountsOutput::LeftEditor(page));
+            }
+
             AccountsInput::SaveOpenPage => {
                 match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
                     Some("editor") => sender.input(AccountsInput::Save),
@@ -1566,6 +1624,7 @@ impl Component for AccountsWindow {
                 widgets.remove_btn.set_visible(false);
                 // A prior GOA edit may have hidden the provider picker.
                 widgets.provider_row.set_visible(true);
+                self.editor_seed = Some(self.editor_fingerprint(widgets));
                 mount_editor(widgets);
                 widgets.nav.push_by_tag("editor");
             }
@@ -1685,6 +1744,7 @@ impl Component for AccountsWindow {
                     "Switching this off returns the account to the import list — it \
                      stays in GNOME Online Accounts."
                 });
+                self.editor_seed = Some(self.editor_fingerprint(widgets));
                 mount_editor(widgets);
                 widgets.nav.push_by_tag("editor");
             }
@@ -2464,6 +2524,10 @@ impl Component for AccountsWindow {
                 if self.accounts.get(i).is_none_or(|a| a.email != secrets.email) {
                     return;
                 }
+                // The passwords arrive after the editor opened, so they would
+                // read as an edit the user never made. Re-take the seed below
+                // when nothing has actually been typed yet.
+                let untouched = !self.editor_touched(widgets);
                 if let Some(acc) = self.accounts.get_mut(i) {
                     secrets.apply(acc);
                 }
@@ -2479,6 +2543,9 @@ impl Component for AccountsWindow {
                             al.smtp_password = pw.clone();
                         }
                     }
+                }
+                if untouched {
+                    self.editor_seed = Some(self.editor_fingerprint(widgets));
                 }
             }
             AccountsCmd::Test(result) => {
@@ -3258,6 +3325,30 @@ impl AccountsWindow {
     /// mode: the accent colour, and the picture, emoji or initials the
     /// sidebar would show — the initials from the label, else the name,
     /// else the email, as the sidebar derives them.
+    /// Everything an account editor holds, as one comparable string: what
+    /// Save would write, less the signature — that lives in a WebView and
+    /// answers only asynchronously (`RichEditor::is_dirty` covers it).
+    fn editor_fingerprint(&self, widgets: &AccountsWindowWidgets) -> String {
+        let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
+        format!(
+            "{account:?}|{:?}|{:?}|{}|{}",
+            self.alias_edits,
+            self.read_folder_roles(widgets),
+            widgets.provider_row.selected(),
+            self.pending_oauth_refresh.is_some(),
+        )
+    }
+
+    /// Whether anything in the open account editor differs from what it was
+    /// opened with. Leaving an untouched editor must not ask about saving;
+    /// with nothing recorded, assume it was touched rather than risk
+    /// dropping an edit.
+    fn editor_touched(&self, widgets: &AccountsWindowWidgets) -> bool {
+        self.editor_seed
+            .as_ref()
+            .is_none_or(|seed| *seed != self.editor_fingerprint(widgets))
+    }
+
     fn refresh_preview(&self, widgets: &AccountsWindowWidgets) {
         let color = crate::color::to_hex(&widgets.color_btn.rgba());
         self.preview_css.load_from_string(&format!(

@@ -785,6 +785,12 @@ pub enum PrefInput {
     SetAccountsPanel { panel: gtk::Widget, sender: relm4::Sender<crate::ui::accounts::AccountsInput> },
     /// A sidebar category was chosen (#141).
     SelectPage(String),
+    /// The open editor says it holds unsaved changes: ask before leaving it
+    /// for this page.
+    LeaveEditorPrompt(String),
+    /// Leave the editor for this page — it is saved, discarded, or was never
+    /// touched.
+    LeaveEditorTo(String),
     /// Select a category by id from outside (the app's showcase hook).
     ShowPageById(String),
     /// An accounts-panel editor subpage (account, filter or tag) opened on
@@ -933,7 +939,7 @@ impl Preferences {
                     } else {
                         let _ = accounts.send(crate::ui::accounts::AccountsInput::SaveOpenPage);
                     }
-                    s.input(PrefInput::ShowPageById(id.clone()));
+                    s.input(PrefInput::LeaveEditorTo(id.clone()));
                 }
                 "discard" => {
                     if cloud_editor {
@@ -943,8 +949,9 @@ impl Preferences {
                     } else {
                         let _ = accounts.send(crate::ui::accounts::AccountsInput::CloseEditor);
                     }
-                    s.input(PrefInput::ShowPageById(id.clone()));
+                    s.input(PrefInput::LeaveEditorTo(id.clone()));
                 }
+                // Staying: put the selection back on the editor's own page.
                 _ => s.input(PrefInput::ShowPageById(editor_page.into())),
             }
         });
@@ -1544,11 +1551,11 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         #[watch]
                                         set_sensitive: model.avatars,
-                                        set_title: &i18n("Your own mail shows your mailbox"),
+                                        set_title: &i18n("Your own mail shows your account circle"),
                                         set_subtitle: &i18n("Messages you sent wear the account's Gravatar, \
-                                                       picture or emoji, the same face its circle in \
-                                                       the sidebar shows. Turning it off gives them \
-                                                       whatever circle anyone else's mail would get."),
+                                                       picture or emoji, as its circle in the sidebar \
+                                                       does. Turning it off gives them whatever circle \
+                                                       anyone else's mail would get."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleOwnMailboxFace(row.is_active()));
                                         },
@@ -3170,7 +3177,17 @@ impl Component for Preferences {
             }
             PrefInput::SelectPage(id) => {
                 if self.editor_open && id != self.editor_page {
-                    self.ask_to_leave_editor(&id, &sender);
+                    // The accounts panel's editors can tell whether anything
+                    // was actually changed, and answer with either
+                    // LeaveEditorTo or LeaveEditorPrompt. The cloud editor
+                    // keeps no such record, so it is always asked about.
+                    if self.editor_page == "cloud" {
+                        self.ask_to_leave_editor(&id, &sender);
+                    } else {
+                        let _ = self
+                            .accounts_sender
+                            .send(crate::ui::accounts::AccountsInput::LeaveRequest(id));
+                    }
                 } else {
                     self.show_page(&id);
                     if id == "system" {
@@ -3180,6 +3197,18 @@ impl Component for Preferences {
                 }
             }
             PrefInput::ShowPageById(id) => self.select_row(&id),
+            PrefInput::LeaveEditorPrompt(id) => self.ask_to_leave_editor(&id, &sender),
+            PrefInput::LeaveEditorTo(id) => {
+                // The row the user clicked is already the selected one — the
+                // click selected it before any of this — so re-selecting it
+                // emits nothing and the page has to be shown outright.
+                self.select_row(&id);
+                self.show_page(&id);
+                if id == "system" {
+                    sender.input(PrefInput::NautilusRefresh);
+                }
+                let _ = sender.output(PrefOutput::PageShown(id));
+            }
             PrefInput::EditorOpen(page) => {
                 self.editor_open = page.is_some();
                 self.editor_page = page.unwrap_or("accounts");

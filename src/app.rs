@@ -1002,6 +1002,9 @@ pub enum AppMsg {
     /// Showcase only (VIREO_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
     ShowcaseFolder(FolderKind),
+    /// Showcase only (VIREO_SHOWCASE_EDITOR_DIRTY): change the open account
+    /// editor, so leaving an edited one can be captured.
+    ShowcaseDirtyEditor,
     Reply,
     ReplyAll,
     Forward,
@@ -1130,6 +1133,9 @@ pub enum AppMsg {
     ClosePreferences,
     /// The accounts editor subpage opened/closed in the settings window.
     SettingsEditorOpen(Option<&'static str>),
+    /// A settings editor was asked whether it can be left: `ask` when it
+    /// holds unsaved changes, otherwise it has already closed itself.
+    SettingsLeaveEditor { page: String, ask: bool },
     /// The "settings window opens to" preference changed (true = Accounts).
     SetSettingsOpenAccounts(bool),
     // Worker events (each carries the account it came from)
@@ -3534,6 +3540,44 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
                         s.input(AppMsg::SidebarContext(CtxAction::OpenAccountSettings(n + 1)));
+                    });
+                }
+                // VIREO_SHOWCASE_EDITOR_DIRTY=1 types into the open account
+                // editor's Label field at 7s, so leaving an edited editor can
+                // be exercised without a keyboard.
+                if std::env::var("VIREO_SHOWCASE_EDITOR_DIRTY").is_ok() {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(7, move || {
+                        s.input(AppMsg::ShowcaseDirtyEditor);
+                    });
+                }
+                // VIREO_SHOWCASE_SETTINGS_GO=<category> picks that sidebar
+                // category at 8s, exactly as a click on its row does.
+                if let Ok(page) = std::env::var("VIREO_SHOWCASE_SETTINGS_GO") {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(8, move || {
+                        s.input(AppMsg::ShowSettingsPage(page.clone()));
+                    });
+                }
+                // VIREO_SHOWCASE_DIALOG=save|discard|cancel answers whatever
+                // message dialog is on screen at 10s.
+                if let Ok(answer) = std::env::var("VIREO_SHOWCASE_DIALOG") {
+                    gtk::glib::timeout_add_seconds_local_once(10, move || {
+                        let tops = gtk::Window::toplevels();
+                        let dialog = (0..tops.n_items())
+                            .filter_map(|i| tops.item(i))
+                            .filter_map(|o| o.downcast::<adw::MessageDialog>().ok())
+                            .find(|d| d.is_visible());
+                        match dialog {
+                            Some(d) => {
+                                // Answering is what a button click emits; the
+                                // click also takes the dialog off screen, so
+                                // hide it (closing would answer a second time).
+                                d.response(&answer);
+                                d.set_visible(false);
+                            }
+                            None => tracing::warn!("showcase: no dialog to answer"),
+                        }
                     });
                 }
                 // VIREO_SHOWCASE_SETTINGS=accounts|prefs opens the Settings
@@ -7065,9 +7109,27 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::ShowcaseDirtyEditor => {
+                if let Some(acc) = &self.accounts_win {
+                    acc.emit(crate::ui::accounts::AccountsInput::DebugEditLabel(
+                        "Edited in the capture".into(),
+                    ));
+                }
+            }
+
             AppMsg::SettingsEditorOpen(open) => {
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::EditorOpen(open));
+                }
+            }
+
+            AppMsg::SettingsLeaveEditor { page, ask } => {
+                if let Some(p) = &self.prefs {
+                    p.emit(if ask {
+                        PrefInput::LeaveEditorPrompt(page)
+                    } else {
+                        PrefInput::LeaveEditorTo(page)
+                    });
                 }
             }
 
@@ -12539,6 +12601,10 @@ impl AppModel {
                 AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
                 AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
                 AccountsOutput::FindTags => AppMsg::FindTags,
+                AccountsOutput::LeftEditor(page) => AppMsg::SettingsLeaveEditor { page, ask: false },
+                AccountsOutput::LeaveNeedsPrompt(page) => {
+                    AppMsg::SettingsLeaveEditor { page, ask: true }
+                }
             });
 
         // The host window: the preferences component, carrying the accounts
