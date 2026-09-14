@@ -2010,6 +2010,9 @@ impl MessageView {
         self.card_actions_hover.hash(&mut h);
         self.card_actions_auto.hash(&mut h);
         self.palette_collapse_secs.hash(&mut h);
+        // The picture a mailbox of your own shows can change while a
+        // conversation is open (#189) — the cards must be built again.
+        crate::avatar::own_faces_generation().hash(&mut h);
         self.thread.len().hash(&mut h);
         for m in &self.thread {
             let key = (m.account_id, m.id);
@@ -2240,36 +2243,66 @@ impl MessageView {
                     ),
                     // An initials circle, tinted per sender address, so who
                     // wrote each card — and which cards are your own replies —
-                    // reads at a glance (#22). Pure markup: no texture crosses
-                    // into this document, and the initial is escaped like every
+                    // reads at a glance (#22). Nothing is linked: a picture
+                    // arrives as an embedded PNG, never a path the document
+                    // could reach for, and the initial is escaped like every
                     // other header field.
                     ava = {
-                        let initial = m
-                            .from_name
-                            .trim()
-                            .chars()
-                            .next()
-                            .or_else(|| m.from_addr.trim().chars().next())
-                            .map(|c| c.to_uppercase().to_string())
-                            .unwrap_or_else(|| "?".to_string());
-                        let hue = m
-                            .from_addr
-                            .to_ascii_lowercase()
-                            .bytes()
-                            .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b as u32))
-                            % 360;
-                        let l = if dark { 38 } else { 45 };
-                        // Drawn ink-centred by ui::initials and embedded as
-                        // a PNG (the same tint); the markup span stands in
-                        // only before a window exists to render with.
-                        let bg = crate::ui::initials::hsl(f64::from(hue), 0.52, f64::from(l) / 100.0);
-                        match crate::ui::initials::png_data_uri(&initial, bg, 26) {
-                            Some(uri) => format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">"),
-                            None => format!(
-                                "<span class=\"vireo-ava\" style=\"background:hsl({hue},52%,{l}%)\">{}</span>",
-                                escape_text(&initial),
-                            ),
-                        }
+                        // One of your own mailboxes wrote this card (#189):
+                        // show what its account chose — the sidebar's picture,
+                        // or its emoji on the account colour — so your own
+                        // replies in a conversation wear the face you gave
+                        // that mailbox rather than plain initials.
+                        let own = crate::avatar::own_face(&m.from_addr).and_then(|face| {
+                            match (&face.picture, &face.emoji) {
+                                (Some(path), _) => crate::ui::initials::picture_data_uri(path, 26)
+                                    .map(|uri| format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">")),
+                                (None, Some(emoji)) => {
+                                    let png = gtk::gdk::RGBA::parse(&face.color)
+                                        .ok()
+                                        .and_then(|bg| crate::ui::initials::png_data_uri(emoji, bg, 26));
+                                    Some(match png {
+                                        Some(uri) => {
+                                            format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">")
+                                        }
+                                        None => format!(
+                                            "<span class=\"vireo-ava\" style=\"background:{bg}\">{glyph}</span>",
+                                            bg = attr_escape(&face.color),
+                                            glyph = escape_text(emoji),
+                                        ),
+                                    })
+                                }
+                                (None, None) => None,
+                            }
+                        });
+                        own.unwrap_or_else(|| {
+                            let initial = m
+                                .from_name
+                                .trim()
+                                .chars()
+                                .next()
+                                .or_else(|| m.from_addr.trim().chars().next())
+                                .map(|c| c.to_uppercase().to_string())
+                                .unwrap_or_else(|| "?".to_string());
+                            let hue = m
+                                .from_addr
+                                .to_ascii_lowercase()
+                                .bytes()
+                                .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b as u32))
+                                % 360;
+                            let l = if dark { 38 } else { 45 };
+                            // Drawn ink-centred by ui::initials and embedded as
+                            // a PNG (the same tint); the markup span stands in
+                            // only before a window exists to render with.
+                            let bg = crate::ui::initials::hsl(f64::from(hue), 0.52, f64::from(l) / 100.0);
+                            match crate::ui::initials::png_data_uri(&initial, bg, 26) {
+                                Some(uri) => format!("<img class=\"vireo-ava\" src=\"{uri}\" alt=\"\">"),
+                                None => format!(
+                                    "<span class=\"vireo-ava\" style=\"background:hsl({hue},52%,{l}%)\">{}</span>",
+                                    escape_text(&initial),
+                                ),
+                            }
+                        })
                     },
                     addr = if m.from_addr.is_empty() {
                         String::new()
@@ -5320,6 +5353,85 @@ mod tests {
         // The cards sit on the deeper page — the same colour the spinner and the
         // cover behind the WebView are painted, so the handover is invisible.
         assert!(doc.contains(&format!("background:{}", PAGE.0)), "page ground: {doc}");
+    }
+
+    /// A card from a mailbox of your own wears the face that mailbox was given
+    /// (#189) — the picture it was handed, or its emoji on the account colour
+    /// — while every other sender keeps their tinted initials.
+    #[test]
+    fn a_card_from_your_own_mailbox_wears_that_mailboxs_face() {
+        let mut mine = msg_for_print();
+        mine.id = 2;
+        mine.from_name = "Me".into();
+        mine.from_addr = "me@example.com".into();
+        let build = |thread: &[Message]| {
+            MessageView::conversation_document(
+                thread,
+                &std::collections::HashMap::new(),
+                &Default::default(),
+                &Default::default(),
+                &[],
+                "#3584e4",
+                true,
+                false,
+                false,
+                false,
+                &crate::config::ReaderStyle::NONE,
+                &Default::default(),
+            )
+        };
+
+        crate::avatar::set_own_faces([(
+            "Me@Example.com".to_string(),
+            crate::avatar::OwnFace {
+                picture: None,
+                emoji: Some("\u{1F98A}".to_string()),
+                color: "#e66100".to_string(),
+            },
+        )]);
+        let doc = build(std::slice::from_ref(&mine));
+        // Drawn with a renderer where there is one, as markup where there is
+        // not — either way it is the mailbox's own face, not the initials
+        // circle a stranger's address would be tinted into.
+        assert!(
+            doc.contains("\u{1F98A}") || doc.contains("src=\"data:image/png;base64,"),
+            "the mailbox's emoji is the face: {doc}"
+        );
+        assert!(!doc.contains("hsl("), "and not the per-sender tint: {doc}");
+        // Someone else's card is untouched by any of this.
+        let doc = build(&[msg_for_print()]);
+        assert!(!doc.contains("\u{1F98A}"), "another sender keeps their own circle: {doc}");
+
+        // A picture wins over the emoji, and rides along embedded: the
+        // document is handed the image, never a path it could go and read.
+        let dir = std::env::temp_dir().join(format!("vireo-own-face-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("a directory to write the picture in");
+        let path = dir.join("avatar.png");
+        let pixbuf = gtk::gdk_pixbuf::Pixbuf::new(gtk::gdk_pixbuf::Colorspace::Rgb, true, 8, 64, 64)
+            .expect("a pixbuf");
+        pixbuf.fill(0xe661_00ff);
+        pixbuf.savev(&path, "png", &[]).expect("a picture on disk");
+        crate::avatar::set_own_faces([(
+            "me@example.com".to_string(),
+            crate::avatar::OwnFace {
+                picture: Some(path.clone()),
+                emoji: Some("\u{1F98A}".to_string()),
+                color: "#e66100".to_string(),
+            },
+        )]);
+        let doc = build(std::slice::from_ref(&mine));
+        assert!(
+            doc.contains("<img class=\"vireo-ava\" src=\"data:image/png;base64,"),
+            "the picture is embedded in the card: {doc}"
+        );
+        assert!(!doc.contains("\u{1F98A}"), "the picture wins over the emoji: {doc}");
+        assert!(
+            !doc.contains(path.to_string_lossy().as_ref()),
+            "the file is never linked: {doc}"
+        );
+
+        crate::avatar::set_own_faces(std::iter::empty());
+        let _ = std::fs::remove_file(&path);
     }
 
     /// Each card names everyone the message went to, collapsed behind a chip so

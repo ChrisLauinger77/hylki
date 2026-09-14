@@ -2453,6 +2453,10 @@ impl SimpleComponent for AppModel {
         model.refresh_tag_css();
         model.message_list.emit(MessageListInput::SetTags(model.tags.clone()));
         model.message_view.emit(MessageViewInput::SetTags(model.tags.clone()));
+        // What each mailbox of the user's own shows (#189), before the first
+        // cached message is painted: the sidebar refreshes this whenever the
+        // accounts change, but nothing has rebuilt it yet at this point.
+        model.refresh_own_faces();
         model.spawn_workers(&sender);
         if model.tray_enabled {
             model.start_tray(&sender);
@@ -8463,6 +8467,38 @@ impl AppModel {
             .and_then(|c| c.emoji.clone())
     }
 
+    /// Tell the face chain which addresses are the user's own, and what their
+    /// accounts show for them (#189): a mailbox given a picture wears it on
+    /// the mail it sent too — in a conversation's cards and in the list — and
+    /// not only in the sidebar. Refreshed with the sidebar, which is rebuilt
+    /// whenever the accounts change.
+    fn refresh_own_faces(&self) {
+        let mut faces: Vec<(String, crate::avatar::OwnFace)> = Vec::new();
+        for (i, cfg) in self.effective_config().iter().enumerate() {
+            let picture = cfg.avatar.as_deref().and_then(config::avatar_path);
+            let emoji = cfg.emoji.clone().filter(|e| !e.trim().is_empty());
+            // An account showing its initials has nothing to add: the circle
+            // its own messages already get is drawn from the same letters.
+            if picture.is_none() && emoji.is_none() {
+                continue;
+            }
+            let face = crate::avatar::OwnFace {
+                picture,
+                emoji,
+                color: self.account_color(i as u32 + 1),
+            };
+            // Mail sent as a send-as alias (#34) is still from this mailbox.
+            let addresses = std::iter::once(cfg.email.clone())
+                .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1));
+            faces.extend(
+                addresses
+                    .filter(|address| !address.trim().is_empty())
+                    .map(|address| (address, face.clone())),
+            );
+        }
+        crate::avatar::set_own_faces(faces);
+    }
+
     /// A label for an account in messages (name, else email, else "Account N").
     /// Uses config (available even before the account connects), then live data.
     fn account_label(&self, account_id: u32) -> String {
@@ -9016,6 +9052,9 @@ impl AppModel {
     }
 
     fn rebuild_sidebar(&self) {
+        // The accounts are being redrawn because something about them changed;
+        // the faces their own mail wears follow from the same place (#189).
+        self.refresh_own_faces();
         let order = self.ordered_emails();
         let sections: Vec<SectionData> = order
             .iter()

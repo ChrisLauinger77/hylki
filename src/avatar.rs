@@ -71,6 +71,60 @@ fn key(email: &str) -> String {
     email.trim().to_lowercase()
 }
 
+/// One of the user's own mailboxes, as its account was set up in Accounts
+/// (#162): the picture or the emoji the sidebar's circle draws for it, and
+/// the colour that emoji sits on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnFace {
+    /// The account's avatar picture, when it has one and the file is there.
+    pub picture: Option<std::path::PathBuf>,
+    /// Its avatar emoji, for an account that chose one instead.
+    pub emoji: Option<String>,
+    /// The account colour ("#rrggbb"), the ground behind the emoji.
+    pub color: String,
+}
+
+thread_local! {
+    /// Every address the user sends from — an account's own and its send-as
+    /// aliases — for the accounts that chose a picture or an emoji. Kept here
+    /// rather than handed down so the reader's cards and the list's rows can
+    /// both ask; the app refreshes it whenever the accounts change.
+    static OWN_FACES: RefCell<HashMap<String, OwnFace>> = RefCell::new(HashMap::new());
+    /// Bumped whenever that map actually changes, so a view holding on to
+    /// what it last drew (the reader's document) knows to draw it again.
+    static OWN_FACES_GENERATION: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Hand the face chain the mailboxes the user owns, keyed by address. Only
+/// accounts with a picture or an emoji belong here: one showing its initials
+/// has nothing to add to the circle a sender already gets.
+pub fn set_own_faces(faces: impl IntoIterator<Item = (String, OwnFace)>) {
+    let faces: HashMap<String, OwnFace> =
+        faces.into_iter().map(|(address, face)| (key(&address), face)).collect();
+    OWN_FACES.with(|current| {
+        if *current.borrow() == faces {
+            return;
+        }
+        *current.borrow_mut() = faces;
+        OWN_FACES_GENERATION.with(|g| g.set(g.get().wrapping_add(1)));
+    });
+}
+
+/// What to draw for `email` when it is one of the user's own addresses
+/// (#189): the picture chosen for that mailbox is the face on the messages it
+/// sent — in a conversation's cards and in the list, exactly as in the
+/// sidebar. `None` for everyone else, and for own accounts showing initials.
+pub fn own_face(email: &str) -> Option<OwnFace> {
+    let key = key(email);
+    OWN_FACES.with(|faces| faces.borrow().get(&key).cloned())
+}
+
+/// How many times [`set_own_faces`] has changed what the user's mailboxes
+/// show — a render token for views that cache their output.
+pub fn own_faces_generation() -> u64 {
+    OWN_FACES_GENERATION.with(Cell::get)
+}
+
 /// Consult the main-thread texture/miss caches without doing I/O.
 pub fn lookup(email: &str, allow_gravatar: bool) -> CacheLookup {
     let key = key(email);
@@ -444,12 +498,35 @@ fn decode_image(bytes: &[u8]) -> Option<DecodedImage> {
 
 #[cfg(test)]
 mod tests {
-    use super::supported_raster;
+    use super::{own_face, own_faces_generation, set_own_faces, supported_raster, OwnFace};
 
     #[test]
     fn accepts_common_rasters_but_not_svg() {
         assert!(supported_raster(b"\x89PNG\r\n\x1a\nrest"));
         assert!(supported_raster(b"\xff\xd8\xffrest"));
         assert!(!supported_raster(b"<svg xmlns='http://www.w3.org/2000/svg'/>"));
+    }
+
+    /// The user's own addresses are matched however they were typed, and a
+    /// map that did not change must not make every open document re-render.
+    #[test]
+    fn own_mailbox_faces_are_found_by_address() {
+        let face = OwnFace {
+            picture: None,
+            emoji: Some("\u{1F98A}".to_string()),
+            color: "#e66100".to_string(),
+        };
+        set_own_faces([(" Ada@Example.COM ".to_string(), face.clone())]);
+        assert_eq!(own_face("ada@example.com").as_ref(), Some(&face));
+        assert_eq!(own_face("ADA@example.com").as_ref(), Some(&face));
+        assert_eq!(own_face("grace@example.com"), None);
+
+        let generation = own_faces_generation();
+        set_own_faces([("ada@example.com".to_string(), face.clone())]);
+        assert_eq!(own_faces_generation(), generation, "the same faces are not a change");
+
+        set_own_faces(std::iter::empty());
+        assert_eq!(own_face("ada@example.com"), None);
+        assert!(own_faces_generation() > generation, "clearing them is");
     }
 }
