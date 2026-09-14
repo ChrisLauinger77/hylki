@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.29.3 — 2026-09-14
 
 Files sent from GNOME Files ask where they should go, and big ones offer
 to go to cloud storage instead.
@@ -46,6 +46,10 @@ to go to cloud storage instead.
   its headers) or that is cut off mid-way no longer reads as a bare
   "HTTP 502": the message says the file's size, that Cloudflare's 100 MB
   limit is the likely cause, and names the switch to turn on.
+- **French** (PR #193 by [@frenchy82](https://github.com/frenchy82)): the
+  1.29.2 strings (mailbox face, Gravatar, settings wording) translated;
+  1128 of 1163 strings, the 35 left being this release's own (the Files
+  hand-off dialogs, the GNOME Files settings rows, the Cloudflare switch).
 
 ## 1.29.2 — 2026-09-14
 

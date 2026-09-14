@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.29.3" date="2026-09-14">
+      <description>
+        <p>Files sent from GNOME Files now ask whether they go into a new message, a draft or a reply, with an offer to upload big ones to cloud storage instead and defaults under Settings → System → GNOME Files; a "Server is behind Cloudflare" switch uploads to self-hosted Nextcloud-kind and Seafile servers in 90 MB pieces; French updated (PR #193).</p>
+      </description>
+    </release>
     <release version="1.29.2" date="2026-09-14">
       <description>
         <p>Your own messages show your mailbox's picture or emoji in conversations and the message list, with a Settings switch to keep the old circle and a per-account "Use my Gravatar" option; leaving a settings editor now shows the page you chose, and an unchanged editor no longer asks about saving.</p>

@@ -2,6 +2,18 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.29.3
+
+**Files from GNOME Files go where you say.** *Send with Vireo*, *Open With Vireo* and Files' own *Email…* entry used to open a new message with the files attached, and nothing else was on offer. Now a dialog asks what the files are for: a new message, a draft you pick from every account's drafts, or a reply to a message you pick from a list, with the message you are reading first and a search box for sender, subject or account. A reply to the message on screen splits the reading pane the way Reply does; any other opens in a window. Each dialog has an "Always do this" box.
+
+**Big files can go to cloud storage instead.** When the files together exceed the size limit (20 MB by default) and a cloud storage account is set up, a second dialog offers to attach them anyway or upload them and put download links in the message. Without a cloud account they are attached as before.
+
+**Settings → System → GNOME Files** holds the defaults for both: what the files go into, what happens over the limit, and the limit in MB.
+
+**Cloud storage behind Cloudflare.** A self-hosted Nextcloud, ownCloud, OpenCloud or Seafile reached through a Cloudflare domain or tunnel cannot take an upload over 100 MB. The account editor has a "Server is behind Cloudflare" switch: with it on, files over 90 MB go up in 90 MB pieces the server puts back together. With it off, a failed upload of that size now says that Cloudflare's limit is the likely cause and names the switch, instead of a bare HTTP error.
+
+**French** updated by [@frenchy82](https://github.com/frenchy82) (PR #193).
+
 ## What's new in 1.29.2
 
 **Your own messages show your mailbox's face** (#189, reported by [@yioannides](https://github.com/yioannides)). The picture you choose for a mailbox in Accounts now appears on the messages you sent too, in the conversation and in the message list, not only in the sidebar. An account with an emoji instead shows the emoji on its colour, as the sidebar does.
