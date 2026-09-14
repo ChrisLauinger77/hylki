@@ -60,6 +60,12 @@ const PREFETCH_LIMIT: usize = 25;
 /// the gallery fills in visibly while the user is looking at it.
 const SCAN_CHUNK: u32 = 200;
 
+/// Most FETCHes one scan request will spend, counting the extra ones a failing
+/// batch costs as it is halved. Bounds the work a folder full of responses we
+/// cannot parse can demand in one pass; whatever is left keeps its place in the
+/// queue and is picked up by the next.
+const SCAN_SPLIT_BUDGET: u32 = 64;
+
 /// How many messages one body fetch asks for.
 ///
 /// `BODY.PEEK[]` returns whole messages, attachments included, so a whole
@@ -1718,49 +1724,85 @@ async fn run_imap(
                 if sel(sess, folder_path.as_str()).await.is_err() {
                     continue;
                 }
-                let set = uid_set(&uids);
-                // BODYSTRUCTURE on its own, not beside ENVELOPE: the servers
-                // that make us fall back to raw headers (iCloud) usually choke
-                // on the ENVELOPE half — an unescaped quote in a Message-ID —
-                // so asking for the structure alone often parses where the
-                // combined fetch did not.
-                let fetched: Result<Vec<Fetch>, _> = match fetch_uids(sess, &set, "BODYSTRUCTURE").await {
-                    Ok(stream) => stream.try_collect().await,
-                    Err(e) => Err(e),
-                };
+
+                // One bad response must not cost the whole batch. A batch that
+                // will not parse is halved and retried, down to the single
+                // message responsible: its neighbours are described normally
+                // and only it is written off. Smaller responses also parse more
+                // often, so the split usually resolves the failure outright.
                 let mut added = 0u32;
-                match fetched {
-                    Ok(fetches) => {
-                        // Every UID we asked about is answered, including the
-                        // ones that turn out to hold nothing: an empty list is
-                        // still an answer, and marking it stops the message
-                        // being asked about on every pass forever.
-                        let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
-                        for f in &fetches {
-                            let Some(uid) = f.uid else { continue };
-                            seen.insert(uid);
-                            let metas = f
-                                .bodystructure()
-                                .map(structure_attachments)
-                                .unwrap_or_default();
-                            added += metas.len() as u32;
-                            c.save_attachment_meta(account_id, folder_path.as_str(), uid, &metas);
-                        }
-                        for uid in uids.iter().filter(|u| !seen.contains(u)) {
-                            c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
-                        }
+                let mut pending: Vec<Vec<u32>> = vec![uids];
+                let mut budget = SCAN_SPLIT_BUDGET;
+                while let Some(batch) = pending.pop() {
+                    if budget == 0 {
+                        break; // the rest keeps its place in the queue
                     }
-                    Err(e) => {
-                        // The structure came back in a shape our parser will
-                        // not take. Record the messages as scanned with nothing
-                        // to show rather than retrying them forever; opening
-                        // one still fetches it in full and lists what it holds.
-                        tracing::warn!("attachment scan of {folder_path} failed to parse: {e}");
-                        for uid in &uids {
-                            c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
+                    budget -= 1;
+                    let set = uid_set(&batch);
+                    // BODYSTRUCTURE on its own, not beside ENVELOPE: the
+                    // servers that make us fall back to raw headers (iCloud)
+                    // usually choke on the ENVELOPE half — an unescaped quote
+                    // in a Message-ID — so asking for the structure alone
+                    // often parses where the combined fetch did not.
+                    let fetched: Result<Vec<Fetch>, _> =
+                        match fetch_uids(sess, &set, "BODYSTRUCTURE").await {
+                            Ok(stream) => stream.try_collect().await,
+                            Err(e) => Err(e),
+                        };
+                    match fetched {
+                        Ok(fetches) => {
+                            // Every UID asked about is answered, including the
+                            // ones holding nothing: an empty list is still an
+                            // answer, and recording it stops the message being
+                            // asked about on every pass forever.
+                            let mut seen: std::collections::HashSet<u32> =
+                                std::collections::HashSet::new();
+                            for f in &fetches {
+                                let Some(uid) = f.uid else { continue };
+                                seen.insert(uid);
+                                let metas = f
+                                    .bodystructure()
+                                    .map(structure_attachments)
+                                    .unwrap_or_default();
+                                added += metas.len() as u32;
+                                c.save_attachment_meta(account_id, folder_path.as_str(), uid, &metas);
+                            }
+                            for uid in batch.iter().filter(|u| !seen.contains(u)) {
+                                c.save_attachment_meta(account_id, folder_path.as_str(), *uid, &[]);
+                            }
+                        }
+                        // A dropped connection says nothing about these
+                        // messages. Leave them unscanned and let the next pass
+                        // have them, rather than recording an answer the server
+                        // never gave.
+                        Err(async_imap::error::Error::ConnectionLost) => {
+                            pending.clear();
+                            session.take();
+                            break;
+                        }
+                        Err(e) if batch.len() > 1 => {
+                            let mid = batch.len() / 2;
+                            pending.push(batch[mid..].to_vec());
+                            pending.push(batch[..mid].to_vec());
+                            tracing::debug!(
+                                "attachment scan of {folder_path}: splitting {} after {e}",
+                                batch.len()
+                            );
+                        }
+                        Err(e) => {
+                            // One message whose structure our parser will not
+                            // take. Record it as holding nothing rather than
+                            // retrying it forever; opening it still fetches the
+                            // message in full and lists what it really holds.
+                            tracing::warn!(
+                                "attachment scan of {folder_path} uid {}: {e}",
+                                batch[0]
+                            );
+                            c.save_attachment_meta(account_id, folder_path.as_str(), batch[0], &[]);
                         }
                     }
                 }
+
                 emit(WorkerEvent::AttachmentsScanned {
                     folder_path: folder_path.clone(),
                     added,

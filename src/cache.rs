@@ -153,7 +153,12 @@ CREATE INDEX IF NOT EXISTS attachment_meta_by_folder
 /// survive forever — drop both tables and let attachments re-fetch on demand.
 /// v14: `attachment_meta`/`attachment_scan` for the gallery — purely additive,
 /// so nothing cached is dropped for it (see [`RENDER_VERSION`]).
-const SCHEMA_VERSION: i64 = 14;
+/// v15: the first attachment scan wrote off a whole batch when one message's
+/// BODYSTRUCTURE would not parse, so up to 200 messages were recorded as
+/// holding nothing when several held files. Messages marked as scanned with
+/// nothing to show are re-queued once, to be asked about again by the scan that
+/// now isolates the one message at fault.
+const SCHEMA_VERSION: i64 = 15;
 
 /// The newest version whose change altered how bodies are *rendered* or how
 /// senders are checked. Opening a database older than this drops `bodies` and
@@ -490,6 +495,19 @@ impl Cache {
         // while the scan works back through the archive.
         if version < 14 {
             Self::seed_attachment_meta(&conn);
+        }
+        // Re-queue the messages a batched parse failure wrote off. Messages
+        // that really do hold nothing are simply asked about once more and
+        // marked again, so this costs a rescan and settles.
+        if (14..15).contains(&version) {
+            let _ = conn.execute(
+                "DELETE FROM attachment_scan WHERE NOT EXISTS (\
+                     SELECT 1 FROM attachment_meta am \
+                     WHERE am.account_id = attachment_scan.account_id \
+                       AND am.folder_path = attachment_scan.folder_path \
+                       AND am.uid = attachment_scan.uid)",
+                [],
+            );
         }
         let _ = conn.execute_batch(&format!("PRAGMA user_version = {SCHEMA_VERSION};"));
 
@@ -2158,6 +2176,39 @@ mod tests {
         let items = c.gallery_page(&all(GallerySort::Newest, 50, 0));
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "second.pdf");
+    }
+
+    /// A batch the scan wrote off wholesale must be askable again: the v15
+    /// re-queue drops the scan mark from any message recorded as holding
+    /// nothing, so the scan that now isolates the one message at fault gets
+    /// another look at its neighbours.
+    #[test]
+    fn messages_recorded_as_holding_nothing_can_be_re_queued() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, "A", "S", 100);
+        add_msg(&c, "INBOX", 2, "B", "T", 200);
+        add_meta(&c, "INBOX", 1, 0, "real.pdf", 2);
+        c.save_attachment_meta(1, "INBOX", 2, &[]); // written off
+        assert_eq!(c.unscanned_attachment_count(1, "INBOX"), 0);
+
+        c.conn
+            .execute(
+                "DELETE FROM attachment_scan WHERE NOT EXISTS (\
+                     SELECT 1 FROM attachment_meta am \
+                     WHERE am.account_id = attachment_scan.account_id \
+                       AND am.folder_path = attachment_scan.folder_path \
+                       AND am.uid = attachment_scan.uid)",
+                [],
+            )
+            .unwrap();
+
+        assert_eq!(c.unscanned_attachment_uids(1, "INBOX", 10), vec![2], "only the empty one");
+        assert_eq!(
+            c.gallery_page(&all(GallerySort::Newest, 50, 0)).len(),
+            1,
+            "the described one is untouched"
+        );
     }
 
     /// The scan's work queue: messages flagged as carrying an attachment that
