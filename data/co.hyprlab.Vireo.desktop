@@ -2,7 +2,9 @@
 Name=Vireo
 GenericName=Email Client
 Comment=A clean, fast GNOME-native email client
-Exec=vireo %u
+# %U, not %u: a file manager hands every selected file to one launch, so
+# they all land in the same message ("Send with Vireo" from GNOME Files).
+Exec=vireo %U
 Icon=co.hyprlab.Vireo
 Terminal=false
 Type=Application

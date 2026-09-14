@@ -448,8 +448,10 @@ fn flatpak_exec() -> Option<(String, String)> {
     let root = app_path
         .split_once(&format!("/app/{}/", crate::APP_ID))
         .map(|(root, _)| root.to_string())?;
+    // `%U` as in the shipped entry: one launch for every selected file, so
+    // "Send with Vireo" from Files attaches them all to the same message.
     let exec = format!(
-        "flatpak run --branch={branch} --arch={arch} --command=vireo --file-forwarding {} @@u %u @@",
+        "flatpak run --branch={branch} --arch={arch} --command=vireo --file-forwarding {} @@u %U @@",
         crate::APP_ID
     );
     Some((exec, format!("{root}/exports/bin/{}", crate::APP_ID)))
