@@ -1410,6 +1410,15 @@ msgstr "Compte IMAP/POP3 sur {host}"
 msgid "Mail account"
 msgstr "Compte e-mail"
 
+#. Every condition, joined the way the rule combines them (#192).
+#, fuzzy
+msgid " or "
+msgstr "À ou Cc"
+
+#. Every condition, joined the way the rule combines them (#192).
+msgid " and "
+msgstr ""
+
 msgid ", tagged {tag}"
 msgstr ", marqué {tag}"
 
@@ -1492,35 +1501,45 @@ msgstr "Ajouter un filtre"
 msgid "Where"
 msgstr "Champ"
 
-msgid "From address"
-msgstr "Adresse de l'expéditeur"
-
-msgid "From name"
-msgstr "Nom de l'expéditeur"
-
-msgid "Subject"
-msgstr "Objet"
-
-msgid "To or Cc"
-msgstr "À ou Cc"
-
 msgid "Match"
 msgstr "Condition"
 
-msgid "contains"
-msgstr "contient"
-
-msgid "is exactly"
-msgstr "est exactement"
-
-msgid "starts with"
-msgstr "commence par"
-
-msgid "ends with"
-msgstr "se termine par"
+msgid "Commas separate alternatives; any one of them counts"
+msgstr ""
 
 msgid "Text to match"
 msgstr "Texte à rechercher"
+
+msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgstr ""
+
+msgid "The From address when the sender set no Reply-To"
+msgstr ""
+
+#, fuzzy
+msgid "Add Condition"
+msgstr "Ajouter un compte cloud"
+
+#, fuzzy
+msgid "Conditions"
+msgstr "Conversations"
+
+msgid "All must match"
+msgstr ""
+
+msgid "Any one may match"
+msgstr ""
+
+#, fuzzy
+msgid "Or where"
+msgstr "Champ"
+
+msgid "And where"
+msgstr ""
+
+#, fuzzy
+msgid "Remove condition"
+msgstr "Supprimer le compte"
 
 msgid "Move to"
 msgstr "Déplacer vers"
@@ -2109,6 +2128,9 @@ msgstr "Cci"
 
 msgid "Reply-To"
 msgstr "Répondre à"
+
+msgid "Subject"
+msgstr "Objet"
 
 msgid "More"
 msgstr "Plus"
@@ -4401,6 +4423,24 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "From address"
+#~ msgstr "Adresse de l'expéditeur"
+
+#~ msgid "From name"
+#~ msgstr "Nom de l'expéditeur"
+
+#~ msgid "contains"
+#~ msgstr "contient"
+
+#~ msgid "is exactly"
+#~ msgstr "est exactement"
+
+#~ msgid "starts with"
+#~ msgstr "commence par"
+
+#~ msgid "ends with"
+#~ msgstr "se termine par"
+
 #~ msgid "Send Now"
 #~ msgstr "Envoyer maintenant"
 
@@ -4512,9 +4552,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Gestion de plusieurs comptes IMAP et POP3, avec une vue unifiée Toutes "
 #~ "les boîtes"
-
-#~ msgid "Remove Account"
-#~ msgstr "Supprimer le compte"
 
 #~ msgid ""
 #~ "Accounts and preferences as one file. Passwords stay in the system "

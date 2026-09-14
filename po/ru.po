@@ -1407,6 +1407,15 @@ msgstr ""
 msgid "Mail account"
 msgstr "Почтовая учётная запись"
 
+#. Every condition, joined the way the rule combines them (#192).
+#, fuzzy
+msgid " or "
+msgstr "Кому или копия"
+
+#. Every condition, joined the way the rule combines them (#192).
+msgid " and "
+msgstr ""
+
 msgid ", tagged {tag}"
 msgstr ", с тегом {tag}"
 
@@ -1487,35 +1496,45 @@ msgstr "Добавить фильтр"
 msgid "Where"
 msgstr "Где искать"
 
-msgid "From address"
-msgstr "Адрес отправителя"
-
-msgid "From name"
-msgstr "Имя отправителя"
-
-msgid "Subject"
-msgstr "Тема"
-
-msgid "To or Cc"
-msgstr "Кому или копия"
-
 msgid "Match"
 msgstr "Совпадение"
 
-msgid "contains"
-msgstr "содержит"
-
-msgid "is exactly"
-msgstr "совпадает с"
-
-msgid "starts with"
-msgstr "начинается с"
-
-msgid "ends with"
-msgstr "заканчивается на"
+msgid "Commas separate alternatives; any one of them counts"
+msgstr ""
 
 msgid "Text to match"
 msgstr "Текст для совпадения"
+
+msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgstr ""
+
+msgid "The From address when the sender set no Reply-To"
+msgstr ""
+
+#, fuzzy
+msgid "Add Condition"
+msgstr "Добавить облачную учётную запись"
+
+#, fuzzy
+msgid "Conditions"
+msgstr "Обсуждения"
+
+msgid "All must match"
+msgstr ""
+
+msgid "Any one may match"
+msgstr ""
+
+#, fuzzy
+msgid "Or where"
+msgstr "Где искать"
+
+msgid "And where"
+msgstr ""
+
+#, fuzzy
+msgid "Remove condition"
+msgstr "Удалить аккаунт?"
 
 msgid "Move to"
 msgstr "Переместить в"
@@ -2102,6 +2121,9 @@ msgstr "Скрытая копия"
 
 msgid "Reply-To"
 msgstr "Адрес для ответа"
+
+msgid "Subject"
+msgstr "Тема"
 
 msgid "More"
 msgstr "Ещё"
@@ -4361,6 +4383,24 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "From address"
+#~ msgstr "Адрес отправителя"
+
+#~ msgid "From name"
+#~ msgstr "Имя отправителя"
+
+#~ msgid "contains"
+#~ msgstr "содержит"
+
+#~ msgid "is exactly"
+#~ msgstr "совпадает с"
+
+#~ msgid "starts with"
+#~ msgstr "начинается с"
+
+#~ msgid "ends with"
+#~ msgstr "заканчивается на"
 
 #~ msgid "Send Now"
 #~ msgstr "Отправить сейчас"

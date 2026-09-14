@@ -1424,6 +1424,15 @@ msgstr ""
 msgid "Mail account"
 msgstr "Conta de correio"
 
+#. Every condition, joined the way the rule combines them (#192).
+#, fuzzy
+msgid " or "
+msgstr "Para ou Cc"
+
+#. Every condition, joined the way the rule combines them (#192).
+msgid " and "
+msgstr ""
+
 msgid ", tagged {tag}"
 msgstr ", com a etiqueta {tag}"
 
@@ -1506,35 +1515,45 @@ msgstr "Adicionar filtro"
 msgid "Where"
 msgstr "Campo"
 
-msgid "From address"
-msgstr "Endereço do remetente"
-
-msgid "From name"
-msgstr "Nome do remetente"
-
-msgid "Subject"
-msgstr "Assunto"
-
-msgid "To or Cc"
-msgstr "Para ou Cc"
-
 msgid "Match"
 msgstr "Correspondência"
 
-msgid "contains"
-msgstr "contém"
-
-msgid "is exactly"
-msgstr "é exatamente"
-
-msgid "starts with"
-msgstr "começa por"
-
-msgid "ends with"
-msgstr "termina com"
+msgid "Commas separate alternatives; any one of them counts"
+msgstr ""
 
 msgid "Text to match"
 msgstr "Texto a procurar"
+
+msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgstr ""
+
+msgid "The From address when the sender set no Reply-To"
+msgstr ""
+
+#, fuzzy
+msgid "Add Condition"
+msgstr "Adicionar conta de armazenamento na nuvem"
+
+#, fuzzy
+msgid "Conditions"
+msgstr "Conversas"
+
+msgid "All must match"
+msgstr ""
+
+msgid "Any one may match"
+msgstr ""
+
+#, fuzzy
+msgid "Or where"
+msgstr "Campo"
+
+msgid "And where"
+msgstr ""
+
+#, fuzzy
+msgid "Remove condition"
+msgstr "Remover conta?"
 
 msgid "Move to"
 msgstr "Mover para"
@@ -2126,6 +2145,9 @@ msgstr "Bcc"
 
 msgid "Reply-To"
 msgstr "Responder a"
+
+msgid "Subject"
+msgstr "Assunto"
 
 msgid "More"
 msgstr "Mais"
@@ -4403,6 +4425,24 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "From address"
+#~ msgstr "Endereço do remetente"
+
+#~ msgid "From name"
+#~ msgstr "Nome do remetente"
+
+#~ msgid "contains"
+#~ msgstr "contém"
+
+#~ msgid "is exactly"
+#~ msgstr "é exatamente"
+
+#~ msgid "starts with"
+#~ msgstr "começa por"
+
+#~ msgid "ends with"
+#~ msgstr "termina com"
 
 #~ msgid "Send Now"
 #~ msgstr "Enviar agora"

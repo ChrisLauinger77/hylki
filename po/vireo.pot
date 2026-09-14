@@ -1300,6 +1300,14 @@ msgstr ""
 msgid "Mail account"
 msgstr ""
 
+#. Every condition, joined the way the rule combines them (#192).
+msgid " or "
+msgstr ""
+
+#. Every condition, joined the way the rule combines them (#192).
+msgid " and "
+msgstr ""
+
 msgid ", tagged {tag}"
 msgstr ""
 
@@ -1372,34 +1380,40 @@ msgstr ""
 msgid "Where"
 msgstr ""
 
-msgid "From address"
-msgstr ""
-
-msgid "From name"
-msgstr ""
-
-msgid "Subject"
-msgstr ""
-
-msgid "To or Cc"
-msgstr ""
-
 msgid "Match"
 msgstr ""
 
-msgid "contains"
-msgstr ""
-
-msgid "is exactly"
-msgstr ""
-
-msgid "starts with"
-msgstr ""
-
-msgid "ends with"
+msgid "Commas separate alternatives; any one of them counts"
 msgstr ""
 
 msgid "Text to match"
+msgstr ""
+
+msgid "Searched on the server as the Inbox syncs, without downloading anything"
+msgstr ""
+
+msgid "The From address when the sender set no Reply-To"
+msgstr ""
+
+msgid "Add Condition"
+msgstr ""
+
+msgid "Conditions"
+msgstr ""
+
+msgid "All must match"
+msgstr ""
+
+msgid "Any one may match"
+msgstr ""
+
+msgid "Or where"
+msgstr ""
+
+msgid "And where"
+msgstr ""
+
+msgid "Remove condition"
 msgstr ""
 
 msgid "Move to"
@@ -1904,6 +1918,9 @@ msgid "Bcc"
 msgstr ""
 
 msgid "Reply-To"
+msgstr ""
+
+msgid "Subject"
 msgstr ""
 
 msgid "More"
