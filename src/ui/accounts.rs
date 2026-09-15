@@ -161,6 +161,11 @@ pub struct AccountsWindow {
     /// Paths behind the currently-open editor's folder combos (index 0 in the
     /// combo is "Automatic"; entry N here is combo index N + 1).
     folder_paths: Vec<String>,
+    /// Paths behind the "Save copies in" combo (#199). A separate list from
+    /// `folder_paths`: this one offers every folder, the Inbox included,
+    /// because a destination takes nothing away from the folder it names.
+    /// Index 0 in the combo is "Sent folder"; entry N here is index N + 1.
+    sent_copy_paths: Vec<String>,
     /// Index being edited; `None` while adding a new account.
     editing: Option<usize>,
     /// Emoji currently chosen in the editor (`None` → use initials).
@@ -1308,6 +1313,28 @@ impl Component for AccountsWindow {
                                 adw::ComboRow { set_title: &i18n("Archive") },
                             },
 
+                            // Where the copy of an outgoing message is filed
+                            // (#199). Deliberately not a Special Folders role:
+                            // a role relabels the folder, and relabelling the
+                            // Inbox costs the account its inbox (#136). This
+                            // is only a destination, so every folder can be
+                            // offered here — the Inbox included.
+                            add = &adw::PreferencesGroup {
+                                set_title: &i18n("Copies of Sent Mail"),
+                                set_description: Some(
+                                    i18n("Normally a copy of everything you send is filed in the Sent \
+                                          folder. Choose another folder to keep your replies beside \
+                                          the mail they answer.").as_str()
+                                ),
+
+                                #[name = "folder_sent_copy_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Save copies in"),
+                                    set_subtitle: &i18n("Copies are saved as already read, and \
+                                                   filters leave your own mail alone."),
+                                },
+                            },
+
                             // OpenPGP (#133): which of the user's keys this
                             // account signs and decrypts with.
                             add = &adw::PreferencesGroup {
@@ -1413,6 +1440,7 @@ impl Component for AccountsWindow {
             alias_dialog: None,
             folders_by_email: std::collections::HashMap::new(),
             folder_paths: Vec::new(),
+            sent_copy_paths: Vec::new(),
             senders,
             sender_addrs: Vec::new(),
             blacklist,
@@ -2115,6 +2143,7 @@ impl Component for AccountsWindow {
                 let mut account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
                 account.aliases = self.alias_edits.clone();
                 account.folder_roles = self.read_folder_roles(widgets);
+                account.sent_copy_path = self.read_sent_copy_path(widgets);
                 let sig = sig_html.trim();
                 account.signature = if signature_is_empty(sig) {
                     None
@@ -2860,15 +2889,18 @@ impl AccountsWindow {
     /// account, whose folders aren't known yet): "Automatic" plus the account's
     /// live folder list, with any saved assignment selected.
     fn populate_folder_combos(&mut self, widgets: &AccountsWindowWidgets, acc: Option<&AccountConfig>) {
-        // The Inbox is never offered as a role (#136): giving it one took
-        // its own role away, and the account lost its inbox.
-        let choices: Vec<(String, String)> = acc
+        let all: Vec<(String, String)> = acc
             .and_then(|a| self.folders_by_email.get(&a.email))
             .cloned()
-            .unwrap_or_default()
-            .into_iter()
+            .unwrap_or_default();
+        // The Inbox is never offered as a role (#136): giving it one took
+        // its own role away, and the account lost its inbox.
+        let choices: Vec<(String, String)> = all
+            .iter()
             .filter(|(path, _)| !path.eq_ignore_ascii_case("INBOX"))
+            .cloned()
             .collect();
+        self.populate_sent_copy_combo(widgets, acc, &all);
         let mut labels: Vec<&str> = vec!["Automatic"];
         labels.extend(choices.iter().map(|(_, display)| display.as_str()));
         self.folder_paths = choices.iter().map(|(path, _)| path.clone()).collect();
@@ -2888,6 +2920,64 @@ impl AccountsWindow {
                 .unwrap_or(0);
             row.set_selected(selected);
         }
+    }
+
+    /// Fill the "Save copies in" combo (#199): "Sent folder" plus every one
+    /// of the account's folders, with the saved choice selected. The Inbox is
+    /// listed here — filing a copy somewhere does not re-label it.
+    fn populate_sent_copy_combo(
+        &mut self,
+        widgets: &AccountsWindowWidgets,
+        acc: Option<&AccountConfig>,
+        all: &[(String, String)],
+    ) {
+        let mut labels: Vec<&str> = vec!["Sent folder"];
+        labels.extend(all.iter().map(|(_, display)| display.as_str()));
+        self.sent_copy_paths = all.iter().map(|(path, _)| path.clone()).collect();
+        let row = &widgets.folder_sent_copy_row;
+        row.set_model(Some(&gtk::StringList::new(&labels)));
+        row.set_list_factory(Some(&non_ellipsizing_factory()));
+        let selected = acc
+            .and_then(|a| a.sent_copy_path.as_ref())
+            .and_then(|path| self.sent_copy_paths.iter().position(|p| p == path))
+            .map(|i| i as u32 + 1)
+            .unwrap_or(0);
+        row.set_selected(selected);
+        // Two backends file the copy themselves, or not at all, and ignore
+        // this setting — say so rather than offer a choice that does nothing.
+        let unsupported = match acc.map(|a| a.protocol) {
+            Some(Protocol::Graph) => Some(i18n(
+                "Microsoft 365 files its own copy in Sent Items; this cannot be changed.",
+            )),
+            Some(Protocol::Pop3) => Some(i18n(
+                "POP3 accounts have no server folders to save a copy in.",
+            )),
+            _ => None,
+        };
+        row.set_sensitive(unsupported.is_none());
+        row.set_subtitle(&unsupported.unwrap_or_else(|| {
+            i18n("Copies are saved as already read, and filters leave your own mail alone.")
+        }));
+    }
+
+    /// The "Save copies in" combo's current choice: a folder path, or `None`
+    /// when it is left on the Sent folder.
+    fn read_sent_copy_path(&self, widgets: &AccountsWindowWidgets) -> Option<String> {
+        // Nothing is known about this account's folders yet (it has never
+        // connected, or is switched off), so the combo holds only "Sent
+        // folder" — which is not the user clearing the setting. Keep what
+        // was saved rather than silently dropping it on an unrelated edit.
+        if self.sent_copy_paths.is_empty() {
+            return self
+                .editing
+                .and_then(|i| self.accounts.get(i))
+                .and_then(|a| a.sent_copy_path.clone());
+        }
+        let sel = widgets.folder_sent_copy_row.selected();
+        if sel == 0 {
+            return None;
+        }
+        self.sent_copy_paths.get(sel as usize - 1).cloned()
     }
 
     /// The Special Folders combos' current assignments: role → folder path,
@@ -3410,9 +3500,10 @@ impl AccountsWindow {
     fn editor_fingerprint(&self, widgets: &AccountsWindowWidgets) -> String {
         let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
         format!(
-            "{account:?}|{:?}|{:?}|{}|{}",
+            "{account:?}|{:?}|{:?}|{:?}|{}|{}",
             self.alias_edits,
             self.read_folder_roles(widgets),
+            self.read_sent_copy_path(widgets),
             widgets.provider_row.selected(),
             self.pending_oauth_refresh.is_some(),
         )
@@ -3573,6 +3664,7 @@ fn read_account(
         },
         // Assigned by SaveWithSig from the Special Folders combos.
         folder_roles: Default::default(),
+        sent_copy_path: None,
         empty_junk_days: AUTO_EMPTY_DAYS
             .get(widgets.empty_junk_row.selected() as usize)
             .copied()

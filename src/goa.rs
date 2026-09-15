@@ -53,6 +53,7 @@ impl GoaMailAccount {
     pub fn to_config(&self, password: String, oauth: bool) -> AccountConfig {
         AccountConfig {
             folder_roles: Default::default(),
+            sent_copy_path: None,
             empty_junk_days: 0,
             empty_trash_days: 0,
             pgp_key: None,

@@ -6601,11 +6601,7 @@ impl SimpleComponent for AppModel {
                         rc.controller.emit(ComposeInput::AddSuggestions(fresh.clone()));
                     }
                 }
-                let sent_path = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Sent))
-                    .map(|f| f.path.clone());
+                let sent_path = self.sent_copy_path(account_id);
                 self.send_to(account_id, MailRequest::Send { message: out, sent_path });
             }
 
@@ -6678,14 +6674,13 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Sent { account_id } => {
                 // No success notification — only send failures are surfaced (via
-                // WorkerEvent::Error). Just refresh the Sent folder if it's open.
-                // Reload Sent if it's the open folder for that account.
+                // WorkerEvent::Error). Just refresh the folder the copy landed
+                // in, if that folder is the open one — which is wherever the
+                // account files its copies (#199), not always Sent.
                 if let Some(sel) = self.selected.clone() {
+                    let copied_to = self.sent_copy_path(account_id);
                     let viewing_sent = sel.account_id == account_id
-                        && self
-                            .folders
-                            .get(&account_id)
-                            .is_some_and(|fs| fs.iter().any(|f| f.id == sel.folder_id && f.kind == FolderKind::Sent));
+                        && copied_to.is_some_and(|path| path == sel.path);
                     if viewing_sent {
                         self.send_to(account_id, MailRequest::LoadMessages {
                             folder_id: sel.folder_id,
@@ -9229,6 +9224,18 @@ impl AppModel {
             .iter()
             .find(|a| a.id == account_id)
             .map(|a| a.email.clone())
+    }
+
+    /// Every address this account sends as: its own, plus its send-as
+    /// aliases (#34). Lower-cased comparison is the caller's job.
+    fn own_identities(&self, account_id: u32) -> Vec<String> {
+        let Some(cfg) = self.effective_config().get(account_id.saturating_sub(1) as usize) else {
+            return Vec::new();
+        };
+        std::iter::once(cfg.email.clone())
+            .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1))
+            .filter(|a| !a.trim().is_empty())
+            .collect()
     }
 
     /// Persist the sidebar's per-account state (order, collapse, custom-folders
@@ -14125,8 +14132,27 @@ impl AppModel {
         let mut still_pending = std::collections::HashSet::new();
         let mut kept = Vec::with_capacity(messages.len());
         let mut filed = Vec::new();
+        // When the account files copies of what it sends into this folder
+        // (#199), the user's own mail sitting here is one of those copies, not
+        // an arrival. Rules are written about incoming mail, so a rule on a
+        // subject or a recipient would otherwise pick up your own reply and
+        // move it away from the thread it was filed beside. The Sent folder is
+        // the exception: everything in it is your own mail, so running rules
+        // over it (#198) plainly means to act on exactly that.
+        let diverted = self.sent_copy_path(account_id).as_deref() == src.as_deref()
+            && self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.path.as_str())
+                != src.as_deref();
+        let own: Vec<String> = if diverted {
+            self.own_identities(account_id)
+        } else {
+            Vec::new()
+        };
         let hits = self.body_hits.get(&(account_id, folder_id));
         for mut m in messages {
+            if own.iter().any(|a| a.eq_ignore_ascii_case(&m.from_addr)) {
+                kept.push(m);
+                continue;
+            }
             let recipients = format!("{} {}", m.to, m.cc);
             let body_hits = hits.and_then(|h| h.get(&m.uid)).map(Vec::as_slice).unwrap_or(&[]);
             let input = config::FilterInput {
@@ -14559,6 +14585,17 @@ impl AppModel {
     /// An account's Inbox folder, if known.
     fn inbox_of(&self, account_id: u32) -> Option<&Folder> {
         self.folder_of_kind(account_id, FolderKind::Inbox)
+    }
+
+    /// Where a copy of outgoing mail is filed (#199): the folder chosen in the
+    /// account editor if it still exists, else the Sent folder. `None` when
+    /// the account has neither — the message is sent without a copy.
+    fn sent_copy_path(&self, account_id: u32) -> Option<String> {
+        let chosen = self
+            .effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+            .and_then(|c| c.sent_copy_path.as_deref());
+        pick_sent_copy(chosen, self.folders.get(&account_id).map_or(&[], Vec::as_slice))
     }
 
     /// An account's folder of a kind, if it has one (the first, for the
@@ -15237,6 +15274,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         oauth_refresh: String::new(),
         push: None,
         folder_roles: Default::default(),
+        sent_copy_path: None,
         empty_junk_days: 0,
         empty_trash_days: 0,
         pgp_key: None,
@@ -15291,6 +15329,22 @@ fn demo_filters() -> Vec<config::FilterRule> {
 
 fn demo_mode() -> bool {
     std::env::var_os("VIREO_DEMO").is_some()
+}
+
+/// The folder a sent copy is filed in (#199): the chosen one when the account
+/// still has it, else the Sent folder, else nowhere. A choice whose folder was
+/// renamed or removed server-side falls back rather than appending into a
+/// mailbox the server would have to create under an old name.
+fn pick_sent_copy(chosen: Option<&str>, folders: &[Folder]) -> Option<String> {
+    chosen
+        .filter(|path| folders.iter().any(|f| f.path == *path))
+        .map(str::to_string)
+        .or_else(|| {
+            folders
+                .iter()
+                .find(|f| f.kind == FolderKind::Sent)
+                .map(|f| f.path.clone())
+        })
 }
 
 /// Apply an account's manual special-folder assignments (#82) over the
@@ -16458,6 +16512,36 @@ mod tests {
         assert_eq!(kind_of("INBOX"), FolderKind::Inbox);
         // Ids survive the re-sort (cached messages reference them).
         assert_eq!(folders.iter().find(|f| f.path == "Sent Items").unwrap().id, 2);
+    }
+
+    #[test]
+    fn sent_copies_go_where_the_account_says_including_the_inbox() {
+        let f = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        let folders = vec![
+            f(1, "INBOX", FolderKind::Inbox),
+            f(2, "Sent", FolderKind::Sent),
+            f(3, "Archive", FolderKind::Archive),
+        ];
+        // Nothing chosen: the Sent folder, as before.
+        assert_eq!(super::pick_sent_copy(None, &folders).as_deref(), Some("Sent"));
+        // The Inbox is a legitimate choice (#199) — unlike a role (#136), a
+        // destination takes nothing away from the folder it names.
+        assert_eq!(super::pick_sent_copy(Some("INBOX"), &folders).as_deref(), Some("INBOX"));
+        assert_eq!(super::pick_sent_copy(Some("Archive"), &folders).as_deref(), Some("Archive"));
+        // A folder that has gone from the server falls back to Sent.
+        assert_eq!(super::pick_sent_copy(Some("Gone"), &folders).as_deref(), Some("Sent"));
+        // No Sent folder and no choice: the message goes out uncopied.
+        let bare = vec![f(1, "INBOX", FolderKind::Inbox)];
+        assert_eq!(super::pick_sent_copy(None, &bare), None);
+        assert_eq!(super::pick_sent_copy(Some("Gone"), &bare), None);
+        assert_eq!(super::pick_sent_copy(Some("INBOX"), &bare).as_deref(), Some("INBOX"));
     }
 
     #[test]

@@ -273,6 +273,13 @@ pub struct AccountConfig {
     /// "archive". Empty = fully automatic.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub folder_roles: std::collections::BTreeMap<String, String>,
+    /// Where copies of sent mail are filed (#199): a full folder path, or
+    /// `None` for the Sent folder. This is only a destination, not a role —
+    /// the folder keeps whatever it already is, so the Inbox can be chosen
+    /// without the account losing its inbox the way a "Sent" role assignment
+    /// would (#136). Ignored by Microsoft 365, which files its own copy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent_copy_path: Option<String>,
     /// Auto-empty (#140): mail in the Junk folder older than this many days
     /// is deleted for good at each sync. 0 = never.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -3570,6 +3577,7 @@ dest_path = "Lists"
             oauth_refresh: "TOKEN".into(),
             push: None,
             folder_roles: Default::default(),
+            sent_copy_path: None,
             empty_junk_days: 0,
             empty_trash_days: 0,
             pgp_key: None,
