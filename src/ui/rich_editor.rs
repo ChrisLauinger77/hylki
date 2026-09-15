@@ -206,26 +206,18 @@ impl RichEditor {
         let theme_handler = {
             let weak = webview.downgrade();
             adw::StyleManager::default().connect_dark_notify(move |sm| {
-                let dark = sm.is_dark();
-                let weak = weak.clone();
-                gtk::glib::idle_add_local_once(move || {
-                    let Some(v) = weak.upgrade() else { return };
-                    let (ground, _, _) = crate::ui::message_view::theme_grounds_for(&v, dark);
-                    let scheme = if dark { "dark" } else { "light" };
-                    exec(
-                        &v,
-                        &format!(
-                            "(function(){{\
-                               var m=document.querySelector('meta[name=color-scheme]');\
-                               if(m)m.content='{scheme}';\
-                               document.documentElement.style.colorScheme='{scheme}';\
-                               document.body.style.background='{ground}';\
-                             }})()"
-                        ),
-                    );
-                });
+                reground(&weak, sm.is_dark());
             })
         };
+        // An appearance theme moves the same colours with no scheme flip, so
+        // the editor re-grounds for that too — and drops out of the list
+        // once its view is gone.
+        {
+            let weak = webview.downgrade();
+            crate::theme::connect_changed(move || {
+                reground(&weak, adw::StyleManager::default().is_dark())
+            });
+        }
 
         // The stock editable menu's single "Paste" hides the plain/rich choice
         // behind the preference; the menu offers both, always, in its place.
@@ -1563,6 +1555,36 @@ pub(crate) fn percent_decode(s: &str) -> String {
         i += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Re-ground an open editor document (#148): the colour scheme and the page
+/// ground are baked into the document when it loads, so a theme change — a
+/// light/dark flip, or a new palette — has to be pushed into it. Deferred to
+/// the next main-loop pass, because the theme's named colours are only
+/// re-resolved after the signal that announced the change. `false` means the
+/// view is gone and this editor needs telling no more.
+fn reground(weak: &gtk::glib::WeakRef<webkit6::WebView>, dark: bool) -> bool {
+    if weak.upgrade().is_none() {
+        return false;
+    }
+    let weak = weak.clone();
+    gtk::glib::idle_add_local_once(move || {
+        let Some(v) = weak.upgrade() else { return };
+        let (ground, _, _) = crate::ui::message_view::theme_grounds_for(&v, dark);
+        let scheme = if dark { "dark" } else { "light" };
+        exec(
+            &v,
+            &format!(
+                "(function(){{\
+                   var m=document.querySelector('meta[name=color-scheme]');\
+                   if(m)m.content='{scheme}';\
+                   document.documentElement.style.colorScheme='{scheme}';\
+                   document.body.style.background='{ground}';\
+                 }})()"
+            ),
+        );
+    });
+    true
 }
 
 #[cfg(test)]

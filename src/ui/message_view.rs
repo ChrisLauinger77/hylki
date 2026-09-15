@@ -1165,6 +1165,20 @@ impl Component for MessageView {
         style_manager.connect_dark_notify(move |_| {
             theme_sender.input(MessageViewInput::ThemeChanged);
         });
+        // The same for an appearance theme, which moves the colours without
+        // touching the light/dark preference. The watcher holds the reader's
+        // view weakly, so a closed message window stops being told.
+        {
+            let theme_sender = sender.clone();
+            let weak = model.webview.downgrade();
+            crate::theme::connect_changed(move || {
+                if weak.upgrade().is_none() {
+                    return false;
+                }
+                theme_sender.input(MessageViewInput::ThemeChanged);
+                true
+            });
+        }
 
         let header_tags = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         let widgets = view_output!();

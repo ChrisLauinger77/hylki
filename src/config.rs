@@ -1002,6 +1002,11 @@ struct PrivacyFile {
     /// The app chrome's theme: follow the system, or force light/dark.
     #[serde(default)]
     app_theme: AppTheme,
+    /// The appearance theme's id: a bundled palette (see `theme.rs`) painted
+    /// over libadwaita's colours, or "system" for the stock GNOME look.
+    /// Empty — a file written before themes existed — means the same.
+    #[serde(default)]
+    theme: String,
     /// Lines of message text shown under the subject in the list: 0 turns the
     /// preview off entirely, and stops it being fetched.
     #[serde(default = "default_preview_lines")]
@@ -1274,6 +1279,7 @@ impl Default for PrivacyFile {
             rail_dots: true,
             rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
+            theme: String::new(),
             preview_lines: default_preview_lines(),
             single_key_shortcuts: false,
             run_in_background: false,
@@ -2372,6 +2378,16 @@ pub fn load_app_theme() -> AppTheme {
     load_privacy().app_theme
 }
 
+/// The appearance theme's id; "system" (the stock look) when unset.
+pub fn load_theme() -> String {
+    let id = load_privacy().theme;
+    if id.is_empty() {
+        crate::theme::SYSTEM_ID.to_string()
+    } else {
+        id
+    }
+}
+
 /// Lines of message text shown under the subject in the list; 0 means previews
 /// are off. Clamped in case the file was edited by hand.
 pub fn load_preview_lines() -> u32 {
@@ -2475,6 +2491,7 @@ pub fn save_privacy(
     rail_dots: bool,
     rail_fold: RailFold,
     app_theme: AppTheme,
+    theme: String,
     show_unified: bool,
     unified_chips: UnifiedChips,
     unified_filtered: bool,
@@ -2556,6 +2573,7 @@ pub fn save_privacy(
         rail_dots,
         rail_fold,
         app_theme,
+        theme,
         show_unified,
         unified_chip: unified_chips.all_inboxes,
         unified_chips,

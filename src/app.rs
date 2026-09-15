@@ -413,6 +413,9 @@ pub struct AppModel {
     rail_fold: config::RailFold,
     /// The app chrome's theme preference (follow system / light / dark).
     app_theme: config::AppTheme,
+    /// The appearance theme: a bundled palette's id, or "system" for the
+    /// stock GNOME colours (see `theme.rs`).
+    theme: String,
     /// Held so the in-flight collapse/expand width animation isn't dropped.
     sidebar_anim: Option<adw::TimedAnimation>,
     current: Option<Message>,
@@ -1023,6 +1026,8 @@ pub enum AppMsg {
     SetRailFold(config::RailFold),
     /// Preference: the app chrome's theme (follow system / light / dark).
     SetAppTheme(config::AppTheme),
+    /// Preference: the appearance theme (Settings gallery).
+    SetTheme(String),
     /// The cursor entered the sidebar pane — open the hover peek (rail +
     /// preference permitting).
     SidebarHoverEnter,
@@ -1976,6 +1981,11 @@ impl SimpleComponent for AppModel {
     ) -> ComponentParts<Self> {
         relm4::set_global_css(include_str!("styles.css"));
         register_icons();
+        // Before install_scheme_css and before the reader exists: both read
+        // the theme's colours back, and both listen for the light/dark flip
+        // that swaps a theme's two palettes — GTK runs those handlers in
+        // connection order, so the palette has to be in place first.
+        crate::theme::install(&config::load_theme());
         install_scheme_css(&root);
 
         let mut sidebar_state = config::load_sidebar_state();
@@ -2404,6 +2414,7 @@ impl SimpleComponent for AppModel {
             rail_dots: config::load_rail_dots(),
             rail_fold: config::load_rail_fold(),
             app_theme: config::load_app_theme(),
+            theme: config::load_theme(),
             current: None,
             allowed_senders: config::load_allowed_senders(),
             auto_remote_content: config::load_auto_remote_content(),
@@ -3657,6 +3668,15 @@ impl SimpleComponent for AppModel {
                         }));
                     });
                 }
+                // VIREO_SHOWCASE_THEME=<id> picks that appearance theme at
+                // 6 s, exactly as the Settings gallery does, so the live
+                // repaint (chrome, reader and composer) can be captured.
+                if let Ok(id) = std::env::var("VIREO_SHOWCASE_THEME") {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        s.input(AppMsg::SetTheme(id.clone()));
+                    });
+                }
                 // VIREO_SHOWCASE_ACCOUNT=N opens account N's editor a beat
                 // after the Settings window (with VIREO_SHOWCASE_SETTINGS),
                 // so the editor itself can be captured.
@@ -4381,6 +4401,20 @@ impl SimpleComponent for AppModel {
                 if self.app_theme != theme {
                     self.app_theme = theme;
                     apply_app_theme(theme);
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SetTheme(id) => {
+                if self.theme != id {
+                    self.theme = id.clone();
+                    // Repaints the chrome and tells the reader and any open
+                    // composer to re-ground their documents. The colours the
+                    // scheme-dependent CSS reads back are taken a main-loop
+                    // pass later, as they are on a light/dark flip, so the
+                    // lookups answer for the palette that just landed.
+                    crate::theme::set(&id);
+                    gtk::glib::idle_add_local_once(refresh_scheme_css);
                     self.save_settings();
                 }
             }
@@ -8290,6 +8324,7 @@ impl AppModel {
             self.rail_dots,
             self.rail_fold,
             self.app_theme,
+            self.theme.clone(),
             self.show_unified_pref,
             self.unified_chips,
             self.unified_filtered,
@@ -12954,6 +12989,7 @@ impl AppModel {
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),
             app_theme: self.app_theme,
+            theme: self.theme.clone(),
             preview_lines: self.preview_lines,
             single_key_shortcuts: self.single_key.get(),
             run_in_background: self.run_in_background.get(),
@@ -13048,6 +13084,7 @@ impl AppModel {
                 PrefOutput::SetReaderToolbar(layout) => AppMsg::SetReaderToolbar(layout),
                 PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
+                PrefOutput::SetTheme(id) => AppMsg::SetTheme(id),
                 PrefOutput::SetSettingsOpenAccounts(on) => {
                     AppMsg::SetSettingsOpenAccounts(on)
                 }
@@ -15336,6 +15373,23 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
     }
 }
 
+thread_local! {
+    /// Reloads the scheme-dependent provider with the colours the live theme
+    /// answers with now (see [`install_scheme_css`]).
+    static SCHEME_REFRESH: std::cell::RefCell<Option<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Re-read the theme's colours into the scheme-dependent CSS, for a change
+/// that moves them without flipping the colour scheme.
+fn refresh_scheme_css() {
+    SCHEME_REFRESH.with(|slot| {
+        if let Some(refresh) = slot.borrow().as_ref() {
+            refresh();
+        }
+    });
+}
+
 /// Styles that branch on the colour scheme, which static CSS cannot do: a
 /// dedicated provider (above the static stylesheet's priority) carries the
 /// scheme-dependent values and reloads whenever the scheme flips.
@@ -15379,6 +15433,15 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     };
     let style = adw::StyleManager::default();
     apply(&provider, style.is_dark());
+    // A theme change moves the same colours without any scheme flip, so the
+    // provider has to be reloadable on demand as well (AppMsg::SetTheme).
+    SCHEME_REFRESH.with(|slot| {
+        let provider = provider.clone();
+        let apply = apply.clone();
+        *slot.borrow_mut() = Some(Box::new(move || {
+            apply(&provider, adw::StyleManager::default().is_dark());
+        }));
+    });
     style.connect_dark_notify(move |sm| {
         // The theme's named colours are re-resolved after this signal, not
         // before it: read them now and the lookup answers for the scheme

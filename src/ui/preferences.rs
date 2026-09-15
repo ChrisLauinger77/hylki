@@ -80,6 +80,8 @@ pub struct PrefInit {
     /// New messages start as plain text (#180).
     pub compose_plain: bool,
     pub app_theme: AppTheme,
+    /// The appearance theme's id ("system" for the stock GNOME colours).
+    pub theme: String,
     pub notifications: bool,
     pub notification_content: bool,
     pub show_attachments: bool,
@@ -814,6 +816,7 @@ pub enum PrefInput {
     ChangePlainFont(String),
     ToggleComposePlain(bool),
     ChangeAppTheme(u32),
+    ChangeTheme(String),
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
     ShowAccounts(bool),
@@ -903,6 +906,8 @@ pub enum PrefOutput {
     SetReaderToolbar(ReaderToolbar),
     SetRailFold(crate::config::RailFold),
     SetAppTheme(AppTheme),
+    /// A theme was picked in the gallery (its id, or "system").
+    SetTheme(String),
     /// The "this window opens to" choice changed (true = Accounts).
     SetSettingsOpenAccounts(bool),
     SetPreviewLines(u32),
@@ -1201,6 +1206,16 @@ impl Component for Preferences {
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeAppTheme(row.selected()));
                                         },
+                                    },
+
+                                    // The theme gallery; its content is built
+                                    // in init (a grid the view! macro can't
+                                    // declare), like the app-icon strip below.
+                                    #[name = "theme_row"]
+                                    adw::PreferencesRow {
+                                        set_title: &i18n("Theme"),
+                                        set_activatable: false,
+                                        set_focusable: false,
                                     },
 
                                     // The app-icon gallery; its content is built in init
@@ -2506,6 +2521,40 @@ impl Component for Preferences {
                 autostart_row.set_sensitive(row.is_active());
             });
         }
+        // Theme: title + subtitle in the row's own voice, the gallery
+        // beneath — the same shape as the app-icon row under it. A pick
+        // goes straight out and is painted at once.
+        {
+            let body = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            body.set_margin_top(12);
+            body.set_margin_bottom(12);
+            body.set_margin_start(12);
+            body.set_margin_end(12);
+            let title = gtk::Label::new(Some(i18n("Theme").as_str()));
+            title.set_halign(gtk::Align::Start);
+            title.set_xalign(0.0);
+            let subtitle = gtk::Label::new(Some(
+                i18n("A whole palette for the app, in a light and a dark version. \
+                      Style above picks which of the two is on.")
+                    .as_str(),
+            ));
+            subtitle.add_css_class("dim-label");
+            subtitle.add_css_class("caption");
+            subtitle.set_halign(gtk::Align::Start);
+            subtitle.set_xalign(0.0);
+            subtitle.set_wrap(true);
+            body.append(&title);
+            body.append(&subtitle);
+            let s = sender.clone();
+            let gallery = crate::ui::theme_picker::gallery(
+                &init.theme,
+                std::rc::Rc::new(move |id: &str| s.input(PrefInput::ChangeTheme(id.to_string()))),
+            );
+            gallery.set_margin_top(10);
+            body.append(&gallery);
+            widgets.theme_row.set_child(Some(&body));
+        }
+
         // App icon: title + subtitle in the row's own voice, the gallery
         // beneath. Picks go straight out; the app applies and offers the
         // restart.
@@ -3343,6 +3392,9 @@ impl Component for Preferences {
                     .map(|(_, t)| *t)
                     .unwrap_or_default();
                 let _ = sender.output(PrefOutput::SetAppTheme(theme));
+            }
+            PrefInput::ChangeTheme(id) => {
+                let _ = sender.output(PrefOutput::SetTheme(id));
             }
             PrefInput::ChangeSettingsOpen(index) => {
                 let _ = sender.output(PrefOutput::SetSettingsOpenAccounts(index == 1));

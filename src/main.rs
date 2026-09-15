@@ -28,6 +28,8 @@ mod power;
 mod ram_cache;
 mod rng;
 mod spell;
+mod theme;
+mod theme_palettes;
 mod tray;
 mod ui;
 mod verify;
