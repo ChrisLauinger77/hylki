@@ -1582,7 +1582,7 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                         }
                     }
                     Err(e) => {
@@ -1603,7 +1603,7 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                         }
                     }
                     Err(e) => {
@@ -1626,7 +1626,7 @@ async fn run_imap(
                             }
                         }
                         if created {
-                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                         }
                     }
                     Err(e) => {
@@ -1648,7 +1648,7 @@ async fn run_imap(
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
-                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                         }
                     }
                     Err(e) => {
@@ -1671,7 +1671,7 @@ async fn run_imap(
                             }
                         }
                         if created {
-                            refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                            refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                         }
                     }
                     Err(e) => {
@@ -1697,7 +1697,7 @@ async fn run_imap(
                 // Vireo has never listed.
                 let sess = session.as_mut().unwrap();
                 let mut hit: Option<(String, u32)> = None;
-                match list_folders(account_id, sess).await {
+                match list_folders(account_id, sess, &account.folder_roles).await {
                     Ok(folders) => {
                         for f in folders {
                             if sel(sess, &f.path).await.is_err() {
@@ -1832,7 +1832,7 @@ async fn run_imap(
                 // unused one is dropped here).
                 let sess = session.as_mut().unwrap();
                 let mut found: Vec<KeywordFinding> = Vec::new();
-                match list_folders(account_id, sess).await {
+                match list_folders(account_id, sess, &account.folder_roles).await {
                     Ok(folders) => {
                         for f in &folders {
                             let Ok(mb) = exam(sess, &f.path).await else { continue };
@@ -2042,7 +2042,7 @@ async fn run_imap(
             MailRequest::CreateFolder { path } => {
                 let sess = session.as_mut().unwrap();
                 match create_folder(sess, &path).await {
-                    Ok(()) => refresh_folders(account_id, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
                     Err(e) => {
                         emit(WorkerEvent::Error {
                             text: i18n_f("Could not create folder: {e}", &[("e", &(e).to_string())]),
@@ -2056,7 +2056,7 @@ async fn run_imap(
             MailRequest::RenameFolder { old_path, new_path } => {
                 let sess = session.as_mut().unwrap();
                 match rename_folder(sess, &old_path, &new_path).await {
-                    Ok(()) => refresh_folders(account_id, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
                     Err(e) => {
                         emit(WorkerEvent::Error {
                             text: i18n_f("Could not move folder: {e}", &[("e", &(e).to_string())]),
@@ -2070,7 +2070,7 @@ async fn run_imap(
             MailRequest::DeleteFolder { path, trash } => {
                 let sess = session.as_mut().unwrap();
                 match delete_folder(sess, &path, trash.as_deref()).await {
-                    Ok(()) => refresh_folders(account_id, sess, cache.as_ref(), &emit).await,
+                    Ok(()) => refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await,
                     Err(e) => {
                         emit(WorkerEvent::Error {
                             text: i18n_f("Could not delete folder: {e}", &[("e", &(e).to_string())]),
@@ -2257,7 +2257,7 @@ async fn run_imap(
                                 }
                                 // Surface a newly-created Drafts folder in the sidebar.
                                 if let Some(sess) = session.as_mut() {
-                                    refresh_folders(account_id, sess, cache.as_ref(), &emit).await;
+                                    refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
                                 }
                                 // Saved as a draft instead of sent: the queued
                                 // copy it was edited from is now superseded.
@@ -2324,7 +2324,7 @@ async fn connect_and_list(
                 label: account.display_label(),
                 accent: accent_for(account_id).into(),
             }));
-            match list_folders(account_id, &mut session).await {
+            match list_folders(account_id, &mut session, &account.folder_roles).await {
                 // An empty LIST can't be right — INBOX always exists (RFC
                 // 3501). Keep whatever the cache has instead of wiping it.
                 Ok(folders) if folders.is_empty() => {}
@@ -5059,6 +5059,7 @@ async fn smtp_auth_check(
 async fn list_folders(
     account_id: u32,
     session: &mut ImapSession,
+    roles: &std::collections::BTreeMap<String, String>,
 ) -> Result<Vec<Folder>, async_imap::error::Error> {
     let names: Vec<async_imap::types::Name> = session
         .list(Some(""), Some("*"))
@@ -5123,6 +5124,12 @@ async fn list_folders(
     for (i, f) in folders.iter_mut().enumerate() {
         f.id = i as u32 + 1;
     }
+    // Manual Special Folders assignments (#82) ride over the detection
+    // before anything is counted: a folder assigned as Drafts must count
+    // every draft, and the cached kind drives every later re-count (the
+    // sweep, the on-open refresh) too. Ids and order stay as numbered —
+    // the app re-sorts its own copy.
+    crate::models::assign_folder_roles(roles, &mut folders);
 
     // Ask the server for each folder's true unread count. STATUS is cheap and
     // downloads no message content, so this stays fast even for huge mailboxes.
@@ -5254,7 +5261,7 @@ async fn auto_empty_imap(
         }
     }
     if purged_any {
-        refresh_folders(account_id, session, cache, emit).await;
+        refresh_folders(account_id, account, session, cache, emit).await;
     }
 }
 
@@ -5328,11 +5335,12 @@ async fn auto_empty_graph(
 
 async fn refresh_folders(
     account_id: u32,
+    account: &AccountConfig,
     session: &mut ImapSession,
     cache: Option<&Cache>,
     emit: &impl Fn(WorkerEvent),
 ) {
-    if let Ok(folders) = list_folders(account_id, session).await {
+    if let Ok(folders) = list_folders(account_id, session, &account.folder_roles).await {
         // A mailbox always has at least INBOX (RFC 3501): an empty LIST is a
         // wedged or throttled session answering nonsense, not the truth.
         // Trusting one once wiped an account's whole folder list — cached,
@@ -8785,7 +8793,11 @@ fn graph_paged(token: &str, first_url: &str, cap: usize) -> Result<Vec<serde_jso
 
 /// List the account's mail folders (tree flattened, well-known roles mapped),
 /// sorted and id-numbered exactly like the IMAP path's folder list.
-fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, String> {
+fn graph_list_folders(
+    token: &str,
+    account_id: u32,
+    assignments: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<GraphFolder>, String> {
     // Well-known folders name the roles; everything else is Custom. A role
     // folder some account type lacks (e.g. archive) just 404s — skip it.
     let mut roles: std::collections::HashMap<String, FolderKind> = Default::default();
@@ -8816,6 +8828,9 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
     // Flatten the tree breadth-first; paths join with '/' like the sidebar's
     // hierarchy expects. Depth and total are capped defensively.
     let mut out: Vec<GraphFolder> = Vec::new();
+    // Graph folder id → (every message, unread): the chip picks one once the
+    // kinds are final (a manual Drafts assignment counts every draft).
+    let mut counts: std::collections::HashMap<String, (u32, u32)> = Default::default();
     let mut queue: Vec<(serde_json::Value, String, u8)> =
         roots.into_iter().map(|v| (v, String::new(), 0u8)).collect();
     while let Some((v, prefix, depth)) = queue.pop() {
@@ -8832,6 +8847,8 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
                 queue.extend(children.into_iter().map(|c| (c, path.clone(), depth + 1)));
             }
         }
+        let count = |field: &str| v[field].as_i64().unwrap_or(0).max(0) as u32;
+        counts.insert(gid.to_string(), (count("totalItemCount"), count("unreadItemCount")));
         out.push(GraphFolder {
             graph_id: gid.to_string(),
             folder: Folder {
@@ -8840,10 +8857,7 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
                 name,
                 path,
                 kind,
-                unread: {
-                    let field = if chip_counts_all(kind) { "totalItemCount" } else { "unreadItemCount" };
-                    v[field].as_i64().unwrap_or(0).max(0) as u32
-                },
+                unread: 0, // filled in below, once the kinds are final
             },
         });
     }
@@ -8855,6 +8869,15 @@ fn graph_list_folders(token: &str, account_id: u32) -> Result<Vec<GraphFolder>, 
     });
     for (i, f) in out.iter_mut().enumerate() {
         f.folder.id = i as u32 + 1;
+    }
+    // Manual Special Folders assignments (#82) over the well-known roles,
+    // before the chips are counted — as the IMAP listing does.
+    let mut folders: Vec<Folder> = out.iter().map(|f| f.folder.clone()).collect();
+    crate::models::assign_folder_roles(assignments, &mut folders);
+    for (gf, f) in out.iter_mut().zip(folders) {
+        gf.folder.kind = f.kind;
+        let (total, unseen) = counts.get(&gf.graph_id).copied().unwrap_or_default();
+        gf.folder.unread = if chip_counts_all(f.kind) { total } else { unseen };
     }
     Ok(out)
 }
@@ -8955,6 +8978,9 @@ struct GraphState {
     drafts: Option<(u32, String)>,
     /// The Inbox's (folder id, path), for the new-mail poll.
     inbox: Option<(u32, String)>,
+    /// The account's manual Special Folders assignments (#82), applied to
+    /// every listing.
+    roles: std::collections::BTreeMap<String, String>,
 }
 
 impl GraphState {
@@ -9013,6 +9039,7 @@ async fn run_graph(
         uids: Default::default(),
         drafts: None,
         inbox: None,
+        roles: account.folder_roles.clone(),
     };
 
     // Fetch a token and the folder list. A GOA token failure here is the one
@@ -9821,7 +9848,8 @@ async fn graph_refresh_unread(
     emit: &impl Fn(WorkerEvent),
 ) {
     let t = token.to_string();
-    let Ok(list) = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id))
+    let roles = state.roles.clone();
+    let Ok(list) = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
         .await
         .unwrap_or_else(|_| Err("task failed".into()))
     else {
@@ -9900,7 +9928,8 @@ async fn refresh_graph_folders(
     emit: &impl Fn(WorkerEvent),
 ) {
     let t = token.to_string();
-    let r = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id))
+    let roles = state.roles.clone();
+    let r = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
         .await
         .unwrap_or_else(|_| Err("task failed".into()));
     match r {
@@ -9932,8 +9961,9 @@ async fn graph_load_folder(
     // (or the folder is new) — refresh it once before giving up.
     if !state.folders.contains_key(path) {
         let t = token.to_string();
+        let roles = state.roles.clone();
         if let Ok(list) =
-            tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id))
+            tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
                 .await
                 .unwrap_or_else(|_| Err("task failed".into()))
         {

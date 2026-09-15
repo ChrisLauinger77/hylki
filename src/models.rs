@@ -75,6 +75,53 @@ pub struct Folder {
     pub unread: u32,
 }
 
+/// The [`FolderKind`] behind a Special Folders role key (#82).
+pub fn role_kind(role: &str) -> Option<FolderKind> {
+    match role {
+        "sent" => Some(FolderKind::Sent),
+        "drafts" => Some(FolderKind::Drafts),
+        "trash" => Some(FolderKind::Trash),
+        "junk" => Some(FolderKind::Junk),
+        "archive" => Some(FolderKind::Archive),
+        _ => None,
+    }
+}
+
+/// Re-kind an account's folders by its manual special-folder assignments
+/// (#82): the chosen folder takes the role and whatever held it demotes to
+/// Custom. Order and ids are untouched (the worker's cache keys ids by
+/// position; the app re-sorts its own copy). The worker applies this to
+/// every listing so its counts see the assignment too — a folder assigned
+/// as Drafts counts every draft, like a detected one, rather than the
+/// unseen mail (none) its detected kind would count.
+pub fn assign_folder_roles(
+    roles: &std::collections::BTreeMap<String, String>,
+    folders: &mut [Folder],
+) {
+    for (role, path) in roles {
+        let Some(kind) = role_kind(role) else { continue };
+        if !folders.iter().any(|f| &f.path == path) {
+            // The assigned folder vanished server-side: leave detection alone.
+            continue;
+        }
+        // The Inbox is never re-roled (#136): an account whose "Sent" was
+        // pointed at INBOX lost its inbox — and with it its place under All
+        // Inboxes, its new-mail notifications and its filters. The
+        // assignment is ignored; the editor no longer offers the Inbox.
+        if folders.iter().any(|f| &f.path == path && f.kind == FolderKind::Inbox) {
+            continue;
+        }
+        for f in folders.iter_mut() {
+            if f.kind == kind {
+                f.kind = FolderKind::Custom;
+            }
+        }
+        if let Some(f) = folders.iter_mut().find(|f| &f.path == path) {
+            f.kind = kind;
+        }
+    }
+}
+
 /// A single message (summary + body). In a real backend the body is loaded
 /// lazily; here it is always present.
 #[derive(Debug, Clone, PartialEq)]
@@ -843,5 +890,32 @@ mod tests {
         assert_eq!(type_bucket("backup.tar"), 4);
         assert_eq!(type_bucket("song.flac"), 5);
         assert_eq!(type_bucket("unknown.xyz"), 6);
+    }
+    #[test]
+    fn assigned_drafts_folder_takes_the_kind_that_counts_every_draft() {
+        let f = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        // A laposte.net-style listing: nothing detected as Drafts, and the
+        // user assigned "Brouillons" under Special Folders.
+        let mut folders = vec![
+            f(1, "INBOX", FolderKind::Inbox),
+            f(2, "Brouillons", FolderKind::Custom),
+            f(3, "Sent", FolderKind::Sent),
+        ];
+        let roles: std::collections::BTreeMap<String, String> =
+            [("drafts".to_string(), "Brouillons".to_string())].into();
+        assign_folder_roles(&roles, &mut folders);
+        let drafts = folders.iter().find(|f| f.path == "Brouillons").unwrap();
+        assert_eq!(drafts.kind, FolderKind::Drafts);
+        assert!(crate::worker::chip_counts_all(drafts.kind), "chip counts every draft");
+        // Positions and ids are untouched: the worker's cache keys ids by order.
+        assert_eq!(folders.iter().map(|f| f.id).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(folders[1].path, "Brouillons");
     }
 }

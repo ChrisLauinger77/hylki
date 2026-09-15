@@ -14833,22 +14833,12 @@ fn demo_mode() -> bool {
     std::env::var_os("VIREO_DEMO").is_some()
 }
 
-/// The [`FolderKind`] behind a Special Folders role key (#82).
-fn role_kind(role: &str) -> Option<FolderKind> {
-    match role {
-        "sent" => Some(FolderKind::Sent),
-        "drafts" => Some(FolderKind::Drafts),
-        "trash" => Some(FolderKind::Trash),
-        "junk" => Some(FolderKind::Junk),
-        "archive" => Some(FolderKind::Archive),
-        _ => None,
-    }
-}
-
 /// Apply an account's manual special-folder assignments (#82) over the
-/// auto-detected kinds: the chosen folder takes the role, whatever held it
-/// demotes to Custom, and the list re-sorts into the fixed role order.
-/// Folder ids are untouched — they are referenced from cached messages.
+/// auto-detected kinds (see [`crate::models::assign_folder_roles`]), then
+/// re-sort into the fixed role order. Folder ids are untouched — they are
+/// referenced from cached messages. The worker already applies the same
+/// assignments to every listing it sends; this keeps the live lists right
+/// between a Settings save and the reconnect's fresh LIST.
 fn apply_folder_roles(
     roles: &std::collections::BTreeMap<String, String>,
     folders: &mut Vec<Folder>,
@@ -14856,28 +14846,7 @@ fn apply_folder_roles(
     if roles.is_empty() {
         return;
     }
-    for (role, path) in roles {
-        let Some(kind) = role_kind(role) else { continue };
-        if !folders.iter().any(|f| &f.path == path) {
-            // The assigned folder vanished server-side: leave detection alone.
-            continue;
-        }
-        // The Inbox is never re-roled (#136): an account whose "Sent" was
-        // pointed at INBOX lost its inbox — and with it its place under All
-        // Inboxes, its new-mail notifications and its filters. The
-        // assignment is ignored; the editor no longer offers the Inbox.
-        if folders.iter().any(|f| &f.path == path && f.kind == FolderKind::Inbox) {
-            continue;
-        }
-        for f in folders.iter_mut() {
-            if f.kind == kind {
-                f.kind = FolderKind::Custom;
-            }
-        }
-        if let Some(f) = folders.iter_mut().find(|f| &f.path == path) {
-            f.kind = kind;
-        }
-    }
+    crate::models::assign_folder_roles(roles, folders);
     folders.sort_by(|a, b| {
         crate::worker::folder_order(a.kind)
             .cmp(&crate::worker::folder_order(b.kind))
