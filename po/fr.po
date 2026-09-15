@@ -1121,7 +1121,10 @@ msgstr "Étiquette (adresse e-mail par défaut)"
 msgid "Account accent color"
 msgstr "Couleur d'accentuation du compte"
 
-msgid "The circle, and this account's marks in the sidebar and lists"
+#, fuzzy
+msgid ""
+"The account circle background, and this account's marks in the sidebar and "
+"lists"
 msgstr ""
 "Le cercle, ainsi que les marques de ce compte dans la barre latérale et les "
 "listes"

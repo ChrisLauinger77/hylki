@@ -94,17 +94,19 @@ impl Component for PgpKeys {
                     ),
                     #[wrap(Some)]
                     set_header_suffix = &gtk::Box {
-                        set_spacing: 6,
+                        set_orientation: gtk::Orientation::Vertical,
+                        set_spacing: 12,
+                        set_valign: gtk::Align::Start,
+                        set_halign: gtk::Align::End,
+                        set_margin_start: 24,
                         gtk::Button {
                             set_label: &i18n("Import…"),
-                            set_valign: gtk::Align::Center,
-                            add_css_class: "flat",
+                            set_size_request: (130, -1),
                             connect_clicked => PgpKeysInput::Import,
                         },
                         gtk::Button {
                             set_label: &i18n("Generate…"),
-                            set_valign: gtk::Align::Center,
-                            add_css_class: "flat",
+                            set_size_request: (130, -1),
                             connect_clicked => PgpKeysInput::Generate,
                         },
                     },
@@ -125,17 +127,19 @@ impl Component for PgpKeys {
                     ),
                     #[wrap(Some)]
                     set_header_suffix = &gtk::Box {
-                        set_spacing: 6,
+                        set_orientation: gtk::Orientation::Vertical,
+                        set_spacing: 12,
+                        set_valign: gtk::Align::Start,
+                        set_halign: gtk::Align::End,
+                        set_margin_start: 24,
                         gtk::Button {
                             set_label: &i18n("Import…"),
-                            set_valign: gtk::Align::Center,
-                            add_css_class: "flat",
+                            set_size_request: (130, -1),
                             connect_clicked => PgpKeysInput::Import,
                         },
                         gtk::Button {
                             set_label: &i18n("Fetch by address…"),
-                            set_valign: gtk::Align::Center,
-                            add_css_class: "flat",
+                            set_size_request: (130, -1),
                             connect_clicked => PgpKeysInput::Fetch,
                         },
                     },

@@ -1120,7 +1120,10 @@ msgstr "Метка (по умолчанию адрес электронной п
 msgid "Account accent color"
 msgstr "Цвет учётной записи"
 
-msgid "The circle, and this account's marks in the sidebar and lists"
+#, fuzzy
+msgid ""
+"The account circle background, and this account's marks in the sidebar and "
+"lists"
 msgstr "Кружок и метки этой учётной записи на боковой панели и в списках"
 
 msgid "Use my Gravatar"

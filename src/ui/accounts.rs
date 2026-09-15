@@ -1081,7 +1081,8 @@ impl Component for AccountsWindow {
                                 // folders and mail elsewhere.
                                 adw::ActionRow {
                                     set_title: &i18n("Account accent color"),
-                                    set_subtitle: &i18n("The circle, and this account's marks in the sidebar and lists"),
+                                    set_subtitle: &i18n("The account circle background, and this account's \
+                                                   marks in the sidebar and lists"),
                                     #[name = "color_btn"]
                                     add_suffix = &gtk::ColorDialogButton {
                                         set_valign: gtk::Align::Center,
@@ -2866,6 +2867,31 @@ impl AccountsWindow {
         }
 
         let mut css = String::new();
+        // The provider mark and the source badge each get a column of their
+        // own, held to one width down the whole list. Both vary: the marks
+        // are logos of different aspect (Gmail's M is wider than an envelope),
+        // and "GOA" is narrower than "Vireo" (and the pair differs again in
+        // each language). Left to themselves they pushed each other sideways
+        // and neither read as a column.
+        let mark_widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
+        let badge_widths = gtk::SizeGroup::new(gtk::SizeGroupMode::Horizontal);
+        // A slot keeps its child at its natural size and centred; the size
+        // group holds the slot, not the child, so a logo is never stretched
+        // and a badge's pill still hugs its text.
+        let slot = |child: &gtk::Widget, group: &gtk::SizeGroup| {
+            let slot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            slot.set_valign(gtk::Align::Center);
+            child.set_halign(gtk::Align::Center);
+            child.set_hexpand(true);
+            slot.append(child);
+            // The child expands to fill the slot so it lands centred — but an
+            // expanding child makes its parent expand too, and an expanding
+            // slot would take a share of the row's spare width and defeat the
+            // whole point. Pin the slot's own answer to "no".
+            slot.set_hexpand(false);
+            group.add_widget(&slot);
+            slot
+        };
         for (pos, acc) in self.accounts.iter().enumerate() {
             let row = gtk::ListBoxRow::new();
             row.set_activatable(true);
@@ -2943,7 +2969,7 @@ impl AccountsWindow {
             let brand = brand_for_account(acc);
             let mark = crate::brand::image_or(brand, 24, crate::brand::GENERIC_MAIL);
             mark.set_tooltip_text(Some(&provider_name(brand, acc)));
-            hbox.append(&mark);
+            hbox.append(&slot(mark.upcast_ref(), &mark_widths));
 
             // Source badge: is this account from GNOME Online Accounts, or added
             // directly in Vireo?
@@ -2957,7 +2983,7 @@ impl AccountsWindow {
             } else {
                 badge.set_tooltip_text(Some(i18n("Added directly in Vireo").as_str()));
             }
-            hbox.append(&badge);
+            hbox.append(&slot(badge.upcast_ref(), &badge_widths));
 
             // Enable/disable toggle. Disabled accounts stay configured but don't
             // sync or appear in the sidebar.

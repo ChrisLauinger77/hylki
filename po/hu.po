@@ -1099,7 +1099,9 @@ msgstr "Címke (alapértelmezés szerint az e-mail-cím)"
 msgid "Account accent color"
 msgstr ""
 
-msgid "The circle, and this account's marks in the sidebar and lists"
+msgid ""
+"The account circle background, and this account's marks in the sidebar and "
+"lists"
 msgstr ""
 
 msgid "Use my Gravatar"

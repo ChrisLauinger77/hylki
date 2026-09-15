@@ -1118,7 +1118,10 @@ msgstr "Etiqueta (por padrão, o endereço de email)"
 msgid "Account accent color"
 msgstr "Cor de destaque da conta"
 
-msgid "The circle, and this account's marks in the sidebar and lists"
+#, fuzzy
+msgid ""
+"The account circle background, and this account's marks in the sidebar and "
+"lists"
 msgstr "O círculo e as marcas desta conta na barra lateral e nas listas"
 
 msgid "Use my Gravatar"
