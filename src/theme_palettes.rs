@@ -71,7 +71,7 @@ pub const ROSE: Theme = Theme {
         border: "#654153",
         input: "#794f64",
         focus: "#db2777",
-        accent: "#a3004c",
+        accent: "#a63962",
         accent_foreground: "#fbd0e8",
         secondary: "#502a3d",
         secondary_foreground: "#d4c7e1",

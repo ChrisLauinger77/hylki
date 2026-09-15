@@ -71,6 +71,7 @@ OVERRIDES = {
     # and Midnight -- at Rose's own hue, 330. Text, accent and the semantic
     # colours are upstream's still.
     ("rose", "dark"): {
+        "accent": "#a63962",
         "canvas": "#291921",
         "chrome": "#291921",
         "toolbar": "#291921",
