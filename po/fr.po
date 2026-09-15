@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-14 18:43+0200\n"
+"PO-Revision-Date: 2026-09-15 17:42+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -328,39 +328,43 @@ msgstr "Nouveau message"
 msgid "Could not attach {names}: Vireo cannot read the file."
 msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
 msgstr[0] ""
+"Impossible de joindre {names} : Vireo ne parvient pas à lire le fichier."
 msgstr[1] ""
+"Impossible de joindre {n} fichiers (Vireo ne parvient pas à les lire) : "
+"{names}"
 
 msgid "Send {n} file with Vireo"
 msgid_plural "Send {n} files with Vireo"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Envoyer {n} fichier avec Vireo"
+msgstr[1] "Envoyer {n} fichiers avec Vireo"
 
 msgid "{names} ({size}). What should the files go into?"
-msgstr ""
+msgstr "{names} ({size}). Où les fichiers doivent-ils aller ?"
 
 msgid "Cancel"
 msgstr "Annuler"
 
 msgid "Reply to a Message…"
-msgstr ""
+msgstr "Répondre à un message…"
 
 msgid "Continue a Draft…"
-msgstr ""
+msgstr "Continuer un brouillon…"
 
 msgid "Reply to a Message"
-msgstr ""
+msgstr "Répondre à un message"
 
 msgid "The files go into a reply to the message you pick."
 msgstr ""
+"Les fichiers seront joints à une réponse au message que vous choisissez."
 
 msgid "No messages to reply to yet."
-msgstr ""
+msgstr "Aucun message auquel répondre pour l'instant."
 
 msgid "Reply With the Files"
-msgstr ""
+msgstr "Répondre avec les fichiers"
 
 msgid "Large files"
-msgstr ""
+msgstr "Fichiers volumineux"
 
 msgid ""
 "{names} is {size}, over the {limit} limit. Upload it to cloud storage and "
@@ -369,25 +373,31 @@ msgid_plural ""
 "{names} add up to {size}, over the {limit} limit. Upload them to cloud "
 "storage and put download links in the message instead?"
 msgstr[0] ""
+"{names} pèse {size}, au-delà de la limite de {limit}. Le mettre en ligne sur "
+"un espace de stockage cloud et insérer un lien de téléchargement dans le "
+"message à la place ?"
 msgstr[1] ""
+"{names} pèsent {size} au total, au-delà de la limite de {limit}. Les mettre "
+"en ligne sur un espace de stockage cloud et insérer des liens de "
+"téléchargement dans le message à la place ?"
 
 msgid "Attach Anyway"
-msgstr ""
+msgstr "Joindre quand même"
 
 msgid "Upload to Cloud Storage"
 msgstr "Téléverser vers un stockage en ligne"
 
 msgid "Continue a Draft"
-msgstr ""
+msgstr "Continuer un brouillon"
 
 msgid "The files go into the draft you pick."
-msgstr ""
+msgstr "Les fichiers seront ajoutés au brouillon que vous choisissez."
 
 msgid "No drafts to continue."
-msgstr ""
+msgstr "Aucun brouillon à continuer."
 
 msgid "Attach to This Draft"
-msgstr ""
+msgstr "Joindre à ce brouillon"
 
 msgid "Delete this conversation?"
 msgstr "Supprimer cette conversation ?"
@@ -656,15 +666,17 @@ msgstr "Enregistrer toutes les pièces jointes"
 
 msgid "Always do this (change it in Settings → System → GNOME Files)"
 msgstr ""
+"Toujours faire cela (modifiable dans Paramètres → Système → Fichiers de "
+"GNOME)"
 
 msgid "New Message Instead"
-msgstr ""
+msgstr "Nouveau message à la place"
 
 msgid "Search by sender, subject or account"
-msgstr ""
+msgstr "Rechercher par expéditeur, objet ou compte"
 
 msgid "(no subject)"
-msgstr ""
+msgstr "(sans objet)"
 
 msgid "Default"
 msgstr "Par défaut"
@@ -784,8 +796,8 @@ msgstr "Un nouveau message est ouvert dans Vireo."
 
 msgid "A new message with {n} file attached is open in Vireo."
 msgid_plural "A new message with {n} files attached is open in Vireo."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Un nouveau message avec {n} fichier joint est ouvert dans Vireo."
+msgstr[1] "Un nouveau message avec {n} fichiers joints est ouvert dans Vireo."
 
 msgid "GnuPG (gpg) is not installed, so this message cannot be read."
 msgstr "GnuPG (gpg) n'est pas installé ; ce message ne peut donc pas être lu."
@@ -1121,13 +1133,12 @@ msgstr "Étiquette (adresse e-mail par défaut)"
 msgid "Account accent color"
 msgstr "Couleur d'accentuation du compte"
 
-#, fuzzy
 msgid ""
 "The account circle background, and this account's marks in the sidebar and "
 "lists"
 msgstr ""
-"Le cercle, ainsi que les marques de ce compte dans la barre latérale et les "
-"listes"
+"L'arrière-plan du cercle du compte, ainsi que les marques de ce compte dans "
+"la barre latérale et les listes"
 
 msgid "Use my Gravatar"
 msgstr "Utiliser mon Gravatar"
@@ -1414,13 +1425,12 @@ msgid "Mail account"
 msgstr "Compte e-mail"
 
 #. Every condition, joined the way the rule combines them (#192).
-#, fuzzy
 msgid " or "
-msgstr "À ou Cc"
+msgstr " ou "
 
 #. Every condition, joined the way the rule combines them (#192).
 msgid " and "
-msgstr ""
+msgstr " et "
 
 msgid ", tagged {tag}"
 msgstr ", marqué {tag}"
@@ -1501,9 +1511,8 @@ msgstr "Modifier le filtre"
 msgid "Add Filter"
 msgstr "Ajouter un filtre"
 
-#, fuzzy
 msgid "Remove condition"
-msgstr "Supprimer le compte"
+msgstr "Supprimer la condition"
 
 msgid "Where"
 msgstr "Champ"
@@ -1512,50 +1521,48 @@ msgid "Match"
 msgstr "Condition"
 
 msgid "Commas separate alternatives; any one of them counts"
-msgstr ""
+msgstr "Les virgules séparent des alternatives ; une seule doit correspondre"
 
 msgid "Text to match"
 msgstr "Texte à rechercher"
 
 msgid "Searched on the server; nothing is downloaded"
-msgstr ""
+msgstr "Recherché sur le serveur ; rien n'est téléchargé"
 
 msgid "From address when no Reply-To is set"
-msgstr ""
+msgstr "Adresse d'expéditeur utilisée en l'absence de Reply-To"
 
-#, fuzzy
 msgid "Add Condition"
-msgstr "Ajouter un compte cloud"
+msgstr "Ajouter une condition"
 
-#, fuzzy
 msgid "Condition matching"
-msgstr "Conversations"
+msgstr "Correspondance des conditions"
 
 msgid "All must match"
-msgstr ""
+msgstr "Toutes doivent correspondre"
 
 msgid "Any one may match"
-msgstr ""
+msgstr "Une seule doit correspondre"
 
-#, fuzzy
 msgid "Condition {n}"
-msgstr "Conversations"
+msgstr "Condition {n}"
 
-#, fuzzy
 msgid "Or where"
-msgstr "Champ"
+msgstr "Ou si"
 
 msgid "And where"
-msgstr ""
+msgstr "Et si"
 
 msgid "Then"
-msgstr ""
+msgstr "Alors"
 
 msgid "Move to"
 msgstr "Déplacer vers"
 
 msgid "Leave in Inbox to only tag matching mail"
 msgstr ""
+"Laisser dans la boîte de réception pour ne faire qu'étiqueter les messages "
+"correspondants"
 
 #. Entry 0 files nowhere (a tag-only rule, #71): its path is "".
 msgid "Leave in Inbox"
@@ -1836,13 +1843,17 @@ msgid "Upload folder"
 msgstr "Dossier de téléversement"
 
 msgid "Server is behind Cloudflare"
-msgstr ""
+msgstr "Le serveur est derrière Cloudflare"
 
 msgid ""
 "Cloudflare's proxy refuses a request over 100 MB, so bigger files are "
 "uploaded in 90 MB pieces the server puts back together. For a self-hosted "
 "server on a Cloudflare domain or tunnel."
 msgstr ""
+"Le proxy de Cloudflare refuse les requêtes de plus de 100 Mo ; les fichiers "
+"plus volumineux sont donc envoyés en morceaux de 90 Mo que le serveur "
+"réassemble. Pour un serveur auto-hébergé sur un domaine ou un tunnel "
+"Cloudflare."
 
 msgid "Links expire after"
 msgstr "Les liens expirent après"
@@ -2919,7 +2930,7 @@ msgstr ""
 "réglage sous « Lecture »."
 
 msgid "Theme"
-msgstr ""
+msgstr "Thème"
 
 msgid "App icon"
 msgstr "Icône de l'application"
@@ -3091,13 +3102,12 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Emplacement des filtres"
 
-#, fuzzy
 msgid ""
 "Choose between appearing in a unified section, or a list above or below the "
 "accounts."
 msgstr ""
-"Les mêmes choix pour la section Tags : une ligne unifiée, ou un en-tête au-"
-"dessus ou en dessous des comptes."
+"Choisissez entre apparaître dans une section unifiée, ou une liste au-dessus "
+"ou en dessous des comptes."
 
 msgid "Tags placement"
 msgstr "Emplacement des balises"
@@ -3137,9 +3147,8 @@ msgstr ""
 msgid "Every account's folder list."
 msgstr "La liste des dossiers de chaque compte."
 
-#, fuzzy
 msgid "The account list under the unified Inboxes row."
-msgstr "La liste des comptes sous la ligne unifiée Envoyés."
+msgstr "La liste des comptes sous la ligne unifiée Boîtes de réception."
 
 msgid "The account list under the unified Starred row."
 msgstr "La liste des comptes sous la ligne unifiée Favoris."
@@ -3170,18 +3179,15 @@ msgstr ""
 "dessus du message. Désactiver cette option donne plus de place à "
 "l'expéditeur et à l'objet."
 
-#, fuzzy
 msgid "Sent mail uses your account circle"
-msgstr "Vos propres messages affichent le cercle de votre compte"
+msgstr "Les messages envoyés utilisent le cercle de votre compte"
 
-#, fuzzy
 msgid ""
 "Messages you sent wear the account's Gravatar, picture or emoji, as its "
 "circle in the sidebar does."
 msgstr ""
-"Les messages que vous envoyez portent le Gravatar, l'image ou l'emoji du "
-"compte, comme son cercle dans la barre latérale. En désactivant cette "
-"option, ils reçoivent le même cercle que n'importe quel autre message."
+"Les messages que vous avez envoyés affichent le Gravatar, l'image ou l'emoji "
+"du compte, comme son cercle dans la barre latérale."
 
 msgid "Preview lines"
 msgstr "Lignes d'aperçu"
@@ -3193,7 +3199,6 @@ msgstr ""
 "La quantité de texte affichée sous l'objet de chaque message. Désactiver "
 "cette option stoppe aussi le téléchargement des aperçus."
 
-#, fuzzy
 msgid "Actions palette in the message list"
 msgstr "Palette d'actions dans la liste des messages"
 
@@ -3206,11 +3211,9 @@ msgstr ""
 "option on libère de l'espace sur la ligne ; les actions restent accessibles "
 "depuis leurs fiches et le menu contextuel."
 
-#, fuzzy
 msgid "Open the actions palette on hover"
 msgstr "Ouvrir la palette d'actions au survol"
 
-#, fuzzy
 msgid ""
 "The message list's ⋯ actions palette slides open by itself while the pointer "
 "rests on a row."
@@ -3221,14 +3224,14 @@ msgstr ""
 msgid "Swipe actions"
 msgstr "Actions par glissement"
 
-#, fuzzy
 msgid ""
 "Drag a message sideways with the mouse, or swipe it with two fingers on a "
 "trackpad, to archive or delete it. Default is left to delete, right to "
 "archive."
 msgstr ""
 "Faites glisser un message sur le côté avec la souris, ou balayez-le avec "
-"deux doigts sur un pavé tactile, pour l'archiver ou le supprimer."
+"deux doigts sur un pavé tactile, pour l'archiver ou le supprimer. Par "
+"défaut : à gauche pour supprimer, à droite pour archiver."
 
 msgid "Reverse swipe directions"
 msgstr "Inverser le sens du balayage"
@@ -3236,27 +3239,31 @@ msgstr "Inverser le sens du balayage"
 msgid ""
 "Turning this on swaps the swipe actions to: left archives, right deletes."
 msgstr ""
+"Activer cette option inverse les actions de balayage : à gauche pour "
+"archiver, à droite pour supprimer."
 
 msgid "Trackpad swipe sensitivity"
-msgstr ""
+msgstr "Sensibilité du balayage au pavé tactile"
 
 msgid ""
 "How readily a two-finger trackpad swipe moves a message. Raise it if a swipe "
 "never gets far enough to archive or delete, lower it if messages slide when "
 "you did not mean them to. Mouse drags are unaffected."
 msgstr ""
+"La facilité avec laquelle un balayage à deux doigts déplace un message. "
+"Augmentez la valeur si un balayage n'atteint jamais la distance nécessaire "
+"pour archiver ou supprimer, diminuez-la si les messages glissent sans que "
+"vous le vouliez. Les glissements à la souris ne sont pas concernés."
 
-#, fuzzy
 msgid "Actions palette timeout"
 msgstr "Délai d'expiration de la palette d'actions"
 
-#, fuzzy
 msgid ""
 "Seconds the message list's actions palette stays open after the cursor "
 "leaves it."
 msgstr ""
-"Nombre de secondes pendant lesquelles la palette d'actions reste ouverte "
-"après le départ du curseur (pour la liste et les cartes de message)."
+"Nombre de secondes pendant lesquelles la palette d'actions de la liste des "
+"messages reste ouverte après que le curseur l'a quittée."
 
 msgid "Conversations"
 msgstr "Conversations"
@@ -3372,36 +3379,31 @@ msgstr "Police monospace"
 msgid "The system's monospace font unless another is chosen."
 msgstr "La police à espacement fixe du système, sauf si une autre est choisie."
 
-#, fuzzy
 msgid "Message card actions palette"
-msgstr "Actions sur la carte du message"
+msgstr "Palette d'actions de la carte du message"
 
 msgid "How each message's action icons show in the reader, single or threaded."
 msgstr ""
 "Comment s'affichent les icônes d'action de chaque message dans le lecteur, "
 "en mode individuel ou en fil de discussion."
 
-#, fuzzy
 msgid "Message card actions palette timeout"
-msgstr "Actions sur la carte du message"
+msgstr "Délai d'expiration de la palette d'actions de la carte du message"
 
-#, fuzzy
 msgid "Seconds a card's actions palette stays open after the cursor leaves it."
 msgstr ""
-"Nombre de secondes pendant lesquelles la palette d'actions reste ouverte "
-"après le départ du curseur (pour la liste et les cartes de message)."
+"Nombre de secondes pendant lesquelles la palette d'actions d'une carte reste "
+"ouverte après que le curseur l'a quittée."
 
-#, fuzzy
 msgid "Message card actions palette as a menu"
-msgstr "Palette d'actions sous forme de menu"
+msgstr "Palette d'actions de la carte du message sous forme de menu"
 
-#, fuzzy
 msgid ""
 "The ⋯ opens the message's menu, the same one a right-click shows, instead of "
 "sliding the actions palette out."
 msgstr ""
-"Le ⋯ ouvre le menu de la ligne, le même que celui affiché par un clic droit, "
-"au lieu de faire glisser la palette."
+"Le ⋯ ouvre le menu du message, le même que celui affiché par un clic droit, "
+"au lieu de faire glisser la palette d'actions."
 
 msgid "Single messages as cards"
 msgstr "Messages isolés sous forme de cartes"
@@ -3564,7 +3566,6 @@ msgstr ""
 "depuis le domaine de l'expéditeur, qui prend alors connaissance de votre "
 "adresse IP, ce que le blocage du contenu distant vise justement à éviter."
 
-#, fuzzy
 msgid ""
 "By default dates follow the system's own arrangement — its field order, "
 "month names and clock. Choose a format here to override what your system is "
@@ -3671,9 +3672,8 @@ msgstr ""
 "de Vireo, afin de les joindre à un rapport de bug. Les adresses e-mail sont "
 "raccourcies à leur domaine."
 
-#, fuzzy
 msgid "GNOME Files Integration"
-msgstr "Fichiers de GNOME"
+msgstr "Intégration avec Fichiers de GNOME"
 
 msgid ""
 "Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
@@ -3715,22 +3715,24 @@ msgid "Restart"
 msgstr "Redémarrer"
 
 msgid "Default Send with Vireo behavior"
-msgstr ""
+msgstr "Comportement par défaut de « Envoyer avec Vireo »"
 
-#, fuzzy
 msgid "Default large attachments behavior"
-msgstr "Récupération des pièces jointes depuis"
+msgstr "Comportement par défaut pour les pièces jointes volumineuses"
 
 msgid ""
 "Upload to cloud storage needs a cloud storage account (Settings → Cloud "
 "Storage) otherwise the files are attached by default."
 msgstr ""
+"La mise en ligne vers un espace de stockage cloud nécessite un compte de "
+"stockage cloud (Paramètres → Stockage cloud), sinon les fichiers sont joints "
+"par défaut."
 
 msgid "Size limit"
-msgstr ""
+msgstr "Limite de taille"
 
 msgid "In MB, for all the files together."
-msgstr ""
+msgstr "En Mo, pour l'ensemble des fichiers."
 
 msgid ""
 "Everything Vireo keeps, as one file: mail and cloud storage accounts, "
@@ -3801,22 +3803,22 @@ msgid "Always visible"
 msgstr "Toujours visible"
 
 msgid "Ask each time"
-msgstr ""
+msgstr "Demander à chaque fois"
 
 msgid "A new message"
-msgstr ""
+msgstr "Un nouveau message"
 
 msgid "A draft you pick"
-msgstr ""
+msgstr "Un brouillon que vous choisissez"
 
 msgid "A reply to a message you pick"
-msgstr ""
+msgstr "Une réponse à un message que vous choisissez"
 
 msgid "Attach them anyway"
-msgstr ""
+msgstr "Les joindre quand même"
 
 msgid "Upload to cloud storage and link them"
-msgstr ""
+msgstr "Les mettre en ligne sur un espace de stockage cloud et les lier"
 
 msgid "Account of the current folder"
 msgstr "Informations sur le dossier actuel"
