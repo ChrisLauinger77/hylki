@@ -36,19 +36,33 @@ NAMES = {
 # order is not one anybody chose; this one is.
 PICKER_ORDER = ["midnight", "tidal", "rose", "earth", "forest"]
 
-# Vireo's own departures from upstream, by (theme id, variant). Upstream
-# authors its dark accents very light, which reads as neon against Vireo's
-# darker chrome; these three are taken down a few steps. Anything here
-# survives a regeneration, so put a reason next to it.
+# Vireo's own departures from upstream, by (theme id, variant). A value is
+# either a literal hex or the name of another role in the same palette, which
+# is resolved after parsing so it tracks upstream rather than freezing a
+# colour. Anything here survives a regeneration, so put a reason next to it.
+#
+# accent: upstream authors its dark accents very light, which reads as neon
+# against Vireo's darker chrome; these three are taken down a few steps.
 #
 # accentForeground rides along where it has to: libadwaita paints it on the
 # accent, so a dark accent needs light text on it (Midnight's would otherwise
-# sit at 1.8:1, unreadable). Forest and Tidal stay light enough for the dark
-# foreground upstream gives them (6.5:1 and 6.0:1).
+# sit at 2.3:1, unreadable; white is 7.6:1). Forest and Tidal stay light
+# enough for the dark foreground upstream gives them (6.5:1 and 6.0:1).
+#
+# sidebarBorder: upstream's dark value is a mid grey, several steps brighter
+# than the sidebar it edges, so the divider between the sidebar and the
+# message list glared. Following the palette's own hairline puts it at the
+# weight of the other pane divider, which takes `border` too (see theme.rs).
+# Rose is left alone: upstream already gives it a hairline-weight value.
 OVERRIDES = {
-    ("midnight", "dark"): {"accent": "#4b3d72", "accentForeground": "#ffffff"},
-    ("forest", "dark"): {"accent": "#3eb272"},
-    ("tidal", "dark"): {"accent": "#509ed8"},
+    ("midnight", "dark"): {
+        "accent": "#5d41a6",
+        "accentForeground": "#ffffff",
+        "sidebarBorder": "border",
+    },
+    ("forest", "dark"): {"accent": "#3eb272", "sidebarBorder": "border"},
+    ("tidal", "dark"): {"accent": "#509ed8", "sidebarBorder": "border"},
+    ("earth", "dark"): {"sidebarBorder": "border"},
 }
 
 # The roles Vireo maps onto libadwaita colours (see src/theme.rs). Upstream
@@ -127,7 +141,9 @@ def main() -> None:
             "dark": parse_colors(re.search(r"\n    dark: \{(.*?)\n    \},", body, re.S).group(1)),
         }
         for variant in ("light", "dark"):
-            theme[variant].update(OVERRIDES.get((theme_id, variant), {}))
+            palette = theme[variant]
+            for role, value in OVERRIDES.get((theme_id, variant), {}).items():
+                palette[role] = value if value.startswith("#") else palette[value]
         themes.append(theme)
 
     bundled = {t["id"] for t in themes}

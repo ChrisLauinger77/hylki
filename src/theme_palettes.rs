@@ -189,7 +189,7 @@ pub const FOREST: Theme = Theme {
         sidebar_row_hover: "#2a4938",
         sidebar_row_active: "#2f5641",
         sidebar_row_selected: "#325c46",
-        sidebar_border: "#6f7a75",
+        sidebar_border: "#415f4f",
     },
 };
 
@@ -282,7 +282,7 @@ pub const TIDAL: Theme = Theme {
         sidebar_row_hover: "#283e50",
         sidebar_row_active: "#2f495f",
         sidebar_row_selected: "#324f66",
-        sidebar_border: "#6d757f",
+        sidebar_border: "#405567",
     },
 };
 
@@ -375,7 +375,7 @@ pub const EARTH: Theme = Theme {
         sidebar_row_hover: "#4f3528",
         sidebar_row_active: "#5d3f2d",
         sidebar_row_selected: "#654330",
-        sidebar_border: "#7e716e",
+        sidebar_border: "#664c3f",
     },
 };
 
@@ -443,7 +443,7 @@ pub const MIDNIGHT: Theme = Theme {
         border: "#4d4366",
         input: "#5d527b",
         focus: "#9d7df2",
-        accent: "#4b3d72",
+        accent: "#5d41a6",
         accent_foreground: "#ffffff",
         secondary: "#362d51",
         secondary_foreground: "#fffaff",
@@ -468,7 +468,7 @@ pub const MIDNIGHT: Theme = Theme {
         sidebar_row_hover: "#352c4f",
         sidebar_row_active: "#3f345e",
         sidebar_row_selected: "#433766",
-        sidebar_border: "#736d7e",
+        sidebar_border: "#4d4366",
     },
 };
 
