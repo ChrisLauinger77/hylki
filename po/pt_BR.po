@@ -3753,16 +3753,6 @@ msgstr "2 linhas"
 msgid "3 lines"
 msgstr "3 linhas"
 
-msgid ""
-"A whole palette for the app, in a light and a dark version. Style above "
-"picks which of the two is on."
-msgstr ""
-
-msgid "Shown in the dock, app grid and switcher, and by the tray icon."
-msgstr ""
-"Exibido no dock, na grade e no alternador de aplicativos, além do ícone da "
-"área de notificação."
-
 msgid "When displayed"
 msgstr "Quando apresentado"
 
@@ -4408,3 +4398,8 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Shown in the dock, app grid and switcher, and by the tray icon."
+#~ msgstr ""
+#~ "Exibido no dock, na grade e no alternador de aplicativos, além do ícone "
+#~ "da área de notificação."

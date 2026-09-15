@@ -2521,9 +2521,9 @@ impl Component for Preferences {
                 autostart_row.set_sensitive(row.is_active());
             });
         }
-        // Theme: title + subtitle in the row's own voice, the gallery
-        // beneath — the same shape as the app-icon row under it. A pick
-        // goes straight out and is painted at once.
+        // Theme: title in the row's own voice, the gallery beneath — the
+        // same shape as the app-icon row under it. A pick goes straight
+        // out and is painted at once.
         {
             let body = gtk::Box::new(gtk::Orientation::Vertical, 4);
             body.set_margin_top(12);
@@ -2533,18 +2533,7 @@ impl Component for Preferences {
             let title = gtk::Label::new(Some(i18n("Theme").as_str()));
             title.set_halign(gtk::Align::Start);
             title.set_xalign(0.0);
-            let subtitle = gtk::Label::new(Some(
-                i18n("A whole palette for the app, in a light and a dark version. \
-                      Style above picks which of the two is on.")
-                    .as_str(),
-            ));
-            subtitle.add_css_class("dim-label");
-            subtitle.add_css_class("caption");
-            subtitle.set_halign(gtk::Align::Start);
-            subtitle.set_xalign(0.0);
-            subtitle.set_wrap(true);
             body.append(&title);
-            body.append(&subtitle);
             let s = sender.clone();
             let gallery = crate::ui::theme_picker::gallery(
                 &init.theme,
@@ -2555,9 +2544,8 @@ impl Component for Preferences {
             widgets.theme_row.set_child(Some(&body));
         }
 
-        // App icon: title + subtitle in the row's own voice, the gallery
-        // beneath. Picks go straight out; the app applies and offers the
-        // restart.
+        // App icon: title in the row's own voice, the gallery beneath.
+        // Picks go straight out; the app applies and offers the restart.
         {
             let body = gtk::Box::new(gtk::Orientation::Vertical, 4);
             body.set_margin_top(12);
@@ -2567,16 +2555,7 @@ impl Component for Preferences {
             let title = gtk::Label::new(Some(i18n("App icon").as_str()));
             title.set_halign(gtk::Align::Start);
             title.set_xalign(0.0);
-            let subtitle = gtk::Label::new(Some(
-                i18n("Shown in the dock, app grid and switcher, and by the tray icon.").as_str(),
-            ));
-            subtitle.add_css_class("dim-label");
-            subtitle.add_css_class("caption");
-            subtitle.set_halign(gtk::Align::Start);
-            subtitle.set_xalign(0.0);
-            subtitle.set_wrap(true);
             body.append(&title);
-            body.append(&subtitle);
             widgets.app_icon_row.set_child(Some(&body));
             // The icon gallery decodes the whole catalogue; it fills in a
             // moment after the window is up rather than holding it back.
