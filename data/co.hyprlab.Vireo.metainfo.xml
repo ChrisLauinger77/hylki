@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.31.0" date="2026-09-15">
+      <description>
+        <p>Appearance themes: Settings, Appearance gained a Theme gallery (System, Midnight, Tidal, Rose, Earth, Forest), each with a light and a dark palette that reaches the reader and the composer; a Drafts folder assigned under Special Folders now shows its count; Settings rows reworded and the ⋯-as-a-menu switch moved to Reading; Mail Accounts marks and badges aligned in columns; Portuguese translations updated (#194).</p>
+      </description>
+    </release>
     <release version="1.30.1" date="2026-09-14">
       <description>
         <p>Swipe actions can be tuned to the trackpad they are used on (Settings, Message List), and a swipe that goes far enough now flies the message off the side it was sent while the list closes over it, instead of the row vanishing on release.</p>

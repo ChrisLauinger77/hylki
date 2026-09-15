@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.31.0 — 2026-09-15
+
+Appearance themes, a Drafts count fix for manually assigned folders, a
+pass over the Settings wording, and updated Portuguese translations.
+
+- **Appearance themes.** Settings → Appearance gained a **Theme**
+  gallery: **System** (the stock GNOME look, still the default) plus
+  **Midnight**, **Tidal**, **Rose**, **Earth** and **Forest**. Each
+  theme carries a light and a dark palette, so the Style setting
+  (follow system, light, dark) keeps doing what it did and picks which
+  of the two is on screen; a card shows both halves with a ring round
+  the one currently showing. The palette is applied through
+  libadwaita's named colours (`@define-color` in an app CSS provider
+  loaded above the static stylesheet), so it reaches past the chrome:
+  the reader and the composer ground their documents from the live
+  theme and are told about a theme change the way they are told about
+  a light/dark flip. The divider between the message list and the
+  reading pane is painted from the palette too (it is a `GtkPaned`
+  separator, which answers to no named colour). The choice is saved as
+  `theme` in `privacy.toml`; an id that no longer resolves falls back
+  to the stock look. The palettes are the theme library of
+  [T3 Code](https://github.com/pingdotgg/t3code) (MIT), converted from
+  OKLCH by `tools/gen-themes.py` into `src/theme_palettes.rs`, with the
+  dark accents taken down from upstream's very light values and their
+  foregrounds checked for contrast, and each dark sidebar divider on
+  its palette's own hairline rather than upstream's brighter grey.
+- **A Drafts folder assigned under Special Folders now shows its
+  count.** The assignment was applied only in the app, after the
+  worker had classified and counted the folder list, so the worker
+  kept its detected kind for the folder (Custom, when the server
+  neither flags nor names it as Drafts) and every count it produced
+  for it was the unseen count: the listing's STATUS, the periodic
+  sweep and the on-open search all asked for UNSEEN instead of ALL.
+  Drafts are never unseen, so the chip always read zero and never
+  showed, while a detected Drafts folder on another account counted
+  its drafts. Seen on laposte.net, which has no IDLE either, so nothing
+  ever corrected it. The assignment now lives in one helper the worker
+  applies to every listing, IMAP and Microsoft Graph, before anything
+  is counted and before the list is cached, so later re-counts see it
+  too; folder ids and order are untouched.
+- **Settings wording and layout.** Rows reworded panel by panel:
+  General's "Show sender and subject" loses its subheading; Sidebar's
+  Filters and Tags placement both read "Choose between appearing in a
+  unified section, or a list above or below the accounts", and the icon
+  rail's Inboxes row matches the Starred and Sent rows under it;
+  Message List's "Sent mail uses your account circle" replaces "Your
+  own mail shows your account circle", Swipe actions names the default
+  sides, and Reverse swipe directions says only what reversing does;
+  Date and Time offers to override the system format; System's Files
+  group is "GNOME Files Integration" with "Default Send with Vireo
+  behavior" and "Default large attachments behavior". "Actions Palette"
+  is lower case unless it opens a sentence. The subheadings under Theme
+  and App icon are gone (the pictures say what the setting does).
+- **The ⋯-as-a-menu switch moved to Reading.** It sat under Message
+  List, acting on the list rows, but was meant for the message cards:
+  it is now "Message card actions palette as a menu" under "Message
+  card actions palette", greyed out unless the palette is in its
+  hidden-behind-a-toggle mode (the only one with a ⋯ to press). The
+  card's script hands the click back to the app, which opens the same
+  menu a right-click on the card shows. The cards keep their own
+  "Message card actions palette timeout" instead of sharing the list's.
+- **Mail Accounts list columns.** The provider mark and the source
+  badge (GOA / Vireo) each keep one width down the list, with the
+  widget centred in its slot, so the marks no longer start at a
+  different x on every row. The account editor's accent row says what
+  the colour fills. OpenPGP's Import, Generate and Fetch by address
+  buttons are a stacked column at the end of their group's header, in
+  the shape the Tags and Filters panels use.
+- **Portuguese translations updated** (pt_PT and pt_BR, PR #194 by
+  [@somepaulo](https://github.com/somepaulo)): complete again against
+  the 1.30.1 template.
+- The reader toolbar placement test predated the six-button cap per
+  side from 1.28.1 and has failed since; it now expects the cap.
+
 ## 1.30.1 — 2026-09-14
 
 Swipe actions can be tuned to the trackpad they are used on, and a
