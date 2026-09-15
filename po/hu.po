@@ -2875,6 +2875,9 @@ msgstr ""
 "Maga az alkalmazás. Az üzenettartalom saját beállítással rendelkezik az "
 "Olvasás alatt."
 
+msgid "Theme"
+msgstr ""
+
 msgid "App icon"
 msgstr "Alkalmazásikon"
 
@@ -3640,6 +3643,11 @@ msgstr "2 sor"
 
 msgid "3 lines"
 msgstr "3 sor"
+
+msgid ""
+"A whole palette for the app, in a light and a dark version. Style above "
+"picks which of the two is on."
+msgstr ""
 
 msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 msgstr ""

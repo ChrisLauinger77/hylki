@@ -2915,6 +2915,9 @@ msgstr ""
 "Сам интерфейс приложения. У содержимого сообщений свои настройки в разделе "
 "«Чтение»."
 
+msgid "Theme"
+msgstr ""
+
 msgid "App icon"
 msgstr "Иконка приложения"
 
@@ -3746,6 +3749,11 @@ msgstr "2 строки"
 
 msgid "3 lines"
 msgstr "3 строки"
+
+msgid ""
+"A whole palette for the app, in a light and a dark version. Style above "
+"picks which of the two is on."
+msgstr ""
 
 msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 msgstr ""

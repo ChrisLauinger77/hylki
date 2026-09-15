@@ -2922,6 +2922,9 @@ msgstr ""
 "L'application elle-même. Le contenu des messages dispose de son propre "
 "réglage sous « Lecture »."
 
+msgid "Theme"
+msgstr ""
+
 msgid "App icon"
 msgstr "Icône de l'application"
 
@@ -3776,6 +3779,11 @@ msgstr "2 lignes"
 
 msgid "3 lines"
 msgstr "3 lignes"
+
+msgid ""
+"A whole palette for the app, in a light and a dark version. Style above "
+"picks which of the two is on."
+msgstr ""
 
 msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 msgstr ""
