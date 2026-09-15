@@ -98,7 +98,7 @@ OVERRIDES = {
     # And in light, where the rest of the palette is fine: upstream's light
     # sidebarBorder is a neutral grey while every other theme's follows its
     # border, so Rose alone had a grey line against a pink one.
-    ("rose", "light"): {"sidebarBorder": "border"},
+    ("rose", "light"): {"accent": "#b75077", "sidebarBorder": "border"},
 }
 
 # The roles Vireo maps onto libadwaita colours (see src/theme.rs). Upstream
