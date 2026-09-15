@@ -474,9 +474,9 @@ pub const MIDNIGHT: Theme = Theme {
 
 /// Every bundled theme, in the order the picker shows them.
 pub const THEMES: &[Theme] = &[
-    ROSE,
-    FOREST,
-    TIDAL,
-    EARTH,
     MIDNIGHT,
+    TIDAL,
+    ROSE,
+    EARTH,
+    FOREST,
 ];
