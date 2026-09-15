@@ -197,12 +197,22 @@ fn repaint() {
     });
 }
 
-/// A palette as libadwaita's named colours.
+/// A palette as libadwaita's named colours, plus the one rule that needs
+/// writing out.
 ///
 /// Only the backgrounds and foregrounds are set: `accent_color`,
 /// `destructive_color` and the other "on a normal background" variants are
 /// derived by libadwaita from the ones below, which keeps text legible on
 /// palettes whose accent is very light or very dark.
+///
+/// The divider between the message list and the reading pane is the
+/// exception: a GtkPaned separator takes no named colour, so it is painted
+/// here by class. (The sidebar's own divider needs nothing — it is an
+/// Adwaita split view, and already follows `sidebar_border_color`.) The
+/// border and shadow resets are load-bearing: libadwaita draws the
+/// separator's hairline as a shadow, which would otherwise sit over the
+/// palette colour and lighten it. Because this string is empty under the
+/// stock look, none of it reaches an unthemed window.
 fn css(p: &Palette) -> String {
     format!(
         "\
@@ -245,7 +255,9 @@ fn css(p: &Palette) -> String {
 @define-color warning_bg_color {warning};\
 @define-color warning_fg_color {on_warning};\
 @define-color shade_color {border};\
-@define-color scrollbar_outline_color {surface};",
+@define-color scrollbar_outline_color {surface};\
+.mail-split > separator {{background-color: {border};\
+border: none;box-shadow: none;outline: none;}}",
         chrome = p.chrome,
         text = p.text,
         surface = p.surface,

@@ -1447,7 +1447,10 @@ impl SimpleComponent for AppModel {
                     add_named[Some("mail")] = &gtk::Paned {
                         set_orientation: gtk::Orientation::Horizontal,
                         // Thin handle so the panes sit flush (just a 1px divider),
-                        // no wide-handle gap between them.
+                        // no wide-handle gap between them. A theme paints that
+                        // divider through this class (see theme::css); without
+                        // one it keeps the stock separator.
+                        add_css_class: "mail-split",
                         set_wide_handle: false,
                         // Launch wide enough for a row's actions palette. That is
                         // also the list's minimum while the avatars are on,
