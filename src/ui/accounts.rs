@@ -150,6 +150,12 @@ pub struct AccountsWindow {
     /// The tag finder's button: its spinner turns while the mailboxes are
     /// being read, and its label says so.
     find_tags_spinner: Option<gtk::Spinner>,
+    /// The Apply Now button's spinner and label, turned on while a manual
+    /// filter run is under way (#198).
+    apply_filters_spinner: Option<gtk::Spinner>,
+    apply_filters_label: Option<gtk::Label>,
+    /// Whether a manual filter run is under way; a second press does nothing.
+    filters_applying: bool,
     find_tags_label: Option<gtk::Label>,
     tag_scanning: bool,
     /// Paths behind the currently-open editor's folder combos (index 0 in the
@@ -304,6 +310,8 @@ pub enum AccountsInput {
     AddFilter,
     /// Run the rules over the mail already in the inboxes (#198).
     ApplyFilters,
+    /// The app says whether that run is still going (#198).
+    FiltersApplying(bool),
     RemoveFilter(usize),
     /// Save whichever editor page is up (account, filter or tag): the
     /// settings window's leave-editor prompt.
@@ -704,12 +712,26 @@ impl Component for AccountsWindow {
                                         // what is already in the Inbox (#198).
                                         #[name = "apply_filters_btn"]
                                         gtk::Button {
-                                            set_label: &i18n("Apply Now"),
                                             set_size_request: (130, -1),
                                             set_tooltip_text: Some(
                                                 i18n("Run every rule over the mail already in your inboxes").as_str()
                                             ),
                                             connect_clicked => AccountsInput::ApplyFilters,
+                                            // A spinner inside the button
+                                            // while the run is under way, as
+                                            // the tag finder has.
+                                            gtk::Box {
+                                                set_spacing: 6,
+                                                set_halign: gtk::Align::Center,
+                                                #[name = "apply_filters_spinner"]
+                                                gtk::Spinner {
+                                                    set_visible: false,
+                                                },
+                                                #[name = "apply_filters_label"]
+                                                gtk::Label {
+                                                    set_label: &i18n("Apply Now"),
+                                                },
+                                            },
                                         },
                                     },
 
@@ -1403,6 +1425,9 @@ impl Component for AccountsWindow {
             tags: init.tags,
             tags_list: None,
             find_tags_spinner: None,
+            apply_filters_spinner: None,
+            apply_filters_label: None,
+            filters_applying: false,
             find_tags_label: None,
             tag_scanning: false,
         };
@@ -1450,6 +1475,8 @@ impl Component for AccountsWindow {
         model.rebuild_filter_rows(&sender);
         model.tags_list = Some(widgets.tags_list.clone());
         model.find_tags_spinner = Some(widgets.find_tags_spinner.clone());
+        model.apply_filters_spinner = Some(widgets.apply_filters_spinner.clone());
+        model.apply_filters_label = Some(widgets.apply_filters_label.clone());
         model.find_tags_label = Some(widgets.find_tags_label.clone());
         model.rebuild_tag_rows(&sender);
         let t_list = std::time::Instant::now();
@@ -2423,8 +2450,12 @@ impl Component for AccountsWindow {
                 self.open_filter_page(&widgets.nav, &sender, None);
             }
             AccountsInput::ApplyFilters => {
-                let _ = sender.output(AccountsOutput::ApplyFilters);
+                if !self.filters_applying {
+                    self.set_filters_applying(true);
+                    let _ = sender.output(AccountsOutput::ApplyFilters);
+                }
             }
+            AccountsInput::FiltersApplying(on) => self.set_filters_applying(on),
             AccountsInput::EditFilter(i) => {
                 if let Some(rule) = self.filter_rules.get(i).cloned() {
                     self.open_filter_page(&widgets.nav, &sender, Some((i, rule)));
@@ -4032,6 +4063,19 @@ impl AccountsWindow {
             next.add_css_class("dim-label");
             row.add_suffix(&next);
             list.append(&row);
+        }
+    }
+
+    /// The Apply Now button while a filter run is under way (#198): a turning
+    /// spinner beside a label saying so. A press meanwhile starts nothing.
+    fn set_filters_applying(&mut self, on: bool) {
+        self.filters_applying = on;
+        if let Some(spinner) = &self.apply_filters_spinner {
+            spinner.set_visible(on);
+            spinner.set_spinning(on);
+        }
+        if let Some(label) = &self.apply_filters_label {
+            label.set_label(&if on { i18n("Applying…") } else { i18n("Apply Now") });
         }
     }
 

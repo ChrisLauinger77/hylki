@@ -50,24 +50,64 @@ const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(20)
 /// that errors, would otherwise leave the run without an answer for good.
 const FILTER_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
 
-/// A manual "Apply Filters" run (#198): the (account, folder) pairs it is
-/// still waiting on, and what the rules have done so far.
+/// The one response of the manual run's progress dialog: "Run in Background"
+/// while it works, "Close" once it holds the report.
+const FILTER_RUN_RESPONSE: &str = "close";
+
+/// What the rules did in one folder of a manual run.
+#[derive(Default, Clone, Copy)]
+struct FolderTally {
+    /// The most messages one pass over the folder was held up against. A
+    /// folder answers twice (cache, then server) over the same mail, so the
+    /// larger listing is the count — adding them would count it twice.
+    checked: usize,
+    /// Tags put on, and messages filed away. Both only ever happen once per
+    /// message (a second pass sees the tag, or the pending move), so these
+    /// add up across passes.
+    tagged: usize,
+    filed: usize,
+}
+
+/// A manual "Apply Filters" run (#198): the folders it covers, what the rules
+/// have done in each so far, and the dialog watching it.
 struct FilterRun {
-    /// Every folder the run covers. A folder load answers twice (what the
-    /// cache holds, then what the server sends), so the scope has to outlive
-    /// the report or the second answer would go unfiltered outside the Inbox.
-    /// Cleared by [`FILTER_RUN_TIMEOUT`].
-    folders: std::collections::HashSet<(u32, u32)>,
-    /// The folders still to answer for the first time.
+    /// Every folder the run covers, with its tally. A folder load answers
+    /// twice (what the cache holds, then what the server sends), so the scope
+    /// has to outlive the cache's answer or the server's would go unfiltered
+    /// outside the Inbox. Cleared by [`FILTER_RUN_TIMEOUT`].
+    folders: std::collections::HashMap<(u32, u32), FolderTally>,
+    /// The folders that have not been to the server and back yet.
     pending: std::collections::HashSet<(u32, u32)>,
     /// Whether the run has already said what it did.
     reported: bool,
-    /// Messages the rules were held up against.
-    checked: usize,
-    /// Tags put on (one per message per rule that asked for one).
-    tagged: usize,
-    /// Messages moved into a rule's folder.
-    filed: usize,
+    /// The progress dialog, while it is up. Gone once the run was sent to the
+    /// background, in which case the report goes to the status bar instead.
+    dialog: Option<FilterRunDialog>,
+}
+
+impl FilterRun {
+    /// The run's totals so far.
+    fn totals(&self) -> FolderTally {
+        self.folders.values().fold(FolderTally::default(), |mut t, f| {
+            t.checked += f.checked;
+            t.tagged += f.tagged;
+            t.filed += f.filed;
+            t
+        })
+    }
+
+    /// How many of the run's folders are done.
+    fn done_count(&self) -> usize {
+        self.folders.len() - self.pending.len()
+    }
+}
+
+/// The widgets of a manual run's progress dialog, kept so its live text can be
+/// rewritten as folders report and so the finish can turn it into the report.
+struct FilterRunDialog {
+    dialog: adw::MessageDialog,
+    spinner: gtk::Spinner,
+    body: gtk::Label,
 }
 
 /// Fallback threshold for folding the reader header's right-hand actions
@@ -1200,6 +1240,11 @@ pub enum AppMsg {
     ApplyFilters(Vec<(u32, u32)>),
     /// A manual filter run has waited long enough: report what it managed.
     FilterRunTimeout,
+    /// The progress dialog of a manual filter run was dismissed: it goes on
+    /// in the background and reports in the status bar instead (#198).
+    FilterRunToBackground,
+    /// A folder's load has been to the server and back (#198).
+    FolderSynced { account_id: u32, folder_id: u32 },
     /// The tags changed in Settings (#71).
     SetTags(Vec<config::Tag>),
     /// A tag row in the sidebar was chosen: list everything carrying it.
@@ -6821,6 +6866,14 @@ impl SimpleComponent for AppModel {
 
             AppMsg::FilterRunTimeout => {
                 self.report_filter_run(true);
+            }
+
+            AppMsg::FilterRunToBackground => {
+                self.filter_run_dismissed();
+            }
+
+            AppMsg::FolderSynced { account_id, folder_id } => {
+                self.filter_run_folder_synced(account_id, folder_id);
             }
 
             AppMsg::SetTags(tags) => {
@@ -14022,12 +14075,12 @@ impl AppModel {
         let manual = self
             .filter_run
             .as_ref()
-            .is_some_and(|r| r.folders.contains(&(account_id, folder_id)));
+            .is_some_and(|r| r.folders.contains_key(&(account_id, folder_id)));
         let (kept, filed, checked, tagged) =
             self.filter_pass(account_id, folder_id, messages, manual);
         if manual {
             let filed_now = filed.len();
-            self.filter_run_folder_done(account_id, folder_id, checked, tagged, filed_now);
+            self.filter_run_folder_pass(account_id, folder_id, checked, tagged, filed_now);
         }
         (kept, filed)
     }
@@ -14182,10 +14235,13 @@ impl AppModel {
 
     /// Start a manual filter run over `targets`: re-load each folder so the
     /// rules meet the mail already in it. The load's `Messages` event is what
-    /// actually runs them, through [`apply_filters`].
+    /// actually runs them, through [`apply_filters`]; the folder counts as
+    /// done once its load has been to the server and back
+    /// (`AppMsg::FolderSynced`), not when the cache answers first.
     fn start_filter_run(&mut self, targets: Vec<(u32, u32)>, sender: &ComponentSender<Self>) {
         let targets = self.filter_run_targets(targets);
         if targets.is_empty() {
+            self.set_filters_applying(false);
             self.notifications.emit(NotifyInput::Push {
                 text: i18n("No filters to apply here yet"),
                 error: false,
@@ -14198,27 +14254,31 @@ impl AppModel {
             targets.len(),
             self.filters.len(),
         );
+        self.set_filters_applying(true);
         self.filter_run = Some(FilterRun {
-            folders: targets.iter().copied().collect(),
+            folders: targets.iter().map(|t| (*t, FolderTally::default())).collect(),
             pending: targets.iter().copied().collect(),
             reported: false,
-            checked: 0,
-            tagged: 0,
-            filed: 0,
+            dialog: None,
         });
-        self.notifications.emit(NotifyInput::SetStatus(i18n("Applying filters…")));
+        let dialog = self.build_filter_run_dialog(sender);
+        if let Some(run) = self.filter_run.as_mut() {
+            run.dialog = Some(dialog);
+        }
+        self.update_filter_run_dialog();
         for (account_id, folder_id) in targets {
             let path = self
                 .folders
                 .get(&account_id)
                 .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
                 .map(|f| f.path.clone());
-            if let Some(path) = path {
-                self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
-            } else {
-                // Nothing to load it from: count the folder as reported so
-                // the run can still finish.
-                self.filter_run_folder_done(account_id, folder_id, 0, 0, 0);
+            match path {
+                Some(path) => {
+                    self.send_to(account_id, MailRequest::LoadMessages { folder_id, path })
+                }
+                // Nothing to load it from: count the folder as done so the
+                // run can still finish.
+                None => self.filter_run_folder_synced(account_id, folder_id),
             }
         }
         // A folder that never answers (offline, or an error) must not leave
@@ -14229,8 +14289,97 @@ impl AppModel {
         });
     }
 
-    /// One folder of a manual run has been through the rules.
-    fn filter_run_folder_done(
+    /// The dialog a manual run puts up: a spinner, a live count, and one
+    /// button that sends the run to the background while it is working and
+    /// closes the report once it is not.
+    fn build_filter_run_dialog(&self, sender: &ComponentSender<Self>) -> FilterRunDialog {
+        // Parented on Settings when the run was started there, so the dialog
+        // is not stranded behind it.
+        let parent: Option<gtk::Window> = self
+            .prefs
+            .as_ref()
+            .map(|p| p.widget().clone())
+            .filter(|w| w.is_visible())
+            .map(|w| w.upcast())
+            .or_else(|| Some(self.window.clone().upcast()));
+        let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&i18n("Applying Filters")), None);
+        dialog.set_body_use_markup(false);
+        dialog.add_response(FILTER_RUN_RESPONSE, &i18n("Run in Background"));
+        dialog.set_close_response(FILTER_RUN_RESPONSE);
+        let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        content.set_halign(gtk::Align::Center);
+        let spinner = gtk::Spinner::new();
+        spinner.set_size_request(32, 32);
+        spinner.set_spinning(true);
+        content.append(&spinner);
+        let body = gtk::Label::new(None);
+        body.set_justify(gtk::Justification::Center);
+        body.set_wrap(true);
+        body.add_css_class("dim-label");
+        content.append(&body);
+        dialog.set_extra_child(Some(&content));
+        // Every way out of the dialog is the same one: while the run is going
+        // it means "keep going without me", and afterwards it is just Close.
+        // Which of the two happened is read off `reported`, not from here.
+        {
+            let sender = sender.clone();
+            dialog.connect_response(None, move |_, _| {
+                sender.input(AppMsg::FilterRunToBackground);
+            });
+        }
+        dialog.present();
+        FilterRunDialog { dialog, spinner, body }
+    }
+
+    /// Rewrite the progress dialog's live count, if it is still up and still
+    /// counting. Once the run has reported, the dialog holds that report and
+    /// a later pass (the scope outlives the report, so an ordinary sync of
+    /// one of these folders still runs the rules) must not write over it.
+    fn update_filter_run_dialog(&self) {
+        let Some(run) = self.filter_run.as_ref() else { return };
+        if run.reported {
+            return;
+        }
+        let Some(d) = run.dialog.as_ref() else { return };
+        let t = run.totals();
+        let mut lines = vec![ni18n_f(
+            "Looked at {n} message so far",
+            "Looked at {n} messages so far",
+            t.checked as u32,
+            &[("n", &t.checked.to_string())],
+        )];
+        if t.tagged > 0 {
+            lines.push(ni18n_f(
+                "Tagged {n} message",
+                "Tagged {n} messages",
+                t.tagged as u32,
+                &[("n", &t.tagged.to_string())],
+            ));
+        }
+        if t.filed > 0 {
+            lines.push(ni18n_f(
+                "Filed {n} message away",
+                "Filed {n} messages away",
+                t.filed as u32,
+                &[("n", &t.filed.to_string())],
+            ));
+        }
+        // Only worth saying which folder the run is on when there is more
+        // than one of them.
+        if run.folders.len() > 1 {
+            lines.push(i18n_f(
+                "Folder {done} of {total}",
+                &[
+                    ("done", &run.done_count().to_string()),
+                    ("total", &run.folders.len().to_string()),
+                ],
+            ));
+        }
+        d.body.set_label(&lines.join("\n"));
+    }
+
+    /// Fold one pass's work into the run's tally for that folder.
+    fn filter_run_folder_pass(
         &mut self,
         account_id: u32,
         folder_id: u32,
@@ -14238,20 +14387,46 @@ impl AppModel {
         tagged: usize,
         filed: usize,
     ) {
+        if let Some(run) = self.filter_run.as_mut() {
+            let tally = run.folders.entry((account_id, folder_id)).or_default();
+            tally.checked = tally.checked.max(checked);
+            tally.tagged += tagged;
+            tally.filed += filed;
+        }
+        self.update_filter_run_dialog();
+    }
+
+    /// One folder of a manual run has been to the server and back.
+    fn filter_run_folder_synced(&mut self, account_id: u32, folder_id: u32) {
         let Some(run) = self.filter_run.as_mut() else { return };
-        run.pending.remove(&(account_id, folder_id));
-        run.checked += checked;
-        run.tagged += tagged;
-        run.filed += filed;
-        if run.pending.is_empty() {
+        if !run.pending.remove(&(account_id, folder_id)) {
+            return;
+        }
+        let done = run.pending.is_empty();
+        self.update_filter_run_dialog();
+        if done {
             self.report_filter_run(false);
         }
     }
 
-    /// Say what a manual filter run did. `end` (the timeout) also drops the
-    /// run, so the folders stop counting as manually swept; without it the
-    /// scope stands, and the server's answer to the same load is filtered
-    /// too. Reports once either way.
+    /// The progress dialog was dismissed. While the run is still going that
+    /// means "carry on without me", and the report will go to the status bar;
+    /// once it has reported, the dialog was only holding the report, so this
+    /// is an ordinary close.
+    fn filter_run_dismissed(&mut self) {
+        let Some(run) = self.filter_run.as_mut() else { return };
+        run.dialog = None;
+        if run.reported {
+            self.filter_run = None;
+        }
+    }
+
+    /// Say what a manual filter run did: in the dialog when it is still up
+    /// (the user waited), in the status bar when it is not (they sent the run
+    /// to the background). `end` (the timeout) also drops the run, so the
+    /// folders stop counting as manually swept; without it the scope stands,
+    /// and the server's answer to the same load is filtered too. Reports once
+    /// either way.
     fn report_filter_run(&mut self, end: bool) {
         let Some(run) = self.filter_run.as_mut() else { return };
         if std::mem::replace(&mut run.reported, true) {
@@ -14260,49 +14435,92 @@ impl AppModel {
             }
             return;
         }
-        let (checked, tagged, filed, unanswered) =
-            (run.checked, run.tagged, run.filed, run.pending.len());
-        if end {
-            self.filter_run = None;
-        }
+        let t = run.totals();
+        let unanswered = run.pending.len();
         tracing::info!(
-            "filter: manual run done, {checked} checked, {tagged} tagged, {filed} filed, \
+            "filter: manual run done, {} checked, {} tagged, {} filed, \
              {unanswered} folder(s) unanswered",
+            t.checked,
+            t.tagged,
+            t.filed,
         );
+        self.set_filters_applying(false);
         self.notifications.emit(NotifyInput::SetStatus(String::new()));
         // Always says how many messages the rules were held up against: with
         // nothing matching, that is the whole answer to "are my rules working"
         // (#198). The plural follows that count throughout.
-        let n = checked.to_string();
-        let tagged_s = tagged.to_string();
-        let filed_s = filed.to_string();
-        let text = match (tagged, filed) {
+        let n = t.checked.to_string();
+        let tagged_s = t.tagged.to_string();
+        let filed_s = t.filed.to_string();
+        let text = match (t.tagged, t.filed) {
             (0, 0) => ni18n_f(
                 "Filters looked at {n} message, and it matched nothing",
                 "Filters looked at {n} messages, and none of them matched",
-                checked as u32,
+                t.checked as u32,
                 &[("n", &n)],
             ),
             (_, 0) => ni18n_f(
                 "Filters tagged {tagged} of {n} message",
                 "Filters tagged {tagged} of {n} messages",
-                checked as u32,
+                t.checked as u32,
                 &[("tagged", &tagged_s), ("n", &n)],
             ),
             (0, _) => ni18n_f(
                 "Filters filed {filed} of {n} message away",
                 "Filters filed {filed} of {n} messages away",
-                checked as u32,
+                t.checked as u32,
                 &[("filed", &filed_s), ("n", &n)],
             ),
             _ => ni18n_f(
                 "Filters tagged {tagged} and filed {filed} of {n} message",
                 "Filters tagged {tagged} and filed {filed} of {n} messages",
-                checked as u32,
+                t.checked as u32,
                 &[("tagged", &tagged_s), ("filed", &filed_s), ("n", &n)],
             ),
         };
-        self.notifications.emit(NotifyInput::Push { text, error: false, connectivity: false });
+        // Waited on the dialog: the report belongs there, and nowhere else.
+        // Sent to the background: the status bar is the only place left. A
+        // dialog that went down with its parent (Settings closed mid-run)
+        // counts as the second case, or the report would go nowhere.
+        match self
+            .filter_run
+            .as_ref()
+            .and_then(|r| r.dialog.as_ref())
+            .filter(|d| d.dialog.is_visible())
+        {
+            Some(d) => {
+                tracing::info!("filter: manual run reported in its dialog");
+                d.spinner.set_spinning(false);
+                d.spinner.set_visible(false);
+                d.body.remove_css_class("dim-label");
+                d.body.set_label(&text);
+                d.dialog.set_heading(Some(&i18n("Filters Applied")));
+                d.dialog.set_response_label(FILTER_RUN_RESPONSE, &i18n("Close"));
+                d.dialog.set_response_appearance(
+                    FILTER_RUN_RESPONSE,
+                    adw::ResponseAppearance::Suggested,
+                );
+            }
+            None => {
+                tracing::info!("filter: manual run reported in the status bar");
+                self.notifications.emit(NotifyInput::Push {
+                    text,
+                    error: false,
+                    connectivity: false,
+                });
+            }
+        }
+        if end {
+            self.filter_run = None;
+        }
+    }
+
+    /// Tell the Settings window whether a manual filter run is under way, so
+    /// its Apply Now button can spin.
+    fn set_filters_applying(&self, on: bool) {
+        if let Some(a) = &self.accounts_win {
+            a.emit(crate::ui::accounts::AccountsInput::FiltersApplying(on));
+        }
     }
 
     /// Re-sync every inbox so a newly-blacklisted sender's existing mail is
@@ -15562,6 +15780,9 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::UndoRestored { account_id, folder_id, message_ids }
         }
         WorkerEvent::BackfillDone { folder_id } => AppMsg::BackfillDone { account_id, folder_id },
+        WorkerEvent::FolderSynced { folder_id } => {
+            AppMsg::FolderSynced { account_id, folder_id }
+        }
         WorkerEvent::FolderUnread { folder_id, unread } => {
             AppMsg::FolderUnread { account_id, folder_id, unread }
         }

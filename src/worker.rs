@@ -368,6 +368,12 @@ pub enum WorkerEvent {
     /// The background backfill for a folder finished — its whole index is now
     /// present, so the UI can stop expecting more rows to stream in.
     BackfillDone { folder_id: u32 },
+    /// A folder's load has been all the way to the server and back, however
+    /// it went. Sent after the `Messages` the server's answer produced (and
+    /// after an error, which produces none), so a manual filter run (#198)
+    /// knows the folder is done rather than stopping at the cache's answer,
+    /// which arrives first and instantly.
+    FolderSynced { folder_id: u32 },
     /// Server-side unread count for a folder (from STATUS/SEARCH, independent of
     /// the loaded window — accurate even for multi-thousand mailboxes).
     FolderUnread { folder_id: u32, unread: u32 },
@@ -1335,6 +1341,8 @@ async fn run_imap(
                         });
                     }
                 }
+                // However it went, this folder has been to the server (#198).
+                emit(WorkerEvent::FolderSynced { folder_id });
                 emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
             }
 
@@ -7984,6 +7992,22 @@ async fn run_mock(
                     folder_id,
                     messages: backend.messages(folder_id),
                 });
+                // VIREO_DEMO_SYNC_DELAY=<secs> holds the "been to the server"
+                // signal back, so the progress a long sync shows (the manual
+                // filter run's dialog, #198) can be watched here.
+                match std::env::var("VIREO_DEMO_SYNC_DELAY")
+                    .ok()
+                    .and_then(|v| v.parse::<u64>().ok())
+                {
+                    Some(secs) => {
+                        let emit = emit.clone();
+                        tokio::task::spawn_local(async move {
+                            tokio::time::sleep(Duration::from_secs(secs)).await;
+                            emit(WorkerEvent::FolderSynced { folder_id });
+                        });
+                    }
+                    None => emit(WorkerEvent::FolderSynced { folder_id }),
+                }
             }
             MailRequest::LoadBody { message_id, ref path, .. } => {
                 let body = backend.message(message_id).map(|m| m.body).unwrap_or_default();
