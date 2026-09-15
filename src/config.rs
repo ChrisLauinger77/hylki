@@ -3858,22 +3858,27 @@ mod toolbar_tests {
     #[test]
     fn place_moves_between_and_within_sides() {
         let mut t = ReaderToolbar::default();
-        // Right → left, at the front.
+        // The default left group is full: a move onto it changes nothing.
+        t.place(ToolbarItem::Print, Some(ToolbarSide::Left), 0);
+        assert_eq!(t.left[0], ToolbarItem::Reply);
+        assert_eq!(t.right.last(), Some(&ToolbarItem::Print));
+        // Make room, then right → left, at the front.
+        t.place(ToolbarItem::Star, None, 0);
         t.place(ToolbarItem::Print, Some(ToolbarSide::Left), 0);
         assert_eq!(t.left[0], ToolbarItem::Print);
         assert!(!t.right.contains(&ToolbarItem::Print));
         // Within the left group: Reply (now index 1) to the end.
         t.place(ToolbarItem::Reply, Some(ToolbarSide::Left), 99);
         assert_eq!(t.left.last(), Some(&ToolbarItem::Reply));
-        assert_eq!(t.left.len(), 7);
+        assert_eq!(t.left.len(), TOOLBAR_SIDE_MAX);
         // Hidden: on neither side, listed under hidden().
         t.place(ToolbarItem::Spam, None, 0);
         assert_eq!(t.side(ToolbarItem::Spam), None);
-        assert_eq!(t.hidden(), vec![ToolbarItem::Spam]);
+        assert_eq!(t.hidden(), vec![ToolbarItem::Star, ToolbarItem::Spam]);
         // Back from hidden into the right group's middle.
         t.place(ToolbarItem::Spam, Some(ToolbarSide::Right), 1);
         assert_eq!(t.right[1], ToolbarItem::Spam);
-        assert!(t.hidden().is_empty());
+        assert_eq!(t.hidden(), vec![ToolbarItem::Star]);
     }
 
     #[test]
