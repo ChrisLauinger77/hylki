@@ -63,6 +63,41 @@ OVERRIDES = {
     ("forest", "dark"): {"accent": "#3eb272", "sidebarBorder": "border"},
     ("tidal", "dark"): {"accent": "#509ed8", "sidebarBorder": "border"},
     ("earth", "dark"): {"sidebarBorder": "border"},
+    # Rose's dark palette is not built like the other four: upstream gives it
+    # grounds at hue 270 (which is Midnight's violet, so the two read alike),
+    # a sidebar darker than its own canvas, and hairlines and panel tints
+    # several steps too dark to see. Its shell is rebuilt here to the family's
+    # saturation and lightness per role -- the median of Forest, Tidal, Earth
+    # and Midnight -- at Rose's own hue, 330. Text, accent and the semantic
+    # colours are upstream's still.
+    ("rose", "dark"): {
+        "canvas": "#291921",
+        "chrome": "#291921",
+        "toolbar": "#291921",
+        "surface": "#291921",
+        "surfaceRaised": "#43343c",
+        "surfaceOverlay": "#4f4249",
+        "sidebar": "#39202c",
+        "sidebarControlSurface": "#58434e",
+        "sidebarRowHover": "#4e293c",
+        "sidebarRowActive": "#5c3046",
+        "sidebarRowSelected": "#63334b",
+        "border": "#654153",
+        "toolbarBorder": "#6c3752",
+        "toolbarControl": "#502a3d",
+        "toolbarControlHover": "#63334b",
+        "secondary": "#502a3d",
+        "accentSurface": "#63334b",
+        "messageSurface": "#6e3853",
+        "codeBackground": "#36272f",
+        "muted": "#422433",
+        "input": "#794f64",
+        "sidebarBorder": "border",
+    },
+    # And in light, where the rest of the palette is fine: upstream's light
+    # sidebarBorder is a neutral grey while every other theme's follows its
+    # border, so Rose alone had a grey line against a pink one.
+    ("rose", "light"): {"sidebarBorder": "border"},
 }
 
 # The roles Vireo maps onto libadwaita colours (see src/theme.rs). Upstream
