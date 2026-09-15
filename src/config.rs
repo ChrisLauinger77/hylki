@@ -1652,6 +1652,11 @@ pub fn load_files_prefs() -> FilesPrefs {
 /// (with the rest of the conditions ignored); `more` holds the others.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FilterRule {
+    /// What to call the rule (#197). Optional: an unnamed rule is still
+    /// listed by its conditions, the way every rule was before names
+    /// existed. Kept first so it reads first in `filters.toml`.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
     /// The account this rule (and its destination folder) belongs to.
     pub account_email: String,
     /// The first condition: what it inspects…
@@ -1830,6 +1835,19 @@ impl FilterRule {
         self.value = first.value;
         self.more = conds;
         true
+    }
+
+    /// What to call the rule in a list or a log line (#197): its name, or
+    /// its conditions when it has none.
+    pub fn label(&self) -> String {
+        if !self.name.trim().is_empty() {
+            return self.name.trim().to_string();
+        }
+        self.conditions()
+            .iter()
+            .map(|c| format!("{:?} {:?} {}", c.field, c.matcher, c.value))
+            .collect::<Vec<_>>()
+            .join(if self.any { " or " } else { " and " })
     }
 
     /// The body alternatives this rule needs a server search for (#191).
@@ -3327,6 +3345,7 @@ mod filter_tests {
 
     fn rule(field: FilterField, matcher: FilterMatch, value: &str) -> FilterRule {
         FilterRule {
+            name: String::new(),
             account_email: "a@b.c".into(),
             field,
             matcher,
@@ -3593,6 +3612,26 @@ dest_path = "Lists"
         let back: SettingsBundle = toml::from_str(&text).unwrap();
         assert_eq!(back.accounts[0].empty_trash_days, 30);
         assert_eq!(back.accounts[0].empty_junk_days, 0);
+    }
+
+    #[test]
+    fn filter_names_are_optional_and_round_trip() {
+        // A rule with no name is written without the key, so a version from
+        // before #197 reads the file back unchanged.
+        let plain = rule(FilterField::Subject, FilterMatch::Contains, "digest");
+        assert_eq!(plain.name, "");
+        let text = toml::to_string_pretty(&FiltersFile { rules: vec![plain.clone()] }).unwrap();
+        assert!(!text.contains("name"), "{text}");
+        // A named one keeps its name across a round trip, and an unknown
+        // `name` key in a file from a newer version is simply carried.
+        let mut named = plain.clone();
+        named.name = "Mailing lists".into();
+        let text = toml::to_string_pretty(&FiltersFile { rules: vec![named.clone()] }).unwrap();
+        let back: FiltersFile = toml::from_str(&text).unwrap();
+        assert_eq!(back.rules, vec![named.clone()]);
+        // The label falls back to the conditions when there is no name.
+        assert_eq!(named.label(), "Mailing lists");
+        assert!(plain.label().contains("digest"));
     }
 
     #[test]

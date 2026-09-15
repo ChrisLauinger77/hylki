@@ -3960,10 +3960,20 @@ impl AccountsWindow {
             row.connect_activated(move |_| s.input(AccountsInput::EditFilter(i)));
             // Every condition, joined the way the rule combines them (#192).
             let joiner = if r.any { i18n(" or ") } else { i18n(" and ") };
-            let title: Vec<String> = r.conditions().iter().map(Self::condition_label).collect();
-            row.set_title(&title.join(&joiner));
+            let conditions: Vec<String> = r.conditions().iter().map(Self::condition_label).collect();
+            let conditions = conditions.join(&joiner);
+            // A named rule (#197) is listed by its name, with the conditions
+            // moved down beside what it does; an unnamed one reads exactly
+            // as it always did.
+            let named = !r.name.trim().is_empty();
+            row.set_title(if named { r.name.trim() } else { conditions.as_str() });
             // "account → folder", "account, tagged Work", or both (#71).
-            let mut subtitle = r.account_email.clone();
+            let mut subtitle = String::new();
+            if named {
+                subtitle.push_str(&conditions);
+                subtitle.push('\n');
+            }
+            subtitle.push_str(&r.account_email);
             if !r.dest_path.is_empty() {
                 let dest = self
                     .folders_by_email
@@ -3983,6 +3993,9 @@ impl AccountsWindow {
                 subtitle.push_str(&i18n_f(", tagged {tag}", &[("tag", &name)]));
             }
             row.set_subtitle(&subtitle);
+            // A named rule's subtitle runs to two lines (the conditions,
+            // then where the mail goes); an unnamed one keeps the one it had.
+            row.set_subtitle_lines(if named { 0 } else { 1 });
             // The trash button removes; a chevron says the row opens the
             // rule's editor, as the account and cloud rows do. The rule's
             // "count unread" switch lives in the editor.
@@ -4515,6 +4528,11 @@ impl AccountsWindow {
         scrolled.set_child(Some(&clamp));
 
         let account_group = adw::PreferencesGroup::new();
+        // A name of your own for the rule (#197): what the filters list
+        // calls it, in place of spelling its conditions out. Optional.
+        let name_row = adw::EntryRow::new();
+        name_row.set_title(&i18n("Name (optional)"));
+        account_group.add(&name_row);
         let account_row = adw::ComboRow::new();
         account_row.set_title(&i18n("Account"));
         let email_refs: Vec<&str> = emails.iter().map(|s| s.as_str()).collect();
@@ -4753,6 +4771,7 @@ impl AccountsWindow {
         // Editing: every field starts from the rule as it stands.
         let edit_index = edit.as_ref().map(|(i, _)| *i);
         if let Some((_, rule)) = &edit {
+            name_row.set_text(&rule.name);
             if let Some(idx) = emails
                 .iter()
                 .position(|e| e.eq_ignore_ascii_case(&rule.account_email))
@@ -4833,7 +4852,7 @@ impl AccountsWindow {
         }
 
         let s = sender.clone();
-        self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), Vec::new(), move || {
+        self.push_form_content(nav, "filter", &title, &verb, scrolled.upcast_ref(), vec![name_row.clone()], move || {
             // Every condition with text; a blank extra one is dropped. The
             // matcher of a body condition is whatever the pinned row says.
             let conditions: Vec<crate::config::FilterCondition> = conds
@@ -4867,6 +4886,7 @@ impl AccountsWindow {
                 return false;
             }
             let mut rule = FilterRule {
+                name: name_row.text().trim().to_string(),
                 account_email: email.clone(),
                 field: FilterField::FromAddress,
                 matcher: FilterMatch::Contains,

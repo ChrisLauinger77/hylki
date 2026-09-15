@@ -14811,7 +14811,8 @@ fn demo_tags() -> Vec<config::Tag> {
 /// only make it vanish from the list.
 fn demo_filters() -> Vec<config::FilterRule> {
     use config::{FilterField, FilterMatch, FilterRule};
-    let mk = |email: &str, field: FilterField, matcher: FilterMatch, value: &str, dest: &str| FilterRule {
+    let mk = |name: &str, email: &str, field: FilterField, matcher: FilterMatch, value: &str, dest: &str| FilterRule {
+        name: name.into(),
         account_email: email.into(),
         field,
         matcher,
@@ -14823,9 +14824,9 @@ fn demo_filters() -> Vec<config::FilterRule> {
         count_unread: true,
     };
     vec![
-        mk("jason@vireo.hyprlab.co", FilterField::FromAddress, FilterMatch::EndsWith, "substack.com", "Newsletters"),
-        mk("hello@hyprlab.dev", FilterField::Subject, FilterMatch::Contains, "invoice", "Invoices"),
-        mk("jason.m@fastmail.com", FilterField::Subject, FilterMatch::Contains, "order", "Orders"),
+        mk("Substack", "jason@vireo.hyprlab.co", FilterField::FromAddress, FilterMatch::EndsWith, "substack.com", "Newsletters"),
+        mk("Invoices", "hello@hyprlab.dev", FilterField::Subject, FilterMatch::Contains, "invoice", "Invoices"),
+        mk("", "jason.m@fastmail.com", FilterField::Subject, FilterMatch::Contains, "order", "Orders"),
     ]
 }
 
