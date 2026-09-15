@@ -81,9 +81,13 @@ pub struct MessageView {
     /// With the toggle off: show the actions automatically while the card is
     /// hovered (vs always).
     card_actions_auto: bool,
-    /// Seconds an opened card palette lingers after the pointer leaves —
-    /// the same "Actions Palette timeout" the list uses.
+    /// Seconds an opened card palette lingers after the pointer leaves — the
+    /// cards' own "Message card actions palette timeout", not the list's.
     palette_collapse_secs: u64,
+    /// The card's ⋯ opens the card menu, the same one a right-click shows,
+    /// instead of sliding its actions palette out. A preference, applied by
+    /// stamping the document (see `document_html`).
+    card_palette_menu: bool,
     /// The open conversation has already auto-scrolled to its first unread
     /// message: later renders of the same thread (bodies streaming in, a theme
     /// flip) carry a no-scroll stamp so the reader's place is kept.
@@ -428,12 +432,19 @@ pub enum MessageViewInput {
     /// A card's Move to… button, at page point (x, y) in CSS pixels of a
     /// page `page_width` wide: the app opens the folder picker there.
     CardMoveAt { account_id: u32, id: u32, x: f64, y: f64, page_width: f64 },
+    /// The card's ⋯, acting as a menu, was clicked at page point (x, y) in
+    /// CSS pixels of a page `page_width` wide: the app shows that message's
+    /// menu there.
+    CardMenuFrom { account_id: u32, id: u32, x: f64, y: f64, page_width: f64 },
     /// Preferences: how card actions show — behind the ⋯ toggle, automatically
     /// on hover, or always.
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     /// Preferences: seconds an opened card palette lingers after the pointer
-    /// leaves (shared with the list's Actions Palette timeout).
+    /// leaves. The cards' own timeout; the list keeps a separate one.
     SetPaletteCollapse(u64),
+    /// Preferences: the card's ⋯ opens the card menu instead of sliding its
+    /// actions palette out.
+    SetCardPaletteMenu(bool),
     /// A conversation message was read: clear its card's unread dot in place,
     /// without reloading the document.
     ClearDot { account_id: u32, id: u32 },
@@ -879,7 +890,8 @@ impl Component for MessageView {
             show_banner: crate::config::load_show_remote_banner(),
             card_actions_hover: crate::config::load_card_actions_hover(),
             card_actions_auto: crate::config::load_card_actions_auto(),
-            palette_collapse_secs: crate::config::load_palette_collapse(),
+            palette_collapse_secs: crate::config::load_card_palette_collapse(),
+            card_palette_menu: crate::config::load_card_palette_menu(),
             remote_allowed: false,
             account_name: None,
             chip_provider,
@@ -1105,6 +1117,22 @@ impl Component for MessageView {
                         account_id,
                         id,
                     }),
+                    // The ⋯ acting as a menu: the button's bottom-left corner
+                    // and the page width, the same shape "moveto" sends.
+                    "cardmenu" => {
+                        let nums: Vec<f64> = extra
+                            .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
+                            .unwrap_or_default();
+                        if let [x, y, vw] = nums[..] {
+                            open_sender.input(MessageViewInput::CardMenuFrom {
+                                account_id,
+                                id,
+                                x,
+                                y,
+                                page_width: vw,
+                            });
+                        }
+                    }
                     // Move to… on a card: extra is the button's bottom-centre
                     // and the page width, in CSS pixels (see "senderinfo").
                     "moveto" => {
@@ -1613,6 +1641,17 @@ impl Component for MessageView {
                 let (wx, wy) = point.map_or((x, y), |p| (p.x() as f64, p.y() as f64));
                 let _ = sender.output(MessageViewOutput::CardMenu { message: Box::new(m), x: wx, y: wy });
             }
+            MessageViewInput::CardMenuFrom { account_id, id, x, y, page_width } => {
+                // CSS pixels → widget pixels (the page may be zoomed); from
+                // there it is the same menu the right-click path opens.
+                let ratio = self.webview.width() as f64 / page_width.max(1.0);
+                sender.input(MessageViewInput::CardMenuAt {
+                    account_id,
+                    id,
+                    x: x * ratio,
+                    y: y * ratio,
+                });
+            }
             MessageViewInput::CardMoveAt { account_id, id, x, y, page_width } => {
                 let Some(m) = self
                     .thread
@@ -1648,6 +1687,14 @@ impl Component for MessageView {
             MessageViewInput::SetPaletteCollapse(secs) => {
                 if self.palette_collapse_secs != secs {
                     self.palette_collapse_secs = secs;
+                    if self.current.is_some() && !self.loading {
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::SetCardPaletteMenu(on) => {
+                if self.card_palette_menu != on {
+                    self.card_palette_menu = on;
                     if self.current.is_some() && !self.loading {
                         self.render();
                     }
@@ -1969,6 +2016,13 @@ impl MessageView {
             " data-vireo-actsdelay=\"{}\"",
             self.palette_collapse_secs.max(1) * 1000
         );
+        // With the ⋯ set to open the card's menu there is no palette to
+        // slide, so the script hands the click back to the app instead.
+        let acts_menu = if self.card_palette_menu {
+            " data-vireo-actsmenu=\"1\""
+        } else {
+            ""
+        };
         // The newest member, for the open-scroll fallback (#101): with no
         // unread mail the reader lands on the newest message rather than
         // wherever the document happens to start.
@@ -1989,7 +2043,7 @@ impl MessageView {
         let copied = format!(" data-vireo-copied=\"{}\"", i18n("Copied").replace('"', "&quot;"));
         let html = html.replacen(
             "<body",
-            &format!("<body{noscroll}{hover}{delay}{newest}{readmark}{copied}"),
+            &format!("<body{noscroll}{hover}{delay}{acts_menu}{newest}{readmark}{copied}"),
             1,
         );
         self.did_autoscroll = true;
@@ -2029,6 +2083,7 @@ impl MessageView {
         self.card_actions_hover.hash(&mut h);
         self.card_actions_auto.hash(&mut h);
         self.palette_collapse_secs.hash(&mut h);
+        self.card_palette_menu.hash(&mut h);
         // The picture a mailbox of your own shows can change while a
         // conversation is open (#189) — the cards must be built again.
         crate::avatar::own_faces_generation().hash(&mut h);
@@ -2154,7 +2209,7 @@ impl MessageView {
                             aid = m.account_id,
                             id = m.id,
                             acts_title = gtk::glib::markup_escape_text(&i18n("Actions")),
-                            // The same ⋯ the list's Actions Palette toggle uses.
+                            // The same ⋯ the list's actions palette toggle uses.
                             svg = inline_icon_svg("view-more-horizontal-symbolic"),
                         )
                     } else {
@@ -2169,7 +2224,7 @@ impl MessageView {
                         format!(
                             "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}{}</span>",
                             // Same order as the reader toolbar and the list's
-                            // Actions Palette, View Source closing the line.
+                            // actions palette, View Source closing the line.
                             card_action_button(key, "reply", "mail-reply-sender-symbolic", &i18n("Reply to this message")),
                             card_action_button(key, "replyall", "mail-reply-all-symbolic", &i18n("Reply to everyone on this message")),
                             card_action_button(key, "forward", "mail-forward-symbolic", &i18n("Forward this message")),
@@ -4574,9 +4629,13 @@ for(var q=0;q<ms.length;q++){ms[q].addEventListener('click',function(e){\
 var k=this.dataset.key;if(k)pick(k,e);});}\
 var actsDelay=parseInt(document.body.dataset.vireoActsdelay||'0',10)||1200;\
 document.documentElement.style.setProperty('--acts-delay',actsDelay+'ms');\
+var actsMenu=document.body.dataset.vireoActsmenu==='1';\
 var ts=document.querySelectorAll('.vireo-acts-toggle');\
 for(var t=0;t<ts.length;t++){ts[t].addEventListener('click',function(e){\
 e.stopPropagation();e.preventDefault();\
+if(actsMenu){var br=this.getBoundingClientRect();\
+try{window.webkit.messageHandlers.vireo.postMessage('cardmenu:'+this.dataset.key+':'\
++br.left+','+br.bottom+','+window.innerWidth);}catch(_){}return;}\
 var h=this.closest('.vireo-msg-hdr');var ac=h?h.querySelector('.vireo-acts'):null;if(!ac)return;\
 var on=!ac.classList.contains('open');\
 ac.classList.toggle('open',on);this.classList.toggle('open',on);});\

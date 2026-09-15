@@ -2431,7 +2431,7 @@ msgid "Double-click to open in a new window"
 msgstr "Двойной клик — открыть в новом окне"
 
 #. Same order as the reader toolbar and the list's
-#. Actions Palette, View Source closing the line.
+#. actions palette, View Source closing the line.
 msgid "Reply to this message"
 msgstr "Ответить на это сообщение"
 
@@ -2900,13 +2900,6 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Показывать отправителя и тему"
 
-msgid ""
-"Name who wrote and what about in the notification. Turn this off to keep "
-"both off the lock screen."
-msgstr ""
-"Отображать имя отправителя и тему письма в уведомлении. Отключите этот "
-"параметр, чтобы скрыть эти данные на экране блокировки."
-
 msgid "Style"
 msgstr "Стиль оформления"
 
@@ -3086,23 +3079,16 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Расположение фильтров"
 
+#, fuzzy
 msgid ""
-"In the unified section, as a row like Inboxes whose caret opens the folders; "
-"or above or below the accounts as a heading with its own list."
-msgstr ""
-"В объединённом разделе (как строка «Входящие», раскрывающая папки по клику "
-"на стрелку) либо выше или ниже учётных записей в виде отдельного заголовка "
-"со своим списком."
-
-msgid "Tags placement"
-msgstr "Расположение тегов"
-
-msgid ""
-"The same choices for the Tags section: a unified row, or a heading above or "
-"below the accounts."
+"Choose between appearing in a unified section, or a list above or below the "
+"accounts."
 msgstr ""
 "Те же варианты размещения для раздела «Теги»: в объединённом разделе либо в "
 "виде заголовка выше или ниже учётных записей."
+
+msgid "Tags placement"
+msgstr "Расположение тегов"
 
 msgid "Icon rail"
 msgstr "Полоса с иконками"
@@ -3137,8 +3123,9 @@ msgstr ""
 msgid "Every account's folder list."
 msgstr "Список папок каждой учётной записи."
 
-msgid "The account list under Inboxes."
-msgstr "Список учётных записей под строкой «Входящие»."
+#, fuzzy
+msgid "The account list under the unified Inboxes row."
+msgstr "Список учётных записей под общей строкой «Отправленные»."
 
 msgid "The account list under the unified Starred row."
 msgstr "Список учётных записей под общей строкой «Отмеченные»."
@@ -3168,13 +3155,12 @@ msgstr ""
 "Аватар отправителя рядом с каждым письмом — в списке и над сообщением. "
 "Отключение этой функции освобождает больше места для имени и темы."
 
-msgid "Your own mail shows your account circle"
+msgid "Sent mail uses your account circle"
 msgstr ""
 
 msgid ""
 "Messages you sent wear the account's Gravatar, picture or emoji, as its "
-"circle in the sidebar does. Turning it off gives them whatever circle anyone "
-"else's mail would get."
+"circle in the sidebar does."
 msgstr ""
 
 msgid "Preview lines"
@@ -3187,7 +3173,8 @@ msgstr ""
 "Количество строк текста письма, отображаемых под его темой. При отключении "
 "загрузка предпросмотров также прекращается."
 
-msgid "Actions Palette in the message list"
+#, fuzzy
+msgid "Actions palette in the message list"
 msgstr "Палитра действий в списке сообщений"
 
 msgid ""
@@ -3199,32 +3186,26 @@ msgstr ""
 "освобождается; управлять сообщениями по-прежнему можно из их карточек и "
 "контекстного меню."
 
-msgid "Open the Actions Palette on hover"
+#, fuzzy
+msgid "Open the actions palette on hover"
 msgstr "Открывать палитру действий при наведении"
 
+#, fuzzy
 msgid ""
-"The message list's ⋯ palette slides open by itself while the pointer rests "
-"on a row."
+"The message list's ⋯ actions palette slides open by itself while the pointer "
+"rests on a row."
 msgstr ""
 "Палитра «⋯» в списке сообщений открывается автоматически при наведении "
 "курсора на строку."
 
-msgid "Actions Palette as a menu"
-msgstr "Палитра действий в виде меню"
-
-msgid ""
-"The ⋯ opens the row's menu, the same one a right-click shows, instead of "
-"sliding the palette out."
-msgstr ""
-"Кнопка «⋯» открывает меню строки (то же, что и при щелчке правой кнопкой "
-"мыши) вместо выдвижения палитры."
-
 msgid "Swipe actions"
 msgstr "Действия свайпом"
 
+#, fuzzy
 msgid ""
 "Drag a message sideways with the mouse, or swipe it with two fingers on a "
-"trackpad, to archive or delete it."
+"trackpad, to archive or delete it. Default is left to delete, right to "
+"archive."
 msgstr ""
 "Перетащите сообщение в сторону мышью или смахните двумя пальцами на тачпаде, "
 "чтобы архивировать или удалить его."
@@ -3233,11 +3214,8 @@ msgid "Reverse swipe directions"
 msgstr "Инвертировать направление свайпа"
 
 msgid ""
-"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
-"archive it. Turning this on swaps the two: left archives, right deletes."
+"Turning this on swaps the swipe actions to: left archives, right deletes."
 msgstr ""
-"Смахните письмо влево для удаления или вправо для архивации. Включение этой "
-"опции меняет их местами: влево — архивация, вправо — удаление."
 
 msgid "Trackpad swipe sensitivity"
 msgstr ""
@@ -3248,12 +3226,14 @@ msgid ""
 "you did not mean them to. Mouse drags are unaffected."
 msgstr ""
 
-msgid "Actions Palette timeout"
+#, fuzzy
+msgid "Actions palette timeout"
 msgstr "Задержка закрытия палитры действий"
 
+#, fuzzy
 msgid ""
-"Seconds an actions palette stays open after the cursor leaves it — the "
-"list's and the message cards' alike."
+"Seconds the message list's actions palette stays open after the cursor "
+"leaves it."
 msgstr ""
 "Время в секундах, в течение которого палитра действий остаётся открытой "
 "после увода курсора — как в списке, так и на карточках сообщений."
@@ -3369,13 +3349,36 @@ msgstr "Моноширинный шрифт"
 msgid "The system's monospace font unless another is chosen."
 msgstr "Системный моноширинный шрифт, если не выбран другой."
 
-msgid "Message card actions"
+#, fuzzy
+msgid "Message card actions palette"
 msgstr "Действия на карточке сообщения"
 
 msgid "How each message's action icons show in the reader, single or threaded."
 msgstr ""
 "Отображение значков действий для каждого письма: в одиночном режиме и в "
 "цепочке."
+
+#, fuzzy
+msgid "Message card actions palette timeout"
+msgstr "Действия на карточке сообщения"
+
+#, fuzzy
+msgid "Seconds a card's actions palette stays open after the cursor leaves it."
+msgstr ""
+"Время в секундах, в течение которого палитра действий остаётся открытой "
+"после увода курсора — как в списке, так и на карточках сообщений."
+
+#, fuzzy
+msgid "Message card actions palette as a menu"
+msgstr "Палитра действий в виде меню"
+
+#, fuzzy
+msgid ""
+"The ⋯ opens the message's menu, the same one a right-click shows, instead of "
+"sliding the actions palette out."
+msgstr ""
+"Кнопка «⋯» открывает меню строки (то же, что и при щелчке правой кнопкой "
+"мыши) вместо выдвижения палитры."
 
 msgid "Single messages as cards"
 msgstr "Одиночные сообщения в виде карточек"
@@ -3536,9 +3539,10 @@ msgstr ""
 "домена. При этом владелец домена узнаёт ваш IP-адрес — то, чего "
 "предотвращает блокировка удалённого содержимого."
 
+#, fuzzy
 msgid ""
 "By default dates follow the system's own arrangement — its field order, "
-"month names and clock. Choose a format here to use it whatever the system is "
+"month names and clock. Choose a format here to override what your system is "
 "set to."
 msgstr ""
 "По умолчанию формат даты соответствует системным настройкам — порядку полей, "
@@ -3640,7 +3644,7 @@ msgstr ""
 "Сохранить все записи консоли с момента запуска Vireo для прикрепления к "
 "отчёту об ошибке. Адреса электронной почты сокращаются до домена."
 
-msgid "GNOME Files"
+msgid "GNOME Files Integration"
 msgstr ""
 
 msgid ""
@@ -3676,20 +3680,16 @@ msgstr ""
 msgid "Restart"
 msgstr "Перезапустить сейчас"
 
-msgid "Files sent from Files go into"
+msgid "Default Send with Vireo behavior"
 msgstr ""
+
+#, fuzzy
+msgid "Default large attachments behavior"
+msgstr "Загрузить вложения с сервера"
 
 msgid ""
-"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
-"offers all three each time."
-msgstr ""
-
-msgid "Files over the size limit"
-msgstr ""
-
-msgid ""
-"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
-"one the files are attached."
+"Upload to cloud storage needs a cloud storage account (Settings → Cloud "
+"Storage) otherwise the files are attached by default."
 msgstr ""
 
 msgid "Size limit"
@@ -4396,6 +4396,31 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Name who wrote and what about in the notification. Turn this off to keep "
+#~ "both off the lock screen."
+#~ msgstr ""
+#~ "Отображать имя отправителя и тему письма в уведомлении. Отключите этот "
+#~ "параметр, чтобы скрыть эти данные на экране блокировки."
+
+#~ msgid ""
+#~ "In the unified section, as a row like Inboxes whose caret opens the "
+#~ "folders; or above or below the accounts as a heading with its own list."
+#~ msgstr ""
+#~ "В объединённом разделе (как строка «Входящие», раскрывающая папки по "
+#~ "клику на стрелку) либо выше или ниже учётных записей в виде отдельного "
+#~ "заголовка со своим списком."
+
+#~ msgid "The account list under Inboxes."
+#~ msgstr "Список учётных записей под строкой «Входящие»."
+
+#~ msgid ""
+#~ "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+#~ "archive it. Turning this on swaps the two: left archives, right deletes."
+#~ msgstr ""
+#~ "Смахните письмо влево для удаления или вправо для архивации. Включение "
+#~ "этой опции меняет их местами: влево — архивация, вправо — удаление."
 
 #~ msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 #~ msgstr ""

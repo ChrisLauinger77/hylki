@@ -2436,7 +2436,7 @@ msgid "Double-click to open in a new window"
 msgstr "Double-cliquez pour ouvrir dans une nouvelle fenêtre"
 
 #. Same order as the reader toolbar and the list's
-#. Actions Palette, View Source closing the line.
+#. actions palette, View Source closing the line.
 msgid "Reply to this message"
 msgstr "Répondre à ce message"
 
@@ -2907,13 +2907,6 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Afficher l'expéditeur et l'objet"
 
-msgid ""
-"Name who wrote and what about in the notification. Turn this off to keep "
-"both off the lock screen."
-msgstr ""
-"Indiquer l'auteur et le sujet dans la notification. Désactivez cette option "
-"pour les masquer de l'écran de verrouillage."
-
 msgid "Style"
 msgstr "Style"
 
@@ -3095,23 +3088,16 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Emplacement des filtres"
 
+#, fuzzy
 msgid ""
-"In the unified section, as a row like Inboxes whose caret opens the folders; "
-"or above or below the accounts as a heading with its own list."
-msgstr ""
-"Dans la section unifiée, comme une ligne semblable à Boîtes de réception "
-"dont le chevron ouvre les dossiers ; ou au-dessus ou en dessous des comptes, "
-"comme un en-tête avec sa propre liste."
-
-msgid "Tags placement"
-msgstr "Emplacement des balises"
-
-msgid ""
-"The same choices for the Tags section: a unified row, or a heading above or "
-"below the accounts."
+"Choose between appearing in a unified section, or a list above or below the "
+"accounts."
 msgstr ""
 "Les mêmes choix pour la section Tags : une ligne unifiée, ou un en-tête au-"
 "dessus ou en dessous des comptes."
+
+msgid "Tags placement"
+msgstr "Emplacement des balises"
 
 msgid "Icon rail"
 msgstr "Barre d'icônes"
@@ -3148,8 +3134,9 @@ msgstr ""
 msgid "Every account's folder list."
 msgstr "La liste des dossiers de chaque compte."
 
-msgid "The account list under Inboxes."
-msgstr "La liste des comptes sous Boîtes de réception."
+#, fuzzy
+msgid "The account list under the unified Inboxes row."
+msgstr "La liste des comptes sous la ligne unifiée Envoyés."
 
 msgid "The account list under the unified Starred row."
 msgstr "La liste des comptes sous la ligne unifiée Favoris."
@@ -3180,13 +3167,14 @@ msgstr ""
 "dessus du message. Désactiver cette option donne plus de place à "
 "l'expéditeur et à l'objet."
 
-msgid "Your own mail shows your account circle"
+#, fuzzy
+msgid "Sent mail uses your account circle"
 msgstr "Vos propres messages affichent le cercle de votre compte"
 
+#, fuzzy
 msgid ""
 "Messages you sent wear the account's Gravatar, picture or emoji, as its "
-"circle in the sidebar does. Turning it off gives them whatever circle anyone "
-"else's mail would get."
+"circle in the sidebar does."
 msgstr ""
 "Les messages que vous envoyez portent le Gravatar, l'image ou l'emoji du "
 "compte, comme son cercle dans la barre latérale. En désactivant cette "
@@ -3202,7 +3190,8 @@ msgstr ""
 "La quantité de texte affichée sous l'objet de chaque message. Désactiver "
 "cette option stoppe aussi le téléchargement des aperçus."
 
-msgid "Actions Palette in the message list"
+#, fuzzy
+msgid "Actions palette in the message list"
 msgstr "Palette d'actions dans la liste des messages"
 
 msgid ""
@@ -3214,32 +3203,26 @@ msgstr ""
 "option on libère de l'espace sur la ligne ; les actions restent accessibles "
 "depuis leurs fiches et le menu contextuel."
 
-msgid "Open the Actions Palette on hover"
+#, fuzzy
+msgid "Open the actions palette on hover"
 msgstr "Ouvrir la palette d'actions au survol"
 
+#, fuzzy
 msgid ""
-"The message list's ⋯ palette slides open by itself while the pointer rests "
-"on a row."
+"The message list's ⋯ actions palette slides open by itself while the pointer "
+"rests on a row."
 msgstr ""
 "La palette ⋯ de la liste des messages s'ouvre automatiquement lorsque le "
 "pointeur s'arrête sur une ligne."
 
-msgid "Actions Palette as a menu"
-msgstr "Palette d'actions sous forme de menu"
-
-msgid ""
-"The ⋯ opens the row's menu, the same one a right-click shows, instead of "
-"sliding the palette out."
-msgstr ""
-"Le ⋯ ouvre le menu de la ligne, le même que celui affiché par un clic droit, "
-"au lieu de faire glisser la palette."
-
 msgid "Swipe actions"
 msgstr "Actions par glissement"
 
+#, fuzzy
 msgid ""
 "Drag a message sideways with the mouse, or swipe it with two fingers on a "
-"trackpad, to archive or delete it."
+"trackpad, to archive or delete it. Default is left to delete, right to "
+"archive."
 msgstr ""
 "Faites glisser un message sur le côté avec la souris, ou balayez-le avec "
 "deux doigts sur un pavé tactile, pour l'archiver ou le supprimer."
@@ -3248,12 +3231,8 @@ msgid "Reverse swipe directions"
 msgstr "Inverser le sens du balayage"
 
 msgid ""
-"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
-"archive it. Turning this on swaps the two: left archives, right deletes."
+"Turning this on swaps the swipe actions to: left archives, right deletes."
 msgstr ""
-"Faites glisser (avec la souris ou le trackpad) un message vers la gauche "
-"pour le supprimer, et vers la droite pour l'archiver. Lorsque cette option "
-"est activée, les actions s'inversent : la gauche archive, la droite supprime."
 
 msgid "Trackpad swipe sensitivity"
 msgstr ""
@@ -3264,12 +3243,14 @@ msgid ""
 "you did not mean them to. Mouse drags are unaffected."
 msgstr ""
 
-msgid "Actions Palette timeout"
+#, fuzzy
+msgid "Actions palette timeout"
 msgstr "Délai d'expiration de la palette d'actions"
 
+#, fuzzy
 msgid ""
-"Seconds an actions palette stays open after the cursor leaves it — the "
-"list's and the message cards' alike."
+"Seconds the message list's actions palette stays open after the cursor "
+"leaves it."
 msgstr ""
 "Nombre de secondes pendant lesquelles la palette d'actions reste ouverte "
 "après le départ du curseur (pour la liste et les cartes de message)."
@@ -3388,13 +3369,36 @@ msgstr "Police monospace"
 msgid "The system's monospace font unless another is chosen."
 msgstr "La police à espacement fixe du système, sauf si une autre est choisie."
 
-msgid "Message card actions"
+#, fuzzy
+msgid "Message card actions palette"
 msgstr "Actions sur la carte du message"
 
 msgid "How each message's action icons show in the reader, single or threaded."
 msgstr ""
 "Comment s'affichent les icônes d'action de chaque message dans le lecteur, "
 "en mode individuel ou en fil de discussion."
+
+#, fuzzy
+msgid "Message card actions palette timeout"
+msgstr "Actions sur la carte du message"
+
+#, fuzzy
+msgid "Seconds a card's actions palette stays open after the cursor leaves it."
+msgstr ""
+"Nombre de secondes pendant lesquelles la palette d'actions reste ouverte "
+"après le départ du curseur (pour la liste et les cartes de message)."
+
+#, fuzzy
+msgid "Message card actions palette as a menu"
+msgstr "Palette d'actions sous forme de menu"
+
+#, fuzzy
+msgid ""
+"The ⋯ opens the message's menu, the same one a right-click shows, instead of "
+"sliding the actions palette out."
+msgstr ""
+"Le ⋯ ouvre le menu de la ligne, le même que celui affiché par un clic droit, "
+"au lieu de faire glisser la palette."
 
 msgid "Single messages as cards"
 msgstr "Messages isolés sous forme de cartes"
@@ -3557,9 +3561,10 @@ msgstr ""
 "depuis le domaine de l'expéditeur, qui prend alors connaissance de votre "
 "adresse IP, ce que le blocage du contenu distant vise justement à éviter."
 
+#, fuzzy
 msgid ""
 "By default dates follow the system's own arrangement — its field order, "
-"month names and clock. Choose a format here to use it whatever the system is "
+"month names and clock. Choose a format here to override what your system is "
 "set to."
 msgstr ""
 "Par défaut, les dates suivent la configuration du système (ordre des champs, "
@@ -3663,7 +3668,8 @@ msgstr ""
 "de Vireo, afin de les joindre à un rapport de bug. Les adresses e-mail sont "
 "raccourcies à leur domaine."
 
-msgid "GNOME Files"
+#, fuzzy
+msgid "GNOME Files Integration"
 msgstr "Fichiers de GNOME"
 
 msgid ""
@@ -3705,20 +3711,16 @@ msgstr ""
 msgid "Restart"
 msgstr "Redémarrer"
 
-msgid "Files sent from Files go into"
+msgid "Default Send with Vireo behavior"
 msgstr ""
+
+#, fuzzy
+msgid "Default large attachments behavior"
+msgstr "Récupération des pièces jointes depuis"
 
 msgid ""
-"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
-"offers all three each time."
-msgstr ""
-
-msgid "Files over the size limit"
-msgstr ""
-
-msgid ""
-"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
-"one the files are attached."
+"Upload to cloud storage needs a cloud storage account (Settings → Cloud "
+"Storage) otherwise the files are attached by default."
 msgstr ""
 
 msgid "Size limit"
@@ -4434,6 +4436,33 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Name who wrote and what about in the notification. Turn this off to keep "
+#~ "both off the lock screen."
+#~ msgstr ""
+#~ "Indiquer l'auteur et le sujet dans la notification. Désactivez cette "
+#~ "option pour les masquer de l'écran de verrouillage."
+
+#~ msgid ""
+#~ "In the unified section, as a row like Inboxes whose caret opens the "
+#~ "folders; or above or below the accounts as a heading with its own list."
+#~ msgstr ""
+#~ "Dans la section unifiée, comme une ligne semblable à Boîtes de réception "
+#~ "dont le chevron ouvre les dossiers ; ou au-dessus ou en dessous des "
+#~ "comptes, comme un en-tête avec sa propre liste."
+
+#~ msgid "The account list under Inboxes."
+#~ msgstr "La liste des comptes sous Boîtes de réception."
+
+#~ msgid ""
+#~ "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+#~ "archive it. Turning this on swaps the two: left archives, right deletes."
+#~ msgstr ""
+#~ "Faites glisser (avec la souris ou le trackpad) un message vers la gauche "
+#~ "pour le supprimer, et vers la droite pour l'archiver. Lorsque cette "
+#~ "option est activée, les actions s'inversent : la gauche archive, la "
+#~ "droite supprime."
 
 #~ msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 #~ msgstr ""

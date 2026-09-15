@@ -151,17 +151,15 @@ pub struct RowInit {
     /// How many lines of the message's text the row shows (1–3).
     pub preview_lines: u32,
     pub ring_class: Option<String>,
-    /// Shared Actions Palette collapse delay in seconds — how long it stays open
+    /// Shared actions palette collapse delay in seconds — how long it stays open
     /// after the cursor leaves it (read live when scheduling).
     pub palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared "open the palette on row hover" flag (read live on each hover).
     pub palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Shared "the ⋯ opens the row menu" flag (read live on each click).
-    pub palette_menu: std::rc::Rc<std::cell::Cell<bool>>,
     /// The tags (#71), shared with every row: the chips a row shows are the
     /// message's keywords that name one of these.
     pub tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
-    /// Whether the row carries the Actions Palette line at all (preference);
+    /// Whether the row carries the actions palette line at all (preference);
     /// off returns its reserved space to the row.
     pub show_palette: bool,
     /// The list shows Junk: the palette's spam button reads "Not Spam".
@@ -257,7 +255,7 @@ pub type ThreadDragKeys =
     std::rc::Rc<std::cell::RefCell<std::collections::HashMap<(u32, u32), Vec<(u32, u32, u32, u32)>>>>;
 
 /// The message-list pane's floor: exactly what a conversation-member card
-/// needs to show a row's full Actions Palette — the tightest real constraint
+/// needs to show a row's full actions palette — the tightest real constraint
 /// in the list. The sum of the card's insets (10px rail margin, 10px + 8px
 /// card margins, 12px + 12px card padding), the avatar (38px), the unread
 /// dot (8px), three 8px gaps, and the 234px actions-line reservation.
@@ -346,7 +344,7 @@ pub struct MessageRow {
     ring_class: Option<String>,
     /// Whether the pointer is over this row (drives the chevron fade).
     row_hovered: bool,
-    /// Whether the Actions Palette is slid open on this row.
+    /// Whether the actions palette is slid open on this row.
     palette_open: bool,
     /// Pending auto-collapse timer (armed when the cursor isn't over the palette;
     /// cancelled while it is, so the palette stays open).
@@ -355,14 +353,12 @@ pub struct MessageRow {
     palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared "open the palette on row hover" flag (read live per hover).
     palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Shared "the ⋯ opens the row menu" flag (read live per click).
-    palette_menu: std::rc::Rc<std::cell::Cell<bool>>,
     /// The tags, shared with the list (#71).
     tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
     /// The keywords the chips were last built for, so post_view (which runs
     /// on every update) rebuilds them only when they changed.
     tags_rendered: std::cell::RefCell<Vec<String>>,
-    /// Whether this row shows the Actions Palette line at all (preference).
+    /// Whether this row shows the actions palette line at all (preference).
     show_palette: bool,
     in_junk: bool,
     in_drafts: bool,
@@ -444,10 +440,7 @@ pub enum MessageRowInput {
     SetRowHover(bool),
     /// Another row's palette opened — fold this one if it is out.
     ClosePalette,
-    /// The chevron was clicked — slide the Actions Palette open or shut,
-    /// or (preference) open the row menu on the button.
-    ChevronClicked(gtk::Button),
-    /// Slide the Actions Palette open or shut.
+    /// Slide the actions palette open or shut.
     TogglePalette,
     /// The cursor moved onto the palette — keep it open (cancel auto-collapse).
     PaletteEnter,
@@ -499,10 +492,6 @@ pub enum MessageRowOutput {
     ToggleThread((u32, String)),
     /// This row's palette just opened — the list closes every other one.
     PaletteOpened(usize),
-    /// The ⋯ was clicked with the palette set to act as a menu: the list
-    /// opens the row's menu at (`x`, `y`), the button's bottom-left corner
-    /// in the list's coordinates.
-    ActionsMenu { index: usize, x: f64, y: f64 },
 }
 
 /// The keys of every selected row in the ListBox this drag started from, in list
@@ -883,7 +872,7 @@ impl FactoryComponent for MessageRow {
             #[watch]
             set_css_classes: &self.row_css(),
 
-            // Track hover so the Actions Palette chevron can fade in/out.
+            // Track hover so the actions palette chevron can fade in/out.
             add_controller = gtk::EventControllerMotion {
                 connect_enter[sender] => move |_, _, _| sender.input(MessageRowInput::SetRowHover(true)),
                 connect_leave[sender] => move |_| sender.input(MessageRowInput::SetRowHover(false)),
@@ -1022,7 +1011,7 @@ impl FactoryComponent for MessageRow {
                 set_visible: self.is_thread_child,
             },
 
-            // The Actions Palette floats over the pill's bottom-left corner,
+            // The actions palette floats over the pill's bottom-left corner,
             // opening rightward from the ⋯ button. As an overlay it takes no
             // room in the row: the text sits centred in the pill whether the
             // palette preference is on or off (the reserved line used to read
@@ -1083,7 +1072,7 @@ impl FactoryComponent for MessageRow {
                         set_css_classes: &self.chevron_classes(),
                         set_tooltip_text: Some(i18n("Actions").as_str()),
                         set_valign: gtk::Align::Center,
-                        connect_clicked[sender] => move |b| sender.input(MessageRowInput::ChevronClicked(b.clone())),
+                        connect_clicked => MessageRowInput::TogglePalette,
                     },
 
                     // Not a GtkRevealer: inside an Overlay's overlay child
@@ -1507,7 +1496,6 @@ impl FactoryComponent for MessageRow {
             ring_class,
             palette_collapse_secs,
             palette_hover,
-            palette_menu,
             tags,
             show_palette,
             in_junk,
@@ -1548,7 +1536,6 @@ impl FactoryComponent for MessageRow {
             collapse_timer: None,
             palette_collapse_secs,
             palette_hover,
-            palette_menu,
             tags,
             tags_rendered: std::cell::RefCell::new(Vec::new()),
             show_palette,
@@ -1655,9 +1642,8 @@ impl FactoryComponent for MessageRow {
             MessageRowInput::SetRowHover(over) => {
                 self.row_hovered = over;
                 // Hover mode: the palette slides open by itself on the row,
-                // and arms the usual collapse timeout on leave. Not when the
-                // ⋯ is a menu: there is no palette to slide.
-                if self.palette_hover.get() && !self.palette_menu.get() {
+                // and arms the usual collapse timeout on leave.
+                if self.palette_hover.get() {
                     if over {
                         if !self.palette_open {
                             self.palette_open = true;
@@ -1669,25 +1655,6 @@ impl FactoryComponent for MessageRow {
                     } else if self.palette_open {
                         self.arm_collapse(&sender);
                     }
-                }
-            }
-            MessageRowInput::ChevronClicked(button) => {
-                if self.palette_menu.get() {
-                    // The menu hangs off the button's bottom-left corner,
-                    // measured in the list's coordinates (the popover's
-                    // parent is the list, as for a right-click).
-                    let (x, y) = button
-                        .ancestor(gtk::ListBox::static_type())
-                        .and_then(|list| button.compute_bounds(&list))
-                        .map(|b| (b.x() as f64, (b.y() + b.height()) as f64))
-                        .unwrap_or((0.0, 0.0));
-                    let _ = sender.output(MessageRowOutput::ActionsMenu {
-                        index: self.index.current_index(),
-                        x,
-                        y,
-                    });
-                } else {
-                    sender.input(MessageRowInput::TogglePalette);
                 }
             }
             MessageRowInput::TogglePalette => {
@@ -2390,12 +2357,10 @@ pub struct MessageList {
     account_colors: std::collections::HashMap<u32, String>,
     /// Display-wide provider with each account's pale row-tint rule.
     color_provider: gtk::CssProvider,
-    /// Actions Palette collapse delay (seconds), shared with every row.
+    /// Actions palette collapse delay (seconds), shared with every row.
     palette_collapse_secs: std::rc::Rc<std::cell::Cell<u64>>,
     /// Shared with every row: open the palette on row hover.
     palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Shared with every row: the ⋯ opens the row menu, not the palette.
-    palette_menu: std::rc::Rc<std::cell::Cell<bool>>,
     /// The tags (#71), shared with every row for its chips and tag menu.
     tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
     /// Shared with every row: swap the swipe-gesture sides (#swipe).
@@ -2491,7 +2456,7 @@ pub struct MessageList {
     /// row keeps its count chip and chevron, but never opens — the thread is
     /// read through the reader's cards instead.
     thread_expansion: bool,
-    /// Whether rows carry the Actions Palette line at all (preference).
+    /// Whether rows carry the actions palette line at all (preference).
     list_palette: bool,
 }
 
@@ -2561,7 +2526,7 @@ pub enum MessageListInput {
     /// Whether conversation rows may expand into their members in the list
     /// (the row keeps its chip and chevron either way).
     SetThreadExpansion(bool),
-    /// Whether rows carry the Actions Palette line at all.
+    /// Whether rows carry the actions palette line at all.
     SetListPalette(bool),
     /// Resolve what deleting the current selection means: a lone selected row
     /// that heads a conversation stands for the whole thread (output
@@ -2629,7 +2594,7 @@ pub enum MessageListInput {
     /// Close and clear the search toolbar (#102): Esc, empty focus-out, or
     /// the header button while open.
     CloseSearch,
-    /// Showcase staging: open row N's Actions Palette (screenshot hook only —
+    /// Showcase staging: open row N's actions palette (screenshot hook only —
     /// see VIREO_SHOWCASE_PALETTE in app.rs).
     DebugOpenPalette(usize),
     /// Showcase only (VIREO_SHOWCASE_SWIPE): drive row `index` through a full
@@ -2664,14 +2629,11 @@ pub enum MessageListInput {
     RemoveMany(Vec<u32>),
     /// Secondary-click at (x, y) in the list: open the context menu.
     ContextMenu { x: f64, y: f64 },
-    /// Set the Actions Palette auto-collapse delay (seconds).
+    /// Set the actions palette auto-collapse delay (seconds).
     SetPaletteCollapse(u64),
-    /// Open the Actions Palette on row hover, without the ⋯ click.
+    /// Open the actions palette on row hover, without the ⋯ click.
     SetPaletteHover(bool),
-    /// The ⋯ opens the row menu instead of sliding the palette (preference).
-    SetPaletteMenu(bool),
     /// A row's ⋯, in menu mode: the row's menu at the button's corner.
-    ActionsMenu { index: usize, x: f64, y: f64 },
     /// Swap the swipe-gesture sides (#swipe).
     SetSwipeReversed(bool),
     /// Turn the swipe gesture on or off (#92).
@@ -2926,14 +2888,14 @@ impl SimpleComponent for MessageList {
                 set_child = &gtk::ScrolledWindow {
                 set_vexpand: true,
                 // External, not Never: with Never the widest row's minimum (the
-                // Actions Palette reservation plus the avatar column) propagates
+                // actions palette reservation plus the avatar column) propagates
                 // all the way up and becomes part of the window's minimum width,
                 // which pushed it past half of a 1920px screen — at which point
                 // GNOME refuses to tile the window to the left/right edge. Rows
                 // ellipsize, so a narrow pane clips gracefully instead.
                 set_hscrollbar_policy: gtk::PolicyType::External,
                 // The pane's own floor, now that rows no longer set one: room
-                // for a row's full Actions Palette (avatar + dot + the reserved
+                // for a row's full actions palette (avatar + dot + the reserved
                 // actions line), so opening the palette never needs to clip —
                 // the narrow-window breakpoint rails the sidebar in time to
                 // afford this even in a half-screen tile. (Grows by the thread
@@ -3046,9 +3008,6 @@ impl SimpleComponent for MessageList {
             palette_collapse_secs: std::rc::Rc::new(std::cell::Cell::new(5)),
             palette_hover: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_list_palette_hover(),
-            )),
-            palette_menu: std::rc::Rc::new(std::cell::Cell::new(
-                crate::config::load_list_palette_menu(),
             )),
             swipe_reversed: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_swipe_reversed(),
@@ -3926,13 +3885,6 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SetPaletteCollapse(secs) => self.palette_collapse_secs.set(secs),
             MessageListInput::SetPaletteHover(on) => self.palette_hover.set(on),
-            MessageListInput::SetPaletteMenu(on) => self.palette_menu.set(on),
-            MessageListInput::ActionsMenu { index, x, y } => {
-                // The same menu a right-click shows, hung under the ⋯.
-                if let Some(msg) = self.shown.get(index).cloned() {
-                    self.show_context_menu(&msg, x, y, &sender);
-                }
-            }
             MessageListInput::SetSwipeReversed(on) => self.swipe_reversed.set(on),
             MessageListInput::SetSwipeEnabled(on) => {
                 self.swipe_enabled.set(on);
@@ -4581,7 +4533,6 @@ impl MessageList {
                         ring_class,
                         palette_collapse_secs: self.palette_collapse_secs.clone(),
                         palette_hover: self.palette_hover.clone(),
-                        palette_menu: self.palette_menu.clone(),
                         tags: self.tags.clone(),
                         show_palette: self.list_palette,
                         in_junk: self.in_junk,
@@ -4890,7 +4841,6 @@ impl MessageList {
                     ring_class,
                     palette_collapse_secs: self.palette_collapse_secs.clone(),
                     palette_hover: self.palette_hover.clone(),
-                    palette_menu: self.palette_menu.clone(),
                     tags: self.tags.clone(),
                     show_palette: self.list_palette,
                     in_junk: self.in_junk,
@@ -4950,9 +4900,6 @@ impl MessageList {
                 }
                 MessageRowOutput::ToggleThread(key) => MessageListInput::ToggleThread(key),
                 MessageRowOutput::PaletteOpened(idx) => MessageListInput::PaletteOpened(idx),
-                MessageRowOutput::ActionsMenu { index, x, y } => {
-                    MessageListInput::ActionsMenu { index, x, y }
-                }
             })
     }
 

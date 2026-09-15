@@ -841,11 +841,16 @@ struct PrivacyFile {
     /// Stored lowercased; a bare domain like "spam.com" matches any sender there.
     #[serde(default)]
     blacklist: Vec<String>,
-    /// Seconds the message-list Actions Palette stays open after the cursor
+    /// Seconds the message-list actions palette stays open after the cursor
     /// leaves it before auto-collapsing. (A prior `palette_delay_ms` setting in
     /// milliseconds is intentionally not migrated — its meaning has changed.)
     #[serde(default = "default_palette_collapse")]
     palette_collapse_secs: u64,
+    /// Seconds a message card's actions palette stays open after the cursor
+    /// leaves it. Separate from the list's: cards are read at a different
+    /// pace from a list being skimmed.
+    #[serde(default = "default_palette_collapse")]
+    card_palette_collapse_secs: u64,
     /// Group messages into conversation threads in the list.
     #[serde(default = "default_threading")]
     threading: bool,
@@ -921,18 +926,18 @@ struct PrivacyFile {
     /// card is hovered (rather than always).
     #[serde(default = "default_card_actions_auto")]
     card_actions_auto: bool,
-    /// Whether the message list rows carry an Actions Palette at all. Off
+    /// Whether the message list rows carry an actions palette at all. Off
     /// removes the ⋯ line entirely, returning its space to the row.
     #[serde(default = "default_list_palette")]
     list_palette: bool,
-    /// Whether the message list's Actions Palette opens on row hover, without
+    /// Whether the message list's actions palette opens on row hover, without
     /// needing the ⋯ click.
     #[serde(default)]
     list_palette_hover: bool,
-    /// Whether the ⋯ on a message row opens the row's menu in place of
-    /// sliding the Actions Palette out.
+    /// Whether the ⋯ on a message card opens the card's menu in place of
+    /// sliding its actions palette out.
     #[serde(default)]
-    list_palette_menu: bool,
+    card_palette_menu: bool,
     /// Whether message rows take a sideways swipe at all (#92, PR #135).
     #[serde(default = "default_swipe_enabled")]
     swipe_enabled: bool,
@@ -1239,6 +1244,7 @@ impl Default for PrivacyFile {
             push: default_push(),
             blacklist: Vec::new(),
             palette_collapse_secs: default_palette_collapse(),
+            card_palette_collapse_secs: default_palette_collapse(),
             threading: default_threading(),
             threads_expanded: false,
             thread_expansion: default_thread_expansion(),
@@ -1261,7 +1267,7 @@ impl Default for PrivacyFile {
             card_actions_auto: default_card_actions_auto(),
             list_palette: default_list_palette(),
             list_palette_hover: false,
-            list_palette_menu: false,
+            card_palette_menu: false,
             swipe_enabled: default_swipe_enabled(),
             swipe_reversed: false,
             swipe_sensitivity: default_swipe_sensitivity(),
@@ -1382,9 +1388,16 @@ pub fn load_blacklist() -> Vec<String> {
     load_privacy().blacklist
 }
 
-/// Seconds the message-list Actions Palette stays open after the cursor leaves it.
+/// Seconds the message list's actions palette stays open after the cursor
+/// leaves it.
 pub fn load_palette_collapse() -> u64 {
     load_privacy().palette_collapse_secs
+}
+
+/// Seconds a message card's actions palette stays open after the cursor
+/// leaves it.
+pub fn load_card_palette_collapse() -> u64 {
+    load_privacy().card_palette_collapse_secs
 }
 
 /// Whether messages are grouped into conversation threads.
@@ -2201,19 +2214,20 @@ pub fn load_card_actions_auto() -> bool {
     load_privacy().card_actions_auto
 }
 
-/// Whether the message list rows carry an Actions Palette at all.
+/// Whether the message list rows carry an actions palette at all.
 pub fn load_list_palette() -> bool {
     load_privacy().list_palette
 }
 
-/// Whether the list's Actions Palette opens on row hover (no ⋯ click).
+/// Whether the list's actions palette opens on row hover (no ⋯ click).
 pub fn load_list_palette_hover() -> bool {
     load_privacy().list_palette_hover
 }
 
-/// Whether a row's ⋯ opens the row menu instead of the sliding palette.
-pub fn load_list_palette_menu() -> bool {
-    load_privacy().list_palette_menu
+/// Whether a message card's ⋯ opens the card menu instead of sliding its
+/// actions palette out.
+pub fn load_card_palette_menu() -> bool {
+    load_privacy().card_palette_menu
 }
 
 fn default_swipe_enabled() -> bool {
@@ -2444,6 +2458,7 @@ pub fn save_privacy(
     push: bool,
     blacklist: &[String],
     palette_collapse_secs: u64,
+    card_palette_collapse_secs: u64,
     threading: bool,
     threads_expanded: bool,
     thread_expansion: bool,
@@ -2466,7 +2481,7 @@ pub fn save_privacy(
     card_actions_auto: bool,
     list_palette: bool,
     list_palette_hover: bool,
-    list_palette_menu: bool,
+    card_palette_menu: bool,
     swipe_enabled: bool,
     swipe_reversed: bool,
     swipe_sensitivity: f64,
@@ -2524,6 +2539,7 @@ pub fn save_privacy(
         push,
         blacklist: blacklist.to_vec(),
         palette_collapse_secs,
+        card_palette_collapse_secs,
         threading,
         threads_expanded,
         thread_expansion,
@@ -2546,7 +2562,7 @@ pub fn save_privacy(
         card_actions_auto,
         list_palette,
         list_palette_hover,
-        list_palette_menu,
+        card_palette_menu,
         swipe_enabled,
         swipe_reversed,
         swipe_sensitivity,

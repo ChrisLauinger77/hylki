@@ -365,7 +365,7 @@ pub struct AppModel {
     /// Whether the sidebar is in icon-only (collapsed) mode.
     sidebar_collapsed: bool,
     /// The narrow-window breakpoint is currently applied (window is too narrow
-    /// for the expanded sidebar + a full-width Actions Palette — e.g. tiled to
+    /// for the expanded sidebar + a full-width actions palette — e.g. tiled to
     /// half of a 1920px screen).
     auto_rail: bool,
     /// The rail's current on-screen state — the user's choice OR'd with the
@@ -428,8 +428,11 @@ pub struct AppModel {
     show_remote_banner: bool,
     /// Addresses/domains whose incoming inbox mail is auto-deleted (lowercased).
     blacklist: Vec<String>,
-    /// Seconds the message-list Actions Palette stays open after the cursor leaves.
+    /// Seconds the message-list actions palette stays open after the cursor leaves.
     palette_collapse_secs: u64,
+    /// Seconds a message card's actions palette stays open — the cards' own,
+    /// separate from the list's above.
+    card_palette_collapse_secs: u64,
     /// Whether to load sender avatars from Gravatar.
     gravatar: bool,
     /// Whether the coloured avatars are drawn at all (#29).
@@ -599,12 +602,13 @@ pub struct AppModel {
     card_actions_hover: bool,
     /// With the ⋯ toggle off: card actions appear automatically on hover.
     card_actions_auto: bool,
-    /// The list's Actions Palette opens on row hover (no ⋯ click).
-    /// Whether the message list rows carry an Actions Palette at all.
+    /// The list's actions palette opens on row hover (no ⋯ click).
+    /// Whether the message list rows carry an actions palette at all.
     list_palette: bool,
     list_palette_hover: bool,
-    /// The row's ⋯ opens the row menu instead of the sliding palette.
-    list_palette_menu: bool,
+    /// A message card's ⋯ opens the card menu instead of sliding its
+    /// actions palette out.
+    card_palette_menu: bool,
     /// Message rows take a sideways swipe to archive / delete (#92).
     swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
@@ -940,7 +944,7 @@ pub enum AppMsg {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
-    SetListPaletteMenu(bool),
+    SetCardPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetSwipeSensitivity(f64),
@@ -1059,6 +1063,7 @@ pub enum AppMsg {
     /// Render it to a PDF and open that, to see what will come out.
     PrintPreview,
     SetPaletteCollapse(u64),
+    SetCardPaletteCollapse(u64),
     SetMessageTheme(config::MessageTheme),
     SetOverrideFonts(bool),
     SetReaderFont(String),
@@ -1444,7 +1449,7 @@ impl SimpleComponent for AppModel {
                         // Thin handle so the panes sit flush (just a 1px divider),
                         // no wide-handle gap between them.
                         set_wide_handle: false,
-                        // Launch wide enough for a row's Actions Palette. That is
+                        // Launch wide enough for a row's actions palette. That is
                         // also the list's minimum while the avatars are on,
                         // so `shrink_start_child: false` clamps to the same figure
                         // either way. With the circles off the minimum drops to what
@@ -2421,6 +2426,7 @@ impl SimpleComponent for AppModel {
             show_remote_banner: config::load_show_remote_banner(),
             blacklist: config::load_blacklist(),
             palette_collapse_secs: config::load_palette_collapse(),
+            card_palette_collapse_secs: config::load_card_palette_collapse(),
             gravatar: config::load_gravatar(),
             avatars: config::load_avatars(),
             own_mailbox_face: config::load_own_mailbox_face(),
@@ -2515,7 +2521,7 @@ impl SimpleComponent for AppModel {
             card_actions_auto: config::load_card_actions_auto(),
             list_palette: config::load_list_palette(),
             list_palette_hover: config::load_list_palette_hover(),
-            list_palette_menu: config::load_list_palette_menu(),
+            card_palette_menu: config::load_card_palette_menu(),
             swipe_enabled: config::load_swipe_enabled(),
             swipe_reversed: config::load_swipe_reversed(),
             swipe_sensitivity: config::load_swipe_sensitivity(),
@@ -3379,7 +3385,7 @@ impl SimpleComponent for AppModel {
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
                         let _ = list.send(MessageListInput::MoveSelection(1));
                     });
-                    // VIREO_SHOWCASE_PALETTE=N opens row N's Actions Palette
+                    // VIREO_SHOWCASE_PALETTE=N opens row N's actions palette
                     // (so a capture can verify the floating palette's look).
                     if let Some(Ok(idx)) =
                         std::env::var("VIREO_SHOWCASE_PALETTE").ok().map(|v| v.parse())
@@ -5982,7 +5988,13 @@ impl SimpleComponent for AppModel {
                     self.palette_collapse_secs = secs;
                     self.save_settings();
                     self.message_list.emit(MessageListInput::SetPaletteCollapse(secs));
-                    // The message cards' palette shares the same timeout.
+                }
+            }
+
+            AppMsg::SetCardPaletteCollapse(secs) => {
+                if self.card_palette_collapse_secs != secs {
+                    self.card_palette_collapse_secs = secs;
+                    self.save_settings();
                     self.message_view.emit(MessageViewInput::SetPaletteCollapse(secs));
                 }
             }
@@ -6003,11 +6015,11 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetListPaletteMenu(on) => {
-                if self.list_palette_menu != on {
-                    self.list_palette_menu = on;
+            AppMsg::SetCardPaletteMenu(on) => {
+                if self.card_palette_menu != on {
+                    self.card_palette_menu = on;
                     self.save_settings();
-                    self.message_list.emit(MessageListInput::SetPaletteMenu(on));
+                    self.message_view.emit(MessageViewInput::SetCardPaletteMenu(on));
                 }
             }
 
@@ -8277,6 +8289,7 @@ impl AppModel {
             self.push,
             &self.blacklist,
             self.palette_collapse_secs,
+            self.card_palette_collapse_secs,
             self.threading,
             self.threads_expanded,
             self.thread_expansion,
@@ -8299,7 +8312,7 @@ impl AppModel {
             self.card_actions_auto,
             self.list_palette,
             self.list_palette_hover,
-            self.list_palette_menu,
+            self.card_palette_menu,
             self.swipe_enabled,
             self.swipe_reversed,
             self.swipe_sensitivity,
@@ -12937,6 +12950,7 @@ impl AppModel {
             fetch_interval_secs: self.fetch_interval_secs,
             push: self.push,
             palette_collapse_secs: self.palette_collapse_secs,
+            card_palette_collapse_secs: self.card_palette_collapse_secs,
             threading: self.threading,
             threads_expanded: self.threads_expanded,
             thread_newest_first: self.thread_newest_first,
@@ -12977,7 +12991,7 @@ impl AppModel {
             card_actions_auto: self.card_actions_auto,
             list_palette: self.list_palette,
             list_palette_hover: self.list_palette_hover,
-            list_palette_menu: self.list_palette_menu,
+            card_palette_menu: self.card_palette_menu,
             swipe_enabled: self.swipe_enabled,
             swipe_reversed: self.swipe_reversed,
             swipe_sensitivity: self.swipe_sensitivity,
@@ -13041,7 +13055,7 @@ impl AppModel {
                 }
                 PrefOutput::SetListPalette(on) => AppMsg::SetListPalette(on),
                 PrefOutput::SetListPaletteHover(on) => AppMsg::SetListPaletteHover(on),
-                PrefOutput::SetListPaletteMenu(on) => AppMsg::SetListPaletteMenu(on),
+                PrefOutput::SetCardPaletteMenu(on) => AppMsg::SetCardPaletteMenu(on),
                 PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetSwipeSensitivity(v) => AppMsg::SetSwipeSensitivity(v),
@@ -13097,6 +13111,7 @@ impl AppModel {
                 PrefOutput::SetTrayMail(on) => AppMsg::SetTrayMail(on),
                 PrefOutput::SetAppIcon(id) => AppMsg::SetAppIcon(id),
                 PrefOutput::SetPaletteCollapse(secs) => AppMsg::SetPaletteCollapse(secs),
+                PrefOutput::SetCardPaletteCollapse(secs) => AppMsg::SetCardPaletteCollapse(secs),
                 PrefOutput::SetMessageTheme(t) => AppMsg::SetMessageTheme(t),
                 PrefOutput::SetOverrideFonts(on) => AppMsg::SetOverrideFonts(on),
                 PrefOutput::SetReaderFont(font) => AppMsg::SetReaderFont(font),

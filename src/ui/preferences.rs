@@ -27,6 +27,9 @@ pub struct PrefInit {
     pub fetch_interval_secs: u64,
     pub push: bool,
     pub palette_collapse_secs: u64,
+    /// Seconds a message card's actions palette stays open — its own, not
+    /// the message list's.
+    pub card_palette_collapse_secs: u64,
     pub threading: bool,
     pub threads_expanded: bool,
     /// Reading pane shows conversations newest-message-first.
@@ -43,12 +46,13 @@ pub struct PrefInit {
     pub card_actions_hover: bool,
     /// With the ⋯ toggle off: card actions appear automatically on hover.
     pub card_actions_auto: bool,
-    /// The list rows carry an Actions Palette line at all.
+    /// The list rows carry an actions palette line at all.
     pub list_palette: bool,
-    /// The list's Actions Palette opens on row hover (no ⋯ click).
+    /// The list's actions palette opens on row hover (no ⋯ click).
     pub list_palette_hover: bool,
-    /// The row's ⋯ opens the row menu instead of the sliding palette.
-    pub list_palette_menu: bool,
+    /// A message card's ⋯ opens the card menu instead of sliding its
+    /// actions palette out.
+    pub card_palette_menu: bool,
     /// Message rows take a sideways swipe to archive / delete (#92).
     pub swipe_enabled: bool,
     /// The message list's swipe-gesture sides are swapped (#swipe).
@@ -291,6 +295,9 @@ pub struct Preferences {
     /// Mirrors the list-palette switch, so the hover row under it can grey
     /// out when there is no palette to open.
     list_palette: bool,
+    /// Mirrors the card-actions mode: only its hidden-behind-a-toggle choice
+    /// has a ⋯, so only there can the ⋯ stand in for a menu.
+    card_actions_hover: bool,
     /// Mirrors the sender-avatars switch: with no circles drawn at all,
     /// whose face they would show doesn't arise (#189).
     avatars: bool,
@@ -738,7 +745,7 @@ pub enum PrefInput {
     ChangeCardActionsMode(u32),
     ToggleListPalette(bool),
     ToggleListPaletteHover(bool),
-    ToggleListPaletteMenu(bool),
+    ToggleCardPaletteMenu(bool),
     ToggleSwipeEnabled(bool),
     ToggleSwipeReversed(bool),
     ChangeSwipeSensitivity(f64),
@@ -808,6 +815,7 @@ pub enum PrefInput {
     ToggleTrayMail(bool),
     ChangeAppIcon(String),
     ChangePaletteCollapse(u64),
+    ChangeCardPaletteCollapse(u64),
     ChangeMessageTheme(u32),
     ToggleOverrideFonts(bool),
     ChangeReaderFont(String),
@@ -868,7 +876,7 @@ pub enum PrefOutput {
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
-    SetListPaletteMenu(bool),
+    SetCardPaletteMenu(bool),
     SetSwipeEnabled(bool),
     SetSwipeReversed(bool),
     SetSwipeSensitivity(f64),
@@ -919,6 +927,7 @@ pub enum PrefOutput {
     SetTrayMail(bool),
     SetAppIcon(String),
     SetPaletteCollapse(u64),
+    SetCardPaletteCollapse(u64),
     SetMessageTheme(MessageTheme),
     SetOverrideFonts(bool),
     SetReaderFont(String),
@@ -1184,7 +1193,6 @@ impl Component for Preferences {
                                         #[watch]
                                         set_sensitive: model.notifications,
                                         set_title: &i18n("Show sender and subject"),
-                                        set_subtitle: &i18n("Name who wrote and what about in the notification. Turn this off to keep both off the lock screen."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleNotificationContent(row.is_active()));
                                         },
@@ -1469,9 +1477,8 @@ impl Component for Preferences {
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Filters placement"),
-                                        set_subtitle: &i18n("In the unified section, as a row like Inboxes \
-                                                       whose caret opens the folders; or above or below \
-                                                       the accounts as a heading with its own list."),
+                                        set_subtitle: &i18n("Choose between appearing in a unified section, \
+                                                       or a list above or below the accounts."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
                                         },
@@ -1480,8 +1487,8 @@ impl Component for Preferences {
                                     #[name = "tags_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Tags placement"),
-                                        set_subtitle: &i18n("The same choices for the Tags section: a unified \
-                                                       row, or a heading above or below the accounts."),
+                                        set_subtitle: &i18n("Choose between appearing in a unified section, \
+                                                       or a list above or below the accounts."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
                                         },
@@ -1530,7 +1537,7 @@ impl Component for Preferences {
                                         #[name = "rail_fold_all_inboxes_row"]
                                         add_row = &adw::SwitchRow {
                                             set_title: &i18n("Inboxes"),
-                                            set_subtitle: &i18n("The account list under Inboxes."),
+                                            set_subtitle: &i18n("The account list under the unified Inboxes row."),
                                             connect_active_notify[sender] => move |row| {
                                                 sender.input(PrefInput::ToggleRailFoldAllInboxes(row.is_active()));
                                             },
@@ -1608,11 +1615,10 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         #[watch]
                                         set_sensitive: model.avatars,
-                                        set_title: &i18n("Your own mail shows your account circle"),
+                                        set_title: &i18n("Sent mail uses your account circle"),
                                         set_subtitle: &i18n("Messages you sent wear the account's Gravatar, \
                                                        picture or emoji, as its circle in the sidebar \
-                                                       does. Turning it off gives them whatever circle \
-                                                       anyone else's mail would get."),
+                                                       does."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleOwnMailboxFace(row.is_active()));
                                         },
@@ -1630,7 +1636,7 @@ impl Component for Preferences {
 
                                     #[name = "list_palette_row"]
                                     adw::SwitchRow {
-                                        set_title: &i18n("Actions Palette in the message list"),
+                                        set_title: &i18n("Actions palette in the message list"),
                                         set_subtitle: &i18n("The \u{22ef} action row under each message summary. \
                                                        Turning it off returns its space to the row; \
                                                        messages are still acted on from their cards and \
@@ -1644,23 +1650,11 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         #[watch]
                                         set_sensitive: model.list_palette,
-                                        set_title: &i18n("Open the Actions Palette on hover"),
-                                        set_subtitle: &i18n("The message list's \u{22ef} palette slides open \
-                                                       by itself while the pointer rests on a row."),
+                                        set_title: &i18n("Open the actions palette on hover"),
+                                        set_subtitle: &i18n("The message list's \u{22ef} actions palette slides \
+                                                       open by itself while the pointer rests on a row."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleListPaletteHover(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "list_palette_menu_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.list_palette,
-                                        set_title: &i18n("Actions Palette as a menu"),
-                                        set_subtitle: &i18n("The \u{22ef} opens the row's menu, the same one a \
-                                                       right-click shows, instead of sliding the palette out."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleListPaletteMenu(row.is_active()));
                                         },
                                     },
 
@@ -1668,7 +1662,8 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         set_title: &i18n("Swipe actions"),
                                         set_subtitle: &i18n("Drag a message sideways with the mouse, or swipe it \
-                                                       with two fingers on a trackpad, to archive or delete it."),
+                                                       with two fingers on a trackpad, to archive or delete \
+                                                       it. Default is left to delete, right to archive."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSwipeEnabled(row.is_active()));
                                         },
@@ -1679,9 +1674,8 @@ impl Component for Preferences {
                                         #[watch]
                                         set_sensitive: model.swipe_enabled,
                                         set_title: &i18n("Reverse swipe directions"),
-                                        set_subtitle: &i18n("Swipe (mouse-drag or trackpad) a message left \
-                                                       to delete it and right to archive it. Turning this \
-                                                       on swaps the two: left archives, right deletes."),
+                                        set_subtitle: &i18n("Turning this on swaps the swipe actions to: \
+                                                       left archives, right deletes."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleSwipeReversed(row.is_active()));
                                         },
@@ -1704,10 +1698,9 @@ impl Component for Preferences {
 
                                     #[name = "palette_collapse_row"]
                                     adw::SpinRow {
-                                        set_title: &i18n("Actions Palette timeout"),
-                                        set_subtitle: &i18n("Seconds an actions palette stays open after the \
-                                                       cursor leaves it — the list's and the message \
-                                                       cards' alike."),
+                                        set_title: &i18n("Actions palette timeout"),
+                                        set_subtitle: &i18n("Seconds the message list's actions palette stays \
+                                                       open after the cursor leaves it."),
                                         connect_value_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangePaletteCollapse(row.value() as u64));
                                         },
@@ -1877,11 +1870,37 @@ impl Component for Preferences {
 
                                     #[name = "card_actions_row"]
                                     adw::ComboRow {
-                                        set_title: &i18n("Message card actions"),
+                                        set_title: &i18n("Message card actions palette"),
                                         set_subtitle: &i18n("How each message's action icons show in the \
                                                        reader, single or threaded."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeCardActionsMode(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "card_palette_collapse_row"]
+                                    adw::SpinRow {
+                                        set_title: &i18n("Message card actions palette timeout"),
+                                        set_subtitle: &i18n("Seconds a card's actions palette stays open \
+                                                       after the cursor leaves it."),
+                                        connect_value_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeCardPaletteCollapse(row.value() as u64));
+                                        },
+                                    },
+
+                                    // Only the hidden-behind-a-toggle mode has
+                                    // a ⋯ to press, so the choice is only live
+                                    // there.
+                                    #[name = "card_palette_menu_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.card_actions_hover,
+                                        set_title: &i18n("Message card actions palette as a menu"),
+                                        set_subtitle: &i18n("The \u{22ef} opens the message's menu, the same \
+                                                       one a right-click shows, instead of sliding the \
+                                                       actions palette out."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleCardPaletteMenu(row.is_active()));
                                         },
                                     },
 
@@ -2074,7 +2093,7 @@ impl Component for Preferences {
                                     set_description: Some(
                                         i18n("By default dates follow the system's own arrangement — its \
                                          field order, month names and clock. Choose a format here to \
-                                         use it whatever the system is set to.").as_str()
+                                         override what your system is set to.").as_str()
                                     ),
 
                                     #[name = "date_style_row"]
@@ -2198,7 +2217,7 @@ impl Component for Preferences {
 
                                 // The Files right-click extension (#188).
                                 add = &adw::PreferencesGroup {
-                                    set_title: &i18n("GNOME Files"),
+                                    set_title: &i18n("GNOME Files Integration"),
                                     set_description: Some(
                                         i18n("Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): \
                                               the selected files open in a new message, attached. This installs \
@@ -2277,9 +2296,7 @@ impl Component for Preferences {
                                     // what happens when they are big.
                                     #[name = "files_action_row"]
                                     adw::ComboRow {
-                                        set_title: &i18n("Files sent from Files go into"),
-                                        set_subtitle: &i18n("What Send with Vireo, Open With Vireo and Email… open \
-                                                       with the files. Asking offers all three each time."),
+                                        set_title: &i18n("Default Send with Vireo behavior"),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilesAction(row.selected()));
                                         },
@@ -2287,9 +2304,10 @@ impl Component for Preferences {
 
                                     #[name = "files_large_row"]
                                     adw::ComboRow {
-                                        set_title: &i18n("Files over the size limit"),
-                                        set_subtitle: &i18n("Uploading needs a cloud storage account (Settings → \
-                                                       Cloud Storage); without one the files are attached."),
+                                        set_title: &i18n("Default large attachments behavior"),
+                                        set_subtitle: &i18n("Upload to cloud storage needs a cloud storage \
+                                                       account (Settings → Cloud Storage) otherwise the \
+                                                       files are attached by default."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilesLarge(row.selected()));
                                         },
@@ -2372,6 +2390,7 @@ impl Component for Preferences {
             threading: init.threading,
             thread_expansion: init.thread_expansion,
             list_palette: init.list_palette,
+            card_actions_hover: init.card_actions_hover,
             avatars: init.avatars,
             panels_stack: None,
             accounts_slot: None,
@@ -2634,7 +2653,7 @@ impl Component for Preferences {
         });
         widgets.list_palette_row.set_active(init.list_palette);
         widgets.list_palette_hover_row.set_active(init.list_palette_hover);
-        widgets.list_palette_menu_row.set_active(init.list_palette_menu);
+        widgets.card_palette_menu_row.set_active(init.card_palette_menu);
         widgets.swipe_enabled_row.set_active(init.swipe_enabled);
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
@@ -2861,9 +2880,12 @@ impl Component for Preferences {
         widgets.swipe_sensitivity_row.set_adjustment(Some(&adj));
 
         // Hover-palette delay spinner (0–3000ms, step 50).
-        // Actions Palette timeout: 1–30 seconds.
+        // Actions palette timeout: 1–30 seconds.
         let adj = gtk::Adjustment::new(init.palette_collapse_secs as f64, 1.0, 30.0, 1.0, 5.0, 0.0);
         widgets.palette_collapse_row.set_adjustment(Some(&adj));
+        let adj =
+            gtk::Adjustment::new(init.card_palette_collapse_secs as f64, 1.0, 30.0, 1.0, 5.0, 0.0);
+        widgets.card_palette_collapse_row.set_adjustment(Some(&adj));
 
         widgets
             .settings_open_row
@@ -3090,6 +3112,7 @@ impl Component for Preferences {
                 let _ = sender.output(PrefOutput::SetSingleMessageCard(on));
             }
             PrefInput::ChangeCardActionsMode(index) => {
+                self.card_actions_hover = index == 0;
                 let (hover_toggle, hover_auto) = match index {
                     0 => (true, false),
                     1 => (false, true),
@@ -3107,8 +3130,8 @@ impl Component for Preferences {
             PrefInput::ToggleListPaletteHover(on) => {
                 let _ = sender.output(PrefOutput::SetListPaletteHover(on));
             }
-            PrefInput::ToggleListPaletteMenu(on) => {
-                let _ = sender.output(PrefOutput::SetListPaletteMenu(on));
+            PrefInput::ToggleCardPaletteMenu(on) => {
+                let _ = sender.output(PrefOutput::SetCardPaletteMenu(on));
             }
             PrefInput::ToggleSwipeEnabled(on) => {
                 self.swipe_enabled = on;
@@ -3364,6 +3387,9 @@ impl Component for Preferences {
             }
             PrefInput::ChangePaletteCollapse(secs) => {
                 let _ = sender.output(PrefOutput::SetPaletteCollapse(secs));
+            }
+            PrefInput::ChangeCardPaletteCollapse(secs) => {
+                let _ = sender.output(PrefOutput::SetCardPaletteCollapse(secs));
             }
             PrefInput::ChangeAppTheme(index) => {
                 let theme = APP_THEMES

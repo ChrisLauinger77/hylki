@@ -486,8 +486,8 @@ fn sample_messages() -> Vec<Message> {
         // ---- Account 1 · Drafts ----
         Spec { id: 20, account_id: 1, folder_id: 4, from_name: "Jason M.", from_addr: ME, to: "team@vireo.hyprlab.co",
             subject: "Release notes for 0.2",
-            preview: "Draft — Highlights for the next build: Actions Palette, message-content theme, infinite scroll…",
-            body: "Draft.\n\nHighlights for 0.2:\n  • Actions Palette with slide-in animation\n  • Per-message light/dark content theme\n  • Infinite scroll for large folders\n\nTODO: add screenshots.",
+            preview: "Draft — Highlights for the next build: actions palette, message-content theme, infinite scroll…",
+            body: "Draft.\n\nHighlights for 0.2:\n  • actions palette with slide-in animation\n  • Per-message light/dark content theme\n  • Infinite scroll for large folders\n\nTODO: add screenshots.",
             date: "Mon", unread: false, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
         // ---- Account 2 · Inbox ----
         Spec { id: 30, account_id: 2, folder_id: 11, from_name: "Proton", from_addr: "security@proton.me", to: LAB,

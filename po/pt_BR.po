@@ -2415,7 +2415,7 @@ msgid "Double-click to open in a new window"
 msgstr "Clique duas vezes para abrir em uma nova janela"
 
 #. Same order as the reader toolbar and the list's
-#. Actions Palette, View Source closing the line.
+#. actions palette, View Source closing the line.
 msgid "Reply to this message"
 msgstr "Responder a esta mensagem"
 
@@ -2883,13 +2883,6 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Mostrar remetente e assunto"
 
-msgid ""
-"Name who wrote and what about in the notification. Turn this off to keep "
-"both off the lock screen."
-msgstr ""
-"Mostra na notificação quem escreveu e qual é o assunto. Desative para manter "
-"ambos fora da tela de bloqueio."
-
 msgid "Style"
 msgstr "Estilo"
 
@@ -3071,23 +3064,16 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Posição dos filtros"
 
+#, fuzzy
 msgid ""
-"In the unified section, as a row like Inboxes whose caret opens the folders; "
-"or above or below the accounts as a heading with its own list."
-msgstr ""
-"Na seção unificada, como uma linha semelhante a Caixas de entrada cuja seta "
-"abre as pastas; ou acima ou abaixo das contas, como um cabeçalho com sua "
-"própria lista."
-
-msgid "Tags placement"
-msgstr "Posição das etiquetas"
-
-msgid ""
-"The same choices for the Tags section: a unified row, or a heading above or "
-"below the accounts."
+"Choose between appearing in a unified section, or a list above or below the "
+"accounts."
 msgstr ""
 "As mesmas opções para a seção Etiquetas: uma linha unificada ou um cabeçalho "
 "acima ou abaixo das contas."
+
+msgid "Tags placement"
+msgstr "Posição das etiquetas"
 
 msgid "Icon rail"
 msgstr "Barra de ícones"
@@ -3123,8 +3109,9 @@ msgstr ""
 msgid "Every account's folder list."
 msgstr "A lista de pastas de cada conta."
 
-msgid "The account list under Inboxes."
-msgstr "A lista de contas sob Caixas de entrada."
+#, fuzzy
+msgid "The account list under the unified Inboxes row."
+msgstr "A lista de contas sob a linha unificada Enviadas."
 
 msgid "The account list under the unified Starred row."
 msgstr "A lista de contas sob a linha unificada Com estrela."
@@ -3154,13 +3141,14 @@ msgstr ""
 "O avatar do remetente junto de cada mensagem, na lista e acima da mensagem. "
 "Desativá-lo dá mais espaço ao remetente e ao assunto."
 
-msgid "Your own mail shows your account circle"
+#, fuzzy
+msgid "Sent mail uses your account circle"
 msgstr "Suas mensagens mostram o círculo da conta"
 
+#, fuzzy
 msgid ""
 "Messages you sent wear the account's Gravatar, picture or emoji, as its "
-"circle in the sidebar does. Turning it off gives them whatever circle anyone "
-"else's mail would get."
+"circle in the sidebar does."
 msgstr ""
 "As mensagens que você envia usam o Gravatar, a imagem ou o emoji da conta, "
 "assim como o círculo na barra lateral. Ao desativar, elas recebem o mesmo "
@@ -3176,7 +3164,8 @@ msgstr ""
 "Quanto de cada mensagem será exibido sob o assunto. Quando desativado, "
 "também interrompe o download das prévias."
 
-msgid "Actions Palette in the message list"
+#, fuzzy
+msgid "Actions palette in the message list"
 msgstr "Paleta de ações na lista de mensagens"
 
 msgid ""
@@ -3188,32 +3177,26 @@ msgstr ""
 "espaço à linha; as mensagens continuam a poder ser manipuladas a partir dos "
 "respectivos cartões e do menu de contexto."
 
-msgid "Open the Actions Palette on hover"
+#, fuzzy
+msgid "Open the actions palette on hover"
 msgstr "Abrir a Paleta de ações ao passar o ponteiro"
 
+#, fuzzy
 msgid ""
-"The message list's ⋯ palette slides open by itself while the pointer rests "
-"on a row."
+"The message list's ⋯ actions palette slides open by itself while the pointer "
+"rests on a row."
 msgstr ""
 "A paleta ⋯ da lista de mensagens abre-se automaticamente enquanto o ponteiro "
 "permanece sobre uma linha."
 
-msgid "Actions Palette as a menu"
-msgstr "Paleta de ações como menu"
-
-msgid ""
-"The ⋯ opens the row's menu, the same one a right-click shows, instead of "
-"sliding the palette out."
-msgstr ""
-"O botão ⋯ abre o menu da linha, o mesmo que aparece ao clicar com o botão "
-"direito, em vez de fazer deslizar a paleta para fora."
-
 msgid "Swipe actions"
 msgstr "Ações de deslize"
 
+#, fuzzy
 msgid ""
 "Drag a message sideways with the mouse, or swipe it with two fingers on a "
-"trackpad, to archive or delete it."
+"trackpad, to archive or delete it. Default is left to delete, right to "
+"archive."
 msgstr ""
 "Arraste uma mensagem lateralmente com o mouse ou deslize-a com dois dedos no "
 "touchpad para arquivá-la ou excluí-la."
@@ -3222,12 +3205,8 @@ msgid "Reverse swipe directions"
 msgstr "Inverter as direções de deslize"
 
 msgid ""
-"Swipe (mouse-drag or trackpad) a message left to delete it and right to "
-"archive it. Turning this on swaps the two: left archives, right deletes."
+"Turning this on swaps the swipe actions to: left archives, right deletes."
 msgstr ""
-"Deslize uma mensagem para a esquerda, com o mouse ou touchpad, para excluí-"
-"la e para a direita para arquivá-la. Ao ativar esta opção, as duas ações são "
-"invertidas: a esquerda arquiva e a direita exclui."
 
 msgid "Trackpad swipe sensitivity"
 msgstr ""
@@ -3238,12 +3217,14 @@ msgid ""
 "you did not mean them to. Mouse drags are unaffected."
 msgstr ""
 
-msgid "Actions Palette timeout"
+#, fuzzy
+msgid "Actions palette timeout"
 msgstr "Tempo limite da Paleta de ações"
 
+#, fuzzy
 msgid ""
-"Seconds an actions palette stays open after the cursor leaves it — the "
-"list's and the message cards' alike."
+"Seconds the message list's actions palette stays open after the cursor "
+"leaves it."
 msgstr ""
 "O número de segundos durante os quais uma paleta de ações permanece aberta "
 "depois que o cursor sair — tanto na lista como nos cartões das mensagens."
@@ -3359,13 +3340,36 @@ msgstr "Fonte monoespaçada"
 msgid "The system's monospace font unless another is chosen."
 msgstr "A fonte monoespaçada do sistema, a menos que outra seja escolhida."
 
-msgid "Message card actions"
+#, fuzzy
+msgid "Message card actions palette"
 msgstr "Ações nos cartões de mensagens"
 
 msgid "How each message's action icons show in the reader, single or threaded."
 msgstr ""
 "A forma como os ícones de ação de cada mensagem aparecem no leitor, isolada "
 "ou encadeada."
+
+#, fuzzy
+msgid "Message card actions palette timeout"
+msgstr "Ações nos cartões de mensagens"
+
+#, fuzzy
+msgid "Seconds a card's actions palette stays open after the cursor leaves it."
+msgstr ""
+"O número de segundos durante os quais uma paleta de ações permanece aberta "
+"depois que o cursor sair — tanto na lista como nos cartões das mensagens."
+
+#, fuzzy
+msgid "Message card actions palette as a menu"
+msgstr "Paleta de ações como menu"
+
+#, fuzzy
+msgid ""
+"The ⋯ opens the message's menu, the same one a right-click shows, instead of "
+"sliding the actions palette out."
+msgstr ""
+"O botão ⋯ abre o menu da linha, o mesmo que aparece ao clicar com o botão "
+"direito, em vez de fazer deslizar a paleta para fora."
 
 msgid "Single messages as cards"
 msgstr "Mensagens individuais como cartões"
@@ -3528,9 +3532,10 @@ msgstr ""
 "passa a saber seu endereço IP — algo que o bloqueio de conteúdo remoto "
 "normalmente evita."
 
+#, fuzzy
 msgid ""
 "By default dates follow the system's own arrangement — its field order, "
-"month names and clock. Choose a format here to use it whatever the system is "
+"month names and clock. Choose a format here to override what your system is "
 "set to."
 msgstr ""
 "Por padrão, as datas seguem a disposição do sistema — a ordem dos campos, os "
@@ -3633,7 +3638,8 @@ msgstr ""
 "anexar a um relatório de erro. Os endereços de email são abreviados para o "
 "respectivo domínio."
 
-msgid "GNOME Files"
+#, fuzzy
+msgid "GNOME Files Integration"
 msgstr "Arquivos do GNOME"
 
 msgid ""
@@ -3674,22 +3680,17 @@ msgstr ""
 msgid "Restart"
 msgstr "Reiniciar"
 
-msgid "Files sent from Files go into"
-msgstr "Os arquivos enviados pelo aplicativo Arquivos são adicionados a"
-
-msgid ""
-"What Send with Vireo, Open With Vireo and Email… open with the files. Asking "
-"offers all three each time."
+msgid "Default Send with Vireo behavior"
 msgstr ""
-"Define o que “Enviar com o Vireo”, “Abrir com o Vireo” e “Email…” abrem com "
-"os arquivos. Perguntar oferece as três opções a cada vez."
 
-msgid "Files over the size limit"
-msgstr "Arquivos acima do limite de tamanho"
+#, fuzzy
+msgid "Default large attachments behavior"
+msgstr "Obtendo anexos de"
 
+#, fuzzy
 msgid ""
-"Uploading needs a cloud storage account (Settings → Cloud Storage); without "
-"one the files are attached."
+"Upload to cloud storage needs a cloud storage account (Settings → Cloud "
+"Storage) otherwise the files are attached by default."
 msgstr ""
 "O envio requer uma conta de armazenamento na nuvem (Configurações → "
 "Armazenamento na nuvem); sem uma, os arquivos são anexados."
@@ -4398,6 +4399,45 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Name who wrote and what about in the notification. Turn this off to keep "
+#~ "both off the lock screen."
+#~ msgstr ""
+#~ "Mostra na notificação quem escreveu e qual é o assunto. Desative para "
+#~ "manter ambos fora da tela de bloqueio."
+
+#~ msgid ""
+#~ "In the unified section, as a row like Inboxes whose caret opens the "
+#~ "folders; or above or below the accounts as a heading with its own list."
+#~ msgstr ""
+#~ "Na seção unificada, como uma linha semelhante a Caixas de entrada cuja "
+#~ "seta abre as pastas; ou acima ou abaixo das contas, como um cabeçalho com "
+#~ "sua própria lista."
+
+#~ msgid "The account list under Inboxes."
+#~ msgstr "A lista de contas sob Caixas de entrada."
+
+#~ msgid ""
+#~ "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
+#~ "archive it. Turning this on swaps the two: left archives, right deletes."
+#~ msgstr ""
+#~ "Deslize uma mensagem para a esquerda, com o mouse ou touchpad, para "
+#~ "excluí-la e para a direita para arquivá-la. Ao ativar esta opção, as duas "
+#~ "ações são invertidas: a esquerda arquiva e a direita exclui."
+
+#~ msgid "Files sent from Files go into"
+#~ msgstr "Os arquivos enviados pelo aplicativo Arquivos são adicionados a"
+
+#~ msgid ""
+#~ "What Send with Vireo, Open With Vireo and Email… open with the files. "
+#~ "Asking offers all three each time."
+#~ msgstr ""
+#~ "Define o que “Enviar com o Vireo”, “Abrir com o Vireo” e “Email…” abrem "
+#~ "com os arquivos. Perguntar oferece as três opções a cada vez."
+
+#~ msgid "Files over the size limit"
+#~ msgstr "Arquivos acima do limite de tamanho"
 
 #~ msgid "Shown in the dock, app grid and switcher, and by the tray icon."
 #~ msgstr ""
