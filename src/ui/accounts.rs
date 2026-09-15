@@ -302,6 +302,8 @@ pub enum AccountsInput {
     AddBlacklistText(String),
     RemoveBlacklistRow(String),
     AddFilter,
+    /// Run the rules over the mail already in the inboxes (#198).
+    ApplyFilters,
     RemoveFilter(usize),
     /// Save whichever editor page is up (account, filter or tag): the
     /// settings window's leave-editor prompt.
@@ -367,6 +369,8 @@ pub enum AccountsOutput {
     AddBlacklist(String),
     RemoveBlacklist(String),
     SetFilters(Vec<crate::config::FilterRule>),
+    /// Apply the rules to mail that is already there (#198).
+    ApplyFilters,
     SetTags(Vec<crate::config::Tag>),
     /// The tag finder wants every account scanned for keywords in use.
     FindTags,
@@ -677,13 +681,16 @@ impl Component for AccountsWindow {
                                     set_description: Some(
                                         i18n("File incoming mail into folders or tag it automatically, \
                                          by sender, subject or recipients. Applied to each \
-                                         account's Inbox as Vireo syncs it.").as_str()
+                                         account's Inbox as Vireo syncs it, or to the mail already \
+                                         there with Apply Now; a folder's right-click menu runs \
+                                         them over that one folder.").as_str()
                                     ),
                                     // At the header's end, like the other
                                     // panels' buttons.
                                     #[wrap(Some)]
                                     set_header_suffix = &gtk::Box {
                                         set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 6,
                                         set_valign: gtk::Align::Start,
                                         set_halign: gtk::Align::End,
                                         set_margin_start: 24,
@@ -691,6 +698,18 @@ impl Component for AccountsWindow {
                                             set_label: &i18n("Add Filter…"),
                                             set_size_request: (130, -1),
                                             connect_clicked => AccountsInput::AddFilter,
+                                        },
+                                        // Rules normally meet mail as it
+                                        // arrives; this holds them up against
+                                        // what is already in the Inbox (#198).
+                                        #[name = "apply_filters_btn"]
+                                        gtk::Button {
+                                            set_label: &i18n("Apply Now"),
+                                            set_size_request: (130, -1),
+                                            set_tooltip_text: Some(
+                                                i18n("Run every rule over the mail already in your inboxes").as_str()
+                                            ),
+                                            connect_clicked => AccountsInput::ApplyFilters,
                                         },
                                     },
 
@@ -2402,6 +2421,9 @@ impl Component for AccountsWindow {
             }
             AccountsInput::AddFilter => {
                 self.open_filter_page(&widgets.nav, &sender, None);
+            }
+            AccountsInput::ApplyFilters => {
+                let _ = sender.output(AccountsOutput::ApplyFilters);
             }
             AccountsInput::EditFilter(i) => {
                 if let Some(rule) = self.filter_rules.get(i).cloned() {

@@ -45,6 +45,31 @@ const READER_MIN_WIDTH: i32 = 400;
 /// confirmation never come (a dropped connection mid-request).
 const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(20);
 
+/// How long a manual "Apply Filters" run (#198) waits for the folders it asked
+/// for before reporting on whatever came back. A folder that is offline, or
+/// that errors, would otherwise leave the run without an answer for good.
+const FILTER_RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
+
+/// A manual "Apply Filters" run (#198): the (account, folder) pairs it is
+/// still waiting on, and what the rules have done so far.
+struct FilterRun {
+    /// Every folder the run covers. A folder load answers twice (what the
+    /// cache holds, then what the server sends), so the scope has to outlive
+    /// the report or the second answer would go unfiltered outside the Inbox.
+    /// Cleared by [`FILTER_RUN_TIMEOUT`].
+    folders: std::collections::HashSet<(u32, u32)>,
+    /// The folders still to answer for the first time.
+    pending: std::collections::HashSet<(u32, u32)>,
+    /// Whether the run has already said what it did.
+    reported: bool,
+    /// Messages the rules were held up against.
+    checked: usize,
+    /// Tags put on (one per message per rule that asked for one).
+    tagged: usize,
+    /// Messages moved into a rule's folder.
+    filed: usize,
+}
+
 /// Fallback threshold for folding the reader header's right-hand actions
 /// into the overflow menu. Normally the threshold is *measured* at startup from the
 /// real row (see the breakpoint in init) so it tracks the user's decoration
@@ -578,6 +603,8 @@ pub struct AppModel {
     /// The on-disk index, for reads the main thread makes itself: the tag
     /// views and folding locally-kept tags into synced summaries.
     cache: Option<crate::cache::Cache>,
+    /// A manual "Apply Filters" run (#198), while one is under way.
+    filter_run: Option<FilterRun>,
     /// Inbox UIDs whose filter move has been requested but not yet observed
     /// (the message still showed up in the last sync). A sync racing the
     /// server-side move must neither re-request the move nor re-notify.
@@ -1167,6 +1194,12 @@ pub enum AppMsg {
     ImportSettings,
     /// The filter rules changed in Settings (#47).
     SetFilters(Vec<config::FilterRule>),
+    /// Run the filter rules over mail that is already in these (account,
+    /// folder) pairs (#198), rather than waiting for the next arrival. An
+    /// empty list means every account's Inbox.
+    ApplyFilters(Vec<(u32, u32)>),
+    /// A manual filter run has waited long enough: report what it managed.
+    FilterRunTimeout,
     /// The tags changed in Settings (#71).
     SetTags(Vec<config::Tag>),
     /// A tag row in the sidebar was chosen: list everything carrying it.
@@ -2514,6 +2547,7 @@ impl SimpleComponent for AppModel {
             } else {
                 crate::cache::Cache::open().ok()
             },
+            filter_run: None,
             filter_moved: Default::default(),
             body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
@@ -3512,6 +3546,20 @@ impl SimpleComponent for AppModel {
                         let _ = ml.send(MessageListInput::ContextMenu { x: 120.0, y: 40.0 });
                     });
                 }
+                // VIREO_SHOWCASE_APPLY_FILTERS=inboxes|<account>:<folder>
+                // starts a manual filter run at 5s (#198), the way Apply Now
+                // and the folder menu's Apply Filters do, and the run's
+                // report lands in the status bar a beat later.
+                if let Ok(spec) = std::env::var("VIREO_SHOWCASE_APPLY_FILTERS") {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(5, move || {
+                        let targets = spec
+                            .split_once(':')
+                            .and_then(|(a, f)| Some(vec![(a.parse().ok()?, f.parse().ok()?)]))
+                            .unwrap_or_default();
+                        s.input(AppMsg::ApplyFilters(targets));
+                    });
+                }
                 // VIREO_SHOWCASE_TOOLBAR_GAP=<zone>:<index> opens a drop gap
                 // in the Settings toolbar editor at 6s (pair with
                 // VIREO_SHOWCASE_SETTINGS=appearance), as a hovering drag
@@ -4461,6 +4509,9 @@ impl SimpleComponent for AppModel {
                     for (account_id, folder_id, path) in reqs {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
+                }
+                CtxAction::ApplyFilters { account_id, folder_id } => {
+                    self.start_filter_run(vec![(account_id, folder_id)], &sender);
                 }
                 CtxAction::EditFilter { account_id, path } => {
                     // The first rule filing into this folder, in the
@@ -6762,6 +6813,14 @@ impl SimpleComponent for AppModel {
                 // list is fetched for the tray menu.
                 self.push_unread_counts();
                 self.sync_unloaded_counted_folders();
+            }
+
+            AppMsg::ApplyFilters(targets) => {
+                self.start_filter_run(targets, &sender);
+            }
+
+            AppMsg::FilterRunTimeout => {
+                self.report_filter_run(true);
             }
 
             AppMsg::SetTags(tags) => {
@@ -9505,7 +9564,12 @@ impl AppModel {
                     .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
                     .collect();
                 let filtered = self.account_filtered_folders(account.id);
+                let has_filters = self
+                    .filters
+                    .iter()
+                    .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
                 Some(SectionData {
+                    has_filters,
                     collapsed: self.collapsed.contains(email),
                     custom_expanded: self.folders_expanded.contains(email),
                     filtered_expanded: self.filtered_expanded_accounts.contains(email),
@@ -13225,6 +13289,7 @@ impl AppModel {
                 AccountsOutput::AddBlacklist(addr) => AppMsg::AddBlacklist(addr),
                 AccountsOutput::RemoveBlacklist(addr) => AppMsg::RemoveBlacklist(addr),
                 AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
+                AccountsOutput::ApplyFilters => AppMsg::ApplyFilters(Vec::new()),
                 AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
                 AccountsOutput::FindTags => AppMsg::FindTags,
                 AccountsOutput::LeftEditor(page) => AppMsg::SettingsLeaveEditor { page, ask: false },
@@ -13944,26 +14009,57 @@ impl AppModel {
     /// Returns the messages staying in the inbox, plus the ones filed away on
     /// this sync (paired with their destination path) so the caller can still
     /// count them as new mail when notifying.
+    ///
+    /// A manual run (#198) adds the folder it was pointed at to the pass, even
+    /// when that is not the Inbox, and tallies what the rules did there so the
+    /// run can report it.
     fn apply_filters(
         &mut self,
         account_id: u32,
         folder_id: u32,
         messages: Vec<Message>,
     ) -> (Vec<Message>, Vec<(Message, String)>) {
-        if self.filters.is_empty()
-            || self.inbox_of(account_id).map(|f| f.id) != Some(folder_id)
-        {
-            return (messages, Vec::new());
+        let manual = self
+            .filter_run
+            .as_ref()
+            .is_some_and(|r| r.folders.contains(&(account_id, folder_id)));
+        let (kept, filed, checked, tagged) =
+            self.filter_pass(account_id, folder_id, messages, manual);
+        if manual {
+            let filed_now = filed.len();
+            self.filter_run_folder_done(account_id, folder_id, checked, tagged, filed_now);
         }
-        let Some(email) = self.email_of(account_id) else { return (messages, Vec::new()) };
+        (kept, filed)
+    }
+
+    /// One pass of the rules over a folder's messages. Returns what stays,
+    /// what was filed elsewhere, and (for a manual run) how many messages
+    /// were looked at and how many tags were put on.
+    fn filter_pass(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        messages: Vec<Message>,
+        manual: bool,
+    ) -> (Vec<Message>, Vec<(Message, String)>, usize, usize) {
+        if self.filters.is_empty()
+            || (!manual && self.inbox_of(account_id).map(|f| f.id) != Some(folder_id))
+        {
+            return (messages, Vec::new(), 0, 0);
+        }
+        let Some(email) = self.email_of(account_id) else {
+            return (messages, Vec::new(), 0, 0);
+        };
         let rules: Vec<&config::FilterRule> = self
             .filters
             .iter()
             .filter(|r| r.account_email.eq_ignore_ascii_case(&email))
             .collect();
         if rules.is_empty() {
-            return (messages, Vec::new());
+            return (messages, Vec::new(), 0, 0);
         }
+        let checked = messages.len();
+        let mut tagged = 0usize;
         let folders = self.folders.get(&account_id);
         let src = folders
             .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
@@ -14001,17 +14097,18 @@ impl AppModel {
             // the move carries the keyword along. A tag that no longer
             // exists tags nothing.
             if let Some(src) = &src {
-                let wanted: Vec<String> = matching
+                let wanted: Vec<(String, String)> = matching
                     .iter()
                     .filter(|r| !r.tag.is_empty() && !m.has_keyword(&r.tag))
                     .filter(|r| self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(&r.tag)))
-                    .map(|r| r.tag.clone())
+                    .map(|r| (r.tag.clone(), r.label()))
                     .collect();
-                for tag in wanted {
+                for (tag, rule) in wanted {
                     if m.has_keyword(&tag) {
                         continue; // two rules naming one tag
                     }
-                    tracing::info!("filter: {} tagged {tag}", m.from_addr);
+                    tagged += 1;
+                    tracing::info!("filter: {} tagged {tag} [{rule}]", m.from_addr);
                     self.send_to(account_id, MailRequest::SetKeyword {
                         path: src.clone(),
                         uid: m.uid,
@@ -14040,11 +14137,10 @@ impl AppModel {
                         continue;
                     }
                     tracing::info!(
-                        "filter: {} → {} ({:?}{})",
+                        "filter: {} → {} [{}]",
                         m.from_addr,
                         rule.dest_path,
-                        rule.conditions(),
-                        if rule.any { ", any" } else { "" },
+                        rule.label(),
                     );
                     self.send_to(account_id, MailRequest::MoveMessage {
                         path: src.clone(),
@@ -14061,7 +14157,152 @@ impl AppModel {
         if !still_pending.is_empty() {
             self.filter_moved.insert((account_id, folder_id), still_pending);
         }
-        (kept, filed)
+        (kept, filed, checked, tagged)
+    }
+
+    /// The (account, folder) pairs a manual filter run should cover (#198).
+    /// An empty `targets` means every account's Inbox; anything else is
+    /// taken as given, minus accounts that have no rules at all.
+    fn filter_run_targets(&self, targets: Vec<(u32, u32)>) -> Vec<(u32, u32)> {
+        let has_rules = |account_id: u32| {
+            self.email_of(account_id).is_some_and(|email| {
+                self.filters.iter().any(|r| r.account_email.eq_ignore_ascii_case(&email))
+            })
+        };
+        let targets = if targets.is_empty() {
+            self.accounts
+                .iter()
+                .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id)))
+                .collect()
+        } else {
+            targets
+        };
+        targets.into_iter().filter(|(a, _)| has_rules(*a)).collect()
+    }
+
+    /// Start a manual filter run over `targets`: re-load each folder so the
+    /// rules meet the mail already in it. The load's `Messages` event is what
+    /// actually runs them, through [`apply_filters`].
+    fn start_filter_run(&mut self, targets: Vec<(u32, u32)>, sender: &ComponentSender<Self>) {
+        let targets = self.filter_run_targets(targets);
+        if targets.is_empty() {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n("No filters to apply here yet"),
+                error: false,
+                connectivity: false,
+            });
+            return;
+        }
+        tracing::info!(
+            "filter: manual run over {} folder(s), {} rule(s)",
+            targets.len(),
+            self.filters.len(),
+        );
+        self.filter_run = Some(FilterRun {
+            folders: targets.iter().copied().collect(),
+            pending: targets.iter().copied().collect(),
+            reported: false,
+            checked: 0,
+            tagged: 0,
+            filed: 0,
+        });
+        self.notifications.emit(NotifyInput::SetStatus(i18n("Applying filters…")));
+        for (account_id, folder_id) in targets {
+            let path = self
+                .folders
+                .get(&account_id)
+                .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+                .map(|f| f.path.clone());
+            if let Some(path) = path {
+                self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
+            } else {
+                // Nothing to load it from: count the folder as reported so
+                // the run can still finish.
+                self.filter_run_folder_done(account_id, folder_id, 0, 0, 0);
+            }
+        }
+        // A folder that never answers (offline, or an error) must not leave
+        // the run hanging: report whatever landed after a decent wait.
+        let sender = sender.clone();
+        gtk::glib::timeout_add_local_once(FILTER_RUN_TIMEOUT, move || {
+            sender.input(AppMsg::FilterRunTimeout);
+        });
+    }
+
+    /// One folder of a manual run has been through the rules.
+    fn filter_run_folder_done(
+        &mut self,
+        account_id: u32,
+        folder_id: u32,
+        checked: usize,
+        tagged: usize,
+        filed: usize,
+    ) {
+        let Some(run) = self.filter_run.as_mut() else { return };
+        run.pending.remove(&(account_id, folder_id));
+        run.checked += checked;
+        run.tagged += tagged;
+        run.filed += filed;
+        if run.pending.is_empty() {
+            self.report_filter_run(false);
+        }
+    }
+
+    /// Say what a manual filter run did. `end` (the timeout) also drops the
+    /// run, so the folders stop counting as manually swept; without it the
+    /// scope stands, and the server's answer to the same load is filtered
+    /// too. Reports once either way.
+    fn report_filter_run(&mut self, end: bool) {
+        let Some(run) = self.filter_run.as_mut() else { return };
+        if std::mem::replace(&mut run.reported, true) {
+            if end {
+                self.filter_run = None;
+            }
+            return;
+        }
+        let (checked, tagged, filed, unanswered) =
+            (run.checked, run.tagged, run.filed, run.pending.len());
+        if end {
+            self.filter_run = None;
+        }
+        tracing::info!(
+            "filter: manual run done, {checked} checked, {tagged} tagged, {filed} filed, \
+             {unanswered} folder(s) unanswered",
+        );
+        self.notifications.emit(NotifyInput::SetStatus(String::new()));
+        // Always says how many messages the rules were held up against: with
+        // nothing matching, that is the whole answer to "are my rules working"
+        // (#198). The plural follows that count throughout.
+        let n = checked.to_string();
+        let tagged_s = tagged.to_string();
+        let filed_s = filed.to_string();
+        let text = match (tagged, filed) {
+            (0, 0) => ni18n_f(
+                "Filters looked at {n} message, and it matched nothing",
+                "Filters looked at {n} messages, and none of them matched",
+                checked as u32,
+                &[("n", &n)],
+            ),
+            (_, 0) => ni18n_f(
+                "Filters tagged {tagged} of {n} message",
+                "Filters tagged {tagged} of {n} messages",
+                checked as u32,
+                &[("tagged", &tagged_s), ("n", &n)],
+            ),
+            (0, _) => ni18n_f(
+                "Filters filed {filed} of {n} message away",
+                "Filters filed {filed} of {n} messages away",
+                checked as u32,
+                &[("filed", &filed_s), ("n", &n)],
+            ),
+            _ => ni18n_f(
+                "Filters tagged {tagged} and filed {filed} of {n} message",
+                "Filters tagged {tagged} and filed {filed} of {n} messages",
+                checked as u32,
+                &[("tagged", &tagged_s), ("filed", &filed_s), ("n", &n)],
+            ),
+        };
+        self.notifications.emit(NotifyInput::Push { text, error: false, connectivity: false });
     }
 
     /// Re-sync every inbox so a newly-blacklisted sender's existing mail is

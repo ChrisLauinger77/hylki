@@ -162,6 +162,9 @@ pub struct SectionData {
     /// (every rule's destination), and whether that section is open.
     pub filtered: Vec<Folder>,
     pub filtered_expanded: bool,
+    /// Whether this account has any filter rule at all: only then is
+    /// "Apply Filters" worth offering on its folders (#198).
+    pub has_filters: bool,
     /// Whether this account's own "Tags" section is open.
     pub tags_expanded: bool,
 }
@@ -551,6 +554,9 @@ pub enum CtxAction {
     EmptyFolder { account_id: u32, folder_id: u32, name: String, path: String },
     /// Open Settings on the filter rule that files into this folder.
     EditFilter { account_id: u32, path: String },
+    /// Run this account's filter rules over the mail already in this
+    /// folder (#198).
+    ApplyFilters { account_id: u32, folder_id: u32 },
     /// Open Settings on this tag (by keyword).
     EditTag(String),
 }
@@ -2269,6 +2275,7 @@ impl Sidebar {
                 id,
                 essential.iter().map(|f| (*f).clone()).collect(),
                 section.filtered.iter().map(|f| f.path.clone()).collect(),
+                section.has_filters,
                 sender,
             );
 
@@ -2407,7 +2414,8 @@ impl Sidebar {
                     id,
                     custom.iter().map(|f| (*f).clone()).collect(),
                     section.filtered.iter().map(|f| f.path.clone()).collect(),
-                sender,
+                    section.has_filters,
+                    sender,
                 );
 
                 custom_revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -2896,7 +2904,7 @@ impl Sidebar {
                         .and_then(|row| refs.get(row.index() as usize))
                     {
                         // The same menu the folder has under its account.
-                        let items = folder_menu_items(r.account_id, &r.folder, true);
+                        let items = folder_menu_items(r.account_id, &r.folder, true, true);
                         show_sidebar_menu(&sub_w, x, y, items, &cs);
                     }
                 });
@@ -3260,7 +3268,7 @@ impl Sidebar {
                 .row_at_y(y as i32)
                 .and_then(|row| refs.get(row.index() as usize))
             {
-                let items = folder_menu_items(r.account_id, &r.folder, true);
+                let items = folder_menu_items(r.account_id, &r.folder, true, true);
                 show_sidebar_menu(&list_w, x, y, items, &cs);
             }
         });
@@ -3832,11 +3840,30 @@ fn folder_drop_target(
 /// The context menu of one folder — the same wherever the folder is
 /// listed (under its account, or as a filtered folder in the unified
 /// section): `filtered` says a filter rule files into it.
-fn folder_menu_items(id: u32, f: &Folder, filtered: bool) -> Vec<(&'static str, CtxAction)> {
+fn folder_menu_items(
+    id: u32,
+    f: &Folder,
+    filtered: bool,
+    has_filters: bool,
+) -> Vec<(&'static str, CtxAction)> {
     let mut items = vec![
         (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead { account_id: id, folder_id: f.id }),
         (i18n_noop("Refresh"), CtxAction::RefreshFolder { account_id: id, folder_id: f.id }),
     ];
+    // Rules normally only meet mail arriving in the Inbox; from here they
+    // can be held up against whatever is already in this folder (#198).
+    // Not on Drafts, Junk or Trash: filing mail *out* of those is never what
+    // a rule about incoming mail meant.
+    let filterable = !matches!(
+        f.kind,
+        FolderKind::Drafts | FolderKind::Junk | FolderKind::Trash | FolderKind::Starred
+    );
+    if has_filters && filterable {
+        items.push((i18n_noop("Apply Filters"), CtxAction::ApplyFilters {
+            account_id: id,
+            folder_id: f.id,
+        }));
+    }
     // A filter files into this folder: its rule is a click away.
     if filtered {
         items.push((i18n_noop("Edit Filter…"), CtxAction::EditFilter {
@@ -3906,6 +3933,7 @@ fn attach_folder_context_menu(
     id: u32,
     folders: Vec<Folder>,
     filtered: Vec<String>,
+    has_filters: bool,
     sender: &ComponentSender<Sidebar>,
 ) {
     let click = gtk::GestureClick::new();
@@ -3917,7 +3945,8 @@ fn attach_folder_context_menu(
             .row_at_y(y as i32)
             .and_then(|row| folders.get(row.index() as usize))
         {
-            let items = folder_menu_items(id, f, filtered.iter().any(|p| *p == f.path));
+            let items =
+                folder_menu_items(id, f, filtered.iter().any(|p| *p == f.path), has_filters);
             show_sidebar_menu(&list_w, x, y, items, &cs);
         }
     });
