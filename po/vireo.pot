@@ -531,6 +531,56 @@ msgstr ""
 msgid "No {v1} folder available for some messages"
 msgstr ""
 
+msgid "No filters to apply here yet"
+msgstr ""
+
+msgid "Applying Filters"
+msgstr ""
+
+msgid "Run in Background"
+msgstr ""
+
+msgid "Looked at {n} message so far"
+msgid_plural "Looked at {n} messages so far"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Tagged {n} message"
+msgid_plural "Tagged {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Filed {n} message away"
+msgid_plural "Filed {n} messages away"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Folder {done} of {total}"
+msgstr ""
+
+msgid "Filters looked at {n} message, and it matched nothing"
+msgid_plural "Filters looked at {n} messages, and none of them matched"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Filters tagged {tagged} of {n} message"
+msgid_plural "Filters tagged {tagged} of {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Filters filed {filed} of {n} message away"
+msgid_plural "Filters filed {filed} of {n} messages away"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Filters tagged {tagged} and filed {filed} of {n} message"
+msgid_plural "Filters tagged {tagged} and filed {filed} of {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Filters Applied"
+msgstr ""
+
 msgid "Move around"
 msgstr ""
 
@@ -882,10 +932,18 @@ msgstr ""
 
 msgid ""
 "File incoming mail into folders or tag it automatically, by sender, subject "
-"or recipients. Applied to each account's Inbox as Vireo syncs it."
+"or recipients. Applied to each account's Inbox as Vireo syncs it, or to the "
+"mail already there with Apply Now; a folder's right-click menu runs them "
+"over that one folder."
 msgstr ""
 
 msgid "Add Filter…"
+msgstr ""
+
+msgid "Run every rule over the mail already in your inboxes"
+msgstr ""
+
+msgid "Apply Now"
 msgstr ""
 
 msgid "Search senders"
@@ -1316,6 +1374,9 @@ msgstr ""
 msgid "Remove filter"
 msgstr ""
 
+msgid "Applying…"
+msgstr ""
+
 msgid "Searching…"
 msgstr ""
 
@@ -1377,6 +1438,9 @@ msgid "Edit Filter"
 msgstr ""
 
 msgid "Add Filter"
+msgstr ""
+
+msgid "Name (optional)"
 msgstr ""
 
 msgid "Remove condition"
@@ -3502,6 +3566,9 @@ msgid "Show each tag"
 msgstr ""
 
 msgid "Long-press to expand or collapse"
+msgstr ""
+
+msgid "Apply Filters"
 msgstr ""
 
 msgid "Edit Filter…"

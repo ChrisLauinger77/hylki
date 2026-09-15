@@ -578,6 +578,71 @@ msgstr "© 2026 Hyprlab"
 msgid "No {v1} folder available for some messages"
 msgstr "Для некоторых сообщений нет доступной папки {v1}"
 
+#, fuzzy
+msgid "No filters to apply here yet"
+msgstr "Сообщение не выбрано"
+
+#, fuzzy
+msgid "Applying Filters"
+msgstr "Добавить фильтр"
+
+#, fuzzy
+msgid "Run in Background"
+msgstr "Продолжать работу в фоновом режиме"
+
+#, fuzzy
+msgid "Looked at {n} message so far"
+msgid_plural "Looked at {n} messages so far"
+msgstr[0] "Отправлять новые сообщения с адреса"
+msgstr[1] "Отправлять новые сообщения с адреса"
+msgstr[2] "Отправлять новые сообщения с адреса"
+
+#, fuzzy
+msgid "Tagged {n} message"
+msgid_plural "Tagged {n} messages"
+msgstr[0] "{n} письмо"
+msgstr[1] "{n} письма"
+msgstr[2] "{n} писем"
+
+#, fuzzy
+msgid "Filed {n} message away"
+msgid_plural "Filed {n} messages away"
+msgstr[0] "Найти в сообщении"
+msgstr[1] "Найти в сообщении"
+msgstr[2] "Найти в сообщении"
+
+#, fuzzy
+msgid "Folder {done} of {total}"
+msgstr "{cur} из {total}"
+
+msgid "Filters looked at {n} message, and it matched nothing"
+msgid_plural "Filters looked at {n} messages, and none of them matched"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Filters tagged {tagged} of {n} message"
+msgid_plural "Filters tagged {tagged} of {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Filters filed {filed} of {n} message away"
+msgid_plural "Filters filed {filed} of {n} messages away"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Filters tagged {tagged} and filed {filed} of {n} message"
+msgid_plural "Filters tagged {tagged} and filed {filed} of {n} messages"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "Filters Applied"
+msgstr "Расположение фильтров"
+
 msgid "Move around"
 msgstr "Перемещаться"
 
@@ -954,9 +1019,12 @@ msgstr "Поиск фильтров"
 msgid "Filters"
 msgstr "Фильтры"
 
+#, fuzzy
 msgid ""
 "File incoming mail into folders or tag it automatically, by sender, subject "
-"or recipients. Applied to each account's Inbox as Vireo syncs it."
+"or recipients. Applied to each account's Inbox as Vireo syncs it, or to the "
+"mail already there with Apply Now; a folder's right-click menu runs them "
+"over that one folder."
 msgstr ""
 "Раскладывайте входящую почту по папкам или автоматически присваивайте ей тег "
 "по отправителю, теме или получателям. Применяется к папке «Входящие» каждой "
@@ -964,6 +1032,13 @@ msgstr ""
 
 msgid "Add Filter…"
 msgstr "Добавить фильтр…"
+
+msgid "Run every rule over the mail already in your inboxes"
+msgstr ""
+
+#, fuzzy
+msgid "Apply Now"
+msgstr "Применить"
 
 msgid "Search senders"
 msgstr "Поиск отправителей"
@@ -1438,6 +1513,10 @@ msgstr ", с тегом {tag}"
 msgid "Remove filter"
 msgstr "Удалить фильтр"
 
+#, fuzzy
+msgid "Applying…"
+msgstr "Загрузка…"
+
 msgid "Searching…"
 msgstr "Поиск…"
 
@@ -1508,6 +1587,10 @@ msgstr "Редактировать фильтр"
 
 msgid "Add Filter"
 msgstr "Добавить фильтр"
+
+#, fuzzy
+msgid "Name (optional)"
+msgstr "Псевдоним (необязательно)"
 
 #, fuzzy
 msgid "Remove condition"
@@ -3983,6 +4066,10 @@ msgstr "Показывать каждую метку"
 
 msgid "Long-press to expand or collapse"
 msgstr "Долгое нажатие — развернуть или свернуть"
+
+#, fuzzy
+msgid "Apply Filters"
+msgstr "Фильтры"
 
 msgid "Edit Filter…"
 msgstr "Редактировать фильтр…"

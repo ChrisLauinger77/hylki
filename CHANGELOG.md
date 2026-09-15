@@ -1,5 +1,62 @@
 # Changelog
 
+## 1.31.1 — 2026-09-15
+
+Filter rules can be given a name, and the rules can be run over mail that
+is already in a folder instead of only meeting mail as it arrives.
+
+- **A filter rule can carry a name** (#197, requested by
+  [@yioannides](https://github.com/yioannides)). The filters list spelled
+  every rule out by its conditions, which since #192 can run to several
+  clauses on one line. The rule editor's first row is now **Name
+  (optional)**, and a named rule is listed by that name with its
+  conditions moved into the subtitle above the account and destination;
+  an unnamed rule reads exactly as it did. The name is written to
+  `filters.toml` only when it is set, so a version that predates it reads
+  the file back unchanged, and it is what the log calls the rule when one
+  tags or files a message.
+- **Filters can be run over mail that is already there** (#198, reported
+  by [@yioannides](https://github.com/yioannides)). Rules only ever met
+  mail as it landed in the Inbox, so a rule written today never touched
+  anything already sitting in a folder, and nothing said what a rule had
+  done, which left a rule that matched nothing indistinguishable from one
+  that never ran. Settings → Filters gained **Apply Now** beside Add
+  Filter, which runs every rule over the mail already in each account's
+  Inbox; a folder's right-click menu in the sidebar gained **Apply
+  Filters** for the same over that one folder, which is the only way
+  rules reach mail outside the Inbox. It is left off Drafts, Junk, Trash
+  and Starred, where filing mail back out is not what a rule about
+  arriving mail meant, and off accounts with no rules at all. The report
+  always names how many messages the rules were held up against:
+  "Filters tagged 9 of 23 messages", or that none of them matched.
+- **A run can be watched, or sent to the background.** Apply Now spins
+  with an "Applying…" label for as long as the run lasts, and the run
+  puts up a dialog with a spinner and a live count: messages looked at,
+  tagged and filed, and which folder of how many it is on. Its one button
+  is **Run in Background** while the work is going and **Close** once it
+  holds the report. Waiting on the dialog puts the report there and
+  nowhere else; sending the run to the background puts it in the status
+  bar when it finishes, as does a dialog that goes down with the Settings
+  window.
+- A folder counts as done in such a run once its load has been to the
+  server and back, not when the cache answers — which it does instantly
+  and synchronously, so the run would otherwise have ended before the
+  dialog could draw, and mail never synced into the cache would have been
+  missed. The worker emits a new `FolderSynced` event at the end of every
+  folder load, after success and after an error alike. Both answers
+  describe the same mail, so a folder's tally takes the larger "looked
+  at" of the two rather than adding them, while tags and moves add up:
+  neither happens twice for one message, since the second pass sees the
+  tag, or the move already requested.
+- **French is complete again** (PR #195 by
+  [@frenchy82](https://github.com/frenchy82)): 1171 of 1171 strings, with
+  the 1.31.0 themes, the multi-condition filter editor, the Mail Accounts
+  columns and the GNOME Files rows all translated and 25 fuzzy entries
+  resolved. **Russian** has every 1.31.0 string (PR #196 by
+  [@iliasen](https://github.com/iliasen)), along with a batch of wrong
+  fuzzy matches corrected; three Send Later labels that had lost their
+  `{time}` placeholder to a fixed clock time were restored.
+
 ## 1.31.0 — 2026-09-15
 
 Appearance themes, a Drafts count fix for manually assigned folders, a

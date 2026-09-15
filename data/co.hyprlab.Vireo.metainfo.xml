@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.31.1" date="2026-09-15">
+      <description>
+        <p>Filter rules can be given a name of their own (#197), and the rules can be run over mail that is already in a folder rather than only meeting mail as it arrives (#198): Apply Now in Settings sweeps every inbox, a folder's right-click menu sweeps that folder, and a dialog shows a live count while the run works and reports what it did. French and Russian translations updated (#195, #196).</p>
+      </description>
+    </release>
     <release version="1.31.0" date="2026-09-15">
       <description>
         <p>Appearance themes: Settings, Appearance gained a Theme gallery (System, Midnight, Tidal, Rose, Earth, Forest), each with a light and a dark palette that reaches the reader and the composer; a Drafts folder assigned under Special Folders now shows its count; Settings rows reworded and the ⋯-as-a-menu switch moved to Reading; Mail Accounts marks and badges aligned in columns; Portuguese translations updated (#194).</p>

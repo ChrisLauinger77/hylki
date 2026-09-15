@@ -2,6 +2,16 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.31.1
+
+**Filter rules can be given a name** (#197, requested by [@yioannides](https://github.com/yioannides)). The filters list used to spell every rule out by its conditions, which can now run to several clauses on one line. The rule editor's first row is **Name (optional)**, and a named rule is listed by its name with the conditions moved underneath. Unnamed rules read exactly as they did.
+
+**Filters can be run over mail that is already there** (#198, reported by [@yioannides](https://github.com/yioannides)). Until now rules only ever met mail as it landed in the Inbox, so a rule you wrote today never touched anything already sitting in a folder. Settings → Filters has an **Apply Now** button beside Add Filter that runs every rule over the mail already in your inboxes, and a folder's right-click menu in the sidebar has **Apply Filters** for that one folder, which is how rules reach mail outside the Inbox. It is left off Drafts, Junk and Trash, where filing mail back out is not what a rule about arriving mail meant.
+
+**A run tells you what it did.** Apply Now spins while the run lasts, and the run puts up a dialog with a live count: how many messages the rules have been held up against, how many were tagged or filed, and which folder of how many it is on. Wait on it and the report appears there; press **Run in Background** and the run carries on without you, reporting in the status bar when it finishes. The report always names the number of messages looked at, so a rule that matches nothing now says so instead of looking like a rule that never ran.
+
+**French is complete again** (PR #195 by [@frenchy82](https://github.com/frenchy82)), and **Russian** has every 1.31.0 string (PR #196 by [@iliasen](https://github.com/iliasen)).
+
 ## What's new in 1.31.0
 
 **Appearance themes.** Settings → Appearance gained a **Theme** gallery: **System**, the stock GNOME look and still the default, plus **Midnight**, **Tidal**, **Rose**, **Earth** and **Forest**. Every theme has a light and a dark palette, so the Style setting keeps doing what it did and picks which of the two you see; each card shows both halves, with a ring round the one currently on screen. A theme colours the whole window, the reader and the composer included, and switches at once without a restart. The palettes come from the theme library of [T3 Code](https://github.com/pingdotgg/t3code) (MIT).
