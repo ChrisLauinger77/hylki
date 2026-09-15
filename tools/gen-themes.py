@@ -62,7 +62,7 @@ OVERRIDES = {
     },
     ("forest", "dark"): {"accent": "#3eb272", "sidebarBorder": "border"},
     ("tidal", "dark"): {"accent": "#509ed8", "sidebarBorder": "border"},
-    ("earth", "dark"): {"sidebarBorder": "border"},
+    ("earth", "dark"): {"accent": "#ea8946", "sidebarBorder": "border"},
     # Rose's dark palette is not built like the other four: upstream gives it
     # grounds at hue 270 (which is Midnight's violet, so the two read alike),
     # a sidebar darker than its own canvas, and hairlines and panel tints

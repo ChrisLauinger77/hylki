@@ -350,7 +350,7 @@ pub const EARTH: Theme = Theme {
         border: "#664c3f",
         input: "#7a5d4d",
         focus: "#f09a64",
-        accent: "#f09a64",
+        accent: "#ea8946",
         accent_foreground: "#241523",
         secondary: "#513728",
         secondary_foreground: "#fffaff",
