@@ -524,7 +524,8 @@ upstream — their work ships in the app and is credited in the About window:
 - [**Paulo Fino**](https://github.com/somepaulo) ([#178](https://github.com/hyprlab/vireo/pull/178),
   [#179](https://github.com/hyprlab/vireo/issues/179),
   [#182](https://github.com/hyprlab/vireo/pull/182),
-  [#183](https://github.com/hyprlab/vireo/issues/183)) — the Portuguese (Portugal)
+  [#183](https://github.com/hyprlab/vireo/issues/183),
+  [#194](https://github.com/hyprlab/vireo/pull/194)) — the Portuguese (Portugal)
   and Brazilian Portuguese translations, the request for a language chooser, and
   the report that the chosen language never reached the Flatpak.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/vireo/pull/7),
