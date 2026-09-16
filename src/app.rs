@@ -9250,14 +9250,9 @@ impl AppModel {
     /// its inverse on the other so the move can be made again.
     fn undo_redo(&mut self, redo: bool) {
         let entry = if redo { self.redo_stack.pop() } else { self.undo_stack.pop() };
-        let Some(entry) = entry else {
-            self.notifications.emit(NotifyInput::Push {
-                text: if redo { i18n("Nothing to redo") } else { i18n("Nothing to undo") },
-                error: false,
-                connectivity: false,
-            });
-            return;
-        };
+        // Nothing to say when there is nothing to do: the menu entry is
+        // already greyed out, and the key should just be inert (#200).
+        let Some(entry) = entry else { return };
         let back = UndoEntry {
             account_id: entry.account_id,
             what: entry.what.clone(),
@@ -9267,7 +9262,7 @@ impl AppModel {
         // back: leaving it on top would jam the key on something that will
         // fail again every time. The entries under it are usually about other
         // messages entirely, so the rest of the history stands.
-        if self.apply_undo_step(entry.account_id, &entry.step, redo) {
+        if self.apply_undo_step(entry.account_id, &entry.step) {
             if redo {
                 self.undo_stack.push(back);
             } else {
@@ -9280,7 +9275,7 @@ impl AppModel {
     /// Carry out one step. Returns false when it could not be done at all
     /// (the folder is gone, the messages are no longer where they were), in
     /// which case the step is dropped rather than left to fail again.
-    fn apply_undo_step(&mut self, account_id: u32, step: &UndoStep, redo: bool) -> bool {
+    fn apply_undo_step(&mut self, account_id: u32, step: &UndoStep) -> bool {
         match step {
             UndoStep::Move { from, to, message_ids } => {
                 let Some(dest_folder_id) = self
@@ -9289,11 +9284,7 @@ impl AppModel {
                     .and_then(|fs| fs.iter().find(|f| &f.path == to))
                     .map(|f| f.id)
                 else {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("That folder is no longer there."),
-                        error: true,
-                        connectivity: false,
-                    });
+                    tracing::info!("undo: {to:?} is no longer there, dropping the step");
                     return false;
                 };
                 self.send_to(account_id, MailRequest::UndoMove {
@@ -9307,11 +9298,6 @@ impl AppModel {
                 // BulkComplete says it has landed.
                 self.bulk_pending += 1;
                 self.update_busy_indicator();
-                self.notifications.emit(NotifyInput::SetStatus(if redo {
-                    i18n("Redoing move…")
-                } else {
-                    i18n("Undoing move…")
-                }));
                 true
             }
             UndoStep::Flags(changes) => {
@@ -9336,11 +9322,7 @@ impl AppModel {
                     }
                 }
                 if touched == 0 {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("Those messages are no longer here."),
-                        error: true,
-                        connectivity: false,
-                    });
+                    tracing::info!("undo: those messages are no longer here, dropping the step");
                 }
                 touched > 0
             }
@@ -9358,11 +9340,7 @@ impl AppModel {
                     .get(&account_id)
                     .is_some_and(|fs| fs.iter().any(|f| &f.path == from))
                 {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("That folder is no longer there."),
-                        error: true,
-                        connectivity: false,
-                    });
+                    tracing::info!("undo: {from:?} is no longer there, dropping the step");
                     return false;
                 }
                 self.apply_folder_rename(account_id, from.clone(), to.clone(), None);
