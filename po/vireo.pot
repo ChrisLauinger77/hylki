@@ -683,7 +683,7 @@ msgstr ""
 msgid "Back out of a reply and return to the list"
 msgstr ""
 
-msgid "Undo the last action (also in the main menu)"
+msgid "Undo the last action, or the last edit while you are writing"
 msgstr ""
 
 msgid "Redo it (Ctrl+Y does the same)"
@@ -2117,6 +2117,15 @@ msgstr ""
 msgid "Attach Files"
 msgstr ""
 
+msgid "Attach {name}"
+msgstr ""
+
+msgid "Remove {name}"
+msgstr ""
+
+msgid "Typing"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr ""
 
@@ -2155,6 +2164,11 @@ msgstr ""
 
 msgid "Choose a time later than now."
 msgstr ""
+
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Contacts"
 msgstr ""

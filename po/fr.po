@@ -735,7 +735,8 @@ msgstr "Rédiger"
 msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
-msgid "Undo the last action (also in the main menu)"
+#, fuzzy
+msgid "Undo the last action, or the last edit while you are writing"
 msgstr "Annuler la dernière action (également dans le menu principal)"
 
 msgid "Redo it (Ctrl+Y does the same)"
@@ -1042,9 +1043,10 @@ msgid ""
 msgstr ""
 "Marquez les messages avec un ou plusieurs tags colorés. Les tags sont "
 "stockés sur le serveur de messagerie sous forme de mots-clés IMAP, afin que "
-"Thunderbird et d'autres clients affichent les mêmes tags.\n\nFaites "
-"glisser un tag pour réorganiser l'ordre : l'ordre défini ici est celui de la "
-"barre latérale, et les neuf premiers répondent aux touches 1 à 9."
+"Thunderbird et d'autres clients affichent les mêmes tags.\n"
+"\n"
+"Faites glisser un tag pour réorganiser l'ordre : l'ordre défini ici est "
+"celui de la barre latérale, et les neuf premiers répondent aux touches 1 à 9."
 
 msgid "Add Tag…"
 msgstr "Ajouter un tag…"
@@ -2355,6 +2357,17 @@ msgstr "Impossible de téléverser {name}"
 msgid "Attach Files"
 msgstr "Joindre des fichiers"
 
+#, fuzzy
+msgid "Attach {name}"
+msgstr "Joindre quand même"
+
+#, fuzzy
+msgid "Remove {name}"
+msgstr "{name} supprimé?"
+
+msgid "Typing"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "Impossible d'envoyer avec OpenPGP"
 
@@ -2400,6 +2413,12 @@ msgstr "Cette heure est déjà passée"
 
 msgid "Choose a time later than now."
 msgstr "Choisissez une heure ultérieure à maintenant."
+
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Aucune pièce jointe"
+msgstr[1] "Aucune pièce jointe"
 
 msgid "Contacts"
 msgstr "Contacts"
@@ -2493,10 +2512,12 @@ msgid ""
 "• Updating “xdg-desktop-portal” and logging back in may fix opening links "
 "directly"
 msgstr ""
-"Le portail de bureau a signalé : {error}\n\n• Faites un clic droit sur le "
-"lien, copiez-le, puis ouvrez-le dans votre navigateur\n• Mettre à jour "
-"« xdg-desktop-portal » et vous reconnecter peut résoudre l'ouverture directe "
-"des liens"
+"Le portail de bureau a signalé : {error}\n"
+"\n"
+"• Faites un clic droit sur le lien, copiez-le, puis ouvrez-le dans votre "
+"navigateur\n"
+"• Mettre à jour « xdg-desktop-portal » et vous reconnecter peut résoudre "
+"l'ouverture directe des liens"
 
 msgid "Mark as read"
 msgstr "Marquer comme lu"

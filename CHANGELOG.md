@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.32.1 — 2026-09-16
+
+Undo and redo reach the composer: Ctrl+Z now takes back what you were just
+writing, a step at a time, along with the attachments beside it. The inline
+reply no longer aborts the app as it slides in, and the French translation
+is complete.
+
+- **Undo and redo in the composer** (extends #200). Ctrl+Z did nothing while
+  a message was being written. WebKitGTK never turns the key into an editing
+  command: its key binding translator forwards the keystroke to a hidden
+  GtkTextView and watches that widget's signals, and undo is a GtkTextView
+  action rather than a signal, so nothing came back; its own table of
+  bindings has no undo entry either, and `execCommand('undo')` is refused
+  from script. The page's history is reachable only through the widget API,
+  so the editor drives it itself. The composer keeps one history over both
+  the things that change a message — the body's typing, formatting, pastes
+  and dropped pictures, and its attachments — with Ctrl+Z, Ctrl+Shift+Z and
+  Ctrl+Y caught above the editor so the order holds. The address and subject
+  rows keep their own entry undo, which is the right one for a single line.
+  Works inline and in a compose window, and in all four composing formats;
+  the body's right-click menu leads with Undo and Redo.
+- **A run of typing is cut into steps worth undoing.** WebKit folds a whole
+  run of typing into one undo step, and folds the deletes that follow into
+  that same step, so Backspace was nothing Ctrl+Z could take back on its own
+  and a paragraph written over several minutes came back all at once. Its
+  history can be stepped but not shaped from outside, and the one thing that
+  closes an open typing command is the selection changing — so the document
+  re-sets the selection to exactly where it already is, which moves no caret
+  and touches no content. The run is closed when the kind of edit changes,
+  typing to deleting or back, and after five seconds without one. An IME
+  composition is left alone, since its own events flip between inserting and
+  deleting while a character is being built.
+- **The main menu's Undo and Redo follow the composer.** They name what they
+  would take back, so a reply being written reads "Undo Typing" rather than
+  "Undo Archive". They are not decided by keyboard focus: opening a menu is
+  itself a focus change, and where focus lands on the way is GTK's business.
+  An open inline composer with anything in its history owns them, since what
+  it can take back is being written now; while it has nothing they go back
+  to the mail history. The keys still follow focus, because Ctrl+Z in the
+  body has to undo the body.
+- **The inline reply no longer aborts the app as it opens.** Both places that
+  settled a running slide held a `RefCell` borrow across the skip that ends
+  it — `if let` keeps the temporary guard alive for its whole body, and
+  skipping an animation emits `done` there and then, whose handler reaches
+  for the same cell. It was a panic in a callback that cannot unwind, so the
+  process aborted rather than recovered.
+- **French translation complete** (PR #204 by
+  [@frenchy82](https://github.com/frenchy82)): the composing formats, the
+  sidebar folder verbs, undo and redo, per-message remote content, the sent
+  copy rows and the portal link errors. Two newline escapes that had been
+  doubled on the way through the editor are repaired, one of them live in
+  1.32.0.
+
 ## 1.32.0 — 2026-09-16
 
 Messages can be written in Markdown or HTML as well as rich or plain text,

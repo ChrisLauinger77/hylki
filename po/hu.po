@@ -730,7 +730,7 @@ msgid "Back out of a reply and return to the list"
 msgstr "Kilépés a válaszból és visszatérés a listához"
 
 #, fuzzy
-msgid "Undo the last action (also in the main menu)"
+msgid "Undo the last action, or the last edit while you are writing"
 msgstr "Olvasatlan levelek a tálcamenüben"
 
 msgid "Redo it (Ctrl+Y does the same)"
@@ -2313,6 +2313,17 @@ msgstr "Nem sikerült feltölteni: {name}"
 msgid "Attach Files"
 msgstr "Fájlok csatolása"
 
+#, fuzzy
+msgid "Attach {name}"
+msgstr "E-mail-cím hozzáadva ehhez: {name}"
+
+#, fuzzy
+msgid "Remove {name}"
+msgstr "Eltávolítva: {name}"
+
+msgid "Typing"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "Nem lehet küldeni OpenPGP-vel"
 
@@ -2358,6 +2369,12 @@ msgstr "Ez az időpont már elmúlt"
 
 msgid "Choose a time later than now."
 msgstr "Válasszon a jelenleginél későbbi időpontot."
+
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Nincsenek mellékletek"
+msgstr[1] "Nincsenek mellékletek"
 
 msgid "Contacts"
 msgstr "Névjegyek"

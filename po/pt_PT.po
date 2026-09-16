@@ -747,7 +747,7 @@ msgid "Back out of a reply and return to the list"
 msgstr "Cancelar uma resposta e voltar à lista"
 
 #, fuzzy
-msgid "Undo the last action (also in the main menu)"
+msgid "Undo the last action, or the last edit while you are writing"
 msgstr "Correio não lido no menu da área de notificação"
 
 msgid "Redo it (Ctrl+Y does the same)"
@@ -2361,6 +2361,17 @@ msgstr "Não foi possível carregar {name}"
 msgid "Attach Files"
 msgstr "Anexar ficheiros"
 
+#, fuzzy
+msgid "Attach {name}"
+msgstr "Anexar mesmo assim"
+
+#, fuzzy
+msgid "Remove {name}"
+msgstr "Remover {name}?"
+
+msgid "Typing"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "Não é possível enviar com OpenPGP"
 
@@ -2406,6 +2417,12 @@ msgstr "Essa hora já passou"
 
 msgid "Choose a time later than now."
 msgstr "Escolha uma hora posterior à atual."
+
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Sem anexos"
+msgstr[1] "Sem anexos"
 
 msgid "Contacts"
 msgstr "Contactos"

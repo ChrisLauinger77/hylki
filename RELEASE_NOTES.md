@@ -2,6 +2,18 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.32.1
+
+**Undo and redo reach the composer** (extends #200). Ctrl+Z did nothing while a message was being written — the key never reached the body's own history at all. It does now, over both the things that change a message: the typing, formatting, pastes and dropped pictures in the body, and the attachments beside it, in one order. Ctrl+Shift+Z and Ctrl+Y put things back. The address and subject rows keep their own undo, which is the right one for a single line. It works in the inline reply and in a compose window, in all four composing formats, and the body's right-click menu leads with Undo and Redo.
+
+**Typing is undone a step at a time.** A run of typing used to come back all at once however long it was, and Backspace was not something Ctrl+Z could take back on its own — rubbing out two letters after a word undid the word with them. Deleting is now its own step, and a pause of more than five seconds starts a new one, so a paragraph written, thought about and carried on comes back in the pieces it was written in.
+
+**The main menu says what it will undo.** Undo and Redo name what they would take back — "Undo Typing" while a reply is being written, "Undo Archive" while reading — and grey out when there is nothing.
+
+**The inline reply no longer closes the app as it opens.** A panic while the reply panel slid into place could take the whole window with it.
+
+**French translation complete** (PR #204 by [@frenchy82](https://github.com/frenchy82)), covering the composing formats, undo and redo, per-message remote content, the sent-copy rows and the portal link errors.
+
 ## What's new in 1.32.0
 
 **Write messages in Markdown or HTML.** A message can now be written as rich text, Markdown, HTML source or plain text. The composer's plain-text button became a format button at the right-hand end of the formatting row: it shows the current format, with the other three behind it, and the two source formats have a preview. Settings → Composing → **Write messages in** picks the default. Nothing goes out as source: Markdown is rendered on the way out with the source as the plain-text alternative, hand-written HTML gets a text part made from it, and both are cleaned of scripts and style sheets before sending. The README lists exactly which Markdown is understood.

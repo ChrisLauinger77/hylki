@@ -759,7 +759,7 @@ msgid "Back out of a reply and return to the list"
 msgstr "Отменить ответ и вернуться к списку"
 
 #, fuzzy
-msgid "Undo the last action (also in the main menu)"
+msgid "Undo the last action, or the last edit while you are writing"
 msgstr "Непрочитанная почта в меню трея"
 
 msgid "Redo it (Ctrl+Y does the same)"
@@ -2374,6 +2374,17 @@ msgstr "Не удалось загрузить {name}"
 msgid "Attach Files"
 msgstr "Прикрепить файлы"
 
+#, fuzzy
+msgid "Attach {name}"
+msgstr "Всё равно прикрепить"
+
+#, fuzzy
+msgid "Remove {name}"
+msgstr "Удалить {name}?"
+
+msgid "Typing"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "Невозможно отправить с помощью OpenPGP"
 
@@ -2417,6 +2428,13 @@ msgstr "Это время уже прошло"
 
 msgid "Choose a time later than now."
 msgstr "Выберите время позже текущего."
+
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Нет вложений"
+msgstr[1] "Нет вложений"
+msgstr[2] "Нет вложений"
 
 msgid "Contacts"
 msgstr "Контакты"
