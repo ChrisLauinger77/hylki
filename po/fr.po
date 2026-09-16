@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-15 17:42+0200\n"
+"PO-Revision-Date: 2026-09-16 13:24+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -148,9 +148,8 @@ msgstr "Non lus en premier"
 msgid "Flagged first"
 msgstr "Signalés en premier"
 
-#, fuzzy
 msgid "Create Folder"
-msgstr "Nouveau dossier"
+msgstr ""
 
 msgid "Added to Contacts"
 msgstr "Ajouté aux contacts"
@@ -257,9 +256,8 @@ msgstr "Raccourcis clavier"
 msgid "About"
 msgstr "À propos"
 
-#, fuzzy
 msgid "Remove Tags"
-msgstr "Supprimer la balise"
+msgstr ""
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
@@ -274,17 +272,14 @@ msgstr "Vos balises"
 msgid "Delete"
 msgstr "Supprimer"
 
-#, fuzzy
 msgid "Move to {name}"
-msgstr "{name} supprimé?"
+msgstr ""
 
-#, fuzzy
 msgid "Add Tag {name}"
-msgstr "Adresse e-mail ajoutée à {name}"
+msgstr ""
 
-#, fuzzy
 msgid "Remove Tag {name}"
-msgstr "{name} supprimé?"
+msgstr ""
 
 msgid "Undo"
 msgstr ""
@@ -339,13 +334,11 @@ msgstr "Ajouter une étoile"
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
 
-#, fuzzy
 msgid "Block Remote Content"
-msgstr "Bloquer les images distantes"
+msgstr ""
 
-#, fuzzy
 msgid "Show Remote Content"
-msgstr "Toujours charger le contenu distant"
+msgstr ""
 
 msgid "Delete {n} messages"
 msgstr "Supprimer {n} messages"
@@ -465,9 +458,8 @@ msgstr ""
 "{foreign} messages n'ont pas été déplacés — les e-mails ne peuvent pas être "
 "déplacés entre différents comptes"
 
-#, fuzzy
 msgid "Move Folder"
-msgstr "Nouveau dossier"
+msgstr ""
 
 msgid "Vireo couldn’t save your password"
 msgstr "Vireo n'a pas pu enregistrer votre mot de passe"
@@ -499,16 +491,13 @@ msgstr "Renommer"
 msgid "A folder named {new_name} is already there."
 msgstr "Un dossier nommé {new_name} existe déjà."
 
-#, fuzzy
 msgid "Rename Folder"
-msgstr "Renommer le dossier…"
+msgstr ""
 
-#, fuzzy
 msgid ""
 "Its messages are moved to Trash and the folder is removed from the server. "
 "This cannot be undone."
 msgstr ""
-"Ses messages seront déplacés vers la Corbeille et le dossier sera supprimé."
 
 msgid "Empty “{name}”?"
 msgstr "Vider « {name} » ?"
@@ -614,50 +603,44 @@ msgstr "© 2026 Hyprlab"
 msgid "No {v1} folder available for some messages"
 msgstr "Aucun dossier {v1} disponible pour certains messages"
 
-#, fuzzy
 msgid "No filters to apply here yet"
-msgstr "Aucun message auquel répondre pour l'instant."
+msgstr "Aucun filtre à appliquer ici pour l'instant"
 
-#, fuzzy
 msgid "Applying Filters"
-msgstr "Ajouter un filtre"
+msgstr "Application de filtres"
 
-#, fuzzy
 msgid "Run in Background"
-msgstr "Maintenir l'exécution en arrière-plan"
+msgstr "Exécuter en arrière-plan"
 
-#, fuzzy
 msgid "Looked at {n} message so far"
 msgid_plural "Looked at {n} messages so far"
-msgstr[0] "Envoyer de nouveaux messages depuis"
-msgstr[1] "Envoyer de nouveaux messages depuis"
+msgstr[0] "{n} message consulté jusqu'à présent"
+msgstr[1] "{n} messages consultés jusqu'à présent"
 
-#, fuzzy
 msgid "Matched {n} message"
 msgid_plural "Matched {n} messages"
-msgstr[0] "{n} message"
-msgstr[1] "{n} messages"
+msgstr[0] ""
+msgstr[1] ""
 
-#, fuzzy
 msgid "Tagged {n} message"
 msgid_plural "Tagged {n} messages"
-msgstr[0] "{n} message"
-msgstr[1] "{n} messages"
+msgstr[0] "{n} message marqué"
+msgstr[1] "{n} messages marqués"
 
-#, fuzzy
 msgid "Filed {n} message away"
 msgid_plural "Filed {n} messages away"
-msgstr[0] "Rechercher dans le message"
-msgstr[1] "Rechercher dans le message"
+msgstr[0] "Classé {n} message"
+msgstr[1] "Classé {n} messages"
 
-#, fuzzy
 msgid "Folder {done} of {total}"
-msgstr "{cur} sur {total}"
+msgstr "Dossier {done} sur {total}"
 
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] ""
+"Les filtres ont examiné {n} message, mais aucun résultat n'a été trouvé."
 msgstr[1] ""
+"Les filtres ont examiné {n} messages, mais aucun résultat n'a été trouvé."
 
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
@@ -672,22 +655,21 @@ msgstr[1] ""
 
 msgid "Filters tagged {tagged} of {n} message"
 msgid_plural "Filters tagged {tagged} of {n} messages"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Filtres marqués {tagged} sur {n} message"
+msgstr[1] "Filtres marqués {tagged} sur {n} messages"
 
 msgid "Filters filed {filed} of {n} message away"
 msgid_plural "Filters filed {filed} of {n} messages away"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Filtres classés {filed} sur {n} message"
+msgstr[1] "Filtres classés {filed} sur {n} messages"
 
 msgid "Filters tagged {tagged} and filed {filed} of {n} message"
 msgid_plural "Filters tagged {tagged} and filed {filed} of {n} messages"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Filtres marqués {tagged} et classés {filed} de {n} message"
+msgstr[1] "Filtres marqués {tagged} et classés {filed} de {n} messages"
 
-#, fuzzy
 msgid "Filters Applied"
-msgstr "Emplacement des filtres"
+msgstr "Filtres appliqués"
 
 msgid "Move around"
 msgstr "Se déplacer"
@@ -748,9 +730,8 @@ msgstr "Rédiger"
 msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
-#, fuzzy
 msgid "Undo the last action (also in the main menu)"
-msgstr "Courrier non lu dans le menu de notification"
+msgstr ""
 
 msgid "Redo it (Ctrl+Y does the same)"
 msgstr ""
@@ -779,9 +760,8 @@ msgstr "Quitter complètement Vireo"
 msgid "This list"
 msgstr "Cette liste"
 
-#, fuzzy
 msgid "Unstar"
-msgstr "Installer"
+msgstr ""
 
 msgid "Save All Attachments"
 msgstr "Enregistrer toutes les pièces jointes"
@@ -1078,27 +1058,28 @@ msgstr "Filtres de recherche"
 msgid "Filters"
 msgstr "Filtres"
 
-#, fuzzy
 msgid ""
 "File incoming mail into folders or tag it automatically, by sender, subject "
 "or recipients. Applied to each account's Inbox as Vireo syncs it, or to the "
 "mail already there with Apply Now; a folder's right-click menu runs them "
 "over that one folder."
 msgstr ""
-"Classez les e-mails entrants dans des dossiers ou attribuez-leur "
-"automatiquement des balises, en fonction de l'expéditeur, de l'objet ou des "
-"destinataires. Cette fonctionnalité s'applique à la boîte de réception de "
-"chaque compte au fur et à mesure que Vireo la synchronise."
+"Classez le courrier entrant dans des dossiers ou marquez-le automatiquement, "
+"par expéditeur, sujet ou destinataire. Appliqué à la boîte de réception de "
+"chaque compte lorsque Vireo la synchronise, ou au courrier déjà présent avec "
+"Appliquer maintenant ; le menu contextuel d'un dossier les exécute sur ce "
+"dossier."
 
 msgid "Add Filter…"
 msgstr "Ajouter un filtre…"
 
 msgid "Run every rule over the mail already in your inboxes"
 msgstr ""
+"Exécutez toutes les règles sur le courrier déjà présent dans vos boîtes de "
+"réception"
 
-#, fuzzy
 msgid "Apply Now"
-msgstr "Appliquer"
+msgstr "Appliquer maintenant"
 
 msgid "Search senders"
 msgstr "Rechercher les expéditeurs"
@@ -1350,16 +1331,12 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
 
-#, fuzzy
 msgid ""
 "Which of this account's folders hold each role. Automatically follows the "
 "server's own markings; pick a folder when a role isn't detected or lands "
 "wrong. Nothing already on the server moves: a role says where mail goes from "
 "now on."
 msgstr ""
-"Là où vont les messages envoyés, supprimés et indésirables. Suit "
-"automatiquement le balisage propre au serveur ; choisissez un dossier "
-"lorsqu'un rôle n'est pas détecté ou mal attribué."
 
 msgid "Sent"
 msgstr "Envoyés"
@@ -1590,9 +1567,8 @@ msgstr ", marqué {tag}"
 msgid "Remove filter"
 msgstr "Supprimer le filtre"
 
-#, fuzzy
 msgid "Applying…"
-msgstr "Téléversement…"
+msgstr "Appliquer…"
 
 msgid "Searching…"
 msgstr "Recherche…"
@@ -1667,9 +1643,8 @@ msgstr "Modifier le filtre"
 msgid "Add Filter"
 msgstr "Ajouter un filtre"
 
-#, fuzzy
 msgid "Name (optional)"
-msgstr "Pseudo (facultatif)"
+msgstr "Nom (facultatif)"
 
 msgid "Remove condition"
 msgstr "Supprimer la condition"
@@ -2227,9 +2202,8 @@ msgstr ""
 msgid "HTML"
 msgstr ""
 
-#, fuzzy
 msgid "Plain text"
-msgstr "Coller comme texte brut"
+msgstr ""
 
 msgid "Format as you type, with the toolbar"
 msgstr ""
@@ -2237,13 +2211,11 @@ msgstr ""
 msgid "Write Markdown; it is sent as formatted mail"
 msgstr ""
 
-#, fuzzy
 msgid "Write the message's HTML by hand"
-msgstr "Imprimer le message en cours de lecture"
+msgstr ""
 
-#, fuzzy
 msgid "No formatting at all"
-msgstr "Effacer la mise en forme"
+msgstr ""
 
 msgid "Collapse into reader"
 msgstr "Réduire dans le lecteur"
@@ -2332,15 +2304,13 @@ msgstr "Répondre à"
 msgid "Subject"
 msgstr "Objet"
 
-#, fuzzy
 msgid "Writing in {format}"
-msgstr "En attente depuis {ago}"
+msgstr ""
 
 #. The one label on the row goes when there is no width for it, the
 #. same trade the header makes when it folds.
-#, fuzzy
 msgid "Preview"
-msgstr "Aperçu avant impression"
+msgstr ""
 
 msgid "Show the message as it will be sent"
 msgstr ""
@@ -2496,9 +2466,8 @@ msgstr "Rechercher des dossiers"
 msgid "the portal answered response code {code}"
 msgstr ""
 
-#, fuzzy
 msgid "The link could not be opened"
-msgstr "Le fichier n'a pas pu être ouvert"
+msgstr ""
 
 #. No Flatseal toggle can help here: portal access is not a
 #. permission, and the failure is inside the portal's own launcher.
@@ -2689,13 +2658,11 @@ msgstr "Retour à mes polices et couleurs"
 msgid "Show the sender's fonts and colours"
 msgstr "Afficher les polices et les couleurs de l'expéditeur"
 
-#, fuzzy
 msgid "Show remote content"
-msgstr "Toujours charger le contenu distant"
+msgstr ""
 
-#, fuzzy
 msgid "Block remote content"
-msgstr "Toujours charger le contenu distant"
+msgstr ""
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -3681,19 +3648,14 @@ msgstr ""
 "Désactivé, le collage conserve sa mise en forme. Un clic droit dans "
 "l'éditeur propose toujours les deux options."
 
-#, fuzzy
 msgid "Write messages in"
-msgstr "Trier les messages"
+msgstr ""
 
-#, fuzzy
 msgid ""
 "What new messages, replies and forwards start as. Markdown and HTML are "
 "written as source and sent as formatted mail; plain text is sent without "
 "formatting. The composer's format button switches any one message."
 msgstr ""
-"Les nouveaux messages, réponses et transferts commencent sous forme de texte "
-"brut, envoyé sans formatage. Le bouton Texte brut du compositeur bascule "
-"dans un sens ou dans l'autre pour un message."
 
 msgid "Spelling"
 msgstr "Orthographe"
@@ -4190,9 +4152,8 @@ msgstr "Afficher chaque tag"
 msgid "Long-press to expand or collapse"
 msgstr "Appui long pour déplier ou replier"
 
-#, fuzzy
 msgid "Apply Filters"
-msgstr "Filtres"
+msgstr "Appliquer des filtres"
 
 msgid "Edit Filter…"
 msgstr "Modifier le filtre…"
@@ -4651,25 +4612,31 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
-#~ msgid "Response"
-#~ msgstr "Réponse"
-
-#, fuzzy
-#~ msgid "Preview the formatted message"
-#~ msgstr "Ouvrir le message sélectionné"
-
-#, fuzzy
-#~ msgid "Back to the source"
-#~ msgstr "Retour à la liste des messages"
-
 #~ msgid "Nothing to undo"
 #~ msgstr "Rien à annuler"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Annulation du déplacement…"
 
+#~ msgid "Its messages are moved to Trash and the folder is removed."
+#~ msgstr ""
+#~ "Ses messages seront déplacés vers la Corbeille et le dossier sera "
+#~ "supprimé."
+
 #~ msgid "Undo the last move or delete"
 #~ msgstr "Annuler le dernier déplacement ou la dernière suppression"
+
+#~ msgid ""
+#~ "Where sent, deleted and junk mail goes. Automatically follows the "
+#~ "server's own markings; pick a folder when a role isn't detected or lands "
+#~ "wrong."
+#~ msgstr ""
+#~ "Là où vont les messages envoyés, supprimés et indésirables. Suit "
+#~ "automatiquement le balisage propre au serveur ; choisissez un dossier "
+#~ "lorsqu'un rôle n'est pas détecté ou mal attribué."
+
+#~ msgid "Response"
+#~ msgstr "Réponse"
 
 #~ msgid "Plain text: send without formatting"
 #~ msgstr "Texte brut : envoyer sans formatage"
@@ -4682,6 +4649,15 @@ msgstr "Hyprlab"
 
 #~ msgid "Compose in plain text"
 #~ msgstr "Rédiger en texte brut"
+
+#~ msgid ""
+#~ "New messages, replies and forwards start as plain text, sent without "
+#~ "formatting. The composer's Plain text button switches either way for one "
+#~ "message."
+#~ msgstr ""
+#~ "Les nouveaux messages, réponses et transferts commencent sous forme de "
+#~ "texte brut, envoyé sans formatage. Le bouton Texte brut du compositeur "
+#~ "bascule dans un sens ou dans l'autre pour un message."
 
 #~ msgid "Undo: the messages are no longer where that move put them."
 #~ msgstr ""
