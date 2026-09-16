@@ -627,6 +627,12 @@ msgstr[0] "Enviar novas mensagens a partir de"
 msgstr[1] "Enviar novas mensagens a partir de"
 
 #, fuzzy
+msgid "Matched {n} message"
+msgid_plural "Matched {n} messages"
+msgstr[0] "{n} mensagem"
+msgstr[1] "{n} mensagens"
+
+#, fuzzy
 msgid "Tagged {n} message"
 msgid_plural "Tagged {n} messages"
 msgstr[0] "{n} mensagem"
@@ -644,6 +650,17 @@ msgstr "{cur} de {total}"
 
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
+msgstr[0] ""
+msgstr[1] ""
+
+#. Matches that needed nothing: the rules had already done their
+#. work on an earlier sync (#201). Saying "none matched" here
+#. made working rules look broken.
+msgid ""
+"Filters matched {matched} of {n} message, and it was already tagged or filed"
+msgid_plural ""
+"Filters matched {matched} of {n} messages, and all of them were already "
+"tagged or filed"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1866,9 +1883,6 @@ msgstr "Carregando mais…"
 msgid "The file could not be opened"
 msgstr "Não foi possível abrir o arquivo"
 
-msgid "Response"
-msgstr "Resposta"
-
 msgid "Cloud Storage"
 msgstr "Armazenamento na nuvem"
 
@@ -2447,6 +2461,23 @@ msgstr[1] "{n} mensagens"
 
 msgid "Search folders"
 msgstr "Pesquisar pastas"
+
+msgid "the portal answered response code {code}"
+msgstr ""
+
+#, fuzzy
+msgid "The link could not be opened"
+msgstr "Não foi possível abrir o arquivo"
+
+#. No Flatseal toggle can help here: portal access is not a
+#. permission, and the failure is inside the portal's own launcher.
+msgid ""
+"The desktop portal reported: {error}\n"
+"\n"
+"• Right-click the link, copy it, and open it in your browser\n"
+"• Updating “xdg-desktop-portal” and logging back in may fix opening links "
+"directly"
+msgstr ""
 
 msgid "Mark as read"
 msgstr "Marcar como lida"
@@ -4580,6 +4611,9 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Response"
+#~ msgstr "Resposta"
 
 #, fuzzy
 #~ msgid "Preview the formatted message"
