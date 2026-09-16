@@ -280,6 +280,13 @@ pub struct AccountConfig {
     /// would (#136). Ignored by Microsoft 365, which files its own copy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sent_copy_path: Option<String>,
+    /// The server files its own copy of outgoing mail, so Vireo must not add
+    /// one. Gmail does this for anything sent through its SMTP, which leaves
+    /// two copies of every message: Google's, and the one Vireo appends.
+    /// Off by default, because a server that does *not* do it and a Vireo
+    /// that has stopped appending means no sent mail is kept at all.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub server_saves_sent: bool,
     /// Auto-empty (#140): mail in the Junk folder older than this many days
     /// is deleted for good at each sync. 0 = never.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -3578,6 +3585,7 @@ dest_path = "Lists"
             push: None,
             folder_roles: Default::default(),
             sent_copy_path: None,
+            server_saves_sent: false,
             empty_junk_days: 0,
             empty_trash_days: 0,
             pgp_key: None,

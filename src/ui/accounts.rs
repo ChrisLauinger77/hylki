@@ -226,6 +226,9 @@ struct AliasDialog {
 pub enum AccountsInput {
     /// The editor's "Use my Gravatar" switch moved (#189).
     SetOwnGravatar(bool),
+    /// The "Server saves its own copy" switch: with it on there is no copy of
+    /// Vireo's to file, so the folder row above has nothing to say.
+    SetServerSavesSent(bool),
     /// Showcase only (VIREO_SHOWCASE_EDITOR_DIRTY): type into the open
     /// editor's Label field, the way a capture cannot.
     DebugEditLabel(String),
@@ -1324,6 +1327,20 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Save a copy of sent mail in"),
                                     set_subtitle: &i18n(SENT_COPY_HINT),
                                 },
+                                // Gmail files a copy of anything sent through
+                                // its SMTP, so Vireo's append makes a second
+                                // one. Off by default: a server that does not
+                                // do it, paired with a Vireo that has stopped
+                                // appending, keeps no sent mail at all.
+                                #[name = "server_saves_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Server saves its own copy"),
+                                    set_subtitle: &i18n("For Gmail and others that file sent mail \
+                                                   themselves. Vireo saves none of its own."),
+                                    connect_active_notify[sender] => move |row| {
+                                        sender.input(AccountsInput::SetServerSavesSent(row.is_active()));
+                                    },
+                                },
                                 #[name = "folder_drafts_row"]
                                 adw::ComboRow { set_title: &i18n("Drafts") },
                                 #[name = "folder_trash_row"]
@@ -1919,6 +1936,10 @@ impl Component for AccountsWindow {
                 self.refresh_preview(widgets);
             }
 
+            AccountsInput::SetServerSavesSent(on) => {
+                widgets.folder_sent_copy_row.set_sensitive(!on);
+            }
+
             AccountsInput::SetOwnGravatar(on) => {
                 // Look it up as soon as it is asked for, so the preview can
                 // answer rather than waiting for the account to be saved.
@@ -2143,6 +2164,7 @@ impl Component for AccountsWindow {
                 account.aliases = self.alias_edits.clone();
                 account.folder_roles = self.read_folder_roles(widgets);
                 account.sent_copy_path = self.read_sent_copy_path(widgets);
+                account.server_saves_sent = widgets.server_saves_row.is_active();
                 let sig = sig_html.trim();
                 account.signature = if signature_is_empty(sig) {
                     None
@@ -2957,7 +2979,10 @@ impl AccountsWindow {
             )),
             _ => None,
         };
-        row.set_sensitive(unsupported.is_none());
+        // The switch above may already have taken this row out of play.
+        let server_saves = acc.is_some_and(|a| a.server_saves_sent);
+        widgets.server_saves_row.set_active(server_saves);
+        row.set_sensitive(unsupported.is_none() && !server_saves);
         row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
     }
 
@@ -3501,10 +3526,11 @@ impl AccountsWindow {
     fn editor_fingerprint(&self, widgets: &AccountsWindowWidgets) -> String {
         let account = read_account(widgets, self.saved_emoji(), self.saved_avatar());
         format!(
-            "{account:?}|{:?}|{:?}|{:?}|{}|{}",
+            "{account:?}|{:?}|{:?}|{:?}|{}|{}|{}",
             self.alias_edits,
             self.read_folder_roles(widgets),
             self.read_sent_copy_path(widgets),
+            widgets.server_saves_row.is_active(),
             widgets.provider_row.selected(),
             self.pending_oauth_refresh.is_some(),
         )
@@ -3666,6 +3692,7 @@ fn read_account(
         // Assigned by SaveWithSig from the Special Folders combos.
         folder_roles: Default::default(),
         sent_copy_path: None,
+        server_saves_sent: false,
         empty_junk_days: AUTO_EMPTY_DAYS
             .get(widgets.empty_junk_row.selected() as usize)
             .copied()

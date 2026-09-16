@@ -15381,10 +15381,13 @@ impl AppModel {
     /// account editor if it still exists, else the Sent folder. `None` when
     /// the account has neither — the message is sent without a copy.
     fn sent_copy_path(&self, account_id: u32) -> Option<String> {
-        let chosen = self
-            .effective_config()
-            .get(account_id.saturating_sub(1) as usize)
-            .and_then(|c| c.sent_copy_path.as_deref());
+        let cfg = self.effective_config().get(account_id.saturating_sub(1) as usize);
+        // The server files its own copy: appending a second one is what makes
+        // a Gmail account show every sent message twice.
+        if cfg.is_some_and(|c| c.server_saves_sent) {
+            return None;
+        }
+        let chosen = cfg.and_then(|c| c.sent_copy_path.as_deref());
         pick_sent_copy(chosen, self.folders.get(&account_id).map_or(&[], Vec::as_slice))
     }
 
@@ -16066,6 +16069,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         push: None,
         folder_roles: Default::default(),
         sent_copy_path: None,
+        server_saves_sent: false,
         empty_junk_days: 0,
         empty_trash_days: 0,
         pgp_key: None,

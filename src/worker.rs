@@ -3429,6 +3429,11 @@ fn pick_queued_sent_copy(
     folders: &[Folder],
     queued: Option<&str>,
 ) -> Option<String> {
+    // Set since the message was queued (or all along): the server keeps its
+    // own copy and ours would be a duplicate.
+    if account.server_saves_sent {
+        return None;
+    }
     if folders.is_empty() {
         return queued.map(str::to_string);
     }
@@ -10344,6 +10349,7 @@ mod tests {
         AccountConfig {
             folder_roles: Default::default(),
             sent_copy_path: None,
+            server_saves_sent: false,
             empty_junk_days: 0,
             empty_trash_days: 0,
             pgp_key: None,
@@ -10843,6 +10849,15 @@ mod tests {
             super::pick_queued_sent_copy(&account(Some("INBOX")), &[], Some("Sent")).as_deref(),
             Some("Sent"),
         );
+        // The server files its own: nothing of ours goes anywhere, whatever
+        // was queued and whatever folder was picked.
+        let server_saves = AccountConfig {
+            sent_copy_path: Some("INBOX".into()),
+            server_saves_sent: true,
+            ..sample_account()
+        };
+        assert_eq!(super::pick_queued_sent_copy(&server_saves, &folders, Some("Sent")), None);
+        assert_eq!(super::pick_queued_sent_copy(&server_saves, &[], Some("Sent")), None);
     }
 
     #[test]
