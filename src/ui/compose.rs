@@ -273,6 +273,10 @@ pub struct Compose {
     /// formatting toolbar and sends no HTML part (#180); Markdown and HTML
     /// are written as source and converted on the way out.
     format: ComposeFormat,
+    /// The format chooser and preview toggle, which live at the end of the
+    /// editor's formatting row rather than in the header.
+    format_btn: gtk::Button,
+    preview_btn: gtk::ToggleButton,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
@@ -558,32 +562,6 @@ impl Component for Compose {
                             sender.input(ComposeInput::ToggleSign(b.is_active()));
                         },
                     },
-                    // Preview: what the message will look like,
-                    // for the formats that are written as source.
-                    #[name = "preview_btn"]
-                    pack_end = &gtk::ToggleButton {
-                        set_icon_name: "co.hyprlab.Vireo-eye-open-negative-filled-symbolic",
-                        set_tooltip_text: Some(i18n("Preview the formatted message").as_str()),
-                        #[watch]
-                        set_visible: model.format.is_source() && !model.narrow,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::TogglePreview(b.is_active()));
-                        },
-                    },
-                    // What this message is written in. The button
-                    // wears the current format and opens the other three.
-                    #[name = "format_btn"]
-                    pack_end = &gtk::Button {
-                        #[watch]
-                        set_icon_name: format_icon(model.format),
-                        #[watch]
-                        set_tooltip_text: Some(
-                            i18n_f("Writing in {format}", &[("format", &format_label(model.format))]).as_str()
-                        ),
-                        #[watch]
-                        set_visible: !model.narrow,
-                        connect_clicked => ComposeInput::FormatMenu,
-                    },
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-attachment-symbolic",
                         set_tooltip_text: Some(i18n("Attach files").as_str()),
@@ -807,6 +785,35 @@ impl Component for Compose {
             }
             ComposeFormat::Rich | ComposeFormat::Plain => {}
         }
+        // The format chooser and the preview toggle belong with the other
+        // formatting controls, at the far end of the same row: a header
+        // button for them folded away exactly when the pane was narrow, and
+        // the format is a property of the body, not of the window.
+        let format_btn = gtk::Button::from_icon_name(format_icon(format));
+        format_btn.set_tooltip_text(Some(
+            i18n_f("Writing in {format}", &[("format", &format_label(format))]).as_str(),
+        ));
+        format_btn.add_css_class("flat");
+        format_btn.set_can_focus(false);
+        let preview_btn = gtk::ToggleButton::new();
+        preview_btn.set_icon_name("co.hyprlab.Vireo-eye-open-negative-filled-symbolic");
+        preview_btn.set_tooltip_text(Some(i18n("Preview the formatted message").as_str()));
+        preview_btn.add_css_class("flat");
+        preview_btn.set_can_focus(false);
+        preview_btn.set_visible(format.is_source());
+        {
+            let s = sender.input_sender().clone();
+            format_btn.connect_clicked(move |_| {
+                let _ = s.send(ComposeInput::FormatMenu);
+            });
+            let s = sender.input_sender().clone();
+            preview_btn.connect_toggled(move |b| {
+                let _ = s.send(ComposeInput::TogglePreview(b.is_active()));
+            });
+        }
+        editor.toolbar_end().append(&preview_btn);
+        editor.toolbar_end().append(&format_btn);
+
         // "Send as Attachment Instead" on an inline image: the editor lifts
         // it to a temp file and it joins the attachment chips here.
         {
@@ -843,6 +850,8 @@ impl Component for Compose {
             fields_dirty: false,
             sign: false,
             format,
+            format_btn,
+            preview_btn,
             encrypt: false,
             send_at,
             cloud_accounts: crate::cloud::load_enabled_accounts(),
@@ -1185,24 +1194,10 @@ impl Component for Compose {
                         .icon(&format!("co.hyprlab.Vireo-{}-symbolic", check(self.encrypt, "channel-secure"))),
                     );
                 }
-                let mut host = vec![MenuEntry::submenu(
-                    i18n_f("Writing in {format}", &[("format", &format_label(self.format))]),
-                    vec![self.format_entries(&sender)],
-                )
-                .icon(format_icon(self.format))];
-                if self.format.is_source() {
-                    // Through its button, so the toggled handler keeps the
-                    // model and the button agreeing.
-                    let preview = widgets.preview_btn.clone();
-                    let showing = preview.is_active();
-                    host.push(
-                        MenuEntry::new(
-                            &if showing { i18n("Back to the source") } else { i18n("Preview the formatted message") },
-                            move || preview.set_active(!preview.is_active()),
-                        )
-                        .icon("co.hyprlab.Vireo-eye-open-negative-filled-symbolic"),
-                    );
-                }
+                // The format chooser and the preview toggle are not here:
+                // they sit at the end of the formatting row, which a narrow
+                // pane never folds away.
+                let mut host = Vec::new();
                 if self.can_toggle {
                     host.push(if self.windowed {
                         entry(i18n("Collapse into reader"), "view-restore", || ComposeInput::ToggleWindowed)
@@ -1602,7 +1597,7 @@ impl Component for Compose {
             ComposeInput::ToggleSign(on) => self.sign = on,
 
             ComposeInput::FormatMenu => {
-                let btn = &widgets.format_btn;
+                let btn = &self.format_btn;
                 show_context_menu(
                     btn,
                     (btn.width() / 2) as f64,
@@ -1618,9 +1613,14 @@ impl Component for Compose {
                 }
                 self.format = to;
                 self.editor.set_formatting_visible(to == ComposeFormat::Rich);
+                self.format_btn.set_icon_name(format_icon(to));
+                self.format_btn.set_tooltip_text(Some(
+                    i18n_f("Writing in {format}", &[("format", &format_label(to))]).as_str(),
+                ));
+                self.preview_btn.set_visible(to.is_source());
                 // A preview of the old format's render would be a lie about
                 // the new one.
-                widgets.preview_btn.set_active(false);
+                self.preview_btn.set_active(false);
                 // Rich and plain text share one document — plain text only
                 // decides what is *sent* — so switching between them must
                 // not reload it and throw away the undo history and caret.
@@ -1654,8 +1654,8 @@ impl Component for Compose {
             ComposeInput::TogglePreview(on) => {
                 // Keep the button with the state, for the times the message
                 // arrives from somewhere other than a click on it.
-                if widgets.preview_btn.is_active() != on {
-                    widgets.preview_btn.set_active(on);
+                if self.preview_btn.is_active() != on {
+                    self.preview_btn.set_active(on);
                 }
                 if !on {
                     self.editor.show_preview(None);

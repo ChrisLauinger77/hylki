@@ -14,9 +14,12 @@ pub struct RichEditor {
     /// The toolbar + editor, ready to be placed in a container.
     pub widget: gtk::Box,
     webview: webkit6::WebView,
-    /// The formatting toolbar, hidden while a message is composed as plain
-    /// text (#180) or as source.
-    toolbar: gtk::Box,
+    /// The formatting commands, hidden while a message is composed as plain
+    /// text (#180) or as source — the row they sit in stays either way.
+    toolbar_commands: gtk::Box,
+    /// The far end of that row, where a host puts controls of its own (the
+    /// composer's format chooser and preview toggle).
+    toolbar_end: gtk::Box,
     /// Swaps the editor for the rendered preview of a source message.
     stack: gtk::Stack,
     /// The preview view, built the first time a preview is asked for: a
@@ -380,7 +383,7 @@ impl RichEditor {
             webview.add_controller(drop);
         }
 
-        let (toolbar, block_buttons) = build_toolbar(&webview);
+        let (toolbar, toolbar_commands, toolbar_end, block_buttons) = build_toolbar(&webview);
         // `fmtState` in PASTE_SCRIPT posts a string of the block kinds the
         // caret sits in: `q` quote, `u` bulleted list, `o` numbered list.
         // A set toggle also means a click on it leaves that block instead of
@@ -417,7 +420,8 @@ impl RichEditor {
         RichEditor {
             widget: bx,
             webview,
-            toolbar,
+            toolbar_commands,
+            toolbar_end,
             stack,
             preview: std::rc::Rc::new(std::cell::RefCell::new(None)),
             source: source.clone(),
@@ -543,10 +547,18 @@ impl RichEditor {
         );
     }
 
-    /// Show or hide the formatting toolbar: hidden while the message is
-    /// composed as plain text (#180), where formatting would go nowhere.
+    /// Show or hide the formatting commands: hidden while the message is
+    /// composed as plain text (#180) or as source, where they would go
+    /// nowhere. The row itself stays, carrying whatever the host put at its
+    /// end — a chooser that vanished with the buttons would be the one
+    /// control needed to get them back.
     pub fn set_formatting_visible(&self, on: bool) {
-        self.toolbar.set_visible(on);
+        self.toolbar_commands.set_visible(on);
+    }
+
+    /// The far end of the formatting row, for a host's own controls.
+    pub fn toolbar_end(&self) -> &gtk::Box {
+        &self.toolbar_end
     }
 
     /// Read the current body HTML asynchronously.
@@ -842,10 +854,19 @@ fn read_image_for_insert(
 /// The format bar, plus the block-kind toggles keyed the way `fmtState` in
 /// PASTE_SCRIPT reports them (`q` quote, `u` bulleted list, `o` numbered
 /// list), so the state handler can light the right one.
-fn build_toolbar(webview: &webkit6::WebView) -> (gtk::Box, Vec<(char, gtk::ToggleButton)>) {
+fn build_toolbar(
+    webview: &webkit6::WebView,
+) -> (gtk::Box, gtk::Box, gtk::Box, Vec<(char, gtk::ToggleButton)>) {
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     bar.add_css_class("toolbar");
     bar.add_css_class("format-bar");
+    // The formatting commands sit in a group of their own, so a host can
+    // hide them (a message written as source has no use for them) while the
+    // row itself stays — the format chooser lives at its far end.
+    let group = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    let end = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    end.set_hexpand(true);
+    end.set_halign(gtk::Align::End);
 
     // (icon, tooltip, execCommand snippet, block-state key). The three block
     // commands are toggles: the document reports whether the caret is inside
@@ -870,7 +891,7 @@ fn build_toolbar(webview: &webkit6::WebView) -> (gtk::Box, Vec<(char, gtk::Toggl
     let mut toggles = Vec::new();
     for (icon, tip, cmd, key) in commands {
         if *icon == "SEP" {
-            bar.append(&gtk::Separator::new(gtk::Orientation::Vertical));
+            group.append(&gtk::Separator::new(gtk::Orientation::Vertical));
             continue;
         }
         let btn: gtk::Button = match key {
@@ -897,9 +918,11 @@ fn build_toolbar(webview: &webkit6::WebView) -> (gtk::Box, Vec<(char, gtk::Toggl
             let cmd = cmd.to_string();
             btn.connect_clicked(move |_| exec(&wv, &cmd));
         }
-        bar.append(&btn);
+        group.append(&btn);
     }
-    (bar, toggles)
+    bar.append(&group);
+    bar.append(&end);
+    (bar, group, end, toggles)
 }
 
 /// Prompt for a URL and turn the current selection into a link.

@@ -282,16 +282,17 @@ of the generated one.
 
 A message can be written in any of four formats, chosen in **Settings →
 Composing → Write messages in** for new messages and switched for any single
-message with the format button in the composer's header (or the **⋯** menu
-when the pane is narrow):
+message with the format button at the right-hand end of the composer's
+formatting row:
 
 - **Rich text** — the WYSIWYG editor with its formatting toolbar. The default.
 - **Markdown** — you write Markdown, the recipient gets formatted mail.
 - **HTML** — you write the message's HTML by hand.
 - **Plain text** — no formatting at all, sent as `text/plain` only.
 
-Markdown and HTML are written as *source*: a monospace field, no formatting
-toolbar, and an eye button beside it that shows the rendered message. Nothing
+Markdown and HTML are written as *source*: a monospace field, the formatting
+buttons gone from the row above it (they would go nowhere), and an eye button
+beside the format chooser that shows the rendered message. Nothing
 is sent as source — Markdown is rendered to HTML when the message goes out,
 and the Markdown you wrote travels as the plain-text alternative, so a
 recipient whose client shows plain text gets something that still reads as
