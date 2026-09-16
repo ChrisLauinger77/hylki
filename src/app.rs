@@ -6930,6 +6930,12 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
+                // The reply just sent answers the conversation on screen, and
+                // its copy is in the cache by now (the worker lists the copy's
+                // folder before it says Sent): ask for the rest of the thread
+                // again so the reply joins it here, not after the next visit
+                // to the Sent folder (#199).
+                self.reload_related(account_id);
             }
 
             AppMsg::OpenAccounts => self.open_settings_window(&sender, true, false),
@@ -12619,6 +12625,24 @@ impl AppModel {
     /// Ignored unless it answers the message still on screen: the lookup is
     /// asynchronous and the user may have moved on. Messages already in the
     /// conversation are skipped, so this is safe to apply more than once.
+    /// Ask the cache again for the rest of the conversation on screen, when
+    /// it belongs to `account_id`. The answer goes through [`merge_related`],
+    /// which adds only what the conversation lacks.
+    fn reload_related(&mut self, account_id: u32) {
+        let Some(current) = self.current.clone() else { return };
+        if current.account_id != account_id || !self.threading {
+            return;
+        }
+        let only = [current.clone()];
+        let ids =
+            thread_ids(if self.current_thread.is_empty() { &only[..] } else { &self.current_thread });
+        if ids.is_empty() {
+            return;
+        }
+        self.send_to(account_id, MailRequest::LoadRelated { message_id: current.id, ids });
+        self.thread_related_pending = true;
+    }
+
     fn merge_related(&mut self, account_id: u32, message_id: u32, messages: Vec<Message>) {
         let Some(current) = self.current.clone() else { return };
         if current.account_id != account_id || current.id != message_id || !self.threading {

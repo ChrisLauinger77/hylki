@@ -889,7 +889,8 @@ async fn run_imap(
             if !outbox_flushed {
                 outbox_flushed = true;
                 flush_outbox(
-                    cache.as_ref(), account_id, &account, None, &mut session, &emit, false,
+                    cache.as_ref(), account_id, &account, None, &mut session, &mut use_envelope,
+                    &emit, false,
                 )
                 .await;
             }
@@ -2127,6 +2128,12 @@ async fn run_imap(
                                     text: i18n_f("Message sent, but saving to Sent failed: {e}", &[("e", &(e).to_string())]),
                                     connectivity: false,
                                 });
+                            } else {
+                                index_sent_copy(
+                                    account_id, &mut session, &account, &path,
+                                    &mut use_envelope, cache.as_ref(), &emit,
+                                )
+                                .await;
                             }
                         }
                         // If sending an edited draft (from this account), remove the
@@ -2212,6 +2219,7 @@ async fn run_imap(
                     &account,
                     id,
                     &mut session,
+                    &mut use_envelope,
                     &emit,
                     true,
                 )
@@ -3458,6 +3466,7 @@ async fn flush_outbox(
     account: &AccountConfig,
     id: Option<u32>,
     session: &mut Option<ImapSession>,
+    use_envelope: &mut bool,
     emit: &impl Fn(WorkerEvent),
     loud: bool,
 ) {
@@ -3506,6 +3515,11 @@ async fn flush_outbox(
                 if let (Some(path), Some(sess)) = (dest.as_deref(), session.as_mut()) {
                     if let Err(e) = append_to_sent(sess, path, &item.raw).await {
                         tracing::warn!("outbox: sent, but saving the copy failed: {e}");
+                    } else {
+                        index_sent_copy(
+                            account_id, session, account, path, use_envelope, Some(cache), emit,
+                        )
+                        .await;
                     }
                 }
             }
@@ -4287,6 +4301,37 @@ async fn append_to_sent(
 ) -> Result<(), async_imap::error::Error> {
     // Mark the saved copy as already read.
     append_msg(session, path, Some("(\\Seen)"), raw).await
+}
+
+/// The copy of a message just sent was APPENDed to `path`: list that folder
+/// again so the copy is in the cache now. A conversation is assembled from
+/// the cache (`related_from_cache`), so until the copy is indexed the reply
+/// cannot join the thread it answers, and the next visit to the Sent folder
+/// was the only thing that indexed it (#199). The folder's listing goes out
+/// too, so a list showing that folder (copies filed into the Inbox) is
+/// current as well.
+async fn index_sent_copy(
+    account_id: u32,
+    session: &mut Option<ImapSession>,
+    account: &AccountConfig,
+    path: &str,
+    use_envelope: &mut bool,
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    let Some(c) = cache else { return };
+    let Some(folder_id) = c.load_folders(account_id).iter().find(|f| f.path == path).map(|f| f.id)
+    else {
+        return;
+    };
+    match load_messages_retry(account_id, session, account, folder_id, path, use_envelope, cache).await
+    {
+        Ok(messages) => {
+            c.upsert_messages(account_id, path, &messages);
+            emit(WorkerEvent::Messages { folder_id, messages });
+        }
+        Err(e) => tracing::warn!("could not list {path} after saving the sent copy: {e}"),
+    }
 }
 
 /// APPEND a draft to the Drafts folder (flagged `\Draft \Seen`), creating the
@@ -7928,6 +7973,7 @@ async fn run_pop3(
                     &account,
                     id,
                     &mut no_session,
+                    &mut true,
                     &emit,
                     true,
                 )
@@ -9866,6 +9912,24 @@ async fn run_graph(
                         if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
                             c.delete_outbox(queued);
                             emit_outbox(cache.as_ref(), account_id, &emit);
+                        }
+                        // The server files the copy in Sent Items itself; list
+                        // that folder now so the copy is in the cache and can
+                        // join the conversation it answers (#199).
+                        let sent = cache
+                            .as_ref()
+                            .and_then(|c| c.load_folders(account_id).into_iter().find(|f| f.kind == FolderKind::Sent));
+                        if let (Some(c), Some(sent)) = (cache.as_ref(), sent) {
+                            if let Some(token) = graph_token(&account, &emit).await {
+                                if let Ok(messages) = graph_load_folder(
+                                    &token, account_id, sent.id, &sent.path, cache.as_ref(), &mut state,
+                                )
+                                .await
+                                {
+                                    c.upsert_messages(account_id, &sent.path, &messages);
+                                    emit(WorkerEvent::Messages { folder_id: sent.id, messages });
+                                }
+                            }
                         }
                         emit(WorkerEvent::Sent);
                     }
