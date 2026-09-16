@@ -403,7 +403,7 @@ pub enum AccountsOutput {
 /// answer here even though giving it the Sent *role* would cost the account
 /// its inbox. Declared once because the row is rebuilt whenever an editor
 /// opens, and the two copies drifting apart is how a hint goes stale.
-const SENT_COPY_HINT: &str = "Any folder, the Inbox included.";
+const SENT_COPY_HINT: &str = "Disabled files them in Sent. Any folder, the Inbox included.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
@@ -2921,19 +2921,20 @@ impl AccountsWindow {
         }
     }
 
-    /// Fill the "Save a copy of sent mail in" combo (#199): "Automatic" plus every one of
-    /// the account's folders, with the saved choice selected. The Inbox is
-    /// listed here — filing a copy somewhere does not re-label it.
+    /// Fill the "Save a copy of sent mail in" combo (#199): "Disabled" plus
+    /// every one of the account's folders, with the saved choice selected. The
+    /// Inbox is listed here — filing a copy somewhere does not re-label it.
     fn populate_sent_copy_combo(
         &mut self,
         widgets: &AccountsWindowWidgets,
         acc: Option<&AccountConfig>,
         all: &[(String, String)],
     ) {
-        // "Automatic" rather than "Sent folder", to read as the rest of the
-        // group does: every row here follows the server until told otherwise,
-        // and for this one following means wherever the Sent role landed.
-        let mut labels: Vec<&str> = vec!["Automatic"];
+        // "Disabled", not "Automatic": the rows around it auto-detect a folder
+        // from the server's markings, and this one detects nothing. It is an
+        // override that is either set or not, and unset means the Sent folder
+        // above keeps taking the copies as it always has.
+        let mut labels: Vec<&str> = vec!["Disabled"];
         labels.extend(all.iter().map(|(_, display)| display.as_str()));
         self.sent_copy_paths = all.iter().map(|(path, _)| path.clone()).collect();
         let row = &widgets.folder_sent_copy_row;
@@ -2960,8 +2961,8 @@ impl AccountsWindow {
         row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
     }
 
-    /// The "Save a copy of sent mail in" combo's current choice: a folder path, or `None`
-    /// on Automatic, which follows the Sent role.
+    /// The "Save a copy of sent mail in" combo's current choice: a folder path,
+    /// or `None` when disabled, which leaves the copy to the Sent role.
     fn read_sent_copy_path(&self, widgets: &AccountsWindowWidgets) -> Option<String> {
         // Nothing is known about this account's folders yet (it has never
         // connected, or is switched off), so the combo holds only "Sent
