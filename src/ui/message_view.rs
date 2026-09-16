@@ -944,12 +944,41 @@ impl Component for MessageView {
         // wrong size and then jumping. The page says when its frames have
         // settled; this is only the backstop for a page that never does.
         let ready_sender = sender.clone();
-        model.webview.connect_load_changed(move |_view, event| {
+        // Debug hook: VIREO_SHOWCASE_CLICK_LINK=1 clicks the first web link
+        // in the first message that has one, once, a few seconds after a
+        // conversation is in, and logs what the click landed on. Exercises
+        // the whole link path (frame → policy decision → launcher, #202)
+        // without a pointer.
+        let click_link = std::env::var("VIREO_SHOWCASE_CLICK_LINK").is_ok();
+        let clicked = std::rc::Rc::new(std::cell::Cell::new(false));
+        model.webview.connect_load_changed(move |view, event| {
             if event == webkit6::LoadEvent::Finished {
                 let s = ready_sender.clone();
                 gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
                     s.input(MessageViewInput::Rendered);
                 });
+                if click_link && !clicked.get() {
+                    let view = view.clone();
+                    let clicked = clicked.clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(4), move || {
+                        view.evaluate_javascript(
+                            CLICK_LINK_PROBE,
+                            None,
+                            None,
+                            None::<&gtk::gio::Cancellable>,
+                            move |r| match r {
+                                Ok(v) => {
+                                    let text = v.to_str().to_string();
+                                    if text.starts_with("clicked") {
+                                        clicked.set(true);
+                                    }
+                                    tracing::info!("showcase: click-link probe: {text}");
+                                }
+                                Err(e) => tracing::warn!("showcase: click-link probe failed: {e}"),
+                            },
+                        );
+                    });
+                }
             }
         });
 
@@ -3036,7 +3065,7 @@ fn new_webview() -> webkit6::WebView {
         false // show the (edited) menu
     });
 
-    webview.connect_decide_policy(|_view, decision, decision_type| {
+    webview.connect_decide_policy(|view, decision, decision_type| {
         // Links (including ones inside sandboxed message iframes, and `_blank`
         // links that request a new window) open in the external browser.
         let is_nav = decision_type == webkit6::PolicyDecisionType::NavigationAction;
@@ -3054,10 +3083,8 @@ fn new_webview() -> webkit6::WebView {
                             // or any scheme a third-party app has registered to that
                             // app on a single click.
                             if is_launchable_uri(&uri) {
-                                let _ = gtk::gio::AppInfo::launch_default_for_uri(
-                                    &uri,
-                                    None::<&gtk::gio::AppLaunchContext>,
-                                );
+                                let window = view.root().and_downcast::<gtk::Window>();
+                                crate::ui::launch::open_link(&uri, window.as_ref());
                             } else {
                                 tracing::warn!(
                                     "refused to open a link with an unsupported scheme: {}",
@@ -3113,6 +3140,18 @@ fn new_webview() -> webkit6::WebView {
 /// An allowlist, not a blocklist: every scheme a desktop registers is a program
 /// that would be started with a sender-controlled argument, and there is no way
 /// to enumerate the dangerous ones ahead of time.
+/// The VIREO_SHOWCASE_CLICK_LINK probe: find the first web link in any
+/// message frame, say what the top document has at that point (the frame
+/// itself when nothing covers it), and click the link.
+const CLICK_LINK_PROBE: &str = "(function(){var fs=document.querySelectorAll('iframe.vireo-frame');\
+for(var i=0;i<fs.length;i++){var d=fs[i].contentDocument;if(!d)continue;\
+var a=d.querySelector('a[href^=\"http\"]');if(!a)continue;a.scrollIntoView({block:'center'});\
+var fr=fs[i].getBoundingClientRect(),r=a.getBoundingClientRect();\
+var x=fr.left+r.left+r.width/2,y=fr.top+r.top+r.height/2;var el=document.elementFromPoint(x,y);\
+var who=el?el.tagName+(el.className?'.'+el.className:''):'nothing';a.click();\
+return 'clicked '+a.href+' at '+Math.round(x)+','+Math.round(y)+' over '+who;}\
+return 'no web link in any frame';})()";
+
 fn is_launchable_uri(uri: &str) -> bool {
     match uri.split_once(':') {
         Some((scheme, rest)) => {

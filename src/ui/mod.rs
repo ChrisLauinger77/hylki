@@ -11,6 +11,7 @@ pub mod folder_picker;
 pub mod grab_pill;
 pub mod icon_picker;
 pub mod initials;
+pub mod launch;
 pub mod message_list;
 pub mod message_view;
 pub mod message_window;

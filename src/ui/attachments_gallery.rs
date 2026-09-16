@@ -2274,28 +2274,19 @@ fn launch_failed_dialog(parent: Option<&gtk::Window>, error: &str) {
     dialog.show(parent);
 }
 
-/// Open a staged file through the OpenURI portal, speaking the protocol
-/// directly over GIO's D-Bus. The subscription to the request's `Response`
-/// signal is set up FIRST, on a path derived from our own `handle_token`, so
-/// a fast reply can't race it. Response 0 is success. On the quiet attempt
-/// (`ask == false`) any failure retries once with the app chooser — the
-/// backend's own dialog, whose launch machinery works even where the direct
-/// default-handler launch is broken (seen on Fedora 44), and whose "always
-/// open with" sticks in the permission store. A cancelled chooser (1) is not
-/// an error; any other chooser failure gets the dialog.
+/// Open a staged file through the OpenURI portal (`portal_request` in the
+/// launch module speaks the protocol). Response 0 is success. On the quiet
+/// attempt (`ask == false`) any failure retries once with the app chooser —
+/// the backend's own dialog, whose launch machinery works even where the
+/// direct default-handler launch is broken (seen on Fedora 44), and whose
+/// "always open with" sticks in the permission store. A cancelled chooser
+/// (1) is not an error; any other chooser failure gets the dialog.
 fn portal_open_file(path: std::path::PathBuf, ask: bool, parent: Option<gtk::Window>) {
     use gtk::gio;
     use gtk::glib;
     use gtk::glib::prelude::*;
     use std::os::fd::AsFd;
 
-    let conn = match gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) {
-        Ok(c) => c,
-        Err(e) => {
-            launch_failed_dialog(parent.as_ref(), &e.to_string());
-            return;
-        }
-    };
     let file = match std::fs::File::open(&path) {
         Ok(f) => f,
         Err(e) => {
@@ -2311,90 +2302,47 @@ fn portal_open_file(path: std::path::PathBuf, ask: bool, parent: Option<gtk::Win
             return;
         }
     };
-
-    let token = crate::rng::nonce(16)
-        .map(|t| t.replace('-', "_"))
-        .unwrap_or_else(|_| format!("vireo{}", std::process::id()));
-    let sender_token = conn
-        .unique_name()
-        .map(|n| n.trim_start_matches(':').replace('.', "_"))
-        .unwrap_or_default();
-    let request_path =
-        format!("/org/freedesktop/portal/desktop/request/{sender_token}/{token}");
-
-    let sub_id: std::rc::Rc<std::cell::RefCell<Option<gtk::gio::SignalSubscriptionId>>> =
-        std::rc::Rc::new(std::cell::RefCell::new(None));
-    let sub = sub_id.clone();
-    let sig_conn = conn.clone();
     let retry_path = path.clone();
     let retry_parent = parent.clone();
-    let id = conn.signal_subscribe(
-        Some("org.freedesktop.portal.Desktop"),
-        Some("org.freedesktop.portal.Request"),
-        Some(i18n("Response").as_str()),
-        Some(&request_path),
-        None,
-        gio::DBusSignalFlags::NONE,
-        move |_, _, _, _, _, params| {
-            if let Some(id) = sub.borrow_mut().take() {
-                sig_conn.signal_unsubscribe(id);
-            }
-            let code = params.child_value(0).get::<u32>().unwrap_or(2);
-            match (code, ask) {
-                (0, _) => {}
-                // The user cancelled — on EITHER attempt. When no default
-                // handler is registered, the backend shows its chooser even
-                // on the quiet attempt, so a cancel can arrive with
-                // ask == false too; treating that as a failure re-asked and
-                // the dialog popped right back up (issue #65). A cancel is
-                // an answer, never a reason to ask again.
-                (1, _) => {}
-                (_, false) => {
-                    tracing::warn!("portal open answered {code}; retrying with the chooser");
-                    portal_open_file(retry_path.clone(), true, retry_parent.clone());
-                }
-                (_, true) => launch_failed_dialog(
-                    retry_parent.as_ref(),
-                    &format!("the portal answered response code {code}"),
-                ),
-            }
-        },
-    );
-    *sub_id.borrow_mut() = Some(id);
-
-    let options = glib::VariantDict::new(None);
-    options.insert_value("handle_token", &token.to_variant());
-    if ask {
-        options.insert_value("ask", &true.to_variant());
-    }
-    // Not the tuple's ToVariant: that boxes the dict as a nested "v" and the
-    // portal rejects "(shv)". tuple_from_iter splices each child at its own
-    // type, producing the "(sha{sv})" the interface declares.
-    let params = glib::Variant::tuple_from_iter([
-        "".to_variant(),
-        glib::variant::Handle(handle).to_variant(),
-        options.end(),
-    ]);
-    let call_conn = conn.clone();
-    conn.call_with_unix_fd_list(
-        Some("org.freedesktop.portal.Desktop"),
-        "/org/freedesktop/portal/desktop",
-        "org.freedesktop.portal.OpenURI",
+    crate::ui::launch::portal_request(
         "OpenFile",
-        Some(&params),
-        None,
-        gio::DBusCallFlags::NONE,
-        10_000,
-        Some(&fd_list),
-        gio::Cancellable::NONE,
-        move |res| {
-            if let Err(e) = res {
-                if let Some(id) = sub_id.borrow_mut().take() {
-                    call_conn.signal_unsubscribe(id);
-                }
-                tracing::warn!("portal OpenFile call failed: {e}");
-                launch_failed_dialog(parent.as_ref(), &e.to_string());
+        Some(fd_list),
+        move |token| {
+            let options = glib::VariantDict::new(None);
+            options.insert_value("handle_token", &token.to_variant());
+            if ask {
+                options.insert_value("ask", &true.to_variant());
             }
+            // Not the tuple's ToVariant: that boxes the dict as a nested "v"
+            // and the portal rejects "(shv)". tuple_from_iter splices each
+            // child at its own type, producing the "(sha{sv})" the interface
+            // declares.
+            glib::Variant::tuple_from_iter([
+                "".to_variant(),
+                glib::variant::Handle(handle).to_variant(),
+                options.end(),
+            ])
+        },
+        move |res| match res {
+            Err(e) => {
+                tracing::warn!("portal OpenFile call failed: {e}");
+                launch_failed_dialog(retry_parent.as_ref(), &e);
+            }
+            // The user cancelled — on EITHER attempt. When no default
+            // handler is registered, the backend shows its chooser even on
+            // the quiet attempt, so a cancel can arrive with ask == false
+            // too; treating that as a failure re-asked and the dialog popped
+            // right back up (issue #65). A cancel is an answer, never a
+            // reason to ask again.
+            Ok(0) | Ok(1) => {}
+            Ok(code) if !ask => {
+                tracing::warn!("portal open answered {code}; retrying with the chooser");
+                portal_open_file(retry_path.clone(), true, retry_parent.clone());
+            }
+            Ok(code) => launch_failed_dialog(
+                retry_parent.as_ref(),
+                &format!("the portal answered response code {code}"),
+            ),
         },
     );
 }

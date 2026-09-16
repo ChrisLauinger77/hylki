@@ -460,10 +460,7 @@ impl Component for ContactsPage {
             ContactsPageInput::OpenUrl(url) => {
                 // Bare "example.org" URLs are common in vCards.
                 let full = if url.contains("://") { url } else { format!("https://{url}") };
-                let _ = gtk::gio::AppInfo::launch_default_for_uri(
-                    &full,
-                    gtk::gio::AppLaunchContext::NONE,
-                );
+                crate::ui::launch::open_link(&full, None);
             }
 
             ContactsPageInput::Edit => {

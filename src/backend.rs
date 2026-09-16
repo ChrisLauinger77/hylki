@@ -387,7 +387,7 @@ fn sample_messages() -> Vec<Message> {
         Spec { id: 6, account_id: 1, folder_id: 1, from_name: "Sophie Turner", from_addr: "sophie@studio.dev", to: ME,
             subject: "Reader redesign: final review",
             preview: "Before we tag the release I'd like one last pass over the reading pane. I've collected everything into…",
-            body: "Hi all,\n\nBefore we tag the release I'd like one last pass over the reading pane. I've collected everything into the review board:\n\n  • Full-width conversation layout\n  • Card action palettes\n  • The new accent selection in the list\n\nComments by Thursday, please!\n\nSophie",
+            body: "<p>Hi all,</p><p>Before we tag the release I'd like one last pass over the reading pane. I've collected everything into <a href=\"https://example.com/review-board\">the review board</a>:</p><ul><li>Full-width conversation layout</li><li>Card action palettes</li><li>The new accent selection in the list</li></ul><p>Comments by Thursday, please!</p><p>Sophie</p>",
             date: "8:12 AM", unread: false, starred: false, keywords: &["Work"], has_attachment: false, in_reply_to: None },
         Spec { id: 5, account_id: 1, folder_id: 1, from_name: "Marcus Chen", from_addr: "marcus@studio.dev", to: ME,
             subject: "Re: Reader redesign: final review",
