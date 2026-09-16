@@ -398,12 +398,14 @@ pub enum AccountsOutput {
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
 /// "Microsoft 365" (`ms_graph`) provider has no IMAP — its token is
 /// Graph-scoped — so the imported account uses [`Protocol::Graph`] (issue #36).
-/// The subtitle under "Save a copy of sent mail in" (#199). Says the one thing the row
-/// above it cannot: this only files mail somewhere, so the Inbox is a fair
-/// answer here even though giving it the Sent *role* would cost the account
-/// its inbox. Declared once because the row is rebuilt whenever an editor
-/// opens, and the two copies drifting apart is how a hint goes stale.
-const SENT_COPY_HINT: &str = "Disabled files them in Sent. Any folder, the Inbox included.";
+/// The subtitle under "Save a copy of sent mail in" (#199). Says the one thing
+/// the row above it cannot: this only files mail somewhere, so the Inbox is a
+/// fair answer here even though giving it the Sent *role* would cost the
+/// account its inbox. What "Disabled" leaves the copy to is left to the title,
+/// which already says "a copy": the originals are the Sent row's business.
+/// Declared once because the row is rebuilt whenever an editor opens, and the
+/// two copies drifting apart is how a hint goes stale.
+const SENT_COPY_HINT: &str = "Any folder, the Inbox included.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
