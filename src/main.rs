@@ -17,6 +17,7 @@ mod desktop;
 mod goa;
 mod i18n;
 mod logo;
+mod markdown;
 mod models;
 mod mutf7;
 mod nautilus_ext;
