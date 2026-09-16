@@ -405,7 +405,7 @@ pub enum AccountsOutput {
 /// which already says "a copy": the originals are the Sent row's business.
 /// Declared once because the row is rebuilt whenever an editor opens, and the
 /// two copies drifting apart is how a hint goes stale.
-const SENT_COPY_HINT: &str = "Any folder, the Inbox included.";
+const SENT_COPY_HINT: &str = "Any folder, the Inbox included. New mail only.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
@@ -1313,10 +1313,8 @@ impl Component for AccountsWindow {
                                 set_description: Some(
                                     i18n("Which of this account's folders hold each role. Automatically \
                                           follows the server's own markings; pick a folder when a role \
-                                          isn't detected or lands wrong. Copies of what you send go to \
-                                          the Sent folder unless you say otherwise — that row files \
-                                          mail rather than naming a role, so the Inbox can be chosen \
-                                          there.").as_str()
+                                          isn't detected or lands wrong. Nothing already on the server \
+                                          moves: a role says where mail goes from now on.").as_str()
                                 ),
 
                                 #[name = "folder_sent_row"]

@@ -3404,6 +3404,49 @@ fn queue_outbox_message(
 /// one that fails again keeps its place with the new reason recorded. `loud`
 /// reports failures to the UI — background sweeps stay quiet, since the user did
 /// not ask for anything and already knows the message is waiting.
+/// Where a sent copy belongs *now*, rather than where it was headed when the
+/// message was queued (#199).
+///
+/// A message can sit in the Outbox for days — Send Later puts it there on
+/// purpose — and the account's choice can move on while it waits. Reading the
+/// stored path back meant a message scheduled last week landed in the folder
+/// that was configured last week. The queued path stays as the fallback for
+/// when the folder list can't be read, so a send never loses its copy over
+/// this.
+fn current_sent_copy_path(
+    account: &AccountConfig,
+    account_id: u32,
+    cache: Option<&Cache>,
+    queued: Option<&str>,
+) -> Option<String> {
+    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    pick_queued_sent_copy(account, &folders, queued)
+}
+
+/// [`current_sent_copy_path`] once the folder list is in hand.
+fn pick_queued_sent_copy(
+    account: &AccountConfig,
+    folders: &[Folder],
+    queued: Option<&str>,
+) -> Option<String> {
+    if folders.is_empty() {
+        return queued.map(str::to_string);
+    }
+    account
+        .sent_copy_path
+        .as_deref()
+        // Renamed or removed since it was chosen: fall through to Sent rather
+        // than appending into a name the server would have to recreate.
+        .filter(|p| folders.iter().any(|f| f.path == *p))
+        .map(str::to_string)
+        .or_else(|| {
+            folders
+                .iter()
+                .find(|f| f.kind == FolderKind::Sent)
+                .map(|f| f.path.clone())
+        })
+}
+
 async fn flush_outbox(
     cache: Option<&Cache>,
     account_id: u32,
@@ -3449,9 +3492,15 @@ async fn flush_outbox(
                 sent_any = true;
                 sent += 1;
                 cache.delete_outbox(item.id);
-                if let (Some(path), Some(sess)) = (item.sent_path.as_deref(), session.as_mut()) {
+                let dest = current_sent_copy_path(
+                    account,
+                    account_id,
+                    Some(cache),
+                    item.sent_path.as_deref(),
+                );
+                if let (Some(path), Some(sess)) = (dest.as_deref(), session.as_mut()) {
                     if let Err(e) = append_to_sent(sess, path, &item.raw).await {
-                        tracing::warn!("outbox: sent, but saving to Sent failed: {e}");
+                        tracing::warn!("outbox: sent, but saving the copy failed: {e}");
                     }
                 }
             }
@@ -10751,6 +10800,49 @@ mod tests {
             "Here are the figures we discussed. Let me know if the Q3 line looks wrong."
         );
         assert_eq!(preview_from_part(b"", None, None), "");
+    }
+
+    #[test]
+    fn a_queued_message_takes_the_sent_copy_folder_it_finds_on_the_way_out() {
+        use crate::models::{Folder, FolderKind};
+        let folder = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        let folders = vec![
+            folder(1, "INBOX", FolderKind::Inbox),
+            folder(2, "Sent", FolderKind::Sent),
+        ];
+        let account = |chosen: Option<&str>| AccountConfig {
+            sent_copy_path: chosen.map(str::to_string),
+            ..sample_account()
+        };
+        // The account says Inbox now; the message was queued for Sent. It goes
+        // where the account says today, not where it said last week.
+        assert_eq!(
+            super::pick_queued_sent_copy(&account(Some("INBOX")), &folders, Some("Sent")).as_deref(),
+            Some("INBOX"),
+        );
+        // Turned back off since queuing: back to the Sent folder.
+        assert_eq!(
+            super::pick_queued_sent_copy(&account(None), &folders, Some("INBOX")).as_deref(),
+            Some("Sent"),
+        );
+        // Chosen folder gone from the server: Sent rather than a dead name.
+        assert_eq!(
+            super::pick_queued_sent_copy(&account(Some("Gone")), &folders, Some("Gone")).as_deref(),
+            Some("Sent"),
+        );
+        // No folder list to read (offline, no cache): the queued path stands,
+        // so a send never loses its copy over this.
+        assert_eq!(
+            super::pick_queued_sent_copy(&account(Some("INBOX")), &[], Some("Sent")).as_deref(),
+            Some("Sent"),
+        );
     }
 
     #[test]
