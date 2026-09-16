@@ -152,6 +152,8 @@ relm4::new_stateless_action!(PrintPreviewAction, WindowActionGroup, "print-previ
 relm4::new_stateless_action!(StatusBarAction, WindowActionGroup, "status-bar");
 relm4::new_stateless_action!(ConsoleAction, WindowActionGroup, "console");
 relm4::new_stateless_action!(FindAction, WindowActionGroup, "find");
+relm4::new_stateless_action!(UndoAction, WindowActionGroup, "undo");
+relm4::new_stateless_action!(RedoAction, WindowActionGroup, "redo");
 
 use crate::config::{self, split_identity, AccountConfig};
 use crate::models::{Account, Attachment, Folder, FolderKind, KeywordFinding, Message};
@@ -206,15 +208,84 @@ struct ComposeHost {
 /// The reader's inline reply/forward composer. `window` is `Some` only while the
 /// pane has been promoted to a floating window (else it lives in the reader's
 /// drop-down revealer).
-/// One undoable move: where the messages went, and where to put them back.
+/// Which flag a recorded change touched (#200).
+#[derive(Clone, Debug, PartialEq)]
+enum FlagKind {
+    Read,
+    Star,
+    Tag(String),
+}
+
+/// One message a flag change covers. Folder ids are re-checked when the
+/// change is applied — they are index-based and shift as folders come and go.
+#[derive(Clone, Debug, PartialEq)]
+struct FlagRef {
+    folder_id: u32,
+    uid: u32,
+    /// The list row's id, which is how the setters find every copy of it.
+    id: u32,
+}
+
+/// Put `kind` to `value` on each of `items`. Only messages the original
+/// action actually changed are listed, so one value covers them all.
+#[derive(Clone, Debug, PartialEq)]
+struct FlagChange {
+    kind: FlagKind,
+    value: bool,
+    items: Vec<FlagRef>,
+}
+
+/// One step of the undo/redo history (#200). A step is a thing to *do*: the
+/// undo stack holds the step that reverses each action, and applying a step
+/// pushes its [`UndoStep::inverse`] onto the other stack. Operations with no
+/// inverse — a permanent delete, an emptied folder, a sent message — are
+/// never recorded.
+#[derive(Clone, Debug, PartialEq)]
+enum UndoStep {
+    /// Take `message_ids` out of `from` and put them in `to`. Symmetric, so
+    /// redoing a move is the same request with the two folders swapped.
+    Move { from: String, to: String, message_ids: Vec<String> },
+    /// Set flags back to what they were.
+    Flags(Vec<FlagChange>),
+    CreateFolder { path: String },
+    /// Only ever the inverse of a [`UndoStep::CreateFolder`]: deleting a
+    /// folder the user made is undoing that, not a delete of its own. A
+    /// folder the user deletes is not undoable at all and never recorded.
+    DeleteFolder { path: String },
+    RenameFolder { from: String, to: String },
+}
+
+impl UndoStep {
+    /// The step that puts this one back.
+    fn inverse(&self) -> UndoStep {
+        match self {
+            UndoStep::Move { from, to, message_ids } => UndoStep::Move {
+                from: to.clone(),
+                to: from.clone(),
+                message_ids: message_ids.clone(),
+            },
+            UndoStep::Flags(changes) => UndoStep::Flags(
+                changes
+                    .iter()
+                    .map(|c| FlagChange { value: !c.value, ..c.clone() })
+                    .collect(),
+            ),
+            UndoStep::CreateFolder { path } => UndoStep::DeleteFolder { path: path.clone() },
+            UndoStep::DeleteFolder { path } => UndoStep::CreateFolder { path: path.clone() },
+            UndoStep::RenameFolder { from, to } => {
+                UndoStep::RenameFolder { from: to.clone(), to: from.clone() }
+            }
+        }
+    }
+}
+
+/// One entry on the undo (or redo) stack: the step to apply, and what the
+/// user called the action it belongs to, so the menu can say "Undo Archive"
+/// rather than just "Undo".
 struct UndoEntry {
     account_id: u32,
-    /// Where the move landed them (searched for the Message-IDs).
-    moved_to: String,
-    /// The folder they came from — where undo restores them.
-    restore_to: String,
-    restore_folder_id: u32,
-    message_ids: Vec<String>,
+    what: String,
+    step: UndoStep,
 }
 
 struct ReaderCompose {
@@ -749,10 +820,20 @@ pub struct AppModel {
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
-    /// Undoable moves (delete/archive/spam/drag), newest last. Unlimited:
-    /// entries are a few strings each. Ctrl+Z pops one and asks the worker to
-    /// bring the messages back (found by Message-ID where the move put them).
+    /// Undoable actions (#200): moves, flag changes, and folder creates and
+    /// renames, newest last. Unlimited: entries are a few strings each.
+    /// Ctrl+Z pops one, applies it, and pushes its inverse onto `redo_stack`.
     undo_stack: Vec<UndoEntry>,
+    /// The other half of the history: what Ctrl+Shift+Z puts back. Cleared
+    /// whenever a new action is recorded, as every undo history does — the
+    /// branch it belonged to no longer exists.
+    redo_stack: Vec<UndoEntry>,
+    /// The burger menu's Undo/Redo section, relabelled as the stacks change.
+    undo_menu: gtk::gio::Menu,
+    /// Their actions, kept so they can be greyed out when there is nothing
+    /// on the stack.
+    undo_action: Option<RelmAction<UndoAction>>,
+    redo_action: Option<RelmAction<RedoAction>>,
     /// A draft awaiting its body before opening in the compose editor.
     /// A draft whose body is being fetched before its editor opens, and
     /// whether that editor goes in the reading pane (true) or a window.
@@ -1039,8 +1120,10 @@ pub enum AppMsg {
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
-    /// Ctrl+Z: undo the most recent move/delete.
+    /// Ctrl+Z: undo the most recent action.
     Undo,
+    /// Ctrl+Shift+Z / Ctrl+Y: put back what undo took away.
+    Redo,
     SetFetchInterval(u64),
     SetPush(bool),
     SetNotifications(bool),
@@ -2308,7 +2391,13 @@ impl SimpleComponent for AppModel {
         // Sectioned: settings / printing / window & help / quit.
         let menu = gtk::gio::Menu::new();
         let help_menu = gtk::gio::Menu::new();
+        let model_undo_menu = gtk::gio::Menu::new();
         {
+            // #200: the only place undo and redo are visible. They name the
+            // action they would reverse ("Undo Archive") and grey out when
+            // there is nothing on the stack.
+            menu.append_section(None, &model_undo_menu);
+
             let settings = gtk::gio::Menu::new();
             settings.append(Some(i18n("Settings").as_str()), Some("win.accounts"));
             menu.append_section(None, &settings);
@@ -2393,6 +2482,7 @@ impl SimpleComponent for AppModel {
             next_compose_id: 1,
             menu,
             help_menu,
+            undo_menu: model_undo_menu.clone(),
             accounts: Vec::new(),
             folders: HashMap::new(),
             account_order: order,
@@ -2450,6 +2540,9 @@ impl SimpleComponent for AppModel {
             current_thread: Vec::new(),
             list_selection: Vec::new(),
             undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            undo_action: None,
+            redo_action: None,
             bulk_pending: 0,
             related_id_seq: u32::MAX,
             related_ids: HashMap::new(),
@@ -3258,6 +3351,16 @@ impl SimpleComponent for AppModel {
                 s.input(AppMsg::OpenListSearch);
             }));
         }
+        let undo_action = {
+            let s = sender.clone();
+            RelmAction::<UndoAction>::new_stateless(move |_| s.input(AppMsg::Undo))
+        };
+        let redo_action = {
+            let s = sender.clone();
+            RelmAction::<RedoAction>::new_stateless(move |_| s.input(AppMsg::Redo))
+        };
+        group.add_action(undo_action.clone());
+        group.add_action(redo_action.clone());
         group.add_action(RelmAction::<StatusBarAction>::new_stateless(move |_| {
             status_sender.input(AppMsg::ToggleNotifications);
         }));
@@ -3303,13 +3406,18 @@ impl SimpleComponent for AppModel {
                     s.input(AppMsg::ShowShortcuts);
                     return gtk::glib::Propagation::Stop;
                 }
-                // Ctrl+Z: undo the last move/delete. Text fields and the
-                // composer keep it for their own text undo.
-                if ctrl && !shift && keyval == gtk::gdk::Key::z {
+                // Ctrl+Z undoes the last action, Ctrl+Shift+Z and Ctrl+Y put
+                // it back (#200). Text fields and the composer keep all three
+                // for their own text history.
+                let undo_key = ctrl && !shift && keyval == gtk::gdk::Key::z;
+                let redo_key = ctrl
+                    && ((shift && matches!(keyval, gtk::gdk::Key::z | gtk::gdk::Key::Z))
+                        || keyval == gtk::gdk::Key::y);
+                if undo_key || redo_key {
                     if focus_is_text(&window) || focus_in_compose(&window) {
                         return gtk::glib::Propagation::Proceed;
                     }
-                    s.input(AppMsg::Undo);
+                    s.input(if redo_key { AppMsg::Redo } else { AppMsg::Undo });
                     return gtk::glib::Propagation::Stop;
                 }
                 // Ctrl+C with the keyboard on the list or the window itself:
@@ -3949,6 +4057,10 @@ impl SimpleComponent for AppModel {
         // mailto: URIs can arrive (via GApplication `open`) before this init
         // ran — install the live sender and drain anything that queued early.
         model.rebuild_help_menu();
+        model.undo_action = Some(undo_action);
+        model.redo_action = Some(redo_action);
+        // Both start empty, so both start greyed out.
+        model.refresh_undo_menu();
         model
             .notifications
             .emit(NotifyInput::SetConsoleEnabled(model.console_mode));
@@ -4247,7 +4359,7 @@ impl SimpleComponent for AppModel {
                 if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
                 {
                     // set_read clears the account's notification itself.
-                    self.set_read(&m, true);
+                    self.user_set_flags(read_label(true), &[m], FlagKind::Read, true);
                 }
             }
 
@@ -4632,27 +4744,12 @@ impl SimpleComponent for AppModel {
                         self.folder_namespace(account_id),
                         crate::mutf7::encode(name)
                     );
-                    // Optimistic: the folder appears in the sidebar right
-                    // away (a server round-trip took seconds); the worker's
-                    // confirming refresh matches the prediction and repaints
-                    // nothing.
-                    if !self
-                        .folders
-                        .get(&account_id)
-                        .is_some_and(|fs| fs.iter().any(|f| f.path == path))
-                    {
-                        self.folders.entry(account_id).or_default().push(Folder {
-                            id: 0,
-                            account_id,
-                            name: name.to_string(),
-                            path: path.clone(),
-                            kind: FolderKind::Custom,
-                            unread: 0,
-                        });
-                        self.normalize_folders(account_id);
-                        self.rebuild_sidebar();
-                    }
-                    self.send_to(account_id, MailRequest::CreateFolder { path });
+                    self.create_folder(account_id, path.clone());
+                    self.push_undo(
+                        account_id,
+                        i18n("Create Folder"),
+                        UndoStep::DeleteFolder { path },
+                    );
                 }
             }
 
@@ -4679,21 +4776,10 @@ impl SimpleComponent for AppModel {
                 self.send_to(account_id, MailRequest::EmptyFolder { folder_id, path });
             }
 
+            // Not recorded: deleting a folder cannot be taken back (#200).
+            // The confirmation says so before it happens.
             AppMsg::DeleteFolder { account_id, path } => {
-                let trash = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Trash))
-                    .map(|f| f.path.clone())
-                    .or_else(|| self.default_folder_path(account_id, FolderKind::Trash));
-                // If the deleted folder is currently open, clear the view.
-                if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.path == path) {
-                    self.current = None;
-                    self.current_thread.clear();
-                    self.show_message(None, false);
-                    self.message_list.emit(MessageListInput::SetLoading);
-                }
-                self.send_to(account_id, MailRequest::DeleteFolder { path, trash });
+                self.delete_folder(account_id, path);
             }
 
             AppMsg::AccountsReordered(emails) => {
@@ -5043,11 +5129,15 @@ impl SimpleComponent for AppModel {
                         // sets the whole set (same semantics as the list row).
                         let any = self.current_thread.iter().any(|t| t.starred);
                         let members = self.current_thread.clone();
-                        for t in &members {
-                            self.set_star(t, !any);
-                        }
+                        self.user_set_flags(
+                            star_label(!any),
+                            &members,
+                            FlagKind::Star,
+                            !any,
+                        );
                     } else {
-                        self.set_star(&m, !m.starred);
+                        let starred = !m.starred;
+                        self.user_set_flags(star_label(starred), &[m], FlagKind::Star, starred);
                     }
                 }
             }
@@ -5143,7 +5233,8 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ToggleReadCurrent => {
                 if let Some(m) = self.reply_target() {
-                    self.set_read(&m, m.unread);
+                    let read = m.unread;
+                    self.user_set_flags(read_label(read), &[m], FlagKind::Read, read);
                 }
             }
 
@@ -5180,8 +5271,14 @@ impl SimpleComponent for AppModel {
                         let m = self.with_cached_body(m);
                         self.open_compose(m.account_id, forward_prefill(&m), &sender);
                     }
-                    RowAction::ToggleStar => self.set_star(&m, !m.starred),
-                    RowAction::ToggleRead => self.set_read(&m, m.unread),
+                    RowAction::ToggleStar => {
+                        let starred = !m.starred;
+                        self.user_set_flags(star_label(starred), &[m], FlagKind::Star, starred);
+                    }
+                    RowAction::ToggleRead => {
+                        let read = m.unread;
+                        self.user_set_flags(read_label(read), &[m], FlagKind::Read, read);
+                    }
                     RowAction::Spam => self.mark_spam_msg(m),
                     RowAction::NotSpam => self.mark_ham_msg(m),
                     RowAction::Archive => self.move_to(m, FolderKind::Archive),
@@ -5214,10 +5311,18 @@ impl SimpleComponent for AppModel {
                 }
                 match action {
                     // Flag/read changes update rows in place (no removal).
-                    BulkAction::MarkRead => for m in &messages { self.set_read(m, true); },
-                    BulkAction::MarkUnread => for m in &messages { self.set_read(m, false); },
-                    BulkAction::Flag => for m in &messages { self.set_star(m, true); },
-                    BulkAction::Unflag => for m in &messages { self.set_star(m, false); },
+                    BulkAction::MarkRead => {
+                        self.user_set_flags(read_label(true), &messages, FlagKind::Read, true)
+                    }
+                    BulkAction::MarkUnread => {
+                        self.user_set_flags(read_label(false), &messages, FlagKind::Read, false)
+                    }
+                    BulkAction::Flag => {
+                        self.user_set_flags(star_label(true), &messages, FlagKind::Star, true)
+                    }
+                    BulkAction::Unflag => {
+                        self.user_set_flags(star_label(false), &messages, FlagKind::Star, false)
+                    }
                     // Archive/Delete/Spam remove every selected row. Doing that one
                     // at a time blocks the UI thread (a render cycle per message) and
                     // trips GTK's "app is not responding" dialog for large selections.
@@ -6151,29 +6256,10 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Undo => {
-                let Some(e) = self.undo_stack.pop() else {
-                    self.notifications.emit(NotifyInput::Push {
-                        text: i18n("Nothing to undo"),
-                        error: false,
-                        connectivity: false,
-                    });
-                    return;
-                };
-                self.send_to(e.account_id, MailRequest::UndoMove {
-                    path: e.moved_to,
-                    dest: e.restore_to,
-                    dest_folder_id: e.restore_folder_id,
-                    message_ids: e.message_ids,
-                });
-                // Finding, moving and reloading the restored messages takes a
-                // few round trips — spin the refresh indicator until the
-                // worker's BulkComplete says the undo has landed.
-                self.bulk_pending += 1;
-                self.update_busy_indicator();
-                self.notifications
-                    .emit(NotifyInput::SetStatus(i18n("Undoing move…")));
-            }
+            AppMsg::Undo => self.undo_redo(false),
+
+            AppMsg::Redo => self.undo_redo(true),
+
 
             AppMsg::SetComposeInline(on) => {
                 if self.compose_inline != on {
@@ -6959,7 +7045,8 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetTag { message, keyword, add } => {
-                self.set_tag(&message, &keyword, add);
+                let what = self.tag_label(&keyword, add);
+                self.user_set_flags(what, &[*message], FlagKind::Tag(keyword), add);
             }
 
             AppMsg::MoveToInbox => {
@@ -6971,7 +7058,8 @@ impl SimpleComponent for AppModel {
             AppMsg::ToggleTagCurrent(keyword) => {
                 if let Some(m) = self.reply_target() {
                     let add = !m.has_keyword(&keyword);
-                    self.set_tag(&m, &keyword, add);
+                    let what = self.tag_label(&keyword, add);
+                    self.user_set_flags(what, &[m], FlagKind::Tag(keyword), add);
                 }
             }
 
@@ -8487,8 +8575,8 @@ impl AppModel {
             Shortcut::Star => sender.input(AppMsg::ToggleStar),
             Shortcut::ToggleRead => {
                 if let Some(m) = self.current.clone() {
-                    let read = !m.unread;
-                    self.set_read(&m, !read);
+                    let read = m.unread;
+                    self.user_set_flags(read_label(read), &[m], FlagKind::Read, read);
                 }
             }
             Shortcut::Compose => sender.input(AppMsg::Compose),
@@ -8515,10 +8603,24 @@ impl AppModel {
                             .collect()
                     })
                     .unwrap_or_default();
+                let mut changes = Vec::new();
+                let mut account_id = 0;
                 for keyword in keywords {
                     if let Some(m) = self.reply_target() {
+                        account_id = m.account_id;
+                        changes.push(FlagChange {
+                            kind: FlagKind::Tag(keyword.clone()),
+                            // The step is the reversal: undo puts them back.
+                            value: true,
+                            items: vec![FlagRef { folder_id: m.folder_id, uid: m.uid, id: m.id }],
+                        });
                         self.set_tag(&m, &keyword, false);
                     }
+                }
+                // One entry, so a single Ctrl+Z restores the whole set rather
+                // than giving back one tag per press.
+                if !changes.is_empty() {
+                    self.push_undo(account_id, i18n("Remove Tags"), UndoStep::Flags(changes));
                 }
             }
         }
@@ -9060,9 +9162,9 @@ impl AppModel {
     }
 
     /// Record a just-issued move so Ctrl+Z can bring it back. Skips silently
-    /// when nothing identifies the messages (no Message-ID) or the source
-    /// folder can't be named — an unrecordable move simply isn't undoable.
-    fn push_undo(
+    /// when nothing identifies the messages (no Message-ID) — an unrecordable
+    /// move simply isn't undoable.
+    fn push_undo_move(
         &mut self,
         account_id: u32,
         moved_to: &str,
@@ -9073,21 +9175,269 @@ impl AppModel {
         if ids.is_empty() {
             return;
         }
-        let Some(folder_id) = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.path == restore_to))
-            .map(|f| f.id)
-        else {
-            return;
-        };
-        self.undo_stack.push(UndoEntry {
-            account_id,
-            moved_to: moved_to.to_string(),
-            restore_to: restore_to.to_string(),
-            restore_folder_id: folder_id,
+        let what = self.move_label(account_id, moved_to);
+        self.push_undo(account_id, what, UndoStep::Move {
+            from: moved_to.to_string(),
+            to: restore_to.to_string(),
             message_ids: ids,
         });
+    }
+
+    /// [`push_undo_move`], for the moves whose destination doesn't name them:
+    /// Not Spam puts mail back in the Inbox, which is not "Move to Inbox".
+    fn push_undo_move_as(
+        &mut self,
+        account_id: u32,
+        what: String,
+        moved_to: &str,
+        restore_to: &str,
+        message_ids: Vec<String>,
+    ) {
+        let ids: Vec<String> = message_ids.into_iter().filter(|i| !i.is_empty()).collect();
+        if ids.is_empty() {
+            return;
+        }
+        self.push_undo(account_id, what, UndoStep::Move {
+            from: moved_to.to_string(),
+            to: restore_to.to_string(),
+            message_ids: ids,
+        });
+    }
+
+    /// What to call a move in the Undo menu, taken from where it landed:
+    /// the named actions where the destination has a role, "Move to X"
+    /// otherwise.
+    fn move_label(&self, account_id: u32, dest: &str) -> String {
+        let folder = self
+            .folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| f.path == dest));
+        match folder.map(|f| f.kind) {
+            Some(FolderKind::Trash) => i18n("Delete"),
+            Some(FolderKind::Archive) => i18n("Archive"),
+            Some(FolderKind::Junk) => i18n("Mark as Spam"),
+            _ => {
+                let name = folder.map(|f| f.name.clone()).unwrap_or_else(|| dest.to_string());
+                i18n_f("Move to {name}", &[("name", &name)])
+            }
+        }
+    }
+
+    /// The same for a tag, named as the user knows it.
+    fn tag_label(&self, keyword: &str, add: bool) -> String {
+        let name = self
+            .tags
+            .iter()
+            .find(|t| t.keyword.eq_ignore_ascii_case(keyword))
+            .map(|t| t.name.clone())
+            .unwrap_or_else(|| keyword.to_string());
+        if add {
+            i18n_f("Add Tag {name}", &[("name", &name)])
+        } else {
+            i18n_f("Remove Tag {name}", &[("name", &name)])
+        }
+    }
+
+    /// Record one reversible action (#200). The step is what *undoes* it.
+    /// A new action ends whatever redo branch was open, as undo histories do.
+    fn push_undo(&mut self, account_id: u32, what: String, step: UndoStep) {
+        self.undo_stack.push(UndoEntry { account_id, what, step });
+        self.redo_stack.clear();
+        self.refresh_undo_menu();
+    }
+
+    /// Ctrl+Z / Ctrl+Shift+Z: take the top of one stack, apply it, and put
+    /// its inverse on the other so the move can be made again.
+    fn undo_redo(&mut self, redo: bool) {
+        let entry = if redo { self.redo_stack.pop() } else { self.undo_stack.pop() };
+        let Some(entry) = entry else {
+            self.notifications.emit(NotifyInput::Push {
+                text: if redo { i18n("Nothing to redo") } else { i18n("Nothing to undo") },
+                error: false,
+                connectivity: false,
+            });
+            return;
+        };
+        let back = UndoEntry {
+            account_id: entry.account_id,
+            what: entry.what.clone(),
+            step: entry.step.inverse(),
+        };
+        // A step that could not be carried out is dropped rather than put
+        // back: leaving it on top would jam the key on something that will
+        // fail again every time. The entries under it are usually about other
+        // messages entirely, so the rest of the history stands.
+        if self.apply_undo_step(entry.account_id, &entry.step, redo) {
+            if redo {
+                self.undo_stack.push(back);
+            } else {
+                self.redo_stack.push(back);
+            }
+        }
+        self.refresh_undo_menu();
+    }
+
+    /// Carry out one step. Returns false when it could not be done at all
+    /// (the folder is gone, the messages are no longer where they were), in
+    /// which case the step is dropped rather than left to fail again.
+    fn apply_undo_step(&mut self, account_id: u32, step: &UndoStep, redo: bool) -> bool {
+        match step {
+            UndoStep::Move { from, to, message_ids } => {
+                let Some(dest_folder_id) = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| &f.path == to))
+                    .map(|f| f.id)
+                else {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("That folder is no longer there."),
+                        error: true,
+                        connectivity: false,
+                    });
+                    return false;
+                };
+                self.send_to(account_id, MailRequest::UndoMove {
+                    path: from.clone(),
+                    dest: to.clone(),
+                    dest_folder_id,
+                    message_ids: message_ids.clone(),
+                });
+                // Finding, moving and reloading the messages takes a few round
+                // trips — spin the refresh indicator until the worker's
+                // BulkComplete says it has landed.
+                self.bulk_pending += 1;
+                self.update_busy_indicator();
+                self.notifications.emit(NotifyInput::SetStatus(if redo {
+                    i18n("Redoing move…")
+                } else {
+                    i18n("Undoing move…")
+                }));
+                true
+            }
+            UndoStep::Flags(changes) => {
+                let mut touched = 0usize;
+                for change in changes {
+                    for item in &change.items {
+                        let Some(m) = self
+                            .message_cache
+                            .get(&(account_id, item.folder_id))
+                            .and_then(|msgs| {
+                                msgs.iter().find(|m| m.uid == item.uid && m.id == item.id).cloned()
+                            })
+                        else {
+                            continue;
+                        };
+                        touched += 1;
+                        match &change.kind {
+                            FlagKind::Read => self.set_read(&m, change.value),
+                            FlagKind::Star => self.set_star(&m, change.value),
+                            FlagKind::Tag(keyword) => self.set_tag(&m, keyword, change.value),
+                        }
+                    }
+                }
+                if touched == 0 {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("Those messages are no longer here."),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+                touched > 0
+            }
+            UndoStep::CreateFolder { path } => {
+                self.create_folder(account_id, path.clone());
+                true
+            }
+            UndoStep::DeleteFolder { path } => {
+                self.delete_folder(account_id, path.clone());
+                true
+            }
+            UndoStep::RenameFolder { from, to } => {
+                if !self
+                    .folders
+                    .get(&account_id)
+                    .is_some_and(|fs| fs.iter().any(|f| &f.path == from))
+                {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("That folder is no longer there."),
+                        error: true,
+                        connectivity: false,
+                    });
+                    return false;
+                }
+                self.apply_folder_rename(account_id, from.clone(), to.clone(), None);
+                true
+            }
+        }
+    }
+
+    /// (Re)build the burger menu's Undo/Redo section, naming the action each
+    /// one would reverse, and grey the entries out when a stack is empty.
+    fn refresh_undo_menu(&self) {
+        let label = |verb: &str, entry: Option<&UndoEntry>| match entry {
+            Some(e) => format!("{verb} {}", e.what),
+            None => verb.to_string(),
+        };
+        self.undo_menu.remove_all();
+        self.undo_menu.append(
+            Some(label(&i18n("Undo"), self.undo_stack.last()).as_str()),
+            Some("win.undo"),
+        );
+        self.undo_menu.append(
+            Some(label(&i18n("Redo"), self.redo_stack.last()).as_str()),
+            Some("win.redo"),
+        );
+        if let Some(a) = &self.undo_action {
+            a.set_enabled(!self.undo_stack.is_empty());
+        }
+        if let Some(a) = &self.redo_action {
+            a.set_enabled(!self.redo_stack.is_empty());
+        }
+    }
+
+    /// A read/star/tag change the user asked for: applied, and recorded so
+    /// Ctrl+Z puts it back (#200). Only messages the change actually moves
+    /// are recorded, so one value covers every one of them. Automatic marks
+    /// — reading a message marks it read — use the plain setters and are
+    /// deliberately not recorded: they are not actions anyone took.
+    fn user_set_flags(&mut self, what: String, msgs: &[Message], kind: FlagKind, value: bool) {
+        let mut by_account: HashMap<u32, Vec<FlagRef>> = HashMap::new();
+        for m in msgs {
+            let changes = match &kind {
+                // A draft is neither read nor unread, and a queued message
+                // has no server flags at all: the setters decline both, so
+                // recording them would leave dead entries in the history.
+                FlagKind::Read => {
+                    m.unread == value && !self.is_drafts_folder(m.account_id, m.folder_id)
+                }
+                FlagKind::Star => m.starred != value,
+                FlagKind::Tag(keyword) => {
+                    m.has_keyword(keyword) != value
+                        && self.outbox_item(m.account_id, m.id).is_none()
+                }
+            };
+            if !changes {
+                continue;
+            }
+            by_account.entry(m.account_id).or_default().push(FlagRef {
+                folder_id: m.folder_id,
+                uid: m.uid,
+                id: m.id,
+            });
+            match &kind {
+                FlagKind::Read => self.set_read(m, value),
+                FlagKind::Star => self.set_star(m, value),
+                FlagKind::Tag(keyword) => self.set_tag(m, keyword, value),
+            }
+        }
+        // One entry per account: undo sends its requests to one worker.
+        for (account_id, items) in by_account {
+            self.push_undo(
+                account_id,
+                what.clone(),
+                UndoStep::Flags(vec![FlagChange { kind: kind.clone(), value: !value, items }]),
+            );
+        }
     }
 
     /// Tell the reader how card actions should show (⋯ toggle / auto on
@@ -12051,7 +12401,7 @@ impl AppModel {
         if src == dest {
             return; // already in that folder
         }
-        self.push_undo(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move(m.account_id, &dest, &src, vec![m.message_id.clone()]);
         self.send_to(m.account_id, MailRequest::MoveMessage { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -12112,7 +12462,7 @@ impl AppModel {
         }
         self.bulk_pending += groups.len();
         for (src, (uids, message_ids)) in groups {
-            self.push_undo(dest_account, &dest, &src, message_ids);
+            self.push_undo_move(dest_account, &dest, &src, message_ids);
             self.send_to(
                 dest_account,
                 MailRequest::MoveMessages { path: src, uids, dest: dest.clone() },
@@ -12125,6 +12475,50 @@ impl AppModel {
     /// Move a custom folder under a new parent (or "" = the account's top
     /// level) via IMAP RENAME, after checking the move makes sense. The server
     /// carries any sub-hierarchy along with it.
+    /// Make a folder at `path`. Optimistic: it appears in the sidebar right
+    /// away (a server round-trip took seconds); the worker's confirming
+    /// refresh matches the prediction and repaints nothing.
+    fn create_folder(&mut self, account_id: u32, path: String) {
+        let delim = self.folder_delimiter(account_id);
+        let leaf = path.rsplit(delim).next().unwrap_or(&path).to_string();
+        if !self
+            .folders
+            .get(&account_id)
+            .is_some_and(|fs| fs.iter().any(|f| f.path == path))
+        {
+            self.folders.entry(account_id).or_default().push(Folder {
+                id: 0,
+                account_id,
+                name: crate::mutf7::decode(&leaf),
+                path: path.clone(),
+                kind: FolderKind::Custom,
+                unread: 0,
+            });
+            self.normalize_folders(account_id);
+            self.rebuild_sidebar();
+        }
+        self.send_to(account_id, MailRequest::CreateFolder { path });
+    }
+
+    /// Remove a folder, its messages going to Trash first so nothing is lost
+    /// even when this is undoing a folder someone has since filed mail into.
+    fn delete_folder(&mut self, account_id: u32, path: String) {
+        let trash = self
+            .folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Trash))
+            .map(|f| f.path.clone())
+            .or_else(|| self.default_folder_path(account_id, FolderKind::Trash));
+        // If the deleted folder is currently open, clear the view.
+        if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.path == path) {
+            self.current = None;
+            self.current_thread.clear();
+            self.show_message(None, false);
+            self.message_list.emit(MessageListInput::SetLoading);
+        }
+        self.send_to(account_id, MailRequest::DeleteFolder { path, trash });
+    }
+
     fn move_folder(&mut self, account_id: u32, path: String, dest: String) {
         let complain = |me: &Self, text: &str| {
             me.notifications.emit(NotifyInput::Push {
@@ -12160,7 +12554,7 @@ impl AppModel {
             complain(self, &format!("A folder named {leaf:?} is already there."));
             return;
         }
-        self.apply_folder_rename(account_id, path, new_path);
+        self.apply_folder_rename(account_id, path, new_path, Some(i18n("Move Folder")));
     }
 
     /// Bring an account's local folder list back to exactly the shape the
@@ -12200,7 +12594,21 @@ impl AppModel {
     /// clear the view if the affected subtree is open, reshape the local
     /// folder list exactly as the worker will report it back, re-key
     /// everything id- or path-addressed, and hand the RENAME to the server.
-    fn apply_folder_rename(&mut self, account_id: u32, path: String, new_path: String) {
+    fn apply_folder_rename(
+        &mut self,
+        account_id: u32,
+        path: String,
+        new_path: String,
+        record: Option<String>,
+    ) {
+        // Recorded as the rename that puts it back. `None` while an undo or
+        // redo is doing exactly that — it keeps its own history.
+        if let Some(what) = record {
+            self.push_undo(account_id, what, UndoStep::RenameFolder {
+                from: new_path.clone(),
+                to: path.clone(),
+            });
+        }
         let delim = self.folder_delimiter(account_id);
         // If the affected folder (or one of its children) is open, clear the
         // view — its path is about to stop existing.
@@ -12540,10 +12948,12 @@ impl AppModel {
             });
             return;
         }
-        self.apply_folder_rename(account_id, path, new_path);
+        self.apply_folder_rename(account_id, path, new_path, Some(i18n("Rename Folder")));
     }
 
-    /// Confirm deleting a custom folder (contents moved to Trash).
+    /// Confirm deleting a custom folder (contents moved to Trash). Deliberately
+    /// outside the undo history (#200): the mailbox itself is gone from the
+    /// server, so the dialog says as much instead of promising a way back.
     fn confirm_delete_folder(
         &self,
         account_id: u32,
@@ -12554,7 +12964,11 @@ impl AppModel {
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
             Some(&format!("Delete “{name}”?")),
-            Some(i18n("Its messages are moved to Trash and the folder is removed.").as_str()),
+            Some(
+                i18n("Its messages are moved to Trash and the folder is removed from the \
+                      server. This cannot be undone.")
+                    .as_str(),
+            ),
         );
         dialog.add_response("cancel", &i18n("Cancel"));
         dialog.add_response("delete", &i18n("Delete"));
@@ -12619,7 +13033,7 @@ impl AppModel {
             });
             return;
         };
-        self.push_undo(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move(m.account_id, &dest, &src, vec![m.message_id.clone()]);
         self.send_to(m.account_id, MailRequest::MarkSpam { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -12638,7 +13052,7 @@ impl AppModel {
             });
             return;
         };
-        self.push_undo(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move_as(m.account_id, i18n("Not Spam"), &dest, &src, vec![m.message_id.clone()]);
         self.send_to(m.account_id, MailRequest::MarkHam { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -13953,7 +14367,11 @@ impl AppModel {
             )));
         }
         for ((account_id, src), (dest, uids, message_ids)) in groups {
-            self.push_undo(account_id, &dest, &src, message_ids);
+            if action == BulkAction::NotSpam {
+                self.push_undo_move_as(account_id, i18n("Not Spam"), &dest, &src, message_ids);
+            } else {
+                self.push_undo_move(account_id, &dest, &src, message_ids);
+            }
             let req = if action == BulkAction::NotSpam {
                 MailRequest::MarkHamMany { path: src, uids, dest }
             } else {
@@ -15162,7 +15580,8 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("c", i18n_noop("Compose")),
             ("Esc", i18n_noop("Back out of a reply and return to the list")),
-            ("Ctrl+Z", i18n_noop("Undo the last move or delete")),
+            ("Ctrl+Z", i18n_noop("Undo the last action (also in the main menu)")),
+            ("Ctrl+Shift+Z", i18n_noop("Redo it (Ctrl+Y does the same)")),
             ("Ctrl+P", i18n_noop("Print the message you are reading")),
             ("Ctrl+Shift+P", i18n_noop("Preview it as a PDF first")),
             ("Ctrl+Shift+S", i18n_noop("Reveal the status bar (also: long-press Refresh)")),
@@ -15325,6 +15744,16 @@ fn demo_filters() -> Vec<config::FilterRule> {
         mk("Invoices", "hello@hyprlab.dev", FilterField::Subject, FilterMatch::Contains, "invoice", "Invoices"),
         mk("", "jason.m@fastmail.com", FilterField::Subject, FilterMatch::Contains, "order", "Orders"),
     ]
+}
+
+/// What the Undo menu calls a star change.
+fn star_label(starred: bool) -> String {
+    if starred { i18n("Star") } else { i18n("Unstar") }
+}
+
+/// The same for a read/unread change.
+fn read_label(read: bool) -> String {
+    if read { i18n("Mark as Read") } else { i18n("Mark as Unread") }
 }
 
 fn demo_mode() -> bool {
@@ -16512,6 +16941,53 @@ mod tests {
         assert_eq!(kind_of("INBOX"), FolderKind::Inbox);
         // Ids survive the re-sort (cached messages reference them).
         assert_eq!(folders.iter().find(|f| f.path == "Sent Items").unwrap().id, 2);
+    }
+
+    #[test]
+    fn every_undo_step_is_its_own_inverse_twice_over() {
+        use super::{FlagChange, FlagKind, FlagRef, UndoStep};
+        let steps = vec![
+            UndoStep::Move {
+                from: "Archive".into(),
+                to: "INBOX".into(),
+                message_ids: vec!["a@b.c".into()],
+            },
+            UndoStep::Flags(vec![
+                FlagChange {
+                    kind: FlagKind::Read,
+                    value: false,
+                    items: vec![FlagRef { folder_id: 1, uid: 7, id: 7 }],
+                },
+                FlagChange {
+                    kind: FlagKind::Tag("Work".into()),
+                    value: true,
+                    items: vec![FlagRef { folder_id: 1, uid: 8, id: 8 }],
+                },
+            ]),
+            UndoStep::CreateFolder { path: "Projects".into() },
+            UndoStep::DeleteFolder { path: "Projects".into() },
+            UndoStep::RenameFolder { from: "Old".into(), to: "New".into() },
+        ];
+        for step in &steps {
+            assert_eq!(&step.inverse().inverse(), step, "{step:?} round-trips");
+            assert_ne!(&step.inverse(), step, "{step:?} actually reverses");
+        }
+        // A move undoes by swapping the two folders, which is what makes
+        // redo the very same request back the other way.
+        assert_eq!(
+            steps[0].inverse(),
+            UndoStep::Move {
+                from: "INBOX".into(),
+                to: "Archive".into(),
+                message_ids: vec!["a@b.c".into()],
+            }
+        );
+        // Undoing a folder someone made deletes it again; there is no step
+        // that undoes a folder the user deleted.
+        assert_eq!(
+            UndoStep::CreateFolder { path: "Projects".into() }.inverse(),
+            UndoStep::DeleteFolder { path: "Projects".into() }
+        );
     }
 
     #[test]
