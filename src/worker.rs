@@ -1958,10 +1958,9 @@ async fn run_imap(
                         connectivity: false,
                     });
                 } else if uids.is_empty() {
-                    emit(WorkerEvent::Error {
-                        text: i18n("Undo: the messages are no longer where that move put them."),
-                        connectivity: false,
-                    });
+                    // Not an error the reader needs interrupting for: the
+                    // step is simply spent (#200).
+                    tracing::info!("undo: the messages are no longer where that move put them");
                 } else {
                     // Reload the restored folder so the messages reappear in
                     // the list (the app can't restore them optimistically —
@@ -1981,11 +1980,9 @@ async fn run_imap(
                             message_ids: message_ids.clone(),
                         });
                     }
-                    emit(WorkerEvent::Notice({
-                        let n = uids.len() as u32;
-                        ni18n_f("Move undone — message restored", "Move undone — {n} messages restored", n, &[("n", &n.to_string())])
-                    }));
                 }
+                // Undoing something is not news: the messages reappearing in
+                // the list is the whole report (#200).
                 // Always signal completion — the app spins the refresh
                 // indicator while the undo's server work is in flight.
                 emit(WorkerEvent::BulkComplete);
@@ -9487,11 +9484,10 @@ async fn run_graph(
                 match graph_undo_move(&account, account_id, &mut state, &path, &dest, &message_ids, cache.as_ref())
                     .await
                 {
-                    Ok(0) => emit(WorkerEvent::Error {
-                        text: i18n("Undo: the messages are no longer where that move put them."),
-                        connectivity: false,
-                    }),
-                    Ok(n) => {
+                    Ok(0) => {
+                        tracing::info!("undo: the messages are no longer where that move put them");
+                    }
+                    Ok(_) => {
                         // Reload the restored folder so the messages reappear.
                         if let Some(token) = graph_token(&account, &emit).await {
                             if let Ok(messages) = graph_load_folder(
@@ -9515,10 +9511,6 @@ async fn run_graph(
                                 });
                             }
                         }
-                        emit(WorkerEvent::Notice({
-                            let n = n as u32;
-                            ni18n_f("Move undone — message restored", "Move undone — {n} messages restored", n, &[("n", &n.to_string())])
-                        }));
                     }
                     Err(e) => emit(WorkerEvent::Error {
                         text: i18n_f("Undo failed: {e}", &[("e", &(e).to_string())]),
