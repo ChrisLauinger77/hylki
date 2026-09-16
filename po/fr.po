@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-16 13:24+0200\n"
+"PO-Revision-Date: 2026-09-16 18:14+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -149,7 +149,7 @@ msgid "Flagged first"
 msgstr "Signalés en premier"
 
 msgid "Create Folder"
-msgstr ""
+msgstr "Créer un dossier"
 
 msgid "Added to Contacts"
 msgstr "Ajouté aux contacts"
@@ -257,7 +257,7 @@ msgid "About"
 msgstr "À propos"
 
 msgid "Remove Tags"
-msgstr ""
+msgstr "Supprimer les tags"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
@@ -273,19 +273,19 @@ msgid "Delete"
 msgstr "Supprimer"
 
 msgid "Move to {name}"
-msgstr ""
+msgstr "Déplacer vers {name}"
 
 msgid "Add Tag {name}"
-msgstr ""
+msgstr "Ajouter le tag {name}"
 
 msgid "Remove Tag {name}"
-msgstr ""
+msgstr "Supprimer le tag {name}"
 
 msgid "Undo"
-msgstr ""
+msgstr "Annuler"
 
 msgid "Redo"
-msgstr ""
+msgstr "Rétablir"
 
 msgid "Restarting Vireo"
 msgstr "Redémarrage de Vireo"
@@ -335,10 +335,10 @@ msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
 
 msgid "Block Remote Content"
-msgstr ""
+msgstr "Bloquer le contenu distant"
 
 msgid "Show Remote Content"
-msgstr ""
+msgstr "Afficher le contenu distant"
 
 msgid "Delete {n} messages"
 msgstr "Supprimer {n} messages"
@@ -459,7 +459,7 @@ msgstr ""
 "déplacés entre différents comptes"
 
 msgid "Move Folder"
-msgstr ""
+msgstr "Déplacer le dossier"
 
 msgid "Vireo couldn’t save your password"
 msgstr "Vireo n'a pas pu enregistrer votre mot de passe"
@@ -492,12 +492,14 @@ msgid "A folder named {new_name} is already there."
 msgstr "Un dossier nommé {new_name} existe déjà."
 
 msgid "Rename Folder"
-msgstr ""
+msgstr "Renommer le dossier"
 
 msgid ""
 "Its messages are moved to Trash and the folder is removed from the server. "
 "This cannot be undone."
 msgstr ""
+"Ses messages sont déplacés vers la Corbeille et le dossier est supprimé du "
+"serveur. Cette action est irréversible."
 
 msgid "Empty “{name}”?"
 msgstr "Vider « {name} » ?"
@@ -619,8 +621,8 @@ msgstr[1] "{n} messages consultés jusqu'à présent"
 
 msgid "Matched {n} message"
 msgid_plural "Matched {n} messages"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{n} message correspondant"
+msgstr[1] "{n} messages correspondants"
 
 msgid "Tagged {n} message"
 msgid_plural "Tagged {n} messages"
@@ -638,9 +640,9 @@ msgstr "Dossier {done} sur {total}"
 msgid "Filters looked at {n} message, and it matched nothing"
 msgid_plural "Filters looked at {n} messages, and none of them matched"
 msgstr[0] ""
-"Les filtres ont examiné {n} message, mais aucun résultat n'a été trouvé."
+"Les filtres ont examiné {n} message, mais aucun résultat n'a été trouvé"
 msgstr[1] ""
-"Les filtres ont examiné {n} messages, mais aucun résultat n'a été trouvé."
+"Les filtres ont examiné {n} messages, mais aucun résultat n'a été trouvé"
 
 #. Matches that needed nothing: the rules had already done their
 #. work on an earlier sync (#201). Saying "none matched" here
@@ -651,7 +653,10 @@ msgid_plural ""
 "Filters matched {matched} of {n} messages, and all of them were already "
 "tagged or filed"
 msgstr[0] ""
+"Filtres correspondant à {matched} sur {n} message, déjà marqué ou classé"
 msgstr[1] ""
+"Filtres correspondant à {matched} sur {n} messages, tous déjà marqués ou "
+"classés"
 
 msgid "Filters tagged {tagged} of {n} message"
 msgid_plural "Filters tagged {tagged} of {n} messages"
@@ -731,10 +736,10 @@ msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
 msgid "Undo the last action (also in the main menu)"
-msgstr ""
+msgstr "Annuler la dernière action (également dans le menu principal)"
 
 msgid "Redo it (Ctrl+Y does the same)"
-msgstr ""
+msgstr "La rétablir (Ctrl+Y fait de même)"
 
 msgid "Print the message you are reading"
 msgstr "Imprimer le message en cours de lecture"
@@ -761,7 +766,7 @@ msgid "This list"
 msgstr "Cette liste"
 
 msgid "Unstar"
-msgstr ""
+msgstr "Retirer l'étoile"
 
 msgid "Save All Attachments"
 msgstr "Enregistrer toutes les pièces jointes"
@@ -1037,7 +1042,7 @@ msgid ""
 msgstr ""
 "Marquez les messages avec un ou plusieurs tags colorés. Les tags sont "
 "stockés sur le serveur de messagerie sous forme de mots-clés IMAP, afin que "
-"Thunderbird et d'autres clients affichent les mêmes tags.\\n\\nFaites "
+"Thunderbird et d'autres clients affichent les mêmes tags.\n\nFaites "
 "glisser un tag pour réorganiser l'ordre : l'ordre défini ici est celui de la "
 "barre latérale, et les neuf premiers répondent aux touches 1 à 9."
 
@@ -1337,20 +1342,27 @@ msgid ""
 "wrong. Nothing already on the server moves: a role says where mail goes from "
 "now on."
 msgstr ""
+"Les dossiers de ce compte qui remplissent chaque rôle. Suit automatiquement "
+"le balisage propre au serveur ; choisissez un dossier lorsqu'un rôle n'est "
+"pas détecté ou mal attribué. Rien de ce qui se trouve déjà sur le serveur "
+"n'est déplacé : un rôle indique seulement où ira le courrier à partir de "
+"maintenant."
 
 msgid "Sent"
 msgstr "Envoyés"
 
 msgid "Save a copy of sent mail in"
-msgstr ""
+msgstr "Enregistrer une copie du courrier envoyé dans"
 
 msgid "Server saves its own copy of sent mail"
-msgstr ""
+msgstr "Le serveur enregistre sa propre copie du courrier envoyé"
 
 msgid ""
 "For Gmail and others that file sent mail themselves. Disables above Save a "
 "copy."
 msgstr ""
+"Pour Gmail et les autres services qui classent eux-mêmes le courrier envoyé. "
+"Désactive l'option Enregistrer une copie ci-dessus."
 
 msgid "Drafts"
 msgstr "Brouillons"
@@ -1499,9 +1511,12 @@ msgstr "Tester le SMTP"
 
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
+"Microsoft 365 classe sa propre copie dans Éléments envoyés ; cela ne peut "
+"pas être modifié."
 
 msgid "POP3 accounts have no server folders to save a copy in."
 msgstr ""
+"Les comptes POP3 n'ont pas de dossiers serveur où enregistrer une copie."
 
 msgid "GOA"
 msgstr "GOA"
@@ -2194,28 +2209,28 @@ msgid "Signed in as {who}. {terms}"
 msgstr "Connecté en tant que {who}. {terms}"
 
 msgid "Rich text"
-msgstr ""
+msgstr "Texte enrichi"
 
 msgid "Markdown"
-msgstr ""
+msgstr "Markdown"
 
 msgid "HTML"
-msgstr ""
+msgstr "HTML"
 
 msgid "Plain text"
-msgstr ""
+msgstr "Texte brut"
 
 msgid "Format as you type, with the toolbar"
-msgstr ""
+msgstr "Mise en forme au fil de la frappe, avec la barre d'outils"
 
 msgid "Write Markdown; it is sent as formatted mail"
-msgstr ""
+msgstr "Rédiger en Markdown ; envoyé sous forme de courrier mis en forme"
 
 msgid "Write the message's HTML by hand"
-msgstr ""
+msgstr "Rédiger le code HTML du message à la main"
 
 msgid "No formatting at all"
-msgstr ""
+msgstr "Aucune mise en forme"
 
 msgid "Collapse into reader"
 msgstr "Réduire dans le lecteur"
@@ -2305,15 +2320,15 @@ msgid "Subject"
 msgstr "Objet"
 
 msgid "Writing in {format}"
-msgstr ""
+msgstr "Rédaction en {format}"
 
 #. The one label on the row goes when there is no width for it, the
 #. same trade the header makes when it folds.
 msgid "Preview"
-msgstr ""
+msgstr "Aperçu"
 
 msgid "Show the message as it will be sent"
-msgstr ""
+msgstr "Afficher le message tel qu'il sera envoyé"
 
 msgid "More"
 msgstr "Plus"
@@ -2464,10 +2479,10 @@ msgid "Search folders"
 msgstr "Rechercher des dossiers"
 
 msgid "the portal answered response code {code}"
-msgstr ""
+msgstr "le portail a répondu avec le code {code}"
 
 msgid "The link could not be opened"
-msgstr ""
+msgstr "Le lien n'a pas pu être ouvert"
 
 #. No Flatseal toggle can help here: portal access is not a
 #. permission, and the failure is inside the portal's own launcher.
@@ -2478,6 +2493,10 @@ msgid ""
 "• Updating “xdg-desktop-portal” and logging back in may fix opening links "
 "directly"
 msgstr ""
+"Le portail de bureau a signalé : {error}\n\n• Faites un clic droit sur le "
+"lien, copiez-le, puis ouvrez-le dans votre navigateur\n• Mettre à jour "
+"« xdg-desktop-portal » et vous reconnecter peut résoudre l'ouverture directe "
+"des liens"
 
 msgid "Mark as read"
 msgstr "Marquer comme lu"
@@ -2659,10 +2678,10 @@ msgid "Show the sender's fonts and colours"
 msgstr "Afficher les polices et les couleurs de l'expéditeur"
 
 msgid "Show remote content"
-msgstr ""
+msgstr "Afficher le contenu distant"
 
 msgid "Block remote content"
-msgstr ""
+msgstr "Bloquer le contenu distant"
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -3649,13 +3668,17 @@ msgstr ""
 "l'éditeur propose toujours les deux options."
 
 msgid "Write messages in"
-msgstr ""
+msgstr "Rédiger les messages en"
 
 msgid ""
 "What new messages, replies and forwards start as. Markdown and HTML are "
 "written as source and sent as formatted mail; plain text is sent without "
 "formatting. The composer's format button switches any one message."
 msgstr ""
+"Ce que sont, au départ, les nouveaux messages, réponses et transferts. "
+"Markdown et HTML sont rédigés sous forme de code source puis envoyés en tant "
+"que courrier mis en forme ; le texte brut est envoyé sans mise en forme. Le "
+"bouton de format du compositeur permet de changer pour un message donné."
 
 msgid "Spelling"
 msgstr "Orthographe"
@@ -4700,10 +4723,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Affiché dans le dock, la grille d'applications, le sélecteur de fenêtres "
 #~ "et l'icône de notification."
-
-#, fuzzy
-#~ msgid "Conditions"
-#~ msgstr "Conversations"
 
 #~ msgid ""
 #~ "Where matching mail is filed; or leave it in the Inbox and only tag it"
