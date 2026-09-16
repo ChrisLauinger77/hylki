@@ -226,8 +226,8 @@ struct AliasDialog {
 pub enum AccountsInput {
     /// The editor's "Use my Gravatar" switch moved (#189).
     SetOwnGravatar(bool),
-    /// The "Server saves its own copy" switch: with it on there is no copy of
-    /// Vireo's to file, so the folder row above has nothing to say.
+    /// The "Server saves its own copy of sent mail" switch: with it on there is
+    /// no copy of Vireo's to file, so the folder row above has nothing to say.
     SetServerSavesSent(bool),
     /// Showcase only (VIREO_SHOWCASE_EDITOR_DIRTY): type into the open
     /// editor's Label field, the way a capture cannot.
@@ -401,6 +401,35 @@ pub enum AccountsOutput {
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
 /// "Microsoft 365" (`ms_graph`) provider has no IMAP — its token is
 /// Graph-scoped — so the imported account uses [`Protocol::Graph`] (issue #36).
+/// Stop a row's subtitle from squeezing out the row's value.
+///
+/// An [`adw::ActionRow`] gives its title block whatever width the text asks
+/// for, and an [`adw::ComboRow`]'s value label takes what is left — which for
+/// a subtitle of any length is an ellipsis where "Disabled" should be. Capping
+/// the label's width in characters bounds what it can ask for, so it wraps to
+/// a second line instead of taking the room from its neighbour. `subtitle-lines`
+/// does not do this: it caps how many lines are drawn, not how wide one is.
+fn wrap_subtitle(row: &impl IsA<gtk::Widget>, chars: i32) {
+    fn walk(w: &gtk::Widget, chars: i32) -> bool {
+        if let Some(label) = w.downcast_ref::<gtk::Label>() {
+            if label.has_css_class("subtitle") {
+                label.set_wrap(true);
+                label.set_max_width_chars(chars);
+                return true;
+            }
+        }
+        let mut child = w.first_child();
+        while let Some(c) = child {
+            if walk(&c, chars) {
+                return true;
+            }
+            child = c.next_sibling();
+        }
+        false
+    }
+    walk(row.as_ref(), chars);
+}
+
 /// The subtitle under "Save a copy of sent mail in" (#199). Says the one thing
 /// the row above it cannot: this only files mail somewhere, so the Inbox is a
 /// fair answer here even though giving it the Sent *role* would cost the
@@ -408,7 +437,8 @@ pub enum AccountsOutput {
 /// which already says "a copy": the originals are the Sent row's business.
 /// Declared once because the row is rebuilt whenever an editor opens, and the
 /// two copies drifting apart is how a hint goes stale.
-const SENT_COPY_HINT: &str = "Any folder, the Inbox included. Only mail sent from Vireo.";
+const SENT_COPY_HINT: &str =
+    "Only mail sent from Vireo going forward, not recursive.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
@@ -1334,7 +1364,7 @@ impl Component for AccountsWindow {
                                 // appending, keeps no sent mail at all.
                                 #[name = "server_saves_row"]
                                 adw::SwitchRow {
-                                    set_title: &i18n("Server saves its own copy"),
+                                    set_title: &i18n("Server saves its own copy of sent mail"),
                                     set_subtitle: &i18n("For Gmail and others that file sent mail \
                                                    themselves. Disables above Save a copy."),
                                     connect_active_notify[sender] => move |row| {
@@ -1497,6 +1527,9 @@ impl Component for AccountsWindow {
         senders_box.set_visible(!model.sender_addrs.is_empty());
         blacklist_box.set_visible(!model.blacklist_addrs.is_empty());
         let widgets = view_output!();
+        // Long enough for the hint, short enough that the combo's own value
+        // is not what gets shortened instead.
+        wrap_subtitle(&widgets.folder_sent_copy_row, 34);
         // Left-justify the editor's wrapping labels (its group descriptions):
         // libadwaita 1.9 renders a group description fill-justified when its
         // text does not naturally fill the label's width, stretching the word
