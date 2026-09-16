@@ -161,7 +161,7 @@ pub struct AccountsWindow {
     /// Paths behind the currently-open editor's folder combos (index 0 in the
     /// combo is "Automatic"; entry N here is combo index N + 1).
     folder_paths: Vec<String>,
-    /// Paths behind the "Save copies in" combo (#199). A separate list from
+    /// Paths behind the "Save sent copies in" combo (#199). A separate list from
     /// `folder_paths`: this one offers every folder, the Inbox included,
     /// because a destination takes nothing away from the folder it names.
     /// Index 0 in the combo is "Sent folder"; entry N here is index N + 1.
@@ -398,7 +398,7 @@ pub enum AccountsOutput {
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
 /// "Microsoft 365" (`ms_graph`) provider has no IMAP — its token is
 /// Graph-scoped — so the imported account uses [`Protocol::Graph`] (issue #36).
-/// The subtitle under "Save copies in" (#199). Says the one thing the row
+/// The subtitle under "Save sent copies in" (#199). Says the one thing the row
 /// above it cannot: this only files mail somewhere, so the Inbox is a fair
 /// answer here even though giving it the Sent *role* would cost the account
 /// its inbox. Declared once because the row is rebuilt whenever an editor
@@ -1321,7 +1321,7 @@ impl Component for AccountsWindow {
                                 adw::ComboRow { set_title: &i18n("Sent") },
                                 #[name = "folder_sent_copy_row"]
                                 adw::ComboRow {
-                                    set_title: &i18n("Save copies in"),
+                                    set_title: &i18n("Save sent copies in"),
                                     set_subtitle: &i18n(SENT_COPY_HINT),
                                 },
                                 #[name = "folder_drafts_row"]
@@ -2921,7 +2921,7 @@ impl AccountsWindow {
         }
     }
 
-    /// Fill the "Save copies in" combo (#199): "Automatic" plus every one of
+    /// Fill the "Save sent copies in" combo (#199): "Automatic" plus every one of
     /// the account's folders, with the saved choice selected. The Inbox is
     /// listed here — filing a copy somewhere does not re-label it.
     fn populate_sent_copy_combo(
@@ -2960,7 +2960,7 @@ impl AccountsWindow {
         row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
     }
 
-    /// The "Save copies in" combo's current choice: a folder path, or `None`
+    /// The "Save sent copies in" combo's current choice: a folder path, or `None`
     /// on Automatic, which follows the Sent role.
     fn read_sent_copy_path(&self, widgets: &AccountsWindowWidgets) -> Option<String> {
         // Nothing is known about this account's folders yet (it has never
