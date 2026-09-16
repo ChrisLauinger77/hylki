@@ -15,8 +15,17 @@ pub struct RichEditor {
     pub widget: gtk::Box,
     webview: webkit6::WebView,
     /// The formatting toolbar, hidden while a message is composed as plain
-    /// text (#180).
+    /// text (#180) or as source (#199).
     toolbar: gtk::Box,
+    /// Swaps the editor for the rendered preview of a source message (#199).
+    stack: gtk::Stack,
+    /// The preview view, built the first time a preview is asked for: a
+    /// second WebView per composer is not something to open speculatively
+    /// (issue #106).
+    preview: std::rc::Rc<std::cell::RefCell<Option<webkit6::WebView>>>,
+    /// Which source language the editor currently holds, if it is in source
+    /// mode rather than rich mode (#199).
+    source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>>,
     /// Where "Send as Attachment Instead" delivers the lifted image, as a
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
@@ -25,6 +34,14 @@ pub struct RichEditor {
     /// on a live theme flip; disconnected when the last clone of the editor
     /// goes (the editor is a cloneable handle, so the guard is shared).
     _theme_handler: std::rc::Rc<ThemeHandlerGuard>,
+}
+
+/// What a source-mode editor is holding (#199). Rich text is the absence of
+/// both.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceKind {
+    Markdown,
+    Html,
 }
 
 /// Disconnects a style-manager handler on drop.
@@ -226,6 +243,9 @@ impl RichEditor {
         // the exact node the right-click landed on (`__vireoCtxImg`).
         let attach_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>> =
             std::rc::Rc::new(std::cell::RefCell::new(None));
+        // Rich to begin with; [`RichEditor::set_source`] moves it.
+        let source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>> =
+            std::rc::Rc::new(std::cell::Cell::new(None));
         let menu_attach_cb = attach_cb.clone();
         webview.connect_context_menu(move |view, menu, hit| {
             if hit.context_is_image() {
@@ -346,8 +366,15 @@ impl RichEditor {
             drop.set_propagation_phase(gtk::PropagationPhase::Capture);
             let v = webview.clone();
             let cb = attach_cb.clone();
+            let src = source.clone();
             drop.connect_drop(move |_, value, x, y| {
                 let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+                // Source mode has no document to hold a picture: everything
+                // dropped becomes an attachment, and the user writes the
+                // reference to it themselves.
+                if src.get().is_some() {
+                    return attach_all(&list.files(), &cb);
+                }
                 deliver_files(&v, &list.files(), Some((x, y)), &cb)
             });
             webview.add_controller(drop);
@@ -368,13 +395,20 @@ impl RichEditor {
             }
         });
 
+        // The editor and (later) its preview are pages of one stack, so a
+        // preview swaps in without the editor document being torn down and
+        // rebuilt — which would cost the undo history and the caret.
+        let stack = gtk::Stack::new();
+        stack.set_vexpand(true);
+        stack.add_named(&webview, Some("edit"));
+
         let frame = gtk::Frame::new(None);
         frame.set_vexpand(true);
         // Same card treatment as the address fields' boxed-list: shadow and
         // radius from libadwaita, with the WebView clipped to the corners.
         frame.add_css_class("card");
         frame.set_overflow(gtk::Overflow::Hidden);
-        frame.set_child(Some(&webview));
+        frame.set_child(Some(&stack));
 
         let bx = gtk::Box::new(gtk::Orientation::Vertical, 6);
         bx.append(&toolbar);
@@ -384,6 +418,9 @@ impl RichEditor {
             widget: bx,
             webview,
             toolbar,
+            stack,
+            preview: std::rc::Rc::new(std::cell::RefCell::new(None)),
+            source: source.clone(),
             attach_cb,
             _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
         }
@@ -395,14 +432,79 @@ impl RichEditor {
         *self.attach_cb.borrow_mut() = Some(Box::new(f));
     }
 
-    /// Replace the editor contents with `content` (HTML).
+    /// Replace the editor contents with `content` (HTML), in rich mode.
     pub fn set_html(&self, content: &str) {
+        self.source.set(None);
+        self.show_preview(None);
         self.webview
             .load_html(&document(content, &self.webview), Some("https://vireo.localhost/editor"));
     }
 
+    /// Put the editor into source mode (#199) holding `text`: a monospace
+    /// plain-text surface with no formatting toolbar, which the composer
+    /// converts on the way out.
+    pub fn set_source(&self, kind: SourceKind, text: &str) {
+        self.source.set(Some(kind));
+        self.show_preview(None);
+        self.webview.load_html(
+            &source_document(text, &self.webview),
+            Some("https://vireo.localhost/editor"),
+        );
+    }
+
+    /// The source language the editor is in, or `None` in rich mode.
+    pub fn source_kind(&self) -> Option<SourceKind> {
+        self.source.get()
+    }
+
+    /// Read the source text back, exactly as typed.
+    pub fn extract_source(&self, cb: impl FnOnce(String) + 'static) {
+        self.webview.evaluate_javascript(
+            "window.__vireoSourceText ? window.__vireoSourceText() : ''",
+            None,
+            None,
+            gtk::gio::Cancellable::NONE,
+            move |res| cb(res.map(|v| v.to_str().to_string()).unwrap_or_default()),
+        );
+    }
+
+    /// Show `html` rendered in place of the editor, or go back to editing.
+    /// The preview is read-only and runs no scripts — it is a look at the
+    /// message, not a second editor.
+    pub fn show_preview(&self, html: Option<&str>) {
+        let Some(html) = html else {
+            self.stack.set_visible_child_name("edit");
+            return;
+        };
+        // Taken out first: a `match` on `borrow()` holds that borrow for the
+        // whole match, and the arm below needs `borrow_mut()`.
+        let existing = self.preview.borrow().clone();
+        let view = match existing {
+            Some(v) => v,
+            None => {
+                let settings = webkit6::Settings::new();
+                settings.set_enable_javascript(false);
+                settings.set_enable_developer_extras(false);
+                let v = webkit6::WebView::builder()
+                    .web_context(&super::message_view::shared_web_context())
+                    .settings(&settings)
+                    .build();
+                v.set_background_color(&gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
+                self.stack.add_named(&v, Some("preview"));
+                *self.preview.borrow_mut() = Some(v.clone());
+                v
+            }
+        };
+        view.load_html(&preview_document(html, &view), Some("https://vireo.localhost/preview"));
+        self.stack.set_visible_child_name("preview");
+    }
+
     pub fn grab_focus(&self) {
         self.webview.grab_focus();
+        if self.source.get().is_some() {
+            // The document's own field is what takes the caret.
+            exec(&self.webview, "var t=document.getElementById('src');if(t)t.focus();");
+        }
     }
 
     /// Run a JavaScript snippet against the editor document (e.g. to swap the
@@ -1388,6 +1490,96 @@ fn document(content: &str, webview: &webkit6::WebView) -> String {
          </script></head>\
          <body contenteditable=\"true\">{content}</body></html>"
     )
+}
+
+/// The source-mode document (#199): one textarea filling the view, in the
+/// same ground as the rich editor so switching format does not change the
+/// look of the pane. A textarea, rather than a plain-text `contenteditable`,
+/// because what comes back out has to be exactly what was typed — no
+/// normalised whitespace, no inserted line divs — and because undo, paste
+/// and the engine's own spell checking all behave there without help.
+fn source_document(text: &str, webview: &webkit6::WebView) -> String {
+    let dark = adw::StyleManager::default().is_dark();
+    let scheme = if dark { "dark" } else { "light" };
+    let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
+    format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\">\
+         <meta name=\"color-scheme\" content=\"{scheme}\">\
+         <style>\
+           :root{{color-scheme:{scheme};}}\
+           html,body{{height:100%;margin:0;background:{ground};}}\
+           textarea{{display:block;width:100%;height:100%;box-sizing:border-box;\
+             border:0;outline:none;resize:none;padding:18px 20px;\
+             background:{ground};color:CanvasText;\
+             font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;\
+             tab-size:2;}}\
+         </style></head><body>\
+         <textarea id=\"src\" spellcheck=\"true\" autocapitalize=\"off\" \
+           autocorrect=\"off\">{text}</textarea>\
+         <script>\
+         (function(){{\
+           var t=document.getElementById('src');\
+           window.__vireoDirty=false;\
+           window.__vireoSourceText=function(){{return t.value;}};\
+           t.addEventListener('input',function(){{window.__vireoDirty=true;}});\
+           /* Tab indents instead of leaving the field: in a source view it\
+              is a character, and there is nowhere else in the document to\
+              tab to anyway. */\
+           t.addEventListener('keydown',function(e){{\
+             if(e.key!=='Tab'||e.ctrlKey||e.altKey)return;\
+             e.preventDefault();\
+             var a=t.selectionStart,b=t.selectionEnd;\
+             t.setRangeText('  ',a,b,'end');\
+             window.__vireoDirty=true;\
+           }});\
+           t.focus();t.setSelectionRange(0,0);\
+         }})();\
+         </script></body></html>",
+        text = html_escape_text(text)
+    )
+}
+
+/// The preview document: the message as the recipient would see it, on the
+/// editor's own ground.
+fn preview_document(html: &str, webview: &webkit6::WebView) -> String {
+    let dark = adw::StyleManager::default().is_dark();
+    let scheme = if dark { "dark" } else { "light" };
+    let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
+    format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\">\
+         <meta name=\"color-scheme\" content=\"{scheme}\">\
+         <style>\
+           :root{{color-scheme:{scheme};}}\
+           html,body{{height:100%;box-sizing:border-box;}}\
+           body{{margin:0;padding:20px;font:14px/1.55 system-ui,sans-serif;\
+             background:{ground};color:CanvasText;}}\
+           img{{max-width:100%;height:auto;}}\
+           a{{color:#3584e4;}}\
+         </style></head><body>{html}</body></html>"
+    )
+}
+
+/// Escape text for a textarea's contents.
+fn html_escape_text(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Every dropped file straight onto the attachment list.
+fn attach_all(
+    files: &[gtk::gio::File],
+    cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+) -> bool {
+    let mut took = false;
+    for path in files.iter().filter_map(|f| f.path()) {
+        match cb.borrow().as_ref() {
+            Some(f) => {
+                f(path);
+                took = true;
+            }
+            None => tracing::warn!("editor drop: no attach callback set on this editor"),
+        }
+    }
+    took
 }
 
 /// Escape a string for inclusion inside a single-quoted JavaScript string.
