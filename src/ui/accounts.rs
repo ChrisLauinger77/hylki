@@ -438,7 +438,8 @@ fn wrap_subtitle(row: &impl IsA<gtk::Widget>, chars: i32) {
 /// Declared once because the row is rebuilt whenever an editor opens, and the
 /// two copies drifting apart is how a hint goes stale.
 const SENT_COPY_HINT: &str =
-    "Only mail sent from Vireo going forward, not recursive.";
+    "Any folder, inbox included. Only applies to mail sent from this Vireo client \
+     going forward. Not recursive.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
