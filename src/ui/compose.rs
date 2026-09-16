@@ -823,8 +823,12 @@ impl Component for Compose {
                 let _ = s.send(ComposeInput::TogglePreview(b.is_active()));
             });
         }
-        editor.toolbar_end().append(&format_btn);
+        // The chooser goes last, which in a right-aligned group is the far
+        // end of the row: it is there in every format, so it is the one
+        // that must not move. Preview comes and goes beside it, to its
+        // left, where an appearing button pushes nothing around.
         editor.toolbar_end().append(&preview_btn);
+        editor.toolbar_end().append(&format_btn);
 
         // "Send as Attachment Instead" on an inline image: the editor lifts
         // it to a temp file and it joins the attachment chips here.
