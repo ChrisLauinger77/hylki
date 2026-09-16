@@ -537,7 +537,8 @@ msgid "Remove"
 msgstr "Eltávolítás"
 
 #. One-sentence description, directly under the version chip.
-msgid "A clean, fast, GNOME-native email client."
+#, fuzzy
+msgid "A fast, GNOME-native email client"
 msgstr "Tiszta, gyors, GNOME-ba illeszkedő levelezőkliens."
 
 msgid ""
@@ -571,11 +572,11 @@ msgstr "Projekt"
 msgid "Website"
 msgstr "Webhely"
 
+msgid "Report an issue or feature request"
+msgstr ""
+
 msgid "Contact — hyprlab@proton.me"
 msgstr "Kapcsolat — hyprlab@proton.me"
-
-msgid "Discord — Join the community"
-msgstr "Discord — Csatlakozás a közösséghez"
 
 msgid "Source Code"
 msgstr "Forráskód"
@@ -4512,6 +4513,9 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Discord — Join the community"
+#~ msgstr "Discord — Csatlakozás a közösséghez"
 
 #~ msgid "Response"
 #~ msgstr "Válasz"

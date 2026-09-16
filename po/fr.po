@@ -544,7 +544,8 @@ msgid "Remove"
 msgstr "Supprimer"
 
 #. One-sentence description, directly under the version chip.
-msgid "A clean, fast, GNOME-native email client."
+#, fuzzy
+msgid "A fast, GNOME-native email client"
 msgstr "Un client e-mail épuré, rapide et natif pour GNOME."
 
 msgid ""
@@ -579,11 +580,11 @@ msgstr "Projet"
 msgid "Website"
 msgstr "Site web"
 
+msgid "Report an issue or feature request"
+msgstr ""
+
 msgid "Contact — hyprlab@proton.me"
 msgstr "Contact — hyprlab@proton.me"
-
-msgid "Discord — Join the community"
-msgstr "Discord — Rejoindre la communauté"
 
 msgid "Source Code"
 msgstr "Code source"
@@ -4655,6 +4656,9 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Discord — Join the community"
+#~ msgstr "Discord — Rejoindre la communauté"
 
 #~ msgid "Nothing to undo"
 #~ msgstr "Rien à annuler"

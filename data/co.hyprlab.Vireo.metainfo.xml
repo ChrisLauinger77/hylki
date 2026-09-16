@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.32.2" date="2026-09-16">
+      <description>
+        <p>Russian shows its translation: around sixty-six strings were marked as needing review and so were skipped when the translation was built, leaving them in English. Portuguese is complete in both the European and Brazilian variants. The About page's links are tidied and its issue tracker row can be translated.</p>
+      </description>
+    </release>
     <release version="1.32.1" date="2026-09-16">
       <description>
         <p>Undo and redo reach the composer: Ctrl+Z takes back what you were just writing, a step at a time, along with the attachments beside it, in every composing format. Deleting with Backspace is its own step and a pause of more than five seconds starts a new one. The main menu's Undo and Redo name what they would take back. The inline reply no longer aborts the app as it slides in. French translation complete (#204).</p>

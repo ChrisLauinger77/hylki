@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.32.2 — 2026-09-16
+
+Russian's fuzzy entries are resolved and Portuguese is complete in both
+variants. The About page's links are tidied.
+
+- **Russian updated** (PR #205 by [@iliasen](https://github.com/iliasen)).
+  Every fuzzy entry in `po/ru.po` is resolved. A fuzzy entry carries a
+  translation but `msgfmt` skips it, so roughly sixty-six strings were
+  rendering in English despite having been translated; they now show in
+  Russian. The 1.32.0 strings are translated too. Russian is 1201 of 1220.
+  `"Indexing {n} messages…"` arrived as a three-form plural entry, which
+  `msgfmt` rejects because the template declares it singular; the plural
+  wording was kept as the single form.
+- **Portuguese updated** (PR #206 by [@somepaulo](https://github.com/somepaulo)).
+  `po/pt_PT.po` and `po/pt_BR.po` both cover the composing formats, the
+  sent-copy rows, undo and redo, the sidebar folder verbs and the Apply Now
+  strings, with fifty-nine corrections in each. Both were complete against
+  the template as submitted.
+- **About page links.** The description is shorter, the issue tracker's row
+  says what it is for rather than naming GitHub, Discord is listed by name
+  above the contact address, and the issue row is translatable — it was the
+  one link label that had never been wrapped.
+- Translation template refreshed: 1220 strings.
+
 ## 1.32.1 — 2026-09-16
 
 Undo and redo reach the composer: Ctrl+Z now takes back what you were just

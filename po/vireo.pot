@@ -503,7 +503,7 @@ msgid "Remove"
 msgstr ""
 
 #. One-sentence description, directly under the version chip.
-msgid "A clean, fast, GNOME-native email client."
+msgid "A fast, GNOME-native email client"
 msgstr ""
 
 msgid ""
@@ -534,10 +534,10 @@ msgstr ""
 msgid "Website"
 msgstr ""
 
-msgid "Contact — hyprlab@proton.me"
+msgid "Report an issue or feature request"
 msgstr ""
 
-msgid "Discord — Join the community"
+msgid "Contact — hyprlab@proton.me"
 msgstr ""
 
 msgid "Source Code"

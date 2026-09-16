@@ -14612,7 +14612,7 @@ impl AppModel {
         page.append(&version);
 
         // One-sentence description, directly under the version chip.
-        let desc = gtk::Label::new(Some(i18n("A clean, fast, GNOME-native email client.").as_str()));
+        let desc = gtk::Label::new(Some(i18n("A fast, GNOME-native email client").as_str()));
         desc.set_wrap(true);
         desc.set_justify(gtk::Justification::Center);
         desc.add_css_class("dim-label");
@@ -14704,11 +14704,11 @@ impl AppModel {
         };
         links.append(&mk_row(&i18n("Website"), "https://vireo.hyprlab.co"));
         links.append(&mk_row(
-            "Github — Submit bug report or feature request",
+            &i18n("Report an issue or feature request"),
             "https://github.com/hyprlab/vireo/issues",
         ));
+        links.append(&mk_row("Discord", "https://discord.gg/YfEJ4b6PFW"));
         links.append(&mk_row(&i18n("Contact — hyprlab@proton.me"), "mailto:hyprlab@proton.me"));
-        links.append(&mk_row(&i18n("Discord — Join the community"), "https://discord.gg/YfEJ4b6PFW"));
         links.append(&mk_row(&i18n("Source Code"), "https://github.com/hyprlab/vireo"));
         links.append(&mk_row(&i18n("License (GNU AGPL v3)"), "https://www.gnu.org/licenses/agpl-3.0.html"));
 

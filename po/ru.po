@@ -542,7 +542,8 @@ msgid "Remove"
 msgstr "Удалить"
 
 #. One-sentence description, directly under the version chip.
-msgid "A clean, fast, GNOME-native email client."
+#, fuzzy
+msgid "A fast, GNOME-native email client"
 msgstr "Простой, быстрый, нативный почтовый клиент для GNOME."
 
 msgid ""
@@ -576,11 +577,11 @@ msgstr "Проект"
 msgid "Website"
 msgstr "Веб-сайт"
 
+msgid "Report an issue or feature request"
+msgstr ""
+
 msgid "Contact — hyprlab@proton.me"
 msgstr "Контакт — hyprlab@proton.me"
-
-msgid "Discord — Join the community"
-msgstr "Discord — присоединиться к сообществу"
 
 msgid "Source Code"
 msgstr "Исходный код"
@@ -4588,6 +4589,9 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Discord — Join the community"
+#~ msgstr "Discord — присоединиться к сообществу"
 
 #~ msgid "Response"
 #~ msgstr "Ответ"
