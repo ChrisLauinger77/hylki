@@ -22,7 +22,11 @@ gtk = { package = "gtk4", version = "0.9", features = ["v4_14"] }
 adw = { package = "libadwaita", version = "0.7", features = ["v1_4"] }
 relm4 = { version = "0.9", features = ["macros", "libadwaita"] }
 relm4-components = "0.9"
-webkit6 = "0.4"
+# v2_44 for WebKitEditorState::changed: the composer's undo (#200) has to know
+# when the body's own text history gains or loses a step, and that signal is
+# the only thing that says so. WebKitGTK 6.0 starts at 2.40, so the floor this
+# sets is a 2024 release; the GNOME 50 runtime has 2.50.
+webkit6 = { version = "0.4", features = ["v2_44"] }
 # PDF thumbnails in the attachment gallery (first-page render via poppler-glib).
 poppler-rs = { version = "0.24", features = ["v20_9"] }
 # "png": only to enable cairo-rs's `ImageSurface::write_to_png`, used to hand a

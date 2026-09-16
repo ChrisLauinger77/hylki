@@ -8,7 +8,7 @@ use crate::models::DraftOrigin;
 use crate::config::ComposeFormat;
 use crate::ui::rich_editor::{self, RichEditor, SourceKind, js_escape};
 use crate::worker::OutgoingMessage;
-use crate::i18n::{i18n, i18n_f};
+use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 
 /// Which recipient field a suggestion is for.
@@ -290,6 +290,41 @@ pub struct Compose {
     /// Download passwords made for this message's links, to pass on
     /// separately: (file name, password).
     cloud_passwords: Vec<(String, String)>,
+    /// The composer's own undo history (#200): the body's typing and
+    /// formatting, and the attachments alongside it. Ctrl+Z takes the top
+    /// one, applies it, and puts what reverses it onto `redo_stack` — the
+    /// same shape as the message list's history. See
+    /// [`Compose::push_history`] for the one place the two kinds of change
+    /// are ordered against each other.
+    undo_stack: Vec<ComposeUndoEntry>,
+    redo_stack: Vec<ComposeUndoEntry>,
+}
+
+/// One entry of the composer's history: a thing to *do*, and what the user
+/// called the change it takes back, so the menu can say "Undo Typing".
+#[derive(Debug)]
+struct ComposeUndoEntry {
+    step: ComposeStep,
+    what: String,
+}
+
+/// A reversible change inside the composer.
+#[derive(Debug)]
+enum ComposeStep {
+    /// The body's own text history. WebKit owns the text — every edit,
+    /// every formatting command, every paste and every dropped image is in
+    /// *its* stack, which cannot be read, counted or spliced. This marker
+    /// stands in for all of it: while the marker is on top and the editor
+    /// still has something to take back, each step asks the editor for one
+    /// more; once the editor has run out the marker crosses to the other
+    /// stack and the change underneath comes up.
+    ///
+    /// There is never more than one on a stack, and it is kept on top.
+    Body,
+    /// Put these files back among the attachments at `at`.
+    Insert { at: usize, paths: Vec<std::path::PathBuf> },
+    /// Take `count` attachments out again, starting at `at`.
+    Remove { at: usize, count: usize },
 }
 
 /// A share link placed in the body (#144), by the id of its paragraph.
@@ -379,6 +414,15 @@ pub enum ComposeInput {
     CompletionAccept,
     /// Dismiss the autocomplete popover.
     CompletionClose,
+    /// Ctrl+Z / Ctrl+Shift+Z (#200): step the composer's history back or
+    /// forward — the body's text and the attachments, in one order.
+    History { redo: bool },
+    /// The body's text history changed: WebKit gained or lost a step. The
+    /// flag is whether it now has anything to take back.
+    BodyHistory(bool),
+    /// Showcase only (VIREO_SHOWCASE_COMPOSE_UNDO): one step of the scripted
+    /// history check. See [`Compose::showcase_history`].
+    ShowcaseHistory(u8),
 }
 
 #[derive(Debug)]
@@ -391,6 +435,11 @@ pub enum ComposeOutput {
     DeleteDraft { id: u32, origin: DraftOrigin },
     /// Ask the app to promote/demote this pane (inline ↔ window). Carries the id.
     ToggleWindow(u32),
+    /// What this composer's history can do now, so the window that hosts it
+    /// inline can label and enable its own Undo and Redo entries from the
+    /// composer while the composer has focus (#200). `None` means that
+    /// direction is empty.
+    History { id: u32, undo: Option<String>, redo: Option<String> },
     /// This pane is done (cancelled / sent / draft-saved / superseded). Carries
     /// the id so the app tears down the right host.
     Close(u32),
@@ -839,6 +888,15 @@ impl Component for Compose {
             });
         }
 
+        // The body's text history joins the composer's order (#200): every
+        // edit in there is one step, wherever the attachments' steps fall.
+        {
+            let s = sender.input_sender().clone();
+            editor.connect_history_changed(move |can_undo, _| {
+                let _ = s.send(ComposeInput::BodyHistory(can_undo));
+            });
+        }
+
         let model = Compose {
             accounts,
             editor,
@@ -875,6 +933,8 @@ impl Component for Compose {
             cloud_links: Vec::new(),
             cloud_busy: 0,
             cloud_passwords: Vec::new(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         };
         let widgets = view_output!();
         if prefill_encrypt && crate::pgp::available() {
@@ -1093,8 +1153,25 @@ impl Component for Compose {
         let s = sender.clone();
         let open = model.completion_open.clone();
         let editor = model.editor.clone();
+        let key_root = root.clone();
         key.connect_key_pressed(move |_, keyval, _, state| {
             use gtk::glib::Propagation;
+            // Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y run the composer's own history
+            // (#200): the body's typing and formatting with the attachments
+            // in the same order. Caught here, in the capture phase above the
+            // editor, so the editor's own handler for the bare body never
+            // sees them and the attachments stay in the order.
+            //
+            // The address and subject rows are the exception: GTK gives every
+            // GtkText an undo history of its own, and for a single line that
+            // is the one the user means.
+            if let Some(redo) = rich_editor::history_key(keyval, state) {
+                if !focus_is_entry(&key_root) {
+                    s.input(ComposeInput::History { redo });
+                    return Propagation::Stop;
+                }
+                return Propagation::Proceed;
+            }
             // Ctrl+V pastes per the "Paste as plain text" preference, read
             // here so a settings change applies to composers already open.
             // Only over the body: the address and subject entries are plain
@@ -1499,15 +1576,45 @@ impl Component for Compose {
             }
 
             ComposeInput::AddAttachments(paths) => {
-                self.attachments.extend(paths);
+                if paths.is_empty() {
+                    break 'handle;
+                }
+                let at = self.attachments.len();
+                let what = attachment_label(i18n_noop("Attach {name}"), &paths[0], paths.len());
+                self.attachments.extend(paths.iter().cloned());
+                self.push_history(what, ComposeStep::Remove { at, count: paths.len() });
                 self.rebuild_attachments(&widgets.attach_box, &sender);
+                self.report_history(&sender);
             }
 
             ComposeInput::RemoveAttachment(i) => {
                 if i < self.attachments.len() {
-                    self.attachments.remove(i);
+                    let path = self.attachments.remove(i);
+                    let what = attachment_label(i18n_noop("Remove {name}"), &path, 1);
+                    self.push_history(what, ComposeStep::Insert { at: i, paths: vec![path] });
                     self.rebuild_attachments(&widgets.attach_box, &sender);
+                    self.report_history(&sender);
                 }
+            }
+
+            ComposeInput::History { redo } => {
+                self.history_step(redo, widgets, &sender);
+            }
+
+            ComposeInput::ShowcaseHistory(step) => {
+                self.showcase_history(step, widgets, &sender);
+            }
+
+            ComposeInput::BodyHistory(can_undo) => {
+                // A fresh edit takes its place in the order — one marker
+                // covers a whole run of typing, since the editor coalesces
+                // its own steps and this only has to say where they sit.
+                if can_undo
+                    && !matches!(self.undo_stack.last().map(|e| &e.step), Some(ComposeStep::Body))
+                {
+                    self.push_history(i18n("Typing"), ComposeStep::Body);
+                }
+                self.report_history(&sender);
             }
 
             ComposeInput::AccountChanged => {
@@ -2032,6 +2139,209 @@ impl Compose {
         self.completion_open.set(true);
     }
 
+    /// Record a change the composer can take back (#200), ending whatever
+    /// redo branch was open — as every undo history does.
+    ///
+    /// A change of the composer's own is filed *under* the body's marker, so
+    /// the marker always sits on top: what someone was just writing comes
+    /// back first, and their attachments after it, newest first. The order
+    /// has to be decided here because it cannot be honoured any finer —
+    /// WebKit's text history can be stepped but not counted, so a marker has
+    /// no way to say that two of its steps belong above an attachment and
+    /// the rest below it. Writing wins, which is what a composer is for.
+    fn push_history(&mut self, what: String, step: ComposeStep) {
+        let at = match self.undo_stack.last().map(|e| &e.step) {
+            Some(ComposeStep::Body) => self.undo_stack.len() - 1,
+            _ => self.undo_stack.len(),
+        };
+        self.undo_stack.insert(at, ComposeUndoEntry { step, what });
+        self.redo_stack.clear();
+    }
+
+    /// Step the composer's history one change back, or forward with `redo`.
+    ///
+    /// A [`ComposeStep::Body`] marker is not popped when it is used: the
+    /// editor holds an unknown number of text steps behind it, so the marker
+    /// stays where it is and a matching one is put on the other side, until
+    /// the editor says it has run out. Only then does it cross over and the
+    /// change under it come up. That reading of the editor is a beat behind
+    /// the command that changed it, which costs at worst one keypress that
+    /// does nothing — never a step out of order.
+    fn history_step(
+        &mut self,
+        redo: bool,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let (mut from, mut to) = if redo {
+            (std::mem::take(&mut self.redo_stack), std::mem::take(&mut self.undo_stack))
+        } else {
+            (std::mem::take(&mut self.undo_stack), std::mem::take(&mut self.redo_stack))
+        };
+        let mut changed_attachments = false;
+        while let Some(entry) = from.last() {
+            if matches!(entry.step, ComposeStep::Body) {
+                if if redo { self.editor.can_redo() } else { self.editor.can_undo() } {
+                    if redo {
+                        self.editor.redo();
+                    } else {
+                        self.editor.undo();
+                    }
+                    // Whatever the editor just took back is now available
+                    // in the other direction, at this point in the order.
+                    if !matches!(to.last().map(|e| &e.step), Some(ComposeStep::Body)) {
+                        to.push(body_entry());
+                    }
+                    break;
+                }
+                // Run out (or a format change reloaded the document and
+                // dropped its history): hand the marker over — dropping it
+                // if that side already ends in one — and go on to the
+                // change underneath.
+                from.pop();
+                if !matches!(to.last().map(|e| &e.step), Some(ComposeStep::Body)) {
+                    to.push(body_entry());
+                }
+                continue;
+            }
+            let entry = from.pop().expect("checked by the loop condition");
+            let back = self.apply_step(entry.step);
+            to.push(ComposeUndoEntry { step: back, what: entry.what });
+            changed_attachments = true;
+            break;
+        }
+        if redo {
+            self.redo_stack = from;
+            self.undo_stack = to;
+        } else {
+            self.undo_stack = from;
+            self.redo_stack = to;
+        }
+        if changed_attachments {
+            self.rebuild_attachments(&widgets.attach_box, sender);
+        }
+        self.report_history(sender);
+    }
+
+    /// Carry out one step, returning the step that puts it back.
+    fn apply_step(&mut self, step: ComposeStep) -> ComposeStep {
+        match step {
+            // Never reached: the caller keeps body markers on their stack.
+            ComposeStep::Body => ComposeStep::Body,
+            ComposeStep::Insert { at, paths } => {
+                let at = at.min(self.attachments.len());
+                let count = paths.len();
+                self.attachments.splice(at..at, paths);
+                ComposeStep::Remove { at, count }
+            }
+            ComposeStep::Remove { at, count } => {
+                let at = at.min(self.attachments.len());
+                let end = (at + count).min(self.attachments.len());
+                let paths: Vec<_> = self.attachments.drain(at..end).collect();
+                ComposeStep::Insert { at, paths }
+            }
+        }
+    }
+
+    /// Tell the host what the history can do now, for its own Undo and Redo
+    /// entries. The body's side is read from the editor rather than from the
+    /// stack: a marker that has run out is still sitting there until the
+    /// next step walks past it.
+    fn report_history(&self, sender: &ComponentSender<Self>) {
+        let reachable = |stack: &[ComposeUndoEntry], can_text: bool| {
+            stack
+                .iter()
+                .rev()
+                .find(|e| !matches!(e.step, ComposeStep::Body) || can_text)
+                .map(|e| e.what.clone())
+        };
+        let _ = sender.output(ComposeOutput::History {
+            id: self.compose_id,
+            undo: reachable(&self.undo_stack, self.editor.can_undo()),
+            redo: reachable(&self.redo_stack, self.editor.can_redo()),
+        });
+    }
+
+    /// Showcase only: walk the history through a round that mixes typing
+    /// with attachments, logging the body and the attachment names after
+    /// each step on `vireo::compose::undo`. The keys cannot be injected on
+    /// a Wayland desktop, so this is how the interleaving is checked.
+    ///
+    /// Each step schedules the next a beat later, because both sides of it
+    /// are asynchronous: the document's edits go to the web process, and
+    /// the editor state that reports them comes back the same way.
+    fn showcase_history(
+        &mut self,
+        step: u8,
+        widgets: &ComposeWidgets,
+        sender: &ComponentSender<Self>,
+    ) {
+        let stack = |s: &[ComposeUndoEntry]| {
+            s.iter().map(|e| e.what.as_str()).collect::<Vec<_>>().join(" | ")
+        };
+        let names = |p: &[std::path::PathBuf]| {
+            p.iter()
+                .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        // Source mode is a textarea rather than the rich document, and takes
+        // the same route through WebKit's history — worth walking too, since
+        // three of the four composing formats are written in it (#180).
+        let focus_js = if self.editor.source_kind().is_some() {
+            "var t=document.getElementById('src');t.focus();\
+             t.selectionStart=t.selectionEnd=t.value.length;"
+        } else {
+            "document.body.focus();"
+        };
+        match step {
+            0 => {
+                // The widget has to hold focus, not just the document, or
+                // the window's own Undo entry never changes hands.
+                self.editor.grab_focus();
+                self.editor
+                    .run_js(&format!("{focus_js}document.execCommand('insertText',false,'ONE')"));
+            }
+            1 => {
+                let path = std::env::temp_dir().join("vireo-undo-probe.txt");
+                let _ = std::fs::write(&path, b"probe");
+                sender.input(ComposeInput::AddAttachments(vec![path]));
+            }
+            2 => self
+                .editor
+                .run_js(&format!("{focus_js}document.execCommand('insertText',false,'TWO')")),
+            3..=8 => sender.input(ComposeInput::History { redo: false }),
+            9..=11 => sender.input(ComposeInput::History { redo: true }),
+            _ => {}
+        }
+        if step > 12 {
+            return;
+        }
+        let s = sender.clone();
+        let editor = self.editor.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(700), move || {
+            let report = move |body: String| {
+                tracing::info!(target: "vireo::compose::undo", "step {step}: body {body:?}");
+                s.input(ComposeInput::ShowcaseHistory(step + 1));
+            };
+            if editor.source_kind().is_some() {
+                editor.extract_source(report);
+            } else {
+                editor.extract_html(report);
+            }
+        });
+        tracing::info!(
+            target: "vireo::compose::undo",
+            "step {step}: undo [{}] redo [{}] text({},{}) attachments [{}]",
+            stack(&self.undo_stack),
+            stack(&self.redo_stack),
+            self.editor.can_undo(),
+            self.editor.can_redo(),
+            names(&self.attachments),
+        );
+        let _ = widgets;
+    }
+
     fn rebuild_attachments(&self, flow: &gtk::FlowBox, sender: &ComponentSender<Self>) {
         while let Some(child) = flow.first_child() {
             flow.remove(&child);
@@ -2357,4 +2667,46 @@ fn pick_send_time(parent: Option<&gtk::Window>, current: Option<i64>, sender: re
         }
     });
     dialog.present();
+}
+
+/// Whether keyboard focus is in a one-line text field of the composer — an
+/// address row or the subject. Those keep their own native undo; everything
+/// else in the composer answers to its history. The body is a WebView, not a
+/// `GtkEditable`, so it never matches here.
+fn focus_is_entry(root: &impl IsA<gtk::Widget>) -> bool {
+    let mut node = root
+        .as_ref()
+        .root()
+        .and_downcast::<gtk::Window>()
+        .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w));
+    while let Some(widget) = node {
+        if widget.is::<gtk::Editable>() || widget.is::<gtk::TextView>() {
+            return true;
+        }
+        node = widget.parent();
+    }
+    false
+}
+
+/// A marker for the body's own text history, named the way the user would
+/// name what it takes back.
+fn body_entry() -> ComposeUndoEntry {
+    ComposeUndoEntry { step: ComposeStep::Body, what: i18n("Typing") }
+}
+
+/// What to call an attachment change in the Undo menu: the file's own name,
+/// or a count once there is more than one. `template` carries the `{name}`
+/// placeholder and is translated here.
+fn attachment_label(template: &str, path: &std::path::Path, count: usize) -> String {
+    let name = if count > 1 {
+        crate::i18n::ni18n_f(
+            "{n} attachment",
+            "{n} attachments",
+            count as u32,
+            &[("n", &count.to_string())],
+        )
+    } else {
+        path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
+    };
+    i18n_f(template, &[("name", &name)])
 }

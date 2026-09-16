@@ -33,6 +33,13 @@ pub struct RichEditor {
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
     attach_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    /// What the document's own text history can do right now, mirrored from
+    /// WebKit's editor state so a host can read it without a round trip
+    /// (#200 in the composer). `(undo, redo)`.
+    text_history: std::rc::Rc<std::cell::Cell<(bool, bool)>>,
+    /// Told whenever that pair changes, so a host can fold the body's text
+    /// history into an undo stack of its own.
+    history_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(bool, bool)>>>>,
     /// The style manager's dark-notify handler that re-grounds the document
     /// on a live theme flip; disconnected when the last clone of the editor
     /// goes (the editor is a cloneable handle, so the guard is shared).
@@ -239,6 +246,59 @@ impl RichEditor {
             });
         }
 
+        // WebKitGTK never turns Ctrl+Z into an editing command: its key
+        // binding translator forwards the key to a hidden GtkTextView and
+        // listens for that widget's *signals*, and undo is a GtkTextView
+        // action rather than a signal — so nothing comes back, and its own
+        // custom table (bold, italic, tab, the newlines, Ctrl+Shift+V) has
+        // no undo entry. The document's `execCommand('undo')` is refused
+        // from script for the same reason it would be in a browser. Only
+        // the widget API reaches the page's history, so the editor drives
+        // it itself, and mirrors what it can do for the host to read.
+        let text_history = std::rc::Rc::new(std::cell::Cell::new((false, false)));
+        let history_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(bool, bool)>>>> =
+            std::rc::Rc::new(std::cell::RefCell::new(None));
+        if let Some(state) = webview.editor_state() {
+            let cell = text_history.clone();
+            let cb = history_cb.clone();
+            // Seeded before the first change so a host that asks early is
+            // not told the document can undo when it cannot.
+            cell.set((state.is_undo_available(), state.is_redo_available()));
+            state.connect_changed(move |state| {
+                let now = (state.is_undo_available(), state.is_redo_available());
+                if cell.replace(now) == now {
+                    return;
+                }
+                if let Some(f) = cb.borrow().as_ref() {
+                    f(now.0, now.1);
+                }
+            });
+        }
+        {
+            // Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y over the body, in the capture
+            // phase so they are decided before WebKit sees the key at all.
+            // A host with a wider history of its own — the composer, whose
+            // undo also covers its attachments — catches them further up,
+            // where capture reaches it first, and this never runs.
+            let keys = gtk::EventControllerKey::new();
+            keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+            let v = webview.clone();
+            keys.connect_key_pressed(move |_, keyval, _, state| {
+                match history_key(keyval, state) {
+                    Some(redo) => {
+                        v.execute_editing_command(if redo {
+                            webkit6::EDITING_COMMAND_REDO
+                        } else {
+                            webkit6::EDITING_COMMAND_UNDO
+                        });
+                        gtk::glib::Propagation::Stop
+                    }
+                    None => gtk::glib::Propagation::Proceed,
+                }
+            });
+            webview.add_controller(keys);
+        }
+
         // The stock editable menu's single "Paste" hides the plain/rich choice
         // behind the preference; the menu offers both, always, in its place.
         // Over an image the menu leads with image actions — cut, copy, and
@@ -250,6 +310,7 @@ impl RichEditor {
         let source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>> =
             std::rc::Rc::new(std::cell::Cell::new(None));
         let menu_attach_cb = attach_cb.clone();
+        let menu_history = text_history.clone();
         webview.connect_context_menu(move |view, menu, hit| {
             if hit.context_is_image() {
                 // Stock image entries (copy/save/open variants) are replaced
@@ -354,6 +415,35 @@ impl RichEditor {
                 menu.insert(&webkit6::ContextMenuItem::from_gaction(&action, &label, None), at);
                 at += 1;
             }
+            // Undo and Redo lead an editable menu, as they do everywhere
+            // else — the one place the body's text history is visible at
+            // all, rather than only on the keys. Inserted last so the
+            // paste group's index above is still the one it was measured
+            // at. Over an image the sizes keep the top: that menu is about
+            // the picture under the pointer, not the message.
+            if !hit.context_is_image() {
+                let (can_undo, can_redo) = menu_history.get();
+                for (label, name, redo, on) in [
+                    (i18n("Undo"), "vireo-undo", false, can_undo),
+                    (i18n("Redo"), "vireo-redo", true, can_redo),
+                ] {
+                    let action = gtk::gio::SimpleAction::new(name, None);
+                    action.set_enabled(on);
+                    let v = view.clone();
+                    action.connect_activate(move |_, _| {
+                        v.execute_editing_command(if redo {
+                            webkit6::EDITING_COMMAND_REDO
+                        } else {
+                            webkit6::EDITING_COMMAND_UNDO
+                        });
+                    });
+                    menu.insert(
+                        &webkit6::ContextMenuItem::from_gaction(&action, &label, None),
+                        i32::from(redo),
+                    );
+                }
+                menu.insert(&webkit6::ContextMenuItem::new_separator(), 2);
+            }
             false
         });
 
@@ -426,8 +516,39 @@ impl RichEditor {
             preview: std::rc::Rc::new(std::cell::RefCell::new(None)),
             source: source.clone(),
             attach_cb,
+            text_history,
+            history_cb,
             _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
         }
+    }
+
+    /// Step the document's own text history back (`redo` false) or forward.
+    /// Asynchronous like every other page command: [`RichEditor::can_undo`]
+    /// only catches up when WebKit reports the new state.
+    pub fn undo(&self) {
+        self.webview.execute_editing_command(webkit6::EDITING_COMMAND_UNDO);
+    }
+
+    pub fn redo(&self) {
+        self.webview.execute_editing_command(webkit6::EDITING_COMMAND_REDO);
+    }
+
+    /// Whether the body has anything left to take back. Read from the
+    /// mirrored editor state, so it is a main-loop pass or two behind a
+    /// command just issued — a host must treat "still true" right after
+    /// [`RichEditor::undo`] as "ask again", not as a miscount.
+    pub fn can_undo(&self) -> bool {
+        self.text_history.get().0
+    }
+
+    pub fn can_redo(&self) -> bool {
+        self.text_history.get().1
+    }
+
+    /// Called with `(can_undo, can_redo)` whenever the body's text history
+    /// changes: an edit, a command, or a reload that drops it.
+    pub fn connect_history_changed(&self, f: impl Fn(bool, bool) + 'static) {
+        *self.history_cb.borrow_mut() = Some(Box::new(f));
     }
 
     /// What "Send as Attachment Instead" does with the lifted image: the
@@ -601,6 +722,25 @@ impl RichEditor {
             },
         );
     }
+}
+
+/// Whether a keystroke is an undo (`Some(false)`) or a redo (`Some(true)`).
+/// Ctrl+Y is bound alongside Ctrl+Shift+Z because both spellings are in wide
+/// use and the app's own history (#200) already answers to each.
+pub fn history_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> Option<bool> {
+    if !state.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
+        return None;
+    }
+    let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+    if !shift && keyval == gtk::gdk::Key::z {
+        return Some(false);
+    }
+    if (shift && matches!(keyval, gtk::gdk::Key::z | gtk::gdk::Key::Z))
+        || keyval == gtk::gdk::Key::y
+    {
+        return Some(true);
+    }
+    None
 }
 
 fn exec(webview: &webkit6::WebView, js: &str) {
