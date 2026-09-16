@@ -2031,12 +2031,6 @@ msgstr ""
 msgid "Sign with your OpenPGP key"
 msgstr ""
 
-msgid "Preview the formatted message"
-msgstr ""
-
-msgid "Writing in {format}"
-msgstr ""
-
 msgid "Attach files"
 msgstr ""
 
@@ -2076,13 +2070,19 @@ msgstr ""
 msgid "Subject"
 msgstr ""
 
+msgid "Writing in {format}"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Show the message as it will be sent"
+msgstr ""
+
 msgid "More"
 msgstr ""
 
 msgid "Show Cc, Bcc and Reply-To"
-msgstr ""
-
-msgid "Back to the source"
 msgstr ""
 
 msgid "Not signed in"

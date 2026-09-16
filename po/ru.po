@@ -2281,14 +2281,6 @@ msgstr "Зашифровать с помощью OpenPGP для каждого �
 msgid "Sign with your OpenPGP key"
 msgstr "Подписать вашим ключом OpenPGP"
 
-#, fuzzy
-msgid "Preview the formatted message"
-msgstr "Открыть выбранное сообщение"
-
-#, fuzzy
-msgid "Writing in {format}"
-msgstr "Ожидает с {ago}"
-
 msgid "Attach files"
 msgstr "Прикрепить файлы"
 
@@ -2328,15 +2320,22 @@ msgstr "Адрес для ответа"
 msgid "Subject"
 msgstr "Тема"
 
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "Ожидает с {ago}"
+
+#, fuzzy
+msgid "Preview"
+msgstr "Предпросмотр печати"
+
+msgid "Show the message as it will be sent"
+msgstr ""
+
 msgid "More"
 msgstr "Ещё"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Показать «Копия», «Скрытая копия» и «Адрес для ответа»"
-
-#, fuzzy
-msgid "Back to the source"
-msgstr "Вернуться к списку сообщений"
 
 msgid "Not signed in"
 msgstr "Вход не выполнен"
@@ -4616,6 +4615,14 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Preview the formatted message"
+#~ msgstr "Открыть выбранное сообщение"
+
+#, fuzzy
+#~ msgid "Back to the source"
+#~ msgstr "Вернуться к списку сообщений"
 
 #~ msgid "Nothing to undo"
 #~ msgstr "Нечего отменять"

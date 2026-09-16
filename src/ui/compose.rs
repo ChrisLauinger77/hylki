@@ -277,6 +277,10 @@ pub struct Compose {
     /// editor's formatting row rather than in the header.
     format_btn: gtk::Button,
     preview_btn: gtk::ToggleButton,
+    /// The icon-and-label insides of those two, so the format button can be
+    /// relabelled and both can shed their words in a narrow pane.
+    format_content: adw::ButtonContent,
+    preview_content: adw::ButtonContent,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
@@ -789,17 +793,31 @@ impl Component for Compose {
         // formatting controls, at the far end of the same row: a header
         // button for them folded away exactly when the pane was narrow, and
         // the format is a property of the body, not of the window.
-        let format_btn = gtk::Button::from_icon_name(format_icon(format));
+        let format_content = adw::ButtonContent::builder()
+            .icon_name(format_icon(format))
+            .label(format_label(format))
+            .build();
+        let format_btn = gtk::Button::builder().child(&format_content).build();
         format_btn.set_tooltip_text(Some(
             i18n_f("Writing in {format}", &[("format", &format_label(format))]).as_str(),
         ));
         format_btn.add_css_class("flat");
         format_btn.set_can_focus(false);
-        let preview_btn = gtk::ToggleButton::new();
-        preview_btn.set_icon_name("co.hyprlab.Vireo-eye-open-negative-filled-symbolic");
-        preview_btn.set_tooltip_text(Some(i18n("Preview the formatted message").as_str()));
+        // A backstop under the narrow rule below: at the pane's floor the
+        // row can still run out of width, and an ellipsized label is a
+        // better answer than a command button pushed off the end.
+        format_btn.set_can_shrink(true);
+        // The preview is a state, not an action, so it reads as one: a
+        // toggle that says what it turns on rather than an eye to guess at.
+        let preview_content = adw::ButtonContent::builder()
+            .icon_name("co.hyprlab.Vireo-eye-open-negative-filled-symbolic")
+            .label(i18n("Preview"))
+            .build();
+        let preview_btn = gtk::ToggleButton::builder().child(&preview_content).build();
+        preview_btn.set_tooltip_text(Some(i18n("Show the message as it will be sent").as_str()));
         preview_btn.add_css_class("flat");
         preview_btn.set_can_focus(false);
+        preview_btn.set_can_shrink(true);
         preview_btn.set_visible(format.is_source());
         {
             let s = sender.input_sender().clone();
@@ -811,8 +829,8 @@ impl Component for Compose {
                 let _ = s.send(ComposeInput::TogglePreview(b.is_active()));
             });
         }
-        editor.toolbar_end().append(&preview_btn);
         editor.toolbar_end().append(&format_btn);
+        editor.toolbar_end().append(&preview_btn);
 
         // "Send as Attachment Instead" on an inline image: the editor lifts
         // it to a temp file and it joins the attachment chips here.
@@ -852,6 +870,8 @@ impl Component for Compose {
             format,
             format_btn,
             preview_btn,
+            format_content,
+            preview_content,
             encrypt: false,
             send_at,
             cloud_accounts: crate::cloud::load_enabled_accounts(),
@@ -1155,7 +1175,10 @@ impl Component for Compose {
                 widgets.fields_list.set_visible(!(self.compact && !self.windowed) || on);
             }
 
-            ComposeInput::SetNarrow(narrow) => self.narrow = narrow,
+            ComposeInput::SetNarrow(narrow) => {
+                self.narrow = narrow;
+                self.dress_format_buttons();
+            }
 
             ComposeInput::OverflowMenu => {
                 let entry = |label: String, icon: &str, msg: fn() -> ComposeInput| {
@@ -1613,10 +1636,7 @@ impl Component for Compose {
                 }
                 self.format = to;
                 self.editor.set_formatting_visible(to == ComposeFormat::Rich);
-                self.format_btn.set_icon_name(format_icon(to));
-                self.format_btn.set_tooltip_text(Some(
-                    i18n_f("Writing in {format}", &[("format", &format_label(to))]).as_str(),
-                ));
+                self.dress_format_buttons();
                 self.preview_btn.set_visible(to.is_source());
                 // A preview of the old format's render would be a lie about
                 // the new one.
@@ -1788,6 +1808,21 @@ impl Component for Compose {
 }
 
 impl Compose {
+    /// The format chooser's icon, label and tooltip for the format it is
+    /// currently set to. Both controls drop their labels in a narrow pane,
+    /// where the row has no width to spare and the icons carry it — the
+    /// same trade the header makes when it folds.
+    fn dress_format_buttons(&self) {
+        self.format_content.set_icon_name(format_icon(self.format));
+        let name = format_label(self.format);
+        self.format_content.set_label(if self.narrow { "" } else { name.as_str() });
+        self.format_btn.set_tooltip_text(Some(
+            i18n_f("Writing in {format}", &[("format", &format_label(self.format))]).as_str(),
+        ));
+        let preview = i18n("Preview");
+        self.preview_content.set_label(if self.narrow { "" } else { preview.as_str() });
+    }
+
     /// The four formats as menu entries, the current one wearing a tick in
     /// place of its icon (as the OpenPGP toggles do).
     fn format_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {

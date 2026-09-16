@@ -2222,14 +2222,6 @@ msgstr "Titkosítás OpenPGP-vel minden címzett kulcsára"
 msgid "Sign with your OpenPGP key"
 msgstr "Aláírás a saját OpenPGP-kulccsal"
 
-#, fuzzy
-msgid "Preview the formatted message"
-msgstr "Kijelölt üzenet megnyitása"
-
-#, fuzzy
-msgid "Writing in {format}"
-msgstr "Várakozás {ago} óta"
-
 msgid "Attach files"
 msgstr "Fájlok csatolása"
 
@@ -2269,15 +2261,22 @@ msgstr "Válaszcím"
 msgid "Subject"
 msgstr "Tárgy"
 
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "Várakozás {ago} óta"
+
+#, fuzzy
+msgid "Preview"
+msgstr "Nyomtatási előnézet"
+
+msgid "Show the message as it will be sent"
+msgstr ""
+
 msgid "More"
 msgstr "Továbbiak"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Másolat, titkos másolat és válaszcím megjelenítése"
-
-#, fuzzy
-msgid "Back to the source"
-msgstr "Vissza az üzenetlistához"
 
 msgid "Not signed in"
 msgstr "Nincs bejelentkezve"
@@ -4463,6 +4462,14 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Preview the formatted message"
+#~ msgstr "Kijelölt üzenet megnyitása"
+
+#, fuzzy
+#~ msgid "Back to the source"
+#~ msgstr "Vissza az üzenetlistához"
 
 #~ msgid "Nothing to undo"
 #~ msgstr "Nincs visszavonható művelet"

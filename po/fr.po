@@ -2279,14 +2279,6 @@ msgstr "Chiffrer avec OpenPGP en utilisant la clé de chaque destinataire"
 msgid "Sign with your OpenPGP key"
 msgstr "Signez avec votre clé OpenPGP"
 
-#, fuzzy
-msgid "Preview the formatted message"
-msgstr "Ouvrir le message sélectionné"
-
-#, fuzzy
-msgid "Writing in {format}"
-msgstr "En attente depuis {ago}"
-
 msgid "Attach files"
 msgstr "Joindre des fichiers"
 
@@ -2326,15 +2318,22 @@ msgstr "Répondre à"
 msgid "Subject"
 msgstr "Objet"
 
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "En attente depuis {ago}"
+
+#, fuzzy
+msgid "Preview"
+msgstr "Aperçu avant impression"
+
+msgid "Show the message as it will be sent"
+msgstr ""
+
 msgid "More"
 msgstr "Plus"
 
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Afficher Cc, Cci et Répondre à"
-
-#, fuzzy
-msgid "Back to the source"
-msgstr "Retour à la liste des messages"
 
 msgid "Not signed in"
 msgstr "Non connecté"
@@ -4618,6 +4617,14 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Preview the formatted message"
+#~ msgstr "Ouvrir le message sélectionné"
+
+#, fuzzy
+#~ msgid "Back to the source"
+#~ msgstr "Retour à la liste des messages"
 
 #~ msgid "Nothing to undo"
 #~ msgstr "Rien à annuler"
