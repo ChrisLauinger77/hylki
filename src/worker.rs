@@ -5829,10 +5829,17 @@ fn preview_of(fetch: &Fetch) -> String {
     }
     let charset = ctype.as_deref().and_then(charset_param);
     let encoding = section_encoding(fetch);
-    let p = fetch
-        .section(&SectionPath::Part(vec![1], None))
-        .map(|bytes| preview_from_part(bytes, charset.as_deref(), encoding.as_deref()))
-        .unwrap_or_default();
+    let bytes = fetch.section(&SectionPath::Part(vec![1], None)).unwrap_or_default();
+    let p = preview_from_part(bytes, charset.as_deref(), encoding.as_deref());
+    // A preheader is built to defeat exactly this read: a marketing mail can
+    // spend thousands of bytes on invisible padding before its first real
+    // sentence, the way an HTML part spends them on <head>. When the slice ran
+    // to its limit and still yielded almost nothing to show, report nothing
+    // rather than a scrap, and let the deeper repair read — bounded, and rare
+    // — go and find the text.
+    if bytes.len() >= PREVIEW_FETCH_BYTES && p.chars().count() < PREVIEW_MIN_CHARS {
+        return String::new();
+    }
     // GTK labels abort on interior NULs, and decoded message text can carry
     // them.
     if p.contains('\0') { p.replace('\0', " ") } else { p }
@@ -5869,6 +5876,11 @@ const PREVIEW_FETCH_BYTES: usize = 2048;
 
 /// Longest preview stored per message.
 const PREVIEW_CHARS: usize = 240;
+
+/// Below this many characters, a preview read from a full slice has not found
+/// the message's text yet — it is still in the preheader padding or the
+/// `<head>` — and the repair read is worth the round trip.
+const PREVIEW_MIN_CHARS: usize = 30;
 
 /// The bigger slice for the preview *repair* fetch (the BODY[TEXT] retry for
 /// messages whose summary fetch produced no preview). An HTML-only message can
@@ -6332,6 +6344,17 @@ fn looks_like_base64(bytes: &[u8]) -> bool {
 /// Decode quoted-printable to the bytes it stands for, leaving anything
 /// malformed as written (a truncated fetch can end mid-escape).
 fn decode_quoted_printable(src: &[u8]) -> Vec<u8> {
+    // The fetch behind a preview is a slice of a part, so it ends wherever the
+    // byte count ran out — routinely in the middle of an escape. Left alone
+    // that stub reaches the reader as literal text ("… =E"), so drop it: a
+    // trailing "=" (which in quoted-printable is a soft line break anyway) and
+    // a trailing "=" plus one hex digit. Anything else is malformed rather
+    // than cut short, and is left as written.
+    let src = match src.len().checked_sub(2).map(|at| &src[at..]) {
+        Some(&[b'=', h]) if h.is_ascii_hexdigit() => &src[..src.len() - 2],
+        _ if src.last() == Some(&b'=') => &src[..src.len() - 1],
+        _ => src,
+    };
     let mut buf = Vec::with_capacity(src.len());
     let mut i = 0;
     while i < src.len() {
@@ -10760,6 +10783,42 @@ mod tests {
         let whole = b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZywgdHdpY2Uu";
         assert!(super::looks_like_base64(whole));
         assert!(super::looks_like_base64(b"VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZz0="));
+
+        // The slice a preview reads ends on a byte count, routinely mid-escape.
+        // The stub is dropped rather than shown as text.
+        let cut = b"AI Bot Controls =E2=80=87=CD=8F =E";
+        let out = super::preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
+        assert!(!out.contains('='), "no half-decoded escape left behind: {out:?}");
+        assert_eq!(out.trim(), "AI Bot Controls");
+        let cut = b"AI Bot Controls =E2=80=87=CD=8F =";
+        let out = super::preview_from_part(cut, Some("UTF-8"), Some("quoted-printable"));
+        assert!(!out.contains('='), "nor a bare one: {out:?}");
+    }
+
+    #[test]
+    fn a_preview_of_nothing_but_preheader_padding_reaches_for_the_real_text() {
+        // What the deeper BODY[TEXT] repair read sees: the whole multipart,
+        // each part carrying its own headers. The text is thousands of bytes
+        // past the padding, which is the point of the padding.
+        let mut plain = b"AI Bot Controls ".to_vec();
+        for _ in 0..250 {
+            plain.extend_from_slice(b"=E2=80=87=CD=8F ");
+        }
+        plain.extend_from_slice(b"Updates to managing AI crawlers on your account.");
+        let mut body = Vec::new();
+        body.extend_from_slice(b"--BOUND\r\n");
+        body.extend_from_slice(b"Content-Type: text/plain; charset=UTF-8\r\n");
+        body.extend_from_slice(b"Content-Transfer-Encoding: quoted-printable\r\n\r\n");
+        body.extend_from_slice(&plain);
+        body.extend_from_slice(b"\r\n--BOUND--\r\n");
+
+        let preview = super::preview_from_part(&body, None, None);
+        assert!(
+            preview.contains("Updates to managing AI crawlers"),
+            "the padding is stepped over, not shown: {preview:?}",
+        );
+        assert!(!preview.contains('\u{fffd}'), "{preview:?}");
+        assert!(!preview.contains('\u{034f}'), "joiners are dropped: {preview:?}");
     }
 
     #[test]
@@ -10787,9 +10846,15 @@ mod tests {
         let truncated = &full[..full.len() - 3];
         let preview = preview_from_part(truncated.as_bytes(), None, None);
         assert!(preview.starts_with("The quick brown fox"), "{preview}");
-        // A quoted-printable escape cut in half stays literal instead of eating
-        // the character after it.
-        assert!(preview_from_part(b"Total: 50=", None, None).ends_with('='));
+        // An escape cut in half is dropped, not shown: the slice ends on a
+        // byte count, so its last escape is routinely half there. A lone
+        // trailing "=" is a soft line break in quoted-printable and goes the
+        // same way.
+        assert_eq!(preview_from_part(b"Total: 50=", None, None), "Total: 50");
+        assert_eq!(preview_from_part(b"Total: 50=4", None, None), "Total: 50");
+        // Malformed rather than cut short: "=Z" is no escape at all, and
+        // whatever it is, it isn't ours to remove.
+        assert_eq!(preview_from_part(b"Total: 50=Z", None, None), "Total: 50=Z");
     }
 
     #[test]
