@@ -882,12 +882,6 @@ pub struct AppModel {
     /// make, so the menu never offers to archive a message while someone is
     /// typing into a reply.
     compose_history: (Option<String>, Option<String>),
-    /// Whether focus was last in that composer. Not read live, because
-    /// opening a menu takes focus into the menu: the burger's own entries
-    /// would then be labelled and greyed for whoever is *not* about to act,
-    /// which is backwards — the popover is how the entries get read at all.
-    /// Moves into a popover leave this where it was.
-    compose_focused: bool,
     /// The burger menu's Undo/Redo section, relabelled as the stacks change.
     undo_menu: gtk::gio::Menu,
     /// Their actions, kept so they can be greyed out when there is nothing
@@ -1191,9 +1185,6 @@ pub enum AppMsg {
     /// Redo would take back now, or `None` for a direction with nothing in
     /// it. The window's entries follow it while it holds focus.
     ComposeHistory { id: u32, undo: Option<String>, redo: Option<String> },
-    /// Keyboard focus moved into or out of the inline composer, so the
-    /// Undo and Redo entries change hands between it and the mail history.
-    FocusMoved,
     SetFetchInterval(u64),
     SetPush(bool),
     SetNotifications(bool),
@@ -2629,7 +2620,6 @@ impl SimpleComponent for AppModel {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             compose_history: (None, None),
-            compose_focused: false,
             carried_bodies: HashMap::new(),
             remote_override: HashMap::new(),
             carried_threads: HashMap::new(),
@@ -3453,13 +3443,6 @@ impl SimpleComponent for AppModel {
         };
         group.add_action(undo_action.clone());
         group.add_action(redo_action.clone());
-        {
-            // Undo and Redo change hands the moment focus does, so the menu
-            // never names a mail action while the caret is in a reply — or
-            // the other way round.
-            let s = sender.clone();
-            root.connect_focus_widget_notify(move |_| s.input(AppMsg::FocusMoved));
-        }
         group.add_action(RelmAction::<StatusBarAction>::new_stateless(move |_| {
             status_sender.input(AppMsg::ToggleNotifications);
         }));
@@ -4005,7 +3988,7 @@ impl SimpleComponent for AppModel {
                     // …and drop the burger menu open over it near the end,
                     // which is the state the entries are actually read in.
                     let s = sender.clone();
-                    gtk::glib::timeout_add_seconds_local_once(18, move || {
+                    gtk::glib::timeout_add_seconds_local_once(16, move || {
                         s.input(AppMsg::ShowcaseBurger);
                     });
                 }
@@ -6482,18 +6465,6 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::FocusMoved => {
-                // A menu or popover taking focus is not focus leaving the
-                // composer — it is how its Undo entry is reached.
-                if focus_is_settled(&self.window) {
-                    let now = focus_in_compose(&self.window);
-                    if now != self.compose_focused {
-                        self.compose_focused = now;
-                        self.refresh_undo_menu();
-                    }
-                }
-            }
-
 
             AppMsg::SetComposeInline(on) => {
                 if self.compose_inline != on {
@@ -6685,7 +6656,22 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::ShowcaseBurger => {
                 if let Some(m) = self.sidebar_menu.as_ref() {
+                    // Focus first: a click on a MenuButton focuses it before
+                    // the popover opens, and popup() alone skips that — the
+                    // difference between the two is a bug's hiding place.
+                    m.grab_focus();
                     m.popup();
+                    let mut chain = Vec::new();
+                    let mut node = gtk::prelude::GtkWindowExt::focus(&self.window);
+                    while let Some(w) = node {
+                        chain.push(format!("{}", w.type_()));
+                        node = w.parent();
+                    }
+                    tracing::info!(
+                        target: "vireo::compose::undo",
+                        "burger: opened, focus now [{}]",
+                        chain.join(" < ")
+                    );
                 }
             }
             AppMsg::ShowcaseComposeFormat(format) => {
@@ -9631,8 +9617,24 @@ impl AppModel {
 
     /// The inline composer, while it holds keyboard focus: whoever the
     /// window's Undo and Redo belong to at this moment.
-    fn focused_compose(&self) -> Option<&ReaderCompose> {
-        self.reader_compose.as_ref().filter(|r| r.window.is_none() && self.compose_focused)
+    /// Who the window's Undo and Redo entries belong to. Not the same
+    /// question as [`AppModel::focused_compose`], and deliberately not
+    /// decided by focus: opening the menu is itself a focus change, and
+    /// whether it lands on the button, inside the popover, or somewhere in
+    /// between is GTK's business and varies with how the menu was opened.
+    /// An entry that reads correctly only until you reach for it is no use.
+    ///
+    /// So: an open inline composer with something in its history owns them.
+    /// Anything it can take back is more recent than anything in the mail
+    /// history — it is being written now — and while it has nothing the
+    /// entries go back to the mail, which is what someone with an untouched
+    /// reply on screen would expect. The keys keep following focus, because
+    /// Ctrl+Z in the body must undo the body.
+    fn menu_compose(&self) -> Option<&ReaderCompose> {
+        self.reader_compose.as_ref().filter(|r| {
+            r.window.is_none()
+                && (self.compose_history.0.is_some() || self.compose_history.1.is_some())
+        })
     }
 
     /// Ctrl+Z / Ctrl+Shift+Z: take the top of one stack, apply it, and put
@@ -9643,7 +9645,7 @@ impl AppModel {
     /// "archive that message again" by Ctrl+Z. The menu entries follow the
     /// same rule, so what they say is always what the key would do.
     fn undo_redo(&mut self, redo: bool) {
-        if let Some(compose) = self.focused_compose() {
+        if let Some(compose) = self.menu_compose() {
             compose.controller.emit(ComposeInput::History { redo });
             return;
         }
@@ -9874,8 +9876,8 @@ impl AppModel {
     /// (Re)build the burger menu's Undo/Redo section, naming the action each
     /// one would reverse, and grey the entries out when a stack is empty.
     fn refresh_undo_menu(&self) {
-        // While the composer has focus its history is the one on offer.
-        let composing = self.focused_compose().is_some();
+        // The composer's history is the one on offer whenever it has one.
+        let composing = self.menu_compose().is_some();
         let (undo_what, redo_what) = if composing {
             (self.compose_history.0.clone(), self.compose_history.1.clone())
         } else {
@@ -12668,7 +12670,6 @@ impl AppModel {
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
         self.compose_history = (None, None);
-        self.compose_focused = false;
         self.refresh_undo_menu();
     }
 
@@ -12680,7 +12681,7 @@ impl AppModel {
             return;
         };
         self.compose_history = (None, None);
-        self.compose_focused = false;
+        self.refresh_undo_menu();
         match r.window {
             Some(window) => {
                 self.composers.push(ComposeHost { id: r.id, controller: r.controller, window });
@@ -16253,27 +16254,6 @@ fn focus_is_text(window: &adw::ApplicationWindow) -> bool {
 
 /// Whether keyboard focus sits inside a composer — whose editor must keep
 /// Ctrl+Z for its own text undo.
-/// Whether the focused widget is somewhere focus has actually come to rest,
-/// rather than a menu or popover that has borrowed it for as long as it is
-/// on screen — or a widget not yet in the window at all, which is what a
-/// menu item looks like for the first moments after it is built.
-fn focus_is_settled(window: &adw::ApplicationWindow) -> bool {
-    let Some(focus) = gtk::prelude::GtkWindowExt::focus(window) else {
-        return false;
-    };
-    let mut node = Some(focus);
-    while let Some(widget) = node {
-        if widget.is::<gtk::Popover>() {
-            return false;
-        }
-        if widget.is::<gtk::Window>() {
-            return true;
-        }
-        node = widget.parent();
-    }
-    false
-}
-
 fn focus_in_compose(window: &adw::ApplicationWindow) -> bool {
     let mut w = gtk::prelude::GtkWindowExt::focus(window);
     while let Some(cur) = w {
