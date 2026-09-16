@@ -4858,6 +4858,24 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::MessageSelected { message: m, thread, solo } => {
+                // What the reader is showing right now. A message that has just
+                // been moved back arrives under a new UID, so the list hands it
+                // over again as if it were a different message; rendering it a
+                // second time only makes the reader blink (#200).
+                // Captured before anything clears it: a conversation on screen
+                // is a different document from the same message shown alone,
+                // even though both answer to the one Message-ID.
+                let was_thread = self.current_thread.len() > 1;
+                let showing = self.current.as_ref().map(|c| {
+                    (
+                        c.account_id,
+                        c.message_id.clone(),
+                        c.body.clone(),
+                        c.unread,
+                        c.starred,
+                        c.keywords.clone(),
+                    )
+                });
                 // Navigating away releases any inline reply (save-if-dirty, or keep
                 // it as an independent window if it was popped out).
                 self.release_reader_compose();
@@ -5004,12 +5022,30 @@ impl SimpleComponent for AppModel {
                 } else {
                     self.current_thread.clear();
                     self.thread_key = None;
+                    let display = current;
+                    // Already on screen, pixel for pixel: leave it alone.
+                    let unchanged = !needs_body
+                        && !was_thread
+                        && showing.is_some_and(|(aid, mid, body, unread, starred, keywords)| {
+                            (aid, &mid, &body, unread, starred, &keywords)
+                                == (
+                                    display.account_id,
+                                    &display.message_id,
+                                    &display.body,
+                                    display.unread,
+                                    display.starred,
+                                    &display.keywords,
+                                )
+                                && !mid.is_empty()
+                        });
                     tracing::debug!(
                         target: "vireo::undo",
-                        "select {}: single message, needs_body={needs_body}",
+                        "select {}: single message, needs_body={needs_body}, unchanged={unchanged}",
                         m.id,
                     );
-                    let display = current;
+                    if unchanged {
+                        return;
+                    }
                     // Request the body FIRST so it renders before attachments — the
                     // worker processes requests in order, so the body must come first.
                     if needs_body {
