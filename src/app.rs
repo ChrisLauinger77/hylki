@@ -285,6 +285,11 @@ impl UndoStep {
 /// there — past this, another client or a sync may have moved on.
 const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// How many carried-over bodies to hold before giving up on them. They are
+/// meant to be claimed by the very next reload; a build-up means the reloads
+/// never came, and these are whole message bodies.
+const CARRIED_BODY_LIMIT: usize = 64;
+
 /// One entry on the undo (or redo) stack: the step to apply, and what the
 /// user called the action it belongs to, so the menu can say "Undo Archive"
 /// rather than just "Undo".
@@ -842,6 +847,13 @@ pub struct AppModel {
     /// whenever a new action is recorded, as every undo history does — the
     /// branch it belonged to no longer exists.
     redo_stack: Vec<UndoEntry>,
+    /// Bodies belonging to messages a move is bringing back (#200), by
+    /// Message-ID. A move gives a message a new UID, which orphans its body in
+    /// [`body_cache`] — that is keyed by the id the UID becomes. These are
+    /// re-keyed onto the new ids as the folder's reload arrives, so the
+    /// restored message renders from what is already here instead of blanking
+    /// to a spinner while the server sends it over again. Drained on use.
+    carried_bodies: HashMap<(u32, String), String>,
     /// The burger menu's Undo/Redo section, relabelled as the stacks change.
     undo_menu: gtk::gio::Menu,
     /// Their actions, kept so they can be greyed out when there is nothing
@@ -2555,6 +2567,7 @@ impl SimpleComponent for AppModel {
             list_selection: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+            carried_bodies: HashMap::new(),
             undo_action: None,
             redo_action: None,
             bulk_pending: 0,
@@ -7740,6 +7753,43 @@ impl SimpleComponent for AppModel {
                 // A list fetched ahead of a read mark still in the worker's
                 // queue shows the message unread again; keep the app's state.
                 let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                // A message a move has just brought home arrives with a new
+                // UID — that is what a move does — which leaves its body filed
+                // under the id the old one became. Move the body across before
+                // anything asks for it (#200).
+                if !self.carried_bodies.is_empty() {
+                    for m in messages.iter().filter(|m| !m.message_id.is_empty()) {
+                        if let Some(body) =
+                            self.carried_bodies.remove(&(account_id, m.message_id.clone()))
+                        {
+                            self.body_cache.insert((account_id, m.id), body);
+                        }
+                    }
+                }
+                // The reader may still be holding the copy from before the
+                // move. Point it at the row that is really there now: every
+                // action on it addresses a UID, and the check just below would
+                // otherwise read it as a message deleted from under us.
+                let renumbered: HashMap<&str, (u32, u32)> = messages
+                    .iter()
+                    .filter(|m| !m.message_id.is_empty())
+                    .map(|m| (m.message_id.as_str(), (m.uid, m.id)))
+                    .collect();
+                let mut renumber = |m: &mut Message| {
+                    if m.account_id != account_id || m.folder_id != folder_id {
+                        return;
+                    }
+                    if let Some(&(uid, id)) = renumbered.get(m.message_id.as_str()) {
+                        m.uid = uid;
+                        m.id = id;
+                    }
+                };
+                if let Some(cur) = self.current.as_mut() {
+                    renumber(cur);
+                }
+                for tm in self.current_thread.iter_mut() {
+                    renumber(tm);
+                }
                 // Did this sync remove the message currently open in the reader
                 // (deleted/moved on another device)? Scope the check to the reader's
                 // own folder so a folder switch or another folder's sync doesn't
@@ -7749,6 +7799,7 @@ impl SimpleComponent for AppModel {
                         && c.folder_id == folder_id
                         && !messages.iter().any(|m| m.uid == c.uid)
                 });
+
                 let next_after_vanish = if vanished {
                     let cur_uid = self.current.as_ref().unwrap().uid;
                     next_after_vanish(
@@ -7897,6 +7948,17 @@ impl SimpleComponent for AppModel {
                 // reload left the list. If the restored message isn't in the
                 // current view (folder switched meanwhile), SelectAndLoad
                 // finds no row and nothing moves.
+                // Unless the reader is already on it, which it will be when
+                // the undo put the row back itself (#200): selecting it again
+                // would tear the message down and render it a second time for
+                // no change the reader can see.
+                let already_open = self
+                    .current
+                    .as_ref()
+                    .is_some_and(|c| !c.message_id.is_empty() && message_ids.contains(&c.message_id));
+                if already_open {
+                    return;
+                }
                 let restored = self
                     .message_cache
                     .get(&(account_id, folder_id))
@@ -9304,6 +9366,18 @@ impl AppModel {
             rows: entry.rows.clone(),
             rows_return: !entry.rows_return,
         };
+        // Hold on to the bodies whatever happens: the move is about to change
+        // these messages' UIDs, and the reload that follows would otherwise
+        // find no body for them and go back to the server for one.
+        if entry.rows_return {
+            if self.carried_bodies.len() > CARRIED_BODY_LIMIT {
+                self.carried_bodies.clear();
+            }
+            for row in entry.rows.iter().filter(|m| !m.body.is_empty()) {
+                self.carried_bodies
+                    .insert((entry.account_id, row.message_id.clone()), row.body.clone());
+            }
+        }
         // Repaint the list now rather than a few round trips from now, while
         // the rows we took off it are still known to be what is there (#200).
         // The server request still goes out; its reload lands behind this and
