@@ -9563,6 +9563,7 @@ impl AppModel {
             self.message_cache.entry((account_id, folder_id)).or_default().push(m);
             added = true;
         }
+        tracing::debug!(target: "vireo::undo", "instant restore: added={added} to folder {folder_id}");
         if !added {
             return;
         }
@@ -9577,6 +9578,22 @@ impl AppModel {
         self.forget_threads(account_id);
         self.refresh_list_display();
         self.push_unread_counts();
+        // Undo means "put that back", and what you want back in front of you
+        // is the message itself, not whatever the list moved on to when it
+        // went away. Select it now, with the row, rather than when the server
+        // gets round to confirming — which is the whole point of doing this
+        // here (#200). The list processes SetMessages first, so the row is
+        // there to select. Restoring several at once picks the newest, the
+        // one nearest the top of the list.
+        let newest = entry
+            .rows
+            .iter()
+            .max_by_key(|m| m.timestamp)
+            .map(|m| (account_id, m.id));
+        tracing::debug!(target: "vireo::undo", "instant restore: selecting {newest:?}");
+        if let Some(key) = newest {
+            self.message_list.emit(MessageListInput::SelectAndLoad(key));
+        }
     }
 
     /// Carry out one step. Returns false when it could not be done at all
