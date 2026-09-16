@@ -405,7 +405,7 @@ pub enum AccountsOutput {
 /// which already says "a copy": the originals are the Sent row's business.
 /// Declared once because the row is rebuilt whenever an editor opens, and the
 /// two copies drifting apart is how a hint goes stale.
-const SENT_COPY_HINT: &str = "Any folder, the Inbox included. New mail only.";
+const SENT_COPY_HINT: &str = "Any folder, the Inbox included. Only mail sent from Vireo.";
 
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
