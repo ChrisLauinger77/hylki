@@ -290,6 +290,9 @@ impl Component for MessageWindow {
                     MessageWindowInput::Ignore
                 }
                 MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
+                // The pop-out keeps its own view's state; the main window's
+                // per-message record is not its to write.
+                MessageViewOutput::SetRemote { .. } => MessageWindowInput::Ignore,
                 MessageViewOutput::ComposeTo(addr) => MessageWindowInput::ComposeTo(addr),
                 MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
                 MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),

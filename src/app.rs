@@ -864,6 +864,11 @@ pub struct AppModel {
     /// restored message renders from what is already here instead of blanking
     /// to a spinner while the server sends it over again. Drained on use.
     carried_bodies: HashMap<(u32, String), String>,
+    /// Per-message remote-content choices: show (true) or block (false) this
+    /// one message, whatever the standing policy says. Set from the reader's
+    /// menu and its banner, and kept for the session only — a decision about
+    /// one message is not a decision about a sender.
+    remote_override: HashMap<(u32, u32), bool>,
     /// The burger menu's Undo/Redo section, relabelled as the stacks change.
     undo_menu: gtk::gio::Menu,
     /// Their actions, kept so they can be greyed out when there is nothing
@@ -1156,6 +1161,9 @@ pub enum AppMsg {
     SetPastePlain(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
+    /// Show or block remote content for one message, whatever the standing
+    /// policy is — the reader menu's entry, and what the banner's Load does.
+    SetRemoteContent { account_id: u32, id: u32, show: bool },
     /// Ctrl+Z: undo the most recent action.
     Undo,
     /// Ctrl+Shift+Z / Ctrl+Y: put back what undo took away.
@@ -2327,6 +2335,9 @@ impl SimpleComponent for AppModel {
                 .launch(())
                 .forward(sender.input_sender(), |out| match out {
                     MessageViewOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
+                    MessageViewOutput::SetRemote { account_id, id, show } => {
+                        AppMsg::SetRemoteContent { account_id, id, show }
+                    }
                     MessageViewOutput::OpenWindow(m) => {
                         AppMsg::OpenMessageWindow { message: *m, thread: Vec::new() }
                     }
@@ -2578,6 +2589,7 @@ impl SimpleComponent for AppModel {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             carried_bodies: HashMap::new(),
+            remote_override: HashMap::new(),
             carried_threads: HashMap::new(),
             undo_action: None,
             redo_action: None,
@@ -6339,6 +6351,19 @@ impl SimpleComponent for AppModel {
                     self.save_settings();
                     self.message_list
                         .emit(MessageListInput::SetSwipeSensitivity(factor));
+                }
+            }
+
+            AppMsg::SetRemoteContent { account_id, id, show } => {
+                self.remote_override.insert((account_id, id), show);
+                // Re-show whatever is open so the decision takes effect now.
+                // The reader re-reads `remote_allowed` for every message it
+                // paints, so a conversation gets it for the card it applies to.
+                if self.current_thread.len() > 1 {
+                    self.show_thread();
+                } else {
+                    let current = self.current.clone();
+                    self.show_message(current, false);
                 }
             }
 
@@ -10349,6 +10374,12 @@ impl AppModel {
     }
 
     fn remote_allowed(&self, m: &Message) -> bool {
+        // A choice made for this one message wins over the standing policy,
+        // in both directions: it is how remote content is shown (or put back)
+        // for a single message when the banner is switched off.
+        if let Some(&show) = self.remote_override.get(&(m.account_id, m.id)) {
+            return show;
+        }
         if self.auto_remote_content {
             return true;
         }
@@ -10922,6 +10953,25 @@ impl AppModel {
         acts.push(item(RowAction::Delete, i18n("Delete"), "user-trash"));
         sections.push(acts);
         sections.push(vec![item(RowAction::AddContact, i18n("Add Sender to Contacts"), "contact-new")]);
+        // Remote content, per message. The banner offers the same thing, but
+        // it can be switched off (Settings → Privacy) and then there is
+        // nothing to click — so the choice lives here too, and here it goes
+        // both ways: the banner can only ever let content in.
+        {
+            let showing = self.remote_allowed(&m);
+            let s = sender.input_sender().clone();
+            let (account_id, id) = (m.account_id, m.id);
+            let label = if showing {
+                i18n("Block Remote Content")
+            } else {
+                i18n("Show Remote Content")
+            };
+            let icon = if showing { "security-high" } else { "image-x-generic" };
+            sections.push(vec![MenuEntry::new(label, move || {
+                let _ = s.send(AppMsg::SetRemoteContent { account_id, id, show: !showing });
+            })
+            .icon(format!("co.hyprlab.Vireo-{icon}-symbolic"))]);
+        }
         sections.push(vec![item(RowAction::ViewSource, i18n("View Source"), "code")]);
         show_context_menu(&self.window, x, y, sections);
     }

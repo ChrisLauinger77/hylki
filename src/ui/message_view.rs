@@ -352,6 +352,9 @@ pub enum MessageViewInput {
     },
     LoadRemoteOnce,
     AllowSenderAlways,
+    /// A card's remote-content button: show what is blocked, or put the block
+    /// back. The banner does the first half and can be switched off entirely.
+    ToggleRemote { account_id: u32, id: u32 },
     /// The system/app light-dark preference changed; re-render to match.
     ThemeChanged,
     /// What one of the user's own mailboxes shows has changed — a Gravatar
@@ -515,6 +518,10 @@ pub enum MessageViewOutput {
         action: crate::ui::message_list::RowAction,
         message: Box<Message>,
     },
+    /// Remote content shown or blocked for one message, from the banner's
+    /// Load or the card's own toggle. Reported so the choice is remembered
+    /// and a repaint doesn't undo it.
+    SetRemote { account_id: u32, id: u32, show: bool },
     /// A card's "Add sender to Contacts" button — add this message's sender.
     ContactSender(Box<Message>),
     /// A right-click on a card: the app shows the message's full menu (the
@@ -743,6 +750,18 @@ impl Component for MessageView {
 
                 gtk::Box {
                     add_css_class: "reader-header",
+                    // The header's top padding is cut to the 4px that puts the
+                    // account chip level with the message list's first row.
+                    // That only reads as alignment when the header is against
+                    // the toolbar; under a bar it reads as cramped, so give it
+                    // its air back whenever one is showing.
+                    #[watch]
+                    set_class_active: (
+                        "under-bar",
+                        model.trust().is_alarming()
+                            || (model.blocked && model.show_banner)
+                            || model.find_open,
+                    ),
                     set_orientation: gtk::Orientation::Vertical,
                     set_spacing: 12,
 
@@ -1112,6 +1131,9 @@ impl Component for MessageView {
                         account_id,
                         id,
                     }),
+                    "remote" => {
+                        open_sender.input(MessageViewInput::ToggleRemote { account_id, id })
+                    }
                     "archive" => open_sender.input(MessageViewInput::CardAction {
                         action: RowAction::Archive,
                         account_id,
@@ -1285,8 +1307,26 @@ impl Component for MessageView {
                 }
             }
             MessageViewInput::LoadRemoteOnce => {
+                // Tell the app as well, so the choice survives the next repaint
+                // and the reader menu stops offering to do what is already done.
+                if let Some(m) = &self.current {
+                    let _ = sender.output(MessageViewOutput::SetRemote {
+                        account_id: m.account_id,
+                        id: m.id,
+                        show: true,
+                    });
+                }
                 self.remote_allowed = true;
                 self.blocked = false;
+                self.render();
+            }
+            MessageViewInput::ToggleRemote { account_id, id } => {
+                let show = !self.remote_allowed;
+                self.remote_allowed = show;
+                self.blocked = !show && self.thread.iter().any(|m| has_remote_resources(&m.body));
+                let _ = sender.output(MessageViewOutput::SetRemote { account_id, id, show });
+                // The app records it and re-shows the message; that render is
+                // free (the fingerprint already matches), so paint now.
                 self.render();
             }
             MessageViewInput::AllowSenderAlways => {
@@ -2222,7 +2262,7 @@ impl MessageView {
                     acts = if !thread.is_empty() {
                         let key = (m.account_id, m.id);
                         format!(
-                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}{}</span>",
+                            "<span class=\"vireo-acts\">{}{}{}{}{}{}{}{}{}{}{}{}{}</span>",
                             // Same order as the reader toolbar and the list's
                             // actions palette, View Source closing the line.
                             card_action_button(key, "reply", "mail-reply-sender-symbolic", &i18n("Reply to this message")),
@@ -2278,6 +2318,29 @@ impl MessageView {
                                         i18n("Show the sender's fonts and colours")
                                     }),
                                     svg = inline_icon_svg("format-text-rich-symbolic"),
+                                )
+                            } else {
+                                String::new()
+                            },
+                            // Remote content, per message. The banner offers
+                            // the same thing, but it can be switched off
+                            // (Settings → Privacy) and then there is nothing to
+                            // click — and it only ever lets content in, where
+                            // this puts the block back too. Offered only on a
+                            // card that actually has something to load.
+                            if has_remote_resources(&m.body) {
+                                format!(
+                                    "<button type=\"button\" class=\"vireo-act{on_cls}\" data-act=\"remote\" \
+                                     data-key=\"{aid}:{id}\" title=\"{title}\">{svg}</button>",
+                                    on_cls = if restrict { "" } else { " on" },
+                                    aid = key.0,
+                                    id = key.1,
+                                    title = gtk::glib::markup_escape_text(&if restrict {
+                                        i18n("Show remote content")
+                                    } else {
+                                        i18n("Block remote content")
+                                    }),
+                                    svg = inline_icon_svg("image-x-generic-symbolic"),
                                 )
                             } else {
                                 String::new()
@@ -5593,6 +5656,41 @@ mod tests {
             1,
             "only the second card: {doc}"
         );
+    }
+
+    #[test]
+    fn a_card_offers_remote_content_both_ways_and_only_where_there_is_any() {
+        let mut with_remote = msg_for_print();
+        with_remote.body = "<p>Hello</p><img src=\"https://example.com/track.gif\">".into();
+        let mut without = msg_for_print();
+        without.id = 2;
+        without.body = "<p>Just words.</p>".into();
+        let doc_for = |restrict: bool| {
+            MessageView::conversation_document(
+                &[with_remote.clone(), without.clone()],
+                &std::collections::HashMap::new(),
+                &Default::default(),
+                &Default::default(),
+                &[],
+                "#3584e4",
+                restrict,
+                false,
+                false,
+                false,
+                &crate::config::ReaderStyle::NONE,
+                &Default::default(),
+            )
+        };
+        // Only the card with something to load carries the button.
+        let blocked = doc_for(true);
+        assert_eq!(blocked.matches("data-act=\"remote\"").count(), 1, "{blocked}");
+        assert!(blocked.contains("Show remote content"), "{blocked}");
+        assert!(!blocked.contains("class=\"vireo-act on\" data-act=\"remote\""), "not lit while blocked");
+        // Showing it, the same button offers to put the block back, and is lit.
+        let shown = doc_for(false);
+        assert_eq!(shown.matches("data-act=\"remote\"").count(), 1, "{shown}");
+        assert!(shown.contains("Block remote content"), "{shown}");
+        assert!(shown.contains("class=\"vireo-act on\" data-act=\"remote\""), "lit while showing: {shown}");
     }
 
     /// Each card carries its own Reply/Reply all/Forward, keyed to that message

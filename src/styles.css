@@ -948,6 +948,14 @@ headerbar.compose-toolbar button.image-button {
   padding: 4px 24px 16px 24px;
 }
 
+/* …unless a bar (spoofing warning, blocked remote content, find) sits
+   between it and the toolbar. There is nothing to line up with there, and
+   4px against a filled band reads as cramped rather than aligned, so the
+   header keeps the 20px it always had. */
+.reader-header.under-bar {
+  padding-top: 20px;
+}
+
 .reader-subject {
   font-size: 1.5em;
   font-weight: 800;
