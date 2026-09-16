@@ -302,6 +302,10 @@ struct UndoEntry {
     /// The rows a move took off screen, kept whole (bodies included) so a
     /// quick undo can put them straight back without a round trip.
     rows: Vec<Message>,
+    /// The conversations those rows were part of, by Message-ID. Taken as
+    /// the move is recorded: moving a message forgets its account's
+    /// conversations, so by the time the undo runs they are gone.
+    threads: Vec<(String, Vec<Message>)>,
     /// Whether applying this entry puts `rows` back on screen (undoing a
     /// move) or takes them away again (redoing it).
     rows_return: bool,
@@ -847,6 +851,12 @@ pub struct AppModel {
     /// whenever a new action is recorded, as every undo history does — the
     /// branch it belonged to no longer exists.
     redo_stack: Vec<UndoEntry>,
+    /// Conversations belonging to messages a move is bringing back (#200),
+    /// keyed and re-filed exactly like [`carried_bodies`]. The reader paints
+    /// an assembled conversation with no lookup and no spinner; without this
+    /// a restored message rebuilt its thread from scratch, which means a
+    /// round trip, which means the spinner.
+    carried_threads: HashMap<(u32, String), Vec<Message>>,
     /// Bodies belonging to messages a move is bringing back (#200), by
     /// Message-ID. A move gives a message a new UID, which orphans its body in
     /// [`body_cache`] — that is keyed by the id the UID becomes. These are
@@ -2568,6 +2578,7 @@ impl SimpleComponent for AppModel {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             carried_bodies: HashMap::new(),
+            carried_threads: HashMap::new(),
             undo_action: None,
             redo_action: None,
             bulk_pending: 0,
@@ -4927,6 +4938,13 @@ impl SimpleComponent for AppModel {
                     // Already assembled: paint it now. No lookup, no body
                     // gathering, no spinner — returning to a thread shouldn't
                     // cost what opening it did.
+                    tracing::debug!(
+                        target: "vireo::undo",
+                        "select {}: thread of {}, remembered={}, needs_body={needs_body}",
+                        m.id,
+                        thread.len(),
+                        self.thread_cache.contains_key(&(account_id, m.id)),
+                    );
                     if let Some(cached) = self.thread_cache.get(&(account_id, m.id)).cloned() {
                         self.current_thread = cached;
                         // The message just opened is read, whatever the stored
@@ -4986,6 +5004,11 @@ impl SimpleComponent for AppModel {
                 } else {
                     self.current_thread.clear();
                     self.thread_key = None;
+                    tracing::debug!(
+                        target: "vireo::undo",
+                        "select {}: single message, needs_body={needs_body}",
+                        m.id,
+                    );
                     let display = current;
                     // Request the body FIRST so it renders before attachments — the
                     // worker processes requests in order, so the body must come first.
@@ -7903,6 +7926,33 @@ impl SimpleComponent for AppModel {
                     self.forget_threads(account_id);
                     self.push_thread_links();
                 }
+                // After that sweep, not before it: a conversation carried over
+                // a move (#200) goes back under the id the message now has,
+                // with the member that moved renumbered to match. The reader
+                // paints a remembered conversation with no lookup and no
+                // spinner, which is the whole point of carrying it.
+                if !self.carried_threads.is_empty() {
+                    for m in messages.iter().filter(|m| !m.message_id.is_empty()) {
+                        let Some(mut thread) =
+                            self.carried_threads.remove(&(account_id, m.message_id.clone()))
+                        else {
+                            continue;
+                        };
+                        for tm in thread.iter_mut() {
+                            if tm.account_id == account_id && tm.message_id == m.message_id {
+                                tm.uid = m.uid;
+                                tm.id = m.id;
+                                tm.folder_id = m.folder_id;
+                            }
+                        }
+                        tracing::debug!(
+                            target: "vireo::undo",
+                            "re-filed conversation under id {}",
+                            m.id,
+                        );
+                        self.remember_thread_for((account_id, m.id), thread);
+                    }
+                }
                 if self.unified {
                     // Accept only the folders the view merges, by recency.
                     if self.is_unified_target(account_id, folder_id) {
@@ -9283,6 +9333,14 @@ impl AppModel {
                 m
             })
             .collect();
+        let threads: Vec<(String, Vec<Message>)> = rows
+            .iter()
+            .filter_map(|m| {
+                self.thread_cache
+                    .get(&(account_id, m.id))
+                    .map(|t| (m.message_id.clone(), t.clone()))
+            })
+            .collect();
         self.push_undo_entry(UndoEntry {
             account_id,
             what,
@@ -9293,6 +9351,7 @@ impl AppModel {
             },
             at: std::time::Instant::now(),
             rows,
+            threads,
             rows_return: true,
         });
     }
@@ -9340,6 +9399,7 @@ impl AppModel {
             step,
             at: std::time::Instant::now(),
             rows: Vec::new(),
+            threads: Vec::new(),
             rows_return: true,
         });
     }
@@ -9364,6 +9424,7 @@ impl AppModel {
             // The window restarts: whatever the state is now, it is current.
             at: std::time::Instant::now(),
             rows: entry.rows.clone(),
+            threads: entry.threads.clone(),
             rows_return: !entry.rows_return,
         };
         // Hold on to the bodies whatever happens: the move is about to change
@@ -9377,6 +9438,16 @@ impl AppModel {
                 self.carried_bodies
                     .insert((entry.account_id, row.message_id.clone()), row.body.clone());
             }
+            for (message_id, thread) in &entry.threads {
+                self.carried_threads
+                    .insert((entry.account_id, message_id.clone()), thread.clone());
+            }
+            tracing::debug!(
+                target: "vireo::undo",
+                "carrying {} bodies and {} conversations over the move",
+                entry.rows.iter().filter(|m| !m.body.is_empty()).count(),
+                entry.threads.len(),
+            );
         }
         // Repaint the list now rather than a few round trips from now, while
         // the rows we took off it are still known to be what is there (#200).
@@ -13288,10 +13359,17 @@ impl AppModel {
     /// Store the conversation on screen so returning to it is instant.
     fn remember_thread(&mut self) {
         let Some(key) = self.thread_key else { return };
-        if self.current_thread.len() <= 1 {
+        let thread = self.current_thread.clone();
+        self.remember_thread_for(key, thread);
+    }
+
+    /// The same, for a conversation that isn't the one on screen — carrying
+    /// one over a move that changed its key (#200).
+    fn remember_thread_for(&mut self, key: (u32, u32), thread: Vec<Message>) {
+        if thread.len() <= 1 {
             return;
         }
-        if self.thread_cache.insert(key, self.current_thread.clone()).is_none() {
+        if self.thread_cache.insert(key, thread).is_none() {
             self.thread_cache_order.push(key);
         }
         while self.thread_cache_order.len() > Self::THREAD_CACHE_MAX {
