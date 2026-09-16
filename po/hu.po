@@ -145,6 +145,10 @@ msgstr "Olvasatlanok elöl"
 msgid "Flagged first"
 msgstr "Megjelöltek elöl"
 
+#, fuzzy
+msgid "Create Folder"
+msgstr "Új mappa"
+
 msgid "Added to Contacts"
 msgstr "Hozzáadva a névjegyekhez"
 
@@ -172,12 +176,6 @@ msgstr ""
 
 msgid "Open a message first, then print it."
 msgstr "Előbb nyisson meg egy üzenetet, majd nyomtassa ki."
-
-msgid "Nothing to undo"
-msgstr "Nincs visszavonható művelet"
-
-msgid "Undoing move…"
-msgstr "Áthelyezés visszavonása…"
 
 msgid "Customize Toolbar…"
 msgstr ""
@@ -252,6 +250,10 @@ msgstr "Billentyűparancsok"
 msgid "About"
 msgstr ""
 
+#, fuzzy
+msgid "Remove Tags"
+msgstr "Címke eltávolítása"
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
 "Appearance."
@@ -260,6 +262,27 @@ msgstr ""
 "Beállítások → Rendszer és megjelenés menüben."
 
 msgid "Your tags"
+msgstr ""
+
+msgid "Delete"
+msgstr "Törlés"
+
+#, fuzzy
+msgid "Move to {name}"
+msgstr "Eltávolítva: {name}"
+
+#, fuzzy
+msgid "Add Tag {name}"
+msgstr "E-mail-cím hozzáadva ehhez: {name}"
+
+#, fuzzy
+msgid "Remove Tag {name}"
+msgstr "Eltávolítva: {name}"
+
+msgid "Undo"
+msgstr ""
+
+msgid "Redo"
 msgstr ""
 
 msgid "Restarting Vireo"
@@ -288,9 +311,6 @@ msgstr "Forrás megtekintése"
 msgid "Remove Flag"
 msgstr "Jelölés eltávolítása"
 
-msgid "Delete"
-msgstr "Törlés"
-
 msgid "Move to Inbox"
 msgstr "Áthelyezés a Beérkezett üzenetek közé"
 
@@ -311,6 +331,14 @@ msgstr "Csillagozás"
 
 msgid "Add Sender to Contacts"
 msgstr "Feladó hozzáadása a névjegyekhez"
+
+#, fuzzy
+msgid "Block Remote Content"
+msgstr "Távoli képek blokkolása"
+
+#, fuzzy
+msgid "Show Remote Content"
+msgstr "Távoli tartalom mindig töltődjön be"
 
 msgid "Delete {n} messages"
 msgstr "{n} üzenet törlése"
@@ -423,6 +451,10 @@ msgid "{foreign} messages stayed put — mail can't be moved between accounts"
 msgstr ""
 "{foreign} üzenet a helyén maradt — a levelek nem helyezhetők át fiókok között"
 
+#, fuzzy
+msgid "Move Folder"
+msgstr "Új mappa"
+
 msgid "Vireo couldn’t save your password"
 msgstr "A Vireo nem tudta menteni a jelszavát"
 
@@ -453,7 +485,14 @@ msgstr "Átnevezés"
 msgid "A folder named {new_name} is already there."
 msgstr "Már létezik {new_name} nevű mappa."
 
-msgid "Its messages are moved to Trash and the folder is removed."
+#, fuzzy
+msgid "Rename Folder"
+msgstr "Mappa átnevezése…"
+
+#, fuzzy
+msgid ""
+"Its messages are moved to Trash and the folder is removed from the server. "
+"This cannot be undone."
 msgstr "A benne lévő üzenetek a Kukába kerülnek, a mappa pedig törlődik."
 
 msgid "Empty “{name}”?"
@@ -673,8 +712,12 @@ msgstr "Levélírás"
 msgid "Back out of a reply and return to the list"
 msgstr "Kilépés a válaszból és visszatérés a listához"
 
-msgid "Undo the last move or delete"
-msgstr "Legutóbbi áthelyezés vagy törlés visszavonása"
+#, fuzzy
+msgid "Undo the last action (also in the main menu)"
+msgstr "Olvasatlan levelek a tálcamenüben"
+
+msgid "Redo it (Ctrl+Y does the same)"
+msgstr ""
 
 msgid "Print the message you are reading"
 msgstr "Olvasott üzenet nyomtatása"
@@ -699,6 +742,10 @@ msgstr "Kilépés teljesen a Vireóból"
 
 msgid "This list"
 msgstr "Ez a lista"
+
+#, fuzzy
+msgid "Unstar"
+msgstr "Újraindítás most"
 
 msgid "Save All Attachments"
 msgstr "Összes melléklet mentése"
@@ -1249,8 +1296,10 @@ msgstr "Speciális mappák"
 
 #, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. Automatically follows the server's "
-"own markings; pick a folder when a role isn't detected or lands wrong."
+"Which of this account's folders hold each role. Automatically follows the "
+"server's own markings; pick a folder when a role isn't detected or lands "
+"wrong. Nothing already on the server moves: a role says where mail goes from "
+"now on."
 msgstr ""
 "Az elküldött, törölt és levélszemét levelek helye. Az Automatikus a "
 "kiszolgáló saját jelöléseit követi; válasszon mappát, ha egy szerepkör nem "
@@ -1258,6 +1307,17 @@ msgstr ""
 
 msgid "Sent"
 msgstr "Elküldött"
+
+msgid "Save a copy of sent mail in"
+msgstr ""
+
+msgid "Server saves its own copy of sent mail"
+msgstr ""
+
+msgid ""
+"For Gmail and others that file sent mail themselves. Disables above Save a "
+"copy."
+msgstr ""
 
 msgid "Drafts"
 msgstr "Piszkozatok"
@@ -1403,6 +1463,12 @@ msgstr "SMTP-jelszó"
 
 msgid "Test SMTP"
 msgstr "SMTP tesztelése"
+
+msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
+msgstr ""
+
+msgid "POP3 accounts have no server folders to save a copy in."
+msgstr ""
 
 msgid "GOA"
 msgstr ""
@@ -2078,6 +2144,33 @@ msgstr ""
 msgid "Signed in as {who}. {terms}"
 msgstr "Bejelentkezve mint: {who}. {terms}"
 
+msgid "Rich text"
+msgstr ""
+
+msgid "Markdown"
+msgstr ""
+
+msgid "HTML"
+msgstr ""
+
+#, fuzzy
+msgid "Plain text"
+msgstr "Beillesztés egyszerű szövegként"
+
+msgid "Format as you type, with the toolbar"
+msgstr ""
+
+msgid "Write Markdown; it is sent as formatted mail"
+msgstr ""
+
+#, fuzzy
+msgid "Write the message's HTML by hand"
+msgstr "Olvasott üzenet nyomtatása"
+
+#, fuzzy
+msgid "No formatting at all"
+msgstr "Formázás törlése"
+
 msgid "Collapse into reader"
 msgstr "Összecsukás olvasóvá"
 
@@ -2130,8 +2223,12 @@ msgid "Sign with your OpenPGP key"
 msgstr "Aláírás a saját OpenPGP-kulccsal"
 
 #, fuzzy
-msgid "Plain text: send without formatting"
-msgstr "Beillesztés formázással"
+msgid "Preview the formatted message"
+msgstr "Kijelölt üzenet megnyitása"
+
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "Várakozás {ago} óta"
 
 msgid "Attach files"
 msgstr "Fájlok csatolása"
@@ -2179,12 +2276,8 @@ msgid "Show Cc, Bcc and Reply-To"
 msgstr "Másolat, titkos másolat és válaszcím megjelenítése"
 
 #, fuzzy
-msgid "Send with formatting"
-msgstr "Beillesztés formázással"
-
-#, fuzzy
-msgid "Send as plain text"
-msgstr "Beillesztés egyszerű szövegként"
+msgid "Back to the source"
+msgstr "Vissza az üzenetlistához"
 
 msgid "Not signed in"
 msgstr "Nincs bejelentkezve"
@@ -2510,6 +2603,14 @@ msgstr "Vissza a saját betűtípusaimhoz és színeimhez"
 
 msgid "Show the sender's fonts and colours"
 msgstr "Feladó betűtípusainak és színeinek megjelenítése"
+
+#, fuzzy
+msgid "Show remote content"
+msgstr "Távoli tartalom mindig töltődjön be"
+
+#, fuzzy
+msgid "Block remote content"
+msgstr "Távoli tartalom mindig töltődjön be"
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -3423,13 +3524,13 @@ msgstr ""
 "mindkettőt felajánlja."
 
 #, fuzzy
-msgid "Compose in plain text"
-msgstr "Beillesztés egyszerű szövegként"
+msgid "Write messages in"
+msgstr "Üzenetek rendezése"
 
 msgid ""
-"New messages, replies and forwards start as plain text, sent without "
-"formatting. The composer's Plain text button switches either way for one "
-"message."
+"What new messages, replies and forwards start as. Markdown and HTML are "
+"written as source and sent as formatted mail; plain text is sent without "
+"formatting. The composer's format button switches any one message."
 msgstr ""
 
 msgid "Spelling"
@@ -4209,15 +4310,6 @@ msgstr "{len} üzenet nem helyezhető át: {e}"
 msgid "Undo failed: {e}"
 msgstr "A visszavonás sikertelen: {e}"
 
-msgid "Undo: the messages are no longer where that move put them."
-msgstr ""
-"Visszavonás: az üzenetek már nincsenek ott, ahová az áthelyezés tette őket."
-
-msgid "Move undone — message restored"
-msgid_plural "Move undone — {n} messages restored"
-msgstr[0] "Áthelyezés visszavonva — üzenet visszaállítva"
-msgstr[1] "Áthelyezés visszavonva — {n} üzenet visszaállítva"
-
 msgid "Could not delete permanently: {e}"
 msgstr "Nem törölhető véglegesen: {e}"
 
@@ -4371,6 +4463,41 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Nothing to undo"
+#~ msgstr "Nincs visszavonható művelet"
+
+#~ msgid "Undoing move…"
+#~ msgstr "Áthelyezés visszavonása…"
+
+#~ msgid "Undo the last move or delete"
+#~ msgstr "Legutóbbi áthelyezés vagy törlés visszavonása"
+
+#, fuzzy
+#~ msgid "Plain text: send without formatting"
+#~ msgstr "Beillesztés formázással"
+
+#, fuzzy
+#~ msgid "Send with formatting"
+#~ msgstr "Beillesztés formázással"
+
+#, fuzzy
+#~ msgid "Send as plain text"
+#~ msgstr "Beillesztés egyszerű szövegként"
+
+#, fuzzy
+#~ msgid "Compose in plain text"
+#~ msgstr "Beillesztés egyszerű szövegként"
+
+#~ msgid "Undo: the messages are no longer where that move put them."
+#~ msgstr ""
+#~ "Visszavonás: az üzenetek már nincsenek ott, ahová az áthelyezés tette "
+#~ "őket."
+
+#~ msgid "Move undone — message restored"
+#~ msgid_plural "Move undone — {n} messages restored"
+#~ msgstr[0] "Áthelyezés visszavonva — üzenet visszaállítva"
+#~ msgstr[1] "Áthelyezés visszavonva — {n} üzenet visszaállítva"
 
 #~ msgid ""
 #~ "Name who wrote and what about in the notification. Turn this off to keep "

@@ -146,6 +146,10 @@ msgstr "Сначала непрочитанные"
 msgid "Flagged first"
 msgstr "Сначала отмеченные"
 
+#, fuzzy
+msgid "Create Folder"
+msgstr "Новая папка"
+
 msgid "Added to Contacts"
 msgstr "Добавлено в контакты"
 
@@ -173,12 +177,6 @@ msgstr ""
 
 msgid "Open a message first, then print it."
 msgstr "Сначала откройте сообщение, затем распечатайте его."
-
-msgid "Nothing to undo"
-msgstr "Нечего отменять"
-
-msgid "Undoing move…"
-msgstr "Отменяем перемещение…"
 
 msgid "Customize Toolbar…"
 msgstr "Настроить панель инструментов…"
@@ -256,6 +254,10 @@ msgstr "Сочетания клавиш"
 msgid "About"
 msgstr "О программе"
 
+#, fuzzy
+msgid "Remove Tags"
+msgstr "Удалить тег"
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
 "Appearance."
@@ -265,6 +267,27 @@ msgstr ""
 
 msgid "Your tags"
 msgstr "Ваши теги"
+
+msgid "Delete"
+msgstr "Удалить"
+
+#, fuzzy
+msgid "Move to {name}"
+msgstr "Удалить {name}?"
+
+#, fuzzy
+msgid "Add Tag {name}"
+msgstr "Адрес электронной почты добавлен к контакту {name}"
+
+#, fuzzy
+msgid "Remove Tag {name}"
+msgstr "Удалить {name}?"
+
+msgid "Undo"
+msgstr ""
+
+msgid "Redo"
+msgstr ""
 
 msgid "Restarting Vireo"
 msgstr "Перезапуск Vireo"
@@ -292,9 +315,6 @@ msgstr "Просмотр исходного кода"
 msgid "Remove Flag"
 msgstr "Снять метку"
 
-msgid "Delete"
-msgstr "Удалить"
-
 msgid "Move to Inbox"
 msgstr "Переместить во Входящие"
 
@@ -315,6 +335,14 @@ msgstr "Отметить звёздочкой"
 
 msgid "Add Sender to Contacts"
 msgstr "Добавить отправителя в «Контакты»"
+
+#, fuzzy
+msgid "Block Remote Content"
+msgstr "Блокировать удалённые изображения"
+
+#, fuzzy
+msgid "Show Remote Content"
+msgstr "Всегда загружать удалённое содержимое"
 
 msgid "Delete {n} messages"
 msgstr "Удалить {n} сообщений"
@@ -443,6 +471,10 @@ msgstr ""
 "{foreign} сообщений осталось на месте — почту нельзя перемещать между "
 "учётными записями"
 
+#, fuzzy
+msgid "Move Folder"
+msgstr "Новая папка"
+
 msgid "Vireo couldn’t save your password"
 msgstr "Vireo не смог сохранить ваш пароль"
 
@@ -473,7 +505,14 @@ msgstr "Переименовать"
 msgid "A folder named {new_name} is already there."
 msgstr "Папка с именем {new_name} уже существует."
 
-msgid "Its messages are moved to Trash and the folder is removed."
+#, fuzzy
+msgid "Rename Folder"
+msgstr "Переименовать папку…"
+
+#, fuzzy
+msgid ""
+"Its messages are moved to Trash and the folder is removed from the server. "
+"This cannot be undone."
 msgstr "Её сообщения будут перемещены в «Корзину», а сама папка — удалена."
 
 msgid "Empty “{name}”?"
@@ -700,8 +739,12 @@ msgstr "Написать"
 msgid "Back out of a reply and return to the list"
 msgstr "Отменить ответ и вернуться к списку"
 
-msgid "Undo the last move or delete"
-msgstr "Отменить последнее перемещение или удаление"
+#, fuzzy
+msgid "Undo the last action (also in the main menu)"
+msgstr "Непрочитанная почта в меню трея"
+
+msgid "Redo it (Ctrl+Y does the same)"
+msgstr ""
 
 msgid "Print the message you are reading"
 msgstr "Печать открытого сообщения"
@@ -726,6 +769,10 @@ msgstr "Полностью выйти из Vireo"
 
 msgid "This list"
 msgstr "Этот список"
+
+#, fuzzy
+msgid "Unstar"
+msgstr "Установить"
 
 msgid "Save All Attachments"
 msgstr "Сохранить все вложения"
@@ -1289,8 +1336,10 @@ msgstr "Специальные папки"
 
 #, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. Automatically follows the server's "
-"own markings; pick a folder when a role isn't detected or lands wrong."
+"Which of this account's folders hold each role. Automatically follows the "
+"server's own markings; pick a folder when a role isn't detected or lands "
+"wrong. Nothing already on the server moves: a role says where mail goes from "
+"now on."
 msgstr ""
 "Папки для отправленных, удалённых писем и спама. Автоматический "
 "режим                                      следует меткам сервера; выберите "
@@ -1299,6 +1348,17 @@ msgstr ""
 
 msgid "Sent"
 msgstr "Отправленные"
+
+msgid "Save a copy of sent mail in"
+msgstr ""
+
+msgid "Server saves its own copy of sent mail"
+msgstr ""
+
+msgid ""
+"For Gmail and others that file sent mail themselves. Disables above Save a "
+"copy."
+msgstr ""
 
 msgid "Drafts"
 msgstr "Черновики"
@@ -1443,6 +1503,12 @@ msgstr "Пароль SMTP"
 
 msgid "Test SMTP"
 msgstr "Проверить SMTP"
+
+msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
+msgstr ""
+
+msgid "POP3 accounts have no server folders to save a copy in."
+msgstr ""
 
 msgid "GOA"
 msgstr "GOA"
@@ -2140,6 +2206,33 @@ msgstr ""
 msgid "Signed in as {who}. {terms}"
 msgstr "Выполнен вход как {who}. {terms}"
 
+msgid "Rich text"
+msgstr ""
+
+msgid "Markdown"
+msgstr ""
+
+msgid "HTML"
+msgstr ""
+
+#, fuzzy
+msgid "Plain text"
+msgstr "Вставлять как обычный текст"
+
+msgid "Format as you type, with the toolbar"
+msgstr ""
+
+msgid "Write Markdown; it is sent as formatted mail"
+msgstr ""
+
+#, fuzzy
+msgid "Write the message's HTML by hand"
+msgstr "Печать открытого сообщения"
+
+#, fuzzy
+msgid "No formatting at all"
+msgstr "Очистить форматирование"
+
 msgid "Collapse into reader"
 msgstr "Свернуть в область чтения"
 
@@ -2189,8 +2282,12 @@ msgid "Sign with your OpenPGP key"
 msgstr "Подписать вашим ключом OpenPGP"
 
 #, fuzzy
-msgid "Plain text: send without formatting"
-msgstr "Вставить с форматированием"
+msgid "Preview the formatted message"
+msgstr "Открыть выбранное сообщение"
+
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "Ожидает с {ago}"
 
 msgid "Attach files"
 msgstr "Прикрепить файлы"
@@ -2238,12 +2335,8 @@ msgid "Show Cc, Bcc and Reply-To"
 msgstr "Показать «Копия», «Скрытая копия» и «Адрес для ответа»"
 
 #, fuzzy
-msgid "Send with formatting"
-msgstr "Вставить с форматированием"
-
-#, fuzzy
-msgid "Send as plain text"
-msgstr "Вставлять как обычный текст"
+msgid "Back to the source"
+msgstr "Вернуться к списку сообщений"
 
 msgid "Not signed in"
 msgstr "Вход не выполнен"
@@ -2565,6 +2658,14 @@ msgstr "Вернуться к моим шрифтам и цветам"
 
 msgid "Show the sender's fonts and colours"
 msgstr "Показывать шрифты и цвета отправителя"
+
+#, fuzzy
+msgid "Show remote content"
+msgstr "Всегда загружать удалённое содержимое"
+
+#, fuzzy
+msgid "Block remote content"
+msgstr "Всегда загружать удалённое содержимое"
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -3554,13 +3655,14 @@ msgstr ""
 "предлагает оба варианта."
 
 #, fuzzy
-msgid "Compose in plain text"
-msgstr "Вставлять как обычный текст"
+msgid "Write messages in"
+msgstr "Сортировка сообщений"
 
+#, fuzzy
 msgid ""
-"New messages, replies and forwards start as plain text, sent without "
-"formatting. The composer's Plain text button switches either way for one "
-"message."
+"What new messages, replies and forwards start as. Markdown and HTML are "
+"written as source and sent as formatted mail; plain text is sent without "
+"formatting. The composer's format button switches any one message."
 msgstr ""
 "Новые письма, ответы и пересылаемые сообщения создаются в виде обычного "
 "текста без форматирования. Кнопка «Обычный текст» в редакторе позволяет "
@@ -4359,15 +4461,6 @@ msgstr "Не удалось переместить сообщения ({len}): {
 msgid "Undo failed: {e}"
 msgstr "Не удалось отменить действие: {e}"
 
-msgid "Undo: the messages are no longer where that move put them."
-msgstr "Отмена: сообщения больше не там, куда их переместили."
-
-msgid "Move undone — message restored"
-msgid_plural "Move undone — {n} messages restored"
-msgstr[0] "Перемещение отменено — сообщение восстановлено"
-msgstr[1] "Перемещение отменено — {n} сообщения восстановлены"
-msgstr[2] "Перемещение отменено — {n} сообщений восстановлено"
-
 msgid "Could not delete permanently: {e}"
 msgstr "Не удалось удалить безвозвратно: {e}"
 
@@ -4523,6 +4616,40 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Nothing to undo"
+#~ msgstr "Нечего отменять"
+
+#~ msgid "Undoing move…"
+#~ msgstr "Отменяем перемещение…"
+
+#~ msgid "Undo the last move or delete"
+#~ msgstr "Отменить последнее перемещение или удаление"
+
+#, fuzzy
+#~ msgid "Plain text: send without formatting"
+#~ msgstr "Вставить с форматированием"
+
+#, fuzzy
+#~ msgid "Send with formatting"
+#~ msgstr "Вставить с форматированием"
+
+#, fuzzy
+#~ msgid "Send as plain text"
+#~ msgstr "Вставлять как обычный текст"
+
+#, fuzzy
+#~ msgid "Compose in plain text"
+#~ msgstr "Вставлять как обычный текст"
+
+#~ msgid "Undo: the messages are no longer where that move put them."
+#~ msgstr "Отмена: сообщения больше не там, куда их переместили."
+
+#~ msgid "Move undone — message restored"
+#~ msgid_plural "Move undone — {n} messages restored"
+#~ msgstr[0] "Перемещение отменено — сообщение восстановлено"
+#~ msgstr[1] "Перемещение отменено — {n} сообщения восстановлены"
+#~ msgstr[2] "Перемещение отменено — {n} сообщений восстановлено"
 
 #~ msgid ""
 #~ "Name who wrote and what about in the notification. Turn this off to keep "

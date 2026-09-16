@@ -148,6 +148,10 @@ msgstr "Non lus en premier"
 msgid "Flagged first"
 msgstr "Signalés en premier"
 
+#, fuzzy
+msgid "Create Folder"
+msgstr "Nouveau dossier"
+
 msgid "Added to Contacts"
 msgstr "Ajouté aux contacts"
 
@@ -175,12 +179,6 @@ msgstr ""
 
 msgid "Open a message first, then print it."
 msgstr "Ouvrez d'abord un message, puis imprimez-le."
-
-msgid "Nothing to undo"
-msgstr "Rien à annuler"
-
-msgid "Undoing move…"
-msgstr "Annulation du déplacement…"
 
 msgid "Customize Toolbar…"
 msgstr "Personnaliser la barre d'outils…"
@@ -259,6 +257,10 @@ msgstr "Raccourcis clavier"
 msgid "About"
 msgstr "À propos"
 
+#, fuzzy
+msgid "Remove Tags"
+msgstr "Supprimer la balise"
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System & "
 "Appearance."
@@ -268,6 +270,27 @@ msgstr ""
 
 msgid "Your tags"
 msgstr "Vos balises"
+
+msgid "Delete"
+msgstr "Supprimer"
+
+#, fuzzy
+msgid "Move to {name}"
+msgstr "{name} supprimé?"
+
+#, fuzzy
+msgid "Add Tag {name}"
+msgstr "Adresse e-mail ajoutée à {name}"
+
+#, fuzzy
+msgid "Remove Tag {name}"
+msgstr "{name} supprimé?"
+
+msgid "Undo"
+msgstr ""
+
+msgid "Redo"
+msgstr ""
 
 msgid "Restarting Vireo"
 msgstr "Redémarrage de Vireo"
@@ -295,9 +318,6 @@ msgstr "Afficher le code source"
 msgid "Remove Flag"
 msgstr "Retirer le drapeau"
 
-msgid "Delete"
-msgstr "Supprimer"
-
 msgid "Move to Inbox"
 msgstr "Déplacer vers la boîte de réception"
 
@@ -318,6 +338,14 @@ msgstr "Ajouter une étoile"
 
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
+
+#, fuzzy
+msgid "Block Remote Content"
+msgstr "Bloquer les images distantes"
+
+#, fuzzy
+msgid "Show Remote Content"
+msgstr "Toujours charger le contenu distant"
 
 msgid "Delete {n} messages"
 msgstr "Supprimer {n} messages"
@@ -437,6 +465,10 @@ msgstr ""
 "{foreign} messages n'ont pas été déplacés — les e-mails ne peuvent pas être "
 "déplacés entre différents comptes"
 
+#, fuzzy
+msgid "Move Folder"
+msgstr "Nouveau dossier"
+
 msgid "Vireo couldn’t save your password"
 msgstr "Vireo n'a pas pu enregistrer votre mot de passe"
 
@@ -467,7 +499,14 @@ msgstr "Renommer"
 msgid "A folder named {new_name} is already there."
 msgstr "Un dossier nommé {new_name} existe déjà."
 
-msgid "Its messages are moved to Trash and the folder is removed."
+#, fuzzy
+msgid "Rename Folder"
+msgstr "Renommer le dossier…"
+
+#, fuzzy
+msgid ""
+"Its messages are moved to Trash and the folder is removed from the server. "
+"This cannot be undone."
 msgstr ""
 "Ses messages seront déplacés vers la Corbeille et le dossier sera supprimé."
 
@@ -692,8 +731,12 @@ msgstr "Rédiger"
 msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
-msgid "Undo the last move or delete"
-msgstr "Annuler le dernier déplacement ou la dernière suppression"
+#, fuzzy
+msgid "Undo the last action (also in the main menu)"
+msgstr "Courrier non lu dans le menu de notification"
+
+msgid "Redo it (Ctrl+Y does the same)"
+msgstr ""
 
 msgid "Print the message you are reading"
 msgstr "Imprimer le message en cours de lecture"
@@ -718,6 +761,10 @@ msgstr "Quitter complètement Vireo"
 
 msgid "This list"
 msgstr "Cette liste"
+
+#, fuzzy
+msgid "Unstar"
+msgstr "Installer"
 
 msgid "Save All Attachments"
 msgstr "Enregistrer toutes les pièces jointes"
@@ -1286,9 +1333,12 @@ msgstr ""
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
 
+#, fuzzy
 msgid ""
-"Where sent, deleted and junk mail goes. Automatically follows the server's "
-"own markings; pick a folder when a role isn't detected or lands wrong."
+"Which of this account's folders hold each role. Automatically follows the "
+"server's own markings; pick a folder when a role isn't detected or lands "
+"wrong. Nothing already on the server moves: a role says where mail goes from "
+"now on."
 msgstr ""
 "Là où vont les messages envoyés, supprimés et indésirables. Suit "
 "automatiquement le balisage propre au serveur ; choisissez un dossier "
@@ -1296,6 +1346,17 @@ msgstr ""
 
 msgid "Sent"
 msgstr "Envoyés"
+
+msgid "Save a copy of sent mail in"
+msgstr ""
+
+msgid "Server saves its own copy of sent mail"
+msgstr ""
+
+msgid ""
+"For Gmail and others that file sent mail themselves. Disables above Save a "
+"copy."
+msgstr ""
 
 msgid "Drafts"
 msgstr "Brouillons"
@@ -1441,6 +1502,12 @@ msgstr "Mot de passe SMTP"
 
 msgid "Test SMTP"
 msgstr "Tester le SMTP"
+
+msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
+msgstr ""
+
+msgid "POP3 accounts have no server folders to save a copy in."
+msgstr ""
 
 msgid "GOA"
 msgstr "GOA"
@@ -2137,6 +2204,33 @@ msgstr ""
 msgid "Signed in as {who}. {terms}"
 msgstr "Connecté en tant que {who}. {terms}"
 
+msgid "Rich text"
+msgstr ""
+
+msgid "Markdown"
+msgstr ""
+
+msgid "HTML"
+msgstr ""
+
+#, fuzzy
+msgid "Plain text"
+msgstr "Coller comme texte brut"
+
+msgid "Format as you type, with the toolbar"
+msgstr ""
+
+msgid "Write Markdown; it is sent as formatted mail"
+msgstr ""
+
+#, fuzzy
+msgid "Write the message's HTML by hand"
+msgstr "Imprimer le message en cours de lecture"
+
+#, fuzzy
+msgid "No formatting at all"
+msgstr "Effacer la mise en forme"
+
 msgid "Collapse into reader"
 msgstr "Réduire dans le lecteur"
 
@@ -2185,8 +2279,13 @@ msgstr "Chiffrer avec OpenPGP en utilisant la clé de chaque destinataire"
 msgid "Sign with your OpenPGP key"
 msgstr "Signez avec votre clé OpenPGP"
 
-msgid "Plain text: send without formatting"
-msgstr "Texte brut : envoyer sans formatage"
+#, fuzzy
+msgid "Preview the formatted message"
+msgstr "Ouvrir le message sélectionné"
+
+#, fuzzy
+msgid "Writing in {format}"
+msgstr "En attente depuis {ago}"
 
 msgid "Attach files"
 msgstr "Joindre des fichiers"
@@ -2233,11 +2332,9 @@ msgstr "Plus"
 msgid "Show Cc, Bcc and Reply-To"
 msgstr "Afficher Cc, Cci et Répondre à"
 
-msgid "Send with formatting"
-msgstr "Envoyer avec formatage"
-
-msgid "Send as plain text"
-msgstr "Envoyer en texte brut"
+#, fuzzy
+msgid "Back to the source"
+msgstr "Retour à la liste des messages"
 
 msgid "Not signed in"
 msgstr "Non connecté"
@@ -2559,6 +2656,14 @@ msgstr "Retour à mes polices et couleurs"
 
 msgid "Show the sender's fonts and colours"
 msgstr "Afficher les polices et les couleurs de l'expéditeur"
+
+#, fuzzy
+msgid "Show remote content"
+msgstr "Toujours charger le contenu distant"
+
+#, fuzzy
+msgid "Block remote content"
+msgstr "Toujours charger le contenu distant"
 
 msgid "{n} recipient"
 msgid_plural "{n} recipients"
@@ -3544,13 +3649,15 @@ msgstr ""
 "Désactivé, le collage conserve sa mise en forme. Un clic droit dans "
 "l'éditeur propose toujours les deux options."
 
-msgid "Compose in plain text"
-msgstr "Rédiger en texte brut"
+#, fuzzy
+msgid "Write messages in"
+msgstr "Trier les messages"
 
+#, fuzzy
 msgid ""
-"New messages, replies and forwards start as plain text, sent without "
-"formatting. The composer's Plain text button switches either way for one "
-"message."
+"What new messages, replies and forwards start as. Markdown and HTML are "
+"written as source and sent as formatted mail; plain text is sent without "
+"formatting. The composer's format button switches any one message."
 msgstr ""
 "Les nouveaux messages, réponses et transferts commencent sous forme de texte "
 "brut, envoyé sans formatage. Le bouton Texte brut du compositeur bascule "
@@ -4350,16 +4457,6 @@ msgstr "Impossible de déplacer {len} messages : {e}"
 msgid "Undo failed: {e}"
 msgstr "L'annulation a échoué : {e}"
 
-msgid "Undo: the messages are no longer where that move put them."
-msgstr ""
-"Annulation : les messages ne se trouvent plus là où ce déplacement les avait "
-"placés."
-
-msgid "Move undone — message restored"
-msgid_plural "Move undone — {n} messages restored"
-msgstr[0] "Déplacement annulé — message restauré"
-msgstr[1] "Déplacement annulé — {n} messages restaurés"
-
 msgid "Could not delete permanently: {e}"
 msgstr "Impossible de supprimer définitivement : {e}"
 
@@ -4521,6 +4618,37 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Nothing to undo"
+#~ msgstr "Rien à annuler"
+
+#~ msgid "Undoing move…"
+#~ msgstr "Annulation du déplacement…"
+
+#~ msgid "Undo the last move or delete"
+#~ msgstr "Annuler le dernier déplacement ou la dernière suppression"
+
+#~ msgid "Plain text: send without formatting"
+#~ msgstr "Texte brut : envoyer sans formatage"
+
+#~ msgid "Send with formatting"
+#~ msgstr "Envoyer avec formatage"
+
+#~ msgid "Send as plain text"
+#~ msgstr "Envoyer en texte brut"
+
+#~ msgid "Compose in plain text"
+#~ msgstr "Rédiger en texte brut"
+
+#~ msgid "Undo: the messages are no longer where that move put them."
+#~ msgstr ""
+#~ "Annulation : les messages ne se trouvent plus là où ce déplacement les "
+#~ "avait placés."
+
+#~ msgid "Move undone — message restored"
+#~ msgid_plural "Move undone — {n} messages restored"
+#~ msgstr[0] "Déplacement annulé — message restauré"
+#~ msgstr[1] "Déplacement annulé — {n} messages restaurés"
 
 #~ msgid ""
 #~ "Name who wrote and what about in the notification. Turn this off to keep "
