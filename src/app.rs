@@ -3972,7 +3972,9 @@ impl SimpleComponent for AppModel {
                 // it without a keyboard, since the keys cannot be injected
                 // on this desktop. Pair with VIREO_SHOWCASE_REPLY.
                 // Set it to markdown, html or plain to walk a source-mode
-                // body (a textarea) instead of the rich document.
+                // body (a textarea) instead of the rich document, to
+                // `backspace` to trim text rather than type it, or to
+                // `pause` to leave a long gap between two runs of typing.
                 if let Ok(which) = std::env::var("VIREO_SHOWCASE_COMPOSE_UNDO") {
                     let format = match which.as_str() {
                         "markdown" => Some(config::ComposeFormat::Markdown),

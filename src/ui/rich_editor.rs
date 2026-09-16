@@ -533,6 +533,14 @@ impl RichEditor {
         self.webview.execute_editing_command(webkit6::EDITING_COMMAND_REDO);
     }
 
+    /// Run any WebCore editing command against the document ("DeleteBackward",
+    /// "InsertParagraph", …). The widget API is the only route to them that
+    /// reaches the page's own history — the same reason [`RichEditor::undo`]
+    /// cannot go through `execCommand`.
+    pub fn editing_command(&self, command: &str) {
+        self.webview.execute_editing_command(command);
+    }
+
     /// Whether the body has anything left to take back. Read from the
     /// mirrored editor state, so it is a main-loop pass or two behind a
     /// command just issued — a host must treat "still true" right after
@@ -1105,6 +1113,61 @@ fn prompt_link(webview: &webkit6::WebView, anchor: &gtk::Button) {
 /// mode lets WebKit's native paste keep the formatting, linkifying only
 /// pastes that carry no HTML at all. Lives in `<head>` (not the editable
 /// body) so it never becomes part of the message.
+/// Cuts the body's text history into steps a person would recognise.
+///
+/// WebKit folds a whole run of typing into one undo step — and folds the
+/// deletes that follow into that same step, so Backspace was nothing Ctrl+Z
+/// could take back on its own, and a paragraph written over several minutes
+/// came back all at once. Its history can be stepped but not shaped from
+/// outside, and there is no API for "end the current step"; the one thing
+/// that closes an open typing command is the selection changing. Re-setting
+/// the selection to exactly where it already is does that and nothing else:
+/// the caret does not move and no content is touched. (`Unselect` closes the
+/// run too, but drops the caret and with it the next keystroke; blur/focus
+/// works and is heavier than it needs to be.)
+///
+/// The run is closed when the kind of edit changes — typing to deleting or
+/// back — and after a pause long enough that what follows is a new thought.
+/// An IME composition is left alone: its own events flip between inserting
+/// and deleting while a character is being built, and a break mid-word would
+/// cut a single character into pieces.
+///
+/// Serves the source-mode document too, where the editable is a `<textarea>`
+/// and the same close is `setSelectionRange` to the selection it already has.
+const HISTORY_SCRIPT: &str = r#"<script>
+(function(){
+  /* How long a hand can rest before the next words are a step of their own. */
+  var PAUSE_MS = 5000;
+  var kind = null, timer = null, composing = false;
+  document.addEventListener('compositionstart', function(){ composing = true; }, true);
+  document.addEventListener('compositionend', function(){ composing = false; }, true);
+  function closeRun(){
+    var el = document.activeElement;
+    if(el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')){
+      try{
+        el.setSelectionRange(el.selectionStart, el.selectionEnd, el.selectionDirection);
+      }catch(_){}
+      return;
+    }
+    var sel = getSelection();
+    if(!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0).cloneRange();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  /* beforeinput, not input: the run has to be closed while the edit that
+     starts the next one is still pending, or it lands in the old step. */
+  document.addEventListener('beforeinput', function(e){
+    if(composing) return;
+    var now = /^delete/.test(e.inputType || '') ? 'delete' : 'insert';
+    if(kind !== null && now !== kind) closeRun();
+    kind = now;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ closeRun(); kind = null; }, PAUSE_MS);
+  }, true);
+})();
+</script>"#;
+
 const PASTE_SCRIPT: &str = r#"<script>
 (function(){
   window.__vireoPasteOnce = null;
@@ -1620,7 +1683,7 @@ fn document(content: &str, webview: &webkit6::WebView) -> String {
     let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
     let paste_rich = !crate::config::load_paste_plain();
     let script = format!(
-        "<script>window.__vireoPasteRich={paste_rich};</script>{PASTE_SCRIPT}"
+        "<script>window.__vireoPasteRich={paste_rich};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}"
     );
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\">\
@@ -1697,7 +1760,7 @@ fn source_document(text: &str, webview: &webkit6::WebView) -> String {
            }});\
            t.focus();t.setSelectionRange(0,0);\
          }})();\
-         </script></body></html>",
+         </script>{HISTORY_SCRIPT}</body></html>",
         text = html_escape_text(text)
     )
 }

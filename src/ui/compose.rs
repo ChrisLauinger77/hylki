@@ -2294,32 +2294,66 @@ impl Compose {
         } else {
             "document.body.focus();"
         };
-        match step {
-            0 => {
-                // The widget has to hold focus, not just the document, or
-                // the window's own Undo entry never changes hands.
-                self.editor.grab_focus();
-                self.editor
-                    .run_js(&format!("{focus_js}document.execCommand('insertText',false,'ONE')"));
-            }
-            1 => {
-                let path = std::env::temp_dir().join("vireo-undo-probe.txt");
-                let _ = std::fs::write(&path, b"probe");
-                sender.input(ComposeInput::AddAttachments(vec![path]));
-            }
-            2 => self
-                .editor
-                .run_js(&format!("{focus_js}document.execCommand('insertText',false,'TWO')")),
-            3..=8 => sender.input(ComposeInput::History { redo: false }),
-            9..=11 => sender.input(ComposeInput::History { redo: true }),
-            _ => {}
+        // VIREO_SHOWCASE_COMPOSE_UNDO=backspace trims the body with the
+        // Backspace key's own editing command instead of typing into it,
+        // which is how a reply is usually cut down to size.
+        let mode = std::env::var("VIREO_SHOWCASE_COMPOSE_UNDO").unwrap_or_default();
+        let deleting = mode == "backspace";
+        // `pause` leaves more than the script's PAUSE_MS between two runs of
+        // typing, so each should come back on a press of its own.
+        let pausing = mode == "pause";
+        let type_in = |editor: &RichEditor, text: &str| {
+            editor.run_js(&format!("{focus_js}document.execCommand('insertText',false,'{text}')"));
+        };
+        let attach = |sender: &ComponentSender<Self>| {
+            let path = std::env::temp_dir().join("vireo-undo-probe.txt");
+            let _ = std::fs::write(&path, b"probe");
+            sender.input(ComposeInput::AddAttachments(vec![path]));
+        };
+        if step == 0 {
+            // The widget has to hold focus, not just the document, or the
+            // window's own Undo entry never changes hands.
+            self.editor.grab_focus();
+            self.editor.run_js(focus_js);
         }
-        if step > 12 {
+        if deleting {
+            // Something to delete first — a caret at the top of a fresh
+            // reply has nothing behind it, and Backspace there is a no-op
+            // that rightly leaves no step to take back.
+            match step {
+                0 => type_in(&self.editor, "ONETWO"),
+                1..=3 => self.editor.editing_command("DeleteBackward"),
+                4 => attach(&sender),
+                5..=9 => sender.input(ComposeInput::History { redo: false }),
+                10..=12 => sender.input(ComposeInput::History { redo: true }),
+                _ => {}
+            }
+        } else if pausing {
+            match step {
+                0 => type_in(&self.editor, "ONE"),
+                1 => {}                       // the long wait below
+                2 => type_in(&self.editor, "TWO"),
+                3..=6 => sender.input(ComposeInput::History { redo: false }),
+                7..=9 => sender.input(ComposeInput::History { redo: true }),
+                _ => {}
+            }
+        } else {
+            match step {
+                0 => type_in(&self.editor, "ONE"),
+                1 => attach(&sender),
+                2 => type_in(&self.editor, "TWO"),
+                3..=8 => sender.input(ComposeInput::History { redo: false }),
+                9..=11 => sender.input(ComposeInput::History { redo: true }),
+                _ => {}
+            }
+        }
+        if step > 13 {
             return;
         }
         let s = sender.clone();
         let editor = self.editor.clone();
-        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(700), move || {
+        let gap = if pausing && step == 1 { 7000 } else { 700 };
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(gap), move || {
             let report = move |body: String| {
                 tracing::info!(target: "vireo::compose::undo", "step {step}: body {body:?}");
                 s.input(ComposeInput::ShowcaseHistory(step + 1));
