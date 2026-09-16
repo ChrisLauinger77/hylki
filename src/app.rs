@@ -12248,7 +12248,11 @@ impl AppModel {
         // In-flow (not overlay) slot: no click-swallowing to disarm. Settle
         // any running slide, then remember the height the user dragged the
         // panel to before it goes.
-        if let Some(prev) = self.split_close_anim.borrow_mut().take() {
+        // Taken out of the cell before it is skipped: `if let` holds the
+        // temporary `borrow_mut` guard alive for its whole body, and
+        // skipping emits `done`, whose handler reaches for this same cell.
+        let prev_anim = self.split_close_anim.borrow_mut().take();
+        if let Some(prev) = prev_anim {
             prev.skip();
         }
         if self.reader_split_top.is_visible() && self.reader_split_top.child().is_some() {
@@ -12307,7 +12311,11 @@ impl AppModel {
         let Some(wrap) = slot.child() else { return };
         // Settle any running slide first, so the height saved below is the
         // real one and not a mid-animation reading.
-        if let Some(prev) = self.split_close_anim.borrow_mut().take() {
+        // Taken out of the cell before it is skipped: `if let` holds the
+        // temporary `borrow_mut` guard alive for its whole body, and
+        // skipping emits `done`, whose handler reaches for this same cell.
+        let prev_anim = self.split_close_anim.borrow_mut().take();
+        if let Some(prev) = prev_anim {
             prev.skip();
         }
         if slot.is_visible() {
