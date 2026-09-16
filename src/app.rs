@@ -882,6 +882,12 @@ pub struct AppModel {
     /// make, so the menu never offers to archive a message while someone is
     /// typing into a reply.
     compose_history: (Option<String>, Option<String>),
+    /// Whether focus was last in that composer. Not read live, because
+    /// opening a menu takes focus into the menu: the burger's own entries
+    /// would then be labelled and greyed for whoever is *not* about to act,
+    /// which is backwards — the popover is how the entries get read at all.
+    /// Moves into a popover leave this where it was.
+    compose_focused: bool,
     /// The burger menu's Undo/Redo section, relabelled as the stacks change.
     undo_menu: gtk::gio::Menu,
     /// Their actions, kept so they can be greyed out when there is nothing
@@ -1292,6 +1298,9 @@ pub enum AppMsg {
     /// Showcase only (VIREO_SHOWCASE_COMPOSE_UNDO): drive the inline
     /// composer's history through a scripted round of edits and undos.
     ShowcaseComposeUndo,
+    /// Showcase only: open the window's burger menu, to read its Undo and
+    /// Redo entries in the state they are actually seen in.
+    ShowcaseBurger,
     /// Showcase only: put the inline composer into this composing format
     /// first, so the same round runs over a source-mode body.
     ShowcaseComposeFormat(config::ComposeFormat),
@@ -2620,6 +2629,7 @@ impl SimpleComponent for AppModel {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             compose_history: (None, None),
+            compose_focused: false,
             carried_bodies: HashMap::new(),
             remote_override: HashMap::new(),
             carried_threads: HashMap::new(),
@@ -3991,6 +4001,12 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(7, move || {
                         s.input(AppMsg::ShowcaseComposeUndo);
+                    });
+                    // …and drop the burger menu open over it near the end,
+                    // which is the state the entries are actually read in.
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(18, move || {
+                        s.input(AppMsg::ShowcaseBurger);
                     });
                 }
                 // VIREO_SHOWCASE_FILES=/a:/b hands those files in at 4 s,
@@ -6466,7 +6482,17 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::FocusMoved => self.refresh_undo_menu(),
+            AppMsg::FocusMoved => {
+                // A menu or popover taking focus is not focus leaving the
+                // composer — it is how its Undo entry is reached.
+                if focus_is_settled(&self.window) {
+                    let now = focus_in_compose(&self.window);
+                    if now != self.compose_focused {
+                        self.compose_focused = now;
+                        self.refresh_undo_menu();
+                    }
+                }
+            }
 
 
             AppMsg::SetComposeInline(on) => {
@@ -6655,6 +6681,11 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowcaseComposeUndo => {
                 if let Some(r) = self.reader_compose.as_ref() {
                     r.controller.emit(ComposeInput::ShowcaseHistory(0));
+                }
+            }
+            AppMsg::ShowcaseBurger => {
+                if let Some(m) = self.sidebar_menu.as_ref() {
+                    m.popup();
                 }
             }
             AppMsg::ShowcaseComposeFormat(format) => {
@@ -9601,9 +9632,7 @@ impl AppModel {
     /// The inline composer, while it holds keyboard focus: whoever the
     /// window's Undo and Redo belong to at this moment.
     fn focused_compose(&self) -> Option<&ReaderCompose> {
-        self.reader_compose
-            .as_ref()
-            .filter(|r| r.window.is_none() && focus_in_compose(&self.window))
+        self.reader_compose.as_ref().filter(|r| r.window.is_none() && self.compose_focused)
     }
 
     /// Ctrl+Z / Ctrl+Shift+Z: take the top of one stack, apply it, and put
@@ -9880,6 +9909,19 @@ impl AppModel {
             "win.redo",
             "<Control><Shift>z",
         ));
+        if std::env::var_os("VIREO_SHOWCASE_COMPOSE_UNDO").is_some() {
+            let mut chain = Vec::new();
+            let mut node = gtk::prelude::GtkWindowExt::focus(&self.window);
+            while let Some(w) = node {
+                chain.push(format!("{}", w.type_()));
+                node = w.parent();
+            }
+            tracing::info!(
+                target: "vireo::compose::undo",
+                "menu: composing={composing} undo={undo_what:?} redo={redo_what:?} focus=[{}]",
+                chain.join(" < ")
+            );
+        }
         if let Some(a) = &self.undo_action {
             a.set_enabled(undo_what.is_some());
         }
@@ -12626,6 +12668,7 @@ impl AppModel {
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
         self.compose_history = (None, None);
+        self.compose_focused = false;
         self.refresh_undo_menu();
     }
 
@@ -12637,6 +12680,7 @@ impl AppModel {
             return;
         };
         self.compose_history = (None, None);
+        self.compose_focused = false;
         match r.window {
             Some(window) => {
                 self.composers.push(ComposeHost { id: r.id, controller: r.controller, window });
@@ -16209,6 +16253,27 @@ fn focus_is_text(window: &adw::ApplicationWindow) -> bool {
 
 /// Whether keyboard focus sits inside a composer — whose editor must keep
 /// Ctrl+Z for its own text undo.
+/// Whether the focused widget is somewhere focus has actually come to rest,
+/// rather than a menu or popover that has borrowed it for as long as it is
+/// on screen — or a widget not yet in the window at all, which is what a
+/// menu item looks like for the first moments after it is built.
+fn focus_is_settled(window: &adw::ApplicationWindow) -> bool {
+    let Some(focus) = gtk::prelude::GtkWindowExt::focus(window) else {
+        return false;
+    };
+    let mut node = Some(focus);
+    while let Some(widget) = node {
+        if widget.is::<gtk::Popover>() {
+            return false;
+        }
+        if widget.is::<gtk::Window>() {
+            return true;
+        }
+        node = widget.parent();
+    }
+    false
+}
+
 fn focus_in_compose(window: &adw::ApplicationWindow) -> bool {
     let mut w = gtk::prelude::GtkWindowExt::focus(window);
     while let Some(cur) = w {
