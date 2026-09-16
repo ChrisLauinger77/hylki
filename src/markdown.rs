@@ -1605,6 +1605,25 @@ mod tests {
         has(&clean, "checked");
     }
 
+    /// The whole outgoing path, as the composer runs it: render, then
+    /// sanitize. What a recipient would notice going missing has to
+    /// survive both halves.
+    #[test]
+    fn the_send_path_keeps_what_the_recipient_would_notice() {
+        let src = "# Update\n\n| Item | Cost |\n| --- | ---: |\n| Chair | 40 |\n\n==Read this== and see https://example.com/x\n\n- [x] ordered\n- [ ] paid\n\n```sh\necho hi\n```";
+        let out = sanitize_outgoing(&to_html(src));
+        has(&out, "<h1>Update</h1>");
+        has(&out, "border-collapse");
+        has(&out, "text-align: right");
+        has(&out, "background:#fff3a3");
+        has(&out, "href=\"https://example.com/x\"");
+        has(&out, "type=\"checkbox\"");
+        has(&out, "echo hi");
+        // And the plain-text alternative is the source itself, which the
+        // composer sends unchanged.
+        assert!(src.contains("==Read this=="));
+    }
+
     #[test]
     fn pretty_html_breaks_blocks_but_not_code() {
         let out = pretty_html("<p>one</p><p>two</p><pre><code>a\nb</code></pre>");
