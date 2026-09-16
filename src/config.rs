@@ -993,7 +993,7 @@ struct PrivacyFile {
     /// composer the way this one was left.
     #[serde(default)]
     compose_plain: bool,
-    /// What new messages are written in (#199): rich text, Markdown, HTML
+    /// What new messages are written in: rich text, Markdown, HTML
     /// source, or plain text. Absent on installs that predate the choice,
     /// where `compose_plain` above still says which of the two it is.
     #[serde(default)]
@@ -2215,7 +2215,7 @@ pub fn load_plain_style() -> (bool, String) {
     (p.plain_monospace, p.plain_font)
 }
 
-/// What a message is written in (#199). Rich text is the WYSIWYG editor;
+/// What a message is written in. Rich text is the WYSIWYG editor;
 /// Markdown and HTML are source views that are converted on the way out;
 /// plain text sends no HTML part at all.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -2235,7 +2235,7 @@ impl ComposeFormat {
     }
 }
 
-/// What new messages start out as (#199), falling back to the plain-text
+/// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
 pub fn load_compose_format() -> ComposeFormat {
     let p = load_privacy();

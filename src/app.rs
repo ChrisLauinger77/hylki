@@ -1267,9 +1267,9 @@ pub enum AppMsg {
     SetPlainFont(String),
     /// Settings: new messages start as plain text (#180).
     SetComposeFormat(crate::config::ComposeFormat),
-    /// Showcase only: turn the inline composer's preview on (#199).
+    /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
-    /// Showcase only: open the inline composer's overflow menu (#199).
+    /// Showcase only: open the inline composer's overflow menu.
     ShowcaseComposeMenu,
     /// Fetch a message's body again: its OpenPGP verdict changed (#133).
     ReloadBody(Box<crate::models::Message>),
@@ -3912,12 +3912,12 @@ impl SimpleComponent for AppModel {
                     });
                 }
                 // VIREO_SHOWCASE_COMPOSE_PREVIEW=1 turns the inline
-                // composer's preview on a beat after it opens (#199), so a
+                // composer's preview on a beat after it opens, so a
                 // capture can show the rendered message rather than the
                 // source it was written in.
                 // VIREO_SHOWCASE_COMPOSE_MENU=1 opens the inline composer's
                 // overflow menu, where a narrow pane keeps the format
-                // chooser (#199).
+                // chooser.
                 if std::env::var("VIREO_SHOWCASE_COMPOSE_MENU").is_ok() {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {

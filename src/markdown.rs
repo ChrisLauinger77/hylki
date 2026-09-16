@@ -1,4 +1,4 @@
-//! Markdown for the composer (#199): the source a message is written in,
+//! Markdown for the composer: the source a message is written in,
 //! turned into the HTML that goes on the wire, and back again.
 //!
 //! The dialect is the one <https://www.markdownguide.org/> documents —

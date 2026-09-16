@@ -26,7 +26,7 @@ fn sig_html(sig: &str) -> String {
     format!("<div class=\"vireo-sig\"><br>-- <br>{body}</div>")
 }
 
-/// The signature as it reads in a source-mode body (#199): Markdown under
+/// The signature as it reads in a source-mode body: Markdown under
 /// its `-- ` line, or the same HTML block the rich editor holds.
 fn sig_source(kind: SourceKind, sig: &str) -> String {
     if sig.is_empty() {
@@ -218,7 +218,7 @@ pub struct ComposeInit {
     /// subject row and shows just the editor — popping out to a window brings
     /// the full fields back.
     pub compact: bool,
-    /// What the message is written in (#199): rich text, Markdown, HTML
+    /// What the message is written in: rich text, Markdown, HTML
     /// source, or plain text.
     pub format: ComposeFormat,
 }
@@ -269,7 +269,7 @@ pub struct Compose {
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
-    /// What this message is written in (#199). Plain text hides the
+    /// What this message is written in. Plain text hides the
     /// formatting toolbar and sends no HTML part (#180); Markdown and HTML
     /// are written as source and converted on the way out.
     format: ComposeFormat,
@@ -327,13 +327,13 @@ pub enum ComposeInput {
     DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
     ToggleSign(bool),
-    /// Pick what this message is written in (#199).
+    /// Pick what this message is written in.
     SetFormat(ComposeFormat),
     /// The header's format button: the four formats as a menu.
     FormatMenu,
     /// The body came back for a format change; put it in the new one.
     LoadAs { from: ComposeFormat, to: ComposeFormat, body: String },
-    /// Show or hide the rendered preview of a source message (#199).
+    /// Show or hide the rendered preview of a source message.
     TogglePreview(bool),
     /// The source came back for the preview; render it.
     ShowPreview(String),
@@ -558,7 +558,7 @@ impl Component for Compose {
                             sender.input(ComposeInput::ToggleSign(b.is_active()));
                         },
                     },
-                    // Preview (#199): what the message will look like,
+                    // Preview: what the message will look like,
                     // for the formats that are written as source.
                     #[name = "preview_btn"]
                     pack_end = &gtk::ToggleButton {
@@ -570,7 +570,7 @@ impl Component for Compose {
                             sender.input(ComposeInput::TogglePreview(b.is_active()));
                         },
                     },
-                    // What this message is written in (#199). The button
+                    // What this message is written in. The button
                     // wears the current format and opens the other three.
                     #[name = "format_btn"]
                     pack_end = &gtk::Button {

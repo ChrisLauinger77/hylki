@@ -15,16 +15,16 @@ pub struct RichEditor {
     pub widget: gtk::Box,
     webview: webkit6::WebView,
     /// The formatting toolbar, hidden while a message is composed as plain
-    /// text (#180) or as source (#199).
+    /// text (#180) or as source.
     toolbar: gtk::Box,
-    /// Swaps the editor for the rendered preview of a source message (#199).
+    /// Swaps the editor for the rendered preview of a source message.
     stack: gtk::Stack,
     /// The preview view, built the first time a preview is asked for: a
     /// second WebView per composer is not something to open speculatively
     /// (issue #106).
     preview: std::rc::Rc<std::cell::RefCell<Option<webkit6::WebView>>>,
     /// Which source language the editor currently holds, if it is in source
-    /// mode rather than rich mode (#199).
+    /// mode rather than rich mode.
     source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>>,
     /// Where "Send as Attachment Instead" delivers the lifted image, as a
     /// temp-file path the host adds to its attachment list. Set by the host
@@ -36,7 +36,7 @@ pub struct RichEditor {
     _theme_handler: std::rc::Rc<ThemeHandlerGuard>,
 }
 
-/// What a source-mode editor is holding (#199). Rich text is the absence of
+/// What a source-mode editor is holding. Rich text is the absence of
 /// both.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceKind {
@@ -440,7 +440,7 @@ impl RichEditor {
             .load_html(&document(content, &self.webview), Some("https://vireo.localhost/editor"));
     }
 
-    /// Put the editor into source mode (#199) holding `text`: a monospace
+    /// Put the editor into source mode holding `text`: a monospace
     /// plain-text surface with no formatting toolbar, which the composer
     /// converts on the way out.
     pub fn set_source(&self, kind: SourceKind, text: &str) {
@@ -1492,7 +1492,7 @@ fn document(content: &str, webview: &webkit6::WebView) -> String {
     )
 }
 
-/// The source-mode document (#199): one textarea filling the view, in the
+/// The source-mode document: one textarea filling the view, in the
 /// same ground as the rich editor so switching format does not change the
 /// look of the pane. A textarea, rather than a plain-text `contenteditable`,
 /// because what comes back out has to be exactly what was typed — no
