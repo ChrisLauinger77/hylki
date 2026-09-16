@@ -279,6 +279,12 @@ impl UndoStep {
     }
 }
 
+/// How long after an action its undo still repaints the list itself rather
+/// than waiting for the server (#200). Long enough to cover "that was a
+/// mistake", short enough that the rows it puts back are still what is
+/// there — past this, another client or a sync may have moved on.
+const INSTANT_UNDO: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// One entry on the undo (or redo) stack: the step to apply, and what the
 /// user called the action it belongs to, so the menu can say "Undo Archive"
 /// rather than just "Undo".
@@ -286,6 +292,14 @@ struct UndoEntry {
     account_id: u32,
     what: String,
     step: UndoStep,
+    /// When the action happened, for the [`INSTANT_UNDO`] window.
+    at: std::time::Instant,
+    /// The rows a move took off screen, kept whole (bodies included) so a
+    /// quick undo can put them straight back without a round trip.
+    rows: Vec<Message>,
+    /// Whether applying this entry puts `rows` back on screen (undoing a
+    /// move) or takes them away again (redoing it).
+    rows_return: bool,
 }
 
 struct ReaderCompose {
@@ -9169,18 +9183,10 @@ impl AppModel {
         account_id: u32,
         moved_to: &str,
         restore_to: &str,
-        message_ids: Vec<String>,
+        rows: Vec<Message>,
     ) {
-        let ids: Vec<String> = message_ids.into_iter().filter(|i| !i.is_empty()).collect();
-        if ids.is_empty() {
-            return;
-        }
         let what = self.move_label(account_id, moved_to);
-        self.push_undo(account_id, what, UndoStep::Move {
-            from: moved_to.to_string(),
-            to: restore_to.to_string(),
-            message_ids: ids,
-        });
+        self.push_undo_move_as(account_id, what, moved_to, restore_to, rows);
     }
 
     /// [`push_undo_move`], for the moves whose destination doesn't name them:
@@ -9191,16 +9197,41 @@ impl AppModel {
         what: String,
         moved_to: &str,
         restore_to: &str,
-        message_ids: Vec<String>,
+        rows: Vec<Message>,
     ) {
-        let ids: Vec<String> = message_ids.into_iter().filter(|i| !i.is_empty()).collect();
-        if ids.is_empty() {
+        // A message with no Message-ID can't be found again on the server, so
+        // it can't be part of the step — and a step of nothing isn't undoable.
+        let rows: Vec<Message> = rows.into_iter().filter(|m| !m.message_id.is_empty()).collect();
+        if rows.is_empty() {
             return;
         }
-        self.push_undo(account_id, what, UndoStep::Move {
-            from: moved_to.to_string(),
-            to: restore_to.to_string(),
-            message_ids: ids,
+        let ids: Vec<String> = rows.iter().map(|m| m.message_id.clone()).collect();
+        // Keep each row's body with it. The reader renders from the message's
+        // own body before it looks anywhere else, so a restored row opens
+        // instantly instead of asking the server for a UID the move has
+        // already retired.
+        let rows: Vec<Message> = rows
+            .into_iter()
+            .map(|mut m| {
+                if m.body.is_empty() {
+                    if let Some(body) = self.body_cache.get(&(account_id, m.id)) {
+                        m.body = body.clone();
+                    }
+                }
+                m
+            })
+            .collect();
+        self.push_undo_entry(UndoEntry {
+            account_id,
+            what,
+            step: UndoStep::Move {
+                from: moved_to.to_string(),
+                to: restore_to.to_string(),
+                message_ids: ids,
+            },
+            at: std::time::Instant::now(),
+            rows,
+            rows_return: true,
         });
     }
 
@@ -9241,7 +9272,18 @@ impl AppModel {
     /// Record one reversible action (#200). The step is what *undoes* it.
     /// A new action ends whatever redo branch was open, as undo histories do.
     fn push_undo(&mut self, account_id: u32, what: String, step: UndoStep) {
-        self.undo_stack.push(UndoEntry { account_id, what, step });
+        self.push_undo_entry(UndoEntry {
+            account_id,
+            what,
+            step,
+            at: std::time::Instant::now(),
+            rows: Vec::new(),
+            rows_return: true,
+        });
+    }
+
+    fn push_undo_entry(&mut self, entry: UndoEntry) {
+        self.undo_stack.push(entry);
         self.redo_stack.clear();
         self.refresh_undo_menu();
     }
@@ -9257,7 +9299,18 @@ impl AppModel {
             account_id: entry.account_id,
             what: entry.what.clone(),
             step: entry.step.inverse(),
+            // The window restarts: whatever the state is now, it is current.
+            at: std::time::Instant::now(),
+            rows: entry.rows.clone(),
+            rows_return: !entry.rows_return,
         };
+        // Repaint the list now rather than a few round trips from now, while
+        // the rows we took off it are still known to be what is there (#200).
+        // The server request still goes out; its reload lands behind this and
+        // replaces these rows with the real ones, UIDs and all.
+        if entry.at.elapsed() <= INSTANT_UNDO && !entry.rows.is_empty() {
+            self.instant_move(&entry);
+        }
         // A step that could not be carried out is dropped rather than put
         // back: leaving it on top would jam the key on something that will
         // fail again every time. The entries under it are usually about other
@@ -9270,6 +9323,79 @@ impl AppModel {
             }
         }
         self.refresh_undo_menu();
+    }
+
+    /// Put a move's rows back on screen (or take them away again), without
+    /// waiting for the server (#200). Only ever called inside the
+    /// [`INSTANT_UNDO`] window, where the rows are still the truth.
+    fn instant_move(&mut self, entry: &UndoEntry) {
+        let UndoStep::Move { from, to, .. } = &entry.step else { return };
+        let account_id = entry.account_id;
+        // The folder the rows are in right now: where the step will put them
+        // when it is returning them, and where it will take them from when it
+        // is not.
+        let here = if entry.rows_return { to } else { from };
+        let Some(folder_id) = self
+            .folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| &f.path == here))
+            .map(|f| f.id)
+        else {
+            return;
+        };
+        if !entry.rows_return {
+            // Redoing the move: take the rows off the list again, using the
+            // copies the caches hold now — a reload may have landed since,
+            // and those carry the UIDs the next action will need.
+            for row in &entry.rows {
+                let current = self
+                    .message_cache
+                    .get(&(account_id, folder_id))
+                    .and_then(|ms| ms.iter().find(|c| c.message_id == row.message_id).cloned());
+                if let Some(m) = current {
+                    self.discard_message(&m);
+                }
+            }
+            return;
+        }
+        let known: std::collections::HashSet<String> = self
+            .message_cache
+            .get(&(account_id, folder_id))
+            .map(|ms| ms.iter().map(|m| m.message_id.clone()).collect())
+            .unwrap_or_default();
+        let mut added = false;
+        for row in &entry.rows {
+            // The reload may have beaten us to it, or the user may have
+            // pressed twice; either way the row is already there.
+            if known.contains(&row.message_id) {
+                continue;
+            }
+            let mut m = row.clone();
+            // Folder ids are positional and shift as folders come and go.
+            m.folder_id = folder_id;
+            if m.unread {
+                *self.folder_unread.entry((account_id, folder_id)).or_default() += 1;
+            }
+            if self.is_unified_target(account_id, folder_id) {
+                self.unified_slices.entry((account_id, folder_id)).or_default().push(m.clone());
+            }
+            self.message_cache.entry((account_id, folder_id)).or_default().push(m);
+            added = true;
+        }
+        if !added {
+            return;
+        }
+        for key in [(account_id, folder_id)] {
+            if let Some(ms) = self.message_cache.get_mut(&key) {
+                ms.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            }
+            if let Some(ms) = self.unified_slices.get_mut(&key) {
+                ms.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            }
+        }
+        self.forget_threads(account_id);
+        self.refresh_list_display();
+        self.push_unread_counts();
     }
 
     /// Carry out one step. Returns false when it could not be done at all
@@ -9356,15 +9482,27 @@ impl AppModel {
             Some(e) => format!("{verb} {}", e.what),
             None => verb.to_string(),
         };
+        // The shortcut is shown with the "accel" attribute rather than a real
+        // accelerator: registering one would have GTK match Ctrl+Z before the
+        // keystroke reached whatever has focus, taking text undo away from
+        // entries and the composer. The key handler keeps that distinction,
+        // and this only draws the reminder next to the entry.
+        let item = |text: String, action: &str, accel: &str| {
+            let item = gtk::gio::MenuItem::new(Some(&text), Some(action));
+            item.set_attribute_value("accel", Some(&accel.to_variant()));
+            item
+        };
         self.undo_menu.remove_all();
-        self.undo_menu.append(
-            Some(label(&i18n("Undo"), self.undo_stack.last()).as_str()),
-            Some("win.undo"),
-        );
-        self.undo_menu.append(
-            Some(label(&i18n("Redo"), self.redo_stack.last()).as_str()),
-            Some("win.redo"),
-        );
+        self.undo_menu.append_item(&item(
+            label(&i18n("Undo"), self.undo_stack.last()),
+            "win.undo",
+            "<Control>z",
+        ));
+        self.undo_menu.append_item(&item(
+            label(&i18n("Redo"), self.redo_stack.last()),
+            "win.redo",
+            "<Control><Shift>z",
+        ));
         if let Some(a) = &self.undo_action {
             a.set_enabled(!self.undo_stack.is_empty());
         }
@@ -12379,7 +12517,7 @@ impl AppModel {
         if src == dest {
             return; // already in that folder
         }
-        self.push_undo_move(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move(m.account_id, &dest, &src, vec![m.clone()]);
         self.send_to(m.account_id, MailRequest::MoveMessage { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -12391,7 +12529,7 @@ impl AppModel {
     /// when the drag started in the unified inbox — stays put and is reported
     /// rather than silently dropped.
     fn drop_move(&mut self, dest_account: u32, dest: String, items: Vec<(u32, u32, u32, u32)>) {
-        let mut groups: HashMap<String, (Vec<u32>, Vec<String>)> = HashMap::new();
+        let mut groups: HashMap<String, (Vec<u32>, Vec<Message>)> = HashMap::new();
         let mut removed_ids: Vec<u32> = Vec::new();
         let mut foreign = 0usize;
         for (aid, fid, uid, id) in items {
@@ -12415,13 +12553,14 @@ impl AppModel {
             if src == dest {
                 continue; // already in that folder
             }
-            let message_id = cached.as_ref().map(|m| m.message_id.clone()).unwrap_or_default();
             if let Some(m) = &cached {
                 self.discard_message_local(m);
             }
             let slot = groups.entry(src).or_default();
             slot.0.push(uid);
-            slot.1.push(message_id);
+            // A row with no cached message is moved, but not recorded: there
+            // is nothing to find it by, and nothing to put back on the list.
+            slot.1.extend(cached);
             removed_ids.push(id);
         }
         if foreign > 0 {
@@ -12439,8 +12578,8 @@ impl AppModel {
             return;
         }
         self.bulk_pending += groups.len();
-        for (src, (uids, message_ids)) in groups {
-            self.push_undo_move(dest_account, &dest, &src, message_ids);
+        for (src, (uids, rows)) in groups {
+            self.push_undo_move(dest_account, &dest, &src, rows);
             self.send_to(
                 dest_account,
                 MailRequest::MoveMessages { path: src, uids, dest: dest.clone() },
@@ -13011,7 +13150,7 @@ impl AppModel {
             });
             return;
         };
-        self.push_undo_move(m.account_id, &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move(m.account_id, &dest, &src, vec![m.clone()]);
         self.send_to(m.account_id, MailRequest::MarkSpam { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -13030,7 +13169,7 @@ impl AppModel {
             });
             return;
         };
-        self.push_undo_move_as(m.account_id, i18n("Not Spam"), &dest, &src, vec![m.message_id.clone()]);
+        self.push_undo_move_as(m.account_id, i18n("Not Spam"), &dest, &src, vec![m.clone()]);
         self.send_to(m.account_id, MailRequest::MarkHam { path: src, uid: m.uid, dest });
         self.discard_message(&m);
     }
@@ -14305,9 +14444,9 @@ impl AppModel {
             | BulkAction::Flag
             | BulkAction::Unflag => return,
         };
-        // (account, source path) → (dest path, uids, Message-IDs for undo).
+        // (account, source path) → (dest path, uids, the rows for undo).
         // dest is per-account.
-        let mut groups: HashMap<(u32, String), (String, Vec<u32>, Vec<String>)> =
+        let mut groups: HashMap<(u32, String), (String, Vec<u32>, Vec<Message>)> =
             HashMap::new();
         let mut removed_ids = Vec::with_capacity(messages.len());
         let mut missing_dest = false;
@@ -14324,7 +14463,7 @@ impl AppModel {
                 .entry((m.account_id, src))
                 .or_insert_with(|| (dest, Vec::new(), Vec::new()));
             slot.1.push(m.uid);
-            slot.2.push(m.message_id.clone());
+            slot.2.push(m.clone());
             self.discard_message_local(m);
             removed_ids.push(m.id);
         }
@@ -14344,11 +14483,11 @@ impl AppModel {
                 kind_label(kind),
             )));
         }
-        for ((account_id, src), (dest, uids, message_ids)) in groups {
+        for ((account_id, src), (dest, uids, rows)) in groups {
             if action == BulkAction::NotSpam {
-                self.push_undo_move_as(account_id, i18n("Not Spam"), &dest, &src, message_ids);
+                self.push_undo_move_as(account_id, i18n("Not Spam"), &dest, &src, rows);
             } else {
-                self.push_undo_move(account_id, &dest, &src, message_ids);
+                self.push_undo_move(account_id, &dest, &src, rows);
             }
             let req = if action == BulkAction::NotSpam {
                 MailRequest::MarkHamMany { path: src, uids, dest }
