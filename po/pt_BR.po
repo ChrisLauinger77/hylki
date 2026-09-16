@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date:\n"
-"PO-Revision-Date: 2026-09-16 20:25+0100\n"
+"PO-Revision-Date: 2026-09-16 23:06+0100\n"
 "Last-Translator: Paulo Fino <somepaulo@duck.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
 "Language: pt_BR\n"
@@ -539,9 +539,8 @@ msgid "Remove"
 msgstr "Remover"
 
 #. One-sentence description, directly under the version chip.
-#, fuzzy
 msgid "A fast, GNOME-native email client"
-msgstr "Um cliente de email simples, rápido e nativo do GNOME."
+msgstr "Um cliente de email rápido e nativo do GNOME"
 
 msgid ""
 "This is a beta build for trying upcoming changes early. Expect bugs and "
@@ -576,7 +575,7 @@ msgid "Website"
 msgstr "Website"
 
 msgid "Report an issue or feature request"
-msgstr ""
+msgstr "Relatar um problema ou sugerir um recurso"
 
 msgid "Contact — hyprlab@proton.me"
 msgstr "Contato — hyprlab@proton.me"
@@ -4605,6 +4604,3 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
-
-#~ msgid "Discord — Join the community"
-#~ msgstr "Discord — Junte-se à comunidade"
