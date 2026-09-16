@@ -1336,7 +1336,7 @@ impl Component for AccountsWindow {
                                 adw::SwitchRow {
                                     set_title: &i18n("Server saves its own copy"),
                                     set_subtitle: &i18n("For Gmail and others that file sent mail \
-                                                   themselves. Vireo saves none of its own."),
+                                                   themselves. Disables above Save a copy."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input(AccountsInput::SetServerSavesSent(row.is_active()));
                                     },
