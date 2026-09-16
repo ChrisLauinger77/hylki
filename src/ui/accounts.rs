@@ -398,6 +398,13 @@ pub enum AccountsOutput {
 /// Whether a GOA account's mail runs over the Microsoft Graph API: the
 /// "Microsoft 365" (`ms_graph`) provider has no IMAP — its token is
 /// Graph-scoped — so the imported account uses [`Protocol::Graph`] (issue #36).
+/// The subtitle under "Save copies in" (#199). Says the one thing the row
+/// above it cannot: this only files mail somewhere, so the Inbox is a fair
+/// answer here even though giving it the Sent *role* would cost the account
+/// its inbox. Declared once because the row is rebuilt whenever an editor
+/// opens, and the two copies drifting apart is how a hint goes stale.
+const SENT_COPY_HINT: &str = "Any folder, the Inbox included.";
+
 fn goa_uses_graph(g: &crate::goa::GoaMailAccount) -> bool {
     g.oauth2 && g.provider_type == "ms_graph"
 }
@@ -1292,17 +1299,31 @@ impl Component for AccountsWindow {
 
                             // Manual special-folder mapping (#82): for servers
                             // whose Sent/Trash/… aren't detected, pin each role
-                            // to one of the account's real folders.
+                            // to one of the account's real folders. "Save
+                            // copies in" (#199) rides with them because it is
+                            // read as a refinement of Sent, but it is a
+                            // different kind of thing: a role says what a
+                            // folder *is*, and relabelling the Inbox costs the
+                            // account its inbox (#136), which is why the Inbox
+                            // is offered in that row and in none of the others.
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Special Folders"),
                                 set_description: Some(
-                                    i18n("Where sent, deleted and junk mail goes. Automatically follows the \
-                                          server's own markings; pick a folder when a role isn't \
-                                          detected or lands wrong.").as_str()
+                                    i18n("Which of this account's folders hold each role. Automatically \
+                                          follows the server's own markings; pick a folder when a role \
+                                          isn't detected or lands wrong. Copies of what you send go to \
+                                          the Sent folder unless you say otherwise — that row files \
+                                          mail rather than naming a role, so the Inbox can be chosen \
+                                          there.").as_str()
                                 ),
 
                                 #[name = "folder_sent_row"]
                                 adw::ComboRow { set_title: &i18n("Sent") },
+                                #[name = "folder_sent_copy_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Save copies in"),
+                                    set_subtitle: &i18n(SENT_COPY_HINT),
+                                },
                                 #[name = "folder_drafts_row"]
                                 adw::ComboRow { set_title: &i18n("Drafts") },
                                 #[name = "folder_trash_row"]
@@ -1311,28 +1332,6 @@ impl Component for AccountsWindow {
                                 adw::ComboRow { set_title: &i18n("Junk") },
                                 #[name = "folder_archive_row"]
                                 adw::ComboRow { set_title: &i18n("Archive") },
-                            },
-
-                            // Where the copy of an outgoing message is filed
-                            // (#199). Deliberately not a Special Folders role:
-                            // a role relabels the folder, and relabelling the
-                            // Inbox costs the account its inbox (#136). This
-                            // is only a destination, so every folder can be
-                            // offered here — the Inbox included.
-                            add = &adw::PreferencesGroup {
-                                set_title: &i18n("Copies of Sent Mail"),
-                                set_description: Some(
-                                    i18n("Normally a copy of everything you send is filed in the Sent \
-                                          folder. Choose another folder to keep your replies beside \
-                                          the mail they answer.").as_str()
-                                ),
-
-                                #[name = "folder_sent_copy_row"]
-                                adw::ComboRow {
-                                    set_title: &i18n("Save copies in"),
-                                    set_subtitle: &i18n("Copies are saved as already read, and \
-                                                   filters leave your own mail alone."),
-                                },
                             },
 
                             // OpenPGP (#133): which of the user's keys this
@@ -2922,8 +2921,8 @@ impl AccountsWindow {
         }
     }
 
-    /// Fill the "Save copies in" combo (#199): "Sent folder" plus every one
-    /// of the account's folders, with the saved choice selected. The Inbox is
+    /// Fill the "Save copies in" combo (#199): "Automatic" plus every one of
+    /// the account's folders, with the saved choice selected. The Inbox is
     /// listed here — filing a copy somewhere does not re-label it.
     fn populate_sent_copy_combo(
         &mut self,
@@ -2931,7 +2930,10 @@ impl AccountsWindow {
         acc: Option<&AccountConfig>,
         all: &[(String, String)],
     ) {
-        let mut labels: Vec<&str> = vec!["Sent folder"];
+        // "Automatic" rather than "Sent folder", to read as the rest of the
+        // group does: every row here follows the server until told otherwise,
+        // and for this one following means wherever the Sent role landed.
+        let mut labels: Vec<&str> = vec!["Automatic"];
         labels.extend(all.iter().map(|(_, display)| display.as_str()));
         self.sent_copy_paths = all.iter().map(|(path, _)| path.clone()).collect();
         let row = &widgets.folder_sent_copy_row;
@@ -2955,13 +2957,11 @@ impl AccountsWindow {
             _ => None,
         };
         row.set_sensitive(unsupported.is_none());
-        row.set_subtitle(&unsupported.unwrap_or_else(|| {
-            i18n("Copies are saved as already read, and filters leave your own mail alone.")
-        }));
+        row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
     }
 
     /// The "Save copies in" combo's current choice: a folder path, or `None`
-    /// when it is left on the Sent folder.
+    /// on Automatic, which follows the Sent role.
     fn read_sent_copy_path(&self, widgets: &AccountsWindowWidgets) -> Option<String> {
         // Nothing is known about this account's folders yet (it has never
         // connected, or is switched off), so the combo holds only "Sent
