@@ -4803,6 +4803,41 @@ impl MessageList {
                 .zip(&self.shown)
                 .all(|(a, b)| (a.account_id, a.id) == (b.account_id, b.id))
             && sigs[..old_len] == self.row_sigs[..];
+        // A message that was moved away and brought back comes home under a
+        // new UID, and a row's id is its UID. The selection would find no row
+        // to light, so the highlight blinked off and came back a moment later
+        // as the list caught up. Follow the selection by Message-ID over a
+        // renumbering instead (#200).
+        let lost = self
+            .selected_ids
+            .iter()
+            .any(|k| !shown.iter().any(|m| (m.account_id, m.id) == *k));
+        if lost {
+            let renumbered: Vec<((u32, u32), (u32, u32))> = self
+                .selected_ids
+                .iter()
+                .filter(|k| !shown.iter().any(|m| (m.account_id, m.id) == **k))
+                .filter_map(|k| {
+                    let was = self
+                        .shown
+                        .iter()
+                        .find(|m| (m.account_id, m.id) == *k)
+                        .filter(|m| !m.message_id.is_empty())?;
+                    let now = shown
+                        .iter()
+                        .find(|m| m.account_id == was.account_id && m.message_id == was.message_id)?;
+                    Some((*k, (now.account_id, now.id)))
+                })
+                .collect();
+            for (was, now) in renumbered {
+                for k in self.selected_ids.iter_mut().filter(|k| **k == was) {
+                    *k = now;
+                }
+                if self.selected_id == Some(was) {
+                    self.selected_id = Some(now);
+                }
+            }
+        }
         self.shown = shown;
         self.row_sigs = sigs;
         // Republish the row keys before the rows are built, so a drag starting on
