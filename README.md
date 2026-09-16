@@ -283,7 +283,8 @@ of the generated one.
 A message can be written in any of four formats, chosen in **Settings →
 Composing → Write messages in** for new messages and switched for any single
 message with the format button at the right-hand end of the composer's
-formatting row, which names the format it is set to:
+formatting row, which wears the icon of the format it is set to and lists
+the others, the current one in your accent colour:
 
 - **Rich text** — the WYSIWYG editor with its formatting toolbar. The default.
 - **Markdown** — you write Markdown, the recipient gets formatted mail.

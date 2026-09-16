@@ -277,9 +277,8 @@ pub struct Compose {
     /// editor's formatting row rather than in the header.
     format_btn: gtk::Button,
     preview_btn: gtk::ToggleButton,
-    /// The icon-and-label insides of those two, so the format button can be
-    /// relabelled and both can shed their words in a narrow pane.
-    format_content: adw::ButtonContent,
+    /// The preview toggle's icon-and-label insides, kept only so the label
+    /// can be dropped in a pane too narrow to carry it.
     preview_content: adw::ButtonContent,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
@@ -793,22 +792,17 @@ impl Component for Compose {
         // formatting controls, at the far end of the same row: a header
         // button for them folded away exactly when the pane was narrow, and
         // the format is a property of the body, not of the window.
-        let format_content = adw::ButtonContent::builder()
-            .icon_name(format_icon(format))
-            .label(format_label(format))
-            .build();
-        let format_btn = gtk::Button::builder().child(&format_content).build();
+        // Icon alone: it sits at the end of a row of icons, and the label
+        // it wore for a while read as a second toolbar rather than as one
+        // more control on the same one. The tooltip still names the format.
+        let format_btn = gtk::Button::from_icon_name(format_icon(format));
         format_btn.set_tooltip_text(Some(
             i18n_f("Writing in {format}", &[("format", &format_label(format))]).as_str(),
         ));
         format_btn.add_css_class("flat");
         format_btn.set_can_focus(false);
-        // A backstop under the narrow rule below: at the pane's floor the
-        // row can still run out of width, and an ellipsized label is a
-        // better answer than a command button pushed off the end.
-        format_btn.set_can_shrink(true);
-        // The preview is a state, not an action, so it reads as one: a
-        // toggle that says what it turns on rather than an eye to guess at.
+        // The preview keeps its word. It is a state rather than an action,
+        // and an eye on its own leaves which state to guesswork.
         let preview_content = adw::ButtonContent::builder()
             .icon_name("co.hyprlab.Vireo-eye-open-negative-filled-symbolic")
             .label(i18n("Preview"))
@@ -870,7 +864,6 @@ impl Component for Compose {
             format,
             format_btn,
             preview_btn,
-            format_content,
             preview_content,
             encrypt: false,
             send_at,
@@ -1808,17 +1801,15 @@ impl Component for Compose {
 }
 
 impl Compose {
-    /// The format chooser's icon, label and tooltip for the format it is
-    /// currently set to. Both controls drop their labels in a narrow pane,
-    /// where the row has no width to spare and the icons carry it — the
-    /// same trade the header makes when it folds.
+    /// The format chooser's icon and tooltip for the format it is currently
+    /// set to, and whether the preview toggle can afford its label.
     fn dress_format_buttons(&self) {
-        self.format_content.set_icon_name(format_icon(self.format));
-        let name = format_label(self.format);
-        self.format_content.set_label(if self.narrow { "" } else { name.as_str() });
+        self.format_btn.set_icon_name(format_icon(self.format));
         self.format_btn.set_tooltip_text(Some(
             i18n_f("Writing in {format}", &[("format", &format_label(self.format))]).as_str(),
         ));
+        // The one label on the row goes when there is no width for it, the
+        // same trade the header makes when it folds.
         let preview = i18n("Preview");
         self.preview_content.set_label(if self.narrow { "" } else { preview.as_str() });
     }
@@ -1836,13 +1827,9 @@ impl Compose {
         .map(|format| {
             let s = sender.clone();
             let label = format!("{} — {}", format_label(format), format_hint(format));
-            MenuEntry::new(&label, move || s.input(ComposeInput::SetFormat(format))).icon(
-                if format == self.format {
-                    "co.hyprlab.Vireo-verified-checkmark-symbolic"
-                } else {
-                    format_icon(format)
-                },
-            )
+            MenuEntry::new(&label, move || s.input(ComposeInput::SetFormat(format)))
+                .icon(format_icon(format))
+                .selected(format == self.format)
         })
         .collect()
     }

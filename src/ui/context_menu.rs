@@ -27,6 +27,11 @@ pub struct MenuEntry {
     /// #71): filled when the entry's state is on, a ring when off.
     swatch: Option<(String, bool)>,
     enabled: bool,
+    /// The entry the menu is currently set to: drawn in the accent colour,
+    /// icon and label together, rather than having its icon swapped for a
+    /// tick. A tick costs the icon that says what the entry *is*, which is
+    /// the part worth keeping in a list of alternatives.
+    selected: bool,
     activate: Box<dyn Fn()>,
     /// Sections of a nested page this entry opens instead of acting.
     submenu: Option<Vec<Vec<MenuEntry>>>,
@@ -39,6 +44,7 @@ impl MenuEntry {
             icon: None,
             swatch: None,
             enabled: true,
+            selected: false,
             activate: Box::new(activate),
             submenu: None,
         }
@@ -53,6 +59,7 @@ impl MenuEntry {
             icon: None,
             swatch: None,
             enabled: !empty,
+            selected: false,
             activate: Box::new(|| {}),
             submenu: Some(sections),
         }
@@ -74,6 +81,12 @@ impl MenuEntry {
 
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
+        self
+    }
+
+    /// Mark this entry as the one the menu is set to.
+    pub fn selected(mut self, selected: bool) -> Self {
+        self.selected = selected;
         self
     }
 }
@@ -205,9 +218,12 @@ fn build_page(
         first = false;
 
         for entry in entries {
-            let MenuEntry { label, icon, swatch, enabled, activate, submenu } = entry;
+            let MenuEntry { label, icon, swatch, enabled, selected, activate, submenu } = entry;
 
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+            if selected {
+                row.add_css_class("context-menu-selected");
+            }
             if let Some((color, on)) = swatch {
                 row.append(&swatch_widget(&color, on));
             } else if has_icons {

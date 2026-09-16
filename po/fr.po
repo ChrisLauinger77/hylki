@@ -2322,6 +2322,8 @@ msgstr "Objet"
 msgid "Writing in {format}"
 msgstr "En attente depuis {ago}"
 
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
 #, fuzzy
 msgid "Preview"
 msgstr "Aperçu avant impression"

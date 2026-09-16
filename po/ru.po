@@ -2324,6 +2324,8 @@ msgstr "Тема"
 msgid "Writing in {format}"
 msgstr "Ожидает с {ago}"
 
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
 #, fuzzy
 msgid "Preview"
 msgstr "Предпросмотр печати"

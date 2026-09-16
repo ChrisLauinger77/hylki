@@ -281,6 +281,14 @@ button.star-active {
 .context-menu-item label {
   font-weight: normal;
 }
+/* The entry a menu is currently set to. `color` is inherited, so one class
+   on the row carries both the label and the symbolic icon beside it, and
+   `@accent_color` is libadwaita's legible-on-a-normal-background accent —
+   the desktop's under the stock look, the palette's under a Vireo theme. */
+.context-menu-selected,
+.context-menu-selected label {
+  color: @accent_color;
+}
 
 /* Popout-window attachment popover rows. */
 .attach-row {

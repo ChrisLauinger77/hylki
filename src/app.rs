@@ -1269,8 +1269,9 @@ pub enum AppMsg {
     SetComposeFormat(crate::config::ComposeFormat),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
-    /// Showcase only: open the inline composer's overflow menu.
-    ShowcaseComposeMenu,
+    /// Showcase only: open the inline composer's format chooser, or its
+    /// overflow menu.
+    ShowcaseComposeMenu { format: bool },
     /// Fetch a message's body again: its OpenPGP verdict changed (#133).
     ReloadBody(Box<crate::models::Message>),
     /// Select a settings category by id (the showcase hook).
@@ -3915,13 +3916,14 @@ impl SimpleComponent for AppModel {
                 // composer's preview on a beat after it opens, so a
                 // capture can show the rendered message rather than the
                 // source it was written in.
-                // VIREO_SHOWCASE_COMPOSE_MENU=1 opens the inline composer's
-                // overflow menu, where a narrow pane keeps the format
-                // chooser.
-                if std::env::var("VIREO_SHOWCASE_COMPOSE_MENU").is_ok() {
+                // VIREO_SHOWCASE_COMPOSE_MENU=format opens the inline
+                // composer's format chooser; any other value opens its
+                // overflow menu. Pair either with VIREO_SHOWCASE_MENU=main.
+                if let Ok(which) = std::env::var("VIREO_SHOWCASE_COMPOSE_MENU") {
                     let s = sender.clone();
+                    let format = which == "format";
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
-                        s.input(AppMsg::ShowcaseComposeMenu);
+                        s.input(AppMsg::ShowcaseComposeMenu { format });
                     });
                 }
                 if std::env::var("VIREO_SHOWCASE_COMPOSE_PREVIEW").is_ok() {
@@ -6564,9 +6566,13 @@ impl SimpleComponent for AppModel {
                     self.push_reader_style();
                 }
             }
-            AppMsg::ShowcaseComposeMenu => {
+            AppMsg::ShowcaseComposeMenu { format } => {
                 if let Some(r) = self.reader_compose.as_ref() {
-                    r.controller.emit(ComposeInput::OverflowMenu);
+                    r.controller.emit(if format {
+                        ComposeInput::FormatMenu
+                    } else {
+                        ComposeInput::OverflowMenu
+                    });
                 }
             }
             AppMsg::ShowcaseComposePreview => {
