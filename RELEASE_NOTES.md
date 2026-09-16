@@ -2,6 +2,24 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.32.0
+
+**Write messages in Markdown or HTML.** A message can now be written as rich text, Markdown, HTML source or plain text. The composer's plain-text button became a format button at the right-hand end of the formatting row: it shows the current format, with the other three behind it, and the two source formats have a preview. Settings → Composing → **Write messages in** picks the default. Nothing goes out as source: Markdown is rendered on the way out with the source as the plain-text alternative, hand-written HTML gets a text part made from it, and both are cleaned of scripts and style sheets before sending. The README lists exactly which Markdown is understood.
+
+**Undo and redo** (#200, requested by [@EmmanuelP](https://github.com/EmmanuelP)). Ctrl+Z and Ctrl+Shift+Z now cover moves, read and unread, starring, tags, and making, renaming or dragging a folder, and both are listed beside Undo and Redo in the main menu. Undoing a move puts the rows back on the spot rather than after a round trip to the server.
+
+**Save a copy of sent mail in any folder** (#199, requested by [@EmmanuelP](https://github.com/EmmanuelP)). The account editor's Special Folders group has **Save a copy of sent mail in**, which lists every folder of the account, the Inbox included, and a switch for servers such as Gmail that keep their own copy, so nothing lands twice. A message waiting in the Outbox uses the setting current when it goes out. And a reply you send now joins the conversation on screen as soon as it is sent, instead of after the next visit to the Sent folder.
+
+**Links open again inside the Flatpak** (#202, reported by [@7system7](https://github.com/7system7)). On a desktop whose portal cannot launch the default browser directly, a link click did nothing and logged nothing. Links now go through the portal with its answer watched, fall back to the portal's app chooser, and say so if that fails too. The same fix repairs the attachment opener's chooser fallback in French, Russian, Hungarian and Portuguese.
+
+**Filter rules on recipients match each recipient** (#201, reported by [@yioannides](https://github.com/yioannides)). "Is", "starts with" and "ends with" are now held against each address and name in To and Cc on its own, so "is x@y" matches mail sent to x@y and someone else. An Apply Now run also reports matches that needed nothing, instead of calling mail already tagged on an earlier sync "none of them matched".
+
+**Remote content per message.** A card's actions and its menu can load or block a message's remote content either way, and the choice sticks for the session. The reading pane also starts on the same line as the message list.
+
+**List previews** no longer come through as noise for quoted-printable newsletters, and a preview padded with an invisible preheader is read deeper to find what the message actually says.
+
+**French translation** updated for the filter run (PR #203 by [@frenchy82](https://github.com/frenchy82)).
+
 ## What's new in 1.31.1
 
 **Filter rules can be given a name** (#197, requested by [@yioannides](https://github.com/yioannides)). The filters list used to spell every rule out by its conditions, which can now run to several clauses on one line. The rule editor's first row is **Name (optional)**, and a named rule is listed by its name with the conditions moved underneath. Unnamed rules read exactly as they did.

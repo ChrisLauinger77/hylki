@@ -615,7 +615,11 @@ for the Inboxes and notification report, [**Peter Weiss**](https://github.com/pe
 for conversation moves, [**taprobane99**](https://github.com/taprobane99)
 for the clock-format report and [**somePaulo**](https://github.com/somepaulo)
 for the language chooser, plain-text composing and monospace requests,
-all in 1.28; and to everyone who files issues and ideas.
+all in 1.28; to [**EmmanuelP**](https://github.com/EmmanuelP) for the
+undo and sent-copy requests, [**yioannides**](https://github.com/yioannides)
+for the recipient-rule report, [**7system7**](https://github.com/7system7)
+for the links report and [**frenchy82**](https://github.com/frenchy82) for the
+French update, all in 1.32; and to everyone who files issues and ideas.
 
 Pull requests are welcome. There's no CLA — by opening one you agree your
 contribution ships under the [AGPL-3.0-or-later](LICENSE), and it may be adapted

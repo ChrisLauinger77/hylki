@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.32.0" date="2026-09-16">
+      <description>
+        <p>Messages can be written in Markdown or HTML as well as rich or plain text, with a preview and a default in Settings. Undo and redo cover moves, read state, stars, tags and folders (#200). Copies of sent mail can be filed in any folder, the Inbox included, with a switch for servers that keep their own copy (#199), and a sent reply joins its conversation at once. Links open again inside the Flatpak through the portal with a chooser fallback (#202). Filter rules on recipients match each recipient on its own and a run reports matches that needed nothing (#201). Remote content can be loaded or blocked per message. Quoted-printable and preheader-padded previews read correctly. French translation updated (#203).</p>
+      </description>
+    </release>
     <release version="1.31.1" date="2026-09-15">
       <description>
         <p>Filter rules can be given a name of their own (#197), and the rules can be run over mail that is already in a folder rather than only meeting mail as it arrives (#198): Apply Now in Settings sweeps every inbox, a folder's right-click menu sweeps that folder, and a dialog shows a live count while the run works and reports what it did. French and Russian translations updated (#195, #196).</p>

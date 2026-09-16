@@ -1,5 +1,103 @@
 # Changelog
 
+## 1.32.0 — 2026-09-16
+
+Messages can be written in Markdown or HTML as well as rich or plain text,
+undo and redo now cover most of what the list can do, copies of sent mail
+can be filed in any folder, and a reply you send joins its conversation at
+once. Links open again inside the Flatpak, and filter rules on recipients
+match the way they read.
+
+- **Composing formats.** A message can be written as rich text, Markdown,
+  HTML source or plain text. The composer's plain-text button (#180) is now
+  a format button at the right-hand end of the formatting row, showing the
+  current format with the other three behind it; a narrow pane keeps the
+  same chooser in the overflow menu. The two source formats get a preview
+  button. Settings → Composing → **Write messages in** picks the default.
+  Nothing is sent as source: Markdown is rendered on the way out and the
+  source travels as the plain-text alternative, and hand-written HTML has
+  a text part derived from it the same way. Both are sanitized before
+  sending (scripts, event handlers and style sheets go; tables, inline
+  styles and images stay), and styling rides on the tags because webmail
+  strips `<style>` blocks. Source mode is a text area inside the same
+  editor, so the signature swap, dirty flag, paste path and drop target
+  keep working; the preview is a second page built the first time it is
+  asked for. The README lists exactly which Markdown is understood. A
+  draft reopens in the default format rather than the one it was written
+  in.
+- **Undo and redo** (#200, requested by
+  [@EmmanuelP](https://github.com/EmmanuelP)). Ctrl+Z only ever knew about
+  moves, and there was no redo. The history is now a stack of steps, so
+  Ctrl+Z and Ctrl+Shift+Z cover moves (archive, delete, drag, Move To,
+  whole conversations, Spam and Not Spam), read and unread, starring, tags
+  including the 0 key that clears them, and making, renaming or dragging a
+  folder. Automatic read marks are left out on purpose. Both keys are
+  shown beside Undo and Redo in the main menu. Within ten seconds of a
+  move the rows come back on the spot and the server catches up behind;
+  after that the careful server-side path takes over. The status bar no
+  longer narrates any of it, the reader does not blink over an undo, and a
+  restored message stays selected once the server renumbers it.
+- **Save a copy of sent mail in any folder** (#199, requested by
+  [@EmmanuelP](https://github.com/EmmanuelP)). The account editor's Special
+  Folders group gained **Save a copy of sent mail in**, listing every folder
+  of the account, the Inbox included. It is a destination only: the folder
+  keeps whatever role it had. Left at Disabled, the copy goes to the Sent
+  folder as before. A switch beside it says the server keeps its own copy
+  (Gmail does), in which case Vireo appends none, so nothing lands twice.
+  A message waiting in the Outbox or scheduled with Send Later uses the
+  setting current when it goes out, not when it was written. Filter rules
+  leave your own mail alone in a folder that receives copies, so a rule on
+  a subject or recipient does not file your reply away from the thread it
+  answers.
+- **A sent reply joins its conversation at once** (#199). Conversations are
+  assembled from the cache across folders, and the copy of a message just
+  sent was only indexed the next time the Sent folder was listed, so the
+  reply stayed out of the thread until you visited Sent and came back. The
+  copy's folder is now listed and cached right after the send, and the
+  conversation on screen asks for the rest of the thread again, so the
+  reply is drawn in on the spot. Both the direct send and the Outbox flush
+  do this; Microsoft 365 accounts list Sent Items after a send.
+- **Links open again inside the Flatpak** (#202, reported by
+  [@7system7](https://github.com/7system7)). A link was handed to GIO's
+  launcher, which inside the sandbox fires a request at the desktop portal
+  and returns without waiting for the answer; on a host whose portal cannot
+  launch the default handler directly (Fedora 44, xdg-desktop-portal 1.22)
+  every click looked dead, with nothing logged. Links now go through a
+  launcher of their own: outside Flatpak GIO leads and the portal is the
+  fallback; inside, the portal request is made directly with its response
+  watched, a failed quiet launch is retried with the portal's app chooser,
+  and a failure on that too gets a dialog saying what happened. Every
+  attempt is logged by scheme and host, never path or query. Fixed on the
+  way: the attachment opener waited for the portal's answer under a
+  translated signal name, so in French, Russian, Hungarian or Portuguese
+  its chooser retry never fired.
+- **Recipient filter rules match each recipient** (#201, reported by
+  [@yioannides](https://github.com/yioannides)). A rule on To/Cc was held
+  against both lists joined into one string, so "is x@y" never matched
+  and "ends with @y" only saw the last recipient. Every matcher but
+  "contains" now looks at each address, and each display name, on its own.
+  An Apply Now run also counted only what it did, so mail already tagged
+  on an earlier sync came back as "none of them matched". The run now
+  counts matches as well, the dialog shows them as they come in, the
+  report says when the matches were already tagged or filed, and the log
+  names how many messages each rule matched in each folder.
+- **Remote content per message.** A card's actions palette gained a button
+  for it, and the card menu an entry, both going both ways and both
+  appearing only on a message that has remote content. The choice is
+  remembered per message for the session, ahead of the standing policy,
+  and the banner's own Load now sticks across a repaint too. The reader
+  header keeps its full spacing under a warning or find bar, and the
+  reading pane now starts on the same line as the message list.
+- **List previews.** A quoted-printable preview no longer reads as base64:
+  the part's declared transfer encoding is read and believed, and an `=`
+  anywhere but the end rules base64 out. A preview whose first kilobytes
+  are preheader padding is read deeper to find what the message says, and
+  a half escape cut off by the preview's byte limit is dropped rather than
+  shown.
+- **French translation** (PR #203 by
+  [@frenchy82](https://github.com/frenchy82)): the filter-run strings and
+  thirteen corrections.
+
 ## 1.31.1 — 2026-09-15
 
 Filter rules can be given a name, and the rules can be run over mail that
