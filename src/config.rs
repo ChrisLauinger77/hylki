@@ -1827,13 +1827,45 @@ impl FilterCondition {
             FilterField::Body => unreachable!(),
         }
         .to_lowercase();
-        alts.iter().any(|needle| match self.matcher {
-            FilterMatch::Contains => hay.contains(needle.as_str()),
-            FilterMatch::Equals => hay == *needle,
-            FilterMatch::StartsWith => hay.starts_with(needle.as_str()),
-            FilterMatch::EndsWith => hay.ends_with(needle.as_str()),
+        // The recipients are a list. "Contains" reads it whole, names
+        // included; the other matchers hold each recipient up on its own,
+        // so "is x@y" matches mail sent to x@y and someone else, and "ends
+        // with @y" finds any one recipient there, not only the last (#201).
+        let hays = if self.field == FilterField::Recipients && self.matcher != FilterMatch::Contains {
+            mailboxes(&hay)
+        } else {
+            vec![hay]
+        };
+        alts.iter().any(|needle| {
+            hays.iter().any(|hay| match self.matcher {
+                FilterMatch::Contains => hay.contains(needle.as_str()),
+                FilterMatch::Equals => hay == needle,
+                FilterMatch::StartsWith => hay.starts_with(needle.as_str()),
+                FilterMatch::EndsWith => hay.ends_with(needle.as_str()),
+            })
         })
     }
+}
+
+/// The pieces of a comma-separated recipient list a matcher can be held
+/// against: every address on its own, and every display name on its own.
+/// `Ann <ann@shop.example>, bob@shop.example` gives `ann`, `ann@shop.example`
+/// and `bob@shop.example`.
+fn mailboxes(list: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for part in list.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        match (part.rfind('<'), part.rfind('>')) {
+            (Some(lt), Some(gt)) if lt < gt => {
+                let name = part[..lt].trim().trim_matches('"').trim();
+                if !name.is_empty() {
+                    out.push(name.to_string());
+                }
+                out.push(part[lt + 1..gt].trim().to_string());
+            }
+            _ => out.push(part.to_string()),
+        }
+    }
+    out
 }
 
 impl FilterRule {
@@ -3540,6 +3572,29 @@ mod filter_tests {
         assert!(!r.matches(&input));
         input.from_addr = "sales@shop.example";
         assert!(r.matches(&input));
+    }
+
+    #[test]
+    fn filter_recipient_matchers_look_at_each_recipient() {
+        // #201: a rule on the recipients compared the whole To and Cc list
+        // as one string, so "is x@y" never matched mail with a second
+        // recipient, and "ends with @y" only ever saw the last one.
+        let list = "Ann <ann@shop.example>, bob@shop.example, \"Cy, Jr\" <cy@other.example>";
+        let input = headers("", "", "", list);
+        let r = |m, v| rule(FilterField::Recipients, m, v);
+        assert!(r(FilterMatch::Equals, "bob@shop.example").matches(&input));
+        assert!(r(FilterMatch::Equals, "ANN@shop.example").matches(&input));
+        assert!(r(FilterMatch::Equals, "cy@other.example").matches(&input));
+        assert!(!r(FilterMatch::Equals, "shop.example").matches(&input));
+        assert!(r(FilterMatch::EndsWith, "@shop.example").matches(&input));
+        assert!(!r(FilterMatch::EndsWith, "@nowhere.example").matches(&input));
+        assert!(r(FilterMatch::StartsWith, "cy@").matches(&input));
+        assert!(r(FilterMatch::Contains, "other").matches(&input));
+        // A display name counts on its own too.
+        assert!(r(FilterMatch::Equals, "ann").matches(&input));
+        // The single bare address most mail carries.
+        assert!(r(FilterMatch::Equals, "me@shop.example").matches(&headers("", "", "", "me@shop.example")));
+        assert!(!r(FilterMatch::Equals, "me@shop.example").matches(&headers("", "", "", "")));
     }
 
     #[test]

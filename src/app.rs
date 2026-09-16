@@ -61,6 +61,11 @@ struct FolderTally {
     /// folder answers twice (cache, then server) over the same mail, so the
     /// larger listing is the count — adding them would count it twice.
     checked: usize,
+    /// Messages at least one rule matched, whether or not anything was
+    /// done about it (#201): mail tagged on an earlier sync matches again
+    /// and needs nothing, and a report that only counted actions called
+    /// that "none of them matched". Held the same way as `checked`.
+    matched: usize,
     /// Tags put on, and messages filed away. Both only ever happen once per
     /// message (a second pass sees the tag, or the pending move), so these
     /// add up across passes.
@@ -90,6 +95,7 @@ impl FilterRun {
     fn totals(&self) -> FolderTally {
         self.folders.values().fold(FolderTally::default(), |mut t, f| {
             t.checked += f.checked;
+            t.matched += f.matched;
             t.tagged += f.tagged;
             t.filed += f.filed;
             t
@@ -14912,32 +14918,31 @@ impl AppModel {
             .filter_run
             .as_ref()
             .is_some_and(|r| r.folders.contains_key(&(account_id, folder_id)));
-        let (kept, filed, checked, tagged) =
-            self.filter_pass(account_id, folder_id, messages, manual);
+        let (kept, filed, pass) = self.filter_pass(account_id, folder_id, messages, manual);
         if manual {
-            let filed_now = filed.len();
-            self.filter_run_folder_pass(account_id, folder_id, checked, tagged, filed_now);
+            self.filter_run_folder_pass(account_id, folder_id, pass);
         }
         (kept, filed)
     }
 
     /// One pass of the rules over a folder's messages. Returns what stays,
-    /// what was filed elsewhere, and (for a manual run) how many messages
-    /// were looked at and how many tags were put on.
+    /// what was filed elsewhere, and (for a manual run) the pass's count:
+    /// how many messages were looked at, how many a rule matched, and how
+    /// many tags were put on and messages filed.
     fn filter_pass(
         &mut self,
         account_id: u32,
         folder_id: u32,
         messages: Vec<Message>,
         manual: bool,
-    ) -> (Vec<Message>, Vec<(Message, String)>, usize, usize) {
+    ) -> (Vec<Message>, Vec<(Message, String)>, FolderTally) {
         if self.filters.is_empty()
             || (!manual && self.inbox_of(account_id).map(|f| f.id) != Some(folder_id))
         {
-            return (messages, Vec::new(), 0, 0);
+            return (messages, Vec::new(), FolderTally::default());
         }
         let Some(email) = self.email_of(account_id) else {
-            return (messages, Vec::new(), 0, 0);
+            return (messages, Vec::new(), FolderTally::default());
         };
         let rules: Vec<&config::FilterRule> = self
             .filters
@@ -14945,10 +14950,15 @@ impl AppModel {
             .filter(|r| r.account_email.eq_ignore_ascii_case(&email))
             .collect();
         if rules.is_empty() {
-            return (messages, Vec::new(), 0, 0);
+            return (messages, Vec::new(), FolderTally::default());
         }
         let checked = messages.len();
+        let mut matched = 0usize;
         let mut tagged = 0usize;
+        // How many messages each rule matched, said in the log at the end of
+        // a manual run: the one place a rule that matches nothing can be
+        // told apart from one whose matches needed nothing done (#201).
+        let mut per_rule = vec![0usize; rules.len()];
         let folders = self.folders.get(&account_id);
         let src = folders
             .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
@@ -14982,7 +14992,11 @@ impl AppModel {
                 kept.push(m);
                 continue;
             }
-            let recipients = format!("{} {}", m.to, m.cc);
+            let recipients = [m.to.as_str(), m.cc.as_str()]
+                .into_iter()
+                .filter(|s| !s.trim().is_empty())
+                .collect::<Vec<_>>()
+                .join(", ");
             let body_hits = hits.and_then(|h| h.get(&m.uid)).map(Vec::as_slice).unwrap_or(&[]);
             let input = config::FilterInput {
                 from_addr: &m.from_addr,
@@ -14997,8 +15011,16 @@ impl AppModel {
             };
             let matching: Vec<&&config::FilterRule> = rules
                 .iter()
-                .filter(|r| r.matches(&input))
+                .enumerate()
+                .filter(|(_, r)| r.matches(&input))
+                .map(|(i, r)| {
+                    per_rule[i] += 1;
+                    r
+                })
                 .collect();
+            if !matching.is_empty() {
+                matched += 1;
+            }
             // Tags first (#71), from every matching rule, and only where the
             // message lacks the tag — this runs on every sync, and the flag
             // comes back down with the next one. Tagged before any move, so
@@ -15065,7 +15087,14 @@ impl AppModel {
         if !still_pending.is_empty() {
             self.filter_moved.insert((account_id, folder_id), still_pending);
         }
-        (kept, filed, checked, tagged)
+        if manual {
+            let folder = src.as_deref().unwrap_or("?");
+            for (rule, n) in rules.iter().zip(&per_rule) {
+                tracing::info!("filter: [{}] matched {n} of {checked} in {folder}", rule.label());
+            }
+        }
+        let pass = FolderTally { checked, matched, tagged, filed: filed.len() };
+        (kept, filed, pass)
     }
 
     /// The (account, folder) pairs a manual filter run should cover (#198).
@@ -15203,6 +15232,14 @@ impl AppModel {
             t.checked as u32,
             &[("n", &t.checked.to_string())],
         )];
+        if t.matched > 0 {
+            lines.push(ni18n_f(
+                "Matched {n} message",
+                "Matched {n} messages",
+                t.matched as u32,
+                &[("n", &t.matched.to_string())],
+            ));
+        }
         if t.tagged > 0 {
             lines.push(ni18n_f(
                 "Tagged {n} message",
@@ -15234,19 +15271,13 @@ impl AppModel {
     }
 
     /// Fold one pass's work into the run's tally for that folder.
-    fn filter_run_folder_pass(
-        &mut self,
-        account_id: u32,
-        folder_id: u32,
-        checked: usize,
-        tagged: usize,
-        filed: usize,
-    ) {
+    fn filter_run_folder_pass(&mut self, account_id: u32, folder_id: u32, pass: FolderTally) {
         if let Some(run) = self.filter_run.as_mut() {
             let tally = run.folders.entry((account_id, folder_id)).or_default();
-            tally.checked = tally.checked.max(checked);
-            tally.tagged += tagged;
-            tally.filed += filed;
+            tally.checked = tally.checked.max(pass.checked);
+            tally.matched = tally.matched.max(pass.matched);
+            tally.tagged += pass.tagged;
+            tally.filed += pass.filed;
         }
         self.update_filter_run_dialog();
     }
@@ -15293,9 +15324,10 @@ impl AppModel {
         let t = run.totals();
         let unanswered = run.pending.len();
         tracing::info!(
-            "filter: manual run done, {} checked, {} tagged, {} filed, \
+            "filter: manual run done, {} checked, {} matched, {} tagged, {} filed, \
              {unanswered} folder(s) unanswered",
             t.checked,
+            t.matched,
             t.tagged,
             t.filed,
         );
@@ -15305,22 +15337,32 @@ impl AppModel {
         // nothing matching, that is the whole answer to "are my rules working"
         // (#198). The plural follows that count throughout.
         let n = t.checked.to_string();
+        let matched_s = t.matched.to_string();
         let tagged_s = t.tagged.to_string();
         let filed_s = t.filed.to_string();
-        let text = match (t.tagged, t.filed) {
-            (0, 0) => ni18n_f(
+        let text = match (t.matched, t.tagged, t.filed) {
+            (0, _, _) => ni18n_f(
                 "Filters looked at {n} message, and it matched nothing",
                 "Filters looked at {n} messages, and none of them matched",
                 t.checked as u32,
                 &[("n", &n)],
             ),
-            (_, 0) => ni18n_f(
+            // Matches that needed nothing: the rules had already done their
+            // work on an earlier sync (#201). Saying "none matched" here
+            // made working rules look broken.
+            (_, 0, 0) => ni18n_f(
+                "Filters matched {matched} of {n} message, and it was already tagged or filed",
+                "Filters matched {matched} of {n} messages, and all of them were already tagged or filed",
+                t.checked as u32,
+                &[("matched", &matched_s), ("n", &n)],
+            ),
+            (_, _, 0) => ni18n_f(
                 "Filters tagged {tagged} of {n} message",
                 "Filters tagged {tagged} of {n} messages",
                 t.checked as u32,
                 &[("tagged", &tagged_s), ("n", &n)],
             ),
-            (0, _) => ni18n_f(
+            (_, 0, _) => ni18n_f(
                 "Filters filed {filed} of {n} message away",
                 "Filters filed {filed} of {n} messages away",
                 t.checked as u32,
