@@ -82,7 +82,7 @@ pub struct PrefInit {
     pub plain_monospace: bool,
     pub plain_font: String,
     /// New messages start as plain text (#180).
-    pub compose_plain: bool,
+    pub compose_format: crate::config::ComposeFormat,
     pub app_theme: AppTheme,
     /// The appearance theme's id ("system" for the stock GNOME colours).
     pub theme: String,
@@ -822,7 +822,7 @@ pub enum PrefInput {
     ToggleOverrideColors(bool),
     TogglePlainMonospace(bool),
     ChangePlainFont(String),
-    ToggleComposePlain(bool),
+    ChangeComposeFormat(u32),
     ChangeAppTheme(u32),
     ChangeTheme(String),
     ChangeSettingsOpen(u32),
@@ -934,7 +934,7 @@ pub enum PrefOutput {
     SetOverrideColors(bool),
     SetPlainMonospace(bool),
     SetPlainFont(String),
-    SetComposePlain(bool),
+    SetComposeFormat(crate::config::ComposeFormat),
     Closed,
 }
 
@@ -1976,15 +1976,16 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "compose_plain_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Compose in plain text"),
-                                        set_subtitle: &i18n("New messages, replies and forwards start as plain \
-                                                       text, sent without formatting. The composer's \
-                                                       Plain text button switches either way for one \
-                                                       message."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleComposePlain(row.is_active()));
+                                    #[name = "compose_format_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Write messages in"),
+                                        set_subtitle: &i18n("What new messages, replies and forwards start \
+                                                       as. Markdown and HTML are written as source and \
+                                                       sent as formatted mail; plain text is sent without \
+                                                       formatting. The composer's format button switches \
+                                                       any one message."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeComposeFormat(row.selected()));
                                         },
                                     },
                                 },
@@ -2705,7 +2706,19 @@ impl Component for Preferences {
             widen_combo_value(&widgets.default_from_row, 50);
         }
         widgets.paste_plain_row.set_active(init.paste_plain);
-        widgets.compose_plain_row.set_active(init.compose_plain);
+        widgets.compose_format_row.set_model(Some(&gtk::StringList::new(&[
+            &i18n("Rich text"),
+            &i18n("Markdown"),
+            &i18n("HTML"),
+            &i18n("Plain text"),
+        ])));
+        no_truncate(&widgets.compose_format_row);
+        widgets.compose_format_row.set_selected(match init.compose_format {
+            crate::config::ComposeFormat::Rich => 0,
+            crate::config::ComposeFormat::Markdown => 1,
+            crate::config::ComposeFormat::Html => 2,
+            crate::config::ComposeFormat::Plain => 3,
+        });
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language dropdown offers exactly what checking can use: the
         // installed dictionaries, behind a "System language" default. Typed
@@ -3480,8 +3493,14 @@ impl Component for Preferences {
             PrefInput::ChangePlainFont(font) => {
                 let _ = sender.output(PrefOutput::SetPlainFont(font));
             }
-            PrefInput::ToggleComposePlain(on) => {
-                let _ = sender.output(PrefOutput::SetComposePlain(on));
+            PrefInput::ChangeComposeFormat(idx) => {
+                let format = match idx {
+                    1 => crate::config::ComposeFormat::Markdown,
+                    2 => crate::config::ComposeFormat::Html,
+                    3 => crate::config::ComposeFormat::Plain,
+                    _ => crate::config::ComposeFormat::Rich,
+                };
+                let _ = sender.output(PrefOutput::SetComposeFormat(format));
             }
         }
     }

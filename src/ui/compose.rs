@@ -5,7 +5,8 @@ use relm4::prelude::*;
 
 use crate::contacts::Suggestion;
 use crate::models::DraftOrigin;
-use crate::ui::rich_editor::{self, RichEditor, js_escape};
+use crate::config::ComposeFormat;
+use crate::ui::rich_editor::{self, RichEditor, SourceKind, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
@@ -23,6 +24,51 @@ pub enum Field {
 fn sig_html(sig: &str) -> String {
     let body = rich_editor::signature_to_html(sig);
     format!("<div class=\"vireo-sig\"><br>-- <br>{body}</div>")
+}
+
+/// The signature as it reads in a source-mode body (#199): Markdown under
+/// its `-- ` line, or the same HTML block the rich editor holds.
+fn sig_source(kind: SourceKind, sig: &str) -> String {
+    if sig.is_empty() {
+        return String::new();
+    }
+    match kind {
+        SourceKind::Html => format!("\n{}\n", sig_html(sig)),
+        SourceKind::Markdown => format!(
+            "\n\n-- \n{}\n",
+            crate::markdown::from_html(&rich_editor::signature_to_html(sig))
+        ),
+    }
+}
+
+/// The icon a composing format carries, in the header and in its menu.
+fn format_icon(format: ComposeFormat) -> &'static str {
+    match format {
+        ComposeFormat::Rich => "co.hyprlab.Vireo-format-text-rich-symbolic",
+        ComposeFormat::Markdown => "co.hyprlab.Vireo-markdown-symbolic",
+        ComposeFormat::Html => "co.hyprlab.Vireo-code-symbolic",
+        ComposeFormat::Plain => "co.hyprlab.Vireo-text-x-generic-symbolic",
+    }
+}
+
+/// What a format is called where the user meets it.
+fn format_label(format: ComposeFormat) -> String {
+    match format {
+        ComposeFormat::Rich => i18n("Rich text"),
+        ComposeFormat::Markdown => i18n("Markdown"),
+        ComposeFormat::Html => i18n("HTML"),
+        ComposeFormat::Plain => i18n("Plain text"),
+    }
+}
+
+/// The one-line explanation under each format in the menu.
+fn format_hint(format: ComposeFormat) -> String {
+    match format {
+        ComposeFormat::Rich => i18n("Format as you type, with the toolbar"),
+        ComposeFormat::Markdown => i18n("Write Markdown; it is sent as formatted mail"),
+        ComposeFormat::Html => i18n("Write the message's HTML by hand"),
+        ComposeFormat::Plain => i18n("No formatting at all"),
+    }
 }
 
 /// The narrowest the compose pane goes (its `adw::BreakpointBin` floor).
@@ -172,9 +218,9 @@ pub struct ComposeInit {
     /// subject row and shows just the editor — popping out to a window brings
     /// the full fields back.
     pub compact: bool,
-    /// Start as plain text (#180): no formatting toolbar, and the message
-    /// goes out as text/plain only.
-    pub plain: bool,
+    /// What the message is written in (#199): rich text, Markdown, HTML
+    /// source, or plain text.
+    pub format: ComposeFormat,
 }
 
 pub struct Compose {
@@ -223,9 +269,10 @@ pub struct Compose {
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
-    /// Plain text (#180): the formatting toolbar is hidden and the message
-    /// is sent as text/plain only, whatever the editor holds.
-    plain: bool,
+    /// What this message is written in (#199). Plain text hides the
+    /// formatting toolbar and sends no HTML part (#180); Markdown and HTML
+    /// are written as source and converted on the way out.
+    format: ComposeFormat,
     /// Send Later (#145): when set, Send queues the message for this time.
     send_at: Option<i64>,
     /// Cloud attachments (#144): the accounts files can be uploaded to, the
@@ -280,8 +327,16 @@ pub enum ComposeInput {
     DeleteDraft,
     /// The OpenPGP Sign toggle (#133).
     ToggleSign(bool),
-    /// The Plain text toggle (#180).
-    TogglePlain(bool),
+    /// Pick what this message is written in (#199).
+    SetFormat(ComposeFormat),
+    /// The header's format button: the four formats as a menu.
+    FormatMenu,
+    /// The body came back for a format change; put it in the new one.
+    LoadAs { from: ComposeFormat, to: ComposeFormat, body: String },
+    /// Show or hide the rendered preview of a source message (#199).
+    TogglePreview(bool),
+    /// The source came back for the preview; render it.
+    ShowPreview(String),
     /// The OpenPGP Encrypt toggle; encrypting turns signing on too.
     ToggleEncrypt(bool),
     /// The editor's HTML + plain text came back asynchronously — finish sending.
@@ -503,17 +558,31 @@ impl Component for Compose {
                             sender.input(ComposeInput::ToggleSign(b.is_active()));
                         },
                     },
-                    // Plain text (#180): send without formatting.
-                    #[name = "plain_btn"]
+                    // Preview (#199): what the message will look like,
+                    // for the formats that are written as source.
+                    #[name = "preview_btn"]
                     pack_end = &gtk::ToggleButton {
-                        set_icon_name: "co.hyprlab.Vireo-text-x-generic-symbolic",
-                        set_tooltip_text: Some(i18n("Plain text: send without formatting").as_str()),
-                        set_active: model.plain,
+                        set_icon_name: "co.hyprlab.Vireo-eye-open-negative-filled-symbolic",
+                        set_tooltip_text: Some(i18n("Preview the formatted message").as_str()),
+                        #[watch]
+                        set_visible: model.format.is_source() && !model.narrow,
+                        connect_toggled[sender] => move |b| {
+                            sender.input(ComposeInput::TogglePreview(b.is_active()));
+                        },
+                    },
+                    // What this message is written in (#199). The button
+                    // wears the current format and opens the other three.
+                    #[name = "format_btn"]
+                    pack_end = &gtk::Button {
+                        #[watch]
+                        set_icon_name: format_icon(model.format),
+                        #[watch]
+                        set_tooltip_text: Some(
+                            i18n_f("Writing in {format}", &[("format", &format_label(model.format))]).as_str()
+                        ),
                         #[watch]
                         set_visible: !model.narrow,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::TogglePlain(b.is_active()));
-                        },
+                        connect_clicked => ComposeInput::FormatMenu,
                     },
                     pack_end = &gtk::Button {
                         set_icon_name: "co.hyprlab.Vireo-mail-attachment-symbolic",
@@ -697,7 +766,7 @@ impl Component for Compose {
             windowed,
             can_toggle,
             compact,
-            plain,
+            format,
         } = init;
         let in_reply_to = prefill.in_reply_to.clone();
         let references = prefill.references.clone();
@@ -725,8 +794,18 @@ impl Component for Compose {
             content.push_str(&sig_html(&current_sig));
         }
         let editor = RichEditor::new(&content);
-        if plain {
-            editor.set_formatting_visible(false);
+        editor.set_formatting_visible(format == ComposeFormat::Rich);
+        // A source format starts from the same content, written out as
+        // source: a reply's quoted original becomes `> ` lines in Markdown,
+        // or the HTML it already was.
+        match format {
+            ComposeFormat::Markdown => {
+                editor.set_source(SourceKind::Markdown, &crate::markdown::from_html(&content))
+            }
+            ComposeFormat::Html => {
+                editor.set_source(SourceKind::Html, &crate::markdown::pretty_html(&content))
+            }
+            ComposeFormat::Rich | ComposeFormat::Plain => {}
         }
         // "Send as Attachment Instead" on an inline image: the editor lifts
         // it to a temp file and it joins the attachment chips here.
@@ -763,7 +842,7 @@ impl Component for Compose {
             narrow: false,
             fields_dirty: false,
             sign: false,
-            plain,
+            format,
             encrypt: false,
             send_at,
             cloud_accounts: crate::cloud::load_enabled_accounts(),
@@ -1106,17 +1185,22 @@ impl Component for Compose {
                         .icon(&format!("co.hyprlab.Vireo-{}-symbolic", check(self.encrypt, "channel-secure"))),
                     );
                 }
-                let mut host = Vec::new();
-                {
+                let mut host = vec![MenuEntry::submenu(
+                    i18n_f("Writing in {format}", &[("format", &format_label(self.format))]),
+                    vec![self.format_entries(&sender)],
+                )
+                .icon(format_icon(self.format))];
+                if self.format.is_source() {
                     // Through its button, so the toggled handler keeps the
                     // model and the button agreeing.
-                    let plain = widgets.plain_btn.clone();
+                    let preview = widgets.preview_btn.clone();
+                    let showing = preview.is_active();
                     host.push(
                         MenuEntry::new(
-                            &if self.plain { i18n("Send with formatting") } else { i18n("Send as plain text") },
-                            move || plain.set_active(!plain.is_active()),
+                            &if showing { i18n("Back to the source") } else { i18n("Preview the formatted message") },
+                            move || preview.set_active(!preview.is_active()),
                         )
-                        .icon("co.hyprlab.Vireo-text-x-generic-symbolic"),
+                        .icon("co.hyprlab.Vireo-eye-open-negative-filled-symbolic"),
                     );
                 }
                 if self.can_toggle {
@@ -1203,6 +1287,33 @@ impl Component for Compose {
                         // Into the body where the user's own text ends: above
                         // the signature, and above a quoted original in a
                         // reply, so the link reads as part of the message.
+                        if let Some(kind) = self.editor.source_kind() {
+                            let line = match kind {
+                                SourceKind::Markdown => format!(
+                                    "\u{1F4CE} [{name}]({url}) ({caption})",
+                                    name = share.name,
+                                    url = share.url,
+                                    caption = caption,
+                                ),
+                                SourceKind::Html => html.clone(),
+                            };
+                            // The same place, said in text: above the `-- `
+                            // signature line if there is one, else at the end.
+                            self.editor.run_js(&format!(
+                                "(function(){{var t=document.getElementById('src');if(!t)return;\
+                                 var l='{}';var v=t.value;var i=v.lastIndexOf('\\n-- \\n');\
+                                 if(i>=0){{v=v.slice(0,i)+'\\n'+l+'\\n'+v.slice(i);}}\
+                                 else{{v=v.replace(/\\s*$/,'')+'\\n\\n'+l+'\\n';}}\
+                                 t.value=v;window.__vireoDirty=true;}})()",
+                                js_escape(&line)
+                            ));
+                            if let Some(p) = share.password.clone() {
+                                self.cloud_passwords.push((share.name.clone(), p));
+                            }
+                            self.cloud_links.push(CloudLink { id, name: share.name, url: share.url });
+                            self.rebuild_attachments(&widgets.attach_box, &sender);
+                            break 'handle;
+                        }
                         self.editor.run_js(&format!(
                             "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
                              var p=d.firstChild;var b=document.body;\
@@ -1236,6 +1347,19 @@ impl Component for Compose {
                 if i < self.cloud_links.len() {
                     let link = self.cloud_links.remove(i);
                     self.cloud_passwords.retain(|(n, _)| *n != link.name);
+                    // Source mode has no element to remove: the line that
+                    // names the link is what goes.
+                    if self.editor.source_kind().is_some() {
+                        self.editor.run_js(&format!(
+                            "(function(){{var t=document.getElementById('src');if(!t)return;\
+                             var u='{}';\
+                             t.value=t.value.split('\\n').filter(function(l){{return l.indexOf(u)<0;}})\
+                               .join('\\n');window.__vireoDirty=true;}})()",
+                            js_escape(&link.url)
+                        ));
+                        self.rebuild_attachments(&widgets.attach_box, &sender);
+                        break 'handle;
+                    }
                     self.editor.run_js(&format!(
                         "(function(){{var p=document.getElementById('{}');if(p)p.remove();document.dispatchEvent(new Event('input'));}})()",
                         js_escape(&link.id)
@@ -1375,7 +1499,27 @@ impl Component for Compose {
                 // Swap the editor's signature block for the new account's.
                 let idx = widgets.from_row.selected() as usize;
                 let new_sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
-                if new_sig != self.current_sig {
+                if new_sig == self.current_sig {
+                    break 'handle;
+                }
+                // Source mode holds the signature as text, so the swap is a
+                // text replacement in the field rather than a DOM one.
+                if let Some(kind) = self.editor.source_kind() {
+                    let old = sig_source(kind, &self.current_sig);
+                    let new = sig_source(kind, &new_sig);
+                    self.editor.run_js(&format!(
+                        "(function(){{var t=document.getElementById('src');if(!t)return;\
+                         var o='{}',n='{}';var v=t.value;\
+                         var i=o?v.lastIndexOf(o):-1;\
+                         if(i>=0){{v=v.slice(0,i)+n+v.slice(i+o.length);}}else{{v=v+n;}}\
+                         t.value=v;window.__vireoDirty=true;}})()",
+                        js_escape(&old),
+                        js_escape(&new)
+                    ));
+                    self.current_sig = new_sig;
+                    break 'handle;
+                }
+                {
                     let replacement = if new_sig.is_empty() {
                         String::new()
                     } else {
@@ -1456,9 +1600,79 @@ impl Component for Compose {
             }
 
             ComposeInput::ToggleSign(on) => self.sign = on,
-            ComposeInput::TogglePlain(on) => {
-                self.plain = on;
-                self.editor.set_formatting_visible(!on);
+
+            ComposeInput::FormatMenu => {
+                let btn = &widgets.format_btn;
+                show_context_menu(
+                    btn,
+                    (btn.width() / 2) as f64,
+                    btn.height() as f64,
+                    vec![self.format_entries(&sender)],
+                );
+            }
+
+            ComposeInput::SetFormat(to) => {
+                let from = self.format;
+                if to == from {
+                    break 'handle;
+                }
+                self.format = to;
+                self.editor.set_formatting_visible(to == ComposeFormat::Rich);
+                // A preview of the old format's render would be a lie about
+                // the new one.
+                widgets.preview_btn.set_active(false);
+                // Rich and plain text share one document — plain text only
+                // decides what is *sent* — so switching between them must
+                // not reload it and throw away the undo history and caret.
+                if from.is_source() || to.is_source() {
+                    let s = sender.clone();
+                    self.read_body_as(from, false, move |body, _| {
+                        s.input(ComposeInput::LoadAs { from, to, body });
+                    });
+                }
+            }
+
+            ComposeInput::LoadAs { from, to, body } => {
+                // Every conversion goes through HTML: it is the one form
+                // all four formats can be written to and read back from.
+                let html = match from {
+                    ComposeFormat::Markdown => crate::markdown::to_html(&body),
+                    _ => body,
+                };
+                match to {
+                    ComposeFormat::Markdown => self
+                        .editor
+                        .set_source(SourceKind::Markdown, &crate::markdown::from_html(&html)),
+                    ComposeFormat::Html => self
+                        .editor
+                        .set_source(SourceKind::Html, &crate::markdown::pretty_html(&html)),
+                    ComposeFormat::Rich | ComposeFormat::Plain => self.editor.set_html(&html),
+                }
+                self.editor.grab_focus();
+            }
+
+            ComposeInput::TogglePreview(on) => {
+                // Keep the button with the state, for the times the message
+                // arrives from somewhere other than a click on it.
+                if widgets.preview_btn.is_active() != on {
+                    widgets.preview_btn.set_active(on);
+                }
+                if !on {
+                    self.editor.show_preview(None);
+                    break 'handle;
+                }
+                let s = sender.clone();
+                self.read_body_as(self.format, false, move |body, _| {
+                    s.input(ComposeInput::ShowPreview(body));
+                });
+            }
+
+            ComposeInput::ShowPreview(body) => {
+                let html = match self.format {
+                    ComposeFormat::Markdown => crate::markdown::to_html(&body),
+                    _ => body,
+                };
+                self.editor.show_preview(Some(&html));
             }
             ComposeInput::ToggleEncrypt(on) => {
                 self.encrypt = on;
@@ -1502,11 +1716,13 @@ impl Component for Compose {
                 let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
                 let from_alias = self.accounts.get(idx).and_then(|a| a.alias_from.clone());
 
-                // Pull the HTML and a plain-text version out of the editor (async),
-                // then finish sending via SendBody. The send-time reader also
-                // recuts any picture armed for it; a draft save below does not.
+                // Pull the body out of the editor (async), then finish
+                // sending via SendBody. The send-time reader also recuts any
+                // picture armed for it; a draft save below does not. In a
+                // source format `html` carries the source itself, which
+                // `outgoing_body` converts.
                 let s = sender.clone();
-                self.editor.extract_for_send(move |html, text| {
+                self.read_body_as(self.format, true, move |html, text| {
                     s.input(ComposeInput::SendBody {
                         html,
                         text,
@@ -1522,9 +1738,7 @@ impl Component for Compose {
             }
 
             ComposeInput::SendBody { html, text, to, cc, bcc, reply_to, subject, from_account_id, from_alias } => {
-                // Plain text (#180): no HTML part, so the mail goes as
-                // text/plain only.
-                let html = if self.plain { String::new() } else { html };
+                let (html, text) = self.outgoing_body(html, text);
                 let out = self
                     .build_outgoing(from_account_id, from_alias, to, cc, bcc, reply_to, subject, text, html);
                 let _ = sender.output(ComposeOutput::Send(Box::new(out)));
@@ -1542,7 +1756,7 @@ impl Component for Compose {
                 let from_account_id = self.accounts.get(idx).map(|a| a.id).unwrap_or(1);
                 let from_alias = self.accounts.get(idx).and_then(|a| a.alias_from.clone());
                 let s = sender.clone();
-                self.editor.extract(move |html, text| {
+                self.read_body_as(self.format, false, move |html, text| {
                     s.input(ComposeInput::SaveDraftBody {
                         html,
                         text,
@@ -1558,7 +1772,7 @@ impl Component for Compose {
             }
 
             ComposeInput::SaveDraftBody { html, text, to, cc, bcc, reply_to, subject, from_account_id, from_alias } => {
-                let html = if self.plain { String::new() } else { html };
+                let (html, text) = self.outgoing_body(html, text);
                 let out = self
                     .build_outgoing(from_account_id, from_alias, to, cc, bcc, reply_to, subject, text, html);
                 let _ = sender.output(ComposeOutput::SaveDraft(Box::new(out)));
@@ -1574,6 +1788,71 @@ impl Component for Compose {
 }
 
 impl Compose {
+    /// The four formats as menu entries, the current one wearing a tick in
+    /// place of its icon (as the OpenPGP toggles do).
+    fn format_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
+        [
+            ComposeFormat::Rich,
+            ComposeFormat::Markdown,
+            ComposeFormat::Html,
+            ComposeFormat::Plain,
+        ]
+        .into_iter()
+        .map(|format| {
+            let s = sender.clone();
+            let label = format!("{} — {}", format_label(format), format_hint(format));
+            MenuEntry::new(&label, move || s.input(ComposeInput::SetFormat(format))).icon(
+                if format == self.format {
+                    "co.hyprlab.Vireo-verified-checkmark-symbolic"
+                } else {
+                    format_icon(format)
+                },
+            )
+        })
+        .collect()
+    }
+
+    /// Read the body out of the editor in `format`'s own terms: the source
+    /// text for a source format (with no plain-text rendering, since the
+    /// source *is* text), the document's HTML and text otherwise.
+    ///
+    /// `for_send` picks the reader that recuts pictures armed for it; a
+    /// draft save must never cost quality, so it passes false.
+    fn read_body_as(
+        &self,
+        format: ComposeFormat,
+        for_send: bool,
+        cb: impl FnOnce(String, String) + 'static,
+    ) {
+        if format.is_source() {
+            self.editor.extract_source(move |src| cb(src, String::new()));
+        } else if for_send {
+            self.editor.extract_for_send(cb);
+        } else {
+            self.editor.extract(cb);
+        }
+    }
+
+    /// The `(html, text)` parts of the outgoing message, from what the
+    /// editor handed back. Markdown is rendered and keeps its source as the
+    /// text part — Markdown being, deliberately, plain text that reads as
+    /// itself. Hand-written HTML is sanitized and gets a Markdown rendering
+    /// as its text part. Plain text sends no HTML part at all (#180).
+    fn outgoing_body(&self, body: String, text: String) -> (String, String) {
+        match self.format {
+            ComposeFormat::Rich => (body, text),
+            ComposeFormat::Plain => (String::new(), text),
+            ComposeFormat::Markdown => {
+                let html = crate::markdown::sanitize_outgoing(&crate::markdown::to_html(&body));
+                (html, body)
+            }
+            ComposeFormat::Html => {
+                let text = crate::markdown::html_to_text(&body);
+                (crate::markdown::sanitize_outgoing(&body), text)
+            }
+        }
+    }
+
     /// Assemble an [`OutgoingMessage`] from the composed fields + attachments,
     /// carrying the draft origin so a saved/sent draft replaces its predecessor.
     #[allow(clippy::too_many_arguments)]

@@ -988,9 +988,16 @@ struct PrivacyFile {
     /// menu always offers both, whichever way this is set.
     #[serde(default = "default_paste_plain")]
     paste_plain: bool,
-    /// New messages start as plain text, without formatting (#180).
+    /// New messages start as plain text, without formatting (#180). Kept
+    /// written so a version that predates `compose_format` still opens its
+    /// composer the way this one was left.
     #[serde(default)]
     compose_plain: bool,
+    /// What new messages are written in (#199): rich text, Markdown, HTML
+    /// source, or plain text. Absent on installs that predate the choice,
+    /// where `compose_plain` above still says which of the two it is.
+    #[serde(default)]
+    compose_format: Option<ComposeFormat>,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_spellcheck")]
     spellcheck: bool,
@@ -1291,6 +1298,7 @@ impl Default for PrivacyFile {
             single_card_default_applied: false,
             paste_plain: default_paste_plain(),
             compose_plain: false,
+            compose_format: None,
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -2207,9 +2215,35 @@ pub fn load_plain_style() -> (bool, String) {
     (p.plain_monospace, p.plain_font)
 }
 
-/// Whether new messages start as plain text (#180).
-pub fn load_compose_plain() -> bool {
-    load_privacy().compose_plain
+/// What a message is written in (#199). Rich text is the WYSIWYG editor;
+/// Markdown and HTML are source views that are converted on the way out;
+/// plain text sends no HTML part at all.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ComposeFormat {
+    #[default]
+    Rich,
+    Markdown,
+    Html,
+    Plain,
+}
+
+impl ComposeFormat {
+    /// Whether this format is edited as source rather than as rich text.
+    pub fn is_source(self) -> bool {
+        matches!(self, ComposeFormat::Markdown | ComposeFormat::Html)
+    }
+}
+
+/// What new messages start out as (#199), falling back to the plain-text
+/// switch this setting replaced (#180).
+pub fn load_compose_format() -> ComposeFormat {
+    let p = load_privacy();
+    p.compose_format.unwrap_or(if p.compose_plain {
+        ComposeFormat::Plain
+    } else {
+        ComposeFormat::Rich
+    })
 }
 
 /// Whether desktop notifications (new mail, error alerts) are enabled.
@@ -2521,7 +2555,7 @@ pub fn save_privacy(
     reply_fields: bool,
     compose_default_from: &str,
     paste_plain: bool,
-    compose_plain: bool,
+    compose_format: ComposeFormat,
     spellcheck: bool,
     spellcheck_langs: String,
     preview_lines: u32,
@@ -2602,7 +2636,9 @@ pub fn save_privacy(
         reply_fields,
         compose_default_from: compose_default_from.to_string(),
         paste_plain,
-        compose_plain,
+        // Both are written: the boolean is what an older version reads.
+        compose_plain: compose_format == ComposeFormat::Plain,
+        compose_format: Some(compose_format),
         spellcheck,
         // Every save is after the first load, which applied it.
         single_card_default_applied: true,

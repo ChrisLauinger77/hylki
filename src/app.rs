@@ -785,7 +785,7 @@ pub struct AppModel {
     compose_default_from: String,
     paste_plain: bool,
     /// New messages start as plain text (#180).
-    compose_plain: bool,
+    compose_format: crate::config::ComposeFormat,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -1266,7 +1266,11 @@ pub enum AppMsg {
     SetPlainMonospace(bool),
     SetPlainFont(String),
     /// Settings: new messages start as plain text (#180).
-    SetComposePlain(bool),
+    SetComposeFormat(crate::config::ComposeFormat),
+    /// Showcase only: turn the inline composer's preview on (#199).
+    ShowcaseComposePreview,
+    /// Showcase only: open the inline composer's overflow menu (#199).
+    ShowcaseComposeMenu,
     /// Fetch a message's body again: its OpenPGP verdict changed (#133).
     ReloadBody(Box<crate::models::Message>),
     /// Select a settings category by id (the showcase hook).
@@ -2754,7 +2758,7 @@ impl SimpleComponent for AppModel {
             reply_fields: config::load_reply_fields(),
             compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
-            compose_plain: config::load_compose_plain(),
+            compose_format: config::load_compose_format(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
@@ -3905,6 +3909,25 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         s.input(AppMsg::Reply);
+                    });
+                }
+                // VIREO_SHOWCASE_COMPOSE_PREVIEW=1 turns the inline
+                // composer's preview on a beat after it opens (#199), so a
+                // capture can show the rendered message rather than the
+                // source it was written in.
+                // VIREO_SHOWCASE_COMPOSE_MENU=1 opens the inline composer's
+                // overflow menu, where a narrow pane keeps the format
+                // chooser (#199).
+                if std::env::var("VIREO_SHOWCASE_COMPOSE_MENU").is_ok() {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        s.input(AppMsg::ShowcaseComposeMenu);
+                    });
+                }
+                if std::env::var("VIREO_SHOWCASE_COMPOSE_PREVIEW").is_ok() {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        s.input(AppMsg::ShowcaseComposePreview);
                     });
                 }
                 // VIREO_SHOWCASE_FILES=/a:/b hands those files in at 4 s,
@@ -6541,9 +6564,19 @@ impl SimpleComponent for AppModel {
                     self.push_reader_style();
                 }
             }
-            AppMsg::SetComposePlain(on) => {
-                if self.compose_plain != on {
-                    self.compose_plain = on;
+            AppMsg::ShowcaseComposeMenu => {
+                if let Some(r) = self.reader_compose.as_ref() {
+                    r.controller.emit(ComposeInput::OverflowMenu);
+                }
+            }
+            AppMsg::ShowcaseComposePreview => {
+                if let Some(r) = self.reader_compose.as_ref() {
+                    r.controller.emit(ComposeInput::TogglePreview(true));
+                }
+            }
+            AppMsg::SetComposeFormat(format) => {
+                if self.compose_format != format {
+                    self.compose_format = format;
                     self.save_settings();
                 }
             }
@@ -8705,7 +8738,7 @@ impl AppModel {
             self.reply_fields,
             &self.compose_default_from,
             self.paste_plain,
-            self.compose_plain,
+            self.compose_format,
             self.spellcheck,
             self.spellcheck_langs.clone(),
             self.preview_lines,
@@ -11731,7 +11764,7 @@ impl AppModel {
             windowed,
             can_toggle,
             compact: false,
-            plain: self.compose_plain,
+            format: self.compose_format,
         };
         (id, init)
     }
@@ -13877,7 +13910,7 @@ impl AppModel {
             override_colors: self.override_colors,
             plain_monospace: self.plain_monospace,
             plain_font: self.plain_font.clone(),
-            compose_plain: self.compose_plain,
+            compose_format: self.compose_format,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             show_attachments: self.show_attachments,
@@ -14031,7 +14064,7 @@ impl AppModel {
                 PrefOutput::SetOverrideColors(on) => AppMsg::SetOverrideColors(on),
                 PrefOutput::SetPlainMonospace(on) => AppMsg::SetPlainMonospace(on),
                 PrefOutput::SetPlainFont(font) => AppMsg::SetPlainFont(font),
-                PrefOutput::SetComposePlain(on) => AppMsg::SetComposePlain(on),
+                PrefOutput::SetComposeFormat(f) => AppMsg::SetComposeFormat(f),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
