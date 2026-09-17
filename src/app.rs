@@ -765,6 +765,10 @@ pub struct AppModel {
     body_hits: std::collections::HashMap<(u32, u32), std::collections::HashMap<u32, Vec<String>>>,
     /// Lone messages render as inset cards (#57).
     single_message_card: bool,
+    /// Each conversation message lists its own attachments (#213).
+    card_attachments: bool,
+    /// The attachment drawer beneath the reader is shown at all (#213).
+    drawer_enabled: bool,
     /// Whether conversation rows may expand into their members in the list
     /// (the row keeps its chip and chevron either way).
     thread_expansion: bool,
@@ -1302,6 +1306,15 @@ pub enum AppMsg {
     SetComposeFormat(crate::config::ComposeFormat),
     /// Settings: where the split reply opens in the reading pane (#212).
     SetReplyPosition(config::ReplyPosition),
+    /// Settings: each conversation message lists its own attachments (#213).
+    SetCardAttachments(bool),
+    /// Settings: the attachment drawer beneath the reader is shown (#213).
+    SetAttachmentDrawer(bool),
+    /// A card's attachment chip (#213): open the file, or save it.
+    CardAttachment { account_id: u32, id: u32, index: usize, save: bool },
+    /// The drawer's "Show in Message": scroll the reader to the message this
+    /// attachment came with (#213).
+    ShowAttachmentInMessage(Attachment),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
     /// Showcase only (VIREO_SHOWCASE_COMPOSE_UNDO): drive the inline
@@ -2394,6 +2407,9 @@ impl SimpleComponent for AppModel {
                         AppMsg::CardAction { action, message }
                     }
                     MessageViewOutput::ContactSender(m) => AppMsg::CardContact(m),
+                    MessageViewOutput::AttachmentAction { account_id, id, index, save } => {
+                        AppMsg::CardAttachment { account_id, id, index, save }
+                    }
                     MessageViewOutput::CardMenu { message, x, y } => {
                         AppMsg::CardMenu { message, x, y }
                     }
@@ -2423,6 +2439,9 @@ impl SimpleComponent for AppModel {
             .forward(sender.input_sender(), |out| match out {
                 crate::ui::attachment_drawer::DrawerOutput::ShowLightbox { items, start } => {
                     AppMsg::ShowLightbox { items, start }
+                }
+                crate::ui::attachment_drawer::DrawerOutput::ShowInMessage(att) => {
+                    AppMsg::ShowAttachmentInMessage(att)
                 }
             });
 
@@ -2803,6 +2822,8 @@ impl SimpleComponent for AppModel {
             filter_moved: Default::default(),
             body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
+            card_attachments: config::load_card_attachments(),
+            drawer_enabled: config::load_attachment_drawer(),
             thread_expansion: config::load_thread_expansion(),
             confirm_thread_delete: config::load_confirm_thread_delete(),
             selection_from_cards: false,
@@ -2960,6 +2981,12 @@ impl SimpleComponent for AppModel {
         model
             .message_view
             .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
+        model
+            .message_view
+            .emit(MessageViewInput::SetCardAttachmentsShown(model.card_attachments));
+        model
+            .message_view
+            .emit(MessageViewInput::SetAttachmentDrawer(model.drawer_enabled));
         model.arm_auto_fetch(&sender);
 
         // The app-wide theme choice must be in force before the first frame.
@@ -6421,6 +6448,67 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetCardAttachments(on) => {
+                if self.card_attachments != on {
+                    self.card_attachments = on;
+                    self.save_settings();
+                    self.message_view.emit(MessageViewInput::SetCardAttachmentsShown(on));
+                }
+            }
+            AppMsg::SetAttachmentDrawer(on) => {
+                if self.drawer_enabled != on {
+                    self.drawer_enabled = on;
+                    self.save_settings();
+                    self.sync_attachment_drawer();
+                    self.message_view.emit(MessageViewInput::SetAttachmentDrawer(on));
+                }
+            }
+            AppMsg::CardAttachment { account_id, id, index, save } => {
+                let Some(items) = self.attachment_cache.get(&(account_id, id)).cloned() else {
+                    return;
+                };
+                let Some(att) = items.get(index).cloned() else { return };
+                if save {
+                    save_attachment(att, Some(self.window.clone()));
+                } else if crate::ui::attachment_drawer::previewable(&att) {
+                    // The lightbox pages through this message's previewable
+                    // files, starting at the one clicked.
+                    let previewable: Vec<Attachment> = items
+                        .iter()
+                        .filter(|a| crate::ui::attachment_drawer::previewable(a))
+                        .cloned()
+                        .collect();
+                    let start = items
+                        .iter()
+                        .take(index + 1)
+                        .filter(|a| crate::ui::attachment_drawer::previewable(a))
+                        .count()
+                        .saturating_sub(1);
+                    sender.input(AppMsg::ShowLightbox { items: previewable, start });
+                } else {
+                    crate::ui::attachments_gallery::open_bytes(
+                        &att.name,
+                        &att.data,
+                        Some(self.window.upcast_ref::<gtk::Window>()),
+                    );
+                }
+            }
+            AppMsg::ShowAttachmentInMessage(att) => {
+                // The drawer shows identical (name, size) pairs once, so the
+                // first message carrying this one is the one to find.
+                let owner = self
+                    .conversation_members()
+                    .into_iter()
+                    .find(|key| {
+                        self.attachment_cache.get(key).is_some_and(|items| {
+                            items.iter().any(|a| a.name == att.name && a.data.len() == att.data.len())
+                        })
+                    });
+                if let Some((account_id, id)) = owner {
+                    self.message_view
+                        .emit(MessageViewInput::ScrollToAttachments { account_id, id });
+                }
+            }
             AppMsg::SetSingleMessageCard(on) => {
                 if self.single_message_card != on {
                     self.single_message_card = on;
@@ -8899,6 +8987,8 @@ impl AppModel {
             self.thread_newest_first,
             self.always_show_recipients,
             self.single_message_card,
+            self.card_attachments,
+            self.drawer_enabled,
             self.confirm_thread_delete,
             self.message_theme,
             self.override_fonts,
@@ -10920,8 +11010,40 @@ impl AppModel {
     }
 
     fn sync_attachment_drawer(&self) {
-        self.attachment_drawer
-            .emit(AttachmentDrawerInput::SetItems(self.attachments.clone()));
+        // Switched off (#213), the drawer is simply never given anything:
+        // empty hides it, seam and all.
+        let items = if self.drawer_enabled { self.attachments.clone() } else { Vec::new() };
+        self.attachment_drawer.emit(AttachmentDrawerInput::SetItems(items));
+        self.push_card_attachments();
+    }
+
+    /// The messages on screen: the open conversation, or the lone message.
+    fn conversation_members(&self) -> Vec<(u32, u32)> {
+        if self.current_thread.is_empty() {
+            self.current.iter().map(|c| (c.account_id, c.id)).collect()
+        } else {
+            self.current_thread.iter().map(|m| (m.account_id, m.id)).collect()
+        }
+    }
+
+    /// Hand the reader what each message on screen has attached (#213), as
+    /// far as the cache knows: names and sizes only, never the bytes — the
+    /// document lists them, and the app opens or saves them on request.
+    fn push_card_attachments(&self) {
+        use crate::ui::message_view::CardAttachment;
+        let mut map: HashMap<(u32, u32), Vec<CardAttachment>> = HashMap::new();
+        for key in self.conversation_members() {
+            if let Some(items) = self.attachment_cache.get(&key) {
+                let atts: Vec<CardAttachment> = items
+                    .iter()
+                    .map(|a| CardAttachment { name: a.name.clone(), size: a.data.len() as u64 })
+                    .collect();
+                if !atts.is_empty() {
+                    map.insert(key, atts);
+                }
+            }
+        }
+        self.message_view.emit(MessageViewInput::SetCardAttachments(map));
     }
 
     /// Fill the drawer for a whole conversation: ask the disk cache for every
@@ -14282,6 +14404,8 @@ impl AppModel {
             thread_newest_first: self.thread_newest_first,
             always_show_recipients: self.always_show_recipients,
             single_message_card: self.single_message_card,
+            card_attachments: self.card_attachments,
+            attachment_drawer: self.drawer_enabled,
             thread_expansion: self.thread_expansion,
             confirm_thread_delete: self.confirm_thread_delete,
             message_theme: self.message_theme,
@@ -14377,6 +14501,8 @@ impl AppModel {
                 PrefOutput::SetThreadNewestFirst(on) => AppMsg::SetThreadNewestFirst(on),
                 PrefOutput::SetAlwaysShowRecipients(on) => AppMsg::SetAlwaysShowRecipients(on),
                 PrefOutput::SetSingleMessageCard(on) => AppMsg::SetSingleMessageCard(on),
+                PrefOutput::SetCardAttachments(on) => AppMsg::SetCardAttachments(on),
+                PrefOutput::SetAttachmentDrawer(on) => AppMsg::SetAttachmentDrawer(on),
                 PrefOutput::SetCardActionsMode { hover_toggle, hover_auto } => {
                     AppMsg::SetCardActionsMode { hover_toggle, hover_auto }
                 }
@@ -17029,6 +17155,21 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
 }
 
 /// Ask for a folder and write every attachment into it.
+/// Save one attachment via a file chooser (a card chip's save button, #213).
+fn save_attachment(att: Attachment, parent: Option<adw::ApplicationWindow>) {
+    let dialog = gtk::FileDialog::builder()
+        .initial_name(&att.name)
+        .title(&i18n("Save Attachment"))
+        .build();
+    dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+        if let Ok(file) = res {
+            if let Some(path) = file.path() {
+                let _ = std::fs::write(path, &att.data);
+            }
+        }
+    });
+}
+
 fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWindow>) {
     let dialog = gtk::FileDialog::new();
     dialog.set_title(&i18n("Save All Attachments"));

@@ -41,7 +41,7 @@ use crate::i18n::i18n;
 
 /// Whether an attachment can be shown in the drawer's lightbox: a decodable
 /// image, or a PDF (whose first page renders on demand).
-fn previewable(att: &Attachment) -> bool {
+pub(crate) fn previewable(att: &Attachment) -> bool {
     (is_image_name(&att.name) && texture_from(&att.data).is_some()) || is_pdf_name(&att.name)
 }
 
@@ -133,6 +133,8 @@ pub enum DrawerOutput {
     /// Show the app's full-window lightbox over these previewable
     /// attachments, starting at `start`.
     ShowLightbox { items: Vec<Attachment>, start: usize },
+    /// Scroll the reader to the message this attachment came with (#213).
+    ShowInMessage(Attachment),
 }
 
 #[derive(Debug)]
@@ -157,6 +159,8 @@ pub enum AttachmentDrawerInput {
     Activate(usize),
     /// Save an attachment to disk (file chooser).
     Download(usize),
+    /// Scroll the reader to the message the attachment belongs to (#213).
+    ShowInMessage(usize),
     /// Save every attachment into a chosen folder ("Save All" header button).
     SaveAll,
     /// Right-click at (x, y) within the cell.
@@ -579,6 +583,11 @@ impl SimpleComponent for AttachmentDrawer {
                     self.save_attachment(&att);
                 }
             }
+            AttachmentDrawerInput::ShowInMessage(i) => {
+                if let Some(att) = self.item_at(i).cloned() {
+                    let _ = sender.output(DrawerOutput::ShowInMessage(att));
+                }
+            }
             AttachmentDrawerInput::Activate(i) => {
                 // Single clicks do nothing at all (a first click must never
                 // steal the second — a modal lightbox on click one made the
@@ -939,6 +948,13 @@ impl AttachmentDrawer {
         let download =
             MenuEntry::new(i18n("Download…"), move || s.input(AttachmentDrawerInput::Download(index)))
                 .icon("co.hyprlab.Vireo-folder-download-symbolic");
+        // The drawer gathers the whole conversation's files; this finds the
+        // message a file came with (#213).
+        let s = sender.clone();
+        let show = MenuEntry::new(i18n("Show in Message"), move || {
+            s.input(AttachmentDrawerInput::ShowInMessage(index))
+        })
+        .icon("co.hyprlab.Vireo-mail-unread-symbolic");
 
         // Anchor on the clicked cell itself so the click point (already
         // relative to it) needs no coordinate translation.
@@ -947,7 +963,7 @@ impl AttachmentDrawer {
             .child_at_index(index as i32)
             .map(|c| c.upcast())
             .unwrap_or_else(|| self.flow.clone().upcast());
-        show_context_menu(&parent, x, y, vec![vec![open, download]]);
+        show_context_menu(&parent, x, y, vec![vec![open, download], vec![show]]);
     }
 
     /// Ask the app to show its full-window lightbox over the message's

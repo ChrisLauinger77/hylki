@@ -290,6 +290,8 @@ impl Component for MessageWindow {
                     MessageWindowInput::Ignore
                 }
                 MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
+                // A window's cards are never given attachment rows (#213).
+                MessageViewOutput::AttachmentAction { .. } => MessageWindowInput::Ignore,
                 // The pop-out keeps its own view's state; the main window's
                 // per-message record is not its to write.
                 MessageViewOutput::SetRemote { .. } => MessageWindowInput::Ignore,

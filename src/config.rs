@@ -887,6 +887,14 @@ struct PrivacyFile {
     /// messages (#57); off keeps the full-bleed view.
     #[serde(default = "default_single_message_card")]
     single_message_card: bool,
+    /// Each conversation message lists its own attachments beneath its body
+    /// (#213), so which file came with which message is never in doubt.
+    #[serde(default = "default_card_attachments")]
+    card_attachments: bool,
+    /// The attachment drawer beneath the reader, gathering every attachment
+    /// in the open conversation (#213).
+    #[serde(default = "default_attachment_drawer")]
+    attachment_drawer: bool,
     /// Whether deleting a whole selected conversation asks for confirmation
     /// first.
     #[serde(default = "default_confirm_thread_delete")]
@@ -1163,6 +1171,14 @@ fn default_thread_expansion() -> bool {
     false
 }
 
+fn default_card_attachments() -> bool {
+    true
+}
+
+fn default_attachment_drawer() -> bool {
+    true
+}
+
 fn default_single_message_card() -> bool {
     // On for new installs (Jason, 2026-08-31): lone messages get the same
     // inset card as conversations. Only a privacy.toml MISSING this key sees
@@ -1275,6 +1291,8 @@ impl Default for PrivacyFile {
             thread_newest_first: false,
             always_show_recipients: false,
             single_message_card: default_single_message_card(),
+            card_attachments: default_card_attachments(),
+            attachment_drawer: default_attachment_drawer(),
             confirm_thread_delete: default_confirm_thread_delete(),
             message_theme: MessageTheme::default(),
             override_fonts: false,
@@ -2225,6 +2243,14 @@ pub fn load_single_message_card() -> bool {
     load_privacy().single_message_card
 }
 
+pub fn load_card_attachments() -> bool {
+    load_privacy().card_attachments
+}
+
+pub fn load_attachment_drawer() -> bool {
+    load_privacy().attachment_drawer
+}
+
 pub fn load_thread_expansion() -> bool {
     load_privacy().thread_expansion
 }
@@ -2584,6 +2610,8 @@ pub fn save_privacy(
     thread_newest_first: bool,
     always_show_recipients: bool,
     single_message_card: bool,
+    card_attachments: bool,
+    attachment_drawer: bool,
     confirm_thread_delete: bool,
     message_theme: MessageTheme,
     override_fonts: bool,
@@ -2666,6 +2694,8 @@ pub fn save_privacy(
         thread_newest_first,
         always_show_recipients,
         single_message_card,
+        card_attachments,
+        attachment_drawer,
         confirm_thread_delete,
         message_theme,
         override_fonts,

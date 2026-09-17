@@ -17,6 +17,14 @@ pub struct MessageView {
     /// Render a lone message as an inset card, same as a conversation's
     /// messages (#57, preference; off keeps the full-bleed view).
     single_message_card: bool,
+    /// What each message on screen has attached (#213): names and sizes,
+    /// handed over by the app as the files arrive. Listed beneath the card.
+    card_atts: std::collections::HashMap<(u32, u32), Vec<CardAttachment>>,
+    /// Preference: cards list their own attachments (#213).
+    card_atts_shown: bool,
+    /// Preference: the attachment drawer is in use. A lone message's files
+    /// are listed on its card only when the drawer is not there to show them.
+    drawer_on: bool,
     /// Always show the recipients line under the sender (preference) — the
     /// chip then only appears for multi-recipient mail, as a collapse toggle.
     always_show_recipients: bool,
@@ -314,6 +322,14 @@ impl MessageView {
     }
 }
 
+/// One attachment as a card lists it (#213): the name and size only. The
+/// bytes stay with the app, which opens or saves the file on request.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CardAttachment {
+    pub name: String,
+    pub size: u64,
+}
+
 #[derive(Debug)]
 pub enum MessageViewInput {
     /// Whether the blocked-remote-content banner is shown. It doesn't change
@@ -323,6 +339,17 @@ pub enum MessageViewInput {
     SetAlwaysShowRecipients(bool),
     /// The "single messages as cards" preference changed (re-render follows).
     SetSingleMessageCard(bool),
+    /// What each message on screen has attached (#213), patched into the
+    /// cards live when the document is up.
+    SetCardAttachments(std::collections::HashMap<(u32, u32), Vec<CardAttachment>>),
+    /// Preference: cards list their own attachments (#213).
+    SetCardAttachmentsShown(bool),
+    /// Preference: the attachment drawer is in use (#213).
+    SetAttachmentDrawer(bool),
+    /// Scroll a card's attachment row into view and flash it (#213).
+    ScrollToAttachments { account_id: u32, id: u32 },
+    /// A card's attachment chip was clicked (open) or its save button (#213).
+    AttachmentAction { account_id: u32, id: u32, index: usize, save: bool },
     Show {
         /// The conversation, newest first. A single message for a normal open;
         /// several for a threaded conversation.
@@ -524,6 +551,9 @@ pub enum MessageViewOutput {
     SetRemote { account_id: u32, id: u32, show: bool },
     /// A card's "Add sender to Contacts" button — add this message's sender.
     ContactSender(Box<Message>),
+    /// A card's attachment chip (#213): open the file at `index` of that
+    /// message's attachments, or save it.
+    AttachmentAction { account_id: u32, id: u32, index: usize, save: bool },
     /// A right-click on a card: the app shows the message's full menu (the
     /// list row's) at window point (x, y).
     CardMenu { message: Box<Message>, x: f64, y: f64 },
@@ -576,6 +606,51 @@ impl MessageView {
 
 /// The tag chips of a card header (#71): one pill per keyword naming a tag,
 /// coloured inline (the document has no access to the app's stylesheet).
+/// A card's attachment row (#213): the container, always emitted so a later
+/// arrival can be patched into it (an empty row is hidden by the stylesheet).
+fn att_row_html(key: (u32, u32), atts: Option<&[CardAttachment]>) -> String {
+    format!(
+        "<div class=\"vireo-atts\" data-key=\"{}:{}\">{}</div>",
+        key.0,
+        key.1,
+        att_chips_html(key, atts.unwrap_or(&[]))
+    )
+}
+
+/// The chips for one card's attachments (#213): the gallery's type icon in
+/// its colour, the name, the size, and a save button. The chip opens the
+/// file; both post the message key and the attachment's index back.
+fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String {
+    use crate::ui::attachments_gallery::{icon_color_class, icon_for};
+    let mut out = String::new();
+    for (idx, a) in atts.iter().enumerate() {
+        // The gallery names its icons with the app prefix; the inliner adds
+        // that itself.
+        let icon = icon_for(&a.name).trim_start_matches("co.hyprlab.Vireo-");
+        out.push_str(&format!(
+            "<span class=\"vireo-attw\">\
+             <button type=\"button\" class=\"vireo-attc {cls}\" data-key=\"{aid}:{id}\" \
+             data-idx=\"{idx}\" title=\"{open}\">{svg}\
+             <span class=\"vireo-attn\">{name}</span>\
+             <span class=\"vireo-attz\">{size}</span></button>\
+             <button type=\"button\" class=\"vireo-attsave\" data-key=\"{aid}:{id}\" \
+             data-idx=\"{idx}\" title=\"{save}\">{dl}</button></span>",
+            cls = icon_color_class(&a.name),
+            aid = key.0,
+            id = key.1,
+            open = gtk::glib::markup_escape_text(&i18n("Open")),
+            svg = inline_icon_svg(icon),
+            // The name comes from the sender: text content, escaped like
+            // every other header field.
+            name = escape_text(&a.name),
+            size = crate::models::human_size(a.size),
+            save = gtk::glib::markup_escape_text(&i18n("Save\u{2026}")),
+            dl = inline_icon_svg("folder-download-symbolic"),
+        ));
+    }
+    out
+}
+
 fn tag_chips_html(tags: &[crate::config::Tag], keywords: &[String]) -> String {
     let mut out = String::new();
     for t in tags.iter().filter(|t| keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))) {
@@ -896,6 +971,9 @@ impl Component for MessageView {
         let mut model = MessageView {
             always_show_recipients: false,
             single_message_card: false,
+            card_atts: std::collections::HashMap::new(),
+            card_atts_shown: true,
+            drawer_on: true,
             current: None,
             thread: Vec::new(),
             tags: Vec::new(),
@@ -1127,6 +1205,16 @@ impl Component for MessageView {
                     }
                     "open" => open_sender.input(MessageViewInput::OpenHeader { account_id, id }),
                     "seen" => open_sender.input(MessageViewInput::MarkSeen { account_id, id }),
+                    // A card's attachment chip (#213); `extra` is the index.
+                    "attopen" | "attsave" => {
+                        let index = extra.and_then(|x| x.trim().parse::<usize>().ok()).unwrap_or(0);
+                        open_sender.input(MessageViewInput::AttachmentAction {
+                            account_id,
+                            id,
+                            index,
+                            save: verb == "attsave",
+                        });
+                    }
                     "found" => {
                         let (cur, total) = extra
                             .and_then(|e| e.split_once(','))
@@ -1410,6 +1498,51 @@ impl Component for MessageView {
             MessageViewInput::SetSingleMessageCard(on) => {
                 self.single_message_card = on;
             }
+            MessageViewInput::SetCardAttachments(map) => {
+                self.card_atts = map;
+                let keys: Vec<(u32, u32)> =
+                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                self.patch_card_atts(&keys);
+            }
+            MessageViewInput::SetCardAttachmentsShown(on) => {
+                if self.card_atts_shown != on {
+                    self.card_atts_shown = on;
+                    if self.current.is_some() && !self.loading {
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::SetAttachmentDrawer(on) => {
+                if self.drawer_on != on {
+                    self.drawer_on = on;
+                    if self.current.is_some() && !self.loading {
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::ScrollToAttachments { account_id, id } => {
+                // The row when it has chips, else the card itself; centred,
+                // with the row flashed so the eye lands on it.
+                let js = format!(
+                    "(function(){{\
+                     var d=document.querySelector('.vireo-atts[data-key=\"{account_id}:{id}\"]');\
+                     var s=document.querySelector('.vireo-msg[data-key=\"{account_id}:{id}\"]');\
+                     var t=(d&&d.children.length)?d:s;if(!t)return;\
+                     t.scrollIntoView({{behavior:'smooth',block:'center'}});\
+                     if(d){{d.classList.remove('flash');void d.offsetWidth;d.classList.add('flash');\
+                     setTimeout(function(){{d.classList.remove('flash');}},1300);}}}})()"
+                );
+                self.webview
+                    .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+            }
+            MessageViewInput::AttachmentAction { account_id, id, index, save } => {
+                let _ = sender.output(MessageViewOutput::AttachmentAction {
+                    account_id,
+                    id,
+                    index,
+                    save,
+                });
+            }
             MessageViewInput::SetBannerShown(show) => {
                 self.show_banner = show;
             }
@@ -1537,6 +1670,11 @@ impl Component for MessageView {
                 for (aid, id) in self.member_checks.keys().copied().collect::<Vec<_>>() {
                     self.patch_verify_badge(aid, id);
                 }
+                // Likewise attachments (#213): the document was built from
+                // what was known when the render was queued.
+                let keys: Vec<(u32, u32)> =
+                    self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                self.patch_card_atts(&keys);
             }
             MessageViewInput::SuppressAutoRead { account_id, id } => {
                 self.no_autoread.insert((account_id, id));
@@ -2029,6 +2167,44 @@ impl MessageView {
             .unwrap_or_else(|| adw::StyleManager::default().is_dark())
     }
 
+    /// Whether cards list their own attachments (#213): by preference, and
+    /// only where the drawer is not already that list — a lone message's
+    /// drawer holds exactly its files, so its card repeats nothing.
+    fn chips_shown(&self) -> bool {
+        self.card_atts_shown && (self.thread.len() > 1 || !self.drawer_on)
+    }
+
+    /// Fill (or empty) the attachment rows of these cards in the live
+    /// document (#213). Files arrive after the paint; reloading the document
+    /// for them would resettle every card, so the rows are patched in place.
+    fn patch_card_atts(&self, keys: &[(u32, u32)]) {
+        if !self.webview_ready || self.current.is_none() || keys.is_empty() {
+            return;
+        }
+        let shown = self.chips_shown();
+        let mut js = String::from("(function(){");
+        for key in keys {
+            let html = if shown {
+                att_chips_html(*key, self.card_atts.get(key).map(|v| v.as_slice()).unwrap_or(&[]))
+            } else {
+                String::new()
+            };
+            js.push_str(&format!(
+                "var d=document.querySelector('.vireo-atts[data-key=\"{}:{}\"]');if(d)d.innerHTML={};",
+                key.0,
+                key.1,
+                serde_json::to_string(&html).unwrap_or_else(|_| "''".into()),
+            ));
+        }
+        js.push_str("})()");
+        self.webview
+            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |r| {
+                if let Err(e) = r {
+                    tracing::warn!("attachment row patch failed: {e}");
+                }
+            });
+    }
+
     fn render(&mut self) {
         let dark = self.effective_dark();
         self.apply_webview_bg(dark);
@@ -2153,6 +2329,9 @@ impl MessageView {
         self.card_actions_auto.hash(&mut h);
         self.palette_collapse_secs.hash(&mut h);
         self.card_palette_menu.hash(&mut h);
+        // Whether cards list their attachments (#213); the lists themselves
+        // are patched in live rather than rendered for.
+        self.chips_shown().hash(&mut h);
         // The picture a mailbox of your own shows can change while a
         // conversation is open (#189) — the cards must be built again.
         crate::avatar::own_faces_generation().hash(&mut h);
@@ -2179,6 +2358,10 @@ impl MessageView {
         // builder without widening its signature — see LIVE_GROUNDS.
         LIVE_GROUNDS.with(|g| *g.borrow_mut() = Some(self.theme_grounds(dark)));
         LIVE_TAGS.with(|t| *t.borrow_mut() = self.tags.clone());
+        LIVE_ATTS.with(|a| {
+            *a.borrow_mut() =
+                if self.chips_shown() { self.card_atts.clone() } else { Default::default() }
+        });
         Self::conversation_document(
             &self.thread,
             &self.folder_labels,
@@ -2261,9 +2444,16 @@ impl MessageView {
                              <span class=\"vireo-date\">{date}</span></span>\
                            {acts_toggle}{acts}\
                          </div>{rcpt}\
-                       </header>{body}</section>",
+                       </header>{body}{atts}</section>",
                     aid = m.account_id,
                     id = m.id,
+                    // The message's own attachments beneath its body (#213).
+                    // The row is always emitted, so files arriving after
+                    // the paint have somewhere to be patched into.
+                    atts = LIVE_ATTS.with(|a| {
+                        let key = (m.account_id, m.id);
+                        att_row_html(key, a.borrow().get(&key).map(|v| v.as_slice()))
+                    }),
                     hdr_title = gtk::glib::markup_escape_text(
                         &i18n("Double-click to open in a new window")
                     ),
@@ -2680,6 +2870,39 @@ impl MessageView {
                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}\
                .vireo-tags{{display:inline-flex;gap:4px;align-items:center;flex:0 0 auto;}}\
                .vireo-tags:empty{{display:none;}}\
+               /* A card's own attachments (#213): chips beneath the body. */\
+               .vireo-atts{{display:flex;flex-wrap:wrap;gap:6px;padding:2px 14px 12px;}}\
+               .vireo-atts:empty{{display:none;}}\
+               .vireo-attw{{display:inline-flex;align-items:stretch;max-width:100%;\
+                 border:1px solid rgba(128,128,128,0.35);border-radius:8px;overflow:hidden;\
+                 background:rgba(128,128,128,0.08);}}\
+               .vireo-attc{{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;\
+                 border:none;background:none;color:inherit;font:inherit;font-size:0.85em;\
+                 cursor:pointer;min-width:0;max-width:320px;}}\
+               .vireo-attc:hover{{background:rgba(128,128,128,0.18);}}\
+               .vireo-attc svg{{width:16px;height:16px;flex:none;display:block;}}\
+               .vireo-attc svg,.vireo-attc svg *{{fill:currentColor;}}\
+               .vireo-attc.ftype-pdf svg{{color:#e01b24;}}\
+               .vireo-attc.ftype-doc svg{{color:#3584e4;}}\
+               .vireo-attc.ftype-sheet svg{{color:#2ec27e;}}\
+               .vireo-attc.ftype-slides svg{{color:#ff7800;}}\
+               .vireo-attc.ftype-archive svg{{color:#e5a50a;}}\
+               .vireo-attc.ftype-audio svg{{color:#9141ac;}}\
+               .vireo-attc.ftype-video svg{{color:#e6689e;}}\
+               .vireo-attc.ftype-calendar svg{{color:#009e8f;}}\
+               .vireo-attc.ftype-image svg{{color:#1c9bd8;}}\
+               .vireo-attc.ftype-generic svg{{color:#8c8c8c;}}\
+               .vireo-attn{{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}}\
+               .vireo-attz{{opacity:0.55;white-space:nowrap;flex:none;}}\
+               .vireo-attsave{{display:inline-flex;align-items:center;padding:0 7px;border:none;\
+                 border-left:1px solid rgba(128,128,128,0.35);background:none;color:inherit;\
+                 cursor:pointer;opacity:0.6;}}\
+               .vireo-attsave:hover{{opacity:1;background:rgba(128,128,128,0.18);}}\
+               .vireo-attsave svg{{width:14px;height:14px;display:block;}}\
+               .vireo-attsave svg,.vireo-attsave svg *{{fill:currentColor;}}\
+               .vireo-atts.flash .vireo-attw{{animation:vireo-att-flash 1.2s ease-out;}}\
+               @keyframes vireo-att-flash{{0%,40%{{box-shadow:0 0 0 3px rgba(53,132,228,0.7);}}\
+                 100%{{box-shadow:0 0 0 3px rgba(53,132,228,0);}}}}\
                .vireo-tag{{font-size:0.72em;font-weight:700;line-height:1.4;padding:1px 7px;\
                  border-radius:9999px;white-space:nowrap;}}\
                .vireo-addr{{opacity:0.55;font-size:0.9em;flex:1 1 0;max-width:max-content;\
@@ -4521,6 +4744,11 @@ thread_local! {
     /// card headers' chips. Empty in tests: no chips.
     static LIVE_TAGS: std::cell::RefCell<Vec<crate::config::Tag>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// What each card has attached (#213), handed to the builder the same
+    /// way. Empty in tests, and whenever the cards are not to list them.
+    static LIVE_ATTS: std::cell::RefCell<
+        std::collections::HashMap<(u32, u32), Vec<CardAttachment>>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
 /// That ground as a colour the WebView itself can be painted with.
@@ -4726,6 +4954,11 @@ rs[r].addEventListener('dblclick',function(e){e.stopPropagation();});}\
 document.addEventListener('click',function(e){\
 if(e.target&&e.target.closest&&e.target.closest('.vireo-msg'))return;\
 try{window.webkit.messageHandlers.vireo.postMessage('desel:0:0');}catch(_){}});\
+document.addEventListener('click',function(e){\
+var t=e.target&&e.target.closest?e.target.closest('.vireo-attc,.vireo-attsave'):null;if(!t)return;\
+e.stopPropagation();e.preventDefault();\
+var verb=t.classList.contains('vireo-attsave')?'attsave':'attopen';\
+try{window.webkit.messageHandlers.vireo.postMessage(verb+':'+t.dataset.key+':'+t.dataset.idx);}catch(_){}},true);\
 var ms=document.querySelectorAll('.vireo-msg');\
 for(var q=0;q<ms.length;q++){ms[q].addEventListener('click',function(e){\
 var k=this.dataset.key;if(k)pick(k,e);});}\
@@ -5216,6 +5449,31 @@ fn sanitize_filename(subject: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== Per-card attachment rows (#213) =====
+
+    /// A card's attachment chips name the message and the file's index, so a
+    /// click can be answered; the row exists even with nothing in it, so a
+    /// late arrival has somewhere to land; and a sender-chosen filename is
+    /// text, never markup.
+    #[test]
+    fn a_cards_attachment_row_lists_its_own_files() {
+        let atts = vec![
+            CardAttachment { name: "report.pdf".into(), size: 2048 },
+            CardAttachment { name: "<b>x</b>.png".into(), size: 10 },
+        ];
+        let row = att_row_html((1, 7), Some(&atts));
+        assert!(row.starts_with("<div class=\"vireo-atts\" data-key=\"1:7\">"), "{row}");
+        assert_eq!(row.matches("class=\"vireo-attc ").count(), 2, "{row}");
+        assert!(row.contains("class=\"vireo-attc ftype-pdf\" data-key=\"1:7\" data-idx=\"0\""), "{row}");
+        assert!(row.contains("class=\"vireo-attc ftype-image\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
+        assert!(row.contains("class=\"vireo-attsave\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
+        assert!(row.contains("2.0 KB"), "{row}");
+        assert!(!row.contains("<b>x</b>"), "filename is escaped: {row}");
+        assert!(row.contains("&lt;b&gt;x&lt;/b&gt;.png"), "{row}");
+        // Nothing attached: the row is there, and empty.
+        assert_eq!(att_row_html((1, 8), None), "<div class=\"vireo-atts\" data-key=\"1:8\"></div>");
+    }
 
     // ===== Dark-mode colour adaptation (issue #35) =====
 

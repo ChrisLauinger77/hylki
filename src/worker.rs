@@ -8082,6 +8082,24 @@ async fn pop3_delete(account: &AccountConfig, uid: u32) -> Result<(), String> {
 // Mock path (offline fallback)
 // ---------------------------------------------------------------------------
 
+/// The files a demo message "carries": a 1x1 PNG and a short text note.
+fn demo_attachment_files() -> Vec<crate::models::Attachment> {
+    const PNG_1X1: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+    vec![
+        crate::models::Attachment { name: "palette-hover.png".into(), data: PNG_1X1.to_vec() },
+        crate::models::Attachment {
+            name: "notes.txt".into(),
+            data: b"Hover palette: reserved-space fade vs. layout shift.\n".to_vec(),
+        },
+    ]
+}
+
 async fn run_mock(
     account_id: u32,
     mut rx: mpsc::UnboundedReceiver<MailRequest>,
@@ -8187,7 +8205,15 @@ async fn run_mock(
                 emit(WorkerEvent::Source { text });
             }
             MailRequest::LoadAttachments { message_id, .. } => {
-                emit(WorkerEvent::Attachments { message_id, items: Vec::new() });
+                // A demo message flagged as carrying attachments gets two
+                // small files, so the reader's per-card rows and the drawer
+                // have something to show (#213).
+                let items = if backend.message(message_id).is_some_and(|m| m.has_attachment) {
+                    demo_attachment_files()
+                } else {
+                    Vec::new()
+                };
+                emit(WorkerEvent::Attachments { message_id, items });
             }
             // Mutations are no-ops offline; the UI updates optimistically.
             MailRequest::SetSeen { .. }

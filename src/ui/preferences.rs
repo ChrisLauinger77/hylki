@@ -38,6 +38,10 @@ pub struct PrefInit {
     pub always_show_recipients: bool,
     /// Lone messages render as inset cards, like conversation messages.
     pub single_message_card: bool,
+    /// Each conversation message lists its own attachments (#213).
+    pub card_attachments: bool,
+    /// The attachment drawer beneath the reader is shown (#213).
+    pub attachment_drawer: bool,
     /// Conversation rows may expand into their members in the message list.
     pub thread_expansion: bool,
     /// Deleting a whole selected conversation asks for confirmation.
@@ -742,6 +746,8 @@ pub enum PrefInput {
     ToggleThreadNewestFirst(bool),
     ToggleAlwaysShowRecipients(bool),
     ToggleSingleMessageCard(bool),
+    ToggleCardAttachments(bool),
+    ToggleAttachmentDrawer(bool),
     ToggleThreadExpansion(bool),
     ToggleConfirmThreadDelete(bool),
     ChangeCardActionsMode(u32),
@@ -874,6 +880,8 @@ pub enum PrefOutput {
     SetThreadNewestFirst(bool),
     SetAlwaysShowRecipients(bool),
     SetSingleMessageCard(bool),
+    SetCardAttachments(bool),
+    SetAttachmentDrawer(bool),
     SetThreadExpansion(bool),
     SetConfirmThreadDelete(bool),
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
@@ -1775,6 +1783,27 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "card_attachments_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Attachments on each message"),
+                                        set_subtitle: &i18n("List a message's attachments beneath it in a \
+                                                       conversation, so which file came with which message \
+                                                       is clear. Click one to open it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleCardAttachments(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "attachment_drawer_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Attachment drawer"),
+                                        set_subtitle: &i18n("Gather every attachment in the open conversation \
+                                                       in a drawer beneath the messages."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleAttachmentDrawer(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "confirm_thread_delete_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Confirm conversation deletion"),
@@ -2654,6 +2683,8 @@ impl Component for Preferences {
         widgets.thread_newest_first_row.set_active(init.thread_newest_first);
         widgets.always_show_recipients_row.set_active(init.always_show_recipients);
         widgets.single_message_card_row.set_active(init.single_message_card);
+        widgets.card_attachments_row.set_active(init.card_attachments);
+        widgets.attachment_drawer_row.set_active(init.attachment_drawer);
         widgets.thread_expansion_row.set_active(init.thread_expansion);
         widgets.confirm_thread_delete_row.set_active(init.confirm_thread_delete);
         widgets.card_actions_row.set_model(Some(&gtk::StringList::new(&[
@@ -3150,6 +3181,12 @@ impl Component for Preferences {
             }
             PrefInput::ToggleSingleMessageCard(on) => {
                 let _ = sender.output(PrefOutput::SetSingleMessageCard(on));
+            }
+            PrefInput::ToggleCardAttachments(on) => {
+                let _ = sender.output(PrefOutput::SetCardAttachments(on));
+            }
+            PrefInput::ToggleAttachmentDrawer(on) => {
+                let _ = sender.output(PrefOutput::SetAttachmentDrawer(on));
             }
             PrefInput::ChangeCardActionsMode(index) => {
                 self.card_actions_hover = index == 0;
