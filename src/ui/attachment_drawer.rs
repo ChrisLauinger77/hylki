@@ -251,6 +251,11 @@ impl SimpleComponent for AttachmentDrawer {
                         // the text one by hand so the two pills match.
                         add_css_class: "text-button",
                         set_valign: gtk::Align::Center,
+                        // A hair off the header's own inset at each end
+                        // (Jason, 2026-09-17): the count and "Save All…" are
+                        // the row's two pills, so they sit the same distance
+                        // from the edge they face.
+                        set_margin_start: 3,
                         #[watch]
                         set_tooltip_text: Some(if model.collapsed {
                             i18n("Show the attachments")
@@ -363,6 +368,8 @@ impl SimpleComponent for AttachmentDrawer {
                         set_label: &i18n("Save All…"),
                         // A standing button, not a flat hover-reveal.
                         set_valign: gtk::Align::Center,
+                        // Matching the count's inset at the other end.
+                        set_margin_end: 3,
                         set_tooltip_text: Some(i18n("Save every attachment to a folder").as_str()),
                         connect_clicked[sender] => move |_| {
                             sender.input(AttachmentDrawerInput::SaveAll);
