@@ -2210,6 +2210,32 @@ fn normalize_subject(subject: &str) -> String {
     s.trim().to_ascii_lowercase()
 }
 
+/// Which shown row stands for a reader key: the message's own row when the
+/// list has one, and otherwise the row of the conversation it belongs to.
+///
+/// With expandable conversations off, a reply never gets a row of its own and
+/// never will — the thread is only ever the one head row here. Without this
+/// fallback the reader's selection would find nothing to select, and the
+/// conversation would appear to deselect itself the moment one of its other
+/// messages was clicked in the reading pane (#211). The head row stands for
+/// the whole thread, so it is what stays lit however the user moves through
+/// the cards.
+fn row_for_reader_key(
+    key: &(u32, u32),
+    shown: &[Message],
+    msg_thread: &std::collections::HashMap<(u32, u32), (u32, String)>,
+) -> Option<usize> {
+    shown
+        .iter()
+        .position(|m| (m.account_id, m.id) == *key)
+        .or_else(|| {
+            let tkey = msg_thread.get(key)?;
+            shown
+                .iter()
+                .position(|m| msg_thread.get(&(m.account_id, m.id)) == Some(tkey))
+        })
+}
+
 /// Group messages into conversations by their reply headers (Message-ID linked
 /// via In-Reply-To / References), scoped per account. Returns each message's
 /// thread key `(account_id, root)`. Messages with no reply relationship get a
@@ -3376,8 +3402,7 @@ impl SimpleComponent for MessageList {
                 let list = self.rows.widget();
                 list.unselect_all();
                 for key in &keys {
-                    if let Some(idx) = self.shown.iter().position(|m| (m.account_id, m.id) == *key)
-                    {
+                    if let Some(idx) = row_for_reader_key(key, &self.shown, &self.msg_thread) {
                         if let Some(row) = list.row_at_index(idx as i32) {
                             list.select_row(Some(&row));
                         }
@@ -5305,7 +5330,7 @@ impl MessageList {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_thread_keys, swipe_progress_px, SWIPE_ARM, SWIPE_MAX};
+    use super::{compute_thread_keys, row_for_reader_key, swipe_progress_px, SWIPE_ARM, SWIPE_MAX};
     use crate::models::Message;
 
     fn msg(id: u32, message_id: &str, references: &str) -> Message {
@@ -5476,5 +5501,33 @@ mod tests {
         for (asked, expected) in [(0u32, 0u32), (1, 1), (3, 3), (9, 3)] {
             assert_eq!(asked.min(3), expected, "for {asked}");
         }
+    }
+
+    /// Clicking a reply's card keeps the conversation's row selected even when
+    /// the list never shows that reply a row of its own (#211).
+    #[test]
+    fn a_hidden_reply_selects_its_conversation_row() {
+        use std::collections::HashMap;
+        // The list shows the head of a three-message conversation, and one
+        // unrelated message below it.
+        let shown = [msg(1, "head@them", ""), msg(9, "other@them", "")];
+        let thread = (1u32, "head@them".to_string());
+        let msg_thread: HashMap<(u32, u32), (u32, String)> = [
+            ((1, 1), thread.clone()),
+            ((1, 2), thread.clone()),
+            ((1, 3), thread.clone()),
+        ]
+        .into_iter()
+        .collect();
+
+        // The head has a row of its own.
+        assert_eq!(row_for_reader_key(&(1, 1), &shown, &msg_thread), Some(0));
+        // Its replies do not, and land on the head's row rather than nowhere.
+        assert_eq!(row_for_reader_key(&(1, 2), &shown, &msg_thread), Some(0));
+        assert_eq!(row_for_reader_key(&(1, 3), &shown, &msg_thread), Some(0));
+        // A message in no conversation still matches only itself.
+        assert_eq!(row_for_reader_key(&(1, 9), &shown, &msg_thread), Some(1));
+        // And one from neither is no row at all.
+        assert_eq!(row_for_reader_key(&(1, 42), &shown, &msg_thread), None);
     }
 }
