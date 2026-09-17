@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.32.3 — 2026-09-16
+
+The two strings the About page gained in 1.32.2 are translated in
+Portuguese.
+
+- **Portuguese updated** (PR #207 by [@somepaulo](https://github.com/somepaulo)).
+  1.32.2 reworded the one-line description under the version chip and made
+  the issue tracker's row translatable. Both are covered in `po/pt_PT.po`
+  and `po/pt_BR.po`, so each is complete again at 1220 of 1220 with no
+  fuzzy entries.
+
 ## 1.32.2 — 2026-09-16
 
 Russian's fuzzy entries are resolved and Portuguese is complete in both

@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.32.3" date="2026-09-16">
+      <description>
+        <p>The two strings the About page gained in 1.32.2, its reworded description and the issue tracker's row, are translated in European and Brazilian Portuguese, so both are complete again.</p>
+      </description>
+    </release>
     <release version="1.32.2" date="2026-09-16">
       <description>
         <p>Russian shows its translation: around sixty-six strings were marked as needing review and so were skipped when the translation was built, leaving them in English. Portuguese is complete in both the European and Brazilian variants. The About page's links are tidied and its issue tracker row can be translated.</p>
