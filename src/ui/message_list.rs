@@ -2220,20 +2220,34 @@ fn normalize_subject(subject: &str) -> String {
 /// messages was clicked in the reading pane (#211). The head row stands for
 /// the whole thread, so it is what stays lit however the user moves through
 /// the cards.
+///
+/// A conversation reaches across folders, so some of its cards — the user's
+/// own replies, pulled in from Sent — belong to no row in this folder at all
+/// and are not in `msg_thread` either. `viewed` is the row the open
+/// conversation was opened from, and `emitted` is that conversation as it was
+/// handed to the reader: a card from it keeps that row lit.
 fn row_for_reader_key(
     key: &(u32, u32),
     shown: &[Message],
     msg_thread: &std::collections::HashMap<(u32, u32), (u32, String)>,
+    emitted: &[(u32, u32)],
+    viewed: Option<(u32, u32)>,
 ) -> Option<usize> {
-    shown
-        .iter()
-        .position(|m| (m.account_id, m.id) == *key)
-        .or_else(|| {
-            let tkey = msg_thread.get(key)?;
-            shown
-                .iter()
-                .position(|m| msg_thread.get(&(m.account_id, m.id)) == Some(tkey))
-        })
+    let own_row = shown.iter().position(|m| (m.account_id, m.id) == *key);
+    let thread_row = || {
+        let tkey = msg_thread.get(key)?;
+        shown
+            .iter()
+            .position(|m| msg_thread.get(&(m.account_id, m.id)) == Some(tkey))
+    };
+    let viewed_row = || {
+        if !emitted.contains(key) {
+            return None;
+        }
+        let viewed = viewed?;
+        shown.iter().position(|m| (m.account_id, m.id) == viewed)
+    };
+    own_row.or_else(thread_row).or_else(viewed_row)
 }
 
 /// Group messages into conversations by their reply headers (Message-ID linked
@@ -3402,7 +3416,13 @@ impl SimpleComponent for MessageList {
                 let list = self.rows.widget();
                 list.unselect_all();
                 for key in &keys {
-                    if let Some(idx) = row_for_reader_key(key, &self.shown, &self.msg_thread) {
+                    if let Some(idx) = row_for_reader_key(
+                        key,
+                        &self.shown,
+                        &self.msg_thread,
+                        &self.emitted_thread,
+                        self.selected_id,
+                    ) {
                         if let Some(row) = list.row_at_index(idx as i32) {
                             list.select_row(Some(&row));
                         }
@@ -5520,14 +5540,25 @@ mod tests {
         .into_iter()
         .collect();
 
+        // The conversation as the reader was given it, opened from its head
+        // row — including a message of the user's own, pulled in from Sent,
+        // which this folder has no row for and no thread entry either.
+        let emitted = [(1, 1), (1, 2), (1, 3), (1, 77)];
+        let viewed = Some((1, 1));
+        let row = |key: (u32, u32)| {
+            row_for_reader_key(&key, &shown, &msg_thread, &emitted, viewed)
+        };
+
         // The head has a row of its own.
-        assert_eq!(row_for_reader_key(&(1, 1), &shown, &msg_thread), Some(0));
+        assert_eq!(row((1, 1)), Some(0));
         // Its replies do not, and land on the head's row rather than nowhere.
-        assert_eq!(row_for_reader_key(&(1, 2), &shown, &msg_thread), Some(0));
-        assert_eq!(row_for_reader_key(&(1, 3), &shown, &msg_thread), Some(0));
+        assert_eq!(row((1, 2)), Some(0));
+        assert_eq!(row((1, 3)), Some(0));
+        // Neither does the copy from Sent, which this folder never lists.
+        assert_eq!(row((1, 77)), Some(0));
         // A message in no conversation still matches only itself.
-        assert_eq!(row_for_reader_key(&(1, 9), &shown, &msg_thread), Some(1));
+        assert_eq!(row((1, 9)), Some(1));
         // And one from neither is no row at all.
-        assert_eq!(row_for_reader_key(&(1, 42), &shown, &msg_thread), None);
+        assert_eq!(row((1, 42)), None);
     }
 }
