@@ -1730,6 +1730,14 @@ msgstr ""
 "Incluir o correio não lido da pasta na contagem de mensagens não lidas do "
 "ícone da área de notificação"
 
+#, fuzzy
+msgid "Show the attachments"
+msgstr "Sem anexos"
+
+#, fuzzy
+msgid "Hide the attachments"
+msgstr "Sem anexos"
+
 msgid "Thumbnail size"
 msgstr "Tamanho das miniaturas"
 
@@ -1770,6 +1778,10 @@ msgstr "Essa chave já tinha sido importada."
 
 msgid "Could not import the key"
 msgstr "Não foi possível importar a chave"
+
+#, fuzzy
+msgid "Show in Message"
+msgstr "Localizar na mensagem"
 
 msgid "Import OpenPGP key"
 msgstr "Importar chave OpenPGP"
@@ -2570,6 +2582,10 @@ msgstr ""
 "Um resultado positivo prova que o endereço não foi falsificado — não que a "
 "mensagem seja segura."
 
+#, fuzzy
+msgid "Save…"
+msgstr "Guardar tudo…"
+
 msgid "No draft selected"
 msgstr "Nenhum rascunho selecionado"
 
@@ -3033,6 +3049,9 @@ msgstr "Barra lateral"
 msgid "Message List"
 msgstr "Lista de mensagens"
 
+msgid "Conversations"
+msgstr "Conversas"
+
 msgid "Reading"
 msgstr "Leitura"
 
@@ -3469,9 +3488,6 @@ msgstr ""
 "Número de segundos durante os quais a paleta de ações da lista de mensagens "
 "permanece aberta depois de o cursor sair."
 
-msgid "Conversations"
-msgstr "Conversas"
-
 msgid "Group messages by conversation"
 msgstr "Agrupar mensagens por conversa"
 
@@ -3510,6 +3526,34 @@ msgstr ""
 "Mostrar a mensagem mais recente de uma conversa no topo do painel de "
 "leitura. Quando desativada, a leitura é feita de cima para baixo, da mais "
 "antiga para a mais recente."
+
+#, fuzzy
+msgid "Reply editor"
+msgstr "Responder a todos"
+
+msgid ""
+"Where a reply or forward opens in the reading pane. Following the reading "
+"order puts it above the messages with newest first, and below them "
+"otherwise, so it continues the conversation where it ends."
+msgstr ""
+
+#, fuzzy
+msgid "Attachments on each message"
+msgstr "Ações numa mensagem"
+
+msgid ""
+"List a message's attachments beneath it in a conversation, so which file "
+"came with which message is clear. Click one to open it."
+msgstr ""
+
+#, fuzzy
+msgid "Attachment drawer"
+msgstr "Anexos"
+
+msgid ""
+"Gather every attachment in the open conversation in a drawer beneath the "
+"messages."
+msgstr ""
 
 msgid "Confirm conversation deletion"
 msgstr "Confirmar a eliminação de conversas"
@@ -4025,6 +4069,18 @@ msgstr "Carregar para o armazenamento na nuvem e criar ligações"
 
 msgid "Account of the current folder"
 msgstr "Conta da pasta atual"
+
+#, fuzzy
+msgid "Above the messages"
+msgstr "Arquivar esta mensagem"
+
+#, fuzzy
+msgid "Below the messages"
+msgstr "Responder a esta mensagem"
+
+#, fuzzy
+msgid "Follows the reading order"
+msgstr "Permitir este remetente"
 
 msgid "System language — {language}"
 msgstr "Idioma do sistema — {language}"

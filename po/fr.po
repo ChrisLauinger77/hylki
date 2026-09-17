@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: vireo\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-16 18:14+0200\n"
+"PO-Revision-Date: 2026-09-17 18:01+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -544,9 +544,8 @@ msgid "Remove"
 msgstr "Supprimer"
 
 #. One-sentence description, directly under the version chip.
-#, fuzzy
 msgid "A fast, GNOME-native email client"
-msgstr "Un client e-mail épuré, rapide et natif pour GNOME."
+msgstr "Un client de messagerie rapide et natif pour GNOME"
 
 msgid ""
 "This is a beta build for trying upcoming changes early. Expect bugs and "
@@ -581,7 +580,7 @@ msgid "Website"
 msgstr "Site web"
 
 msgid "Report an issue or feature request"
-msgstr ""
+msgstr "Signaler un problème ou une demande de fonctionnalité"
 
 msgid "Contact — hyprlab@proton.me"
 msgstr "Contact — hyprlab@proton.me"
@@ -736,9 +735,10 @@ msgstr "Rédiger"
 msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
-#, fuzzy
 msgid "Undo the last action, or the last edit while you are writing"
-msgstr "Annuler la dernière action (également dans le menu principal)"
+msgstr ""
+"Annuler la dernière action ou la dernière modification pendant que vous "
+"écrivez"
 
 msgid "Redo it (Ctrl+Y does the same)"
 msgstr "La rétablir (Ctrl+Y fait de même)"
@@ -1735,6 +1735,12 @@ msgstr ""
 "Inclure le courrier non lu de ce dossier dans le compteur de non-lus de "
 "l'icône de la zone de notification"
 
+msgid "Show the attachments"
+msgstr ""
+
+msgid "Hide the attachments"
+msgstr ""
+
 msgid "Thumbnail size"
 msgstr "Taille des vignettes"
 
@@ -1775,6 +1781,9 @@ msgstr "Cette clé avait déjà été importée."
 
 msgid "Could not import the key"
 msgstr "Impossible d'importer la clé"
+
+msgid "Show in Message"
+msgstr ""
 
 msgid "Import OpenPGP key"
 msgstr "Importer une clé OpenPGP"
@@ -2358,16 +2367,14 @@ msgstr "Impossible de téléverser {name}"
 msgid "Attach Files"
 msgstr "Joindre des fichiers"
 
-#, fuzzy
 msgid "Attach {name}"
-msgstr "Joindre quand même"
+msgstr "Joindre {name}"
 
-#, fuzzy
 msgid "Remove {name}"
-msgstr "{name} supprimé?"
+msgstr "Supprimer {name}"
 
 msgid "Typing"
-msgstr ""
+msgstr "Dactylographie"
 
 msgid "Cannot send with OpenPGP"
 msgstr "Impossible d'envoyer avec OpenPGP"
@@ -2415,11 +2422,10 @@ msgstr "Cette heure est déjà passée"
 msgid "Choose a time later than now."
 msgstr "Choisissez une heure ultérieure à maintenant."
 
-#, fuzzy
 msgid "{n} attachment"
 msgid_plural "{n} attachments"
-msgstr[0] "Aucune pièce jointe"
-msgstr[1] "Aucune pièce jointe"
+msgstr[0] "{n} pièce jointe"
+msgstr[1] "{n} pièces jointes"
 
 msgid "Contacts"
 msgstr "Contacts"
@@ -2581,6 +2587,9 @@ msgid "A pass proves the address wasn't forged — not that the message is safe.
 msgstr ""
 "Une validation prouve que l'adresse n'a pas été falsifiée, mais ne garantit "
 "pas que le message soit sans danger."
+
+msgid "Save…"
+msgstr ""
 
 msgid "No draft selected"
 msgstr "Aucun brouillon sélectionné"
@@ -3049,6 +3058,9 @@ msgstr "Barre latérale"
 msgid "Message List"
 msgstr "Liste des messages"
 
+msgid "Conversations"
+msgstr "Conversations"
+
 msgid "Reading"
 msgstr "Lecture"
 
@@ -3486,9 +3498,6 @@ msgstr ""
 "Nombre de secondes pendant lesquelles la palette d'actions de la liste des "
 "messages reste ouverte après que le curseur l'a quittée."
 
-msgid "Conversations"
-msgstr "Conversations"
-
 msgid "Group messages by conversation"
 msgstr "Grouper les messages par conversation"
 
@@ -3527,6 +3536,31 @@ msgstr ""
 "Afficher le dernier message d'une conversation en haut du panneau de "
 "lecture. Désactivé, la lecture se fait du plus ancien au plus récent vers le "
 "bas."
+
+msgid "Reply editor"
+msgstr ""
+
+msgid ""
+"Where a reply or forward opens in the reading pane. Following the reading "
+"order puts it above the messages with newest first, and below them "
+"otherwise, so it continues the conversation where it ends."
+msgstr ""
+
+msgid "Attachments on each message"
+msgstr ""
+
+msgid ""
+"List a message's attachments beneath it in a conversation, so which file "
+"came with which message is clear. Click one to open it."
+msgstr ""
+
+msgid "Attachment drawer"
+msgstr ""
+
+msgid ""
+"Gather every attachment in the open conversation in a drawer beneath the "
+"messages."
+msgstr ""
 
 msgid "Confirm conversation deletion"
 msgstr "Confirmer la suppression d'une conversation"
@@ -4044,6 +4078,15 @@ msgstr "Les mettre en ligne sur un espace de stockage cloud et les lier"
 
 msgid "Account of the current folder"
 msgstr "Informations sur le dossier actuel"
+
+msgid "Above the messages"
+msgstr ""
+
+msgid "Below the messages"
+msgstr ""
+
+msgid "Follows the reading order"
+msgstr ""
 
 msgid "System language — {language}"
 msgstr "Langue du système — {language}"

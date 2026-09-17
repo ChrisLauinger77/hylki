@@ -1717,6 +1717,14 @@ msgstr ""
 "Включать непрочитанные письма этой папки в счётчик непрочитанного у значка в "
 "трее"
 
+#, fuzzy
+msgid "Show the attachments"
+msgstr "Нет вложений"
+
+#, fuzzy
+msgid "Hide the attachments"
+msgstr "Нет вложений"
+
 msgid "Thumbnail size"
 msgstr "Размер миниатюр"
 
@@ -1757,6 +1765,10 @@ msgstr "Этот ключ был импортирован ранее."
 
 msgid "Could not import the key"
 msgstr "Не удалось импортировать ключ"
+
+#, fuzzy
+msgid "Show in Message"
+msgstr "Поиск в сообщении"
 
 msgid "Import OpenPGP key"
 msgstr "Импортировать ключ OpenPGP"
@@ -2545,6 +2557,10 @@ msgstr ""
 "Пройденная проверка доказывает лишь, что адрес не подделан, — но не "
 "безопасность письма."
 
+#, fuzzy
+msgid "Save…"
+msgstr "Сохранить все…"
+
 msgid "No draft selected"
 msgstr "Сообщение не выбрано"
 
@@ -3010,6 +3026,9 @@ msgstr "Боковая панель"
 msgid "Message List"
 msgstr "Список сообщений"
 
+msgid "Conversations"
+msgstr "Обсуждения"
+
 msgid "Reading"
 msgstr "Чтение"
 
@@ -3442,9 +3461,6 @@ msgstr ""
 "Время в секундах, в течение которого палитра действий списка сообщений "
 "остаётся открытой после того, как курсор покинул её."
 
-msgid "Conversations"
-msgstr "Обсуждения"
-
 msgid "Group messages by conversation"
 msgstr "Группировать сообщения по обсуждениям"
 
@@ -3482,6 +3498,34 @@ msgid ""
 msgstr ""
 "Показывать последнее письмо цепочки в самом верху панели чтения. Если "
 "отключено, порядок чтения будет хронологическим — от старых к новым."
+
+#, fuzzy
+msgid "Reply editor"
+msgstr "Ответить всем"
+
+msgid ""
+"Where a reply or forward opens in the reading pane. Following the reading "
+"order puts it above the messages with newest first, and below them "
+"otherwise, so it continues the conversation where it ends."
+msgstr ""
+
+#, fuzzy
+msgid "Attachments on each message"
+msgstr "Действовать по сообщению"
+
+msgid ""
+"List a message's attachments beneath it in a conversation, so which file "
+"came with which message is clear. Click one to open it."
+msgstr ""
+
+#, fuzzy
+msgid "Attachment drawer"
+msgstr "Вложения"
+
+msgid ""
+"Gather every attachment in the open conversation in a drawer beneath the "
+"messages."
+msgstr ""
 
 msgid "Confirm conversation deletion"
 msgstr "Подтверждать удаление обсуждения"
@@ -3990,6 +4034,18 @@ msgstr "Загрузить в облачное хранилище и добав�
 
 msgid "Account of the current folder"
 msgstr "Учётная запись текущей папки"
+
+#, fuzzy
+msgid "Above the messages"
+msgstr "Архивировать это сообщение"
+
+#, fuzzy
+msgid "Below the messages"
+msgstr "Ответить на это сообщение"
+
+#, fuzzy
+msgid "Follows the reading order"
+msgstr "Разрешить этого отправителя"
 
 msgid "System language — {language}"
 msgstr "Системный язык — {language}"

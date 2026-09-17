@@ -1580,6 +1580,12 @@ msgstr ""
 msgid "Include the folder's unread mail in the tray icon's unread count"
 msgstr ""
 
+msgid "Show the attachments"
+msgstr ""
+
+msgid "Hide the attachments"
+msgstr ""
+
 msgid "Thumbnail size"
 msgstr ""
 
@@ -1616,6 +1622,9 @@ msgid "That key was imported before."
 msgstr ""
 
 msgid "Could not import the key"
+msgstr ""
+
+msgid "Show in Message"
 msgstr ""
 
 msgid "Import OpenPGP key"
@@ -2323,6 +2332,9 @@ msgstr ""
 msgid "A pass proves the address wasn't forged — not that the message is safe."
 msgstr ""
 
+msgid "Save…"
+msgstr ""
+
 msgid "No draft selected"
 msgstr ""
 
@@ -2755,6 +2767,9 @@ msgstr ""
 msgid "Message List"
 msgstr ""
 
+msgid "Conversations"
+msgstr ""
+
 msgid "Reading"
 msgstr ""
 
@@ -3104,9 +3119,6 @@ msgid ""
 "leaves it."
 msgstr ""
 
-msgid "Conversations"
-msgstr ""
-
 msgid "Group messages by conversation"
 msgstr ""
 
@@ -3136,6 +3148,31 @@ msgstr ""
 msgid ""
 "Show a conversation's latest message at the top of the reading pane. Off "
 "reads oldest to newest, downward."
+msgstr ""
+
+msgid "Reply editor"
+msgstr ""
+
+msgid ""
+"Where a reply or forward opens in the reading pane. Following the reading "
+"order puts it above the messages with newest first, and below them "
+"otherwise, so it continues the conversation where it ends."
+msgstr ""
+
+msgid "Attachments on each message"
+msgstr ""
+
+msgid ""
+"List a message's attachments beneath it in a conversation, so which file "
+"came with which message is clear. Click one to open it."
+msgstr ""
+
+msgid "Attachment drawer"
+msgstr ""
+
+msgid ""
+"Gather every attachment in the open conversation in a drawer beneath the "
+"messages."
 msgstr ""
 
 msgid "Confirm conversation deletion"
@@ -3543,6 +3580,15 @@ msgid "Upload to cloud storage and link them"
 msgstr ""
 
 msgid "Account of the current folder"
+msgstr ""
+
+msgid "Above the messages"
+msgstr ""
+
+msgid "Below the messages"
+msgstr ""
+
+msgid "Follows the reading order"
 msgstr ""
 
 msgid "System language — {language}"

@@ -1701,6 +1701,14 @@ msgstr "Olvasatlan levelek számlálása"
 msgid "Include the folder's unread mail in the tray icon's unread count"
 msgstr ""
 
+#, fuzzy
+msgid "Show the attachments"
+msgstr "Nincsenek mellékletek"
+
+#, fuzzy
+msgid "Hide the attachments"
+msgstr "Nincsenek mellékletek"
+
 msgid "Thumbnail size"
 msgstr "Bélyegkép mérete"
 
@@ -1740,6 +1748,10 @@ msgstr "Ezt a kulcsot korábban már importálták."
 
 msgid "Could not import the key"
 msgstr "A kulcs nem importálható"
+
+#, fuzzy
+msgid "Show in Message"
+msgstr "Ugrás az üzenethez"
 
 msgid "Import OpenPGP key"
 msgstr "OpenPGP-kulcs importálása"
@@ -2537,6 +2549,10 @@ msgstr ""
 "nem, hogy az üzenet biztonságos."
 
 #, fuzzy
+msgid "Save…"
+msgstr "Összes mentése…"
+
+#, fuzzy
 msgid "No draft selected"
 msgstr "Nincs kijelölt üzenet"
 
@@ -3002,6 +3018,9 @@ msgstr "Oldalsáv"
 msgid "Message List"
 msgstr "Üzenetlista"
 
+msgid "Conversations"
+msgstr "Beszélgetések"
+
 msgid "Reading"
 msgstr "Olvasás"
 
@@ -3381,9 +3400,6 @@ msgstr ""
 "A műveletpaletta nyitva maradásának másodpercei a kurzor távozása után — a "
 "listában és az üzenetkártyákon egyaránt."
 
-msgid "Conversations"
-msgstr "Beszélgetések"
-
 msgid "Group messages by conversation"
 msgstr "Üzenetek csoportosítása beszélgetés szerint"
 
@@ -3418,6 +3434,34 @@ msgid ""
 msgstr ""
 "A beszélgetés legújabb üzenetének megjelenítése az olvasópanel tetején. "
 "Kikapcsolva a legrégebbitől a legújabb felé, lefelé olvas."
+
+#, fuzzy
+msgid "Reply editor"
+msgstr "Válasz mindenkinek"
+
+msgid ""
+"Where a reply or forward opens in the reading pane. Following the reading "
+"order puts it above the messages with newest first, and below them "
+"otherwise, so it continues the conversation where it ends."
+msgstr ""
+
+#, fuzzy
+msgid "Attachments on each message"
+msgstr "Művelet az üzeneten"
+
+msgid ""
+"List a message's attachments beneath it in a conversation, so which file "
+"came with which message is clear. Click one to open it."
+msgstr ""
+
+#, fuzzy
+msgid "Attachment drawer"
+msgstr "Mellékletek"
+
+msgid ""
+"Gather every attachment in the open conversation in a drawer beneath the "
+"messages."
+msgstr ""
 
 msgid "Confirm conversation deletion"
 msgstr "Beszélgetés törlésének megerősítése"
@@ -3910,6 +3954,18 @@ msgstr "Feltöltés felhőtárhelyre és hivatkozás megosztása"
 
 msgid "Account of the current folder"
 msgstr ""
+
+#, fuzzy
+msgid "Above the messages"
+msgstr "Üzenet archiválása"
+
+#, fuzzy
+msgid "Below the messages"
+msgstr "Válasz erre az üzenetre"
+
+#, fuzzy
+msgid "Follows the reading order"
+msgstr "Feladó engedélyezése"
 
 msgid "System language — {language}"
 msgstr "Rendszernyelv — {language}"
