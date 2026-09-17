@@ -1351,7 +1351,10 @@ headerbar.compose-toolbar button.image-button {
   min-height: 1px;
 }
 .attachment-drawer-header {
-  padding: 4px 8px;
+  /* 2px tighter to the drawer's top edge than the sides and the bottom
+     (Jason, 2026-09-17): the seam's own 8px strip sits above this, so the
+     stock 4px left the header's row, "Save All…" included, sitting low. */
+  padding: 2px 8px 4px;
 }
 /* The "N attachments" count is a button (it toggles the drawer), but it has to
    keep reading as the header's title: no chrome until it is hovered, and tight
