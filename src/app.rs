@@ -5393,6 +5393,11 @@ impl SimpleComponent for AppModel {
                 // inline composer, exactly like the toolbar's buttons — not in
                 // a separate compose window.
                 let m = self.with_cached_body(*message);
+                tracing::debug!(
+                    target: "vireo::reply",
+                    "card {:?}: {}:{} from={}",
+                    action, m.account_id, m.id, m.from_addr,
+                );
                 match action {
                     RowAction::Reply => {
                         self.open_inline_reply(m.account_id, self.reply_pgp(&m, reply_prefill(&m)), Some((m.account_id, m.id)), &sender);
@@ -5433,6 +5438,14 @@ impl SimpleComponent for AppModel {
 
             AppMsg::RowAction { action, message, conversation } => {
                 let m = *message;
+                if matches!(action, RowAction::Reply | RowAction::ReplyAll | RowAction::Forward) {
+                    tracing::debug!(
+                        target: "vireo::reply",
+                        "row {:?}: {}:{} from={} conversation={:?}",
+                        action, m.account_id, m.id, m.from_addr,
+                        conversation.iter().map(|c| c.id).collect::<Vec<_>>(),
+                    );
+                }
                 if self.outbox_item(m.account_id, m.id).is_some() {
                     // Nothing else in the palette applies to an unsent message,
                     // and every other action would aim an IMAP command at a UID
@@ -10030,10 +10043,22 @@ impl AppModel {
     /// addressed as itself.
     fn compose_target(&self) -> Option<Message> {
         let m = self.reply_target()?;
+        tracing::debug!(
+            target: "vireo::reply",
+            "toolbar target: selected {}:{} from={} cards={} thread={} head={}",
+            m.account_id, m.id, m.from_addr, self.selection_from_cards,
+            self.current_thread.len(), self.thread_star_target(&m),
+        );
         if self.selection_from_cards || !self.thread_star_target(&m) {
             return Some(m);
         }
-        Some(self.newest_to_answer(&self.current_thread, m))
+        let picked = self.newest_to_answer(&self.current_thread, m);
+        tracing::debug!(
+            target: "vireo::reply",
+            "toolbar target: answering {}:{} from={}",
+            picked.account_id, picked.id, picked.from_addr,
+        );
+        Some(picked)
     }
 
     /// Which message of a conversation an untargeted reply answers: the newest
@@ -10117,14 +10142,24 @@ impl AppModel {
         self.push_unread_counts();
     }
 
-    /// Whether a star toggle aimed at `m` should act on the whole open
-    /// conversation: a thread is open and `m` is its head.
+    /// Whether a star toggle (or an untargeted reply) aimed at `m` should act
+    /// on the whole open conversation: a thread is open and `m` is the row it
+    /// was opened from, which stands for every message in it.
+    ///
+    /// That row is the head of the conversation *as the folder lists it*, and
+    /// not necessarily the oldest message once the members from other folders
+    /// have been merged in and the whole re-sorted: a reply of the user's own
+    /// pulled in from Sent can precede it. So the message the reader was
+    /// opened on is what identifies the row, never `current_thread`'s first
+    /// entry (#210). `current` is that message on every path a conversation
+    /// is assembled by, including the one where a lone folder message finds
+    /// its siblings in other folders.
     fn thread_star_target(&self, m: &Message) -> bool {
         self.current_thread.len() > 1
             && self
-                .current_thread
-                .first()
-                .is_some_and(|h| h.id == m.id && h.account_id == m.account_id)
+                .current
+                .as_ref()
+                .is_some_and(|c| c.account_id == m.account_id && c.id == m.id)
     }
 
     /// Whether the reader toolbar's star shows lit: the target message's own
