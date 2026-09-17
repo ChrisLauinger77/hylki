@@ -10008,15 +10008,16 @@ impl AppModel {
     /// The message a reply, reply-all or forward addresses: the reply
     /// target, except when only the list row is selected over a
     /// conversation. That row stands for the thread's head, its oldest
-    /// message; the toolbar's reply follows the reading pane instead and
-    /// addresses the message shown at the top (#165) — with "newest first"
-    /// on, the newest message from someone else (never the user's own
-    /// reply by accident), or the newest of all when every message is
-    /// theirs; the head otherwise. A highlighted card is addressed as
-    /// itself.
+    /// message, and answering the oldest message of a conversation is never
+    /// what was meant (#210) — so the toolbar's reply addresses the
+    /// conversation's newest message from someone else (never the user's own
+    /// reply by accident), or the newest of all when every message is theirs.
+    /// This holds whichever way the reading pane is ordered: "newest first"
+    /// only decides where that message is drawn (#165). A highlighted card is
+    /// addressed as itself.
     fn compose_target(&self) -> Option<Message> {
         let m = self.reply_target()?;
-        if self.selection_from_cards || !self.thread_star_target(&m) || !self.thread_newest_first {
+        if self.selection_from_cards || !self.thread_star_target(&m) {
             return Some(m);
         }
         let own = self.email_of(m.account_id).unwrap_or_default();
