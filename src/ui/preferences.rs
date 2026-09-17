@@ -83,6 +83,8 @@ pub struct PrefInit {
     pub plain_font: String,
     /// New messages start as plain text (#180).
     pub compose_format: crate::config::ComposeFormat,
+    /// Where the split reply opens in the reading pane (#212).
+    pub reply_position: crate::config::ReplyPosition,
     pub app_theme: AppTheme,
     /// The appearance theme's id ("system" for the stock GNOME colours).
     pub theme: String,
@@ -823,6 +825,7 @@ pub enum PrefInput {
     TogglePlainMonospace(bool),
     ChangePlainFont(String),
     ChangeComposeFormat(u32),
+    ChangeReplyPosition(u32),
     ChangeAppTheme(u32),
     ChangeTheme(String),
     ChangeSettingsOpen(u32),
@@ -935,6 +938,7 @@ pub enum PrefOutput {
     SetPlainMonospace(bool),
     SetPlainFont(String),
     SetComposeFormat(crate::config::ComposeFormat),
+    SetReplyPosition(crate::config::ReplyPosition),
     Closed,
 }
 
@@ -1756,6 +1760,18 @@ impl Component for Preferences {
                                                        downward."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleThreadNewestFirst(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "reply_position_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Reply editor"),
+                                        set_subtitle: &i18n("Where a reply or forward opens in the reading \
+                                                       pane. Following the reading order puts it above the \
+                                                       messages with newest first, and below them otherwise, \
+                                                       so it continues the conversation where it ends."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeReplyPosition(row.selected()));
                                         },
                                     },
 
@@ -2719,6 +2735,17 @@ impl Component for Preferences {
             crate::config::ComposeFormat::Html => 2,
             crate::config::ComposeFormat::Plain => 3,
         });
+        widgets.reply_position_row.set_model(Some(&gtk::StringList::new(&[
+            &i18n("Above the messages"),
+            &i18n("Below the messages"),
+            &i18n("Follows the reading order"),
+        ])));
+        no_truncate(&widgets.reply_position_row);
+        widgets.reply_position_row.set_selected(match init.reply_position {
+            crate::config::ReplyPosition::Top => 0,
+            crate::config::ReplyPosition::Bottom => 1,
+            crate::config::ReplyPosition::Follow => 2,
+        });
         widgets.spellcheck_row.set_active(init.spellcheck);
         // The language dropdown offers exactly what checking can use: the
         // installed dictionaries, behind a "System language" default. Typed
@@ -3501,6 +3528,14 @@ impl Component for Preferences {
                     _ => crate::config::ComposeFormat::Rich,
                 };
                 let _ = sender.output(PrefOutput::SetComposeFormat(format));
+            }
+            PrefInput::ChangeReplyPosition(idx) => {
+                let position = match idx {
+                    1 => crate::config::ReplyPosition::Bottom,
+                    2 => crate::config::ReplyPosition::Follow,
+                    _ => crate::config::ReplyPosition::Top,
+                };
+                let _ = sender.output(PrefOutput::SetReplyPosition(position));
             }
         }
     }

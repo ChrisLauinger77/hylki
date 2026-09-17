@@ -998,6 +998,9 @@ struct PrivacyFile {
     /// where `compose_plain` above still says which of the two it is.
     #[serde(default)]
     compose_format: Option<ComposeFormat>,
+    /// Where the split reply opens in the reading pane (#212).
+    #[serde(default)]
+    reply_position: ReplyPosition,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_spellcheck")]
     spellcheck: bool,
@@ -1299,6 +1302,7 @@ impl Default for PrivacyFile {
             paste_plain: default_paste_plain(),
             compose_plain: false,
             compose_format: None,
+            reply_position: ReplyPosition::default(),
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -2267,6 +2271,23 @@ impl ComposeFormat {
     }
 }
 
+/// Where the split reply opens in the reading pane (#212): above the
+/// messages (the original placement), below them, or wherever the newest
+/// message is — above with "newest message first", below otherwise, so the
+/// editor always continues the conversation in its reading direction.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplyPosition {
+    #[default]
+    Top,
+    Bottom,
+    Follow,
+}
+
+pub fn load_reply_position() -> ReplyPosition {
+    load_privacy().reply_position
+}
+
 /// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
 pub fn load_compose_format() -> ComposeFormat {
@@ -2588,6 +2609,7 @@ pub fn save_privacy(
     compose_default_from: &str,
     paste_plain: bool,
     compose_format: ComposeFormat,
+    reply_position: ReplyPosition,
     spellcheck: bool,
     spellcheck_langs: String,
     preview_lines: u32,
@@ -2671,6 +2693,7 @@ pub fn save_privacy(
         // Both are written: the boolean is what an older version reads.
         compose_plain: compose_format == ComposeFormat::Plain,
         compose_format: Some(compose_format),
+        reply_position,
         spellcheck,
         // Every save is after the first load, which applied it.
         single_card_default_applied: true,

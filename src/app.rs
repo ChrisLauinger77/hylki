@@ -395,12 +395,22 @@ pub struct AppModel {
     /// Split-reply slot (#86): a reply slides down from the pane's top and
     /// the message(s) stay below it, visible and interactive.
     reader_split_top: gtk::Revealer,
+    /// The same slot beneath the reader (#212): the reply slides up from the
+    /// pane's bottom edge when the reading order puts the newest message
+    /// there, so the editor continues the conversation where it ends. Only
+    /// one of the two slots is ever occupied.
+    reader_split_bottom: gtk::Revealer,
     /// The vertical Paned dividing the split reply (start child, the slot
     /// above) from the reader (end child). A Paned allocates by divider
     /// position, so the composer holds the height it was given — a big paste
     /// can't push it down over the messages — and its divider is the grab
     /// handle that resizes the panel. Hidden slot = hidden divider.
     reader_split: gtk::Paned,
+    /// The reader's own Paned, nested as `reader_split`'s end child: the
+    /// reader (start child) over the bottom slot (end child). A second Paned
+    /// rather than swapping children, so the reader is never reparented and
+    /// the bottom slot has a divider of its own to be sized by.
+    reader_split_lower: gtk::Paned,
     /// The running slide (open or close) of the split reply — held so the
     /// opposite motion can skip it to its end instead of fighting it over
     /// the divider.
@@ -792,6 +802,8 @@ pub struct AppModel {
     paste_plain: bool,
     /// New messages start as plain text (#180).
     compose_format: crate::config::ComposeFormat,
+    /// Where the split reply opens in the reading pane (#212).
+    reply_position: config::ReplyPosition,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -1288,6 +1300,8 @@ pub enum AppMsg {
     SetPlainFont(String),
     /// Settings: new messages start as plain text (#180).
     SetComposeFormat(crate::config::ComposeFormat),
+    /// Settings: where the split reply opens in the reading pane (#212).
+    SetReplyPosition(config::ReplyPosition),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
     /// Showcase only (VIREO_SHOWCASE_COMPOSE_UNDO): drive the inline
@@ -2542,6 +2556,20 @@ impl SimpleComponent for AppModel {
                 r.set_reveal_child(false);
                 r
             },
+            reader_split_bottom: {
+                let r = gtk::Revealer::new();
+                r.set_transition_type(gtk::RevealerTransitionType::SlideUp);
+                r.set_transition_duration(300);
+                r.set_reveal_child(false);
+                r
+            },
+            reader_split_lower: {
+                let p = gtk::Paned::new(gtk::Orientation::Vertical);
+                // Same invisible separator as the outer split: the bottom
+                // panel's grab pill is its visible affordance too.
+                p.add_css_class("reader-split");
+                p
+            },
             split_close_anim: std::rc::Rc::new(std::cell::RefCell::new(None)),
             reader_header: std::cell::OnceCell::new(),
             reader_split: {
@@ -2791,6 +2819,7 @@ impl SimpleComponent for AppModel {
             compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
             compose_format: config::load_compose_format(),
+            reply_position: config::load_reply_position(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
@@ -3091,9 +3120,21 @@ impl SimpleComponent for AppModel {
             // position — dragged by the user, immune to the editor's natural
             // height — instead of whatever the composer asks for.
             pane.set_vexpand(true);
+            // The reader over the bottom slot (#212), the pair beneath the
+            // top slot. Each slot is hidden while no split reply is open in
+            // it, which hides its divider too.
+            let lower = &model.reader_split_lower;
+            lower.set_start_child(Some(&pane));
+            lower.set_end_child(Some(&model.reader_split_bottom));
+            lower.set_resize_start_child(true);
+            lower.set_shrink_start_child(true);
+            lower.set_resize_end_child(false);
+            lower.set_shrink_end_child(false);
+            lower.set_vexpand(true);
+            model.reader_split_bottom.set_visible(false);
             let split = &model.reader_split;
             split.set_start_child(Some(&model.reader_split_top));
-            split.set_end_child(Some(&pane));
+            split.set_end_child(Some(lower));
             // Window resizes go to the reader; the composer keeps its set
             // height and never shrinks below its minimum. The reader may
             // shrink — the divider clamp at open time is what keeps a slice
@@ -3102,7 +3143,6 @@ impl SimpleComponent for AppModel {
             split.set_shrink_start_child(false);
             split.set_resize_end_child(true);
             split.set_shrink_end_child(true);
-            // Hidden while no split reply is open, which hides the divider too.
             model.reader_split_top.set_visible(false);
             let overlay = gtk::Overlay::new();
             overlay.set_child(Some(split));
@@ -6711,6 +6751,14 @@ impl SimpleComponent for AppModel {
                     self.save_settings();
                 }
             }
+            AppMsg::SetReplyPosition(position) => {
+                // A split reply already open stays where it is; the next
+                // one opens in the new place.
+                if self.reply_position != position {
+                    self.reply_position = position;
+                    self.save_settings();
+                }
+            }
             AppMsg::SetOverrideColors(on) => {
                 if self.override_colors != on {
                     self.override_colors = on;
@@ -8876,6 +8924,7 @@ impl AppModel {
             &self.compose_default_from,
             self.paste_plain,
             self.compose_format,
+            self.reply_position,
             self.spellcheck,
             self.spellcheck_langs.clone(),
             self.preview_lines,
@@ -11999,6 +12048,7 @@ impl AppModel {
             windowed,
             can_toggle,
             compact: false,
+            decorations: true,
             format: self.compose_format,
         };
         (id, init)
@@ -12475,21 +12525,25 @@ impl AppModel {
         if let Some(prev) = prev_anim {
             prev.skip();
         }
-        if self.reader_split_top.is_visible() && self.reader_split_top.child().is_some() {
-            config::save_split_reply_height(self.reader_split.position());
+        if let Some((slot, split, bottom)) = self.live_split() {
+            if slot.is_visible() {
+                config::save_split_reply_height(split_reply_height(&split, bottom));
+            }
         }
         // The reader gets its header back with the pane.
         self.show_reader_header(true);
-        self.reader_split_top.set_reveal_child(false);
-        // The composer sits inside the grab-pill Overlay wrapper: unparent it
-        // from there explicitly, or hosting it elsewhere (pop-out, drain)
-        // would find it still parented.
-        if let Some(wrap) = self.reader_split_top.child().and_downcast::<gtk::Overlay>() {
-            wrap.set_child(None::<&gtk::Widget>);
+        for slot in [&self.reader_split_top, &self.reader_split_bottom] {
+            slot.set_reveal_child(false);
+            // The composer sits inside the grab-pill Overlay wrapper:
+            // unparent it from there explicitly, or hosting it elsewhere
+            // (pop-out, drain) would find it still parented.
+            if let Some(wrap) = slot.child().and_downcast::<gtk::Overlay>() {
+                wrap.set_child(None::<&gtk::Widget>);
+            }
+            slot.set_child(None::<&gtk::Widget>);
+            // Hiding the slot hides the Paned divider with it.
+            slot.set_visible(false);
         }
-        self.reader_split_top.set_child(None::<&gtk::Widget>);
-        // Hiding the slot hides the Paned divider with it.
-        self.reader_split_top.set_visible(false);
         // The split's reply-target outline goes with the composer.
         self.message_view.emit(MessageViewInput::BlurCard);
     }
@@ -12527,7 +12581,7 @@ impl AppModel {
     /// allowed to shrink below the composer's minimum. The teardown at the
     /// end is skipped if a new reply has taken the slot meanwhile.
     fn animate_split_close(&self) {
-        let slot = &self.reader_split_top;
+        let Some((slot, split, bottom)) = self.live_split() else { return };
         let Some(wrap) = slot.child() else { return };
         // Settle any running slide first, so the height saved below is the
         // real one and not a mid-animation reading.
@@ -12539,28 +12593,30 @@ impl AppModel {
             prev.skip();
         }
         if slot.is_visible() {
-            config::save_split_reply_height(self.reader_split.position());
+            config::save_split_reply_height(split_reply_height(&split, bottom));
         }
         // The reply-target outline goes with the composer, as on an
         // instant teardown.
         self.message_view.emit(MessageViewInput::BlurCard);
 
-        let split = self.reader_split.clone();
-        split.set_shrink_start_child(true);
+        set_split_shrink(&split, bottom, true);
         slot.set_reveal_child(false);
         // The reader's header comes back in step with the panel's exit: it
         // slides down while the panel slides up, its icons fading in, so the
         // reader below moves in one motion rather than jumping up as the
-        // panel goes and back down as the header pops in after it.
+        // panel goes and back down as the header pops in after it. (Beneath
+        // the reader the header never left; this is a no-op there.)
         self.show_reader_header(true);
         let from = split.position() as f64;
+        // Out the way it came in: to nothing above the reader, to the
+        // pane's full height beneath it.
+        let to = if bottom { split.height() as f64 } else { 0.0 };
         let target = adw::CallbackAnimationTarget::new({
             let split = split.clone();
             move |v| split.set_position(v as i32)
         });
-        let anim = adw::TimedAnimation::new(&split, from, 0.0, 300, target);
+        let anim = adw::TimedAnimation::new(&split, from, to, 300, target);
         anim.set_easing(adw::Easing::EaseOutCubic);
-        let slot = slot.clone();
         let cell = self.split_close_anim.clone();
         anim.connect_done(move |_| {
             cell.borrow_mut().take();
@@ -12575,7 +12631,7 @@ impl AppModel {
             // composer still in the slot, forbidding shrink first would
             // re-clamp the divider to the composer's minimum for a frame —
             // the bounce at the end of the slide.
-            split.set_shrink_start_child(false);
+            set_split_shrink(&split, bottom, false);
         });
         *self.split_close_anim.borrow_mut() = Some(anim.clone());
         anim.play();
@@ -12610,20 +12666,56 @@ impl AppModel {
     }
 
     /// The split reply's grab handle: the shared grab pill, floated at the
-    /// panel's bottom edge and bounded like the panel's opening height — a
-    /// usable panel, a visible reader.
-    fn build_split_grab_pill(&self) -> gtk::Box {
-        let pill = crate::ui::grab_pill::paned_grab_pill(&self.reader_split, |split, want| {
-            want.clamp(220, (split.height() - 200).max(220))
+    /// panel's edge that meets the reader and bounded like the panel's
+    /// opening height — a usable panel, a visible reader. Above the reader
+    /// that edge is the panel's bottom; beneath it (#212), its top, where the
+    /// divider position is the reader's height rather than the panel's.
+    fn build_split_grab_pill(&self, bottom: bool) -> gtk::Box {
+        let paned = if bottom { &self.reader_split_lower } else { &self.reader_split };
+        let pill = crate::ui::grab_pill::paned_grab_pill(paned, move |split, want| {
+            if bottom {
+                want.clamp(200, (split.height() - 220).max(200))
+            } else {
+                want.clamp(220, (split.height() - 200).max(220))
+            }
         });
-        pill.set_valign(gtk::Align::End);
-        // Bias the centred bar 6px downward inside its hit zone (a top margin
-        // shifts the centring by half its size): more air between the editor
-        // card and the bar, matching the attachment drawer's spacing.
+        pill.set_valign(if bottom { gtk::Align::Start } else { gtk::Align::End });
+        // Bias the centred bar 6px away from the editor inside its hit zone
+        // (a margin shifts the centring by half its size): more air between
+        // the editor card and the bar, matching the attachment drawer's
+        // spacing.
         if let Some(bar) = pill.first_child() {
-            bar.set_margin_top(12);
+            if bottom {
+                bar.set_margin_bottom(12);
+            } else {
+                bar.set_margin_top(12);
+            }
         }
         pill
+    }
+
+    /// The split-reply slot in use, with the Paned that sizes it and whether
+    /// it is the one beneath the reader; `None` while no split reply is open.
+    fn live_split(&self) -> Option<(gtk::Revealer, gtk::Paned, bool)> {
+        if self.reader_split_top.child().is_some() {
+            Some((self.reader_split_top.clone(), self.reader_split.clone(), false))
+        } else if self.reader_split_bottom.child().is_some() {
+            Some((self.reader_split_bottom.clone(), self.reader_split_lower.clone(), true))
+        } else {
+            None
+        }
+    }
+
+    /// Whether the next split reply opens beneath the reader (#212): by the
+    /// setting outright, or following the reading order — beneath when the
+    /// conversation reads downward to its newest message, above when the
+    /// newest is at the top.
+    fn split_reply_at_bottom(&self) -> bool {
+        match self.reply_position {
+            config::ReplyPosition::Top => false,
+            config::ReplyPosition::Bottom => true,
+            config::ReplyPosition::Follow => !self.thread_newest_first,
+        }
     }
 
     fn open_inline_reply(
@@ -12639,6 +12731,10 @@ impl AppModel {
         let (id, mut init) = self.build_compose_init(account_id, prefill, false, true);
         // The split reply is compact: just the editor, fields behind pop-out.
         init.compact = contextual;
+        // Beneath the reader (#212) the reader's header stays, so the
+        // composer's must not carry a second set of window controls.
+        let bottom = contextual && !self.showing_contacts && self.split_reply_at_bottom();
+        init.decorations = !bottom;
         let controller = self.spawn_compose(init, sender);
         let widget = controller.widget();
         widget.set_hexpand(true);
@@ -12662,22 +12758,27 @@ impl AppModel {
             if let Some(prev) = prev_anim {
                 prev.skip();
             }
-            // The reader's own header would show a second set of window
-            // decorations mid-window (the composer header at the pane's top
-            // already carries them) and spend vertical space the split
-            // needs: gone while the split hosts, back when it goes. What
-            // remains of the reader starts at the remote-content banner, or
-            // the subject block when there is none.
-            self.show_reader_header(false);
-            let slot = &self.reader_split_top;
+            // Above the reader, the reader's own header would show a second
+            // set of window decorations mid-window (the composer header at
+            // the pane's top already carries them) and spend vertical space
+            // the split needs: gone while the split hosts, back when it
+            // goes. What remains of the reader starts at the remote-content
+            // banner, or the subject block when there is none. Beneath the
+            // reader the header is nowhere near the panel and stays.
+            self.show_reader_header(bottom);
+            let (slot, split) = if bottom {
+                (&self.reader_split_bottom, self.reader_split_lower.clone())
+            } else {
+                (&self.reader_split_top, self.reader_split.clone())
+            };
             widget.set_vexpand(true);
             let wrap = gtk::Overlay::new();
             wrap.set_child(Some(widget));
-            wrap.add_overlay(&self.build_split_grab_pill());
+            wrap.add_overlay(&self.build_split_grab_pill(bottom));
             slot.set_child(Some(&wrap));
             slot.set_visible(true);
             slot.set_reveal_child(true);
-            let pane_h = self.reader_split.height();
+            let pane_h = split.height();
             let pane_h = if pane_h > 0 { pane_h } else { 900 };
             let saved = config::load_split_reply_height();
             let h =
@@ -12687,15 +12788,21 @@ impl AppModel {
             // the animation, driven from zero to the opening height (the
             // revealer's own transition can't run — it starts unmapped, and
             // adw skips animations on unmapped widgets — so the divider
-            // does all the moving).
+            // does all the moving). Beneath the reader the divider position
+            // is the reader's height, so the same slide runs from the pane's
+            // full height down to what is left once the panel has its share.
             let target = h.clamp(220, (pane_h - 200).max(220));
-            let split = self.reader_split.clone();
-            split.set_shrink_start_child(true);
-            split.set_position(0);
+            let (from, to) = if bottom {
+                (pane_h as f64, (pane_h - target) as f64)
+            } else {
+                (0.0, target as f64)
+            };
+            set_split_shrink(&split, bottom, true);
+            split.set_position(from as i32);
             let anim = adw::TimedAnimation::new(
                 &split,
-                0.0,
-                target as f64,
+                from,
+                to,
                 300,
                 adw::CallbackAnimationTarget::new({
                     let split = split.clone();
@@ -12708,7 +12815,7 @@ impl AppModel {
                 let cell = cell.clone();
                 move |_| {
                     cell.borrow_mut().take();
-                    split.set_shrink_start_child(false);
+                    set_split_shrink(&split, bottom, false);
                 }
             });
             *cell.borrow_mut() = Some(anim.clone());
@@ -12759,7 +12866,7 @@ impl AppModel {
             None => {
                 // Either kind of inline composer slides out the way it
                 // slid in.
-                if self.reader_split_top.child().is_some() {
+                if self.live_split().is_some() {
                     self.animate_split_close();
                 } else {
                     self.animate_cover_close();
@@ -12804,6 +12911,9 @@ impl AppModel {
                 slot.set_can_target(true);
                 let s = slot.clone();
                 gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
+                // Back inline it covers the reader, header and all, so it
+                // carries the decorations whatever slot it left from.
+                r.controller.emit(ComposeInput::SetDecorations(true));
                 r.controller.emit(ComposeInput::SetWindowed(false));
             }
         }
@@ -12829,7 +12939,7 @@ impl AppModel {
                 None => {
                     // Cancel/send on either inline composer: slide it out,
                     // not blink it.
-                    if self.reader_split_top.child().is_some() {
+                    if self.live_split().is_some() {
                         self.animate_split_close();
                     } else {
                         self.animate_cover_close();
@@ -14181,6 +14291,7 @@ impl AppModel {
             plain_monospace: self.plain_monospace,
             plain_font: self.plain_font.clone(),
             compose_format: self.compose_format,
+            reply_position: self.reply_position,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             show_attachments: self.show_attachments,
@@ -14335,6 +14446,7 @@ impl AppModel {
                 PrefOutput::SetPlainMonospace(on) => AppMsg::SetPlainMonospace(on),
                 PrefOutput::SetPlainFont(font) => AppMsg::SetPlainFont(font),
                 PrefOutput::SetComposeFormat(f) => AppMsg::SetComposeFormat(f),
+                PrefOutput::SetReplyPosition(p) => AppMsg::SetReplyPosition(p),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
@@ -16353,6 +16465,28 @@ fn focus_matches(window: &adw::ApplicationWindow, include_web_view: bool) -> boo
 }
 
 /// Whether to serve the built-in sample/demo data (for screenshots). Off unless
+/// The split reply's own height on its Paned: the divider position above
+/// the reader, and what the position leaves of the pane beneath it, where
+/// the position is the reader's height (#212).
+fn split_reply_height(split: &gtk::Paned, bottom: bool) -> i32 {
+    if bottom {
+        split.height() - split.position()
+    } else {
+        split.position()
+    }
+}
+
+/// Let (or forbid) the split reply's child of `split` shrink below the
+/// composer's minimum — needed for the slide, which runs the panel through
+/// heights the composer could not otherwise be allocated.
+fn set_split_shrink(split: &gtk::Paned, bottom: bool, shrink: bool) {
+    if bottom {
+        split.set_shrink_end_child(shrink);
+    } else {
+        split.set_shrink_start_child(shrink);
+    }
+}
+
 /// `VIREO_DEMO` is set, so removing all real accounts leaves the app blank.
 /// Stand-in [`AccountConfig`]s mirroring the demo backend's three accounts
 /// (same names, colours and emoji), so the Accounts window has something to

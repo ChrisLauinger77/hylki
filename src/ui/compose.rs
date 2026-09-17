@@ -111,17 +111,20 @@ fn header_rows_width(header: &gtk::Widget) -> Option<i32> {
 /// reader-covering overlay inline (it fills the whole pane), the window itself
 /// popped out — so the editor always expands to fill whatever it is given.
 /// Inline, the compose header also stands in for the reader's (which it
-/// covers), so it takes over the GNOME window decorations.
+/// covers, or tops), so it takes over the GNOME window decorations — unless
+/// `decorations` is off: a split reply beneath the reader leaves the reader's
+/// own header in place, and a second set of controls mid-pane would be wrong.
 fn size_for_host(
     root: &adw::ToolbarView,
     header: &adw::HeaderBar,
     editor_holder: &gtk::Box,
     windowed: bool,
+    decorations: bool,
 ) {
     root.set_vexpand(true);
     editor_holder.set_vexpand(true);
     editor_holder.set_height_request(-1);
-    header.set_show_end_title_buttons(!windowed);
+    header.set_show_end_title_buttons(!windowed && decorations);
 }
 
 /// Set the inline/window toggle button's icon + tooltip for the current host.
@@ -218,6 +221,9 @@ pub struct ComposeInit {
     /// subject row and shows just the editor — popping out to a window brings
     /// the full fields back.
     pub compact: bool,
+    /// Whether the inline header carries the window decorations. Off for a
+    /// split reply placed beneath the reader (#212), whose header stays.
+    pub decorations: bool,
     /// What the message is written in: rich text, Markdown, HTML
     /// source, or plain text.
     pub format: ComposeFormat,
@@ -256,6 +262,9 @@ pub struct Compose {
     /// Whether this composer offers the inline/window toggle at all.
     can_toggle: bool,
     compact: bool,
+    /// Whether the inline header carries the window decorations (see
+    /// `ComposeInit::decorations`).
+    decorations: bool,
     /// A compact reply's field rows, revealed by the header button (#154)
     /// or from the start by the preference.
     fields_shown: bool,
@@ -392,6 +401,9 @@ pub enum ComposeInput {
     ToggleWindowed,
     /// The app moved this pane between inline and window; sync the button icon.
     SetWindowed(bool),
+    /// Whether the inline header should carry the window decorations: off
+    /// while the pane sits beneath the reader, whose header stays (#212).
+    SetDecorations(bool),
     /// Re-grab keyboard focus into the editor (after a host move).
     FocusEditor,
     /// A recipient/subject field changed — mark dirty.
@@ -796,6 +808,7 @@ impl Component for Compose {
             windowed,
             can_toggle,
             compact,
+            decorations,
             format,
         } = init;
         let in_reply_to = prefill.in_reply_to.clone();
@@ -919,6 +932,7 @@ impl Component for Compose {
             // A compact (fields-hidden) pane only makes sense once it is
             // addressed: replies arrive with To filled, forwards do not.
             compact: compact && !prefill.to.trim().is_empty(),
+            decorations,
             fields_shown: crate::config::load_reply_fields(),
             narrow: false,
             fields_dirty: false,
@@ -947,7 +961,13 @@ impl Component for Compose {
         // reflects the current host (fullscreen = "expand to window", restore =
         // "collapse back inline").
         set_toggle_icon(&widgets.toggle_btn, model.windowed);
-        size_for_host(&widgets.toolbar_root, &widgets.header, &widgets.editor_holder, model.windowed);
+        size_for_host(
+            &widgets.toolbar_root,
+            &widgets.header,
+            &widgets.editor_holder,
+            model.windowed,
+            model.decorations,
+        );
 
         // Fold the toolbar once the pane is narrower than the full row (as
         // the reader's header does). Measured on the first map — before
@@ -1488,10 +1508,27 @@ impl Component for Compose {
                 let _ = sender.output(ComposeOutput::ToggleWindow(self.compose_id));
             }
 
+            ComposeInput::SetDecorations(on) => {
+                self.decorations = on;
+                size_for_host(
+                    &widgets.toolbar_root,
+                    &widgets.header,
+                    &widgets.editor_holder,
+                    self.windowed,
+                    on,
+                );
+            }
+
             ComposeInput::SetWindowed(windowed) => {
                 self.windowed = windowed;
                 set_toggle_icon(&widgets.toggle_btn, windowed);
-                size_for_host(&widgets.toolbar_root, &widgets.header, &widgets.editor_holder, windowed);
+                size_for_host(
+                    &widgets.toolbar_root,
+                    &widgets.header,
+                    &widgets.editor_holder,
+                    windowed,
+                    self.decorations,
+                );
                 // A compact reply grows its field rows back in a window (and
                 // sheds them again if it returns inline).
                 widgets.fields_list.set_visible(!(self.compact && !windowed) || self.fields_shown);
