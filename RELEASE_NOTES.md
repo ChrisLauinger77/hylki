@@ -2,6 +2,10 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.33.1
+
+**An account no longer stops syncing over one odd message** (#215, reported and fixed by [@typedev](https://github.com/typedev), PR #216). A message whose part headers carried an accented character at one particular position made the app's mail thread for that account crash while building list previews, and because the same message was offered again on every sync, that account's wheel turned forever while the others carried on. Restarting did not help. The header is now read safely, and the two tests that come with the fix reproduce the crash without it.
+
 ## What's new in 1.33.0
 
 **Replies go to the newest message** (#210, reported by [@p-mitana](https://github.com/p-mitana), with [@yioannides](https://github.com/yioannides)). Answering a conversation from the toolbar, Ctrl+R, or a row's hover palette or right-click menu used to address whichever message was drawn at the top, which with the conversation read oldest first was the message that started it. Every reply now answers the conversation's newest message from someone else, whatever the reading order. Your own earlier replies, and mail sent from a send-as alias, are never the target.

@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.33.1 — 2026-09-17
+
+A MIME part header carrying a non-ASCII character in the wrong place
+could kill an account's mail thread, after which that account never
+synced again.
+
+- **A non-ASCII part header no longer takes an account down** (#215,
+  reported and fixed by
+  [@typedev](https://github.com/typedev), PR #216). `mime_header` found
+  its header by slicing the line at the name's byte length and comparing
+  that slice as a `str`. Header blocks reach it through
+  `String::from_utf8_lossy`, so a line such as
+  `Content-Description: abcóde` can carry a multibyte character straddling
+  byte 25, the length of `content-transfer-encoding`, and the slice
+  panicked instead of not matching. The panic landed on `vireo-mail-N`,
+  the thread that owns all of that account's IMAP work, so the account's
+  wheel turned for good while the others carried on, and because the
+  garbled- and missing-preview passes offer the same rows on every sync,
+  it never recovered. The prefix is now compared as bytes; a byte-wise
+  match against an ASCII name proves the offset is a character boundary,
+  so the slices that follow are safe. Two regression tests reproduce the
+  reported panic with the fix reverted. Every release since 1.27.0 was
+  affected; 1.32.0 widened it by reading the transfer encoding from the
+  part's own header block.
+
 ## 1.33.0 — 2026-09-17
 
 Replies address a conversation's newest message, a conversation's row
