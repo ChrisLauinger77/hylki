@@ -19,9 +19,11 @@
 //! reader pane is allowed to shrink, resizing the drawer never grows the
 //! window; while the drawer is collapsed a drag snaps back, so only the
 //! expanded drawer resizes. The size slider in the header scales the
-//! thumbnails only; a click on the grab pill collapses the grid to just the
-//! header. The dragged height, collapsed state and view settings are
-//! persisted; thumbnail size is per-session.
+//! thumbnails only; a click on the grab pill — or on the header's
+//! "N attachments" count, which is a button for exactly this — collapses the
+//! grid to just the header, and clicking again brings it back. The dragged
+//! height, collapsed state and view settings are persisted; thumbnail size is
+//! per-session.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -175,6 +177,10 @@ pub enum AttachmentDrawerInput {
     /// A click landed on the seam itself (the Paned separator, or the
     /// drawer's topmost strip) — toggles like a pill click.
     EdgeClicked,
+    /// The header's "N attachments" button was clicked — toggles the drawer
+    /// like the seam does, from the one part of the header that is always
+    /// visible (collapsed included).
+    CountClicked,
     /// The expand/collapse slide finished. Carries the state it was heading
     /// for and the generation it belongs to (see `toggle_gen`).
     ToggleSettled { collapsed: bool, gen: u64 },
@@ -231,18 +237,52 @@ impl SimpleComponent for AttachmentDrawer {
                     set_orientation: gtk::Orientation::Horizontal,
                     set_spacing: 8,
                     add_css_class: "attachment-drawer-header",
-                    gtk::Image {
-                        set_icon_name: Some("co.hyprlab.Vireo-mail-attachment-symbolic"),
-                        add_css_class: "dim-label",
-                    },
-                    gtk::Label {
+                    // The count is the drawer's other handle: clicking it
+                    // expands or collapses exactly like a click on the seam,
+                    // with the chevron showing which way it goes next.
+                    #[name = "count_btn"]
+                    gtk::Button {
+                        add_css_class: "flat",
+                        add_css_class: "attachment-drawer-count",
+                        set_valign: gtk::Align::Center,
                         #[watch]
-                        set_label: &format!(
-                            "{} attachment{}",
-                            model.items.len(),
-                            if model.items.len() == 1 { "" } else { "s" },
-                        ),
-                        add_css_class: "heading",
+                        set_tooltip_text: Some(if model.collapsed {
+                            i18n("Show the attachments")
+                        } else {
+                            i18n("Hide the attachments")
+                        }.as_str()),
+                        connect_clicked[sender] => move |_| {
+                            sender.input(AttachmentDrawerInput::CountClicked);
+                        },
+
+                        #[wrap(Some)]
+                        set_child = &gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 8,
+                            gtk::Image {
+                                set_icon_name: Some("co.hyprlab.Vireo-mail-attachment-symbolic"),
+                                add_css_class: "dim-label",
+                            },
+                            gtk::Label {
+                                #[watch]
+                                set_label: &format!(
+                                    "{} attachment{}",
+                                    model.items.len(),
+                                    if model.items.len() == 1 { "" } else { "s" },
+                                ),
+                                add_css_class: "heading",
+                            },
+                            gtk::Image {
+                                #[watch]
+                                set_icon_name: Some(if model.collapsed {
+                                    "co.hyprlab.Vireo-pan-up-symbolic"
+                                } else {
+                                    "co.hyprlab.Vireo-pan-down-symbolic"
+                                }),
+                                add_css_class: "dim-label",
+                                set_pixel_size: 12,
+                            },
+                        },
                     },
                     gtk::Box { set_hexpand: true },
                     gtk::Image {
@@ -507,6 +547,16 @@ impl SimpleComponent for AttachmentDrawer {
                 move |want| s2.input(AttachmentDrawerInput::PillDrag { want }),
             );
         }
+        // VIREO_SHOWCASE_DRAWER=N clicks the header's count button N times,
+        // one a second from 6s — the real button press, so the capture proves
+        // the click path and not just the input it sends.
+        if let Some(Ok(n)) = std::env::var("VIREO_SHOWCASE_DRAWER").ok().map(|v| v.parse::<u32>()) {
+            let btn = widgets.count_btn.clone();
+            for i in 0..n {
+                let btn = btn.clone();
+                glib::timeout_add_seconds_local_once(6 + i, move || btn.emit_clicked());
+            }
+        }
         ComponentParts { model, widgets }
     }
 
@@ -650,6 +700,12 @@ impl SimpleComponent for AttachmentDrawer {
                 if !self.pill_dragged {
                     self.toggle_collapsed(&sender);
                 }
+            }
+            AttachmentDrawerInput::CountClicked => {
+                // A real button, never part of a drag: it toggles
+                // unconditionally (the seam's `pill_dragged` guard would
+                // otherwise swallow the first click after any resize).
+                self.toggle_collapsed(&sender);
             }
             AttachmentDrawerInput::ToggleSettled { collapsed, gen } => {
                 // A skipped slide's settle arrives late; its work was already

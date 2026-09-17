@@ -1353,6 +1353,13 @@ headerbar.compose-toolbar button.image-button {
 .attachment-drawer-header {
   padding: 4px 8px;
 }
+/* The "N attachments" count is a button (it toggles the drawer), but it has to
+   keep reading as the header's title: no chrome until it is hovered, and tight
+   padding so the header does not grow taller than the labels it held before. */
+.attachment-drawer-count {
+  padding: 2px 6px;
+  min-height: 0;
+}
 /* Split-reply divider: the separator is a flush strip of the composer's own
    ground (its background-color comes from the runtime theme CSS), so the
    panel reads as running to its edge with no line across. The visible
