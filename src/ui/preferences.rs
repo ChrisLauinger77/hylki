@@ -1075,7 +1075,7 @@ impl Component for Preferences {
             set_default_width: 920,
             // The same size every time: the two-pane layout (#141) fits its
             // sidebar at this height, and nothing is remembered from a resize.
-            set_default_height: 804,
+            set_default_height: 810,
             set_title: Some(i18n("Settings").as_str()),
             // Closing hides: the window is kept and shown again next time.
             set_hide_on_close: true,
