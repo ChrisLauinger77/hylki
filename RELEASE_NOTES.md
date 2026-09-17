@@ -2,6 +2,22 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.33.0
+
+**Replies go to the newest message** (#210, reported by [@p-mitana](https://github.com/p-mitana), with [@yioannides](https://github.com/yioannides)). Answering a conversation from the toolbar, Ctrl+R, or a row's hover palette or right-click menu used to address whichever message was drawn at the top, which with the conversation read oldest first was the message that started it. Every reply now answers the conversation's newest message from someone else, whatever the reading order. Your own earlier replies, and mail sent from a send-as alias, are never the target.
+
+**A conversation stays selected while you read it** (#211, reported by [@p-mitana](https://github.com/p-mitana)). Clicking a reply's card in the reading pane, with expandable conversations off, made the list drop its selection. The conversation's row now stays lit for every message in it, including your own replies pulled in from Sent.
+
+**The reply editor can open beneath the reader** (#212, reported by [@p-mitana](https://github.com/p-mitana)). Settings → Conversations has a new **Reply editor** choice: above the messages, as before and still the default; below them; or following the reading order, which puts it above with "Newest message first" and below otherwise. Beneath the reader the panel slides up from the bottom edge and remembers its own height there.
+
+**Each message lists its own attachments** (#213, reported by [@p-mitana](https://github.com/p-mitana), with [@yioannides](https://github.com/yioannides)). Every card in a conversation now shows its files beneath its text: icon, name, size and a save button, with a click opening the file. The attachment drawer stays, and its right-click menu gains **Show in Message**, which jumps to the card a file came with. Both can be turned off in Settings → Conversations.
+
+**Conversations has its own Settings page**, between Message List and Reading, with everything that shapes how a thread reads in one place.
+
+**The attachment count opens and closes the drawer.** The "3 attachments" label in the drawer's header is now a button, with a chevron beside it, so the drawer no longer relies on the handle along its top edge alone.
+
+**French updated** (PR #214 by [@frenchy82](https://github.com/frenchy82)), covering the About page and the undo strings.
+
 ## What's new in 1.32.3
 
 **Portuguese covers the new About strings.** The one-line description under the version chip was reworded in 1.32.2 and the issue tracker's row became translatable; European and Brazilian Portuguese both cover them, so each is complete again. By [@somepaulo](https://github.com/somepaulo) (PR #207).

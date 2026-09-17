@@ -1,5 +1,81 @@
 # Changelog
 
+## 1.33.0 — 2026-09-17
+
+Replies address a conversation's newest message, a conversation's row
+stays selected while its messages are read, the reply editor can open
+beneath the reader, and each message in a conversation lists its own
+attachments. Conversations have a Settings page of their own, and the
+attachment drawer's count is a button.
+
+- **A reply answers the newest message** (#210, reported by
+  [@p-mitana](https://github.com/p-mitana), with
+  [@yioannides](https://github.com/yioannides)). An untargeted reply
+  (toolbar, Ctrl+R, a row's hover palette or context menu) addressed the
+  message the reading pane showed at the top, so with "Newest message
+  first" off it answered the message that started the conversation. Every
+  untargeted reply now goes through one step that picks the conversation's
+  newest message from someone else, whatever the display order; send-as
+  aliases count as your own addresses. The row palette and menu paths did
+  not know about the conversation at all: the list now sends it with the
+  action when the row stands for a collapsed thread. And the check for
+  "the selected row is the conversation" compared against the first entry
+  on screen, which after Sent members are merged in and re-sorted can be
+  your own earlier reply; it now compares against the message the reader
+  was opened on. Reply decisions log under `vireo::reply` at debug level.
+- **The conversation's row stays selected** (#211, reported by
+  [@p-mitana](https://github.com/p-mitana)). With expandable conversations
+  off, clicking a reply's card asked the list to select a row that does not
+  exist, so the list selected nothing and the conversation appeared to
+  deselect itself. A reader key with no row of its own now falls back to
+  the row of the conversation it belongs to, including messages pulled in
+  from Sent, which belong to no row in the folder on screen at all.
+- **The reply editor can open beneath the reader** (#212, reported by
+  [@p-mitana](https://github.com/p-mitana)). Settings → Conversations gains
+  **Reply editor**: above the messages (the default, and the placement so
+  far), below them, or following the reading order (above with "Newest
+  message first", below otherwise). The bottom slot is the end child of a
+  second Paned nested under the reader, so the reader is never reparented
+  and each slot has a divider of its own; beneath the reader the composer's
+  header carries no window controls and the grab pill sits on the panel's
+  top edge. The dragged height is remembered as the panel's own height
+  whichever side it is on. Placing the editor between two cards is not
+  possible: the cards are one HTML document in one web view.
+- **Each message lists its own attachments** (#213, reported by
+  [@p-mitana](https://github.com/p-mitana), with
+  [@yioannides](https://github.com/yioannides)). The drawer beneath the
+  reader gathers every file in a conversation, which left no way to tell
+  which message a file came with. Each card now lists its attachments
+  beneath its body: type icon, name, size and a save button; a click opens
+  the file, images and PDFs in the lightbox. The rows carry names and sizes
+  only and are patched into the live document when the files arrive, so
+  the conversation is not re-rendered for them. A lone message keeps the
+  drawer alone unless the drawer is turned off. The drawer's right-click
+  menu gains **Show in Message**, which scrolls to the card the file
+  belongs to and flashes its row. Settings → Conversations has switches
+  for both, **Attachments on each message** and **Attachment drawer**,
+  both on by default. The offline demo answers a message flagged as having
+  attachments with two small files.
+- **Conversations has its own Settings page.** The Conversations group
+  had grown to eight settings at the top of Reading; it is now a page
+  between Message List and Reading with a chat-bubbles icon, and the
+  Settings window is 38px taller so the sidebar lists every page without
+  scrolling.
+- **The attachment count toggles the drawer.** The drawer opened and
+  closed from its seam alone, which is invisible until hovered. The
+  header's "N attachments" is now a flat button that expands or collapses
+  the drawer, with a chevron pointing the way the next click goes; it
+  stays in the header when collapsed, so the same target reopens it. It
+  takes the same padding as the Save All… button beside it, and the two
+  stand the same distance from the edge each faces; the header sits 2px
+  closer to the drawer's top edge. `VIREO_SHOWCASE_DRAWER=N` presses the
+  button N times for checking the path without injected input.
+- **French updated** (PR #214 by
+  [@frenchy82](https://github.com/frenchy82)). The two About strings from
+  1.32.2 and the four undo strings from 1.32.1 are translated, so French
+  covers everything up to 1.32.3. The template gained 13 strings for this
+  release, which are untranslated in every language.
+
 ## 1.32.3 — 2026-09-16
 
 The two strings the About page gained in 1.32.2 are translated in

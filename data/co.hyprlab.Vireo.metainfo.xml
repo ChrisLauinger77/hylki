@@ -56,6 +56,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.33.0" date="2026-09-17">
+      <description>
+        <p>Replies answer a conversation's newest message, a conversation's row stays selected while its messages are read, the reply editor can open beneath the reader, and each message in a conversation lists its own attachments. Conversations have their own Settings page, the attachment drawer's count is a button that opens and closes it, and French is updated.</p>
+      </description>
+    </release>
     <release version="1.32.3" date="2026-09-16">
       <description>
         <p>The two strings the About page gained in 1.32.2, its reworded description and the issue tracker's row, are translated in European and Brazilian Portuguese, so both are complete again.</p>
