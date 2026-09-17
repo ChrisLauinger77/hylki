@@ -628,6 +628,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "appearance", title: i18n_noop("Appearance"), icon: "co.hyprlab.Vireo-preferences-desktop-appearance-symbolic", accounts: false },
             SidePage { id: "sidebar", title: i18n_noop("Sidebar"), icon: "co.hyprlab.Vireo-sidebar-show-symbolic", accounts: false },
             SidePage { id: "list", title: i18n_noop("Message List"), icon: "co.hyprlab.Vireo-view-list-bullet-symbolic", accounts: false },
+            SidePage { id: "conversations", title: i18n_noop("Conversations"), icon: "co.hyprlab.Vireo-chat-bubbles-text-symbolic", accounts: false },
             SidePage { id: "reading", title: i18n_noop("Reading"), icon: "co.hyprlab.Vireo-mail-read-symbolic", accounts: false },
             SidePage { id: "composing", title: i18n_noop("Composing"), icon: "co.hyprlab.Vireo-document-edit-symbolic", accounts: false },
             SidePage { id: "privacy", title: i18n_noop("Privacy"), icon: "co.hyprlab.Vireo-security-high-symbolic", accounts: false },
@@ -1074,7 +1075,7 @@ impl Component for Preferences {
             set_default_width: 920,
             // The same size every time: the two-pane layout (#141) fits its
             // sidebar at this height, and nothing is remembered from a resize.
-            set_default_height: 772,
+            set_default_height: 804,
             set_title: Some(i18n("Settings").as_str()),
             // Closing hides: the window is kept and shown again next time.
             set_hide_on_close: true,
@@ -1720,7 +1721,7 @@ impl Component for Preferences {
                                 },
                             },
 
-                            add_named[Some("reading")] = &adw::PreferencesPage {
+                            add_named[Some("conversations")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Conversations"),
 
@@ -1815,7 +1816,9 @@ impl Component for Preferences {
                                         },
                                     },
                                 },
+                            },
 
+                            add_named[Some("reading")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Reading"),
 
