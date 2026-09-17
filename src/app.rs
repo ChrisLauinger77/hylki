@@ -1047,7 +1047,11 @@ pub enum AppMsg {
     PurgeMessages(Vec<Message>),
     /// The rest of an open message's conversation, found in other folders.
     Related { account_id: u32, message_id: u32, messages: Vec<Message> },
-    RowAction { action: RowAction, message: Box<Message> },
+    /// A row's palette or context-menu action. `conversation` holds the whole
+    /// thread when the row stands for a collapsed conversation rather than for
+    /// `message` alone — a reply started there answers the conversation's
+    /// newest message, not the head it is filed under (#210). Empty otherwise.
+    RowAction { action: RowAction, message: Box<Message>, conversation: Vec<Message> },
     /// A conversation card's own action pill. Reply/Reply all/Forward open the
     /// reader's inline composer (like the toolbar); the rest act like RowAction.
     CardAction { action: RowAction, message: Box<Message> },
@@ -2345,8 +2349,8 @@ impl SimpleComponent for AppModel {
                     MessageListOutput::Activated { message, thread } => {
                         AppMsg::OpenMessageWindow { message, thread }
                     }
-                    MessageListOutput::Action { action, message } => {
-                        AppMsg::RowAction { action, message }
+                    MessageListOutput::Action { action, message, conversation } => {
+                        AppMsg::RowAction { action, message, conversation }
                     }
                     MessageListOutput::SetTag { message, keyword, add } => {
                         AppMsg::SetTag { message, keyword, add }
@@ -5410,6 +5414,8 @@ impl SimpleComponent for AppModel {
                     other => sender.input(AppMsg::RowAction {
                         action: other,
                         message: Box::new(m),
+                        // A card is always its own message.
+                        conversation: Vec::new(),
                     }),
                 }
             }
@@ -5425,7 +5431,7 @@ impl SimpleComponent for AppModel {
                 self.show_add_contact_dialog(&message.from_name, &message.from_addr, &sender);
             }
 
-            AppMsg::RowAction { action, message } => {
+            AppMsg::RowAction { action, message, conversation } => {
                 let m = *message;
                 if self.outbox_item(m.account_id, m.id).is_some() {
                     // Nothing else in the palette applies to an unsent message,
@@ -5437,11 +5443,17 @@ impl SimpleComponent for AppModel {
                     return;
                 }
                 match action {
+                    // A row that stands for a whole conversation answers the
+                    // conversation's newest message, exactly as the reader's
+                    // own reply does (#210) — the row is filed under the
+                    // thread's head, which is its oldest message.
                     RowAction::Reply => {
+                        let m = self.newest_to_answer(&conversation, m);
                         let m = self.with_cached_body(m);
                         self.open_compose(m.account_id, self.reply_pgp(&m, reply_prefill(&m)), &sender);
                     }
                     RowAction::ReplyAll => {
+                        let m = self.newest_to_answer(&conversation, m);
                         let m = self.with_cached_body(m);
                         let self_email = self.email_of(m.account_id).unwrap_or_default();
                         self.open_compose(
@@ -5451,6 +5463,7 @@ impl SimpleComponent for AppModel {
                         );
                     }
                     RowAction::Forward => {
+                        let m = self.newest_to_answer(&conversation, m);
                         let m = self.with_cached_body(m);
                         self.open_compose(m.account_id, forward_prefill(&m), &sender);
                     }
@@ -10020,15 +10033,35 @@ impl AppModel {
         if self.selection_from_cards || !self.thread_star_target(&m) {
             return Some(m);
         }
-        let own = self.email_of(m.account_id).unwrap_or_default();
+        Some(self.newest_to_answer(&self.current_thread, m))
+    }
+
+    /// Which message of a conversation an untargeted reply answers: the newest
+    /// message from someone else, so a reply never lands on the user's own last
+    /// word, or the newest of all when every message is theirs. `fallback` is
+    /// returned for anything that is not a conversation.
+    ///
+    /// Shared by every untargeted reply — the reader toolbar, the keyboard
+    /// shortcut, and a row's palette or menu — so all of them answer the same
+    /// message (#210).
+    fn newest_to_answer(&self, thread: &[Message], fallback: Message) -> Message {
+        if thread.len() <= 1 {
+            return fallback;
+        }
+        let mut own = self.own_identities(fallback.account_id);
+        if own.is_empty() {
+            own.extend(self.email_of(fallback.account_id));
+        }
         let newest = |from_others: bool| {
-            self.current_thread
+            thread
                 .iter()
-                .filter(|t| !from_others || !t.from_addr.eq_ignore_ascii_case(&own))
+                .filter(|t| {
+                    !from_others || !own.iter().any(|o| t.from_addr.eq_ignore_ascii_case(o))
+                })
                 .max_by_key(|t| t.timestamp)
                 .cloned()
         };
-        newest(true).or_else(|| newest(false)).or(Some(m))
+        newest(true).or_else(|| newest(false)).unwrap_or(fallback)
     }
 
     /// Launch (or re-present) the welcome wizard: the first run's greeting,
@@ -11515,7 +11548,8 @@ impl AppModel {
             .launch(init)
             .forward(sender.input_sender(), move |out| match out {
                 MessageWindowOutput::Action { action, message } => {
-                    AppMsg::RowAction { action, message }
+                    // The window's actions name the card they came from.
+                    AppMsg::RowAction { action, message, conversation: Vec::new() }
                 }
                 MessageWindowOutput::AddToContacts { name, email } => {
                     AppMsg::AddContactFrom { name, email }

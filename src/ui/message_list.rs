@@ -2729,8 +2729,13 @@ pub enum MessageListOutput {
     /// whole conversation when the row heads one (same shape as `Selected`),
     /// so the window shows every card — otherwise just `[message]`.
     Activated { message: Message, thread: Vec<Message> },
-    /// A context-menu action chosen for a specific message.
-    Action { action: RowAction, message: Box<Message> },
+    /// A context-menu or palette action chosen for a specific message.
+    /// `conversation` holds the thread when the row stands for a collapsed
+    /// conversation rather than for `message` alone, so a reply started there
+    /// can answer the conversation instead of the head it is filed under
+    /// (#210). Empty for an ordinary row, and for a head row shown alongside
+    /// its expanded replies — there the row means only itself.
+    Action { action: RowAction, message: Box<Message>, conversation: Vec<Message> },
     /// A tag toggled on a specific message (#71).
     SetTag { message: Box<Message>, keyword: String, add: bool },
     /// A bulk action chosen for every currently-selected message.
@@ -3926,7 +3931,8 @@ impl SimpleComponent for MessageList {
                         return;
                     }
                 }
-                let _ = sender.output(MessageListOutput::Action { action, message });
+                let conversation = self.row_conversation(&message);
+                let _ = sender.output(MessageListOutput::Action { action, message, conversation });
             }
             MessageListInput::SetPaletteCollapse(secs) => self.palette_collapse_secs.set(secs),
             MessageListInput::SetPaletteHover(on) => self.palette_hover.set(on),
@@ -4085,13 +4091,16 @@ impl MessageList {
     ) {
         // Each entry carries the same icon as the reader-toolbar button (or
         // row-palette button) for that action, tying the two together.
+        let conversation = self.row_conversation(msg);
         let item = |action: RowAction, label: &str, icon: &str| -> MenuEntry {
             let s = sender.clone();
             let m = msg.clone();
+            let conversation = conversation.clone();
             MenuEntry::new(label, move || {
                 let _ = s.output(MessageListOutput::Action {
                     action,
                     message: Box::new(m.clone()),
+                    conversation: conversation.clone(),
                 });
             })
             .icon(icon)
@@ -5203,6 +5212,32 @@ impl MessageList {
     /// Every on-screen member of `m`'s conversation (oldest first) — from any
     /// member, head or reply. Empty when threading is off or `m` stands alone,
     /// so callers can treat non-empty as "this is a real thread".
+    /// The conversation a row stands for, or empty when the row means only its
+    /// own message. A row stands for its thread when it is the head of one and
+    /// the thread is not currently opened out in the list — which, with
+    /// expandable conversations off, it never is.
+    fn row_conversation(&self, m: &Message) -> Vec<Message> {
+        let members = self.thread_members(m);
+        let is_head = members
+            .first()
+            .is_some_and(|h| (h.account_id, h.id) == (m.account_id, m.id));
+        if !is_head {
+            return Vec::new();
+        }
+        let expanded = self.thread_expansion
+            && self
+                .msg_thread
+                .get(&(m.account_id, m.id))
+                .is_some_and(|key| {
+                    self.expanded_threads.contains(key) != self.default_expanded
+                });
+        if expanded {
+            Vec::new()
+        } else {
+            members
+        }
+    }
+
     fn thread_members(&self, m: &Message) -> Vec<Message> {
         if !self.threading {
             return Vec::new();
