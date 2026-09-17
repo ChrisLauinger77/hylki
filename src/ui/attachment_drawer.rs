@@ -243,7 +243,13 @@ impl SimpleComponent for AttachmentDrawer {
                     #[name = "count_btn"]
                     gtk::Button {
                         add_css_class: "flat",
-                        add_css_class: "attachment-drawer-count",
+                        // GTK hands a button with a plain label the
+                        // `text-button` padding and one with an icon the
+                        // `image-button` padding; a button with a child of its
+                        // own (this one: clip, count, chevron) gets neither and
+                        // ends up tighter than "Save All…" beside it. Ask for
+                        // the text one by hand so the two pills match.
+                        add_css_class: "text-button",
                         set_valign: gtk::Align::Center,
                         #[watch]
                         set_tooltip_text: Some(if model.collapsed {
