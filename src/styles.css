@@ -1357,7 +1357,9 @@ headerbar.compose-toolbar button.image-button {
    keep reading as the header's title: no chrome until it is hovered, and tight
    padding so the header does not grow taller than the labels it held before. */
 .attachment-drawer-count {
-  padding: 2px 6px;
+  /* 3px more above and below than the text needs (Jason, 2026-09-17), so the
+     hover pill has some air around the count rather than hugging it. */
+  padding: 5px 6px;
   min-height: 0;
 }
 /* Split-reply divider: the separator is a flush strip of the composer's own
