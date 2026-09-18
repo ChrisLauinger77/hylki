@@ -12976,6 +12976,9 @@ impl AppModel {
     /// from appearing at full strength on the first frame of the slide.
     /// Timed to match the split reply's own 300ms slide, which it accompanies.
     fn show_reader_header(&self, shown: bool) {
+        // The header bar goes only while a split reply sits above the
+        // reader; the subject block under it wants more air then.
+        self.message_view.emit(MessageViewInput::SetUnderSplit(!shown));
         let Some(header) = self.reader_header.get() else { return };
         let tv = header
             .ancestor(adw::ToolbarView::static_type())
