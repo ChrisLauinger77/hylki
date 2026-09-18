@@ -4081,6 +4081,14 @@ impl SimpleComponent for MessageList {
 }
 
 impl MessageList {
+    /// What the list holds in RAM, for the memory section of an export: the
+    /// folder's index, the rows built from it, and the whole-mailbox search
+    /// pool (empty unless a search is open), each as (messages, bytes).
+    pub fn memory_stats(&self) -> [(usize, usize); 3] {
+        use crate::memory_report::messages_bytes;
+        [messages_bytes(&self.all), messages_bytes(&self.shown), messages_bytes(&self.search_pool)]
+    }
+
     /// Build and pop up the right-click menu for `msg` at the click location.
     fn show_context_menu(
         &self,
