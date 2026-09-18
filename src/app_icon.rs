@@ -56,14 +56,14 @@ macro_rules! alt {
 /// envelope, so it has no entry of its own), then the other envelopes.
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
-    alt!("envelope-bird-blue", "Envelope with bird, blue"),
-    alt!("envelope-bird-yellow", "Envelope with bird, yellow"),
-    alt!("envelope-blue", "Envelope, blue"),
-    alt!("envelope-yellow", "Envelope, yellow"),
-    alt!("envelope-white", "Envelope, white"),
-    alt!("envelope-manilla", "Envelope, manila"),
-    alt!("envelope-faded-blue", "Envelope, faded blue"),
-    alt!("envelope-starfield", "Envelope, starfield"),
+    alt!("envelope-bird-blue", "Blue with bird"),
+    alt!("envelope-bird-yellow", "Yellow with bird"),
+    alt!("envelope-blue", "Blue"),
+    alt!("envelope-yellow", "Yellow"),
+    alt!("envelope-white", "White"),
+    alt!("envelope-manilla", "Manila"),
+    alt!("envelope-faded-blue", "Faded blue"),
+    alt!("envelope-starfield", "Starfield"),
 ];
 
 /// Every choice the gallery offers.
