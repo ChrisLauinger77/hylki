@@ -11004,7 +11004,7 @@ mod tests {
         );
         assert_eq!(
             preview_from_part(part.as_bytes(), None, None),
-            "Hello, I recently installed Hylki after reading about it on the omg!ubuntu website."
+            "Hello, I recently installed Vireo after reading about it on the omg!ubuntu website."
         );
         // Nothing of the MIME machinery reaches the list.
         assert!(!preview_from_part(part.as_bytes(), None, None).contains("--b2="));
