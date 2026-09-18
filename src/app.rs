@@ -8997,13 +8997,27 @@ impl AppModel {
             .map(|r| r.type_().name().to_string())
             .unwrap_or_else(|| "none yet".to_string());
         let libs = crate::memory_report::graphics_libraries();
+        // Mesa's Vulkan loader maps every installed driver to enumerate the
+        // devices, so lavapipe (and with it LLVM) shows up on a machine that
+        // draws with its GPU too; software rendering is the verdict only when
+        // no hardware driver is there beside it.
+        let hardware = libs.iter().any(|l| {
+            let l = l.as_str();
+            (l.starts_with("libvulkan_") && !l.starts_with("libvulkan_lvp") && !l.starts_with("libvulkan_dzn"))
+                || l.contains("nvidia")
+                || (l.ends_with("_dri.so") && !l.contains("swrast"))
+        });
         let software = libs.iter().any(|l| {
             l.starts_with("libvulkan_lvp") || l.starts_with("libLLVM") || l.contains("swrast")
         });
         out.push_str(&format!(
             "Graphics: {renderer}; driver libraries: {}{}\n",
             if libs.is_empty() { "none loaded".to_string() } else { libs.join(", ") },
-            if software { " (SOFTWARE rendering: shaders compile through LLVM in this process)" } else { "" }
+            match (hardware, software) {
+                (false, true) => " (SOFTWARE rendering: shaders compile through LLVM in this process)",
+                (true, true) => " (hardware driver in use; the software fallback is mapped alongside it, as Mesa's loader does)",
+                _ => "",
+            }
         ));
 
         out.push_str("Mail index (follows the mailbox size, kept in RAM by design):\n");
