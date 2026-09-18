@@ -844,7 +844,7 @@ impl Component for MessageView {
                             || model.find_open,
                     ),
                     // Under the split reply there is no list row to line up
-                    // with either, only the composer's grab strip: 10px more
+                    // with either, only the composer's grab strip: 14px more
                     // air than the aligned case.
                     #[watch]
                     set_class_active: ("under-split", model.under_split),
