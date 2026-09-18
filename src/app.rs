@@ -8633,7 +8633,11 @@ impl SimpleComponent for AppModel {
                         self.set_read(&m, true);
                     }
                 }
-                self.message_list.emit(MessageListInput::SelectFromReader { keys });
+                // The conversation as the reader has it, Sent members and all,
+                // so a card the list never listed still keeps its row (#220).
+                let conversation =
+                    self.current_thread.iter().map(|m| (m.account_id, m.id)).collect();
+                self.message_list.emit(MessageListInput::SelectFromReader { keys, conversation });
             }
 
             AppMsg::ThreadMessageSeen { account_id, id } => {
