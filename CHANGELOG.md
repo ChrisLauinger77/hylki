@@ -19,6 +19,13 @@ The first release under the Hylki name.
   envelope variants; the birds, colours, patterns and classic icon are
   gone. The beta wears the envelope's hazard-striped twin.
 - The welcome wizard and About window carry the Hylki wordmark.
+- **Freed memory goes back to the system.** A log from 1.33.4 showed the
+  process at 2.17 GB with 270 MB in use: the rest had been freed but the
+  allocator held on to it. The allocator is now tuned before the first
+  allocation, an idle timer returns held memory every 30 seconds when there
+  is enough of it, the gallery's thumbnail and PDF caches are bounded, and a
+  preview retry remembers its answer instead of re-fetching the same rows on
+  every sync (#221).
 - The Message-IDs of sent mail, exported log file names and temporary
   directories use the new name.
 

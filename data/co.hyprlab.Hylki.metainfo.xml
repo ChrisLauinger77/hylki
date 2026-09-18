@@ -60,6 +60,7 @@
     <release version="1.35.0" date="2026-09-18">
       <description>
         <p>Vireo is now Hylki. Same app, new name and icon. The first start carries a Vireo install's accounts, settings and cached mail across, leaving Vireo untouched until you remove it. The app icon gallery is a new set of Hylki envelopes.</p>
+        <p>Memory that was freed is now given back to the system, and the attachment gallery's caches are bounded.</p>
       </description>
     </release>
     <release version="1.33.4" date="2026-09-18">
