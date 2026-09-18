@@ -2,6 +2,12 @@
 
 Vireo is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.33.3
+
+**The exported log now reports memory use.** Export log, in Settings → System or from the notification centre, opens with a Memory section: how much each of Vireo's processes is using, how much of the main process is Vireo's own data as opposed to GTK, WebKit and the graphics driver, whether the graphics driver is rendering in software, and how large the mail index and each cache are. If Vireo looks large on your machine, that section says why, so please attach an exported log to any report about memory.
+
+**Tag icon.** The tag glyph in the reader toolbar, menus, list, sidebar and Settings is now an outline.
+
 ## What's new in 1.33.2
 
 **All Inboxes no longer loads forever** (#218, reported by [@7system7](https://github.com/7system7)). With more than one account set up, the "Loading more…" spinner under the message list waited for every account to finish indexing its inbox, and several things could stop an account from ever reporting in: a sign-in that failed, a server that could not be reached, or simply a small inbox whose turn in the background queue never came. One account in that state left the spinner turning over everyone's mail, and an empty list showed it instead of "No Messages". An account that cannot be reached now says so and stops the spinner, with the usual banner reporting the problem, and a folder whose mail has all arrived no longer waits on anything.
