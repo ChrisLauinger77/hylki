@@ -17,7 +17,7 @@ use crate::worker::{self, ConnTest};
 use crate::i18n::{i18n, i18n_f};
 
 /// Wordmark art, embedded so the wizard needs nothing on disk.
-const WORDMARK_SVG: &[u8] = include_bytes!("../../data/welcome/wordmark-blue.svg");
+const WORDMARK_SVG: &[u8] = include_bytes!("../../data/welcome/wordmark-black.svg");
 
 /// The settings chosen on the privacy + personalize pages, applied by the app
 /// through its normal Set* handlers when the wizard finishes.
@@ -233,8 +233,8 @@ const SMALL_TOP: f64 = 6.0;
 const SMALL_BOTTOM: f64 = 16.0;
 const SMALL_SIZE: f64 = 100.0;
 
-/// The wordmark art's aspect (its viewBox is 1329x483).
-const WORDMARK_ASPECT: f64 = 483.0 / 1329.0;
+/// The wordmark art's aspect (its viewBox is 433x125).
+const WORDMARK_ASPECT: f64 = 125.0 / 433.0;
 
 /// The wordmark's height for a given width.
 pub(crate) fn wordmark_height(width: f64) -> i32 {

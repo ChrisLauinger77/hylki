@@ -1,19 +1,15 @@
 //! The app icon the user chose, and how it reaches the desktop.
 //!
-//! Vireo ships one icon (the envelope with the bird since 1.23; the yellow
-//! squircle in 1.21 and 1.22, the round envelope before) and carries a gallery of
-//! alternatives inside the binary. The beta ships the envelope's `.Devel`
-//! twin, GNOME's development-build styling (the hazard stripe). A
-//! choice is applied by writing that artwork over the app's icon name in the
-//! user's own icon directory (`~/.local/share/icons/hicolor`), which every
-//! desktop searches before the install's — the Flatpak export included — so
-//! the dock, app grid and switcher pick it up under the same name. "Default"
-//! removes the override and whatever the build installed shows again.
-//!
-//! Existing installs keep the envelope: the first start of a build that
-//! ships the new default records "legacy" for any install that already has
-//! settings on disk, so nobody's dock changes without them asking (the
-//! gallery offers the switch). Fresh installs pick in the welcome wizard.
+//! The app ships one icon (the Hylki envelope, `data/icons/src/default.svg`)
+//! and carries a gallery of alternative envelopes inside the binary. The
+//! beta ships the default's `.Devel` twin, GNOME's development-build
+//! styling (the hazard stripe). A choice is applied by writing that artwork
+//! over the app's icon name in the user's own icon directory
+//! (`~/.local/share/icons/hicolor`), which every desktop searches before
+//! the install's — the Flatpak export included — so the dock, app grid and
+//! switcher pick it up under the same name. "Default" removes the override
+//! and whatever the build installed shows again. Fresh installs pick in the
+//! welcome wizard.
 //!
 //! The tray icon and the in-app uses draw the same choice, so it needs no
 //! restart; the window's own icon (X11 fallback, some panels) does, and a
@@ -33,12 +29,11 @@ pub struct IconChoice {
 /// The id meaning "whatever this build ships".
 pub const DEFAULT_ID: &str = "default";
 /// Bumped when a release's new default icon is to replace every existing
-/// choice once (1.23's blue bird envelope, generation 1): the first start
-/// on such a release resets the stored choice to the default, and records
-/// the generation so a choice made afterwards stands.
-pub const ICON_GENERATION: u32 = 1;
-/// The pre-1.21 round envelope, kept for installs that had it.
-pub const LEGACY_ID: &str = "legacy";
+/// choice once (1.23's blue bird envelope was generation 1; the Hylki
+/// envelope of 1.35, the first release under the new name, is 2): the
+/// first start on such a release resets the stored choice to the default,
+/// and records the generation so a choice made afterwards stands.
+pub const ICON_GENERATION: u32 = 2;
 
 /// The icon this build installs under its app ID.
 #[cfg(not(feature = "beta"))]
@@ -57,64 +52,30 @@ macro_rules! alt {
     };
 }
 
-/// The gallery, in display order: the build's own icon (the blue envelope
-/// with the bird, so it has no entry of its own), the other bird
-/// envelopes, the plain envelopes, the birds, the logotype, then the
-/// colours, and the classic icon last.
+/// The gallery, in display order: the build's own icon (the Hylki
+/// envelope, so it has no entry of its own), then the other envelopes.
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
-    alt!("envelope-bird-yellow", "Vireo envelope, yellow"),
-    alt!("envelope-bird-blue-subtle", "Vireo envelope, blue subtle"),
-    alt!("envelope-bird-white", "Vireo envelope, white"),
-    alt!("envelope-bird-beige", "Vireo envelope, beige"),
-    alt!("envelope-bird-faded-blue", "Vireo envelope, faded blue"),
+    alt!("envelope-bird-blue", "Envelope with bird, blue"),
+    alt!("envelope-bird-yellow", "Envelope with bird, yellow"),
     alt!("envelope-blue", "Envelope, blue"),
     alt!("envelope-yellow", "Envelope, yellow"),
     alt!("envelope-white", "Envelope, white"),
-    alt!("envelope-beige", "Envelope, beige"),
-    alt!("envelope-starfield", "Envelope, starfield"),
+    alt!("envelope-manilla", "Envelope, manila"),
     alt!("envelope-faded-blue", "Envelope, faded blue"),
-    alt!("bird", "Vireo"),
-    alt!("bird-at-symbol", "Vireo, @"),
-    alt!("logotype-yellow", "Logotype"),
-    alt!("yellow-blue", "Yellow & blue"),
-    alt!("blue", "Blue"),
-    alt!("blue-dark", "Dark blue"),
-    alt!("blue-yellow", "Blue & yellow"),
-    alt!("teal", "Teal"),
-    alt!("green", "Green"),
-    alt!("orange", "Orange"),
-    alt!("red", "Red"),
-    alt!("peach", "Peach"),
-    alt!("pink", "Pink"),
-    alt!("purple", "Purple"),
-    alt!("grey", "Grey"),
-    alt!("pattern-blue", "Pattern, blue"),
-    alt!("pattern-pink", "Pattern, pink"),
-    alt!("pattern-teal", "Pattern, teal"),
-    alt!("legacy", "Classic"),
+    alt!("envelope-starfield", "Envelope, starfield"),
 ];
 
-/// Every choice the gallery offers. The classic envelope belongs to the
-/// stable app: on the beta it would hide the beta ribbon, so it is left out
-/// and treated as the default there.
+/// Every choice the gallery offers.
 pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
-    CATALOG.iter().filter(|c| !(cfg!(feature = "beta") && c.id == LEGACY_ID))
+    CATALOG.iter()
 }
 
-/// Normalise a stored id to one this build offers. Ids from the 1.22
-/// gallery map onto their redrawn successors, so a choice made there keeps
-/// its look after the upgrade.
+/// Normalise a stored id to one this build offers. Every id from the
+/// Vireo galleries (birds, colours, patterns, the classic envelope) is
+/// gone; a stored one falls back to the default, which generation 2 puts
+/// on every install once anyway.
 fn effective(id: &str) -> &'static str {
-    let id = match id {
-        "envelope" => "envelope-yellow",
-        "envelope-cream" => "envelope-beige",
-        "bird-blue" => "bird",
-        "bird-blue-at-symbol" => "bird-at-symbol",
-        "envelope-bird" => DEFAULT_ID,
-        "logotype" => "logotype-yellow",
-        other => other,
-    };
     catalog().find(|c| c.id == id).map(|c| c.id).unwrap_or(DEFAULT_ID)
 }
 
@@ -124,9 +85,8 @@ pub fn png_for(id: &str) -> &'static [u8] {
     CATALOG.iter().find(|c| c.id == id).map(|c| c.png).unwrap_or(DEFAULT_PNG)
 }
 
-/// The choice in force, settling it on the first start that finds none:
-/// an install with settings already on disk keeps the envelope it had, a
-/// fresh one gets the default (the wizard lets it pick). The override on
+/// The choice in force, settling it on the first start that finds none
+/// (the default; the wizard lets a fresh install pick). The override on
 /// disk is brought in line either way, so a reinstall (or a changed
 /// default) never silently swaps the icon someone chose.
 pub fn init_on_startup() -> String {
@@ -143,9 +103,8 @@ pub fn init_on_startup() -> String {
         match crate::config::load_app_icon() {
             Some(id) => id,
             None => {
-                let id = if crate::config::settings_on_disk() { LEGACY_ID } else { DEFAULT_ID };
-                crate::config::save_app_icon(id);
-                id.to_string()
+                crate::config::save_app_icon(DEFAULT_ID);
+                DEFAULT_ID.to_string()
             }
         }
     };
