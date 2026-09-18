@@ -2645,7 +2645,7 @@ impl SimpleComponent for AppModel {
                 b
             },
             reader_tag_btn: {
-                let b = gtk::Button::from_icon_name("co.hyprlab.Vireo-tag-symbolic");
+                let b = gtk::Button::from_icon_name("co.hyprlab.Vireo-tag-outline-symbolic");
                 b.set_tooltip_text(Some(i18n("Tags").as_str()));
                 b.add_css_class("flat");
                 b
@@ -11186,7 +11186,7 @@ impl AppModel {
                     T::Tags => {
                         if let Some(entries) = self.reader_tag_entries(sender) {
                             section.push(
-                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic"),
+                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-outline-symbolic"),
                             );
                         }
                     }
@@ -11566,7 +11566,7 @@ impl AppModel {
                     });
                 });
             sections.push(vec![
-                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic"),
+                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-outline-symbolic"),
             ]);
         }
         let mut acts = Vec::new();

@@ -61,7 +61,7 @@ impl MessageRow {
         });
         let star = button("co.hyprlab.Vireo-non-starred-symbolic", i18n("Star"));
         action(&star, RowAction::ToggleStar);
-        let tag = button("co.hyprlab.Vireo-tag-symbolic", i18n("Tags"));
+        let tag = button("co.hyprlab.Vireo-tag-outline-symbolic", i18n("Tags"));
         {
             let s = sender.clone();
             tag.connect_clicked(move |b| s.input(MessageRowInput::OpenTagMenu(b.clone())));
@@ -4223,7 +4223,7 @@ impl MessageList {
             if entries.is_empty() {
                 Vec::new()
             } else {
-                vec![MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-symbolic")]
+                vec![MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Vireo-tag-outline-symbolic")]
             }
         };
 
