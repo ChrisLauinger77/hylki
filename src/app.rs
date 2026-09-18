@@ -15153,9 +15153,9 @@ impl AppModel {
         // Identity block: the blue wordmark on the brand yellow, wizard-style.
         // Same Overlay-with-spacer cap as the wizard — a Picture's texture
         // wins over both width requests and clamps.
-        let wm_pic = crate::ui::welcome::wordmark_picture(120);
+        let wm_pic = crate::ui::welcome::wordmark_picture(150);
         let wm_frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        wm_frame.set_size_request(120, crate::ui::welcome::wordmark_height(120.0));
+        wm_frame.set_size_request(150, crate::ui::welcome::wordmark_height(150.0));
         let wm = gtk::Overlay::new();
         wm.set_child(Some(&wm_frame));
         wm.add_overlay(&wm_pic);
