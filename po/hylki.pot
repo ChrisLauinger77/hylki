@@ -1,10 +1,10 @@
-# Translation template for Vireo.
-# This file is distributed under the same license as the Vireo package.
+# Translation template for Hylki.
+# This file is distributed under the same license as the Hylki package.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: vireo\n"
-"Report-Msgid-Bugs-To: https://github.com/hyprlab/vireo/issues\n"
+"Project-Id-Version: hylki\n"
+"Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -157,14 +157,14 @@ msgstr ""
 msgid "Could not add contact: {e}"
 msgstr ""
 
-msgid "The language applies the next time Vireo starts."
+msgid "The language applies the next time Hylki starts."
 msgstr ""
 
 msgid "Save Attachment"
 msgstr ""
 
 msgid ""
-"Couldn't restart automatically — quit and reopen Vireo to finish switching "
+"Couldn't restart automatically — quit and reopen Hylki to finish switching "
 "the icon."
 msgstr ""
 
@@ -209,14 +209,14 @@ msgstr ""
 
 msgid ""
 "{n} mail account(s), the cloud storage accounts and all preferences were "
-"imported. Restart Vireo to apply them. Passwords and sign-ins are not part "
+"imported. Restart Hylki to apply them. Passwords and sign-ins are not part "
 "of a backup; re-enter them on first use if this is a new machine."
 msgstr ""
 
 msgid "Later"
 msgstr ""
 
-msgid "Restart Vireo"
+msgid "Restart Hylki"
 msgstr ""
 
 msgid "Import failed: {e}"
@@ -272,17 +272,17 @@ msgstr ""
 msgid "Redo"
 msgstr ""
 
-msgid "Restarting Vireo"
+msgid "Restarting Hylki"
 msgstr ""
 
-msgid "Applying your new app icon. Vireo will close and reopen in a moment."
+msgid "Applying your new app icon. Hylki will close and reopen in a moment."
 msgstr ""
 
 msgid "Restart to finish switching icons?"
 msgstr ""
 
 msgid ""
-"The dock and Vireo's own windows keep the old icon until Vireo restarts."
+"The dock and Hylki's own windows keep the old icon until Hylki restarts."
 msgstr ""
 
 msgid "Restart Now"
@@ -327,13 +327,13 @@ msgstr ""
 msgid "New Message"
 msgstr ""
 
-msgid "Could not attach {names}: Vireo cannot read the file."
-msgid_plural "Could not attach {n} files (Vireo cannot read them): {names}"
+msgid "Could not attach {names}: Hylki cannot read the file."
+msgid_plural "Could not attach {n} files (Hylki cannot read them): {names}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Send {n} file with Vireo"
-msgid_plural "Send {n} files with Vireo"
+msgid "Send {n} file with Hylki"
+msgid_plural "Send {n} files with Hylki"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -424,7 +424,7 @@ msgstr ""
 msgid "Move Folder"
 msgstr ""
 
-msgid "Vireo couldn’t save your password"
+msgid "Hylki couldn’t save your password"
 msgstr ""
 
 msgid "Keyring setup on Linux Mint"
@@ -509,7 +509,7 @@ msgstr ""
 msgid ""
 "This is a beta build for trying upcoming changes early. Expect bugs and "
 "instability — please report anything broken on GitHub. It shares your "
-"accounts and mail with the stable Vireo install."
+"accounts and mail with the stable Hylki install."
 msgstr ""
 
 msgid "Release Notes"
@@ -707,7 +707,7 @@ msgstr ""
 msgid "Close the window (background sync keeps running)"
 msgstr ""
 
-msgid "Quit Vireo entirely"
+msgid "Quit Hylki entirely"
 msgstr ""
 
 msgid "This list"
@@ -735,7 +735,7 @@ msgid "Default"
 msgstr ""
 
 msgid ""
-"Vireo checks for new mail and shows notifications while its window is closed."
+"Hylki checks for new mail and shows notifications while its window is closed."
 msgstr ""
 
 msgid "Checking for new mail"
@@ -840,11 +840,11 @@ msgstr ""
 msgid "Message ready to send"
 msgstr ""
 
-msgid "A new message is open in Vireo."
+msgid "A new message is open in Hylki."
 msgstr ""
 
-msgid "A new message with {n} file attached is open in Vireo."
-msgid_plural "A new message with {n} files attached is open in Vireo."
+msgid "A new message with {n} file attached is open in Hylki."
+msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -904,7 +904,7 @@ msgstr ""
 msgid "gpg did not encrypt the message."
 msgstr ""
 
-msgid "Open Vireo"
+msgid "Open Hylki"
 msgstr ""
 
 msgid "View all {n} unread in Inboxes…"
@@ -954,7 +954,7 @@ msgstr ""
 msgid "GNOME Online Accounts"
 msgstr ""
 
-msgid "Mail accounts from GNOME Settings. Toggle one on to use it in Vireo."
+msgid "Mail accounts from GNOME Settings. Toggle one on to use it in Hylki."
 msgstr ""
 
 msgid ""
@@ -983,7 +983,7 @@ msgstr ""
 
 msgid ""
 "File incoming mail into folders or tag it automatically, by sender, subject "
-"or recipients. Applied to each account's Inbox as Vireo syncs it, or to the "
+"or recipients. Applied to each account's Inbox as Hylki syncs it, or to the "
 "mail already there with Apply Now; a folder's right-click menu runs them "
 "over that one folder."
 msgstr ""
@@ -1036,7 +1036,7 @@ msgstr ""
 msgid "GNOME Online Account"
 msgstr ""
 
-msgid "Show in Vireo"
+msgid "Show in Hylki"
 msgstr ""
 
 msgid ""
@@ -1110,7 +1110,7 @@ msgid ""
 "Google and Microsoft sign-in use GNOME Online Accounts.\n"
 "\n"
 "1. Open Online Accounts and sign in there.\n"
-"2. Come back to Vireo and reopen this window — the account then appears "
+"2. Come back to Hylki and reopen this window — the account then appears "
 "under “GNOME Online Accounts” at the top of this window. Enable it there."
 msgstr ""
 
@@ -1383,19 +1383,19 @@ msgstr ""
 msgid "GOA"
 msgstr ""
 
-msgid "Vireo"
+msgid "Hylki"
 msgstr ""
 
 msgid "Imported GNOME Online Account"
 msgstr ""
 
-msgid "Added directly in Vireo"
+msgid "Added directly in Hylki"
 msgstr ""
 
 msgid "Enable this account"
 msgstr ""
 
-msgid "Use this account in Vireo"
+msgid "Use this account in Hylki"
 msgstr ""
 
 msgid "Automatic"
@@ -1745,6 +1745,26 @@ msgstr ""
 msgid "The file could not be opened"
 msgstr ""
 
+msgid "Welcome to Hylki, formerly {old}"
+msgstr ""
+
+msgid ""
+"Your accounts, settings and cached mail were carried over from {old}. There "
+"is nothing to set up again, and nothing in {old} was changed or removed. "
+"Once everything is here, you can remove {old}."
+msgstr ""
+
+msgid ""
+"{old} is still the app your desktop opens email links with. To hand that to "
+"Hylki, choose it under Default Apps in Settings."
+msgstr ""
+
+msgid "To remove {old}, run:"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
 msgid "Cloud Storage"
 msgstr ""
 
@@ -1770,7 +1790,7 @@ msgid "Remove {name}?"
 msgstr ""
 
 msgid ""
-"Vireo forgets the account and its sign-in. Files already uploaded, and the "
+"Hylki forgets the account and its sign-in. Files already uploaded, and the "
 "links in messages you sent, stay where they are."
 msgstr ""
 
@@ -1809,7 +1829,7 @@ msgstr ""
 
 msgid ""
 "Sign in with your Seafile password. If the account uses two-step "
-"verification, also enter the current code from your authenticator app: Vireo "
+"verification, also enter the current code from your authenticator app: Hylki "
 "turns it into an API token once and keeps that instead of the password. A "
 "token obtained another way can be pasted in the password field."
 msgstr ""
@@ -1923,9 +1943,9 @@ msgid ""
 "yourself (it takes a minute and stays private):\n"
 "1. Open dropbox.com/developers/apps, signed in to your Dropbox, and press "
 "Create app.\n"
-"2. Choose Scoped access, then App folder (Vireo sees only its own folder "
+"2. Choose Scoped access, then App folder (Hylki sees only its own folder "
 "under Apps) or Full Dropbox (uploads go to the folder named above).\n"
-"3. Give the app a name that no one else has used, such as Vireo for your "
+"3. Give the app a name that no one else has used, such as Hylki for your "
 "name, and press Create app.\n"
 "4. On the Permissions tab, tick account_info.read, files.content.write and "
 "sharing.write, then press Submit.\n"
@@ -2069,9 +2089,6 @@ msgid "Send now instead"
 msgstr ""
 
 msgid "Download password for {name}: {password}"
-msgstr ""
-
-msgid "Copy"
 msgstr ""
 
 msgid "From"
@@ -2501,7 +2518,7 @@ msgid "GnuPG"
 msgstr ""
 
 msgid ""
-"Vireo reads and writes the keyring of the GnuPG on this computer, the same "
+"Hylki reads and writes the keyring of the GnuPG on this computer, the same "
 "one the gpg command and other mail programs use."
 msgstr ""
 
@@ -2531,7 +2548,7 @@ msgid "Fetch by address…"
 msgstr ""
 
 msgid ""
-"GnuPG {version} found. Vireo reads and writes its keyring, the same one the "
+"GnuPG {version} found. Hylki reads and writes its keyring, the same one the "
 "gpg command and other mail programs use."
 msgstr ""
 
@@ -2683,7 +2700,7 @@ msgstr[1] ""
 msgid "That key was already in your keyring."
 msgstr ""
 
-msgid "Vireo icon"
+msgid "Hylki icon"
 msgstr ""
 
 msgid "Envelope, white"
@@ -2844,7 +2861,7 @@ msgid "Desktop notifications"
 msgstr ""
 
 msgid ""
-"Show system notifications for new mail and error alerts when Vireo isn't "
+"Show system notifications for new mail and error alerts when Hylki isn't "
 "focused."
 msgstr ""
 
@@ -3332,7 +3349,7 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Vireo collects no telemetry and sends no analytics. Remote content (images, "
+"Hylki collects no telemetry and sends no analytics. Remote content (images, "
 "trackers) is blocked by default. Allow it per message, trust a sender to "
 "always load it, or turn on \"Always load remote content\" below."
 msgstr ""
@@ -3367,7 +3384,7 @@ msgstr ""
 
 msgid ""
 "Fills the sender's avatar with the brand's logo: the one the sender "
-"publishes for mail (BIMI), one bundled with Vireo, or the site's own icon. "
+"publishes for mail (BIMI), one bundled with Hylki, or the site's own icon. "
 "All but the bundled ones are fetched from the sender's domain, which then "
 "learns your IP address, as blocking remote content otherwise avoids."
 msgstr ""
@@ -3385,8 +3402,8 @@ msgid "Clock"
 msgstr ""
 
 msgid ""
-"The language Vireo is shown in. \"System\" follows the desktop, with English "
-"where no translation exists. A change applies the next time Vireo starts."
+"The language Hylki is shown in. \"System\" follows the desktop, with English "
+"where no translation exists. A change applies the next time Hylki starts."
 msgstr ""
 
 msgid "Keep running in the background"
@@ -3394,7 +3411,7 @@ msgstr ""
 
 msgid ""
 "Closing the window hides it instead of quitting, so new mail still arrives. "
-"Vireo then appears under Background Apps in the system menu, where it can be "
+"Hylki then appears under Background Apps in the system menu, where it can be "
 "quit."
 msgstr ""
 
@@ -3402,7 +3419,7 @@ msgid "Start at login"
 msgstr ""
 
 msgid ""
-"Start checking for mail when you log in. Vireo starts without a window and "
+"Start checking for mail when you log in. Hylki starts without a window and "
 "waits in the system menu."
 msgstr ""
 
@@ -3411,7 +3428,7 @@ msgstr ""
 
 msgid ""
 "An icon in the system tray, with a red dot while any inbox has unread mail. "
-"Click it to open Vireo. GNOME needs the AppIndicator extension; other "
+"Click it to open Hylki. GNOME needs the AppIndicator extension; other "
 "desktops show it as they are."
 msgstr ""
 
@@ -3419,7 +3436,7 @@ msgid "Tray icon"
 msgstr ""
 
 msgid ""
-"The Vireo icon, or a plain envelope in white or black to match the panel."
+"The Hylki icon, or a plain envelope in white or black to match the panel."
 msgstr ""
 
 msgid "Unread mail in the tray menu"
@@ -3442,12 +3459,12 @@ msgid "Console mode"
 msgstr ""
 
 msgid ""
-"A verbose live console in the status bar showing everything Vireo is doing "
+"A verbose live console in the status bar showing everything Hylki is doing "
 "under the hood."
 msgstr ""
 
 msgid ""
-"Save everything the console has recorded since Vireo started, to attach to a "
+"Save everything the console has recorded since Hylki started, to attach to a "
 "bug report. Email addresses are shortened to their domain."
 msgstr ""
 
@@ -3455,7 +3472,7 @@ msgid "GNOME Files Integration"
 msgstr ""
 
 msgid ""
-"Add \"Send with Vireo\" to the right-click menu in Files (Nautilus): the "
+"Add \"Send with Hylki\" to the right-click menu in Files (Nautilus): the "
 "selected files open in a new message, attached. This installs a small "
 "extension in your home folder. It also needs the nautilus-python package "
 "(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
@@ -3485,7 +3502,7 @@ msgstr ""
 msgid "Restart"
 msgstr ""
 
-msgid "Default Send with Vireo behavior"
+msgid "Default Send with Hylki behavior"
 msgstr ""
 
 msgid "Default large attachments behavior"
@@ -3503,7 +3520,7 @@ msgid "In MB, for all the files together."
 msgstr ""
 
 msgid ""
-"Everything Vireo keeps, as one file: mail and cloud storage accounts, "
+"Everything Hylki keeps, as one file: mail and cloud storage accounts, "
 "preferences, filters, tags, the sidebar and window layout, the app icon "
 "choice and the words taught to the spell checker. Passwords and sign-ins "
 "stay in the system keyring and are never exported; OpenPGP keys stay in "
@@ -3764,7 +3781,7 @@ msgstr ""
 msgid "Edit Tag…"
 msgstr ""
 
-msgid "Welcome to Vireo"
+msgid "Welcome to Hylki"
 msgstr ""
 
 msgid ""
@@ -3773,7 +3790,7 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Choosing another language restarts Vireo: it closes for a moment and this "
+"Choosing another language restarts Hylki: it closes for a moment and this "
 "wizard comes back in that language."
 msgstr ""
 
@@ -3816,7 +3833,7 @@ msgid "Privacy, your way"
 msgstr ""
 
 msgid ""
-"Vireo sends no telemetry, ever. These control what leaves your machine while "
+"Hylki sends no telemetry, ever. These control what leaves your machine while "
 "you read."
 msgstr ""
 
@@ -3988,7 +4005,7 @@ msgid "Could not flag message: {e}"
 msgstr ""
 
 msgid ""
-"This server does not store tags, so Vireo keeps them on this computer only"
+"This server does not store tags, so Hylki keeps them on this computer only"
 msgstr ""
 
 msgid "Could not tag message: {e}"
@@ -4117,7 +4134,7 @@ msgid "Private, GNOME-native email client"
 msgstr ""
 
 msgid ""
-"Vireo is a desktop email client for Wayland that feels at home in GNOME. It "
+"Hylki is a desktop email client for Wayland that feels at home in GNOME. It "
 "talks IMAP and SMTP directly, keeps your mail and credentials on your "
 "machine, and blocks trackers by default — no telemetry, no analytics."
 msgstr ""

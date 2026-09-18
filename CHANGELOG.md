@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.35.0 — 2026-09-18
+
+The first release under the Hylki name.
+
+- **Vireo is now Hylki.** Same app, new name and icon: app ID
+  `co.hyprlab.Hylki`, binary `hylki`, site hylki.hyprlab.co, repository
+  hyprlab/hylki. The first start carries a Vireo (or Veem) install's
+  accounts, settings and cached mail across — renamed in place beside a
+  native install or a rebased Flatpak, copied out of the old app's sandbox
+  otherwise — and copies keyring entries as each is first needed. Nothing
+  of the old app's is changed or removed; a notice says what came over and
+  how to remove it. The GNOME Files extension is replaced by the Hylki one,
+  start-at-login is asked for again under the new ID, and an old
+  per-user launcher copy is cleared once its app is gone.
+- **New app icon and gallery.** The Hylki envelope is the default (every
+  install gets it once, whatever it had chosen) and the gallery is eight
+  envelope variants; the birds, colours, patterns and classic icon are
+  gone. The beta wears the envelope's hazard-striped twin.
+- The welcome wizard and About window carry the Hylki wordmark.
+- The Message-IDs of sent mail, exported log file names and temporary
+  directories use the new name.
+
 ## 1.33.4 — 2026-09-18
 
 A background loop that could hold a mailbox at several gigabytes, the

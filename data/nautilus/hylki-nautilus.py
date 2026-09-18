@@ -1,11 +1,11 @@
-# vireo-nautilus.py
+# hylki-nautilus.py
 #
-# GNOME Files (Nautilus) extension that adds "Send with Vireo" to the
-# right-click menu: the selected files open in a new Vireo message, already
-# attached (https://github.com/hyprlab/vireo, issue #188).
+# GNOME Files (Nautilus) extension that adds "Send with Hylki" to the
+# right-click menu: the selected files open in a new Hylki message, already
+# attached (https://github.com/hyprlab/hylki, issue #188).
 #
-# It launches Vireo by its desktop id, so it works whether Vireo is the
-# Flatpak or a native package. Vireo installs this file for you from
+# It launches Hylki by its desktop id, so it works whether Hylki is the
+# Flatpak or a native package. Hylki installs this file for you from
 # Settings -> System -> GNOME Files. By hand, copy it to
 #   ~/.local/share/nautilus-python/extensions/      (per user)
 #   /usr/share/nautilus-python/extensions/          (system wide)
@@ -33,31 +33,31 @@ from gi.repository import Gio, GLib, GObject, Nautilus  # noqa: E402
 __version__ = "1"
 
 # The stable build first, the beta after it; whichever is installed answers.
-APP_IDS = ("co.hyprlab.Vireo", "co.hyprlab.Vireo.Beta")
+APP_IDS = ("co.hyprlab.Hylki", "co.hyprlab.Hylki.Beta")
 
 # Nautilus loads this file outside the app, so its translations live here
-# rather than in Vireo's catalogues.
+# rather than in Hylki's catalogues.
 _STRINGS = {
-    "label": "Send with Vireo",
-    "tip": "Attach the selected files to a new message in Vireo",
+    "label": "Send with Hylki",
+    "tip": "Attach the selected files to a new message in Hylki",
 }
 
 _TRANSLATIONS = {
     "fr": {
-        "label": "Envoyer avec Vireo",
-        "tip": "Joindre les fichiers sélectionnés à un nouveau message dans Vireo",
+        "label": "Envoyer avec Hylki",
+        "tip": "Joindre les fichiers sélectionnés à un nouveau message dans Hylki",
     },
     "hu": {
         "label": "Küldés a Vireóval",
         "tip": "A kijelölt fájlok csatolása egy új üzenethez a Vireóban",
     },
     "pt": {
-        "label": "Enviar com o Vireo",
-        "tip": "Anexar os ficheiros selecionados a uma nova mensagem no Vireo",
+        "label": "Enviar com o Hylki",
+        "tip": "Anexar os ficheiros selecionados a uma nova mensagem no Hylki",
     },
     "ru": {
-        "label": "Отправить через Vireo",
-        "tip": "Прикрепить выбранные файлы к новому сообщению в Vireo",
+        "label": "Отправить через Hylki",
+        "tip": "Прикрепить выбранные файлы к новому сообщению в Hylki",
     },
 }
 
@@ -94,20 +94,20 @@ _S = _strings()
 
 
 def _log(*values):
-    print("Vireo:", *values, file=sys.stderr)
+    print("Hylki:", *values, file=sys.stderr)
 
 
 def _mark_loaded():
-    # Vireo's settings cannot tell from the file alone whether Files has
+    # Hylki's settings cannot tell from the file alone whether Files has
     # actually loaded it (the nautilus-python bindings may be missing), so
     # note here that this copy was loaded: a hidden file next to it holding
-    # the SHA-256 of this file, which Vireo compares with its own copy.
+    # the SHA-256 of this file, which Hylki compares with its own copy.
     try:
         import hashlib
 
         with open(__file__, "rb") as f:
             digest = hashlib.sha256(f.read()).hexdigest()
-        marker = os.path.join(os.path.dirname(__file__), ".vireo-nautilus.loaded")
+        marker = os.path.join(os.path.dirname(__file__), ".hylki-nautilus.loaded")
         with open(marker, "w") as f:
             f.write(digest + "\n")
     except OSError as error:
@@ -119,7 +119,7 @@ _mark_loaded()
 
 def _launch_context():
     # Files' own launch context carries an activation token, which is what
-    # lets Vireo's window come to the front over Files.
+    # lets Hylki's window come to the front over Files.
     try:
         gi.require_version("Gdk", "4.0")
         from gi.repository import Gdk
@@ -154,20 +154,20 @@ def _launch(uris):
         except GLib.Error as error:
             _log("could not launch", app_id + ":", error)
     # No desktop entry found: the command line, native or Flatpak.
-    if GLib.find_program_in_path("vireo"):
-        argv = ["vireo"] + uris
+    if GLib.find_program_in_path("hylki"):
+        argv = ["hylki"] + uris
     elif GLib.find_program_in_path("flatpak"):
         argv = ["flatpak", "run", "--file-forwarding", APP_IDS[0], "@@u"] + uris + ["@@"]
     else:
-        _log("Vireo is not installed")
+        _log("Hylki is not installed")
         return
     try:
         Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE)
     except GLib.Error as error:
-        _log("could not start Vireo:", error)
+        _log("could not start Hylki:", error)
 
 
-class VireoMenuProvider(GObject.GObject, Nautilus.MenuProvider):
+class HylkiMenuProvider(GObject.GObject, Nautilus.MenuProvider):
     def get_file_items(self, *args):
         files = args[-1]
         uris = []
@@ -184,7 +184,7 @@ class VireoMenuProvider(GObject.GObject, Nautilus.MenuProvider):
         if not uris:
             return []
         item = Nautilus.MenuItem(
-            name="VireoMenuProvider::send",
+            name="HylkiMenuProvider::send",
             label=_S["label"],
             tip=_S["tip"],
         )

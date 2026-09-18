@@ -37,10 +37,10 @@ pub const ICON_GENERATION: u32 = 2;
 
 /// The icon this build installs under its app ID.
 #[cfg(not(feature = "beta"))]
-const DEFAULT_PNG: &[u8] = include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Vireo.png");
+const DEFAULT_PNG: &[u8] = include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.png");
 #[cfg(feature = "beta")]
 const DEFAULT_PNG: &[u8] =
-    include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Vireo.Beta.png");
+    include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.Beta.png");
 
 macro_rules! alt {
     ($id:literal, $label:literal) => {
@@ -72,7 +72,7 @@ pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
 }
 
 /// Normalise a stored id to one this build offers. Every id from the
-/// Vireo galleries (birds, colours, patterns, the classic envelope) is
+/// Hylki galleries (birds, colours, patterns, the classic envelope) is
 /// gone; a stored one falls back to the default, which generation 2 puts
 /// on every install once anyway.
 fn effective(id: &str) -> &'static str {
@@ -90,7 +90,7 @@ pub fn png_for(id: &str) -> &'static [u8] {
 /// disk is brought in line either way, so a reinstall (or a changed
 /// default) never silently swaps the icon someone chose.
 pub fn init_on_startup() -> String {
-    if std::env::var("VIREO_DEMO").is_ok() {
+    if std::env::var("HYLKI_DEMO").is_ok() {
         return DEFAULT_ID.to_string();
     }
     let id = if crate::config::load_app_icon_generation() < ICON_GENERATION {
@@ -117,7 +117,7 @@ pub fn init_on_startup() -> String {
 pub fn set(id: &str) -> String {
     let id = effective(id).to_string();
     crate::config::save_app_icon(&id);
-    if std::env::var("VIREO_DEMO").is_err() {
+    if std::env::var("HYLKI_DEMO").is_err() {
         apply(&id);
     }
     id
@@ -185,7 +185,7 @@ fn apply(id: &str) {
     sync_icon_files(&hicolor, id, &name, own_file);
     let path = hicolor.join("512x512/apps").join(format!("{name}.png"));
     launcher.point_at(&path.to_string_lossy(), is_default && !own_file);
-    // Vireo's own windows (X11, panels that draw window icons).
+    // Hylki's own windows (X11, panels that draw window icons).
     if own_file {
         gtk::Window::set_default_icon_name(&name);
     } else {
@@ -279,9 +279,9 @@ fn touch(dir: &std::path::Path) {
 // The launcher
 // ---------------------------------------------------------------------------
 
-/// Marker key in a launcher Vireo wrote, so only its own files are ever
+/// Marker key in a launcher Hylki wrote, so only its own files are ever
 /// removed or regenerated.
-const LAUNCHER_MARK: &str = "X-Vireo-Icon-Launcher";
+const LAUNCHER_MARK: &str = "X-Hylki-Icon-Launcher";
 
 /// When the launcher was last written by this process.
 static LAST_LAUNCHER_WRITE: std::sync::Mutex<Option<std::time::Instant>> =
@@ -408,9 +408,9 @@ fn flatpak_exec() -> Option<(String, String)> {
         .split_once(&format!("/app/{}/", crate::APP_ID))
         .map(|(root, _)| root.to_string())?;
     // `%U` as in the shipped entry: one launch for every selected file, so
-    // "Send with Vireo" from Files attaches them all to the same message.
+    // "Send with Hylki" from Files attaches them all to the same message.
     let exec = format!(
-        "flatpak run --branch={branch} --arch={arch} --command=vireo --file-forwarding {} @@u %U @@",
+        "flatpak run --branch={branch} --arch={arch} --command=hylki --file-forwarding {} @@u %U @@",
         crate::APP_ID
     );
     Some((exec, format!("{root}/exports/bin/{}", crate::APP_ID)))
@@ -632,18 +632,18 @@ pub fn run_restart_helper() -> ! {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
     drop(conn);
-    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("vireo"));
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("hylki"));
     // A one-off launch's review and capture switches must not carry over
     // into the instance that comes back.
     let err = std::process::Command::new(exe)
-        .env_remove("VIREO_WELCOME")
-        .env_remove("VIREO_SHOWCASE")
-        .env_remove("VIREO_SHOWCASE_PAGE")
-        .env_remove("VIREO_SHOWCASE_SETTINGS")
-        .env_remove("VIREO_SHOWCASE_SCROLL")
-        .env_remove("VIREO_SHOWCASE_DELAY")
+        .env_remove("HYLKI_WELCOME")
+        .env_remove("HYLKI_SHOWCASE")
+        .env_remove("HYLKI_SHOWCASE_PAGE")
+        .env_remove("HYLKI_SHOWCASE_SETTINGS")
+        .env_remove("HYLKI_SHOWCASE_SCROLL")
+        .env_remove("HYLKI_SHOWCASE_DELAY")
         .exec();
-    eprintln!("vireo: restart failed: {err}");
+    eprintln!("hylki: restart failed: {err}");
     std::process::exit(1);
 }
 
