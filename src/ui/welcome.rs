@@ -253,7 +253,7 @@ const HERO_TOP: i32 = 150;
 const HERO_SIZE: f64 = 240.0;
 const SMALL_TOP: f64 = 6.0;
 const SMALL_BOTTOM: f64 = 16.0;
-const SMALL_SIZE: f64 = 100.0;
+const SMALL_SIZE: f64 = 128.0;
 
 /// The wordmark art's aspect (the PNG master is 1024x293).
 const WORDMARK_ASPECT: f64 = 293.0 / 1024.0;
