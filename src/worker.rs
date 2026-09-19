@@ -119,6 +119,108 @@ static PREVIEW_RETRIED: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<(u32, u32, u32), String>>,
 > = std::sync::LazyLock::new(Default::default);
 
+/// Accounts whose server answers the summary fetch with something our IMAP
+/// parser cannot read once the list-preview items (`BODY.PEEK[1]<0.N>` and
+/// `BODY.PEEK[1.MIME]`) ride along (#226, Mailfence). The summary fetch is
+/// retried without them (see [`step_fetch_mode`]) and, once it works that
+/// way, every preview read for the account is skipped for the session: a
+/// reply the parser rejects leaves the connection unusable, and the repair
+/// reads ask for the same items.
+static PREVIEW_ITEMS_REJECTED: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashSet<u32>>,
+> = std::sync::LazyLock::new(Default::default);
+
+/// Whether the account's fetches should read list previews at all: the
+/// setting is on and the server has not rejected the preview items.
+fn inline_previews_wanted(account_id: u32) -> bool {
+    crate::config::load_preview_lines() > 0
+        && !PREVIEW_ITEMS_REJECTED
+            .lock()
+            .map(|r| r.contains(&account_id))
+            .unwrap_or(false)
+}
+
+/// Whether the error is the IMAP parser giving up on a server's reply, as
+/// opposed to the connection dropping or the server saying NO.
+fn is_parse_error(e: &async_imap::error::Error) -> bool {
+    match e {
+        async_imap::error::Error::Parse(_) => true,
+        async_imap::error::Error::Io(io) => io.to_string().contains(" during parsing of "),
+        _ => false,
+    }
+}
+
+/// After a summary fetch whose reply the parser rejected, move to the next
+/// way of asking for the same summaries. Returns false once every way has
+/// been tried. The order keeps the structured ENVELOPE as long as possible
+/// and previews as long as possible:
+///
+/// 1. ENVELOPE + BODYSTRUCTURE with previews (the default)
+/// 2. raw headers with previews (iCloud's non-compliant ENVELOPE)
+/// 3. ENVELOPE + BODYSTRUCTURE without previews (Mailfence, #226: the
+///    preview items make its whole FETCH reply unreadable)
+/// 4. raw headers without previews
+///
+/// With previews switched off in Settings, steps 2 and 3 collapse into one.
+fn step_fetch_mode(account_id: u32, use_envelope: &mut bool) -> bool {
+    let previews = inline_previews_wanted(account_id);
+    match (*use_envelope, previews) {
+        (true, true) => {
+            *use_envelope = false;
+        }
+        (false, true) => {
+            if let Ok(mut r) = PREVIEW_ITEMS_REJECTED.lock() {
+                r.insert(account_id);
+            }
+            *use_envelope = true;
+        }
+        (true, false) => {
+            *use_envelope = false;
+        }
+        (false, false) => return false,
+    }
+    tracing::info!(
+        target: "hylki::imap",
+        "summary fetch: reply unreadable; retrying with envelope={} previews={}",
+        *use_envelope,
+        inline_previews_wanted(account_id)
+    );
+    true
+}
+
+/// A worker error with a parser dump made readable. When a server's reply
+/// cannot be read, the IMAP parser's error carries the whole reply twice,
+/// as a byte array and as text: ten thousand numbers for one message's
+/// headers, filling the status bar (#226). The log keeps all of it (see
+/// `AppMsg::Error`); this is what the person sees instead.
+pub fn readable_error(text: &str) -> String {
+    const MARK: &str = " during parsing of \"";
+    let Some(start) = text.find("Error(Error { input: [") else {
+        return text.to_string();
+    };
+    let Some(reply) = text[start..].find(MARK).map(|i| start + i + MARK.len()) else {
+        return text.to_string();
+    };
+    let head = text[..start].trim_end().trim_end_matches("io:").trim_end();
+    let reply = &text[reply..];
+    // The reply is the parser's `{:?}` of it, so line ends are the two
+    // characters `\r\n`.
+    let first_line = reply.split("\\r\\n").next().unwrap_or(reply);
+    let mut excerpt: String = first_line.chars().take(96).collect();
+    if excerpt.len() < first_line.len() {
+        excerpt.push('…');
+    }
+    let what = i18n_f(
+        "the server's reply could not be read (it began: {reply})",
+        &[("reply", &excerpt)],
+    );
+    if head.is_empty() {
+        what
+    } else {
+        format!("{head} {what}")
+    }
+}
+
 /// Floor between two unread-count sweeps out of the IDLE loop, so a burst of
 /// new mail (one `Refreshed` wake per delivery) doesn't STATUS the whole folder
 /// tree over and over. Explicit [`MailRequest::RefreshUnread`]s are never
@@ -2484,39 +2586,51 @@ async fn load_messages_retry(
     cache: Option<&Cache>,
 ) -> Result<Vec<Message>, async_imap::error::Error> {
     let mut s = session.take().expect("session ensured before call");
-    let first = load_messages(account_id, &mut s, folder_id, path, *use_envelope, cache).await;
+    let mut result = load_messages(account_id, &mut s, folder_id, path, *use_envelope, cache).await;
 
     // A non-empty success is trustworthy — keep the session and return it.
-    if matches!(&first, Ok(msgs) if !msgs.is_empty()) {
+    if matches!(&result, Ok(msgs) if !msgs.is_empty()) {
         *session = Some(s);
-        return first;
+        return result;
     }
 
-    // Otherwise the result is an error (stale connection → EOF, or a BODYSTRUCTURE
-    // our parser rejected) or an empty mailbox (which a stale session can return
-    // without erroring). Re-verify on a fresh login. An *unverified* empty result
-    // is treated as a failure so it can never wipe cached mail.
-    match connect(account).await {
-        Ok(fresh) => {
-            s = fresh;
-            // If the first attempt errored while parsing the structured ENVELOPE/
-            // BODYSTRUCTURE, the server likely sends non-compliant responses (e.g.
-            // iCloud). Fall back to raw-header parsing for the rest of the session.
-            if first.is_err() && *use_envelope {
-                *use_envelope = false;
+    // Otherwise the result is an error (stale connection → EOF, or a reply
+    // our parser rejected) or an empty mailbox (which a stale session can
+    // return without erroring). Re-verify on a fresh login. An *unverified*
+    // empty result is treated as a failure so it can never wipe cached mail.
+    //
+    // A reply the parser rejected means the server answers this way of
+    // asking with something non-compliant — iCloud's ENVELOPE, Mailfence's
+    // FETCH once the preview items are in it (#226) — so each such failure
+    // moves the account one step down the [`step_fetch_mode`] ladder for the
+    // rest of the session, until a way works or the ladder runs out. Any
+    // other error is retried once as it was.
+    for _ in 0..4 {
+        if let Err(e) = &result {
+            if is_parse_error(e) && !step_fetch_mode(account_id, use_envelope) {
+                return result;
             }
-            let second =
-                load_messages(account_id, &mut s, folder_id, path, *use_envelope, cache).await;
-            if second.is_ok() {
-                *session = Some(s);
-            }
-            second
         }
-        Err(_) => match first {
-            Ok(_) => Err(async_imap::error::Error::ConnectionLost),
-            Err(e) => Err(e),
-        },
+        match connect(account).await {
+            Ok(fresh) => s = fresh,
+            Err(_) => {
+                return match result {
+                    Ok(_) => Err(async_imap::error::Error::ConnectionLost),
+                    Err(e) => Err(e),
+                }
+            }
+        }
+        result = load_messages(account_id, &mut s, folder_id, path, *use_envelope, cache).await;
+        match &result {
+            Ok(_) => {
+                *session = Some(s);
+                return result;
+            }
+            Err(e) if is_parse_error(e) => continue,
+            Err(_) => return result,
+        }
     }
+    result
 }
 
 /// Like [`load_messages_retry`], but for a single body.
@@ -5991,7 +6105,7 @@ async fn fetch_window(
     // partly to avoid downloading a slice of every message, so honouring it only
     // in the UI would miss the point. Read per sync, so turning it back on takes
     // effect without a restart.
-    let want_preview = crate::config::load_preview_lines() > 0;
+    let want_preview = inline_previews_wanted(account_id);
     let preview_part = if want_preview { preview_fetch_items() } else { String::new() };
     let mut messages: Vec<Message> = if use_envelope {
         let query = format!(
@@ -6124,7 +6238,10 @@ fn preview_fetch_items() -> String {
 /// keep their garbled snippet otherwise, since only the recent window is read
 /// again on each sync. A few rows per sync.
 async fn redecode_garbled_previews(session: &mut ImapSession, messages: &mut [Message]) {
-    if crate::config::load_preview_lines() == 0 {
+    let Some(account_id) = messages.first().map(|m| m.account_id) else {
+        return;
+    };
+    if !inline_previews_wanted(account_id) {
         return;
     }
     let uids: Vec<u32> = messages
@@ -7024,14 +7141,16 @@ async fn run_one_backfill(
             });
             *session = Some(s);
         }
-        Err(_) => {
-            // Put the chunk back and reconnect; a parse error means the server's
-            // structured responses are unusable (iCloud) — fall back to headers.
+        Err(e) => {
+            // Put the chunk back and reconnect; a parse error means the server
+            // answers this way of asking with something unreadable (iCloud's
+            // ENVELOPE, Mailfence with the preview items, #226) — move down
+            // the same ladder the first load uses.
             for uid in chunk.into_iter().rev() {
                 rem.insert(0, uid);
             }
-            if *use_envelope {
-                *use_envelope = false;
+            if is_parse_error(&e) {
+                step_fetch_mode(account_id, use_envelope);
             }
             if let Ok(fresh) = connect(account).await {
                 *session = Some(fresh);
@@ -12665,5 +12784,45 @@ mod attachment_scan_tests {
         assert_eq!(mime_extension("IMAGE", "PNG"), ".png");
         assert_eq!(mime_extension("application", "pdf"), "");
         assert_eq!(mime_extension("image", "svg+xml"), "");
+    }
+}
+
+#[cfg(test)]
+mod fetch_mode_tests {
+    use super::*;
+
+    #[test]
+    fn readable_error_keeps_the_first_line_of_the_reply() {
+        let text = "Could not load INBOX: io: Error(Error { input: [42, 32, 55, 57, 56, 32, 70], code: Tag }) during parsing of \"* 798 FETCH (FLAGS (\\\\Seen) UID 4321 BODY[HEADER] {9821}\\r\\nReceived: from a\\r\\n\"";
+        let out = readable_error(text);
+        assert!(out.starts_with("Could not load INBOX: the server's reply could not be read"), "{out}");
+        assert!(out.contains("* 798 FETCH (FLAGS (\\\\Seen) UID 4321 BODY[HEADER] {9821}"), "{out}");
+        assert!(!out.contains("Received:"), "{out}");
+        assert!(!out.contains("42, 32"), "{out}");
+    }
+
+    #[test]
+    fn readable_error_leaves_other_errors_alone() {
+        assert_eq!(readable_error("Could not load INBOX: connection lost"), "Could not load INBOX: connection lost");
+    }
+
+    #[test]
+    fn ladder_visits_every_way_of_asking_once() {
+        // A fresh account id so the test does not share the set with others.
+        let account_id = 900_226;
+        let mut use_envelope = true;
+        // 1 → 2: raw headers, previews kept.
+        assert!(step_fetch_mode(account_id, &mut use_envelope));
+        assert!(!use_envelope);
+        // 2 → 3: back to ENVELOPE, previews dropped.
+        assert!(step_fetch_mode(account_id, &mut use_envelope));
+        assert!(use_envelope);
+        assert!(!inline_previews_wanted(account_id));
+        // 3 → 4: raw headers, still no previews.
+        assert!(step_fetch_mode(account_id, &mut use_envelope));
+        assert!(!use_envelope);
+        // 4: nothing left.
+        assert!(!step_fetch_mode(account_id, &mut use_envelope));
+        assert!(!use_envelope);
     }
 }

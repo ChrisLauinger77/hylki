@@ -8915,7 +8915,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Error { account_id, text, connectivity } => {
+                // The log gets the whole error (a parser dump included, which
+                // is what diagnoses #226-style replies); the bar gets it
+                // readable.
                 tracing::error!("[account {account_id}] {text}");
+                let text = crate::worker::readable_error(&text);
                 let label = self.account_label(account_id);
                 // Desktop-notify only genuine failures (not transient connectivity
                 // blips that auto-recover), and only when unfocused — the in-app bar
