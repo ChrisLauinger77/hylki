@@ -15259,7 +15259,7 @@ impl AppModel {
             "https://github.com/hyprlab/hylki/issues",
         ));
         links.append(&mk_row("Discord", "https://discord.gg/YfEJ4b6PFW"));
-        links.append(&mk_row(&i18n("Contact — hyprlab@proton.me"), "mailto:hyprlab@proton.me"));
+        links.append(&mk_row("hyprlab@proton.me", "mailto:hyprlab@proton.me"));
         links.append(&mk_row(&i18n("Source Code"), "https://github.com/hyprlab/hylki"));
         links.append(&mk_row(&i18n("License (GNU AGPL v3)"), "https://www.gnu.org/licenses/agpl-3.0.html"));
 
