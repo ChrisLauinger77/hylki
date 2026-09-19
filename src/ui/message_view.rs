@@ -881,26 +881,36 @@ impl Component for MessageView {
                             },
                         },
 
-                        // Reader View: the message(s) as content alone. On the
-                        // account chip's line, at its right end — part of the
-                        // message header, not the action row.
-                        gtk::ToggleButton {
-                            set_icon_name: "co.hyprlab.Hylki-open-book-symbolic",
-                            set_tooltip_text: Some(i18n("Reader View: show only the text of every message, in one plain format").as_str()),
-                            add_css_class: "flat",
-                            add_css_class: "reader-toggle",
-                            set_valign: gtk::Align::Center,
+                        // Reader View: the message(s) as content alone. A
+                        // labelled switch on the account chip's line, at its
+                        // right end — part of the message header, not the
+                        // action row.
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 8,
                             set_halign: gtk::Align::End,
+                            set_valign: gtk::Align::Center,
+                            add_css_class: "reader-toggle",
+                            set_tooltip_text: Some(i18n("Show only the text of every message, in one plain format").as_str()),
                             #[watch]
                             set_visible: model.current.is_some(),
-                            #[watch]
-                            set_active: model.reader_mode,
-                            // The app owns the preference: it saves the choice
-                            // and hands it back to every reader (this one
-                            // included), so a toggle here never renders on
-                            // its own.
-                            connect_toggled[sender] => move |b| {
-                                let _ = sender.output(MessageViewOutput::ReaderMode(b.is_active()));
+
+                            gtk::Label {
+                                set_label: &i18n("Reader View"),
+                                add_css_class: "caption",
+                                add_css_class: "dim-label",
+                            },
+                            gtk::Switch {
+                                set_valign: gtk::Align::Center,
+                                #[watch]
+                                set_active: model.reader_mode,
+                                // The app owns the preference: it saves the
+                                // choice and hands it back to every reader
+                                // (this one included), so a flip here never
+                                // renders on its own.
+                                connect_active_notify[sender] => move |sw| {
+                                    let _ = sender.output(MessageViewOutput::ReaderMode(sw.is_active()));
+                                },
                             },
                         },
                     },
