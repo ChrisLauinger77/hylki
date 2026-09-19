@@ -2423,6 +2423,10 @@ msgstr "GNOME Névjegyek megnyitása"
 msgid "New contact"
 msgstr "Új névjegy"
 
+#, fuzzy
+msgid "Loading Contacts…"
+msgstr "Mellékletek betöltése…"
+
 msgid "Contacts you add in GNOME Contacts appear here."
 msgstr "A GNOME Névjegyekben hozzáadott névjegyek itt jelennek meg."
 

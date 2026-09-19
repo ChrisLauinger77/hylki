@@ -2184,10 +2184,11 @@ async fn run_imap(
             }
 
             // Send Later (#145): into the Outbox until its time.
-            MailRequest::Send { message, sent_path }
+            MailRequest::Send { mut message, sent_path }
                 if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
             {
                 let at = message.send_at.unwrap_or_default();
+                restore_msgid_case(cache.as_ref(), &mut message);
                 schedule_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit);
                 // The draft it was opened from is superseded by the queued copy.
                 if let Some(o) = message.draft_origin.clone() {
@@ -2210,8 +2211,9 @@ async fn run_imap(
                 }
             }
 
-            MailRequest::Send { message, sent_path } => {
+            MailRequest::Send { mut message, sent_path } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
+                restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(raw) => {
                         emit(WorkerEvent::Status(String::new()));
@@ -2326,7 +2328,8 @@ async fn run_imap(
                 emit(WorkerEvent::Status(i18n("Saving draft…")));
                 // A draft is kept as written: signing and encrypting happen
                 // at send time (#133).
-                let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
+                let mut message = OutgoingMessage { sign: false, encrypt: false, ..*message };
+                restore_msgid_case(cache.as_ref(), &mut message);
                 match build_draft(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
@@ -3810,6 +3813,16 @@ fn mailbox(name: &str, addr: &str) -> Result<Mailbox, SmtpError> {
     } else {
         Ok(Mailbox::new(Some(name.to_string()), address))
     }
+}
+
+/// Spell a message's threading ids (In-Reply-To, References) the way they
+/// arrived before the message goes anywhere: the cache stores them lowercased
+/// for matching, and a server that looks a parent up by its exact id — Proton
+/// Bridge — would otherwise find nothing and file the copy without them.
+fn restore_msgid_case(cache: Option<&Cache>, msg: &mut OutgoingMessage) {
+    let Some(c) = cache else { return };
+    msg.in_reply_to = c.exact_msgids(&msg.in_reply_to);
+    msg.references = c.exact_msgids(&msg.references);
 }
 
 /// Build the RFC 822 email (headers + MIME body) from a composed message, for
@@ -6749,7 +6762,9 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
 fn mp_thread_ids(parsed: Option<&mail_parser::Message>) -> (String, String) {
     use mail_parser::HeaderValue;
     let norm = |s: &str| {
-        s.trim().trim_start_matches('<').trim_end_matches('>').trim().to_ascii_lowercase()
+        let exact = s.trim().trim_start_matches('<').trim_end_matches('>').trim();
+        crate::cache::note_msgid_case(exact);
+        exact.to_ascii_lowercase()
     };
     let collect = |hv: &HeaderValue| -> Vec<String> {
         match hv {
@@ -7326,16 +7341,24 @@ fn custom_flags(flags: &[Flag]) -> Vec<String> {
 }
 
 /// Normalize a single Message-ID: strip angle brackets/whitespace, lowercase.
+/// The spelling it arrived in is noted for the wire
+/// ([`crate::cache::note_msgid_case`]).
 fn normalize_msgid(raw: &[u8]) -> String {
     let s = String::from_utf8_lossy(raw);
-    s.trim().trim_start_matches('<').trim_end_matches('>').trim().to_ascii_lowercase()
+    let exact = s.trim().trim_start_matches('<').trim_end_matches('>').trim();
+    crate::cache::note_msgid_case(exact);
+    exact.to_ascii_lowercase()
 }
 
 /// Normalize a whitespace-separated list of Message-IDs into a canonical string.
 fn normalize_msgids(raw: &[u8]) -> String {
     let s = String::from_utf8_lossy(raw);
     s.split_whitespace()
-        .map(|tok| tok.trim_start_matches('<').trim_end_matches('>').trim().to_ascii_lowercase())
+        .map(|tok| {
+            let exact = tok.trim_start_matches('<').trim_end_matches('>').trim();
+            crate::cache::note_msgid_case(exact);
+            exact.to_ascii_lowercase()
+        })
         .filter(|t| !t.is_empty())
         .collect::<Vec<_>>()
         .join(" ")
@@ -8083,41 +8106,44 @@ async fn run_pop3(
                 });
             }
 
-            MailRequest::Send { message, .. } => match send_smtp(&account, &message).await {
-                Ok(_) => {
-                    if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
-                        c.delete_outbox(queued);
+            MailRequest::Send { mut message, .. } => {
+                restore_msgid_case(cache.as_ref(), &mut message);
+                match send_smtp(&account, &message).await {
+                    Ok(_) => {
+                        if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
+                            c.delete_outbox(queued);
+                            emit_outbox(cache.as_ref(), account_id, &emit);
+                        }
+                        emit(WorkerEvent::Sent);
+                    }
+                    Err(e) => {
+                        // POP3 has no Sent folder to copy to, but the message is held
+                        // exactly as it is for IMAP accounts.
+                        let queued = queue_failed_send(
+                            cache.as_ref(),
+                            account_id,
+                            &account,
+                            &message,
+                            None,
+                            &e.to_string(),
+                        );
+                        if let (true, Some(old), Some(c)) =
+                            (queued, message.outbox_origin, cache.as_ref())
+                        {
+                            c.delete_outbox(old);
+                        }
+                        emit(WorkerEvent::Error {
+                            text: if queued {
+                                i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e.to_string())])
+                            } else {
+                                i18n_f("Send failed: {e}", &[("e", &e.to_string())])
+                            },
+                            connectivity: false,
+                        });
                         emit_outbox(cache.as_ref(), account_id, &emit);
                     }
-                    emit(WorkerEvent::Sent);
                 }
-                Err(e) => {
-                    // POP3 has no Sent folder to copy to, but the message is held
-                    // exactly as it is for IMAP accounts.
-                    let queued = queue_failed_send(
-                        cache.as_ref(),
-                        account_id,
-                        &account,
-                        &message,
-                        None,
-                        &e.to_string(),
-                    );
-                    if let (true, Some(old), Some(c)) =
-                        (queued, message.outbox_origin, cache.as_ref())
-                    {
-                        c.delete_outbox(old);
-                    }
-                    emit(WorkerEvent::Error {
-                        text: if queued {
-                            i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e.to_string())])
-                        } else {
-                            i18n_f("Send failed: {e}", &[("e", &e.to_string())])
-                        },
-                        connectivity: false,
-                    });
-                    emit_outbox(cache.as_ref(), account_id, &emit);
-                }
-            },
+            }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
@@ -9980,7 +10006,8 @@ async fn run_graph(
 
             MailRequest::SaveDraft { message, folder_id, path } => {
                 emit(WorkerEvent::Status(i18n("Saving draft…")));
-                let message = OutgoingMessage { sign: false, encrypt: false, ..*message };
+                let mut message = OutgoingMessage { sign: false, encrypt: false, ..*message };
+                restore_msgid_case(cache.as_ref(), &mut message);
                 let saved = match build_draft(&account, &message) {
                     Ok(email) => {
                         let raw = email.formatted();
@@ -10057,10 +10084,11 @@ async fn run_graph(
 
             // `sent_path` is unused: Graph's sendMail files the Sent copy itself.
             // Send Later (#145): into the Outbox until its time.
-            MailRequest::Send { message, sent_path: _ }
+            MailRequest::Send { mut message, sent_path: _ }
                 if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
             {
                 let at = message.send_at.unwrap_or_default();
+                restore_msgid_case(cache.as_ref(), &mut message);
                 schedule_send(cache.as_ref(), account_id, &account, &message, None, at, &emit);
                 if let Some(o) = message.draft_origin.clone() {
                     if o.account_id == account_id {
@@ -10077,8 +10105,9 @@ async fn run_graph(
                 }
             }
 
-            MailRequest::Send { message, sent_path: _ } => {
+            MailRequest::Send { mut message, sent_path: _ } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
+                restore_msgid_case(cache.as_ref(), &mut message);
                 match graph_send_message(&account, &message, &emit).await {
                     Ok(()) => {
                         emit(WorkerEvent::Status(String::new()));

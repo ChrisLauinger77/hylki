@@ -2458,6 +2458,10 @@ msgstr "Abrir Contactos do GNOME"
 msgid "New contact"
 msgstr "Novo contacto"
 
+#, fuzzy
+msgid "Loading Contacts…"
+msgstr "A carregar anexos…"
+
 msgid "Contacts you add in GNOME Contacts appear here."
 msgstr "Os contactos adicionados nos Contactos do GNOME aparecem aqui."
 

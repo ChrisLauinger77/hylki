@@ -2211,6 +2211,9 @@ msgstr ""
 msgid "New contact"
 msgstr ""
 
+msgid "Loading Contacts…"
+msgstr ""
+
 msgid "Contacts you add in GNOME Contacts appear here."
 msgstr ""
 
