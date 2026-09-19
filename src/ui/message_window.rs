@@ -33,6 +33,8 @@ pub struct MessageWindowInit {
     pub content_dark: Option<bool>,
     /// The reader's own fonts and colours over the senders' (#56).
     pub reader_style: crate::config::ReaderStyle,
+    /// Reader View (the main window's header toggle), followed here too.
+    pub reader_mode: bool,
     /// The tags (#71), for the cards' chips.
     pub tags: Vec<crate::config::Tag>,
 }
@@ -79,6 +81,7 @@ pub enum MessageWindowInput {
     SetContentTheme(Option<bool>),
     /// The reader's own fonts and colours changed (#56).
     SetReaderStyle(crate::config::ReaderStyle),
+    SetReaderMode(bool),
     /// What one of the user's own mailboxes shows changed (#189).
     FacesChanged,
     // ---- toolbar actions ----
@@ -305,6 +308,7 @@ impl Component for MessageWindow {
         // Apply the message-content theme before the first render.
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
         view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
+        view.emit(MessageViewInput::SetReaderMode(init.reader_mode));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
 
         let thread = if init.thread.is_empty() {
@@ -365,6 +369,9 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetReaderStyle(style) => {
                 self.view.emit(MessageViewInput::SetReaderStyle(style));
+            }
+            MessageWindowInput::SetReaderMode(on) => {
+                self.view.emit(MessageViewInput::SetReaderMode(on));
             }
             MessageWindowInput::FacesChanged => {
                 self.view.emit(MessageViewInput::FacesChanged);

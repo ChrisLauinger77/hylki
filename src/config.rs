@@ -891,6 +891,10 @@ struct PrivacyFile {
     /// messages (#57); off keeps the full-bleed view.
     #[serde(default = "default_single_message_card")]
     single_message_card: bool,
+    /// Reader View (the reader header's toggle): every message shown as its
+    /// content alone, in the reader's own sheet.
+    #[serde(default)]
+    reader_mode: bool,
     /// Each conversation message lists its own attachments beneath its body
     /// (#213), so which file came with which message is never in doubt.
     #[serde(default = "default_card_attachments")]
@@ -1295,6 +1299,7 @@ impl Default for PrivacyFile {
             thread_newest_first: false,
             always_show_recipients: false,
             single_message_card: default_single_message_card(),
+            reader_mode: false,
             card_attachments: default_card_attachments(),
             attachment_drawer: default_attachment_drawer(),
             confirm_thread_delete: default_confirm_thread_delete(),
@@ -2247,6 +2252,10 @@ pub fn load_single_message_card() -> bool {
     load_privacy().single_message_card
 }
 
+pub fn load_reader_mode() -> bool {
+    load_privacy().reader_mode
+}
+
 pub fn load_card_attachments() -> bool {
     load_privacy().card_attachments
 }
@@ -2614,6 +2623,7 @@ pub fn save_privacy(
     thread_newest_first: bool,
     always_show_recipients: bool,
     single_message_card: bool,
+    reader_mode: bool,
     card_attachments: bool,
     attachment_drawer: bool,
     confirm_thread_delete: bool,
@@ -2698,6 +2708,7 @@ pub fn save_privacy(
         thread_newest_first,
         always_show_recipients,
         single_message_card,
+        reader_mode,
         card_attachments,
         attachment_drawer,
         confirm_thread_delete,

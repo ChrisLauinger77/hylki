@@ -56,6 +56,10 @@ pub struct MessageView {
     /// despite `reader_style` (the card's "sender's formatting" toggle).
     /// Kept for the session, so a thread reopened keeps the choice.
     sender_style: std::collections::HashSet<(u32, u32)>,
+    /// Reader View: every message on screen stripped to its content and set
+    /// in the reader's own uniform sheet (see `crate::reader`). The header's
+    /// toggle; applies to the whole conversation at once.
+    reader_mode: bool,
     /// Read-marking policy (#100), stamped on the document for the
     /// viewport observer.
     read_mark: crate::config::ReadMark,
@@ -406,6 +410,9 @@ pub enum MessageViewInput {
     /// The card's "sender's formatting" toggle: show that one message as its
     /// sender formatted it, or back under the reader's style.
     ToggleSenderStyle { account_id: u32, id: u32 },
+    /// Reader View on or off (the header's toggle): re-renders the whole
+    /// conversation stripped to its content, or back as sent.
+    SetReaderMode(bool),
     /// The popover's "Fetch the sender's key" (#133): the Autocrypt key in
     /// the message first, then WKD and the keyservers.
     PgpFetchKey { account_id: u32, id: u32 },
@@ -994,6 +1001,7 @@ impl Component for MessageView {
             no_autoread: std::collections::HashSet::new(),
             reader_style: crate::config::ReaderStyle::NONE,
             sender_style: std::collections::HashSet::new(),
+            reader_mode: false,
             read_mark: crate::config::ReadMark::default(),
             show_banner: crate::config::load_show_remote_banner(),
             card_actions_hover: crate::config::load_card_actions_hover(),
@@ -1574,6 +1582,18 @@ impl Component for MessageView {
             MessageViewInput::SetReaderStyle(style) => {
                 if self.reader_style != style {
                     self.reader_style = style;
+                    if self.current.is_some() && !self.loading {
+                        self.render();
+                    }
+                }
+            }
+            MessageViewInput::SetReaderMode(on) => {
+                if self.reader_mode != on {
+                    self.reader_mode = on;
+                    // A frame measures differently in each view; the heights
+                    // remembered for the other one would only make the
+                    // cards lurch on the way to their real size.
+                    self.frame_heights.clear();
                     if self.current.is_some() && !self.loading {
                         self.render();
                     }
@@ -2340,6 +2360,7 @@ impl MessageView {
         self.theme_grounds(dark).hash(&mut h);
         self.remote_allowed.hash(&mut h);
         self.reader_style.hash(&mut h);
+        self.reader_mode.hash(&mut h);
         self.card_actions_hover.hash(&mut h);
         self.card_actions_auto.hash(&mut h);
         self.palette_collapse_secs.hash(&mut h);
@@ -2390,6 +2411,7 @@ impl MessageView {
             self.single_message_card,
             &self.reader_style,
             &self.sender_style,
+            self.reader_mode,
         )
     }
 
@@ -2414,6 +2436,7 @@ impl MessageView {
         single_message_card: bool,
         style: &crate::config::ReaderStyle,
         sender_style: &std::collections::HashSet<(u32, u32)>,
+        reader: bool,
     ) -> String {
         // Every message renders with the conversation chrome — a thread of one
         // gets the same in-document header. But only a real conversation is
@@ -2445,6 +2468,7 @@ impl MessageView {
                         style
                     },
                     accent,
+                    reader,
                 )
             };
             if conversation {
@@ -2538,7 +2562,7 @@ impl MessageView {
                             // The escape from the reader's own fonts and
                             // colours (#56): only offered while an override
                             // is on, lit while this card shows the sender's.
-                            if style.active() {
+                            if style.active() && !reader {
                                 let on = sender_style.contains(&key);
                                 format!(
                                     "<button type=\"button\" class=\"vireo-act{on_cls}\" data-act=\"senderfmt\" \
@@ -2770,7 +2794,7 @@ impl MessageView {
         // ground — the chrome ground when it paints no background (see
         // `plain_css` below) — so the whole view is one colour.
         let single_ground = if !carded && thread.len() == 1
-            && !paints_own_background(&thread[0].body)
+            && (reader || !paints_own_background(&thread[0].body))
         {
             chrome.clone()
         } else {
@@ -2814,7 +2838,7 @@ impl MessageView {
         // that declares a background keeps the plain ground so its design
         // renders as intended.
         let single_plain =
-            !carded && thread.len() == 1 && !paints_own_background(&thread[0].body);
+            !carded && thread.len() == 1 && (reader || !paints_own_background(&thread[0].body));
         let plain_css = if single_plain {
             format!(
                 "body:not(.vireo-conv) .vireo-msg,\
@@ -3107,7 +3131,12 @@ impl MessageView {
             .iter()
             .enumerate()
             .map(|(n, m)| {
-                let doc = body_html(&m.body);
+                // Reader View prints what it shows: the content alone.
+                let doc = if self.reader_mode {
+                    crate::reader::render(&m.body, false, &self.accent_hex())
+                } else {
+                    body_html(&m.body)
+                };
                 let doc = if self.remote_allowed { doc } else { strip_remote(&doc) };
                 // The reader's own fonts and colours (#56) reach paper too,
                 // scoped to this message's block; a card shown with the
@@ -3167,7 +3196,7 @@ impl MessageView {
         let (ground, page, chrome) = self.theme_grounds(dark);
         let ground = if self.thread.len() > 1 || (!self.thread.is_empty() && self.single_message_card) {
             page
-        } else if self.thread.len() == 1 && !paints_own_background(&self.thread[0].body) {
+        } else if self.thread.len() == 1 && (self.reader_mode || !paints_own_background(&self.thread[0].body)) {
             chrome
         } else {
             ground
@@ -5114,15 +5143,27 @@ fn message_frame(
     height: Option<u32>,
     style: &crate::config::ReaderStyle,
     accent: &str,
+    reader: bool,
 ) -> String {
-    let doc = body_html(body);
+    // Reader View: the message rebuilt from its content alone, in the
+    // reader's own sheet. It carries no colours of the sender's to adapt
+    // and needs none of the reader's colour override over it; the reader's
+    // font choice (#56) still applies, below.
+    let doc = if reader { crate::reader::render(body, dark, accent) } else { body_html(body) };
+    let own_style;
+    let style = if reader {
+        own_style = crate::config::ReaderStyle { colors: false, ..style.clone() };
+        &own_style
+    } else {
+        style
+    };
     let doc = if restrict { strip_remote(&doc) } else { doc };
     // Dark mode: adapt the message's own colours so dark-on-dark text can't
     // happen (issue #35). `color-scheme` only helps unstyled mail; anything
     // that sets explicit dark text without a background needs its colours
     // transformed, and the sandboxed frames run no JS to do it live. Moot
     // when the reader's own colours are laid over the message anyway.
-    let doc = if dark && !style.colors { adapt_colors_for_dark(&doc) } else { doc };
+    let doc = if dark && !style.colors && !reader { adapt_colors_for_dark(&doc) } else { doc };
     // Make the email's own light/dark rules follow the ground we chose rather
     // than the desktop's preference (see `pin_color_scheme`). Runs after the
     // dark adaptation so a message's hand-authored dark palette is used as-is,
@@ -5616,16 +5657,16 @@ mod tests {
     #[test]
     fn light_mode_frames_are_untouched() {
         let body = r#"<p style="color:#000">x</p>"#;
-        let frame = message_frame(body, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        let frame = message_frame(body, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false);
         assert!(frame.contains("color:#000"), "{frame}");
-        let frame = message_frame(body, true, true, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        let frame = message_frame(body, true, true, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false);
         assert!(!frame.contains("color:#000"), "{frame}");
     }
 
     /// With nothing overridden the frame carries no reader stylesheet.
     #[test]
     fn reader_style_none_adds_nothing() {
-        let frame = message_frame("<p>x</p>", true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        let frame = message_frame("<p>x</p>", true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false);
         assert!(!frame.contains(":not(#vireo-a)"), "{frame}");
         assert_eq!(inject_reader_style("<p>x</p>", ""), "<p>x</p>");
     }
@@ -5638,7 +5679,7 @@ mod tests {
         let style = crate::config::ReaderStyle { font: Some("DejaVu Serif 12".into()), colors: false, plain_font: None };
         let body = "<html><head><style>p{font-family:Comic Sans MS}</style></head>\
                     <body><p style=\"font-size:30px\">x</p></body></html>";
-        let frame = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
+        let frame = message_frame(body, true, false, (1, 1), None, &style, "#3584e4", false);
         let ours = frame.find(":root :not(#vireo-a):not(#vireo-b):not(#vireo-c)").expect("override sheet");
         let theirs = frame.find("Comic Sans").expect("sender css kept");
         assert!(ours > theirs, "the reader's sheet must come last: {frame}");
@@ -5657,11 +5698,11 @@ mod tests {
     fn reader_colours_force_text_and_links() {
         let style = crate::config::ReaderStyle { font: None, colors: true, plain_font: None };
         let body = r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
-        let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4");
+        let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4", false);
         assert!(light.contains("color:#1a1a1a !important;-webkit-text-fill-color:#1a1a1a !important;background-color:transparent !important;background-image:none !important"), "{light}");
         assert!(light.contains(":root a:not(#vireo-a):not(#vireo-b):not(#vireo-c),:root a:not(#vireo-a):not(#vireo-b):not(#vireo-c) *{color:#3584e4 !important"), "{light}");
         assert!(!light.contains("font-family"), "no font rule was asked for: {light}");
-        let dark = message_frame(body, true, true, (1, 1), None, &style, "#3584e4");
+        let dark = message_frame(body, true, true, (1, 1), None, &style, "#3584e4", false);
         assert!(dark.contains("color:#e6e6e6 !important"), "{dark}");
         assert!(dark.contains("color:#000"), "sender colours left as written when overridden: {dark}");
     }
@@ -5715,6 +5756,7 @@ mod tests {
             false,
             &style,
             &escaped,
+            false,
         );
         assert_eq!(doc.matches("data-act=\"senderfmt\"").count(), 2, "{doc}");
         assert_eq!(doc.matches("class=\"vireo-act on\" data-act=\"senderfmt\"").count(), 1, "{doc}");
@@ -5734,6 +5776,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &escaped,
+            false,
         );
         assert!(!plain.contains("senderfmt"), "{plain}");
         assert!(!plain.contains(":not(#vireo-a)"), "{plain}");
@@ -5803,6 +5846,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert_eq!(
             doc.matches("<section class=\"vireo-msg\"").count(),
@@ -5841,6 +5885,7 @@ mod tests {
                 false,
                 &crate::config::ReaderStyle::NONE,
                 &Default::default(),
+                false,
             )
         };
 
@@ -5923,6 +5968,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert_eq!(
             doc.matches("class=\"vireo-rcpt\" hidden").count(),
@@ -5962,6 +6008,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert_eq!(
             doc.matches("<button type=\"button\" class=\"vireo-rcpt-toggle\"").count(),
@@ -5991,6 +6038,7 @@ mod tests {
                 false,
                 &crate::config::ReaderStyle::NONE,
                 &Default::default(),
+                false,
             )
         };
         // Only the card with something to load carries the button.
@@ -6026,6 +6074,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         for act in ["reply", "replyall", "forward"] {
             assert_eq!(
@@ -6061,6 +6110,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert_eq!(doc.matches("class=\"vireo-dot\"").count(), 1, "one dot: {doc}");
         assert_eq!(doc.matches("class=\"vireo-end\"").count(), 0, "no sentinel: {doc}");
@@ -6092,6 +6142,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert_eq!(doc.matches("class=\"vireo-dot\"").count(), 1, "still marked: {doc}");
         assert_eq!(doc.matches("class=\"vireo-end\"").count(), 0, "no sentinel: {doc}");
@@ -6119,6 +6170,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert!(doc.contains("style=\"height:640px\""), "known height used: {doc}");
         // The unmeasured one opens collapsed rather than at the browser's
@@ -6148,6 +6200,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert!(doc.contains("class=\"vireo-msg selected\" data-key=\"1:2\""), "{doc}");
         assert_eq!(doc.matches("vireo-msg selected").count(), 1, "only the selected one");
@@ -6173,6 +6226,7 @@ mod tests {
             false,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert!(doc.contains("<section class=\"vireo-msg\""), "message chrome: {doc}");
         assert!(doc.contains("class=\"vireo-msg-hdr\""), "in-document header: {doc}");
@@ -6200,6 +6254,7 @@ mod tests {
             true,
             &crate::config::ReaderStyle::NONE,
             &Default::default(),
+            false,
         );
         assert!(doc.contains("<body class=\"vireo-conv\">"), "card gutter: {doc}");
         assert!(doc.contains(&format!("background:{}", PAGE.0)), "deeper page ground: {doc}");
@@ -6212,7 +6267,7 @@ mod tests {
         b.id = 2;
         b.folder_id = 3; // pulled in from Sent
         let labels = std::collections::HashMap::from([((1u32, 2u32), "Sent".to_string())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
+        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false);
         assert_eq!(
             doc.matches("vireo-folder").count(),
             // once in the stylesheet, once on the message that came from Sent —
@@ -6232,7 +6287,7 @@ mod tests {
         b.id = 2;
         let labels =
             std::collections::HashMap::from([((1u32, 2u32), "<img src=x onerror=alert(1)>".into())]);
-        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
+        let doc = MessageView::conversation_document(&[a, b], &labels, &Default::default(), &Default::default(), &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false);
         assert!(!doc.contains("<img src=x"), "the label must be escaped, not rendered");
         assert!(doc.contains("&lt;img src=x"));
     }
@@ -6251,7 +6306,7 @@ mod tests {
         b.id = 2;
         // Two messages: the per-message headers only render in conversation mode.
         let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false);
 
         assert!(!doc.contains("<script>x=1"), "{doc}");
         assert!(!doc.contains("<img src=y"), "{doc}");
@@ -6266,7 +6321,7 @@ mod tests {
         let mut b = msg_for_print();
         b.id = 2;
         let doc = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false);
 
         // A nonce'd CSP, so an injected `<script>` or `onerror=` is refused by
         // the engine even if the escaping above ever regresses.
@@ -6305,6 +6360,7 @@ mod tests {
                 false,
                 &crate::config::ReaderStyle::NONE,
                 &Default::default(),
+                false,
             );
         assert!(!again.contains(nonce), "nonce was reused across renders");
     }
@@ -6375,13 +6431,13 @@ mod tests {
         // about, a frame built while remote content is disallowed carries the
         // restrictive policy. A detector miss costs a banner, not the blocking.
         let sneaky = r#"<img data-x="y" src="//tracker.example/p.gif">"#;
-        let frame = message_frame(sneaky, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        let frame = message_frame(sneaky, true, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false);
         assert!(frame.contains("img-src data: cid:"), "{frame}");
         assert!(!frame.contains("img-src http:"), "{frame}");
         assert!(!frame.contains("tracker.example"), "{frame}");
 
         // And once the user allows it, the same body renders untouched.
-        let allowed = message_frame(sneaky, false, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4");
+        let allowed = message_frame(sneaky, false, false, (1, 1), None, &crate::config::ReaderStyle::NONE, "#3584e4", false);
         assert!(allowed.contains("img-src http: https:"), "{allowed}");
         assert!(allowed.contains("tracker.example"), "{allowed}");
     }
@@ -6434,7 +6490,7 @@ mod tests {
         b.id = 2;
         b.body = "<p style=\"height:300px\">second</p>".into();
         let html = MessageView::conversation_document(&[a, b], &Default::default(), &Default::default(), &Default::default(),
-            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default());
+            &[], "#3584e4", true, false, false, false, &crate::config::ReaderStyle::NONE, &Default::default(), false);
 
         let view = webkit6::WebView::new();
         let settings = webkit6::Settings::new();
