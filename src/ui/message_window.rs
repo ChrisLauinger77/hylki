@@ -122,10 +122,23 @@ pub enum MessageWindowInput {
     ComposeTo(String),
     /// "Add to Contacts" from an address's right-click menu.
     AddContactAddr(String),
+    /// A card's Unsubscribe button — handed to the app, which owns the
+    /// request.
+    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    /// The lists left so far, for the cards' banners.
+    SetUnsubscribed(std::collections::HashMap<String, i64>),
+    /// Where a card's unsubscribe request stands.
+    UnsubscribeState {
+        account_id: u32,
+        id: u32,
+        state: Option<crate::ui::message_view::UnsubState>,
+    },
 }
 
 #[derive(Debug)]
 pub enum MessageWindowOutput {
+    /// A card's Unsubscribe button: leave the list, by these handles.
+    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
     /// Reader View flipped from this window's subject block.
     ReaderMode(bool),
     /// A per-message action handled exactly like a list/context-menu action.
@@ -313,6 +326,9 @@ impl Component for MessageWindow {
                 MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
                 MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),
                 MessageViewOutput::ReaderMode(on) => MessageWindowInput::ReaderMode(on),
+                MessageViewOutput::Unsubscribe { message, info } => {
+                    MessageWindowInput::Unsubscribe { message, info }
+                }
                 MessageViewOutput::AddContactAddr(addr) => {
                     MessageWindowInput::AddContactAddr(addr)
                 }
@@ -395,6 +411,15 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::ReaderMode(on) => {
                 let _ = sender.output(MessageWindowOutput::ReaderMode(on));
+            }
+            MessageWindowInput::Unsubscribe { message, info } => {
+                let _ = sender.output(MessageWindowOutput::Unsubscribe { message, info });
+            }
+            MessageWindowInput::SetUnsubscribed(lists) => {
+                self.view.emit(MessageViewInput::SetUnsubscribed(lists));
+            }
+            MessageWindowInput::UnsubscribeState { account_id, id, state } => {
+                self.view.emit(MessageViewInput::UnsubscribeState { account_id, id, state });
             }
             MessageWindowInput::FacesChanged => {
                 self.view.emit(MessageViewInput::FacesChanged);

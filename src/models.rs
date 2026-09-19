@@ -380,6 +380,47 @@ impl PgpStatus {
     }
 }
 
+/// How a mailing list lets its readers leave (RFC 2369, RFC 8058): read out
+/// of the message's headers with the sender check, kept in the cache beside
+/// it, and drawn as the card's Unsubscribe banner. See [`crate::unsubscribe`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Unsubscribe {
+    /// The https handle that takes a one-click POST (RFC 8058), when the
+    /// message promised one. The route the button prefers: no browser, no
+    /// page, no mail.
+    #[serde(default)]
+    pub one_click: Option<String>,
+    /// A `mailto:` handle: a short message to the list from the account the
+    /// message arrived in.
+    #[serde(default)]
+    pub mailto: Option<String>,
+    /// A web page to visit — the browser, only when nothing better is on
+    /// offer or the better routes failed.
+    #[serde(default)]
+    pub web: Option<String>,
+    /// The list's own identifier (`List-Id`, lowercased, without the
+    /// brackets); empty when the message named none.
+    #[serde(default)]
+    pub list_id: String,
+}
+
+impl Unsubscribe {
+    /// Whether the button can unsubscribe without a browser.
+    pub fn direct(&self) -> bool {
+        self.one_click.is_some() || self.mailto.is_some()
+    }
+
+    /// What a list is remembered by once left: its List-Id, or failing
+    /// that the address its mail comes from.
+    pub fn key(&self, from_addr: &str) -> String {
+        if self.list_id.is_empty() {
+            format!("from:{}", from_addr.trim().to_ascii_lowercase())
+        } else {
+            format!("list:{}", self.list_id)
+        }
+    }
+}
+
 /// The result of checking whether a message's From: address was forged.
 #[derive(Debug, Clone)]
 pub struct SenderCheck {
@@ -390,6 +431,9 @@ pub struct SenderCheck {
     pub findings: Vec<String>,
     /// The OpenPGP verdict (#133), when the message carried any.
     pub pgp: Option<PgpStatus>,
+    /// How to leave the list this came from, when it is from one. Read with
+    /// the verdict: both come out of the raw headers at the one fetch.
+    pub unsubscribe: Option<Unsubscribe>,
 }
 
 impl Default for SenderCheck {
@@ -399,6 +443,7 @@ impl Default for SenderCheck {
             summary: i18n("This message hasn't been checked."),
             findings: Vec::new(),
             pgp: None,
+            unsubscribe: None,
         }
     }
 }

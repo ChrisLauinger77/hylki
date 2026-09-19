@@ -206,7 +206,7 @@ use crate::ui::attachments_gallery::{
 const GALLERY_DATA_CAP: i64 = 6 * 1024 * 1024;
 use crate::ui::contacts_page::{ContactsPage, ContactsPageInput, ContactsPageOutput};
 use crate::ui::attachment_drawer::{AttachmentDrawer, AttachmentDrawerInput};
-use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput};
+use crate::ui::message_view::{MessageView, MessageViewInput, MessageViewOutput, UnsubState};
 use crate::ui::message_window::{
     MessageWindow, MessageWindowInit, MessageWindowInput, MessageWindowOutput,
 };
@@ -623,6 +623,9 @@ pub struct AppModel {
     current: Option<Message>,
     /// Sender addresses allowed to auto-load remote content (lowercased).
     allowed_senders: Vec<String>,
+    /// The mailing lists left through the reader's Unsubscribe button
+    /// (unsubscribed.toml), so a later message from one says so.
+    unsubscribed: Vec<config::UnsubscribedList>,
     /// Whether remote content is auto-loaded for every new message.
     auto_remote_content: bool,
     /// Whether the blocked-remote-content banner is shown at all. Hiding it changes nothing about what
@@ -1141,6 +1144,17 @@ pub enum AppMsg {
     AllowSender(String),
     AddSender(String),
     RemoveSender(String),
+    /// A card's Unsubscribe button: confirm, then leave the list the message
+    /// came from by the handles its headers offered.
+    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    /// Confirmed: send the request.
+    UnsubscribeGo { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    /// The one-click route failed (or was not offered): write to the list's
+    /// `mailto:` handle instead, from the account the message arrived in.
+    UnsubscribeByMail { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+    /// The request is over: `Ok(true)` left the list, `Ok(false)` only opened
+    /// the list's web page, `Err` says what went wrong.
+    UnsubscribeDone { message: Box<Message>, result: Result<bool, String> },
     AddBlacklist(String),
     RemoveBlacklist(String),
     MarkSpam,
@@ -2627,6 +2641,9 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                     MessageViewOutput::Notice(text) => AppMsg::Notice(text),
                     MessageViewOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
+                    MessageViewOutput::Unsubscribe { message, info } => {
+                        AppMsg::Unsubscribe { message, info }
+                    }
                 });
 
         // The drawer owns a Paned whose top pane is the reader body, so hand it
@@ -2950,6 +2967,7 @@ impl SimpleComponent for AppModel {
             theme: config::load_theme(),
             current: None,
             allowed_senders: config::load_allowed_senders(),
+            unsubscribed: config::load_unsubscribed(),
             auto_remote_content: config::load_auto_remote_content(),
             show_remote_banner: config::load_show_remote_banner(),
             blacklist: config::load_blacklist(),
@@ -3222,6 +3240,7 @@ impl SimpleComponent for AppModel {
         model
             .message_view
             .emit(MessageViewInput::SetAttachmentDrawer(model.drawer_enabled));
+        model.message_view.emit(MessageViewInput::SetUnsubscribed(model.unsubscribed_map()));
         model.arm_auto_fetch(&sender);
 
         // The app-wide theme choice must be in force before the first frame.
@@ -4113,6 +4132,15 @@ impl SimpleComponent for AppModel {
                         for _ in 0..=n {
                             let _ = list.send(MessageListInput::MoveSelection(1));
                         }
+                    });
+                }
+                // HYLKI_SHOWCASE_UNSUB=ask|go presses the open card's
+                // Unsubscribe button at 7s (after HYLKI_SHOWCASE_ROW opened
+                // it): `ask` stops at the confirmation, `go` skips it.
+                if std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok() {
+                    let view = model.message_view.sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(7, move || {
+                        let _ = view.send(MessageViewInput::Unsubscribe { account_id: 1, id: 10 });
                     });
                 }
                 // HYLKI_SHOWCASE_UNIFIED=sent|starred|drafts opens that unified
@@ -6128,6 +6156,49 @@ impl SimpleComponent for AppModel {
                 if !addr.is_empty() && !self.allowed_senders.contains(&addr) {
                     self.allowed_senders.push(addr);
                     self.save_settings();
+                }
+            }
+
+            AppMsg::Unsubscribe { message, info } => {
+                if std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok_and(|v| v == "go" || v == "fail") {
+                    self.unsubscribe_go(*message, *info, &sender);
+                } else {
+                    self.confirm_unsubscribe(*message, *info, &sender);
+                }
+            }
+            AppMsg::UnsubscribeGo { message, info } => {
+                self.unsubscribe_go(*message, *info, &sender);
+            }
+            AppMsg::UnsubscribeByMail { message, info } => {
+                self.unsubscribe_by_mail(*message, &info, &sender);
+            }
+            AppMsg::UnsubscribeDone { message, result } => {
+                let key = (message.account_id, message.id);
+                match result {
+                    Ok(left) => {
+                        if left {
+                            self.record_unsubscribed(&message);
+                            self.notifications.emit(NotifyInput::Push {
+                                text: i18n_f(
+                                    "Unsubscribed from {name}.",
+                                    &[("name", &sender_label(&message))],
+                                ),
+                                error: false,
+                                connectivity: false,
+                            });
+                        } else {
+                            self.notifications.emit(NotifyInput::Push {
+                                text: i18n("The list's unsubscribe page is open in your browser."),
+                                error: false,
+                                connectivity: false,
+                            });
+                        }
+                        self.push_unsubscribe_state(key, None);
+                    }
+                    Err(why) => {
+                        tracing::warn!("unsubscribe failed for {}: {why}", message.from_addr);
+                        self.push_unsubscribe_state(key, Some(UnsubState::Failed(why)));
+                    }
                 }
             }
 
@@ -12607,6 +12678,9 @@ impl AppModel {
                 MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                 MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
                 MessageWindowOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
+                MessageWindowOutput::Unsubscribe { message, info } => {
+                    AppMsg::Unsubscribe { message, info }
+                }
                 MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
                 MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
             });
@@ -12614,6 +12688,7 @@ impl AppModel {
         let window = controller.widget().clone();
         window.set_transient_for(Some(&self.window));
         window.present();
+        controller.emit(MessageWindowInput::SetUnsubscribed(self.unsubscribed_map()));
 
         self.popouts.insert(key, PopOut { window, controller });
     }
@@ -16833,6 +16908,223 @@ impl AppModel {
     /// Where a copy of outgoing mail is filed (#199): the folder chosen in the
     /// account editor if it still exists, else the Sent folder. `None` when
     /// the account has neither — the message is sent without a copy.
+    /// The lists left, as the readers take them: key → when.
+    fn unsubscribed_map(&self) -> HashMap<String, i64> {
+        self.unsubscribed.iter().map(|l| (l.key.clone(), l.at)).collect()
+    }
+
+    /// Tell every reader (the main one and the pop-outs) where a card's
+    /// unsubscribe request stands.
+    fn push_unsubscribe_state(&self, key: (u32, u32), state: Option<UnsubState>) {
+        self.message_view.emit(MessageViewInput::UnsubscribeState {
+            account_id: key.0,
+            id: key.1,
+            state: state.clone(),
+        });
+        for p in self.popouts.values() {
+            p.controller.emit(MessageWindowInput::UnsubscribeState {
+                account_id: key.0,
+                id: key.1,
+                state: state.clone(),
+            });
+        }
+    }
+
+    /// Remember that this message's list was left, and tell the readers.
+    fn record_unsubscribed(&mut self, message: &Message) {
+        let Some(info) = self
+            .sender_cache
+            .get(&(message.account_id, message.id))
+            .and_then(|c| c.unsubscribe.as_ref())
+        else {
+            return;
+        };
+        let key = info.key(&message.from_addr);
+        self.unsubscribed.retain(|l| l.key != key);
+        self.unsubscribed.push(config::UnsubscribedList {
+            key,
+            name: sender_label(message),
+            at: crate::datefmt::now(),
+        });
+        config::save_unsubscribed(&self.unsubscribed);
+        let map = self.unsubscribed_map();
+        self.message_view.emit(MessageViewInput::SetUnsubscribed(map.clone()));
+        for p in self.popouts.values() {
+            p.controller.emit(MessageWindowInput::SetUnsubscribed(map.clone()));
+        }
+    }
+
+    /// The identity an unsubscribe mail leaves under: the alias the message
+    /// was addressed to when it was one (a list knows its subscriber by the
+    /// address it writes to), else the account itself. Returns the send-as
+    /// alias for the wire (`None` for the account) and the bare address.
+    fn unsubscribe_from(&self, message: &Message) -> (Option<String>, String) {
+        let cfg = self.effective_config();
+        let Some(cfg) = cfg.get(message.account_id.saturating_sub(1) as usize) else {
+            return (None, String::new());
+        };
+        let recipients: Vec<String> = [&message.to, &message.cc]
+            .into_iter()
+            .flat_map(|f| crate::worker::parse_recipients(f))
+            .map(|(_, e)| e.to_lowercase())
+            .collect();
+        for alias in &cfg.aliases {
+            if let Some((_, addr)) = crate::worker::parse_recipients(&alias.identity).into_iter().next() {
+                if recipients.iter().any(|r| *r == addr.to_lowercase()) {
+                    return (Some(alias.identity.clone()), addr);
+                }
+            }
+        }
+        (None, cfg.email.clone())
+    }
+
+    /// Ask before leaving a list: what will happen depends on the route the
+    /// list offers, and a mail sent in the user's name is said so up front.
+    fn confirm_unsubscribe(
+        &self,
+        message: Message,
+        info: crate::models::Unsubscribe,
+        sender: &ComponentSender<Self>,
+    ) {
+        let heading = i18n_f("Unsubscribe from {name}?", &[("name", &sender_label(&message))]);
+        let body = if info.one_click.is_some() {
+            i18n("Hylki will ask the list to stop sending you mail. A list can take a few days to act on the request.")
+        } else if let Some(t) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) {
+            let (_, from) = self.unsubscribe_from(&message);
+            i18n_f(
+                "An unsubscribe request will be sent to {addr} from {from}. A list can take a few days to act on it.",
+                &[("addr", &t.to), ("from", &from)],
+            )
+        } else {
+            i18n("This list offers no direct way to unsubscribe. Its unsubscribe page will open in your browser.")
+        };
+        let parent = relm4::main_application()
+            .active_window()
+            .unwrap_or_else(|| self.window.clone().upcast());
+        let dialog = adw::MessageDialog::new(Some(&parent), Some(&heading), Some(body.as_str()));
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("unsub", &i18n("Unsubscribe"));
+        dialog.set_default_response(Some("unsub"));
+        dialog.set_close_response("cancel");
+        dialog.set_response_appearance("unsub", adw::ResponseAppearance::Suggested);
+        let s = sender.clone();
+        let message = Box::new(message);
+        let info = Box::new(info);
+        dialog.connect_response(None, move |_, resp| {
+            if resp == "unsub" {
+                s.input(AppMsg::UnsubscribeGo { message: message.clone(), info: info.clone() });
+            }
+        });
+        dialog.present();
+        // HYLKI_SHOWCASE_UNSUB=ask: the dialog is its own surface, so the
+        // main window's capture never shows it — take one of it too.
+        if std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok_and(|v| v == "ask") {
+            if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
+                let d = dialog.clone();
+                gtk::glib::timeout_add_seconds_local_once(1, move || {
+                    showcase_capture(d.upcast_ref::<gtk::Widget>(), &format!("{path}.dialog.png"));
+                });
+            }
+        }
+    }
+
+    /// Leave the list, by the best route it offers: the one-click POST
+    /// (RFC 8058), falling back to its `mailto:` handle when that fails or
+    /// is not there, and only then the web page in the browser.
+    fn unsubscribe_go(
+        &mut self,
+        message: Message,
+        info: crate::models::Unsubscribe,
+        sender: &ComponentSender<Self>,
+    ) {
+        let key = (message.account_id, message.id);
+        self.push_unsubscribe_state(key, Some(UnsubState::Working));
+        let message = Box::new(message);
+        if demo_mode() {
+            // The demo has no list to ask: the request succeeds after a beat
+            // (or fails, for a look at that banner: HYLKI_SHOWCASE_UNSUB=fail).
+            let s = sender.clone();
+            let fail = std::env::var("HYLKI_SHOWCASE_UNSUB").is_ok_and(|v| v == "fail");
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(900), move || {
+                let result = if fail {
+                    Err("the list's server answered 503".to_string())
+                } else {
+                    Ok(true)
+                };
+                s.input(AppMsg::UnsubscribeDone { message, result });
+            });
+            return;
+        }
+        if let Some(url) = info.one_click.clone() {
+            let s = sender.clone();
+            let info = Box::new(info);
+            std::thread::spawn(move || match crate::unsubscribe::one_click_post(&url) {
+                Ok(()) => s.input(AppMsg::UnsubscribeDone { message, result: Ok(true) }),
+                Err(why) if info.mailto.is_some() => {
+                    tracing::warn!("one-click unsubscribe failed ({why}); writing to the list instead");
+                    s.input(AppMsg::UnsubscribeByMail { message, info });
+                }
+                Err(why) => s.input(AppMsg::UnsubscribeDone { message, result: Err(why) }),
+            });
+            return;
+        }
+        if info.mailto.is_some() {
+            self.unsubscribe_by_mail(*message, &info, sender);
+            return;
+        }
+        match info.web.as_deref() {
+            Some(url) => {
+                crate::ui::launch::open_link(url, Some(self.window.upcast_ref()));
+                sender.input(AppMsg::UnsubscribeDone { message, result: Ok(false) });
+            }
+            None => sender.input(AppMsg::UnsubscribeDone {
+                message,
+                result: Err(i18n("the message offers no way to unsubscribe")),
+            }),
+        }
+    }
+
+    /// The `mailto:` route: a short message to the list's handle, sent
+    /// through the account the message arrived in (as the alias it was
+    /// addressed to, when it was one). No copy is filed in Sent. A send that
+    /// fails is reported and queued in the Outbox like any other.
+    fn unsubscribe_by_mail(
+        &mut self,
+        message: Message,
+        info: &crate::models::Unsubscribe,
+        sender: &ComponentSender<Self>,
+    ) {
+        let Some(target) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) else {
+            sender.input(AppMsg::UnsubscribeDone {
+                message: Box::new(message),
+                result: Err(i18n("the list's mail address could not be read")),
+            });
+            return;
+        };
+        let (from_alias, _) = self.unsubscribe_from(&message);
+        let out = crate::worker::OutgoingMessage {
+            from_account_id: message.account_id,
+            from_alias,
+            to: target.to,
+            cc: String::new(),
+            bcc: String::new(),
+            reply_to: String::new(),
+            subject: target.subject,
+            body: target.body,
+            html: String::new(),
+            attachments: Vec::new(),
+            in_reply_to: String::new(),
+            references: String::new(),
+            draft_origin: None,
+            outbox_origin: None,
+            sign: false,
+            encrypt: false,
+            send_at: None,
+        };
+        self.send_to(message.account_id, MailRequest::Send { message: Box::new(out), sent_path: None });
+        sender.input(AppMsg::UnsubscribeDone { message: Box::new(message), result: Ok(true) });
+    }
+
     fn sent_copy_path(&self, account_id: u32) -> Option<String> {
         let cfg = self.effective_config().get(account_id.saturating_sub(1) as usize);
         // The server files its own copy: appending a second one is what makes
@@ -17641,6 +17933,12 @@ fn star_label(starred: bool) -> String {
 /// The same for a read/unread change.
 fn read_label(read: bool) -> String {
     if read { i18n("Mark as Read") } else { i18n("Mark as Unread") }
+}
+
+/// A sender as a dialog or toast names them: the display name, else the address.
+fn sender_label(message: &Message) -> String {
+    let name = message.from_name.trim();
+    if name.is_empty() { message.from_addr.clone() } else { name.to_string() }
 }
 
 fn demo_mode() -> bool {

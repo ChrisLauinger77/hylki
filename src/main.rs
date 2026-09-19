@@ -35,6 +35,7 @@ mod spell;
 mod theme;
 mod theme_palettes;
 mod tray;
+mod unsubscribe;
 mod ui;
 mod verify;
 mod worker;

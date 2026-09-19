@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS sender_checks (
     summary     TEXT NOT NULL,
     findings    TEXT NOT NULL,
     pgp         TEXT NOT NULL DEFAULT '',
+    unsubscribe TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (account_id, folder_path, uid)
 );
 CREATE TABLE IF NOT EXISTS attachments (
@@ -162,14 +163,19 @@ CREATE INDEX IF NOT EXISTS attachment_meta_by_folder
 /// holding nothing when several held files. Messages marked as scanned with
 /// nothing to show are re-queued once, to be asked about again by the scan that
 /// now isolates the one message at fault.
-const SCHEMA_VERSION: i64 = 15;
+/// v16: the sender check now carries the message's unsubscribe handles
+/// (List-Unsubscribe, RFC 8058), read from the raw headers at the fetch. A
+/// check stored by an earlier build knows nothing of them, and a cached
+/// body is served without ever re-fetching — so the derived tables are
+/// dropped once and every message read again gains its Unsubscribe banner.
+const SCHEMA_VERSION: i64 = 16;
 
 /// The newest version whose change altered how bodies are *rendered* or how
 /// senders are checked. Opening a database older than this drops `bodies` and
 /// `sender_checks` so they rebuild; a later purely-additive bump must not,
 /// or every such release would cost users a full re-fetch of everything they
 /// had read. Raise this only when the rendering itself changes.
-const RENDER_VERSION: i64 = 13;
+const RENDER_VERSION: i64 = 16;
 
 /// A message's keywords as one column: the server's, then any tag kept
 /// locally for the same Message-ID (POP3, or an IMAP server that refuses
@@ -1286,7 +1292,7 @@ impl Cache {
     ) -> Option<crate::models::SenderCheck> {
         self.conn
             .query_row(
-                "SELECT trust, summary, findings, pgp FROM sender_checks \
+                "SELECT trust, summary, findings, pgp, unsubscribe FROM sender_checks \
                  WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
                 params![account_id, folder_path, uid],
                 |row| {
@@ -1302,6 +1308,7 @@ impl Cache {
                         // The stored verdict is a marker only (see the
                         // cleanup in `open`): a served verdict must be fresh.
                         pgp: None,
+                        unsubscribe: serde_json::from_str(&row.get::<_, String>(4)?).ok(),
                     })
                 },
             )
@@ -1317,8 +1324,8 @@ impl Cache {
     ) {
         if let Err(e) = self.conn.execute(
             "INSERT OR REPLACE INTO sender_checks \
-             (account_id, folder_path, uid, trust, summary, findings, pgp) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+             (account_id, folder_path, uid, trust, summary, findings, pgp, unsubscribe) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 account_id,
                 folder_path,
@@ -1330,6 +1337,11 @@ impl Cache {
                     .pgp
                     .as_ref()
                     .and_then(|p| serde_json::to_string(p).ok())
+                    .unwrap_or_default(),
+                check
+                    .unsubscribe
+                    .as_ref()
+                    .and_then(|u| serde_json::to_string(u).ok())
                     .unwrap_or_default()
             ],
         ) {

@@ -4287,6 +4287,51 @@ impl FocusMode {
     }
 }
 
+/// A mailing list the user has unsubscribed from through the reader's
+/// button, so a later message from the same list can say so.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UnsubscribedList {
+    /// [`crate::models::Unsubscribe::key`]: the List-Id, or the From address.
+    pub key: String,
+    /// Who the mail came from, for the record.
+    #[serde(default)]
+    pub name: String,
+    /// Unix seconds of the request.
+    #[serde(default)]
+    pub at: i64,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct UnsubscribedFile {
+    #[serde(default)]
+    lists: Vec<UnsubscribedList>,
+}
+
+fn unsubscribed_path() -> Option<PathBuf> {
+    Some(config_base()?.join("hylki").join("unsubscribed.toml"))
+}
+
+/// The lists left through the reader's Unsubscribe button, newest last.
+pub fn load_unsubscribed() -> Vec<UnsubscribedList> {
+    let Some(text) = unsubscribed_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
+        return Vec::new();
+    };
+    toml::from_str::<UnsubscribedFile>(&text).unwrap_or_default().lists
+}
+
+pub fn save_unsubscribed(lists: &[UnsubscribedList]) {
+    let Some(path) = unsubscribed_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let file = UnsubscribedFile { lists: lists.to_vec() };
+    if let Ok(toml) = toml::to_string_pretty(&file) {
+        let _ = std::fs::write(&path, toml);
+    }
+}
+
 fn focus_path() -> Option<PathBuf> {
     Some(config_base()?.join("hylki").join("focus.toml"))
 }

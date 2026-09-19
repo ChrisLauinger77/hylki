@@ -68,6 +68,9 @@ struct Evidence {
     /// Which authserv-id supplied each verdict, so the details can name who
     /// vouched — a check attributed to an unfamiliar authority is itself a clue.
     authorities: Vec<(&'static str, String)>,
+    /// How to leave the list this came from (RFC 2369/8058), read in the
+    /// same pass over the headers so it rides with the verdict.
+    unsubscribe: Option<crate::models::Unsubscribe>,
 }
 
 impl Evidence {
@@ -102,6 +105,7 @@ fn gather(raw: &[u8]) -> Evidence {
     let Some(parsed) = MessageParser::default().parse(raw) else {
         return ev;
     };
+    ev.unsubscribe = crate::unsubscribe::detect(&parsed);
 
     let first_addr = |a: Option<&mail_parser::Address>| -> Option<String> {
         a.and_then(|a| a.first())
@@ -345,6 +349,7 @@ fn judge(ev: &Evidence) -> SenderCheck {
         summary,
         findings,
         pgp: None,
+        unsubscribe: ev.unsubscribe.clone(),
     }
 }
 

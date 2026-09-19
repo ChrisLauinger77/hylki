@@ -8408,6 +8408,16 @@ fn demo_attachment_files() -> Vec<crate::models::Attachment> {
     ]
 }
 
+/// The demo's sender verdict for a message that has a header block: the
+/// real check, run over those headers, so the card's seal and the
+/// Unsubscribe banner appear as they would for fetched mail.
+fn mock_sender_check(message_id: u32, emit: &impl Fn(WorkerEvent)) {
+    if let Some(raw) = crate::backend::demo_headers(message_id) {
+        let check = crate::verify::check_sender(raw.as_bytes());
+        emit(WorkerEvent::SenderChecked { message_id, check });
+    }
+}
+
 async fn run_mock(
     account_id: u32,
     mut rx: mpsc::UnboundedReceiver<MailRequest>,
@@ -8478,10 +8488,15 @@ async fn run_mock(
             }
             MailRequest::LoadMessages { folder_id, .. }
             | MailRequest::SyncFolder { folder_id, .. } => {
-                emit(WorkerEvent::Messages {
-                    folder_id,
-                    messages: backend.messages(folder_id),
-                });
+                let messages = backend.messages(folder_id);
+                // Demo messages carry their bodies in the listing, so the
+                // app never asks for one: the verdicts that would come with
+                // a fetched body are served with the listing instead.
+                let ids: Vec<u32> = messages.iter().map(|m| m.id).collect();
+                emit(WorkerEvent::Messages { folder_id, messages });
+                for id in ids {
+                    mock_sender_check(id, &emit);
+                }
                 // HYLKI_DEMO_SYNC_DELAY=<secs> holds the "been to the server"
                 // signal back, so the progress a long sync shows (the manual
                 // filter run's dialog, #198) can be watched here.
@@ -8502,6 +8517,7 @@ async fn run_mock(
             MailRequest::LoadBody { message_id, ref path, .. } => {
                 let body = backend.message(message_id).map(|m| m.body).unwrap_or_default();
                 emit(WorkerEvent::Body { message_id, path: path.clone(), body });
+                mock_sender_check(message_id, &emit);
             }
             MailRequest::LoadBodies { ref items, ref path } => {
                 for (message_id, _) in items {
@@ -8511,6 +8527,7 @@ async fn run_mock(
                         path: path.clone(),
                         body,
                     });
+                    mock_sender_check(*message_id, &emit);
                 }
             }
             MailRequest::LoadSource { message_id, .. } => {

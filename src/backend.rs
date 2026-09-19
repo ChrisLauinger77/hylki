@@ -207,6 +207,27 @@ fn folder(id: u32, account_id: u32, name: &str, kind: FolderKind, unread: u32) -
     }
 }
 
+/// Raw header blocks for the demo messages that come from a mailing list:
+/// run through the real sender check when the body is served, so the
+/// newsletter's card wears a verdict and the Unsubscribe banner exactly as
+/// a fetched message would. Keyed by message id.
+const DEMO_HEADERS: &[(u32, &str)] = &[(
+    10,
+    "From: Rust Weekly <digest@this-week-in-rust.org>\r\n\
+     Authentication-Results: mx.hylki.local; dkim=pass header.d=this-week-in-rust.org; \
+     spf=pass smtp.mailfrom=this-week-in-rust.org; dmarc=pass header.from=this-week-in-rust.org\r\n\
+     List-Id: This Week in Rust <digest.this-week-in-rust.org>\r\n\
+     List-Unsubscribe: <mailto:leave@this-week-in-rust.org?subject=unsubscribe>, \
+     <https://this-week-in-rust.org/unsubscribe/612/abc>\r\n\
+     List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n\
+     Subject: This Week in Rust #612\r\n\r\n",
+)];
+
+/// The demo header block of a message, when it has one (see [`DEMO_HEADERS`]).
+pub fn demo_headers(id: u32) -> Option<&'static str> {
+    DEMO_HEADERS.iter().find(|(i, _)| *i == id).map(|(_, h)| *h)
+}
+
 /// Compact spec for a sample message; expanded into a [`Message`] by [`build`].
 struct Spec {
     id: u32,

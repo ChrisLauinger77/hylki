@@ -163,6 +163,12 @@ pub struct MessageView {
     /// Per-member verdicts for the conversation on screen, behind each card's
     /// header seal (#88). Keyed (account_id, id); cleared on Show.
     member_checks: std::collections::HashMap<(u32, u32), crate::models::SenderCheck>,
+    /// The mailing lists left through the cards' Unsubscribe button, by
+    /// [`crate::models::Unsubscribe::key`] with the time of the request, so a
+    /// message from one says so instead of offering the button afresh.
+    unsubscribed: std::collections::HashMap<String, i64>,
+    /// Cards whose unsubscribe request is under way or has just failed.
+    unsub_state: std::collections::HashMap<(u32, u32), UnsubState>,
     /// Full URL of the link under the pointer, shown in a corner overlay so a
     /// link's real destination is visible before it is clicked.
     link_preview: gtk::Label,
@@ -206,6 +212,68 @@ impl MessageView {
              if(!b)return;b.className='vireo-verify on {cls}';b.title={title:?};}})()",
             cls = check.trust.css_class(),
             title = check.trust.label(),
+        );
+        self.webview
+            .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+    }
+
+    /// What a card's Unsubscribe banner holds right now: nothing for a
+    /// message from no list; otherwise a line and a button that follow the
+    /// request — resting, under way, failed — and say when the list was
+    /// already left.
+    fn unsub_inner_html(&self, m: &Message) -> String {
+        let key = (m.account_id, m.id);
+        let Some(info) = self.member_checks.get(&key).and_then(|c| c.unsubscribe.as_ref()) else {
+            return String::new();
+        };
+        let button = |label: &str, title: &str| {
+            format!(
+                "<button type=\"button\" class=\"vireo-unsub-btn\" data-key=\"{}:{}\" title=\"{}\">{}</button>",
+                key.0,
+                key.1,
+                attr_escape(title),
+                escape_text(label),
+            )
+        };
+        let (text, btn) = match self.unsub_state.get(&key) {
+            Some(UnsubState::Working) => (i18n("Unsubscribing…"), String::new()),
+            Some(UnsubState::Failed(why)) => (
+                i18n_f("Unsubscribing didn't work: {why}", &[("why", why)]),
+                button(&i18n("Try Again"), ""),
+            ),
+            None => {
+                let text = match self.unsubscribed.get(&info.key(&m.from_addr)) {
+                    Some(at) => i18n_f(
+                        "You unsubscribed from this list on {date}.",
+                        &[("date", &crate::datefmt::day_month_year(*at))],
+                    ),
+                    None => i18n("This message is from a mailing list."),
+                };
+                let btn = if info.direct() {
+                    button(&i18n("Unsubscribe"), "")
+                } else {
+                    // Nothing but a web page on offer: the button says so.
+                    button(&i18n("Unsubscribe…"), &i18n("Opens the list's unsubscribe page in your browser"))
+                };
+                (text, btn)
+            }
+        };
+        format!("<span class=\"vireo-unsub-text\">{}</span>{btn}", escape_text(&text))
+    }
+
+    /// Redraw one card's Unsubscribe banner in the live document.
+    fn patch_unsub(&self, account_id: u32, id: u32) {
+        if !self.webview_ready || self.current.is_none() {
+            return;
+        }
+        let Some(m) = self.thread.iter().find(|m| m.account_id == account_id && m.id == id) else {
+            return;
+        };
+        let html = self.unsub_inner_html(m);
+        let js = format!(
+            "(function(){{var d=document.querySelector('.vireo-unsub[data-key=\"{account_id}:{id}\"]');\
+             if(d)d.innerHTML={};}})()",
+            serde_json::to_string(&html).unwrap_or_else(|_| "''".into()),
         );
         self.webview
             .evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
@@ -452,6 +520,15 @@ pub enum MessageViewInput {
     /// A member's sender verdict, for its header seal (#88). Patched into the
     /// live document; queued until the document reports ready.
     SenderCheckFor { account_id: u32, id: u32, check: Box<crate::models::SenderCheck> },
+    /// The lists left so far (key → unix seconds), from the app; the cards'
+    /// banners are patched to match.
+    SetUnsubscribed(std::collections::HashMap<String, i64>),
+    /// A card's Unsubscribe button was clicked.
+    Unsubscribe { account_id: u32, id: u32 },
+    /// The app reports where a card's unsubscribe request stands: under way,
+    /// failed, or over (`None` — the banner goes back to its resting state,
+    /// which says "unsubscribed" once `SetUnsubscribed` carries the list).
+    UnsubscribeState { account_id: u32, id: u32, state: Option<UnsubState> },
     /// The header seal was clicked — show the verdict details anchored on the
     /// seal's own rect (x, y, w, h in document coordinates).
     SenderInfoAt { account_id: u32, id: u32, rect: (f64, f64, f64, f64), page_width: f64 },
@@ -609,6 +686,18 @@ pub enum MessageViewOutput {
     /// The subject block's Reader View toggle was flipped; the app saves the
     /// preference and pushes it back (`SetReaderMode`) to every reader.
     ReaderMode(bool),
+    /// A card's Unsubscribe button: leave the list this message came from,
+    /// by the handles its headers offered.
+    Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
+}
+
+/// Where a card's unsubscribe request stands while it is not at rest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnsubState {
+    /// The request is on its way.
+    Working,
+    /// It failed, and this is why (plain words for the banner).
+    Failed(String),
 }
 
 impl MessageView {
@@ -647,6 +736,13 @@ impl MessageView {
 
 /// The tag chips of a card header (#71): one pill per keyword naming a tag,
 /// coloured inline (the document has no access to the app's stylesheet).
+/// A card's Unsubscribe banner: the container, always emitted so a verdict
+/// arriving later can be patched into it (empty, it is hidden by the
+/// stylesheet). `inner` is what [`MessageView::unsub_inner_html`] rendered.
+fn unsub_row_html(key: (u32, u32), inner: &str) -> String {
+    format!("<div class=\"vireo-unsub\" data-key=\"{}:{}\">{inner}</div>", key.0, key.1)
+}
+
 /// A card's attachment row (#213): the container, always emitted so a later
 /// arrival can be patched into it (an empty row is hidden by the stylesheet).
 fn att_row_html(key: (u32, u32), atts: Option<&[CardAttachment]>) -> String {
@@ -1103,6 +1199,8 @@ impl Component for MessageView {
             webview,
             sender_check: None,
             member_checks: std::collections::HashMap::new(),
+            unsubscribed: std::collections::HashMap::new(),
+            unsub_state: std::collections::HashMap::new(),
             link_preview: link_preview.clone(),
             seq: std::cell::Cell::new(0),
             content_dark: None,
@@ -1297,6 +1395,7 @@ impl Component for MessageView {
                     }
                     "open" => open_sender.input(MessageViewInput::OpenHeader { account_id, id }),
                     "seen" => open_sender.input(MessageViewInput::MarkSeen { account_id, id }),
+                    "unsub" => open_sender.input(MessageViewInput::Unsubscribe { account_id, id }),
                     // A card's attachment chip (#213); `extra` is the index.
                     "attopen" | "attsave" => {
                         let index = extra.and_then(|x| x.trim().parse::<usize>().ok()).unwrap_or(0);
@@ -1475,6 +1574,7 @@ impl Component for MessageView {
                 if !same_message {
                     self.sender_check = None;
                     self.member_checks.clear();
+                    self.unsub_state.clear();
                 }
                 self.link_preview.set_visible(false);
                 self.current = shown;
@@ -1694,7 +1794,43 @@ impl Component for MessageView {
                 self.member_checks.insert((account_id, id), *check);
                 if self.webview_ready {
                     self.patch_verify_badge(account_id, id);
+                    self.patch_unsub(account_id, id);
                 }
+            }
+            MessageViewInput::SetUnsubscribed(lists) => {
+                self.unsubscribed = lists;
+                let keys: Vec<(u32, u32)> = self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                for (account_id, id) in keys {
+                    self.patch_unsub(account_id, id);
+                }
+            }
+            MessageViewInput::Unsubscribe { account_id, id } => {
+                let info = self
+                    .member_checks
+                    .get(&(account_id, id))
+                    .and_then(|c| c.unsubscribe.clone());
+                let message = self
+                    .thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .cloned();
+                if let (Some(info), Some(message)) = (info, message) {
+                    let _ = sender.output(MessageViewOutput::Unsubscribe {
+                        message: Box::new(message),
+                        info: Box::new(info),
+                    });
+                }
+            }
+            MessageViewInput::UnsubscribeState { account_id, id, state } => {
+                match state {
+                    Some(s) => {
+                        self.unsub_state.insert((account_id, id), s);
+                    }
+                    None => {
+                        self.unsub_state.remove(&(account_id, id));
+                    }
+                }
+                self.patch_unsub(account_id, id);
             }
 
             MessageViewInput::SenderInfoAt { account_id, id, rect, page_width } => {
@@ -1782,6 +1918,7 @@ impl Component for MessageView {
                 // Verdicts that arrived while the document was still loading.
                 for (aid, id) in self.member_checks.keys().copied().collect::<Vec<_>>() {
                     self.patch_verify_badge(aid, id);
+                    self.patch_unsub(aid, id);
                 }
                 // Likewise attachments (#213): the document was built from
                 // what was known when the render was queued.
@@ -2476,6 +2613,13 @@ impl MessageView {
             *a.borrow_mut() =
                 if self.chips_shown() { self.card_atts.clone() } else { Default::default() }
         });
+        LIVE_UNSUB.with(|u| {
+            *u.borrow_mut() = self
+                .thread
+                .iter()
+                .map(|m| ((m.account_id, m.id), self.unsub_inner_html(m)))
+                .collect()
+        });
         Self::conversation_document(
             &self.thread,
             &self.folder_labels,
@@ -2561,7 +2705,7 @@ impl MessageView {
                              <span class=\"vireo-date\">{date}</span></span>\
                            {acts_toggle}{acts}\
                          </div>{rcpt}\
-                       </header>{body}{atts}</section>",
+                       </header>{unsub}{body}{atts}</section>",
                     aid = m.account_id,
                     id = m.id,
                     // The message's own attachments beneath its body (#213).
@@ -2570,6 +2714,16 @@ impl MessageView {
                     atts = LIVE_ATTS.with(|a| {
                         let key = (m.account_id, m.id);
                         att_row_html(key, a.borrow().get(&key).map(|v| v.as_slice()))
+                    }),
+                    // The Unsubscribe banner between header and body: the
+                    // container is always there, empty (hidden) for a
+                    // message from no list, so a verdict arriving after the
+                    // paint is patched in without a re-render.
+                    unsub = LIVE_UNSUB.with(|u| {
+                        unsub_row_html(
+                            (m.account_id, m.id),
+                            u.borrow().get(&(m.account_id, m.id)).map(String::as_str).unwrap_or(""),
+                        )
                     }),
                     hdr_title = gtk::glib::markup_escape_text(
                         &i18n("Double-click to open in a new window")
@@ -2990,6 +3144,16 @@ impl MessageView {
                /* A card's own attachments (#213): chips beneath the body. */\
                .vireo-atts{{display:flex;flex-wrap:wrap;gap:6px;padding:2px 14px 12px;}}\
                .vireo-atts:empty{{display:none;}}\
+               /* The Unsubscribe banner between a list message's header and\
+                  body: a line of text and one button. */\
+               .vireo-unsub{{display:flex;align-items:center;gap:10px;padding:8px 14px 9px;\
+                 font-size:0.9em;border-bottom:1px solid rgba(128,128,128,0.25);}}\
+               .vireo-unsub:empty{{display:none;}}\
+               .vireo-unsub-text{{flex:1 1 auto;min-width:0;opacity:0.8;}}\
+               .vireo-unsub-btn{{flex:none;border:1px solid rgba(128,128,128,0.4);border-radius:6px;\
+                 padding:3px 12px;background:rgba(128,128,128,0.1);color:inherit;font:inherit;\
+                 font-size:0.95em;font-weight:600;cursor:pointer;}}\
+               .vireo-unsub-btn:hover{{background:rgba(128,128,128,0.22);}}\
                .vireo-attw{{display:inline-flex;align-items:stretch;max-width:100%;\
                  border:1px solid rgba(128,128,128,0.35);border-radius:8px;overflow:hidden;\
                  background:rgba(128,128,128,0.08);}}\
@@ -4876,6 +5040,10 @@ thread_local! {
     static LIVE_ATTS: std::cell::RefCell<
         std::collections::HashMap<(u32, u32), Vec<CardAttachment>>,
     > = std::cell::RefCell::new(std::collections::HashMap::new());
+    /// Each card's Unsubscribe banner, already rendered, handed to the
+    /// builder the same way. Empty in tests: no banners.
+    static LIVE_UNSUB: std::cell::RefCell<std::collections::HashMap<(u32, u32), String>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
 /// That ground as a colour the WebView itself can be painted with.
@@ -5116,6 +5284,9 @@ var extra='';if(this.dataset.act==='moveto'){var br=this.getBoundingClientRect()
 extra=':'+(br.left+br.width/2)+','+br.bottom+','+window.innerWidth;}\
 try{window.webkit.messageHandlers.hylki.postMessage(this.dataset.act+':'+this.dataset.key+extra);}catch(_){}});\
 as[k].addEventListener('dblclick',function(e){e.stopPropagation();});}\
+document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('.vireo-unsub-btn'):null;\
+if(!b)return;e.stopPropagation();e.preventDefault();\
+try{window.webkit.messageHandlers.hylki.postMessage('unsub:'+b.dataset.key);}catch(_){}});\
 });\
 function markClipped(){var as=document.querySelectorAll('.vireo-addr');\
 for(var i=0;i<as.length;i++){var a=as[i];\
