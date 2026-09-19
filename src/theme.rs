@@ -211,8 +211,10 @@ fn repaint() {
 /// Adwaita split view, and already follows `sidebar_border_color`.) The
 /// border and shadow resets are load-bearing: libadwaita draws the
 /// separator's hairline as a shadow, which would otherwise sit over the
-/// palette colour and lighten it. Because this string is empty under the
-/// stock look, none of it reaches an unthemed window.
+/// palette colour and lighten it. It is painted a fifth darker than the
+/// palette's border role, which every theme pitches brighter than the list
+/// and the reader on either side of it. Because this string is empty under
+/// the stock look, none of it reaches an unthemed window.
 ///
 /// The sidebar's divider keeps libadwaita's own values rather than the
 /// palette's `sidebar_border`: every theme's tint is lighter than the
@@ -268,7 +270,7 @@ fn css(p: &Palette, dark: bool) -> String {
 @define-color warning_fg_color {on_warning};\
 @define-color shade_color {border};\
 @define-color scrollbar_outline_color {surface};\
-.mail-split > separator {{background-color: {border};\
+.mail-split > separator {{background-color: {separator};\
 border: none;box-shadow: none;outline: none;}}",
         chrome = p.chrome,
         text = p.text,
@@ -276,6 +278,7 @@ border: none;box-shadow: none;outline: none;}}",
         toolbar = p.toolbar,
         toolbar_fg = p.toolbar_foreground,
         border = p.border,
+        separator = crate::color::darken(p.border, 0.2),
         sidebar = p.sidebar,
         sidebar_fg = p.sidebar_foreground,
         raised = p.surface_raised,
