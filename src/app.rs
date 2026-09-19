@@ -766,12 +766,9 @@ pub struct AppModel {
     /// Lone messages render as inset cards (#57).
     single_message_card: bool,
     /// Reader View: every message in the reader shown as its content alone,
-    /// in the reader's own sheet (see `crate::reader`). The header's toggle,
-    /// remembered across runs.
+    /// in the reader's own sheet (see `crate::reader`). The toggle sits in
+    /// the reader's subject block; the choice is remembered across runs.
     reader_mode: bool,
-    /// That toggle, in the reader header beside the ⋯: it stays on the bar at
-    /// every width, outside the fold-away action groups.
-    reader_mode_btn: gtk::ToggleButton,
     /// Each conversation message lists its own attachments (#213).
     card_attachments: bool,
     /// The attachment drawer beneath the reader is shown at all (#213).
@@ -1874,20 +1871,6 @@ impl SimpleComponent for AppModel {
                                 // controls: the overflow ⋯ that stands in for the
                                 // action buttons while collapsed.
                                 pack_end: &model.reader_overflow_btn,
-                                // Reader View: the message(s) as content alone.
-                                // Next to the ⋯, and never folded with the
-                                // action groups: it is a way of reading, not
-                                // an action on the message.
-                                pack_end = &gtk::Box {
-                                    #[local_ref]
-                                    reader_mode_btn -> gtk::ToggleButton {
-                                        #[watch]
-                                        set_visible: !model.showing_outbox
-                                            && model.reader_compose.is_none(),
-                                        #[watch]
-                                        set_sensitive: model.current.is_some(),
-                                    },
-                                },
                                 add_css_class: "flat",
                                 // Tighter icon spacing than stock so the full
                                 // action row fits a narrower pane (see
@@ -2465,6 +2448,7 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::AddContactAddr(addr) => AppMsg::AddContactAddr(addr),
                     MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                     MessageViewOutput::Notice(text) => AppMsg::Notice(text),
+                    MessageViewOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
                 });
 
         // The drawer owns a Paned whose top pane is the reader body, so hand it
@@ -2861,14 +2845,6 @@ impl SimpleComponent for AppModel {
             body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
             reader_mode: config::load_reader_mode(),
-            reader_mode_btn: {
-                let b = gtk::ToggleButton::new();
-                b.set_icon_name("co.hyprlab.Hylki-open-book-symbolic");
-                b.set_tooltip_text(Some(i18n("Reader View: show only the text of every message, in one plain format").as_str()));
-                b.add_css_class("flat");
-                b.set_active(config::load_reader_mode());
-                b
-            },
             card_attachments: config::load_card_attachments(),
             drawer_enabled: config::load_attachment_drawer(),
             thread_expansion: config::load_thread_expansion(),
@@ -3041,7 +3017,6 @@ impl SimpleComponent for AppModel {
         apply_app_theme(model.app_theme);
         let reader_tag_btn = model.reader_tag_btn.clone();
         let reader_move_btn = model.reader_move_btn.clone();
-        let reader_mode_btn = model.reader_mode_btn.clone();
         let widgets = view_output!();
         let _ = model.reader_header.set(widgets.reader_header.clone());
         // Right-click on the header's empty space (not a button) offers
@@ -3170,10 +3145,6 @@ impl SimpleComponent for AppModel {
             let s = sender.input_sender().clone();
             model.reader_overflow_btn.connect_clicked(move |_| {
                 let _ = s.send(AppMsg::ReaderOverflowMenu);
-            });
-            let s = sender.input_sender().clone();
-            model.reader_mode_btn.connect_toggled(move |b| {
-                let _ = s.send(AppMsg::SetReaderMode(b.is_active()));
             });
             let s = sender.input_sender().clone();
             model.reader_tag_btn.connect_clicked(move |_| {
@@ -6638,9 +6609,6 @@ impl SimpleComponent for AppModel {
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetReaderMode(on));
                     }
-                }
-                if self.reader_mode_btn.is_active() != on {
-                    self.reader_mode_btn.set_active(on);
                 }
             }
             AppMsg::SetSingleMessageCard(on) => {
@@ -12110,6 +12078,7 @@ impl AppModel {
                 MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
                 MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                 MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
+                MessageWindowOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
                 MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
                 MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
             });

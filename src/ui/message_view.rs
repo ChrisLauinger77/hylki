@@ -581,6 +581,9 @@ pub enum MessageViewOutput {
     ReloadBody(Box<Message>),
     /// Something to tell the user in a toast.
     Notice(String),
+    /// The subject block's Reader View toggle was flipped; the app saves the
+    /// preference and pushes it back (`SetReaderMode`) to every reader.
+    ReaderMode(bool),
 }
 
 impl MessageView {
@@ -870,19 +873,48 @@ impl Component for MessageView {
                         },
                     },
 
-                    gtk::Label {
-                        #[watch]
-                        set_label: model.current.as_ref().map(|m| m.subject.as_str()).unwrap_or_default(),
-                        set_halign: gtk::Align::Start,
-                        set_wrap: true,
-                        // Break mid-word for unbreakable tokens (e.g. an
-                        // undecodable subject or a long URL) so an extreme
-                        // subject can never force the pane — and with it the
-                        // window controls — wider than the screen.
-                        set_wrap_mode: gtk::pango::WrapMode::WordChar,
-                        set_xalign: 0.0,
-                        set_selectable: true,
-                        add_css_class: "reader-subject",
+                    gtk::Box {
+                        set_orientation: gtk::Orientation::Horizontal,
+                        set_spacing: 12,
+
+                        gtk::Label {
+                            #[watch]
+                            set_label: model.current.as_ref().map(|m| m.subject.as_str()).unwrap_or_default(),
+                            set_halign: gtk::Align::Start,
+                            set_hexpand: true,
+                            set_wrap: true,
+                            // Break mid-word for unbreakable tokens (e.g. an
+                            // undecodable subject or a long URL) so an extreme
+                            // subject can never force the pane — and with it the
+                            // window controls — wider than the screen.
+                            set_wrap_mode: gtk::pango::WrapMode::WordChar,
+                            set_xalign: 0.0,
+                            set_selectable: true,
+                            add_css_class: "reader-subject",
+                        },
+
+                        // Reader View: the message(s) as content alone. At
+                        // the subject's right, level with its first line —
+                        // part of the message header, not the action row.
+                        gtk::ToggleButton {
+                            set_icon_name: "co.hyprlab.Hylki-open-book-symbolic",
+                            set_tooltip_text: Some(i18n("Reader View: show only the text of every message, in one plain format").as_str()),
+                            add_css_class: "flat",
+                            add_css_class: "reader-toggle",
+                            set_valign: gtk::Align::Start,
+                            set_halign: gtk::Align::End,
+                            #[watch]
+                            set_visible: model.current.is_some(),
+                            #[watch]
+                            set_active: model.reader_mode,
+                            // The app owns the preference: it saves the choice
+                            // and hands it back to every reader (this one
+                            // included), so a toggle here never renders on
+                            // its own.
+                            connect_toggled[sender] => move |b| {
+                                let _ = sender.output(MessageViewOutput::ReaderMode(b.is_active()));
+                            },
+                        },
                     },
 
                     // Tag chips (#71) for a lone full-bleed message, whose
