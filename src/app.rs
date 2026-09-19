@@ -3641,6 +3641,10 @@ impl SimpleComponent for AppModel {
                 crate::background::request(true);
             }
             sender.input(AppMsg::ShowCarryOverNotice(from));
+        } else if std::env::var_os("HYLKI_SHOWCASE_CARRY_OVER").is_some() {
+            // Opens the notice as if Vireo's data had just come across, for
+            // checking it by hand.
+            sender.input(AppMsg::ShowCarryOverNotice(&crate::legacy::PREDECESSORS[0]));
         }
 
         model.lightbox_picture = Some(widgets.lightbox_picture.clone());
