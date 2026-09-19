@@ -916,7 +916,7 @@ impl Component for MessageView {
                             set_halign: gtk::Align::End,
                             set_valign: gtk::Align::Center,
                             add_css_class: "reader-toggle",
-                            set_tooltip_text: Some(i18n("Show only the text of every message, in one plain format").as_str()),
+                            set_tooltip_text: Some(i18n("Reader View shows a message as its text alone, in one plain format, without the sender's layout, colours and fonts.").as_str()),
                             #[watch]
                             set_visible: model.current.is_some() && model.reader_switch_shown,
 
