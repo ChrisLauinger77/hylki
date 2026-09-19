@@ -1337,6 +1337,9 @@ pub enum AppMsg {
     ShowAttachmentInMessage(Attachment),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
+    /// Showcase only (HYLKI_SHOWCASE_COMPOSE_CLOSE): cancel the inline
+    /// composer, to check its web process goes with it.
+    ShowcaseComposeClose,
     /// Showcase only (HYLKI_SHOWCASE_COMPOSE_UNDO): drive the inline
     /// composer's history through a scripted round of edits and undos.
     ShowcaseComposeUndo,
@@ -4111,6 +4114,16 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
                         s.input(AppMsg::ShowcaseComposePreview);
+                    });
+                }
+                // HYLKI_SHOWCASE_COMPOSE_CLOSE=N cancels the inline composer
+                // N seconds in (pair with HYLKI_SHOWCASE_REPLY), to check
+                // that a closed composer's web view, and so its web process,
+                // actually goes away (#221).
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COMPOSE_CLOSE").ok().and_then(|v| v.parse::<u32>().ok()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(at, move || {
+                        s.input(AppMsg::ShowcaseComposeClose);
                     });
                 }
                 // HYLKI_SHOWCASE_COMPOSE_UNDO=1 runs the composer's history
@@ -7300,6 +7313,11 @@ impl SimpleComponent for AppModel {
                 // compose window has closed. No notification (mirrors silent send).
             }
 
+            AppMsg::ShowcaseComposeClose => {
+                if let Some(r) = &self.reader_compose {
+                    r.controller.emit(ComposeInput::Cancel);
+                }
+            }
             AppMsg::ComposeClosed(id) => {
                 self.close_compose(id);
                 self.message_list.emit(MessageListInput::ReclaimFocus);
@@ -8078,7 +8096,13 @@ impl SimpleComponent for AppModel {
             // Closing the combined Settings window hides it (the window's
             // own hide-on-close); both panels stay for the next open, which
             // then only rebuilds the accounts panel.
-            AppMsg::ClosePreferences => {}
+            AppMsg::ClosePreferences => {
+                // The window only hides; let the signature editor's web
+                // process go with it (#221).
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::ReleaseSignatureEditor);
+                }
+            }
 
             // Build the Settings window ahead of its first open, hidden and
             // realized, a moment after startup: its first appearance is
@@ -9100,6 +9124,10 @@ impl AppModel {
         }
         out.push_str("Processes:\n");
         for line in crate::memory_report::process_lines() {
+            out.push_str(&line);
+            out.push('\n');
+        }
+        for line in crate::memory_report::web_view_lines() {
             out.push_str(&line);
             out.push('\n');
         }
@@ -13401,6 +13429,7 @@ impl AppModel {
 
     /// Tear down a composer by id (from a Close output or a window's close-request).
     fn close_compose(&mut self, id: u32) {
+        tracing::debug!(target: "hylki::compose", "composer {id} closed");
         if let Some(pos) = self.composers.iter().position(|h| h.id == id) {
             let host = self.composers.remove(pos);
             host.window.set_content(None::<&gtk::Widget>);

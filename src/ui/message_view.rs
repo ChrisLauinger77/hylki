@@ -3302,7 +3302,7 @@ impl MessageView {
 /// A web view for the print preview: same sandboxing as the reader's, since it
 /// shows the same message.
 pub fn new_preview_webview() -> webkit6::WebView {
-    new_webview()
+    build_webview("print preview")
 }
 
 thread_local! {
@@ -3336,6 +3336,10 @@ pub fn shared_web_context() -> webkit6::WebContext {
 }
 
 fn new_webview() -> webkit6::WebView {
+    build_webview("message view")
+}
+
+fn build_webview(role: &'static str) -> webkit6::WebView {
     // A user-content manager with a script message handler lets the wrapper
     // document notify us (e.g. a double-clicked conversation header).
     let ucm = webkit6::UserContentManager::new();
@@ -3344,6 +3348,7 @@ fn new_webview() -> webkit6::WebView {
         .web_context(&shared_web_context())
         .user_content_manager(&ucm)
         .build();
+    crate::memory_report::register_web_view(&webview, role);
 
     let settings = webkit6::Settings::new();
     // JavaScript runs only in our own (trusted) wrapper document — it sizes each
@@ -6908,3 +6913,11 @@ mod scan_perf {
     }
 }
 
+
+impl Drop for MessageView {
+    /// A pop-out's view goes with its window (the reader's own only ever
+    /// drops at exit): see [`crate::memory_report::release_web_view`].
+    fn drop(&mut self) {
+        crate::memory_report::release_web_view(&self.webview);
+    }
+}
