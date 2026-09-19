@@ -60,6 +60,11 @@ pub struct MessageView {
     /// in the reader's own uniform sheet (see `crate::reader`). The header's
     /// toggle; applies to the whole conversation at once.
     reader_mode: bool,
+    /// Whether the header's Reader View switch is shown (Settings).
+    reader_switch_shown: bool,
+    /// What Reader View does when a conversation is opened afresh
+    /// (Settings): keep the last choice, or start on or off.
+    reader_default: crate::config::ReaderDefault,
     /// Read-marking policy (#100), stamped on the document for the
     /// viewport observer.
     read_mark: crate::config::ReadMark,
@@ -164,6 +169,21 @@ pub struct MessageView {
 }
 
 impl MessageView {
+    /// Reader View on or off, re-rendering what is on screen if it changed.
+    fn set_reader_mode(&mut self, on: bool) {
+        if self.reader_mode == on {
+            return;
+        }
+        self.reader_mode = on;
+        // A frame measures differently in each view; the heights remembered
+        // for the other one would only make the cards lurch on the way to
+        // their real size.
+        self.frame_heights.clear();
+        if self.current.is_some() && !self.loading {
+            self.render();
+        }
+    }
+
     /// Light the header seal for one member with its verdict class + tooltip.
     fn patch_verify_badge(&self, account_id: u32, id: u32) {
         let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
@@ -413,6 +433,11 @@ pub enum MessageViewInput {
     /// Reader View on or off (the header's toggle): re-renders the whole
     /// conversation stripped to its content, or back as sent.
     SetReaderMode(bool),
+    /// Settings: show the Reader View switch in the header at all.
+    SetReaderSwitchShown(bool),
+    /// Settings: what Reader View does when a conversation is opened. A
+    /// per-message default applies to what is on screen right away.
+    SetReaderDefault(crate::config::ReaderDefault),
     /// The popover's "Fetch the sender's key" (#133): the Autocrypt key in
     /// the message first, then WKD and the keyservers.
     PgpFetchKey { account_id: u32, id: u32 },
@@ -893,7 +918,7 @@ impl Component for MessageView {
                             add_css_class: "reader-toggle",
                             set_tooltip_text: Some(i18n("Show only the text of every message, in one plain format").as_str()),
                             #[watch]
-                            set_visible: model.current.is_some(),
+                            set_visible: model.current.is_some() && model.reader_switch_shown,
 
                             gtk::Label {
                                 set_label: &i18n("Reader View"),
@@ -1047,6 +1072,8 @@ impl Component for MessageView {
             reader_style: crate::config::ReaderStyle::NONE,
             sender_style: std::collections::HashSet::new(),
             reader_mode: false,
+            reader_switch_shown: true,
+            reader_default: crate::config::ReaderDefault::Remember,
             read_mark: crate::config::ReadMark::default(),
             show_banner: crate::config::load_show_remote_banner(),
             card_actions_hover: crate::config::load_card_actions_hover(),
@@ -1458,6 +1485,12 @@ impl Component for MessageView {
                     self.no_autoread.clear();
                     self.did_autoscroll = false;
                     self.saved_anchor = None;
+                    // A per-message Reader View default (Settings) resets
+                    // the view for each conversation opened; the switch can
+                    // still flip this one.
+                    if let Some(on) = self.reader_default.starts_on() {
+                        self.set_reader_mode(on);
+                    }
                 }
                 self.thread = thread;
                 self.folder_labels = folder_labels;
@@ -1633,15 +1666,15 @@ impl Component for MessageView {
                 }
             }
             MessageViewInput::SetReaderMode(on) => {
-                if self.reader_mode != on {
-                    self.reader_mode = on;
-                    // A frame measures differently in each view; the heights
-                    // remembered for the other one would only make the
-                    // cards lurch on the way to their real size.
-                    self.frame_heights.clear();
-                    if self.current.is_some() && !self.loading {
-                        self.render();
-                    }
+                self.set_reader_mode(on);
+            }
+            MessageViewInput::SetReaderSwitchShown(on) => {
+                self.reader_switch_shown = on;
+            }
+            MessageViewInput::SetReaderDefault(policy) => {
+                self.reader_default = policy;
+                if let Some(on) = policy.starts_on() {
+                    self.set_reader_mode(on);
                 }
             }
             MessageViewInput::ToggleSenderStyle { account_id, id } => {

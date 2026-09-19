@@ -769,6 +769,10 @@ pub struct AppModel {
     /// in the reader's own sheet (see `crate::reader`). The toggle sits in
     /// the reader's subject block; the choice is remembered across runs.
     reader_mode: bool,
+    /// The Reader View switch is shown in the reader header.
+    reader_switch: bool,
+    /// What Reader View does when a message is opened (Settings).
+    reader_default: config::ReaderDefault,
     /// Each conversation message lists its own attachments (#213).
     card_attachments: bool,
     /// The attachment drawer beneath the reader is shown at all (#213).
@@ -1173,8 +1177,12 @@ pub enum AppMsg {
     SetThreadNewestFirst(bool),
     SetAlwaysShowRecipients(bool),
     SetSingleMessageCard(bool),
-    /// Reader View on or off (the header's toggle).
+    /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
+    /// Settings: show the Reader View switch in the reader header.
+    SetReaderSwitchShown(bool),
+    /// Settings: what Reader View does when a message is opened.
+    SetReaderDefault(config::ReaderDefault),
     SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
     SetListPalette(bool),
     SetListPaletteHover(bool),
@@ -2845,6 +2853,8 @@ impl SimpleComponent for AppModel {
             body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
             reader_mode: config::load_reader_mode(),
+            reader_switch: config::load_reader_switch(),
+            reader_default: config::load_reader_default(),
             card_attachments: config::load_card_attachments(),
             drawer_enabled: config::load_attachment_drawer(),
             thread_expansion: config::load_thread_expansion(),
@@ -3005,6 +3015,8 @@ impl SimpleComponent for AppModel {
             .message_view
             .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
         model.message_view.emit(MessageViewInput::SetReaderMode(model.reader_mode));
+        model.message_view.emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
+        model.message_view.emit(MessageViewInput::SetReaderDefault(model.reader_default));
         model
             .message_view
             .emit(MessageViewInput::SetCardAttachmentsShown(model.card_attachments));
@@ -6605,9 +6617,33 @@ impl SimpleComponent for AppModel {
                 if self.reader_mode != on {
                     self.reader_mode = on;
                     self.save_settings();
-                    self.message_view.emit(MessageViewInput::SetReaderMode(on));
+                }
+                // Always pushed, equal or not: with a per-message default the
+                // readers reset themselves on each open, so what they show
+                // can differ from the saved state — and a switch flipped in
+                // one of them must land there regardless.
+                self.message_view.emit(MessageViewInput::SetReaderMode(on));
+                for p in self.popouts.values() {
+                    p.controller.emit(MessageWindowInput::SetReaderMode(on));
+                }
+            }
+            AppMsg::SetReaderSwitchShown(on) => {
+                if self.reader_switch != on {
+                    self.reader_switch = on;
+                    self.save_settings();
+                    self.message_view.emit(MessageViewInput::SetReaderSwitchShown(on));
                     for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetReaderMode(on));
+                        p.controller.emit(MessageWindowInput::SetReaderSwitchShown(on));
+                    }
+                }
+            }
+            AppMsg::SetReaderDefault(policy) => {
+                if self.reader_default != policy {
+                    self.reader_default = policy;
+                    self.save_settings();
+                    self.message_view.emit(MessageViewInput::SetReaderDefault(policy));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetReaderDefault(policy));
                     }
                 }
             }
@@ -9298,6 +9334,8 @@ impl AppModel {
             self.always_show_recipients,
             self.single_message_card,
             self.reader_mode,
+            self.reader_switch,
+            self.reader_default,
             self.card_attachments,
             self.drawer_enabled,
             self.confirm_thread_delete,
@@ -12059,6 +12097,8 @@ impl AppModel {
             content_dark: self.message_theme.dark_override(),
             reader_style: self.reader_style(),
             reader_mode: self.reader_mode,
+            reader_switch: self.reader_switch,
+            reader_default: self.reader_default,
             tags: self.tags.clone(),
         };
 
@@ -14744,6 +14784,8 @@ impl AppModel {
             thread_newest_first: self.thread_newest_first,
             always_show_recipients: self.always_show_recipients,
             single_message_card: self.single_message_card,
+            reader_switch: self.reader_switch,
+            reader_default: self.reader_default,
             card_attachments: self.card_attachments,
             attachment_drawer: self.drawer_enabled,
             thread_expansion: self.thread_expansion,
@@ -14841,6 +14883,8 @@ impl AppModel {
                 PrefOutput::SetThreadNewestFirst(on) => AppMsg::SetThreadNewestFirst(on),
                 PrefOutput::SetAlwaysShowRecipients(on) => AppMsg::SetAlwaysShowRecipients(on),
                 PrefOutput::SetSingleMessageCard(on) => AppMsg::SetSingleMessageCard(on),
+                PrefOutput::SetReaderSwitch(on) => AppMsg::SetReaderSwitchShown(on),
+                PrefOutput::SetReaderDefault(p) => AppMsg::SetReaderDefault(p),
                 PrefOutput::SetCardAttachments(on) => AppMsg::SetCardAttachments(on),
                 PrefOutput::SetAttachmentDrawer(on) => AppMsg::SetAttachmentDrawer(on),
                 PrefOutput::SetCardActionsMode { hover_toggle, hover_auto } => {

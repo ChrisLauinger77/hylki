@@ -35,6 +35,10 @@ pub struct MessageWindowInit {
     pub reader_style: crate::config::ReaderStyle,
     /// Reader View (the main window's header toggle), followed here too.
     pub reader_mode: bool,
+    /// Whether the Reader View switch is shown at all.
+    pub reader_switch: bool,
+    /// What Reader View does when a message is opened.
+    pub reader_default: crate::config::ReaderDefault,
     /// The tags (#71), for the cards' chips.
     pub tags: Vec<crate::config::Tag>,
 }
@@ -82,6 +86,8 @@ pub enum MessageWindowInput {
     /// The reader's own fonts and colours changed (#56).
     SetReaderStyle(crate::config::ReaderStyle),
     SetReaderMode(bool),
+    SetReaderSwitchShown(bool),
+    SetReaderDefault(crate::config::ReaderDefault),
     /// This window's own Reader View toggle was flipped: handed up to the
     /// app, which owns the preference and pushes it back to every reader.
     ReaderMode(bool),
@@ -315,6 +321,8 @@ impl Component for MessageWindow {
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
         view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
         view.emit(MessageViewInput::SetReaderMode(init.reader_mode));
+        view.emit(MessageViewInput::SetReaderSwitchShown(init.reader_switch));
+        view.emit(MessageViewInput::SetReaderDefault(init.reader_default));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
 
         let thread = if init.thread.is_empty() {
@@ -378,6 +386,12 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetReaderMode(on) => {
                 self.view.emit(MessageViewInput::SetReaderMode(on));
+            }
+            MessageWindowInput::SetReaderSwitchShown(on) => {
+                self.view.emit(MessageViewInput::SetReaderSwitchShown(on));
+            }
+            MessageWindowInput::SetReaderDefault(policy) => {
+                self.view.emit(MessageViewInput::SetReaderDefault(policy));
             }
             MessageWindowInput::ReaderMode(on) => {
                 let _ = sender.output(MessageWindowOutput::ReaderMode(on));

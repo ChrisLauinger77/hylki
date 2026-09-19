@@ -895,6 +895,13 @@ struct PrivacyFile {
     /// content alone, in the reader's own sheet.
     #[serde(default)]
     reader_mode: bool,
+    /// Whether the Reader View switch is shown in the reader header at all.
+    #[serde(default = "default_reader_switch")]
+    reader_switch: bool,
+    /// What Reader View does when a message is opened: keep the last choice,
+    /// or start every message on or off.
+    #[serde(default)]
+    reader_default: ReaderDefault,
     /// Each conversation message lists its own attachments beneath its body
     /// (#213), so which file came with which message is never in doubt.
     #[serde(default = "default_card_attachments")]
@@ -1187,6 +1194,10 @@ fn default_attachment_drawer() -> bool {
     true
 }
 
+fn default_reader_switch() -> bool {
+    true
+}
+
 fn default_single_message_card() -> bool {
     // On for new installs (Jason, 2026-08-31): lone messages get the same
     // inset card as conversations. Only a privacy.toml MISSING this key sees
@@ -1300,6 +1311,8 @@ impl Default for PrivacyFile {
             always_show_recipients: false,
             single_message_card: default_single_message_card(),
             reader_mode: false,
+            reader_switch: default_reader_switch(),
+            reader_default: ReaderDefault::default(),
             card_attachments: default_card_attachments(),
             attachment_drawer: default_attachment_drawer(),
             confirm_thread_delete: default_confirm_thread_delete(),
@@ -2256,6 +2269,41 @@ pub fn load_reader_mode() -> bool {
     load_privacy().reader_mode
 }
 
+pub fn load_reader_switch() -> bool {
+    load_privacy().reader_switch
+}
+
+pub fn load_reader_default() -> ReaderDefault {
+    load_privacy().reader_default
+}
+
+/// What Reader View does each time a message is opened.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReaderDefault {
+    /// Stay as last set; the switch's state is remembered across runs.
+    #[default]
+    Remember,
+    /// Every message opens in Reader View (the switch can turn it off for
+    /// that one).
+    On,
+    /// Every message opens as sent (the switch can turn Reader View on for
+    /// that one).
+    Off,
+}
+
+impl ReaderDefault {
+    /// The state a freshly opened message starts in, or `None` to keep the
+    /// last choice.
+    pub fn starts_on(self) -> Option<bool> {
+        match self {
+            ReaderDefault::Remember => None,
+            ReaderDefault::On => Some(true),
+            ReaderDefault::Off => Some(false),
+        }
+    }
+}
+
 pub fn load_card_attachments() -> bool {
     load_privacy().card_attachments
 }
@@ -2624,6 +2672,8 @@ pub fn save_privacy(
     always_show_recipients: bool,
     single_message_card: bool,
     reader_mode: bool,
+    reader_switch: bool,
+    reader_default: ReaderDefault,
     card_attachments: bool,
     attachment_drawer: bool,
     confirm_thread_delete: bool,
@@ -2709,6 +2759,8 @@ pub fn save_privacy(
         always_show_recipients,
         single_message_card,
         reader_mode,
+        reader_switch,
+        reader_default,
         card_attachments,
         attachment_drawer,
         confirm_thread_delete,
