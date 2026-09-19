@@ -4189,3 +4189,154 @@ mod files_prefs_tests {
         assert_eq!(prefs.limit_bytes(), 3_000_000);
     }
 }
+
+// ---- Focus Mode -----------------------------------------------------------
+
+/// Focus Mode: a distraction-free layout for reading, switched on from the
+/// main menu, Ctrl+Shift+F or Settings → Appearance. Each part can be left
+/// out, so it strips exactly what its owner finds distracting. Stored in
+/// focus.toml (like the toolbar layout) so the ordinary settings file and
+/// its long save call stay as they are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FocusMode {
+    /// The master switch: on, the parts below apply.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Every button of the reading pane's toolbar folds into its ⋯ menu.
+    #[serde(default = "default_on")]
+    pub reader_toolbar: bool,
+    /// The message list's search, filters, count and sort fold into a ⋯
+    /// menu; only the sidebar toggle stays.
+    #[serde(default = "default_on")]
+    pub list_header: bool,
+    /// The sidebar's account sections are hidden.
+    #[serde(default = "default_on")]
+    pub hide_accounts: bool,
+    /// The sidebar's unified rows (Inboxes, Starred, …) fold up.
+    #[serde(default = "default_on")]
+    pub fold_unified: bool,
+    /// The message list's sender avatars are hidden.
+    #[serde(default = "default_on")]
+    pub hide_avatars: bool,
+    /// The message list shows at most one line of preview text.
+    #[serde(default = "default_on")]
+    pub one_preview_line: bool,
+    /// Every message opens in Reader View (the switch still works).
+    #[serde(default = "default_on")]
+    pub reader_view: bool,
+}
+
+impl Default for FocusMode {
+    fn default() -> Self {
+        FocusMode {
+            enabled: false,
+            reader_toolbar: true,
+            list_header: true,
+            hide_accounts: true,
+            fold_unified: true,
+            hide_avatars: true,
+            one_preview_line: true,
+            reader_view: true,
+        }
+    }
+}
+
+/// One switch of Focus Mode, for Settings rows that all set the same struct.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FocusPart {
+    Enabled,
+    ReaderToolbar,
+    ListHeader,
+    HideAccounts,
+    FoldUnified,
+    HideAvatars,
+    OnePreviewLine,
+    ReaderView,
+}
+
+impl FocusMode {
+    pub fn get(&self, part: FocusPart) -> bool {
+        match part {
+            FocusPart::Enabled => self.enabled,
+            FocusPart::ReaderToolbar => self.reader_toolbar,
+            FocusPart::ListHeader => self.list_header,
+            FocusPart::HideAccounts => self.hide_accounts,
+            FocusPart::FoldUnified => self.fold_unified,
+            FocusPart::HideAvatars => self.hide_avatars,
+            FocusPart::OnePreviewLine => self.one_preview_line,
+            FocusPart::ReaderView => self.reader_view,
+        }
+    }
+
+    pub fn set(&mut self, part: FocusPart, on: bool) {
+        match part {
+            FocusPart::Enabled => self.enabled = on,
+            FocusPart::ReaderToolbar => self.reader_toolbar = on,
+            FocusPart::ListHeader => self.list_header = on,
+            FocusPart::HideAccounts => self.hide_accounts = on,
+            FocusPart::FoldUnified => self.fold_unified = on,
+            FocusPart::HideAvatars => self.hide_avatars = on,
+            FocusPart::OnePreviewLine => self.one_preview_line = on,
+            FocusPart::ReaderView => self.reader_view = on,
+        }
+    }
+
+    /// Whether `part` is in force: Focus Mode is on and the part is ticked.
+    pub fn active(&self, part: FocusPart) -> bool {
+        self.enabled && self.get(part)
+    }
+}
+
+fn focus_path() -> Option<PathBuf> {
+    Some(config_base()?.join("hylki").join("focus.toml"))
+}
+
+/// The saved Focus Mode settings, or the defaults (off) when there are none.
+pub fn load_focus_mode() -> FocusMode {
+    let Some(text) = focus_path().and_then(|p| std::fs::read_to_string(p).ok()) else {
+        return FocusMode::default();
+    };
+    toml::from_str::<FocusMode>(&text).unwrap_or_default()
+}
+
+pub fn save_focus_mode(focus: &FocusMode) {
+    let Some(path) = focus_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(toml) = toml::to_string_pretty(focus) {
+        let _ = std::fs::write(&path, toml);
+    }
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+
+    #[test]
+    fn focus_defaults_off_with_every_part_ticked() {
+        let f = FocusMode::default();
+        assert!(!f.enabled);
+        assert!(f.reader_toolbar && f.list_header && f.hide_accounts && f.fold_unified);
+        assert!(f.hide_avatars && f.one_preview_line && f.reader_view);
+        // Off, no part is in force whatever its switch says.
+        assert!(!f.active(FocusPart::ReaderView));
+    }
+
+    #[test]
+    fn focus_round_trips_and_fills_missing_parts() {
+        let mut f = FocusMode::default();
+        f.set(FocusPart::Enabled, true);
+        f.set(FocusPart::HideAvatars, false);
+        let text = toml::to_string(&f).unwrap();
+        let back: FocusMode = toml::from_str(&text).unwrap();
+        assert_eq!(back, f);
+        assert!(back.active(FocusPart::ReaderToolbar));
+        assert!(!back.active(FocusPart::HideAvatars));
+        // A file from before a part existed reads it as ticked.
+        let partial: FocusMode = toml::from_str("enabled = true").unwrap();
+        assert!(partial.enabled && partial.fold_unified);
+    }
+}
