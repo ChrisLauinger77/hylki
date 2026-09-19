@@ -4334,6 +4334,15 @@ impl SimpleComponent for AppModel {
             .emit(NotifyInput::SetConsoleEnabled(model.console_mode));
         // Screenshot/dev hook: open the status bar console shortly after
         // launch (pref permitting) so captures can show it.
+        // HYLKI_SHOWCASE_ABOUT=1 opens the About window a beat after
+        // launch; pair it with HYLKI_SHOWCASE_TOP=1 to capture that window
+        // instead of the main one.
+        if std::env::var("HYLKI_SHOWCASE_ABOUT").is_ok() {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(3, move || {
+                s.input(AppMsg::OpenAbout);
+            });
+        }
         if std::env::var("HYLKI_SHOWCASE_CONSOLE").is_ok() {
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(3, move || {
