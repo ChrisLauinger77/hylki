@@ -4376,6 +4376,9 @@ msgstr "A visszapattanó levelek ide mennének: {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "A feladó neve „{claimed}”, de a cím: {from}"
 
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
 msgid "runtime error: {e}"
 msgstr "futásidejű hiba: {e}"
 

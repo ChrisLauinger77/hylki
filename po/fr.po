@@ -4507,6 +4507,9 @@ msgstr "Les rejets iront à {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "Le nom de l'expéditeur indique « {claimed} » mais l'adresse est {from}"
 
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
 msgid "runtime error: {e}"
 msgstr "erreur d'exécution : {e}"
 

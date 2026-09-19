@@ -4450,6 +4450,9 @@ msgstr "Уведомления о недоставке будут отправл
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "В имени отправителя указано «{claimed}», но адрес — {from}"
 
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
 msgid "runtime error: {e}"
 msgstr "ошибка выполнения: {e}"
 

@@ -4467,6 +4467,9 @@ msgstr "As mensagens devolvidas seriam enviadas para {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "O nome do remetente indica «{claimed}», mas o endereço é {from}"
 
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
 msgid "runtime error: {e}"
 msgstr "erro de execução: {e}"
 

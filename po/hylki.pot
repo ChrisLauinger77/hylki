@@ -3974,6 +3974,9 @@ msgstr ""
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr ""
 
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
 msgid "runtime error: {e}"
 msgstr ""
 
