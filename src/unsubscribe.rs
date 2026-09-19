@@ -104,8 +104,11 @@ pub fn from_headers(
     })
 }
 
-/// The `<…>` handles of a `List-Unsubscribe` value, in order. Comments
-/// (`(…)`) and anything outside the brackets are skipped, as RFC 2369 asks.
+/// The handles of a `List-Unsubscribe` value, in order. RFC 2369 wants each
+/// in `<…>`, with comments (`(…)`) and anything else outside the brackets
+/// skipped — but plenty of real mail (ArtStation through Amazon SES, for
+/// one) writes the bare URL with no brackets at all, so a value without any
+/// is read as bare handles separated by commas or whitespace.
 fn angle_handles(value: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut rest = value;
@@ -117,6 +120,18 @@ fn angle_handles(value: &str) -> Vec<String> {
             out.push(handle.to_string());
         }
         rest = &after[end + 1..];
+    }
+    if out.is_empty() && !value.contains('<') {
+        out.extend(
+            value
+                .split(|c: char| c == ',' || c.is_whitespace())
+                .map(str::trim)
+                .filter(|t| {
+                    let l = t.to_ascii_lowercase();
+                    l.starts_with("mailto:") || l.starts_with("http://") || l.starts_with("https://")
+                })
+                .map(str::to_string),
+        );
     }
     out
 }
@@ -274,6 +289,24 @@ mod tests {
     }
 
     #[test]
+    fn bare_handles_without_brackets_are_taken_too() {
+        // ArtStation, through Amazon SES: the URL alone, no brackets.
+        let hdr = s(&["https://www.artstation.com/unsubscribe/notifications/21d2?kind%5B%5D=project_publish"]);
+        let u = from_headers(&hdr, None, None).unwrap();
+        assert_eq!(
+            u.web.as_deref(),
+            Some("https://www.artstation.com/unsubscribe/notifications/21d2?kind%5B%5D=project_publish")
+        );
+        assert!(!u.direct(), "a page only: the button opens the browser");
+        let u = from_headers(&s(&["mailto:leave@x.example, https://x.example/u"]), None, None).unwrap();
+        assert_eq!(u.mailto.as_deref(), Some("mailto:leave@x.example"));
+        assert_eq!(u.web.as_deref(), Some("https://x.example/u"));
+        // A bracketed value keeps the strict reading: text outside is not a handle.
+        let u = from_headers(&s(&["https://ignored.example <mailto:a@b.c>"]), None, None).unwrap();
+        assert_eq!(u.web, None);
+    }
+
+    #[test]
     fn a_message_with_no_handles_offers_nothing() {
         assert_eq!(from_headers(&[], None, None), None);
         assert_eq!(from_headers(&s(&["nothing in brackets"]), None, None), None);
@@ -302,6 +335,18 @@ mod tests {
         assert!(u.one_click.is_some() && u.mailto.is_some() && u.direct());
         assert_eq!(u.list_id, "digest.this-week-in-rust.org");
         assert_eq!(check.trust, crate::models::SenderTrust::Pass);
+    }
+
+    /// Probe a saved message (or header block): `HYLKI_UNSUB_PROBE=<file>
+    /// cargo test --bin hylki unsubscribe::tests::probe_file -- --ignored
+    /// --nocapture` prints what the check reads out of it.
+    #[test]
+    #[ignore]
+    fn probe_file() {
+        let Ok(path) = std::env::var("HYLKI_UNSUB_PROBE") else { return };
+        let raw = std::fs::read(&path).expect("readable file");
+        let check = crate::verify::check_sender(&raw);
+        eprintln!("{path}: trust {:?}, unsubscribe {:#?}", check.trust, check.unsubscribe);
     }
 
     #[test]

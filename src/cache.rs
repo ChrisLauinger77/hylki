@@ -163,19 +163,19 @@ CREATE INDEX IF NOT EXISTS attachment_meta_by_folder
 /// holding nothing when several held files. Messages marked as scanned with
 /// nothing to show are re-queued once, to be asked about again by the scan that
 /// now isolates the one message at fault.
-/// v16: the sender check now carries the message's unsubscribe handles
+/// v17: the sender check now carries the message's unsubscribe handles
 /// (List-Unsubscribe, RFC 8058), read from the raw headers at the fetch. A
 /// check stored by an earlier build knows nothing of them, and a cached
 /// body is served without ever re-fetching — so the derived tables are
 /// dropped once and every message read again gains its Unsubscribe banner.
-const SCHEMA_VERSION: i64 = 16;
+const SCHEMA_VERSION: i64 = 17;
 
 /// The newest version whose change altered how bodies are *rendered* or how
 /// senders are checked. Opening a database older than this drops `bodies` and
 /// `sender_checks` so they rebuild; a later purely-additive bump must not,
 /// or every such release would cost users a full re-fetch of everything they
 /// had read. Raise this only when the rendering itself changes.
-const RENDER_VERSION: i64 = 16;
+const RENDER_VERSION: i64 = 17;
 
 /// A message's keywords as one column: the server's, then any tag kept
 /// locally for the same Message-ID (POP3, or an IMAP server that refuses
