@@ -862,46 +862,34 @@ impl Component for MessageView {
                     set_spacing: 12,
 
                     gtk::Box {
-                        set_halign: gtk::Align::Start,
-                        #[watch]
-                        set_visible: model.account_name.is_some(),
-                        gtk::Label {
-                            #[watch]
-                            set_label: model.account_name.as_deref().unwrap_or_default(),
-                            add_css_class: "account-chip",
-                            add_css_class: "vireo-account-chip",
-                        },
-                    },
-
-                    gtk::Box {
                         set_orientation: gtk::Orientation::Horizontal,
                         set_spacing: 12,
+                        #[watch]
+                        set_visible: model.account_name.is_some() || model.current.is_some(),
 
-                        gtk::Label {
-                            #[watch]
-                            set_label: model.current.as_ref().map(|m| m.subject.as_str()).unwrap_or_default(),
+                        gtk::Box {
                             set_halign: gtk::Align::Start,
                             set_hexpand: true,
-                            set_wrap: true,
-                            // Break mid-word for unbreakable tokens (e.g. an
-                            // undecodable subject or a long URL) so an extreme
-                            // subject can never force the pane — and with it the
-                            // window controls — wider than the screen.
-                            set_wrap_mode: gtk::pango::WrapMode::WordChar,
-                            set_xalign: 0.0,
-                            set_selectable: true,
-                            add_css_class: "reader-subject",
+                            set_valign: gtk::Align::Center,
+                            #[watch]
+                            set_visible: model.account_name.is_some(),
+                            gtk::Label {
+                                #[watch]
+                                set_label: model.account_name.as_deref().unwrap_or_default(),
+                                add_css_class: "account-chip",
+                                add_css_class: "vireo-account-chip",
+                            },
                         },
 
-                        // Reader View: the message(s) as content alone. At
-                        // the subject's right, level with its first line —
-                        // part of the message header, not the action row.
+                        // Reader View: the message(s) as content alone. On the
+                        // account chip's line, at its right end — part of the
+                        // message header, not the action row.
                         gtk::ToggleButton {
                             set_icon_name: "co.hyprlab.Hylki-open-book-symbolic",
                             set_tooltip_text: Some(i18n("Reader View: show only the text of every message, in one plain format").as_str()),
                             add_css_class: "flat",
                             add_css_class: "reader-toggle",
-                            set_valign: gtk::Align::Start,
+                            set_valign: gtk::Align::Center,
                             set_halign: gtk::Align::End,
                             #[watch]
                             set_visible: model.current.is_some(),
@@ -915,6 +903,21 @@ impl Component for MessageView {
                                 let _ = sender.output(MessageViewOutput::ReaderMode(b.is_active()));
                             },
                         },
+                    },
+
+                    gtk::Label {
+                        #[watch]
+                        set_label: model.current.as_ref().map(|m| m.subject.as_str()).unwrap_or_default(),
+                        set_halign: gtk::Align::Start,
+                        set_wrap: true,
+                        // Break mid-word for unbreakable tokens (e.g. an
+                        // undecodable subject or a long URL) so an extreme
+                        // subject can never force the pane — and with it the
+                        // window controls — wider than the screen.
+                        set_wrap_mode: gtk::pango::WrapMode::WordChar,
+                        set_xalign: 0.0,
+                        set_selectable: true,
+                        add_css_class: "reader-subject",
                     },
 
                     // Tag chips (#71) for a lone full-bleed message, whose
