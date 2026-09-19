@@ -555,12 +555,6 @@ msgstr ""
 msgid "Release Notes"
 msgstr "Notas de lançamento"
 
-msgid "Changelog"
-msgstr "Registro de alterações"
-
-msgid "Full version history"
-msgstr "Histórico completo de versões"
-
 msgid "Keyring Setup Help"
 msgstr "Ajuda para configurar o chaveiro"
 
@@ -576,9 +570,6 @@ msgstr "Website"
 
 msgid "Report an issue or feature request"
 msgstr "Relatar um problema ou sugerir um recurso"
-
-msgid "Contact — hyprlab@proton.me"
-msgstr "Contato — hyprlab@proton.me"
 
 msgid "Source Code"
 msgstr "Código fonte"
@@ -675,6 +666,10 @@ msgstr[1] ""
 
 msgid "Filters Applied"
 msgstr "Filtros aplicados"
+
+#, fuzzy
+msgid "Full Release Notes on GitHub"
+msgstr "Notas de lançamento"
 
 msgid "Move around"
 msgstr "Navegação"
@@ -1896,10 +1891,9 @@ msgid ""
 "is nothing to set up again, and nothing in {old} was changed or removed. "
 "Once everything is here, you can remove {old}."
 msgstr ""
-"Suas contas, configurações e mensagens em cache foram transferidas do "
-"{old}. Não é necessário configurar nada novamente, e nada no {old} foi "
-"alterado ou removido. Quando tudo estiver aqui, você poderá remover o "
-"{old}."
+"Suas contas, configurações e mensagens em cache foram transferidas do {old}. "
+"Não é necessário configurar nada novamente, e nada no {old} foi alterado ou "
+"removido. Quando tudo estiver aqui, você poderá remover o {old}."
 
 msgid ""
 "{old} is still the app your desktop opens email links with. To hand that to "
@@ -3534,10 +3528,10 @@ msgid ""
 "order puts it above the messages with newest first, and below them "
 "otherwise, so it continues the conversation where it ends."
 msgstr ""
-"Define onde uma resposta ou um encaminhamento é aberto no painel de "
-"leitura. Seguir a ordem de leitura o posiciona acima das mensagens "
-"quando as mais recentes vêm primeiro, e abaixo delas nos demais casos, "
-"para que a conversa continue de onde termina."
+"Define onde uma resposta ou um encaminhamento é aberto no painel de leitura. "
+"Seguir a ordem de leitura o posiciona acima das mensagens quando as mais "
+"recentes vêm primeiro, e abaixo delas nos demais casos, para que a conversa "
+"continue de onde termina."
 
 msgid "Attachments on each message"
 msgstr "Anexos em cada mensagem"
@@ -3546,8 +3540,8 @@ msgid ""
 "List a message's attachments beneath it in a conversation, so which file "
 "came with which message is clear. Click one to open it."
 msgstr ""
-"Lista os anexos de uma mensagem abaixo dela em uma conversa, deixando "
-"claro qual arquivo veio com cada mensagem. Clique em um para abri-lo."
+"Lista os anexos de uma mensagem abaixo dela em uma conversa, deixando claro "
+"qual arquivo veio com cada mensagem. Clique em um para abri-lo."
 
 msgid "Attachment drawer"
 msgstr "Painel de anexos"
@@ -3556,8 +3550,7 @@ msgid ""
 "Gather every attachment in the open conversation in a drawer beneath the "
 "messages."
 msgstr ""
-"Reúne todos os anexos da conversa aberta em um painel abaixo das "
-"mensagens."
+"Reúne todos os anexos da conversa aberta em um painel abaixo das mensagens."
 
 msgid "Confirm conversation deletion"
 msgstr "Confirmar a exclusão de conversas"
@@ -4682,3 +4675,12 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Changelog"
+#~ msgstr "Registro de alterações"
+
+#~ msgid "Full version history"
+#~ msgstr "Histórico completo de versões"
+
+#~ msgid "Contact — hyprlab@proton.me"
+#~ msgstr "Contato — hyprlab@proton.me"

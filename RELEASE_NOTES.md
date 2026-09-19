@@ -2,6 +2,14 @@
 
 Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.35.1
+
+**The welcome wizard follows your theme.** The yellow ground is gone: the wizard, the About window and the carry-over notice use the theme's light or dark colours, with the wordmark switching to its light-lettered version in dark mode.
+
+**The final icon set.** Every app icon comes from the latest artwork, and the gallery gains two entries at the end: the default drawn at full size, and the classic yellow icon.
+
+**About shows this release's notes**, with a button to the full history on GitHub.
+
 ## What's new in 1.35.0
 
 **Vireo is now Hylki.** Same app, new name and icon. Hylki installs alongside Vireo, and its first start carries your accounts, settings and cached mail across: nothing in Vireo is changed or removed, and there is nothing to set up again. A notice says what came over and how to remove Vireo once you are happy everything is here. If Vireo was your default email app, choose Hylki under Default Apps in Settings.
