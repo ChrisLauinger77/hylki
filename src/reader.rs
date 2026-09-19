@@ -22,8 +22,12 @@ use markup5ever_rcdom::{Handle, NodeData, RcDom};
 /// cached (HTML, or the plain-text wrapper the worker builds).
 pub fn render(body: &str, dark: bool, accent: &str) -> String {
     format!(
+        // The content sits directly in the body, no wrapper: the wrapper
+        // script's quote fold looks for a quote's topmost ancestor *under
+        // the body*, and for content before it; a single wrapper would be
+        // that ancestor, with nothing before it, and no quote would fold.
         "<!doctype html><html><head><meta charset=\"utf-8\"><style>{css}</style></head>\
-         <body><div class=\"hylki-reader\">{content}</div></body></html>",
+         <body>{content}</body></html>",
         css = stylesheet(dark, accent),
         content = extract(body),
     )
@@ -58,16 +62,16 @@ fn stylesheet(dark: bool, accent: &str) -> String {
     const SOFT: &str = "rgba(128,128,128,0.12)";
     format!(
         ":root{{color-scheme:{scheme};}}\
-         html,body{{margin:0;padding:0;background:transparent;}}\
+         html{{margin:0;padding:0;background:transparent;}}\
          body{{color:{fg};font:15px/1.6 system-ui,\"Adwaita Sans\",Cantarell,sans-serif;\
-           overflow-wrap:anywhere;-webkit-font-smoothing:antialiased;}}\
-         .hylki-reader{{max-width:44em;margin:0 auto;padding:22px 26px 26px;box-sizing:border-box;}}\
+           overflow-wrap:anywhere;-webkit-font-smoothing:antialiased;background:transparent;\
+           max-width:44em;margin:0 auto;padding:22px 26px 26px;box-sizing:border-box;}}\
          p,ul,ol,dl,blockquote,pre,table,figure,.vireo-plain{{margin:0 0 1em;}}\
-         .hylki-reader>:last-child{{margin-bottom:0;}}\
+         body>:last-child{{margin-bottom:0;}}\
          h1,h2,h3,h4,h5,h6{{margin:1.4em 0 0.5em;line-height:1.25;font-weight:700;}}\
          h1{{font-size:1.5em;}}h2{{font-size:1.3em;}}h3{{font-size:1.15em;}}\
          h4,h5,h6{{font-size:1em;}}\
-         .hylki-reader>:first-child{{margin-top:0;}}\
+         body>:first-child{{margin-top:0;}}\
          a{{color:{accent};text-decoration:none;}}a:hover{{text-decoration:underline;}}\
          img{{display:block;max-width:100%;height:auto;margin:1em auto;border-radius:8px;}}\
          a img{{margin:0.5em 0;}}\
@@ -481,15 +485,18 @@ fn is_hidden(attrs: &[html5ever::Attribute]) -> bool {
         || get("visibility").is_some_and(|v| v == "hidden")
         || get("mso-hide").is_some_and(|v| v == "all")
         || get("opacity").is_some_and(|v| v.parse::<f64>().is_ok_and(|n| n == 0.0))
-        || get("max-height").is_some_and(is_zero_length)
-        || get("font-size").is_some_and(is_zero_length)
     {
         return true;
     }
-    // A zero-height (or zero-width) box that clips its content is a
-    // preheader by another name.
+    // A zero-size box that clips its content is a preheader by another
+    // name. Only with the clipping: a zero font size on its own is how
+    // MJML and its like build every column and cell (their children set
+    // their own), so it says nothing about what is shown.
     let clipped = get("overflow").is_some_and(|v| v == "hidden");
-    clipped && (get("height").is_some_and(is_zero_length) || get("width").is_some_and(is_zero_length))
+    clipped
+        && (get("max-height").is_some_and(is_zero_length)
+            || get("height").is_some_and(is_zero_length)
+            || get("width").is_some_and(is_zero_length))
 }
 
 /// A picture worth showing: a real source, and bigger than a tracking pixel.
@@ -667,6 +674,13 @@ fn tidy(kids: Vec<Out>, root: bool) -> Vec<Out> {
                 if matches!(e.tag, "div" | "blockquote" | "li" | "td" | "th" | "dd" | "figure") {
                     e.kids = paragraphs(std::mem::take(&mut e.kids), e.tag != "div");
                 }
+                // A heading (or paragraph) holds a line, not boxes: blocks a
+                // sender nested in one are opened up, a line break between.
+                if matches!(e.tag, "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p")
+                    && e.kids.iter().any(Out::is_block)
+                {
+                    e.kids = trim_run(flatten_blocks(std::mem::take(&mut e.kids)));
+                }
                 let node = Out::Elem(e);
                 if !node.has_content() {
                     continue;
@@ -694,6 +708,27 @@ fn tidy(kids: Vec<Out>, root: bool) -> Vec<Out> {
     } else {
         out
     }
+}
+
+/// Every block among `kids` replaced by its content, with a line break
+/// where one block met the next.
+fn flatten_blocks(kids: Vec<Out>) -> Vec<Out> {
+    let mut out = Vec::new();
+    for k in kids {
+        match k {
+            Out::Elem(e) if e.is_block() => {
+                if e.tag == "hr" {
+                    continue;
+                }
+                if out.iter().any(Out::has_content) {
+                    out.push(Out::Elem(Elem::new("br")));
+                }
+                out.extend(flatten_blocks(e.kids));
+            }
+            k => out.push(k),
+        }
+    }
+    out
 }
 
 /// `kids` wrapped in a copy of `shell` (an inline element) — block by block
@@ -832,10 +867,26 @@ mod tests {
     fn hidden_preview_text_is_dropped() {
         let html = "<div style=\"display:none;max-height:0;overflow:hidden\">Preview text you \
                     should not see</div><div style=\"mso-hide:all\">Outlook only</div>\
-                    <div style=\"opacity:0\">ghost</div><div style=\"font-size:0px;line-height:0\">pad</div>\
+                    <div style=\"opacity:0\">ghost</div><div style=\"height:0;overflow:hidden\">pad</div>\
                     <div hidden>h</div><p>The real message.</p>";
         let out = extract(html);
         assert_eq!(out, "<p>The real message.</p>");
+    }
+
+    #[test]
+    fn a_zero_font_size_column_is_not_hidden() {
+        // MJML sets font-size:0px on every column and cell; the text inside
+        // sets its own size and is very much meant to be read.
+        let html = "<div style=\"font-size:0px;text-align:left;display:inline-block;width:100%\">\
+                    <table><tr><td style=\"font-size:0px;padding:10px 25px\"><div style=\"font-size:16px\">Convention reminder</div></td></tr></table></div>\
+                    <div style=\"max-height:0px\">not clipped, shown</div>";
+        assert_eq!(extract(html), "<p>Convention reminder</p><p>not clipped, shown</p>");
+    }
+
+    #[test]
+    fn a_heading_holds_a_line_not_boxes() {
+        let html = "<h2><p>Your package</p><p>was delivered!</p></h2><p><div>a</div><div>b</div></p>";
+        assert_eq!(extract(html), "<h2>Your package<br>was delivered!</h2><p>a</p><p>b</p>");
     }
 
     #[test]
@@ -945,9 +996,19 @@ mod tests {
         let doc = render("<p>x</p>", true, "#3584e4");
         assert!(doc.contains("color-scheme:dark"), "{doc}");
         assert!(doc.contains("#3584e4"), "{doc}");
-        assert!(doc.contains("<div class=\"hylki-reader\"><p>x</p></div>"), "{doc}");
+        assert!(doc.contains("<body><p>x</p></body>"), "{doc}");
         let light = render("<p>x</p>", false, "#3584e4");
         assert!(light.contains("color-scheme:light"), "{light}");
+    }
+
+    /// `HYLKI_READER_PROBE=<file> cargo test --bin hylki reader::tests::probe_file -- --ignored --nocapture`
+    /// prints what the reader makes of a cached body dumped to a file.
+    #[test]
+    #[ignore]
+    fn probe_file() {
+        let Ok(path) = std::env::var("HYLKI_READER_PROBE") else { return };
+        let body = std::fs::read_to_string(path).unwrap();
+        println!("{}", extract(&body));
     }
 
     #[test]
