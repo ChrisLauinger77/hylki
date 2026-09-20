@@ -113,7 +113,9 @@ development tool:
 - **Code** — the large majority of the Rust code in this repository was written
   with Anthropic's Claude (via Claude Code), working from the maintainer's
   direction. The maintainer decides what gets built, reviews the results, tests
-  every release, and signs off on everything that ships.
+  every release, and signs off on everything that ships. Commits are the
+  maintainer's own: this notice is where the tool is declared, rather than a
+  trailer on every commit.
 - **Text** — documentation, release notes, and website copy are largely
   AI-drafted and human-edited.
 - **Artwork** — the app icon and other visual assets are human-made, without

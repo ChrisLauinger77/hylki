@@ -37,6 +37,25 @@ fast, it has no dependencies, and a release should not go out while it fails
 - Say what the app does, not what it enables you to do.
 - Comments in the code explain *why*, not *what*.
 
+## Commits
+
+The history is the maintainer's. Commits are authored by Hyprlab
+<hyprlab@proton.me> and carry no tool attribution: no `Co-Authored-By:` line
+for Claude or any other assistant, no "Generated with" footer in a commit
+message or a pull request body (#230). The [AI notice](README.md#ai-notice)
+declares how the app is built, once, for the whole repository. A
+`Co-Authored-By:` trailer is still how an outside contributor is credited, with
+the GitHub noreply address that resolves to their profile.
+
+Write what a person would write: an imperative subject of about 72 characters
+or fewer, then a body wrapped at 76 saying why the change exists. The prose
+rules below apply to a commit message too, and one more on top of them: no em
+dashes, which a colon, a comma or a full stop replaces. Factual, no marketing,
+no emoji, no restating the diff.
+
+`tools/git-hooks/commit-msg` refuses the attribution lines. A clone is pointed
+at it with `git config core.hooksPath tools/git-hooks`.
+
 ## Code
 
 - User-facing strings go through the `i18n()` helpers in `src/i18n.rs`, and

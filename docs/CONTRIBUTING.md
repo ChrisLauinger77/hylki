@@ -38,6 +38,19 @@ Everyone whose work is in the app is named in
 - Contributions are credited by name and handle, so say if you would rather be
   credited differently, or not at all.
 
+## Commits
+
+Commit messages are plain: an imperative subject, then why the change exists,
+in factual language with no marketing, no emoji and no em dashes.
+Trailers are for people — a `Co-Authored-By:` line credits somebody whose work
+is in the commit, using the `users.noreply.github.com` address that resolves to
+their profile — and not for the tools anyone wrote it with. The README's
+[AI notice](../README.md#ai-notice) covers that for the repository as a whole,
+so the history reads as the maintainer's own
+([#230](https://github.com/hyprlab/hylki/issues/230)).
+`tools/git-hooks/commit-msg` checks it; point a clone at the hooks with
+`git config core.hooksPath tools/git-hooks`.
+
 ## Documentation
 
 Documentation lives in `docs/`, one subject per file, and the
