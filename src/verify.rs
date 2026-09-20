@@ -71,6 +71,9 @@ struct Evidence {
     /// How to leave the list this came from (RFC 2369/8058), read in the
     /// same pass over the headers so it rides with the verdict.
     unsubscribe: Option<crate::models::Unsubscribe>,
+    /// The meeting it invites the reader to (#223), read in the same pass
+    /// over the same parse, for the same reason.
+    invite: Option<Box<crate::models::Invite>>,
 }
 
 impl Evidence {
@@ -106,6 +109,7 @@ fn gather(raw: &[u8]) -> Evidence {
         return ev;
     };
     ev.unsubscribe = crate::unsubscribe::detect(&parsed);
+    ev.invite = crate::invite::detect(&parsed).map(Box::new);
 
 
     let first_addr = |a: Option<&mail_parser::Address>| -> Option<String> {
@@ -351,6 +355,7 @@ fn judge(ev: &Evidence) -> SenderCheck {
         findings,
         pgp: None,
         unsubscribe: ev.unsubscribe.clone(),
+        invite: ev.invite.clone(),
     }
 }
 

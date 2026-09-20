@@ -16,6 +16,7 @@ mod datefmt;
 mod desktop;
 mod goa;
 mod i18n;
+mod invite;
 mod legacy;
 mod logo;
 mod memory_report;
