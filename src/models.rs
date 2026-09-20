@@ -394,6 +394,10 @@ pub struct Unsubscribe {
     /// message arrived in.
     #[serde(default)]
     pub mailto: Option<String>,
+    /// A "reply with UNSUBSCRIBE" instruction read out of the body: where
+    /// to answer and the word to put in the subject.
+    #[serde(default)]
+    pub reply: Option<ReplyRoute>,
     /// A web page to visit — the browser, only when nothing better is on
     /// offer or the better routes failed.
     #[serde(default)]
@@ -402,12 +406,27 @@ pub struct Unsubscribe {
     /// brackets); empty when the message named none.
     #[serde(default)]
     pub list_id: String,
+    /// Whether the message's own headers said any of this. False means it
+    /// was read out of the body, which is a guess — a good one, but the
+    /// banner says "looks like" rather than stating it.
+    #[serde(default)]
+    pub in_headers: bool,
+}
+
+/// "Reply to this email with UNSUBSCRIBE in the subject": the oldest
+/// mechanism of all, and still in use by hand-run lists.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReplyRoute {
+    /// The address to answer (Reply-To, else From).
+    pub to: String,
+    /// The word the list asked for, as the subject (UNSUBSCRIBE, STOP, …).
+    pub subject: String,
 }
 
 impl Unsubscribe {
     /// Whether the button can unsubscribe without a browser.
     pub fn direct(&self) -> bool {
-        self.one_click.is_some() || self.mailto.is_some()
+        self.one_click.is_some() || self.mailto.is_some() || self.reply.is_some()
     }
 
     /// What a list is remembered by once left: its List-Id, or failing

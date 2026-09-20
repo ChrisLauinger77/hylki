@@ -8412,7 +8412,7 @@ fn demo_attachment_files() -> Vec<crate::models::Attachment> {
 /// real check, run over those headers, so the card's seal and the
 /// Unsubscribe banner appear as they would for fetched mail.
 fn mock_sender_check(message_id: u32, emit: &impl Fn(WorkerEvent)) {
-    if let Some(raw) = crate::backend::demo_headers(message_id) {
+    if let Some(raw) = crate::backend::demo_raw(message_id) {
         let check = crate::verify::check_sender(raw.as_bytes());
         emit(WorkerEvent::SenderChecked { message_id, check });
     }

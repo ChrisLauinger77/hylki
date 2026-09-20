@@ -16978,6 +16978,22 @@ impl AppModel {
         (None, cfg.email.clone())
     }
 
+    /// Where an unsubscribe mail goes: the list's `mailto:` handle when it
+    /// gave one, else the "reply with UNSUBSCRIBE" it asked for. `None`
+    /// when the message offers neither.
+    fn unsubscribe_mail_target(
+        info: &crate::models::Unsubscribe,
+    ) -> Option<crate::unsubscribe::MailtoTarget> {
+        if let Some(t) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) {
+            return Some(t);
+        }
+        info.reply.as_ref().map(|r| crate::unsubscribe::MailtoTarget {
+            to: r.to.clone(),
+            subject: r.subject.clone(),
+            body: r.subject.clone(),
+        })
+    }
+
     /// Ask before leaving a list: what will happen depends on the route the
     /// list offers, and a mail sent in the user's name is said so up front.
     fn confirm_unsubscribe(
@@ -16987,9 +17003,9 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         let heading = i18n_f("Unsubscribe from {name}?", &[("name", &sender_label(&message))]);
-        let body = if info.one_click.is_some() {
+        let mut body = if info.one_click.is_some() {
             i18n("Hylki will ask the list to stop sending you mail. A list can take a few days to act on the request.")
-        } else if let Some(t) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) {
+        } else if let Some(t) = Self::unsubscribe_mail_target(&info) {
             let (_, from) = self.unsubscribe_from(&message);
             i18n_f(
                 "An unsubscribe request will be sent to {addr} from {from}. A list can take a few days to act on it.",
@@ -16998,6 +17014,12 @@ impl AppModel {
         } else {
             i18n("This list offers no direct way to unsubscribe. Its unsubscribe page will open in your browser.")
         };
+        // Read out of the message's words rather than its headers: a good
+        // guess, but the user should know it is one before anything is sent.
+        if !info.in_headers {
+            body.push(' ');
+            body.push_str(&i18n("This message carries no unsubscribe header, so Hylki is going by the link in it."));
+        }
         let parent = relm4::main_application()
             .active_window()
             .unwrap_or_else(|| self.window.clone().upcast());
@@ -17060,7 +17082,7 @@ impl AppModel {
             let info = Box::new(info);
             std::thread::spawn(move || match crate::unsubscribe::one_click_post(&url) {
                 Ok(()) => s.input(AppMsg::UnsubscribeDone { message, result: Ok(true) }),
-                Err(why) if info.mailto.is_some() => {
+                Err(why) if info.mailto.is_some() || info.reply.is_some() => {
                     tracing::warn!("one-click unsubscribe failed ({why}); writing to the list instead");
                     s.input(AppMsg::UnsubscribeByMail { message, info });
                 }
@@ -17068,7 +17090,7 @@ impl AppModel {
             });
             return;
         }
-        if info.mailto.is_some() {
+        if info.mailto.is_some() || info.reply.is_some() {
             self.unsubscribe_by_mail(*message, &info, sender);
             return;
         }
@@ -17094,7 +17116,7 @@ impl AppModel {
         info: &crate::models::Unsubscribe,
         sender: &ComponentSender<Self>,
     ) {
-        let Some(target) = info.mailto.as_deref().and_then(crate::unsubscribe::parse_mailto) else {
+        let Some(target) = Self::unsubscribe_mail_target(info) else {
             sender.input(AppMsg::UnsubscribeDone {
                 message: Box::new(message),
                 result: Err(i18n("the list's mail address could not be read")),
@@ -17113,7 +17135,9 @@ impl AppModel {
             body: target.body,
             html: String::new(),
             attachments: Vec::new(),
-            in_reply_to: String::new(),
+            // A "reply with UNSUBSCRIBE" is a reply: the list matches it to
+            // the message it sent. A `mailto:` handle is a fresh message.
+            in_reply_to: if info.mailto.is_some() { String::new() } else { message.message_id.clone() },
             references: String::new(),
             draft_origin: None,
             outbox_origin: None,

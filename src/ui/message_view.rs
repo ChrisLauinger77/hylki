@@ -247,10 +247,15 @@ impl MessageView {
                         "You unsubscribed from this list on {date}.",
                         &[("date", &crate::datefmt::day_month_year(*at))],
                     ),
-                    None => i18n("This message is from a mailing list."),
+                    // A message that said so in its headers is from a list;
+                    // one whose footer link gave it away only has a link.
+                    None if info.in_headers => i18n("This message is from a mailing list."),
+                    None => i18n("This message has an unsubscribe link."),
                 };
-                let btn = if info.direct() {
-                    button(&i18n("Unsubscribe"), "")
+                let btn = if info.one_click.is_some() {
+                    button(&i18n("Unsubscribe"), &i18n("Asks the list to stop sending you mail"))
+                } else if info.direct() {
+                    button(&i18n("Unsubscribe"), &i18n("Sends an unsubscribe request by email"))
                 } else {
                     // Nothing but a web page on offer: the button says so.
                     button(&i18n("Unsubscribe…"), &i18n("Opens the list's unsubscribe page in your browser"))

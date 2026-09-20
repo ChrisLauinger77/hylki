@@ -107,6 +107,7 @@ fn gather(raw: &[u8]) -> Evidence {
     };
     ev.unsubscribe = crate::unsubscribe::detect(&parsed);
 
+
     let first_addr = |a: Option<&mail_parser::Address>| -> Option<String> {
         a.and_then(|a| a.first())
             .and_then(|x| x.address())

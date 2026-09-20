@@ -211,7 +211,18 @@ fn folder(id: u32, account_id: u32, name: &str, kind: FolderKind, unread: u32) -
 /// run through the real sender check when the body is served, so the
 /// newsletter's card wears a verdict and the Unsubscribe banner exactly as
 /// a fetched message would. Keyed by message id.
-const DEMO_HEADERS: &[(u32, &str)] = &[(
+const DEMO_HEADERS: &[(u32, &str)] = &[
+    // No List-Unsubscribe at all: the route is the link in the footer,
+    // which is how a great deal of real bulk mail is written.
+    (
+        7,
+        "From: GNOME Foundation <news@gnome.org>\r\n\
+         Authentication-Results: mx.hylki.local; dkim=pass header.d=gnome.org; \
+         spf=pass smtp.mailfrom=gnome.org; dmarc=pass header.from=gnome.org\r\n\
+         Subject: GNOME 49 release candidate is here\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\r\n",
+    ),
+    (
     10,
     "From: Rust Weekly <digest@this-week-in-rust.org>\r\n\
      Authentication-Results: mx.hylki.local; dkim=pass header.d=this-week-in-rust.org; \
@@ -221,11 +232,16 @@ const DEMO_HEADERS: &[(u32, &str)] = &[(
      <https://this-week-in-rust.org/unsubscribe/612/abc>\r\n\
      List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n\
      Subject: This Week in Rust #612\r\n\r\n",
-)];
+    ),
+];
 
-/// The demo header block of a message, when it has one (see [`DEMO_HEADERS`]).
-pub fn demo_headers(id: u32) -> Option<&'static str> {
-    DEMO_HEADERS.iter().find(|(i, _)| *i == id).map(|(_, h)| *h)
+/// A demo message as raw RFC 822: its header block (see [`DEMO_HEADERS`])
+/// followed by its body, so the real sender check and the real unsubscribe
+/// scan can be run over it exactly as they are over fetched mail.
+pub fn demo_raw(id: u32) -> Option<String> {
+    let headers = DEMO_HEADERS.iter().find(|(i, _)| *i == id).map(|(_, h)| *h)?;
+    let body = MockBackend::new().message(id).map(|m| m.body).unwrap_or_default();
+    Some(format!("{headers}{body}"))
 }
 
 /// Compact spec for a sample message; expanded into a [`Message`] by [`build`].
@@ -515,7 +531,7 @@ fn sample_messages() -> Vec<Message> {
         Spec { id: 7, account_id: 1, folder_id: 1, from_name: "GNOME Foundation", from_addr: "news@gnome.org", to: ME,
             subject: "GNOME 49 release candidate is here",
             preview: "The release candidate for GNOME 49 is now available for testing. This cycle brings major performance work…",
-            body: "Hi Jason,\n\nThe release candidate for GNOME 49 is now available for testing. This cycle brings major performance work across the shell and a refreshed libadwaita with new adaptive widgets.\n\nHighlights:\n  • Faster startup and lower memory use\n  • New AdwMultiLayoutView for responsive layouts\n  • Improved Wayland fractional scaling\n\nPlease help us test and file issues before the final release.\n\n— The GNOME Release Team",
+            body: "Hi Jason,\n\nThe release candidate for GNOME 49 is now available for testing. This cycle brings major performance work across the shell and a refreshed libadwaita with new adaptive widgets.\n\nHighlights:\n  • Faster startup and lower memory use\n  • New AdwMultiLayoutView for responsive layouts\n  • Improved Wayland fractional scaling\n\nPlease help us test and file issues before the final release.\n\n— The GNOME Release Team\n\n---\nYou are receiving this because you signed up for GNOME news.\nTo unsubscribe, visit https://mail.gnome.org/list/news/unsubscribe/j7Kq2",
             date: "9:42 AM", unread: true, starred: true, keywords: &["Personal"], has_attachment: false, in_reply_to: None },
         // ---- Account 1 · Inbox · the Q3 roadmap thread (ids 23 → 8, oldest = 23).
         // Sophie's original is the oldest (id 23, yesterday); the newest reply
