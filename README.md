@@ -5,7 +5,7 @@
 <h1 align="center">Hylki</h1>
 
 <p align="center">
-  A fast, <strong>GNOME-native</strong> email client — built with Rust and libadwaita, privacy-first.
+  A fast, <strong>GNOME-native</strong> email client — built with Rust and libadwaita. Open source and private by default. 
 </p>
 
 <p align="center">
