@@ -8,24 +8,32 @@ use relm4::actions::{AccelsPlus, RelmAction, RelmActionGroup};
 use relm4::prelude::*;
 use tokio::sync::mpsc::UnboundedSender;
 
-/// Contributors whose work is in the app, shown in the About window's "Thanks"
-/// list: display name and GitHub handle (which is also the link). What each
-/// person contributed is credited in the README and the changelog.
-const CONTRIBUTORS: &[(&str, &str)] = &[
-    ("Alfonso Lizárraga", "alfonsolzrg"),
-    ("Chris Pouliot", "chrispouliot"),
-    ("Isaac", "thecalamityjoe87"),
-    ("Alexander Lubovenko", "typedev"),
-    ("Anton Palgunov", "Toxblh"),
-    ("frenchy82", "frenchy82"),
-    ("Yiannis Ioannides", "yioannides"),
-    ("p-mitana", "p-mitana"),
-    ("Laszlo Lang", "7system7"),
-    ("Ilya Semenkovich", "iliasen"),
-    ("Paulo Fino", "somepaulo"),
-    ("taprobane99", "taprobane99"),
-    ("Peter Weiss", "peterweissdk"),
-];
+/// The contributors and translators shown in the About window's thanks lists.
+/// Both come from the repository's metafiles, read in at build time: one
+/// person per line, `Display Name <github-handle>`, with a translator's
+/// languages after a dash. What each person contributed is credited in
+/// `docs/CREDITS.md` and the changelog, not in the files.
+const CONTRIBUTORS: &str = include_str!("../data/CONTRIBUTORS");
+const TRANSLATORS: &str = include_str!("../data/TRANSLATORS");
+
+/// One of those files as (display name, GitHub handle, note) rows. Comments,
+/// blank lines and any line without a handle are skipped, so a typo in the
+/// file costs that one row rather than the list.
+fn credits(file: &'static str) -> Vec<(&'static str, &'static str, &'static str)> {
+    file.lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .filter_map(|line| {
+            let (name, rest) = line.split_once('<')?;
+            let (handle, note) = rest.split_once('>')?;
+            Some((
+                name.trim(),
+                handle.trim(),
+                note.trim().trim_start_matches('-').trim(),
+            ))
+        })
+        .collect()
+}
 
 // The message list's opening width now comes from config (the remembered pane
 // width, #28); its floor lives with the pane in message_list.rs
@@ -16312,22 +16320,39 @@ impl AppModel {
         thanks_title.set_margin_bottom(6);
         page.append(&thanks_title);
 
-        let thanks = gtk::ListBox::new();
-        thanks.add_css_class("boxed-list");
-        thanks.set_selection_mode(gtk::SelectionMode::None);
-        for (name, handle) in CONTRIBUTORS {
-            let row = adw::ActionRow::builder()
-                .title(*name)
-                .subtitle(format!("@{handle}"))
-                .activatable(true)
-                .build();
-            let url = format!("https://github.com/{handle}");
-            row.set_tooltip_text(Some(&url));
-            row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic"));
-            row.connect_activated(move |_| crate::oauth::open_uri(&url));
-            thanks.append(&row);
-        }
-        page.append(&thanks);
+        let people = |rows: Vec<(&'static str, &'static str, &'static str)>| {
+            let list = gtk::ListBox::new();
+            list.add_css_class("boxed-list");
+            list.set_selection_mode(gtk::SelectionMode::None);
+            for (name, handle, note) in rows {
+                let subtitle = if note.is_empty() {
+                    format!("@{handle}")
+                } else {
+                    format!("{note} · @{handle}")
+                };
+                let row = adw::ActionRow::builder()
+                    .title(name)
+                    .subtitle(subtitle)
+                    .activatable(true)
+                    .build();
+                let url = format!("https://github.com/{handle}");
+                row.set_tooltip_text(Some(&url));
+                row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic"));
+                row.connect_activated(move |_| crate::oauth::open_uri(&url));
+                list.append(&row);
+            }
+            list
+        };
+        page.append(&people(credits(CONTRIBUTORS)));
+
+        // Translators — the same list, with the languages each one carried.
+        let translators_title = gtk::Label::new(Some(i18n("Translated by").as_str()));
+        translators_title.add_css_class("heading");
+        translators_title.set_halign(gtk::Align::Start);
+        translators_title.set_margin_top(20);
+        translators_title.set_margin_bottom(6);
+        page.append(&translators_title);
+        page.append(&people(credits(TRANSLATORS)));
 
         // Footer.
         let footer = gtk::Label::new(Some(i18n("© 2026 Hyprlab").as_str()));
@@ -16359,6 +16384,20 @@ impl AppModel {
 
         win.set_content(Some(&nav));
         win.present();
+
+        // Screenshot hook: HYLKI_SHOWCASE_SCROLL runs the page down by that
+        // fraction once it has been laid out, so a capture can show the
+        // thanks lists at the bottom (the same variable does this for
+        // Settings).
+        if let Some(frac) = std::env::var("HYLKI_SHOWCASE_SCROLL")
+            .ok()
+            .map(|v| v.parse::<f64>().unwrap_or(1.0))
+        {
+            let vadj = scroller.vadjustment();
+            gtk::glib::timeout_add_seconds_local_once(2, move || {
+                vadj.set_value(vadj.lower() + (vadj.upper() - vadj.page_size()) * frac);
+            });
+        }
     }
 
     /// Star/unstar a message, updating the server, the list, and the reader.
@@ -20264,4 +20303,34 @@ mod tests {
     fn search_pool_is_empty_when_nothing_indexed() {
         assert!(build_search_pool(&HashMap::new()).is_empty());
     }
+
+    /// The credits metafiles are read at build time and shown in About, so a
+    /// line that stops parsing loses a real person from the list silently.
+    #[test]
+    fn credits_files_parse() {
+        for file in [CONTRIBUTORS, TRANSLATORS] {
+            let rows = credits(file);
+            let lines = file
+                .lines()
+                .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+                .count();
+            assert_eq!(rows.len(), lines, "every non-comment line must parse");
+            for (name, handle, _) in rows {
+                assert!(!name.is_empty() && !handle.is_empty(), "{name}/{handle}");
+                assert!(
+                    !handle.contains(char::is_whitespace),
+                    "{handle} is not a GitHub handle"
+                );
+            }
+        }
+    }
+
+    /// Translators carry their languages after the dash; contributors carry
+    /// nothing after the handle.
+    #[test]
+    fn credits_notes_are_translator_languages() {
+        assert!(credits(CONTRIBUTORS).iter().all(|(_, _, note)| note.is_empty()));
+        assert!(credits(TRANSLATORS).iter().all(|(_, _, note)| !note.is_empty()));
+    }
 }
+
