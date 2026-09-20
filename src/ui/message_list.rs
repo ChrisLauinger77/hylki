@@ -153,6 +153,9 @@ pub struct RowInit {
     pub sender_logos: bool,
     /// How many lines of the message's text the row shows (1–3).
     pub preview_lines: u32,
+    /// Whether the subject line is drawn at all (Focus Mode can take it
+    /// away, leaving the sender, the date and the row's marks).
+    pub show_subject: bool,
     pub ring_class: Option<String>,
     /// Shared actions palette collapse delay in seconds — how long it stays open
     /// after the cursor leaves it (read live when scheduling).
@@ -344,6 +347,7 @@ pub struct MessageRow {
     avatar_shown: bool,
     sender_logos: bool,
     preview_lines: u32,
+    show_subject: bool,
     avatar_texture: Option<gtk::gdk::Texture>,
     /// The initials circle drawn when no picture is known, kept per name
     /// so the view hands the avatar the same object on every refresh.
@@ -1271,6 +1275,10 @@ impl FactoryComponent for MessageRow {
 
                 gtk::Box {
                     set_spacing: 6,
+                    // Hidden outright by Focus Mode's subject part: the tag
+                    // chips ride on this line, and a row of chips under a
+                    // lone sender reads as a stray, so the line goes whole.
+                    set_visible: self.show_subject,
                     gtk::Label {
                         set_label: &self.msg.subject,
                         set_halign: gtk::Align::Start,
@@ -1522,6 +1530,7 @@ impl FactoryComponent for MessageRow {
             avatar_late,
             sender_logos,
             preview_lines,
+            show_subject,
             ring_class,
             palette_collapse_secs,
             palette_hover,
@@ -1558,6 +1567,7 @@ impl FactoryComponent for MessageRow {
             avatar_shown: !avatar_late,
             sender_logos,
             preview_lines,
+            show_subject,
             avatar_texture: None,
             initials_image: std::cell::RefCell::new(None),
             ring_class,
@@ -2458,6 +2468,8 @@ pub struct MessageList {
     gravatar: bool,
     /// Lines of preview text per row (1–3), from Preferences.
     preview_lines: u32,
+    /// Whether rows draw their subject line (Focus Mode can take it away).
+    show_subject: bool,
     /// Whether the coloured avatars are drawn (#29).
     avatars: bool,
     /// The next rebuild draws the avatars folded away and slides them in
@@ -2689,7 +2701,7 @@ pub enum MessageListInput {
     /// Mode leave them. `animate` (a Focus Mode toggle) slides the avatars
     /// away before the rows are rebuilt without them, or builds them folded
     /// and slides them in.
-    SetLook { avatars: bool, preview_lines: u32, animate: bool },
+    SetLook { avatars: bool, preview_lines: u32, subject: bool, animate: bool },
     /// The Focus Mode slide finished: rebuild the rows as they now are.
     LookSettled,
     /// Fill them with senders' own site icons, or stop (#30).
@@ -3161,6 +3173,7 @@ impl SimpleComponent for MessageList {
             rows_stale: false,
             sender_logos: false,
             preview_lines: 1,
+            show_subject: true,
             colorize: false,
             account_colors: std::collections::HashMap::new(),
             color_provider,
@@ -3448,13 +3461,17 @@ impl SimpleComponent for MessageList {
                     self.rebuild_rows_preserving_scroll();
                 }
             }
-            MessageListInput::SetLook { avatars, preview_lines, animate } => {
+            MessageListInput::SetLook { avatars, preview_lines, subject, animate } => {
                 let preview_lines = preview_lines.min(3);
                 let avatars_changed = self.avatars != avatars;
                 let lines_changed = self.preview_lines != preview_lines;
-                if !avatars_changed && !lines_changed {
+                let subject_changed = self.show_subject != subject;
+                if !avatars_changed && !lines_changed && !subject_changed {
                     return;
                 }
+                // The subject line is built with the row, so it can only come
+                // or go in a rebuild; the slide below ends in one anyway.
+                self.show_subject = subject;
                 if animate && avatars_changed && !avatars {
                     // Slide every circle away (and the preview to its new
                     // height in place); the rebuild that takes the slot
@@ -4804,6 +4821,7 @@ impl MessageList {
                         avatar_late: false,
                         sender_logos: self.sender_logos,
                         preview_lines: self.preview_lines,
+                        show_subject: self.show_subject,
                         ring_class,
                         palette_collapse_secs: self.palette_collapse_secs.clone(),
                         palette_hover: self.palette_hover.clone(),
@@ -5180,6 +5198,7 @@ impl MessageList {
                     avatar_late: self.reveal_avatars_late,
                     sender_logos: self.sender_logos,
                     preview_lines: self.preview_lines,
+                    show_subject: self.show_subject,
                     ring_class,
                     palette_collapse_secs: self.palette_collapse_secs.clone(),
                     palette_hover: self.palette_hover.clone(),

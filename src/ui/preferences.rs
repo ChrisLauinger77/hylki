@@ -1325,6 +1325,17 @@ impl Component for Preferences {
                                             sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::Enabled, row.is_active()));
                                         },
                                     },
+                                    #[name = "focus_start_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_active: model.focus.start_focused,
+                                        set_title: &i18n("Start in Focus Mode"),
+                                        set_subtitle: &i18n("Every launch opens in the mode. Off, the app opens as normal, \
+                                                       whichever way the last session was left."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::StartFocused, row.is_active()));
+                                        },
+                                    },
                                     #[name = "focus_toolbar_row"]
                                     adw::SwitchRow {
                                         #[watch]
@@ -1377,14 +1388,51 @@ impl Component for Preferences {
                                             sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::HideAvatars, row.is_active()));
                                         },
                                     },
+                                    #[name = "focus_hide_preview_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_active: model.focus.hide_preview,
+                                        set_title: &i18n("Hide the preview text"),
+                                        set_subtitle: &i18n("Rows show the sender, the subject and the date alone. The preview \
+                                                       is only hidden: it is back the moment Focus Mode ends."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::HidePreview, row.is_active()));
+                                        },
+                                    },
                                     #[name = "focus_preview_row"]
                                     adw::SwitchRow {
                                         #[watch]
                                         set_active: model.focus.one_preview_line,
+                                        // Nothing left to cap once the preview
+                                        // text is hidden altogether.
+                                        #[watch]
+                                        set_sensitive: !model.focus.hide_preview,
                                         set_title: &i18n("One line of preview text"),
                                         set_subtitle: &i18n("Rows show at most one line of a message's text."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::OnePreviewLine, row.is_active()));
+                                        },
+                                    },
+                                    #[name = "focus_subject_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_active: model.focus.hide_subject,
+                                        set_title: &i18n("Hide the subject"),
+                                        set_subtitle: &i18n("Rows show who wrote and when, and nothing else. Tag chips ride \
+                                                       on the subject line, so they go with it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::HideSubject, row.is_active()));
+                                        },
+                                    },
+                                    #[name = "focus_rail_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_active: model.focus.rail_sidebar,
+                                        set_title: &i18n("Fold the sidebar to the icon rail"),
+                                        set_subtitle: &i18n("The sidebar shows as icons, with a dot for unread mail in place \
+                                                       of the counts. Hovering it still slides the full sidebar out."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleFocus(crate::config::FocusPart::RailSidebar, row.is_active()));
                                         },
                                     },
                                     #[name = "focus_reader_row"]

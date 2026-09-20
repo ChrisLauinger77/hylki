@@ -2493,6 +2493,19 @@ impl SimpleComponent for AppModel {
         let remember_sidebar = config::load_remember_sidebar();
         let remember_rail = config::load_remember_rail();
         let icon_only = remember_rail && sidebar_state.icon_only;
+        // Read here, ahead of the sidebar itself: Focus Mode's rail part
+        // decides what the sidebar is built as. `icon_only` stays the user's
+        // own choice — the one that is saved and the one that comes back
+        // when Focus Mode ends.
+        let mut focus = config::load_focus_mode();
+        // "Start in Focus Mode" decides how the app opens, whatever the last
+        // session left on. Written back at once so the file, the menu's check
+        // item and the window all say the same thing from the first frame.
+        if focus.enabled != focus.start_focused {
+            focus.enabled = focus.start_focused;
+            config::save_focus_mode(&focus);
+        }
+        let rail_now = icon_only || focus.active(config::FocusPart::RailSidebar);
         if !remember_sidebar {
             sidebar_state = config::SidebarState { order: sidebar_state.order, ..Default::default() };
         }
@@ -2549,7 +2562,7 @@ impl SimpleComponent for AppModel {
         let show_contacts = config::load_show_contacts();
         let sidebar = Sidebar::builder()
             .launch(SidebarInit {
-                collapsed: icon_only,
+                collapsed: rail_now,
                 mirror: false,
                 unified_expanded,
                 filtered_expanded,
@@ -2786,7 +2799,6 @@ impl SimpleComponent for AppModel {
             });
         }
 
-        let focus = config::load_focus_mode();
         let focus_action = gtk::gio::SimpleAction::new_stateful(
             "focus-mode",
             None,
@@ -2953,7 +2965,7 @@ impl SimpleComponent for AppModel {
             sidebar_collapsed: icon_only,
             sidebar_anim: None,
             auto_rail: false,
-            rail_active: icon_only,
+            rail_active: rail_now,
             sidebar_peek: false,
             peek_transition: std::rc::Rc::new(std::cell::Cell::new(false)),
             peek_split: None,
@@ -3213,9 +3225,12 @@ impl SimpleComponent for AppModel {
             .message_list
             .emit(MessageListInput::SetSenderLogos(model.sender_logos));
         crate::datefmt::set_style(model.date_style, model.clock_style);
-        model
-            .message_list
-            .emit(MessageListInput::SetPreviewLines(model.list_preview_lines()));
+        model.message_list.emit(MessageListInput::SetLook {
+            avatars: model.list_avatars(),
+            preview_lines: model.list_preview_lines(),
+            subject: model.list_show_subject(),
+            animate: false,
+        });
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
             fold_unified: model.focus.active(config::FocusPart::FoldUnified),
@@ -3682,7 +3697,7 @@ impl SimpleComponent for AppModel {
                 .add_named(&model.peek_refresh_spinner, Some("spinner"));
             model.peek_refresh_stack.set_visible_child_name("icon");
         }
-        if model.sidebar_collapsed {
+        if model.rail_active {
             widgets.sidebar_split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
             widgets.sidebar_split.set_max_sidebar_width(SIDEBAR_RAIL_WIDTH);
             set_sidebar_header_compact(
@@ -4332,6 +4347,54 @@ impl SimpleComponent for AppModel {
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
                         let _ = sb.send(SidebarInput::ToggleCollapsed);
                     });
+                }
+                // HYLKI_SHOWCASE_PEEK=<seconds>[,<seconds>…] works the header's
+                // sidebar toggle at each of those moments (1 or anything
+                // unparseable means 8 s), with the window raised first so the
+                // slide really animates; HYLKI_SHOWCASE_BURST writes stills
+                // through the first one. In a narrow window (a window.toml
+                // under the 1094px breakpoint) that is the floating peek; at
+                // full width, or under Focus Mode's rail, it is the rail
+                // expanding and folding again.
+                if let Ok(spec) = std::env::var("HYLKI_SHOWCASE_PEEK") {
+                    let mut at: Vec<f64> =
+                        spec.split(',').filter_map(|p| p.trim().parse::<f64>().ok()).filter(|s| *s > 1.5).collect();
+                    if at.is_empty() {
+                        at.push(8.0);
+                    }
+                    let burst = std::env::var("HYLKI_SHOWCASE_BURST").ok();
+                    let win = root.clone();
+                    {
+                        let win = win.clone();
+                        let first = at[0];
+                        gtk::glib::timeout_add_local_once(
+                            std::time::Duration::from_millis(((first - 1.5) * 1000.0) as u64),
+                            move || win.present(),
+                        );
+                    }
+                    for (n, secs) in at.into_iter().enumerate() {
+                        let s = sender.clone();
+                        let win = win.clone();
+                        let burst = (n == 0).then(|| burst.clone()).flatten();
+                        gtk::glib::timeout_add_local_once(
+                            std::time::Duration::from_millis((secs * 1000.0) as u64),
+                            move || {
+                                s.input(AppMsg::ToggleSidebar);
+                                if let Some(base) = burst {
+                                    for (i, ms) in [60u64, 120, 200, 400].iter().enumerate() {
+                                        let win = win.clone();
+                                        let path = format!("{base}.{i}.png");
+                                        gtk::glib::timeout_add_local_once(
+                                            std::time::Duration::from_millis(*ms),
+                                            move || {
+                                                showcase_capture(win.upcast_ref::<gtk::Widget>(), &path);
+                                            },
+                                        );
+                                    }
+                                }
+                            },
+                        );
+                    }
                 }
                 // HYLKI_SHOWCASE_TOGGLE=starred|sent|drafts toggles that
                 // unified row's list at 5s (what a long-press does).
@@ -5076,11 +5139,18 @@ impl SimpleComponent for AppModel {
                     self.rail_active = true;
                     self.set_sidebar_peek(!collapsed, true);
                 } else {
-                    self.sidebar_collapsed = collapsed;
+                    // Focus Mode holding the rail borrows the sidebar's
+                    // layout: expanding it for a moment is a look, not a
+                    // choice, so only what is on screen moves.
+                    if !self.sidebar_layout_borrowed() {
+                        self.sidebar_collapsed = collapsed;
+                    }
                     self.rail_active = collapsed;
                     self.animate_sidebar(collapsed);
                     self.compact_sidebar_header(collapsed);
-                    self.save_sidebar_state();
+                    if !self.sidebar_layout_borrowed() {
+                        self.save_sidebar_state();
+                    }
                 }
             }
 
@@ -5096,7 +5166,7 @@ impl SimpleComponent for AppModel {
                 // The rail wins while the window is narrow; the user's own
                 // choice comes back the moment there is room again. Nothing is
                 // persisted here — this is the window's shape, not a preference.
-                let want = on || self.sidebar_collapsed;
+                let want = self.rail_wanted();
                 if want != self.rail_active {
                     self.rail_active = want;
                     self.sidebar.emit(SidebarInput::SetCollapsed(want));
@@ -5172,7 +5242,7 @@ impl SimpleComponent for AppModel {
                 // the narrow-window breakpoint or the user's own collapse.
                 // The same peek the expand button opens, dismissed the same
                 // ways (navigation, or a click outside the panel).
-                let rail_up = self.auto_rail || self.sidebar_collapsed;
+                let rail_up = self.rail_wanted();
                 if self.sidebar_hover_expand && rail_up && !self.sidebar_peek {
                     self.rail_active = false;
                     self.set_sidebar_peek(true, true);
@@ -11143,7 +11213,9 @@ impl AppModel {
     fn pin_sidebar_from_peek(&mut self) {
         tracing::info!("peek: pinned to side-by-side");
         self.sidebar_peek = false;
-        self.sidebar_collapsed = false;
+        if !self.sidebar_layout_borrowed() {
+            self.sidebar_collapsed = false;
+        }
         self.rail_active = false;
         if let Some(peek) = self.peek_split.clone() {
             self.peek_transition.set(true);
@@ -11154,7 +11226,9 @@ impl AppModel {
         // Side-by-side again: settle at the normal expanded width.
         self.animate_sidebar(false);
         self.compact_sidebar_header(false);
-        self.save_sidebar_state();
+        if !self.sidebar_layout_borrowed() {
+            self.save_sidebar_state();
+        }
     }
 
     /// Close the floating sidebar overlay if it is open — navigation picked in
@@ -11521,7 +11595,7 @@ impl AppModel {
             show_accounts: self.show_accounts,
             unified_chips: self.unified_chips,
             chevrons_left: self.chevrons_left,
-            rail_dots: self.rail_dots,
+            rail_dots: self.rail_dots_now(),
             rail_fold: self.rail_fold,
             unified_unread,
             unified_folders,
@@ -11874,8 +11948,18 @@ impl AppModel {
                     animate: true,
                 });
             }
-            if changed(F::HideAvatars) || changed(F::OnePreviewLine) {
+            if changed(F::HideAvatars)
+                || changed(F::OnePreviewLine)
+                || changed(F::HidePreview)
+                || changed(F::HideSubject)
+            {
                 self.push_list_look(true);
+            }
+            if changed(F::RailSidebar) {
+                // The dots (or counts) are drawn with the rows, so the
+                // sidebar is rebuilt before it folds.
+                self.rebuild_sidebar();
+                self.sync_rail();
             }
             if changed(F::ReaderView) {
                 self.push_reader_focus();
@@ -11921,13 +12005,65 @@ impl AppModel {
         self.avatars && !self.focus.active(config::FocusPart::HideAvatars)
     }
 
-    /// The preview lines the list shows: the setting, capped at one by
-    /// Focus Mode (previews switched off stay off).
+    /// The preview lines the list shows: the setting, hidden outright or
+    /// capped at one by Focus Mode (previews switched off stay off).
+    ///
+    /// Only what is *drawn* changes — the setting itself, and with it what
+    /// the workers fetch, is left alone. So the preview text is in hand the
+    /// moment Focus Mode ends, rather than waiting for the next sync the way
+    /// switching previews off in Settings does.
     fn list_preview_lines(&self) -> u32 {
-        if self.focus.active(config::FocusPart::OnePreviewLine) {
+        if self.focus.active(config::FocusPart::HidePreview) {
+            0
+        } else if self.focus.active(config::FocusPart::OnePreviewLine) {
             self.preview_lines.min(1)
         } else {
             self.preview_lines
+        }
+    }
+
+    /// Whether the list draws subject lines: always, unless Focus Mode's
+    /// subject part is in force (then a row is its sender and its date).
+    fn list_show_subject(&self) -> bool {
+        !self.focus.active(config::FocusPart::HideSubject)
+    }
+
+    /// Whether the icon rail marks unread folders with a dot instead of a
+    /// count: the preference, or Focus Mode's rail part while it holds.
+    fn rail_dots_now(&self) -> bool {
+        self.rail_dots || self.focus.active(config::FocusPart::RailSidebar)
+    }
+
+    /// Whether the rail belongs on screen: the window is too narrow for the
+    /// full sidebar, Focus Mode has folded it, or the user collapsed it
+    /// themselves. Only the last of those is ever saved.
+    fn rail_wanted(&self) -> bool {
+        self.auto_rail || self.focus.active(config::FocusPart::RailSidebar) || self.sidebar_collapsed
+    }
+
+    /// Whether the sidebar's layout is Focus Mode's for the while: the rail
+    /// part is in force, so collapsing or expanding it is a look for as long
+    /// as the mode lasts and never the layout the user keeps. Nothing is
+    /// saved while this holds, and ending the mode gives back exactly the
+    /// sidebar it took over — whatever was done to it meanwhile.
+    fn sidebar_layout_borrowed(&self) -> bool {
+        self.focus.active(config::FocusPart::RailSidebar)
+    }
+
+    /// Put the rail up or take it down to match [`Self::rail_wanted`],
+    /// animating the split the way the toggle does. Persists nothing.
+    fn sync_rail(&mut self) {
+        let want = self.rail_wanted();
+        // A floating peek is the expanded sidebar by another name: fold it
+        // before the rail goes up under it.
+        if want && self.sidebar_peek {
+            self.set_sidebar_peek(false, true);
+        }
+        if want != self.rail_active {
+            self.rail_active = want;
+            self.sidebar.emit(SidebarInput::SetCollapsed(want));
+            self.animate_sidebar(want);
+            self.compact_sidebar_header(want);
         }
     }
 
@@ -11937,6 +12073,7 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetLook {
             avatars: self.list_avatars(),
             preview_lines: self.list_preview_lines(),
+            subject: self.list_show_subject(),
             animate,
         });
     }
