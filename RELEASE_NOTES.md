@@ -2,6 +2,24 @@
 
 Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.37.0
+
+- **Choose the browser links open in** (#232). Settings → System → Links: the
+  desktop's default, any browser you have installed, or ask each time.
+- **Edit as New Message** (#232). Open a copy of any message in the composer —
+  same recipients, subject, body and attachments, no tie to the original.
+- **Focus Mode goes further.** Four new switches in Settings → Appearance: hide
+  the preview text, hide the subject, fold the sidebar to its icon rail, and
+  start every launch in the mode.
+- **Fixed: the reading pane's actions fold into the ⋯ menu again** on a narrow
+  window. They had stopped folding at any width.
+- **Fixed: the hovering sidebar dims the window behind it** instead of covering
+  it in flat colour when a theme is on.
+- **About names the translators**, in their own list beside the contributors.
+- **The repository is readable** (#230, [@yioannides](https://github.com/yioannides)).
+  The README is a page rather than a manual, and the documentation lives in
+  [docs/](https://github.com/hyprlab/hylki/tree/main/docs).
+
 ## What's new in 1.36.0
 
 **Meeting invitations** (#223). A message that carries a meeting now shows it at the top of the card, instead of only the note the sender's calendar wrote for clients that cannot read the invitation: what the meeting is, when it runs in your own clock and time zone, where it is, who organised it and how many are invited — with **Accept**, **Maybe**, **Decline** and **Add to Calendar** underneath. Your answer goes to the organiser as a proper reply their calendar understands, sent from the address that was invited, so their guest list updates. Answer a meeting that has been moved, or one date out of a repeating series, and the answer lands on the right one. Reopen the message later and it says what you answered and when; a meeting you answered in another program shows that too. A cancelled meeting says so, and a reply from somebody else says who answered and how. **Add to Calendar** opens the invitation in your calendar application. The calendar file is also listed as an attachment now, so you can save it like any other. Reported by [@EmmanuelP](https://github.com/EmmanuelP).
