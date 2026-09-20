@@ -17,4 +17,7 @@ Also at the top of the repository: [RELEASE_NOTES.md](../RELEASE_NOTES.md),
 [CHANGELOG.md](../CHANGELOG.md), [SECURITY.md](../SECURITY.md) and
 [po/README.md](../po/README.md) for translators.
 
-`data/repo/` holds the artwork these pages and the README use.
+`data/repo/` holds the artwork these pages and the README use, and
+`python3 tools/check-docs.py` checks that all of it still hangs together:
+links, anchors, this index, and where each kind of thing belongs
+([CONTRIBUTING.md](CONTRIBUTING.md#documentation)).

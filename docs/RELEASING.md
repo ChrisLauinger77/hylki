@@ -40,6 +40,13 @@ Part 2 is asked of GitHub, so the tag has to be pushed first — the order the
 ship steps already run in. Without `gh`, or before the tag is up, the script
 still emits parts 1 and 3 and says on stderr what it left out.
 
+## Before the tag
+
+`python3 tools/check-docs.py` has to pass: a release page, the About window and
+the site all link into the documentation, so a broken link ships as a broken
+link. It also catches a README that has crept past its budget, and a
+contributor line the About window would silently drop.
+
 ## Every release gets a section
 
 `RELEASE_NOTES.md` needs an entry for every version, betas included: the About

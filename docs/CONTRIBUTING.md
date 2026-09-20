@@ -38,6 +38,30 @@ Everyone whose work is in the app is named in
 - Contributions are credited by name and handle, so say if you would rather be
   credited differently, or not at all.
 
+## Documentation
+
+Documentation lives in `docs/`, one subject per file, and the
+[README](../README.md) is the front door: what the app is, ten or so features,
+how to install it, and links. It reached 667 lines once by taking "just one
+more paragraph" forty times ([#230](https://github.com/hyprlab/hylki/issues/230)),
+so a change that documents something goes where that something already lives:
+
+| What you have | Where it goes |
+| --- | --- |
+| A feature worth pitching | [FEATURES.md](FEATURES.md) |
+| How to set something up, or use it | [DOCUMENTATION.md](DOCUMENTATION.md) |
+| A keyboard change | [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md) |
+| A package or install caveat | [INSTALLING.md](INSTALLING.md) |
+| A build dependency or step | [BUILDING.md](BUILDING.md) |
+| Credit | [`data/CONTRIBUTORS`](../data/CONTRIBUTORS) or [`data/TRANSLATORS`](../data/TRANSLATORS) for the name, [CREDITS.md](CREDITS.md) for the work |
+| A licence or trademark note | [LICENSE.md](LICENSE.md) |
+| What changed in a release | [CHANGELOG.md](../CHANGELOG.md) and [RELEASE_NOTES.md](../RELEASE_NOTES.md) |
+| Artwork | `data/repo/` — `docs/` holds Markdown only |
+
+A new page belongs in [docs/README.md](README.md)'s index, and
+`python3 tools/check-docs.py` checks all of this — every relative link and
+anchor included — in about a second. Run it after touching any `.md`.
+
 ## AI-assisted contributions
 
 Hylki is built with AI assistance itself (see the
