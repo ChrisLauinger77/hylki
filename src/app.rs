@@ -3342,19 +3342,28 @@ impl SimpleComponent for AppModel {
             // One button's cost, from the buttons themselves (a hidden one —
             // Tags before any tag exists — measures 0 and is skipped); what
             // is left of the row after them and the controls is the base.
-            let mut visible_sum = 0;
+            //
+            // Two different widths, and the difference is load-bearing. Each
+            // button sits in a Focus Mode revealer, and a revealer that has
+            // not been revealed yet measures 0 however wide its child is —
+            // which is exactly the state this runs in, before
+            // `sync_focus_chrome` opens them. So a button's own cost comes
+            // from the button inside the revealer, while what is taken off
+            // `full` is what the row counted for it *just now*: the revealer.
+            // Subtracting the buttons from a row that never included them is
+            // how the base went negative (and the fold stopped happening) the
+            // moment Focus Mode wrapped the row in revealers.
+            let mut packed_sum = 0;
             let mut button_w = 0;
             for (_, w) in &buttons {
-                // Each button sits in a Focus Mode revealer; the button is
-                // what has a width worth knowing.
+                packed_sum += w.measure(gtk::Orientation::Horizontal, -1).1;
                 let inner = w.downcast_ref::<gtk::Revealer>().and_then(|r| r.child()).unwrap_or_else(|| w.clone());
                 let nat = inner.measure(gtk::Orientation::Horizontal, -1).1;
                 if nat > 0 {
-                    visible_sum += nat;
                     button_w = button_w.max(nat);
                 }
             }
-            let base = if full <= 0 { 0 } else { full - controls - visible_sum };
+            let base = if full <= 0 { 0 } else { (full - controls - packed_sum).max(0) };
             let bp = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
                 adw::BreakpointConditionLengthType::MaxWidth,
                 READER_ACTIONS_BREAKPOINT,
