@@ -1145,6 +1145,12 @@ struct PrivacyFile {
     files_large: FilesLarge,
     #[serde(default = "default_files_limit_mb")]
     files_limit_mb: u32,
+    /// Which browser a link in a message opens in (#232). Empty = whatever
+    /// the desktop opens links with; `"ask"` = the system's app chooser,
+    /// every time; anything else is a desktop entry id
+    /// ("brave-browser.desktop") launched directly.
+    #[serde(default)]
+    link_browser: String,
 }
 
 fn default_chevrons_left() -> bool {
@@ -1293,6 +1299,7 @@ impl Default for PrivacyFile {
             files_action: FilesAction::default(),
             files_large: FilesLarge::default(),
             files_limit_mb: default_files_limit_mb(),
+            link_browser: String::new(),
             gravatar: false,
             avatars: default_avatars(),
             own_mailbox_face: default_own_mailbox_face(),
@@ -1701,6 +1708,11 @@ impl FilesPrefs {
 
 fn default_files_limit_mb() -> u32 {
     20
+}
+
+/// Which browser links open in (#232): see `PrivacyFile::link_browser`.
+pub fn load_link_browser() -> String {
+    load_privacy().link_browser
 }
 
 pub fn load_files_prefs() -> FilesPrefs {
@@ -2731,6 +2743,7 @@ pub fn save_privacy(
     console_mode: bool,
     read_mark: ReadMark,
     files: FilesPrefs,
+    link_browser: String,
 ) {
     let Some(path) = privacy_path() else {
         return;
@@ -2825,6 +2838,7 @@ pub fn save_privacy(
         files_action: files.action,
         files_large: files.large,
         files_limit_mb: files.limit_mb,
+        link_browser,
     };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {

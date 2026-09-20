@@ -125,6 +125,10 @@ pub enum RowAction {
     Reply,
     ReplyAll,
     Forward,
+    /// Open a copy of the message in the composer as a message of its own
+    /// (#232) — same recipients, subject, body and files, nothing tying it
+    /// to the original.
+    EditAsNew,
     ToggleStar,
     ToggleRead,
     Spam,
@@ -4447,6 +4451,11 @@ impl MessageList {
                 item(RowAction::Reply, &i18n("Reply"), "co.hyprlab.Hylki-mail-reply-sender-symbolic"),
                 item(RowAction::ReplyAll, &i18n("Reply All"), "co.hyprlab.Hylki-mail-reply-all-symbolic"),
                 item(RowAction::Forward, &i18n("Forward"), "co.hyprlab.Hylki-mail-forward-symbolic"),
+                item(
+                    RowAction::EditAsNew,
+                    &i18n("Edit as New Message"),
+                    "co.hyprlab.Hylki-document-edit-symbolic",
+                ),
             ],
             flag_section,
             tag_section,

@@ -968,6 +968,13 @@ pub struct AppModel {
     /// Settings → System → GNOME Files: what handed-in files open into and
     /// what happens over the size limit.
     files_prefs: config::FilesPrefs,
+    /// "Edit as New Message" (#232) waiting on the body, or the attachments,
+    /// it is to be copied from.
+    pending_edit_as_new: Option<Message>,
+    /// Settings → System → Links: which browser a link in a message opens in
+    /// (#232). Empty = the desktop's default, "ask" = its app chooser,
+    /// otherwise a desktop entry id.
+    link_browser: String,
     /// Outstanding bulk MoveMessages requests awaiting a worker `BulkComplete`.
     /// Outstanding server-side bulk operations; while > 0 the refresh spinner
     /// spins and the status bar narrates.
@@ -1256,6 +1263,10 @@ pub enum AppMsg {
     SetReplyFields(bool),
     /// Settings → System → GNOME Files changed.
     SetFilesPrefs(config::FilesPrefs),
+    /// Settings → System → Links: the browser links open in (#232).
+    SetLinkBrowser(String),
+    /// Copy the message the reader is on into a new one (#232).
+    EditAsNewCurrent,
     /// A hand-off's files have a destination (the dialog answered, or the
     /// preference decided); `remember` writes the choice to Settings.
     HandOffAction { hand_off: FileHandOff, action: config::FilesAction, remember: bool },
@@ -2928,7 +2939,15 @@ impl SimpleComponent for AppModel {
             pending_draft: None,
             pending_reply: None,
             pending_draft_pick: None,
+            pending_edit_as_new: None,
             files_prefs: config::load_files_prefs(),
+            link_browser: {
+                // The launcher reads its choice from here, not from disk, so
+                // it is handed over before the first link can be clicked.
+                let choice = config::load_link_browser();
+                crate::ui::launch::set_browser(&choice);
+                choice
+            },
             popouts: HashMap::new(),
             current_thread: Vec::new(),
             list_selection: Vec::new(),
@@ -4289,6 +4308,14 @@ impl SimpleComponent for AppModel {
                     let s = sender.input_sender().clone();
                     gtk::glib::timeout_add_seconds_local_once(5, move || {
                         let _ = s.send(AppMsg::ReaderOverflowMenu);
+                    });
+                }
+                // HYLKI_SHOWCASE_EDIT_AS_NEW=1 copies the open message into
+                // the composer at 6s (#232), as its menu entry does.
+                if std::env::var("HYLKI_SHOWCASE_EDIT_AS_NEW").is_ok() {
+                    let s = sender.input_sender().clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        let _ = s.send(AppMsg::EditAsNewCurrent);
                     });
                 }
                 // HYLKI_SHOWCASE_MOVE=1 opens the Move To… picker at 5s
@@ -6061,6 +6088,12 @@ impl SimpleComponent for AppModel {
                         let m = self.with_cached_body(m);
                         self.open_compose(m.account_id, forward_prefill(&m), &sender);
                     }
+                    // A conversation row stands for its newest message here
+                    // too: that is the one the row is showing.
+                    RowAction::EditAsNew => {
+                        let m = self.newest_to_answer(&conversation, m);
+                        self.edit_as_new(m, &sender);
+                    }
                     RowAction::ToggleStar => {
                         let starred = !m.starred;
                         self.user_set_flags(star_label(starred), &[m], FlagKind::Star, starred);
@@ -7242,6 +7275,20 @@ impl SimpleComponent for AppModel {
             AppMsg::SetFilesPrefs(prefs) => {
                 if self.files_prefs != prefs {
                     self.files_prefs = prefs;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::EditAsNewCurrent => {
+                if let Some(m) = self.compose_target() {
+                    self.edit_as_new(m, &sender);
+                }
+            }
+
+            AppMsg::SetLinkBrowser(choice) => {
+                if self.link_browser != choice {
+                    self.link_browser = choice;
+                    crate::ui::launch::set_browser(&self.link_browser);
                     self.save_settings();
                 }
             }
@@ -9122,6 +9169,15 @@ impl SimpleComponent for AppModel {
                     }
                     self.pending_draft = Some((pd, inline, extra));
                 }
+                // Likewise a copy being edited as a new message: the body is
+                // in the cache now, so the second pass finds it there.
+                if let Some(pending) = self.pending_edit_as_new.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        self.edit_as_new(pending, &sender);
+                        return;
+                    }
+                    self.pending_edit_as_new = Some(pending);
+                }
                 // Likewise a reply picked for handed-in files.
                 if let Some((mut m, extra)) = self.pending_reply.take() {
                     if m.account_id == account_id && m.id == message_id {
@@ -9334,6 +9390,15 @@ impl SimpleComponent for AppModel {
                 if let Some(p) = self.popouts.get(&(account_id, message_id)) {
                     p.controller.emit(MessageWindowInput::SetAttachments(items));
                 }
+                // These files were fetched to be carried into a copy of the
+                // message; they are cached now, so the second pass stages them.
+                if let Some(pending) = self.pending_edit_as_new.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        self.edit_as_new(pending, &sender);
+                    } else {
+                        self.pending_edit_as_new = Some(pending);
+                    }
+                }
             }
 
             AppMsg::AttachmentsPending { account_id, message_id } => {
@@ -9387,6 +9452,16 @@ impl SimpleComponent for AppModel {
                 }
                 self.message_list
                     .emit(MessageListInput::SetHasAttachment { id: message_id, has: false });
+                // A copy waiting on files that do not exist: open it anyway,
+                // rather than leave the menu entry looking dead.
+                if let Some(mut pending) = self.pending_edit_as_new.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        pending.has_attachment = false;
+                        self.edit_as_new(pending, &sender);
+                    } else {
+                        self.pending_edit_as_new = Some(pending);
+                    }
+                }
             }
 
             AppMsg::HasAttachments { account_id, message_id } => {
@@ -9875,6 +9950,7 @@ impl AppModel {
             self.console_mode,
             self.read_mark,
             self.files_prefs,
+            self.link_browser.clone(),
         );
     }
 
@@ -12431,6 +12507,7 @@ impl AppModel {
                 item(RowAction::Reply, i18n("Reply"), "mail-reply-sender"),
                 item(RowAction::ReplyAll, i18n("Reply All"), "mail-reply-all"),
                 item(RowAction::Forward, i18n("Forward"), "mail-forward"),
+                item(RowAction::EditAsNew, i18n("Edit as New Message"), "document-edit"),
             ],
             vec![
                 if m.starred {
@@ -13087,27 +13164,8 @@ impl AppModel {
         };
         let editable = crate::worker::editable_from_raw(&item.raw, &item.rcpts);
 
-        let mut attachments = Vec::new();
-        if !editable.attachments.is_empty() {
-            let dir = std::env::temp_dir().join(format!("hylki-outbox-{account_id}-{id}"));
-            if std::fs::create_dir_all(&dir).is_ok() {
-                for (i, att) in editable.attachments.iter().enumerate() {
-                    // The name came out of a message header; keep it to a single
-                    // path component.
-                    let safe = att.name.replace(['/', '\\'], "_");
-                    let name = if safe.trim().is_empty() {
-                        format!("attachment-{}", i + 1)
-                    } else {
-                        safe
-                    };
-                    let path = dir.join(&name);
-                    match std::fs::write(&path, &att.data) {
-                        Ok(()) => attachments.push(path),
-                        Err(e) => tracing::warn!("could not stage {name} for editing: {e}"),
-                    }
-                }
-            }
-        }
+        let attachments =
+            stage_attachments(&format!("hylki-outbox-{account_id}-{id}"), &editable.attachments);
 
         let prefill = ComposePrefill {
             to: editable.to,
@@ -13170,6 +13228,70 @@ impl AppModel {
             self.current = None;
             self.current_thread.clear();
             self.show_message(None, false);
+            self.open_inline_reply(m.account_id, prefill, None, sender);
+        } else {
+            self.open_compose(m.account_id, prefill, sender);
+        }
+    }
+
+    /// "Edit as New Message" (#232): the message opened in the composer as a
+    /// message of its own — the same recipients, subject, body and
+    /// attachments, with none of the threading headers and no tie to what it
+    /// was copied from. Sending it sends a new message; the original is left
+    /// exactly where it was.
+    ///
+    /// The body and the attachments may still be on the server. Each is
+    /// fetched at most once, and the reply re-enters here: the message is
+    /// held in `pending_edit_as_new` meanwhile, so nothing opens until what
+    /// is being copied is actually in hand.
+    fn edit_as_new(&mut self, m: Message, sender: &ComponentSender<Self>) {
+        let m = self.with_cached_body(m);
+        let key = (m.account_id, m.id);
+        if m.body.is_empty() {
+            if let Some(path) = self.resolve_folder_path(&m) {
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
+                );
+                self.pending_edit_as_new = Some(m);
+                return;
+            }
+        }
+        if m.has_attachment && !self.attachment_cache.contains_key(&key) {
+            if let Some(path) = self.resolve_folder_path(&m) {
+                self.send_to(m.account_id, MailRequest::LoadAttachments {
+                    message_id: m.id,
+                    path,
+                    uid: m.uid,
+                    download: true,
+                });
+                self.pending_edit_as_new = Some(m);
+                return;
+            }
+        }
+        let attachments = self
+            .attachment_cache
+            .get(&key)
+            .map(|items| {
+                stage_attachments(&format!("hylki-copy-{}-{}", m.account_id, m.id), items)
+            })
+            .unwrap_or_default();
+        tracing::info!(
+            "edit as new: copying {}:{} ({} attachment(s))",
+            m.account_id,
+            m.id,
+            attachments.len()
+        );
+        let prefill = ComposePrefill {
+            to: m.to.clone(),
+            cc: m.cc.clone(),
+            subject: m.subject.clone(),
+            body_html: editable_copy_html(&m.body),
+            attachments,
+            ..Default::default()
+        };
+        // A new message, so it opens where a new message opens.
+        if self.compose_inline {
             self.open_inline_reply(m.account_id, prefill, None, sender);
         } else {
             self.open_compose(m.account_id, prefill, sender);
@@ -15604,6 +15726,7 @@ impl AppModel {
             compose_inline: self.compose_inline,
             reply_fields: self.reply_fields,
             files: self.files_prefs,
+            link_browser: self.link_browser.clone(),
             compose_default_from: self.compose_default_from.clone(),
             paste_plain: self.paste_plain,
             spellcheck: self.spellcheck,
@@ -15672,6 +15795,7 @@ impl AppModel {
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
                 PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
                 PrefOutput::SetFilesPrefs(p) => AppMsg::SetFilesPrefs(p),
+                PrefOutput::SetLinkBrowser(id) => AppMsg::SetLinkBrowser(id),
                 PrefOutput::SetComposeDefaultFrom(addr) => AppMsg::SetComposeDefaultFrom(addr),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
                 PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
@@ -19246,6 +19370,50 @@ fn reply_all_prefill(m: &Message, self_email: &str) -> ComposePrefill {
     prefill
 }
 
+/// Write attachments out to a private temp directory: the composer attaches
+/// files by path, and these exist only as bytes — in a queued message's
+/// stored MIME, or in a cached message being copied.
+fn stage_attachments(dir_name: &str, items: &[crate::models::Attachment]) -> Vec<std::path::PathBuf> {
+    if items.is_empty() {
+        return Vec::new();
+    }
+    let dir = std::env::temp_dir().join(dir_name);
+    if std::fs::create_dir_all(&dir).is_err() {
+        return Vec::new();
+    }
+    let mut staged = Vec::new();
+    for (i, att) in items.iter().enumerate() {
+        // The name came out of a message header; keep it to a single
+        // path component.
+        let safe = att.name.replace(['/', '\\'], "_");
+        let name = if safe.trim().is_empty() { format!("attachment-{}", i + 1) } else { safe };
+        let path = dir.join(&name);
+        match std::fs::write(&path, &att.data) {
+            Ok(()) => staged.push(path),
+            Err(e) => tracing::warn!("could not stage {name} for editing: {e}"),
+        }
+    }
+    staged
+}
+
+/// A message's own content, ready to be edited rather than quoted: the HTML
+/// sanitized exactly as a forward's is (#52, it is the same untrusted mail),
+/// or the plain text escaped into it.
+fn editable_copy_html(body: &str) -> String {
+    if body.contains('<') {
+        sanitize_forward_html(body)
+    } else {
+        let text = message_text(body);
+        format!(
+            "<p>{}</p>",
+            text.replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('\n', "<br>")
+        )
+    }
+}
+
 fn forward_prefill(m: &Message) -> ComposePrefill {
     let subject = if m.subject.to_lowercase().starts_with("fwd:") {
         m.subject.clone()
@@ -19520,6 +19688,20 @@ fn next_after_vanish(
 
 #[cfg(test)]
 mod tests {
+    /// A copy to edit carries the message's own content, not a quote of it:
+    /// the HTML survives its sanitizing, and plain text becomes a paragraph
+    /// with its line breaks kept.
+    #[test]
+    fn a_copy_keeps_the_body_unquoted() {
+        let html = super::editable_copy_html("<p>Hi <b>there</b></p><script>steal()</script>");
+        assert!(html.contains("<b>there</b>"), "{html}");
+        assert!(!html.contains("script"), "{html}");
+        assert!(!html.contains("blockquote"), "{html}");
+
+        let html = super::editable_copy_html("Line one\nLine two");
+        assert_eq!(html, "<p>Line one<br>Line two</p>");
+    }
+
     /// A `mid:` link names a Message-ID the way the cache stores it: no
     /// brackets, lowercase, percent-decoded, without a `/cid` part.
     #[test]
