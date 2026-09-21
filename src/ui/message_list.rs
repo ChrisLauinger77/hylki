@@ -12,7 +12,11 @@ use crate::i18n::i18n;
 
 /// Max rows rendered at once. GtkListBox isn't virtualized, so the full folder
 /// index is kept in memory for search but only this many rows are built.
-const RENDER_CAP: usize = 200;
+/// Raised from 200 (#236): the unified Inboxes merge every account newest
+/// first, and a conversation's older messages fell past the window within
+/// days; a wider window keeps more of a conversation on the same page, and
+/// the rows past the first paint are built in idle-time chunks anyway.
+const RENDER_CAP: usize = 500;
 
 /// Rows built synchronously when the list is (re)built — enough to fill the
 /// pane — before the rest of the page arrives in idle-time chunks. Building
@@ -2327,8 +2331,8 @@ fn reader_conversation(emitted: &[(u32, u32)], merged: &[(u32, u32)]) -> Vec<(u3
 /// whole list, that row failed the head test, was taken for a reply picked
 /// out of an opened-up thread, and was shown alone in the reader, with no
 /// look in the cache for the rest. The unified Inboxes hit this constantly:
-/// five inboxes merged, newest first, put a conversation's start past two
-/// hundred rows within days, while one folder rarely does.
+/// several inboxes merged, newest first, put a conversation's start past
+/// the rendered window within days, while one folder rarely does.
 fn heads_its_row(
     key: (u32, u32),
     msg_thread: &std::collections::HashMap<(u32, u32), (u32, String)>,
