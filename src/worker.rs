@@ -803,6 +803,11 @@ fn serve_cached_body(
     let Some(body) = cache.load_body(account_id, path, uid) else {
         return false;
     };
+    // A blank cached by an earlier build for a message the server would not
+    // hand over (#226) is a miss, so the message is asked for again.
+    if body == "(empty message)" {
+        return false;
+    }
     emit(WorkerEvent::Body { message_id, path: path.to_string(), body });
     if let Some(check) = cache.load_sender_check(account_id, path, uid) {
         emit(WorkerEvent::SenderChecked { message_id, check });
@@ -2782,19 +2787,8 @@ async fn load_source(
     uid: u32,
 ) -> Result<String, async_imap::error::Error> {
     sel(session, path).await?;
-
-    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
-        .await?
-        .try_collect()
-        .await?;
-
-    let raw = fetches
-        .iter()
-        .find_map(|f| f.body())
-        .map(|b| String::from_utf8_lossy(b).into_owned())
-        .unwrap_or_else(|| "(empty message)".to_string());
-
-    Ok(raw)
+    let raw = fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))?;
+    Ok(String::from_utf8_lossy(&raw).into_owned())
 }
 
 /// Result of an IDLE wait: a request to handle, a folder that was refreshed
@@ -3368,21 +3362,75 @@ async fn load_raw_retry(
 }
 
 /// Fetch the raw RFC 822 bytes of a message (binary-safe, for attachments).
+/// The whole message out of one FETCH item, however the server labelled
+/// it: `BODY[]` or `RFC822` as asked, or the header and text as two items,
+/// which is what a server that will not hand over `BODY[]` (#226) can
+/// still be asked for, joined back into one message.
+fn raw_of(f: &Fetch) -> Option<Vec<u8>> {
+    if let Some(b) = f.body() {
+        return Some(b.to_vec());
+    }
+    match (f.header(), f.text()) {
+        (Some(h), Some(t)) => {
+            let mut raw = h.to_vec();
+            if !raw.ends_with(b"\r\n\r\n") {
+                if raw.ends_with(b"\r\n") {
+                    raw.extend_from_slice(b"\r\n");
+                } else {
+                    raw.extend_from_slice(b"\r\n\r\n");
+                }
+            }
+            raw.extend_from_slice(t);
+            Some(raw)
+        }
+        (None, Some(t)) => Some(t.to_vec()),
+        _ => None,
+    }
+}
+
+/// Fetch one message's raw bytes, asking three ways before giving up: the
+/// usual `BODY.PEEK[]`, then `RFC822`, then the header and text as two
+/// items. Mailfence answered the first with a FETCH that carried no
+/// message at all (#226), which read as an empty message and was shown,
+/// and cached, as one. `None` means the server would not hand it over any
+/// way; the reply's shape is logged so the export says what came back.
+async fn fetch_raw_message(
+    session: &mut ImapSession,
+    uid: u32,
+) -> Result<Option<Vec<u8>>, async_imap::error::Error> {
+    for (n, items) in ["(BODY.PEEK[])", "(RFC822)", "(BODY.PEEK[HEADER] BODY.PEEK[TEXT])"].iter().enumerate() {
+        let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), items).await?.try_collect().await?;
+        if let Some(raw) = fetches.iter().find_map(raw_of) {
+            if n > 0 {
+                tracing::info!(target: "hylki::imap", "message {uid}: content came with {items}");
+            }
+            return Ok(Some(raw));
+        }
+        tracing::warn!(
+            target: "hylki::imap",
+            "message {uid}: {} FETCH item(s) came back for {items}, none carrying the message: {}",
+            fetches.len(),
+            fetches.iter().map(|f| format!("{f:?}")).collect::<Vec<_>>().join(" | ").chars().take(600).collect::<String>()
+        );
+    }
+    Ok(None)
+}
+
+/// The error for a message the server would not hand over (#226): surfaced
+/// rather than shown as empty, and never cached.
+fn no_content_error(uid: u32) -> async_imap::error::Error {
+    async_imap::error::Error::Bad(format!(
+        "the server sent no content for message {uid} (asked as BODY.PEEK[], RFC822, and header plus text)"
+    ))
+}
+
 async fn load_raw(
     session: &mut ImapSession,
     path: &str,
     uid: u32,
 ) -> Result<Vec<u8>, async_imap::error::Error> {
     sel(session, path).await?;
-    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
-        .await?
-        .try_collect()
-        .await?;
-    Ok(fetches
-        .iter()
-        .find_map(|f| f.body())
-        .map(|b| b.to_vec())
-        .unwrap_or_default())
+    fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))
 }
 
 /// Decoded size at or above which a part carrying a Content-ID counts as an
@@ -7385,21 +7433,17 @@ async fn load_body(
     // mail-parser. We deliberately avoid a BODYSTRUCTURE-based "text part only"
     // fast path: some servers (iCloud) return structures our IMAP parser rejects,
     // which would fail the fetch and corrupt the session.
-    let fetches: Vec<Fetch> = fetch_uids(session, uid.to_string(), "(BODY.PEEK[])")
-        .await?
-        .try_collect()
-        .await?;
     // The whole message is in hand, so the sender check rides along for free
-    // rather than costing a second fetch.
-    let raw = fetches.iter().find_map(|f| f.body());
-    // The paperclip is guessed from BODYSTRUCTURE (or, on servers whose structure
-    // we can't parse, from the top-level Content-Type), and both guesses miss
-    // shapes like Apple Mail's inline PDF nested under an alternative (issue #9).
-    // The whole message is in hand here, so the guess can be replaced with fact
-    // — at no extra network cost.
-    Ok(raw
-        .map(render_raw)
-        .unwrap_or_else(|| ("(empty message)".to_string(), Default::default(), false)))
+    // rather than costing a second fetch. The paperclip is guessed from
+    // BODYSTRUCTURE (or, on servers whose structure we can't parse, from the
+    // top-level Content-Type), and both guesses miss shapes like Apple Mail's
+    // inline PDF nested under an alternative (issue #9). The whole message is
+    // in hand here, so the guess can be replaced with fact, at no extra
+    // network cost. A server that hands nothing over is an error, not an
+    // empty message (#226): shown as one, it read as the message being
+    // blank, and was cached as such.
+    let raw = fetch_raw_message(session, uid).await?.ok_or_else(|| no_content_error(uid))?;
+    Ok(render_raw(&raw))
 }
 
 /// Fetch several messages' bodies from one folder in a single `uid_fetch`.
@@ -7435,10 +7479,10 @@ async fn load_bodies(
         // message, just not the part carrying one, so it is skipped: leaving the
         // UID out of the map means the caller shows "(empty message)" without
         // writing that over a real body in the cache.
-        let (Some(uid), Some(raw)) = (last_uid, f.body()) else {
+        let (Some(uid), Some(raw)) = (last_uid, raw_of(f)) else {
             continue;
         };
-        out.entry(uid).or_insert_with(|| render_raw(raw));
+        out.entry(uid).or_insert_with(|| render_raw(&raw));
     }
     Ok(out)
 }
