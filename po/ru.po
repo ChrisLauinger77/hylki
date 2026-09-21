@@ -4004,6 +4004,15 @@ msgstr "Оформление сообщений"
 msgid "Theme for email content only, not the app itself."
 msgstr "Тема только для содержимого писем, не для самого приложения."
 
+#, fuzzy
+msgid "Default zoom"
+msgstr "По умолчанию"
+
+msgid ""
+"How large every message is shown, Reader View or not. Ctrl+ and Ctrl- change "
+"it until Hylki is next started; Ctrl+0 comes back to this."
+msgstr ""
+
 msgid "Use my own font"
 msgstr "Использовать свой шрифт"
 
@@ -4108,15 +4117,6 @@ msgstr "Составлять сообщения в"
 msgid ""
 "Keep the switch where it was last set, or start every message in Reader View "
 "or as sent. The switch still changes the message on screen."
-msgstr ""
-
-#, fuzzy
-msgid "Default zoom"
-msgstr "По умолчанию"
-
-msgid ""
-"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
-"started; Ctrl+0 comes back to this."
 msgstr ""
 
 msgid "Compose in the main window"

@@ -2144,6 +2144,15 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "reader_zoom_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Default zoom"),
+                                        set_subtitle: &i18n("How large every message is shown, Reader View or not. Ctrl+ and Ctrl- change it until Hylki is next started; Ctrl+0 comes back to this."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeReaderZoom(row.selected()));
+                                        },
+                                    },
+
                                     #[name = "override_fonts_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Use my own font"),
@@ -2296,15 +2305,6 @@ impl Component for Preferences {
                                         set_subtitle: &i18n("Keep the switch where it was last set, or start every message in Reader View or as sent. The switch still changes the message on screen."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeReaderDefault(row.selected()));
-                                        },
-                                    },
-
-                                    #[name = "reader_zoom_row"]
-                                    adw::ComboRow {
-                                        set_title: &i18n("Default zoom"),
-                                        set_subtitle: &i18n("How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next started; Ctrl+0 comes back to this."),
-                                        connect_selected_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ChangeReaderZoom(row.selected()));
                                         },
                                     },
                                 },

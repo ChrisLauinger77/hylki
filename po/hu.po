@@ -3936,6 +3936,15 @@ msgstr "Üzenet megjelenése"
 msgid "Theme for email content only, not the app itself."
 msgstr "Csak az e-mail-tartalom témája, nem magának az alkalmazásnak a témája."
 
+#, fuzzy
+msgid "Default zoom"
+msgstr "Alapértelmezett"
+
+msgid ""
+"How large every message is shown, Reader View or not. Ctrl+ and Ctrl- change "
+"it until Hylki is next started; Ctrl+0 comes back to this."
+msgstr ""
+
 msgid "Use my own font"
 msgstr "Saját betűtípus használata"
 
@@ -4043,15 +4052,6 @@ msgstr "Üzenetek rendezése"
 msgid ""
 "Keep the switch where it was last set, or start every message in Reader View "
 "or as sent. The switch still changes the message on screen."
-msgstr ""
-
-#, fuzzy
-msgid "Default zoom"
-msgstr "Alapértelmezett"
-
-msgid ""
-"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
-"started; Ctrl+0 comes back to this."
 msgstr ""
 
 msgid "Compose in the main window"

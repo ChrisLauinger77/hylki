@@ -4064,6 +4064,15 @@ msgid "Theme for email content only, not the app itself."
 msgstr ""
 "Thème s'appliquant au contenu des e-mails uniquement, pas à l'application."
 
+#, fuzzy
+msgid "Default zoom"
+msgstr "Par défaut"
+
+msgid ""
+"How large every message is shown, Reader View or not. Ctrl+ and Ctrl- change "
+"it until Hylki is next started; Ctrl+0 comes back to this."
+msgstr ""
+
 msgid "Use my own font"
 msgstr "Utiliser ma propre police"
 
@@ -4177,15 +4186,6 @@ msgstr ""
 "Conserver le commutateur dans sa dernière position, ou toujours ouvrir les "
 "messages en mode Lecture ou tel qu'envoyé. Le commutateur permet toujours de "
 "changer le message affiché à l'écran."
-
-#, fuzzy
-msgid "Default zoom"
-msgstr "Par défaut"
-
-msgid ""
-"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
-"started; Ctrl+0 comes back to this."
-msgstr ""
 
 msgid "Compose in the main window"
 msgstr "Rédiger dans la fenêtre principale"
