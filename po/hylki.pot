@@ -1228,7 +1228,12 @@ msgstr ""
 msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 
-msgid "Label (defaults to email address)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
 msgstr ""
 
 msgid "Account accent color"

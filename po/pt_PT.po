@@ -1341,8 +1341,13 @@ msgstr ""
 "A forma como esta conta é apresentada na barra lateral e na vista Caixas de "
 "entrada."
 
-msgid "Label (defaults to email address)"
-msgstr "Etiqueta (por predefinição, o endereço de e-mail)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
+msgstr ""
 
 msgid "Account accent color"
 msgstr "Cor de destaque da conta"
@@ -5153,6 +5158,9 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Label (defaults to email address)"
+#~ msgstr "Etiqueta (por predefinição, o endereço de e-mail)"
 
 #~ msgid "Changelog"
 #~ msgstr "Registo de alterações"

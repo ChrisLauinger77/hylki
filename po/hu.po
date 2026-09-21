@@ -1323,8 +1323,13 @@ msgstr "Megjelenés"
 msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 
-msgid "Label (defaults to email address)"
-msgstr "Címke (alapértelmezés szerint az e-mail-cím)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
+msgstr ""
 
 msgid "Account accent color"
 msgstr ""
@@ -5029,6 +5034,9 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Label (defaults to email address)"
+#~ msgstr "Címke (alapértelmezés szerint az e-mail-cím)"
 
 #~ msgid "Changelog"
 #~ msgstr "Változásnapló"

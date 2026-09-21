@@ -1347,8 +1347,13 @@ msgstr ""
 "Façon dont ce compte est affiché dans la barre latérale et dans la vue "
 "Boîtes de réception."
 
-msgid "Label (defaults to email address)"
-msgstr "Étiquette (adresse e-mail par défaut)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
+msgstr ""
 
 msgid "Account accent color"
 msgstr "Couleur d'accentuation du compte"
@@ -5183,6 +5188,9 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Label (defaults to email address)"
+#~ msgstr "Étiquette (adresse e-mail par défaut)"
 
 #~ msgid "Changelog"
 #~ msgstr "Journal des modifications"

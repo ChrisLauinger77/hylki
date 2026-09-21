@@ -1346,8 +1346,13 @@ msgstr ""
 "Πώς εμφανίζεται αυτός ο λογαριασμός στην πλευρική στήλη και στην προβολή "
 "Εισερχομένων."
 
-msgid "Label (defaults to email address)"
-msgstr "Ετικέτα (προεπιλογή η διεύθυνση email)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
+msgstr ""
 
 msgid "Account accent color"
 msgstr "Χρώμα έμφασης λογαριασμού"
@@ -5184,6 +5189,9 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Label (defaults to email address)"
+#~ msgstr "Ετικέτα (προεπιλογή η διεύθυνση email)"
 
 #~ msgid "Changelog"
 #~ msgstr "Αρχείο αλλαγών"

@@ -1339,8 +1339,13 @@ msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Как эта учётная запись отображается на боковой панели и во «Всех входящих»."
 
-msgid "Label (defaults to email address)"
-msgstr "Метка (по умолчанию адрес электронной почты)"
+msgid "Nickname"
+msgstr ""
+
+msgid ""
+"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
+"address."
+msgstr ""
 
 msgid "Account accent color"
 msgstr "Цвет учётной записи"
@@ -5109,6 +5114,9 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Label (defaults to email address)"
+#~ msgstr "Метка (по умолчанию адрес электронной почты)"
 
 #~ msgid "Changelog"
 #~ msgstr "Список изменений"

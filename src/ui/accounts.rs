@@ -1170,9 +1170,21 @@ impl Component for AccountsWindow {
                                     },
                                 },
 
-                                #[name = "label_row"]
-                                adw::EntryRow {
-                                    set_title: &i18n("Label (defaults to email address)"),
+                                // The nickname names the account wherever
+                                // it is listed; the address stands in
+                                // while there is none. An ActionRow rather
+                                // than an EntryRow, which has no subtitle
+                                // to say where the name shows up.
+                                adw::ActionRow {
+                                    set_title: &i18n("Nickname"),
+                                    set_subtitle: &i18n("Shown in the sidebar and in the Mail Accounts \
+                                                   list. Defaults to the email address."),
+                                    #[name = "label_row"]
+                                    add_suffix = &gtk::Entry {
+                                        set_valign: gtk::Align::Center,
+                                        set_hexpand: true,
+                                        set_width_chars: 18,
+                                    },
                                 },
 
                                 // The accent stands on its own: it colours
@@ -1663,9 +1675,13 @@ impl Component for AccountsWindow {
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
-        for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
+        for row in [&widgets.name_row, &widgets.email_row] {
             let s = sender.clone();
             row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
+        }
+        {
+            let s = sender.clone();
+            widgets.label_row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
         }
 
         // Tell the combined settings window when the editor subpage is up —
@@ -3258,14 +3274,25 @@ impl AccountsWindow {
             let vbox = gtk::Box::new(gtk::Orientation::Vertical, 0);
             vbox.set_hexpand(true);
             vbox.set_valign(gtk::Align::Center);
-            let name = gtk::Label::new(Some(&display_name(acc)));
+            // The nickname, as the sidebar names the account, over the
+            // address. With no nickname the address is the first line, and
+            // the second carries the sender name instead of repeating it,
+            // or nothing when there is no name either.
+            let title = acc.display_label();
+            let second = if title == acc.email {
+                acc.name.trim().to_string()
+            } else {
+                acc.email.clone()
+            };
+            let name = gtk::Label::new(Some(&title));
             name.set_halign(gtk::Align::Start);
             name.set_ellipsize(gtk::pango::EllipsizeMode::End);
             name.add_css_class("account-name");
-            let email = gtk::Label::new(Some(&acc.email));
+            let email = gtk::Label::new(Some(&second));
             email.set_halign(gtk::Align::Start);
             email.set_ellipsize(gtk::pango::EllipsizeMode::End);
             email.add_css_class("account-email");
+            email.set_visible(!second.is_empty());
             vbox.append(&name);
             vbox.append(&email);
             hbox.append(&vbox);
