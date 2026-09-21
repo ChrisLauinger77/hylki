@@ -65,6 +65,10 @@ pub struct MessageView {
     /// Message zoom in percent (Ctrl+ / Ctrl-): the bodies alone are
     /// scaled, in Reader View and out of it; the chrome keeps its size.
     zoom: u32,
+    /// The zoom Settings starts every launch at. The header's chip only
+    /// speaks up away from it: someone who chose 125% has nothing to be
+    /// told at 125%.
+    zoom_default: u32,
     /// What Reader View does when a conversation is opened afresh
     /// (Settings): keep the last choice, or start on or off.
     reader_default: crate::config::ReaderDefault,
@@ -729,6 +733,8 @@ pub enum MessageViewInput {
     SetReaderMode(bool),
     /// Message zoom in percent; the bodies on screen rescale in place.
     SetZoom(u32),
+    /// The zoom Settings starts at, which the chip measures against.
+    SetZoomDefault(u32),
     /// Settings: show the Reader View switch in the header at all.
     SetReaderSwitchShown(bool),
     /// Settings: what Reader View does when a conversation is opened. A
@@ -922,6 +928,8 @@ pub enum MessageViewOutput {
     /// The subject block's Reader View toggle was flipped; the app saves the
     /// preference and pushes it back (`SetReaderMode`) to every reader.
     ReaderMode(bool),
+    /// The zoom chip was clicked: back to the default from Settings.
+    ZoomReset,
     /// A card's Unsubscribe button: leave the list this message came from,
     /// by the handles its headers offered.
     Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
@@ -1329,17 +1337,23 @@ impl Component for MessageView {
                         },
 
                         // Message zoom (Ctrl+ / Ctrl-): the percentage, shown
-                        // only while it is not the sender's size, so at 100%
-                        // nothing says anything.
+                        // only while it is away from the default Settings
+                        // starts at, so a chosen size says nothing about
+                        // itself. A click goes back to that default.
                         gtk::Label {
                             #[watch]
                             set_label: &format!("{}%", model.zoom),
                             #[watch]
-                            set_visible: model.current.is_some() && model.zoom != 100,
+                            set_visible: model.current.is_some() && model.zoom != model.zoom_default,
                             set_valign: gtk::Align::Center,
                             add_css_class: "caption",
                             add_css_class: "vireo-zoom-chip",
-                            set_tooltip_text: Some(i18n("Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back to the default from Settings.").as_str()),
+                            set_tooltip_text: Some(i18n("Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it back to the default from Settings.").as_str()),
+                            add_controller = gtk::GestureClick {
+                                connect_released[sender] => move |_, _, _, _| {
+                                    let _ = sender.output(MessageViewOutput::ZoomReset);
+                                },
+                            },
                         },
 
                         // Reader View: the message(s) as content alone. A
@@ -1510,6 +1524,7 @@ impl Component for MessageView {
             reader_mode: false,
             reader_switch_shown: true,
             zoom: 100,
+            zoom_default: 100,
             reader_default: crate::config::ReaderDefault::Remember,
             read_mark: crate::config::ReadMark::default(),
             show_banner: crate::config::load_show_remote_banner(),
@@ -2129,6 +2144,9 @@ impl Component for MessageView {
             }
             MessageViewInput::SetReaderMode(on) => {
                 self.set_reader_mode(on);
+            }
+            MessageViewInput::SetZoomDefault(percent) => {
+                self.zoom_default = percent;
             }
             MessageViewInput::SetZoom(percent) => {
                 if self.zoom != percent {

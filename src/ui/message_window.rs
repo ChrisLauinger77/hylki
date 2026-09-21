@@ -37,6 +37,8 @@ pub struct MessageWindowInit {
     pub reader_mode: bool,
     /// Message zoom in percent (Ctrl+ / Ctrl-), followed here too.
     pub zoom: u32,
+    /// The zoom Settings starts at, for the chip.
+    pub zoom_default: u32,
     /// Whether the Reader View switch is shown at all.
     pub reader_switch: bool,
     /// What Reader View does when a message is opened.
@@ -89,6 +91,9 @@ pub enum MessageWindowInput {
     SetReaderStyle(crate::config::ReaderStyle),
     SetReaderMode(bool),
     SetZoom(u32),
+    SetZoomDefault(u32),
+    /// The zoom chip was clicked in this window.
+    ZoomReset,
     SetReaderSwitchShown(bool),
     SetReaderDefault(crate::config::ReaderDefault),
     /// This window's own Reader View toggle was flipped: handed up to the
@@ -162,6 +167,8 @@ pub enum MessageWindowOutput {
     },
     /// Reader View flipped from this window's subject block.
     ReaderMode(bool),
+    /// The zoom chip was clicked in this window: back to the default.
+    ZoomReset,
     /// A per-message action handled exactly like a list/context-menu action.
     Action { action: RowAction, message: Box<Message> },
     /// Add this sender to Contacts.
@@ -347,6 +354,7 @@ impl Component for MessageWindow {
                 MessageViewOutput::ReloadBody(m) => MessageWindowInput::ReloadBody(m),
                 MessageViewOutput::Notice(text) => MessageWindowInput::Notice(text),
                 MessageViewOutput::ReaderMode(on) => MessageWindowInput::ReaderMode(on),
+                MessageViewOutput::ZoomReset => MessageWindowInput::ZoomReset,
                 MessageViewOutput::Unsubscribe { message, info } => {
                     MessageWindowInput::Unsubscribe { message, info }
                 }
@@ -361,6 +369,7 @@ impl Component for MessageWindow {
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
         view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
         view.emit(MessageViewInput::SetReaderMode(init.reader_mode));
+        view.emit(MessageViewInput::SetZoomDefault(init.zoom_default));
         view.emit(MessageViewInput::SetZoom(init.zoom));
         view.emit(MessageViewInput::SetReaderSwitchShown(init.reader_switch));
         view.emit(MessageViewInput::SetReaderDefault(init.reader_default));
@@ -427,6 +436,12 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetZoom(percent) => {
                 self.view.emit(MessageViewInput::SetZoom(percent));
+            }
+            MessageWindowInput::SetZoomDefault(percent) => {
+                self.view.emit(MessageViewInput::SetZoomDefault(percent));
+            }
+            MessageWindowInput::ZoomReset => {
+                let _ = sender.output(MessageWindowOutput::ZoomReset);
             }
             MessageWindowInput::SetReaderMode(on) => {
                 self.view.emit(MessageViewInput::SetReaderMode(on));

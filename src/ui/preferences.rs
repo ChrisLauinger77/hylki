@@ -2147,7 +2147,7 @@ impl Component for Preferences {
                                     #[name = "reader_zoom_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Default zoom"),
-                                        set_subtitle: &i18n("How large every message is shown, Reader View or not. Ctrl+ and Ctrl- change it until Hylki is next started; Ctrl+0 comes back to this."),
+                                        set_subtitle: &i18n("How large every message is shown. Ctrl+ and Ctrl- change it until Hylki is next started; Ctrl+0 comes back to this."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeReaderZoom(row.selected()));
                                         },

@@ -2717,6 +2717,7 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                     MessageViewOutput::Notice(text) => AppMsg::Notice(text),
                     MessageViewOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
+                    MessageViewOutput::ZoomReset => AppMsg::ZoomMessage(0),
                     MessageViewOutput::Unsubscribe { message, info } => {
                         AppMsg::Unsubscribe { message, info }
                     }
@@ -3329,6 +3330,7 @@ impl SimpleComponent for AppModel {
             .message_view
             .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
         model.message_view.emit(MessageViewInput::SetReaderMode(model.effective_reader_mode()));
+        model.message_view.emit(MessageViewInput::SetZoomDefault(model.zoom_default));
         model.message_view.emit(MessageViewInput::SetZoom(model.zoom));
         model.message_view.emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
         model.message_view.emit(MessageViewInput::SetReaderDefault(model.effective_reader_default()));
@@ -7350,6 +7352,10 @@ impl SimpleComponent for AppModel {
                 if self.zoom_default != zoom {
                     self.zoom_default = zoom;
                     self.save_settings();
+                    self.message_view.emit(MessageViewInput::SetZoomDefault(zoom));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetZoomDefault(zoom));
+                    }
                 }
                 // The setting is also what the user wants to see now.
                 self.set_zoom(zoom);
@@ -13288,6 +13294,7 @@ impl AppModel {
             reader_style: self.reader_style(),
             reader_mode: self.effective_reader_mode(),
             zoom: self.zoom,
+            zoom_default: self.zoom_default,
             reader_switch: self.reader_switch,
             reader_default: self.effective_reader_default(),
             tags: self.tags.clone(),
@@ -13310,6 +13317,7 @@ impl AppModel {
                 MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                 MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
                 MessageWindowOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
+                MessageWindowOutput::ZoomReset => AppMsg::ZoomMessage(0),
                 MessageWindowOutput::Unsubscribe { message, info } => {
                     AppMsg::Unsubscribe { message, info }
                 }

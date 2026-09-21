@@ -37,7 +37,8 @@ with or without single-key shortcuts.
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
 in and out, with or without Reader View; <kbd>Ctrl+0</kbd> puts it back to
 the default. Only the message scales, not the header or the toolbar; a chip
-beside the Reader View switch shows the percentage while it is not 100%.
+beside the Reader View switch shows the percentage while it is away from
+the default, and a click on it goes back there.
 The zoom stays as set from message to message until Hylki is next started,
 which begins at the default from **Settings → Reading → Default zoom**.
 
