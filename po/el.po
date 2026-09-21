@@ -1252,6 +1252,12 @@ msgstr "Άνοιγμα Διαδικτυακών λογαριασμών…"
 msgid "Mail Account"
 msgstr "Λογαριασμός αλληλογραφίας"
 
+#, fuzzy
+msgid "Nickname (shown in the sidebar and the Mail Accounts list)"
+msgstr ""
+"Πώς εμφανίζεται αυτός ο λογαριασμός στην πλευρική στήλη και στην προβολή "
+"Εισερχομένων."
+
 msgid "Provider"
 msgstr "Πάροχος"
 
@@ -1345,14 +1351,6 @@ msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Πώς εμφανίζεται αυτός ο λογαριασμός στην πλευρική στήλη και στην προβολή "
 "Εισερχομένων."
-
-msgid "Nickname"
-msgstr ""
-
-msgid ""
-"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
-"address."
-msgstr ""
 
 msgid "Account accent color"
 msgstr "Χρώμα έμφασης λογαριασμού"

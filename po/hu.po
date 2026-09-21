@@ -1232,6 +1232,10 @@ msgstr "Online-fiókok megnyitása…"
 msgid "Mail Account"
 msgstr "Levelezési fiók"
 
+#, fuzzy
+msgid "Nickname (shown in the sidebar and the Mail Accounts list)"
+msgstr "A fiók megjelenése az oldalsávban és az Összes Beérkezett nézetben."
+
 msgid "Provider"
 msgstr "Szolgáltató"
 
@@ -1321,14 +1325,6 @@ msgid "Appearance"
 msgstr "Megjelenés"
 
 msgid "How this account is shown in the sidebar and the Inboxes view."
-msgstr ""
-
-msgid "Nickname"
-msgstr ""
-
-msgid ""
-"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
-"address."
 msgstr ""
 
 msgid "Account accent color"
@@ -5161,9 +5157,6 @@ msgstr "Hyprlab"
 #~ "Üzenetek címkézése egy vagy több színes címkével. A címkék IMAP-"
 #~ "kulcsszóként tárolódnak a levelezőkiszolgálón, így a Thunderbird és más "
 #~ "kliensek ugyanazokat a címkéket jelenítik meg."
-
-#~ msgid "How this account is shown in the sidebar and the All Inboxes view."
-#~ msgstr "A fiók megjelenése az oldalsávban és az Összes Beérkezett nézetben."
 
 #~ msgid "Circle color"
 #~ msgstr "Kör színe"

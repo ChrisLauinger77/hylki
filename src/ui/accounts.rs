@@ -992,20 +992,12 @@ impl Component for AccountsWindow {
                                 // The nickname first: it is the one thing
                                 // most edits are for, and it names the
                                 // account wherever it is listed, the address
-                                // standing in while there is none. An
-                                // ActionRow rather than an EntryRow, which
-                                // has no subtitle to say where the name
-                                // shows up.
-                                adw::ActionRow {
-                                    set_title: &i18n("Nickname"),
-                                    set_subtitle: &i18n("Shown in the sidebar and in the Mail Accounts \
-                                                   list. Defaults to the email address."),
-                                    #[name = "label_row"]
-                                    add_suffix = &gtk::Entry {
-                                        set_valign: gtk::Align::Center,
-                                        set_hexpand: true,
-                                        set_width_chars: 18,
-                                    },
+                                // standing in while there is none. Where it
+                                // shows up is said in the title, the way the
+                                // other rows carry their hints.
+                                #[name = "label_row"]
+                                adw::EntryRow {
+                                    set_title: &i18n("Nickname (shown in the sidebar and the Mail Accounts list)"),
                                 },
 
                                 // Then the provider; the rest of the form
@@ -1677,13 +1669,9 @@ impl Component for AccountsWindow {
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
         }
-        for row in [&widgets.name_row, &widgets.email_row] {
+        for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
             let s = sender.clone();
             row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
-        }
-        {
-            let s = sender.clone();
-            widgets.label_row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
         }
 
         // Tell the combined settings window when the editor subpage is up —

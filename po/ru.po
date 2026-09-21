@@ -1247,6 +1247,11 @@ msgstr "Открыть «Сетевые учётные записи»…"
 msgid "Mail Account"
 msgstr "Почтовая учётная запись"
 
+#, fuzzy
+msgid "Nickname (shown in the sidebar and the Mail Accounts list)"
+msgstr ""
+"Как эта учётная запись отображается на боковой панели и во «Всех входящих»."
+
 msgid "Provider"
 msgstr "Провайдер"
 
@@ -1338,14 +1343,6 @@ msgstr "Внешний вид"
 msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Как эта учётная запись отображается на боковой панели и во «Всех входящих»."
-
-msgid "Nickname"
-msgstr ""
-
-msgid ""
-"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
-"address."
-msgstr ""
 
 msgid "Account accent color"
 msgstr "Цвет учётной записи"

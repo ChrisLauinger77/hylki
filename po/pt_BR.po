@@ -1241,6 +1241,12 @@ msgstr "Abrir Contas online…"
 msgid "Mail Account"
 msgstr "Conta de email"
 
+#, fuzzy
+msgid "Nickname (shown in the sidebar and the Mail Accounts list)"
+msgstr ""
+"Como esta conta é exibida na barra lateral e na visualização Caixas de "
+"entrada."
+
 msgid "Provider"
 msgstr "Provedor"
 
@@ -1332,14 +1338,6 @@ msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Como esta conta é exibida na barra lateral e na visualização Caixas de "
 "entrada."
-
-msgid "Nickname"
-msgstr ""
-
-msgid ""
-"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
-"address."
-msgstr ""
 
 msgid "Account accent color"
 msgstr "Cor de destaque da conta"

@@ -1255,6 +1255,12 @@ msgstr "Ouvrir Comptes en ligne…"
 msgid "Mail Account"
 msgstr "Compte e-mail"
 
+#, fuzzy
+msgid "Nickname (shown in the sidebar and the Mail Accounts list)"
+msgstr ""
+"Comment ce compte est affiché dans la barre latérale et dans la vue Toutes "
+"les boîtes de réception."
+
 msgid "Provider"
 msgstr "Fournisseur"
 
@@ -1346,14 +1352,6 @@ msgid "How this account is shown in the sidebar and the Inboxes view."
 msgstr ""
 "Façon dont ce compte est affiché dans la barre latérale et dans la vue "
 "Boîtes de réception."
-
-msgid "Nickname"
-msgstr ""
-
-msgid ""
-"Shown in the sidebar and in the Mail Accounts list. Defaults to the email "
-"address."
-msgstr ""
 
 msgid "Account accent color"
 msgstr "Couleur d'accentuation du compte"
@@ -5347,11 +5345,6 @@ msgstr "Hyprlab"
 #~ "étiquettes. Faites glisser une étiquette pour la réorganiser : l'ordre "
 #~ "affiché ici correspond à celui de la barre latérale, et les neuf "
 #~ "premières correspondent aux touches 1 à 9."
-
-#~ msgid "How this account is shown in the sidebar and the All Inboxes view."
-#~ msgstr ""
-#~ "Comment ce compte est affiché dans la barre latérale et dans la vue "
-#~ "Toutes les boîtes de réception."
 
 #~ msgid "Circle color"
 #~ msgstr "Couleur du cercle"
