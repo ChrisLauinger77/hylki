@@ -440,6 +440,9 @@ pub enum ComposeInput {
     /// Showcase only (HYLKI_SHOWCASE_COMPOSE_UNDO): one step of the scripted
     /// history check. See [`Compose::showcase_history`].
     ShowcaseHistory(u8),
+    /// Showcase only (HYLKI_SHOWCASE_COMPOSE_FROM): pick the From row's
+    /// entry `n`, as a click would, so the signature swap can be captured.
+    ShowcaseFrom(u32),
 }
 
 #[derive(Debug)]
@@ -1674,6 +1677,10 @@ impl Component for Compose {
                 self.showcase_history(step, widgets, &sender);
             }
 
+            ComposeInput::ShowcaseFrom(n) => {
+                widgets.from_row.set_selected(n);
+            }
+
             ComposeInput::BodyHistory(can_undo) => {
                 // A fresh edit takes its place in the order — one marker
                 // covers a whole run of typing, since the editor coalesces
@@ -1698,11 +1705,31 @@ impl Component for Compose {
                 if let Some(kind) = self.editor.source_kind() {
                     let old = sig_source(kind, &self.current_sig);
                     let new = sig_source(kind, &new_sig);
+                    // With no old block to replace (the previous account had
+                    // none), the new one goes where the setting puts it: at
+                    // the end, or above the quoted original (#237), which
+                    // in source is found by its text. HTML keeps the quote's
+                    // tags; Markdown has the `> ` lines, with the attribution
+                    // line ("On …, X wrote:" or the forward header) above.
+                    let place = match (self.signature_position, kind) {
+                        (SignaturePosition::BelowQuote, _) => "v=v+n;",
+                        (SignaturePosition::AboveQuote, SourceKind::Html) => {
+                            "var q=v.search(/<p class=\"vireo-quote-attr\"|<blockquote/);\
+                             if(q<0){v=v+n;}else{v=v.slice(0,q).replace(/\\s*$/,'')+n+v.slice(q);}"
+                        }
+                        (SignaturePosition::AboveQuote, SourceKind::Markdown) => {
+                            "var L=v.split('\\n');var qi=-1;\
+                             for(var k=0;k<L.length;k++){if(L[k]==='>'||L[k].indexOf('> ')===0){qi=k;break;}}\
+                             if(qi<0){v=v+n;}else{var a=qi-1;while(a>=0&&L[a].trim()==='')a--;\
+                             if(a>=0&&(/wrote:\\s*$/.test(L[a])||/^-{5,} Forwarded message/.test(L[a])))qi=a;\
+                             v=L.slice(0,qi).join('\\n').replace(/\\s*$/,'')+n+'\\n'+L.slice(qi).join('\\n');}"
+                        }
+                    };
                     self.editor.run_js(&format!(
                         "(function(){{var t=document.getElementById('src');if(!t)return;\
                          var o='{}',n='{}';var v=t.value;\
                          var i=o?v.lastIndexOf(o):-1;\
-                         if(i>=0){{v=v.slice(0,i)+n+v.slice(i+o.length);}}else{{v=v+n;}}\
+                         if(i>=0){{v=v.slice(0,i)+n+v.slice(i+o.length);}}else{{{place}}}\
                          t.value=v;window.__hylkiDirty=true;}})()",
                         js_escape(&old),
                         js_escape(&new)

@@ -1431,6 +1431,8 @@ pub enum AppMsg {
     ShowAttachmentInMessage(Attachment),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
+    /// Pick entry `n` of the inline composer's From row (#237 capture).
+    ShowcaseComposeFrom(u32),
     /// Forward one message of the open conversation by its id (#240), as
     /// its card's Forward button would.
     ShowcaseForward { account_id: u32, id: u32 },
@@ -4577,6 +4579,15 @@ impl SimpleComponent for AppModel {
                         s.input(AppMsg::ShowcaseComposePreview);
                     });
                 }
+                // HYLKI_SHOWCASE_COMPOSE_FROM=N picks the inline composer's
+                // From entry N at 7 s, to check where the new account's
+                // signature lands (#237).
+                if let Some(Ok(n)) = std::env::var("HYLKI_SHOWCASE_COMPOSE_FROM").ok().map(|v| v.parse::<u32>()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(7, move || {
+                        s.input(AppMsg::ShowcaseComposeFrom(n));
+                    });
+                }
                 // HYLKI_SHOWCASE_COMPOSE_CLOSE=N cancels the inline composer
                 // N seconds in (pair with HYLKI_SHOWCASE_REPLY), to check
                 // that a closed composer's web view, and so its web process,
@@ -7529,6 +7540,11 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowcaseComposePreview => {
                 if let Some(r) = self.reader_compose.as_ref() {
                     r.controller.emit(ComposeInput::TogglePreview(true));
+                }
+            }
+            AppMsg::ShowcaseComposeFrom(n) => {
+                if let Some(r) = self.reader_compose.as_ref() {
+                    r.controller.emit(ComposeInput::ShowcaseFrom(n));
                 }
             }
             AppMsg::ShowcaseForward { account_id, id } => {
