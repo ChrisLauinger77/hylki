@@ -65,7 +65,7 @@ fn stylesheet(dark: bool, accent: &str) -> String {
          html{{margin:0;padding:0;background:transparent;}}\
          body{{color:{fg};font:15px/1.6 system-ui,\"Adwaita Sans\",Cantarell,sans-serif;\
            overflow-wrap:anywhere;-webkit-font-smoothing:antialiased;background:transparent;\
-           max-width:44em;margin:0 auto;padding:22px 26px 26px;box-sizing:border-box;}}\
+           margin:0;padding:22px 26px 26px;box-sizing:border-box;}}\
          p,ul,ol,dl,blockquote,pre,table,figure,.vireo-plain{{margin:0 0 1em;}}\
          body>:last-child{{margin-bottom:0;}}\
          h1,h2,h3,h4,h5,h6{{margin:1.4em 0 0.5em;line-height:1.25;font-weight:700;}}\

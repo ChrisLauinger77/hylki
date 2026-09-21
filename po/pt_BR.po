@@ -5120,64 +5120,149 @@ msgstr "Caixa de entrada"
 msgid "Email Client"
 msgstr "Cliente de email"
 
-msgid "A clean, fast GNOME-native email client"
-msgstr "Um cliente de email simples, rápido e nativo do GNOME"
+msgid ""
+"A fast, GNOME-native email client, built with Rust and libadwaita. Open "
+"source and private by default."
+msgstr ""
 
 msgid "Email;Mail;IMAP;"
 msgstr "Email;Email;IMAP;"
 
-msgid "Private, GNOME-native email client"
-msgstr "Cliente de email privado e nativo do GNOME"
-
 msgid ""
-"Hylki is a desktop email client for Wayland that feels at home in GNOME. It "
-"talks IMAP and SMTP directly, keeps your mail and credentials on your "
-"machine, and blocks trackers by default — no telemetry, no analytics."
+"Hylki is a desktop email client for GNOME on Wayland, written in Rust with "
+"libadwaita. Your mail and credentials stay on your machine, remote content "
+"is blocked until you allow it, and there is no telemetry. It works with "
+"IMAP, POP3, JMAP and Microsoft 365, and with any server from iCloud to "
+"Proton Bridge to a Stalwart of your own."
 msgstr ""
-"O Hylki é um cliente de email para Wayland que se integra naturalmente ao "
-"GNOME. Comunica-se diretamente por IMAP e SMTP, mantém suas mensagens e "
-"credenciais no computador e bloqueia rastreadores por padrão — sem "
-"telemetria nem dados analíticos."
 
-msgid "Features:"
-msgstr "Recursos:"
+#, fuzzy
+msgid "Accounts and mail:"
+msgstr "Contar email não lido"
 
-msgid "Multiple IMAP and POP3 accounts, with a unified Inboxes view"
-msgstr ""
-"Várias contas IMAP e POP3, com uma vista unificada das Caixas de entrada"
-
+#, fuzzy
 msgid ""
-"Google, Microsoft and custom OAuth 2.0 sign-in, plus GNOME Online Accounts "
-"import"
+"Multiple accounts with a unified Inboxes view; Google, Microsoft and custom "
+"OAuth sign-in, or an account imported from GNOME Online Accounts"
 msgstr ""
 "Acesso no Google, Microsoft e serviços OAuth 2.0 personalizados, além da "
 "importação das Contas online do GNOME"
 
-msgid "Whole-mailbox sync and search with infinite scroll"
-msgstr "Sincronização e pesquisa de toda a caixa de email com rolagem infinita"
-
-msgid "Deletions and moves made on other devices sync back automatically"
+msgid ""
+"Whole-mailbox sync and search, conversation threading, and changes made on "
+"other devices synced back"
 msgstr ""
-"Exclusões e movimentações feitas em outros dispositivos são sincronizadas "
-"automaticamente"
 
-msgid "Conversation threading, compose, reply, forward, and editable drafts"
+msgid ""
+"Folder management, filters, tags, unified and filtered folders, and Trash "
+"and Junk emptied by hand or on a schedule"
 msgstr ""
-"Organização por conversas, composição, resposta, encaminhamento e rascunhos "
-"editáveis"
 
-msgid "Remote content blocked by default; per-message light or dark reading"
+msgid "An attachment gallery, an Outbox for sends that fail, and Send Later"
+msgstr ""
+
+msgid "Writing:"
+msgstr ""
+
+msgid ""
+"Rich text, Markdown, HTML or plain text, with HTML signatures, inline "
+"images, spell check and undo"
+msgstr ""
+
+msgid ""
+"Drafts, quote folding, split replies, and forwarding that keeps the "
+"attachments"
+msgstr ""
+
+msgid ""
+"Large files uploaded to your own Nextcloud, OneDrive, Dropbox or Seafile; a "
+"Send with Hylki entry in GNOME Files"
+msgstr ""
+
+#, fuzzy
+msgid "Reading:"
+msgstr "Leitura"
+
+#, fuzzy
+msgid ""
+"Reader View, your own font and colours, and per-message light or dark "
+"rendering"
 msgstr ""
 "Conteúdo remoto bloqueado por padrão; leitura clara ou escura por mensagem"
 
-msgid "Passwords and OAuth tokens kept in the system keyring"
-msgstr "Senhas e tokens OAuth salvos no chaveiro do sistema"
+msgid ""
+"OpenPGP signing, encryption and reading; DKIM, SPF and DMARC checked on "
+"arrival"
+msgstr ""
+
+msgid ""
+"Meeting invitations answered in place, and one-click unsubscribe from list "
+"mail"
+msgstr ""
+
+msgid "The app:"
+msgstr ""
+
+msgid ""
+"Adaptive three-pane layout, five appearance themes, Focus Mode, a "
+"customizable toolbar and swipe actions"
+msgstr ""
+
+msgid ""
+"Gmail-style single-key shortcuts, notifications with actions, an optional "
+"tray icon and background running"
+msgstr ""
+
+msgid ""
+"GNOME Contacts integration, your choice of language and clock, and passwords "
+"kept in the system keyring"
+msgstr ""
 
 msgid "The unified inbox in light mode"
 msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "A clean, fast GNOME-native email client"
+#~ msgstr "Um cliente de email simples, rápido e nativo do GNOME"
+
+#~ msgid "Private, GNOME-native email client"
+#~ msgstr "Cliente de email privado e nativo do GNOME"
+
+#~ msgid ""
+#~ "Hylki is a desktop email client for Wayland that feels at home in GNOME. "
+#~ "It talks IMAP and SMTP directly, keeps your mail and credentials on your "
+#~ "machine, and blocks trackers by default — no telemetry, no analytics."
+#~ msgstr ""
+#~ "O Hylki é um cliente de email para Wayland que se integra naturalmente ao "
+#~ "GNOME. Comunica-se diretamente por IMAP e SMTP, mantém suas mensagens e "
+#~ "credenciais no computador e bloqueia rastreadores por padrão — sem "
+#~ "telemetria nem dados analíticos."
+
+#~ msgid "Features:"
+#~ msgstr "Recursos:"
+
+#~ msgid "Multiple IMAP and POP3 accounts, with a unified Inboxes view"
+#~ msgstr ""
+#~ "Várias contas IMAP e POP3, com uma vista unificada das Caixas de entrada"
+
+#~ msgid "Whole-mailbox sync and search with infinite scroll"
+#~ msgstr ""
+#~ "Sincronização e pesquisa de toda a caixa de email com rolagem infinita"
+
+#~ msgid "Deletions and moves made on other devices sync back automatically"
+#~ msgstr ""
+#~ "Exclusões e movimentações feitas em outros dispositivos são sincronizadas "
+#~ "automaticamente"
+
+#~ msgid "Conversation threading, compose, reply, forward, and editable drafts"
+#~ msgstr ""
+#~ "Organização por conversas, composição, resposta, encaminhamento e "
+#~ "rascunhos editáveis"
+
+#~ msgid "Passwords and OAuth tokens kept in the system keyring"
+#~ msgstr "Senhas e tokens OAuth salvos no chaveiro do sistema"
 
 #, fuzzy
 #~ msgid "Mark as Read button"
