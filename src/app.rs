@@ -1458,7 +1458,7 @@ pub enum AppMsg {
     ComposeTo(String),
     /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
-    ShowcaseFolder(FolderKind),
+    ShowcaseFolder { kind: FolderKind, account: Option<u32> },
     /// Showcase only (HYLKI_SHOWCASE_EDITOR_DIRTY): change the open account
     /// editor, so leaving an edited one can be captured.
     ShowcaseDirtyEditor,
@@ -4101,12 +4101,14 @@ impl SimpleComponent for AppModel {
                 let _ = list.send(MessageListInput::SelectAndLoad((a, id)));
             });
         }
-        // HYLKI_SHOWCASE_INBOX=1 switches to the first account's Inbox at
-        // 3 s, real accounts included, for the same probe from a folder view.
-        if std::env::var_os("HYLKI_SHOWCASE_INBOX").is_some() {
+        // HYLKI_SHOWCASE_INBOX=<account> switches to that account's Inbox
+        // at 3 s (the first account's when it is not a number), real
+        // accounts included, for the same probe from a folder view.
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_INBOX") {
+            let account = v.parse::<u32>().ok().filter(|a| *a > 0);
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(3, move || {
-                s.input(AppMsg::ShowcaseFolder(FolderKind::Inbox));
+                s.input(AppMsg::ShowcaseFolder { kind: FolderKind::Inbox, account });
             });
         }
         // Timers leave room for the WebViews to load and settle between steps.
@@ -4529,7 +4531,7 @@ impl SimpleComponent for AppModel {
                     if let Some(kind) = kind {
                         let s = sender.clone();
                         gtk::glib::timeout_add_seconds_local_once(2, move || {
-                            s.input(AppMsg::ShowcaseFolder(kind));
+                            s.input(AppMsg::ShowcaseFolder { kind, account: None });
                         });
                     }
                 }
@@ -6300,8 +6302,8 @@ impl SimpleComponent for AppModel {
                 self.sync_tag_keywords();
             }
 
-            AppMsg::ShowcaseFolder(kind) => {
-                let account = self.active_account();
+            AppMsg::ShowcaseFolder { kind, account } => {
+                let account = account.unwrap_or_else(|| self.active_account());
                 let found = self
                     .folders
                     .get(&account)
