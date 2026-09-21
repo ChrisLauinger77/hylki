@@ -952,6 +952,11 @@ struct PrivacyFile {
     /// on the lock screen, so turning it off is worth offering.
     #[serde(default = "default_notification_content")]
     notification_content: bool,
+    /// Which action buttons a new-mail notification carries (#244), by
+    /// name: `mark_read`, `archive`, `delete`, `reply`, `forward`, `spam`;
+    /// at most three count. Absent = mark_read, archive, delete.
+    #[serde(default = "default_notification_buttons")]
+    notification_buttons: Vec<String>,
     /// Whether the sidebar's pinned footer shows the "Attachments" row (the
     /// gallery of every account's attachments).
     #[serde(default = "default_show_attachments")]
@@ -1246,6 +1251,10 @@ fn default_notification_content() -> bool {
     true
 }
 
+fn default_notification_buttons() -> Vec<String> {
+    NotificationButtons::default().to_list()
+}
+
 fn default_notifications() -> bool {
     true
 }
@@ -1345,6 +1354,7 @@ impl Default for PrivacyFile {
             plain_font: String::new(),
             notifications: default_notifications(),
             notification_content: default_notification_content(),
+            notification_buttons: default_notification_buttons(),
             show_attachments: default_show_attachments(),
             show_contacts: default_show_contacts(),
             settings_open_accounts: false,
@@ -2439,6 +2449,134 @@ pub fn load_notification_content() -> bool {
     load_privacy().notification_content
 }
 
+/// One of the action buttons a new-mail notification can carry (#244).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NotificationButton {
+    MarkRead,
+    Archive,
+    Delete,
+    Reply,
+    Forward,
+    Spam,
+}
+
+impl NotificationButton {
+    /// Every button, in the order they appear on a notification.
+    pub const ALL: [NotificationButton; 6] = [
+        NotificationButton::MarkRead,
+        NotificationButton::Archive,
+        NotificationButton::Delete,
+        NotificationButton::Reply,
+        NotificationButton::Forward,
+        NotificationButton::Spam,
+    ];
+
+    /// The name the setting is stored under.
+    fn key(self) -> &'static str {
+        match self {
+            NotificationButton::MarkRead => "mark_read",
+            NotificationButton::Archive => "archive",
+            NotificationButton::Delete => "delete",
+            NotificationButton::Reply => "reply",
+            NotificationButton::Forward => "forward",
+            NotificationButton::Spam => "spam",
+        }
+    }
+}
+
+/// Which action buttons a new-mail notification carries (#244): any three
+/// of the six, chosen in Settings → General → Notifications. Three is what
+/// GNOME's notification portal shows; a fourth would be dropped anyway.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotificationButtons {
+    pub mark_read: bool,
+    pub archive: bool,
+    pub delete: bool,
+    pub reply: bool,
+    pub forward: bool,
+    pub spam: bool,
+}
+
+impl NotificationButtons {
+    pub const MAX: usize = 3;
+
+    const NONE: Self = Self {
+        mark_read: false,
+        archive: false,
+        delete: false,
+        reply: false,
+        forward: false,
+        spam: false,
+    };
+}
+
+impl Default for NotificationButtons {
+    fn default() -> Self {
+        Self { mark_read: true, archive: true, delete: true, ..Self::NONE }
+    }
+}
+
+impl NotificationButtons {
+    pub fn get(self, button: NotificationButton) -> bool {
+        match button {
+            NotificationButton::MarkRead => self.mark_read,
+            NotificationButton::Archive => self.archive,
+            NotificationButton::Delete => self.delete,
+            NotificationButton::Reply => self.reply,
+            NotificationButton::Forward => self.forward,
+            NotificationButton::Spam => self.spam,
+        }
+    }
+
+    pub fn set(&mut self, button: NotificationButton, on: bool) {
+        match button {
+            NotificationButton::MarkRead => self.mark_read = on,
+            NotificationButton::Archive => self.archive = on,
+            NotificationButton::Delete => self.delete = on,
+            NotificationButton::Reply => self.reply = on,
+            NotificationButton::Forward => self.forward = on,
+            NotificationButton::Spam => self.spam = on,
+        }
+    }
+
+    /// How many are on.
+    pub fn count(self) -> usize {
+        NotificationButton::ALL.into_iter().filter(|b| self.get(*b)).count()
+    }
+
+    /// Whether the set is full, so another button cannot be switched on.
+    pub fn full(self) -> bool {
+        self.count() >= Self::MAX
+    }
+
+    /// The setting as stored: the names of the buttons that are on. A name
+    /// the file has that this version does not know is dropped, and past
+    /// the third button (in [`NotificationButton::ALL`] order) so are the
+    /// rest.
+    fn from_list(names: &[String]) -> Self {
+        let mut b = Self::NONE;
+        for button in NotificationButton::ALL {
+            if !b.full() && names.iter().any(|n| n == button.key()) {
+                b.set(button, true);
+            }
+        }
+        b
+    }
+
+    fn to_list(self) -> Vec<String> {
+        NotificationButton::ALL
+            .into_iter()
+            .filter(|b| self.get(*b))
+            .map(|b| b.key().to_string())
+            .collect()
+    }
+}
+
+/// Which action buttons a new-mail notification carries (#244).
+pub fn load_notification_buttons() -> NotificationButtons {
+    NotificationButtons::from_list(&load_privacy().notification_buttons)
+}
+
 /// Whether the sidebar shows the "Attachments" row.
 pub fn load_show_attachments() -> bool {
     load_privacy().show_attachments
@@ -2728,6 +2866,7 @@ pub fn save_privacy(
     plain_font: String,
     notifications: bool,
     notification_content: bool,
+    notification_buttons: NotificationButtons,
     show_attachments: bool,
     show_contacts: bool,
     settings_open_accounts: bool,
@@ -2817,6 +2956,7 @@ pub fn save_privacy(
         plain_font,
         notifications,
         notification_content,
+        notification_buttons: notification_buttons.to_list(),
         show_attachments,
         show_contacts,
         settings_open_accounts,
@@ -3579,6 +3719,39 @@ mod tests {
         // An older privacy.toml with no `notifications` key opts in by default.
         let p: PrivacyFile = toml::from_str("").unwrap();
         assert!(p.notifications);
+    }
+
+    #[test]
+    fn notification_buttons_default_to_all_and_round_trip() {
+        // An older privacy.toml with no key carries every button.
+        let p: PrivacyFile = toml::from_str("").unwrap();
+        assert_eq!(super::NotificationButtons::from_list(&p.notification_buttons), super::NotificationButtons::default());
+        // An empty list is no buttons at all, not the default.
+        let p: PrivacyFile = toml::from_str("notification_buttons = []").unwrap();
+        let none = super::NotificationButtons::NONE;
+        assert_eq!(super::NotificationButtons::from_list(&p.notification_buttons), none);
+        let p: PrivacyFile =
+            toml::from_str(r#"notification_buttons = ["delete", "bogus", "mark_read"]"#).unwrap();
+        let b = super::NotificationButtons::from_list(&p.notification_buttons);
+        assert_eq!(b, super::NotificationButtons { mark_read: true, delete: true, ..none });
+        assert_eq!(b.to_list(), vec!["mark_read".to_string(), "delete".to_string()]);
+    }
+
+    #[test]
+    fn notification_buttons_stop_at_three() {
+        // A hand-edited file naming more than three keeps the first three
+        // in button order, whatever order the file lists them in.
+        let p: PrivacyFile = toml::from_str(
+            r#"notification_buttons = ["spam", "forward", "reply", "delete", "archive"]"#,
+        )
+        .unwrap();
+        let b = super::NotificationButtons::from_list(&p.notification_buttons);
+        assert_eq!(
+            b,
+            super::NotificationButtons { archive: true, delete: true, reply: true, ..super::NotificationButtons::NONE }
+        );
+        assert!(b.full());
+        assert_eq!(b.count(), 3);
     }
 
     #[test]

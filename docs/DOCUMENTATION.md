@@ -362,6 +362,17 @@ System → GNOME Files** holds the same choices, so the questions can be
 skipped: what the files go into, what happens over the limit, and the limit
 itself.
 
+### Notifications
+
+A new-mail notification opens the message when clicked. When it is about a
+single message it also carries up to three buttons. **Mark as Read**,
+**Archive**, **Delete** (to Trash, with the usual undo in the window) and
+**Mark as Spam** act on the message without raising the window; **Reply**
+and **Forward** open the message with the composer started. Settings →
+General → Notification Buttons picks any three of the six (Mark as Read,
+Archive and Delete to begin with); a notification that sums up several new
+messages carries none. Stored as `notification_buttons` in `privacy.toml`.
+
 ## Privacy
 
 Hylki collects no telemetry and sends no analytics. Remote content in messages is

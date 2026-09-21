@@ -3134,6 +3134,24 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr ""
 
+msgid "Notification Buttons"
+msgstr ""
+
+msgid "Up to three buttons on a notification about one message."
+msgstr ""
+
+msgid "Moves the message to Trash."
+msgstr ""
+
+msgid "Opens the message with a reply started."
+msgstr ""
+
+msgid "Opens the message with a forward started."
+msgstr ""
+
+msgid "Moves the message to Junk."
+msgstr ""
+
 msgid "Style"
 msgstr ""
 

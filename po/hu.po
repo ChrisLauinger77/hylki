@@ -3416,6 +3416,29 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Feladó és tárgy megjelenítése"
 
+#, fuzzy
+msgid "Notification Buttons"
+msgstr "Értesítések"
+
+msgid "Up to three buttons on a notification about one message."
+msgstr ""
+
+#, fuzzy
+msgid "Moves the message to Trash."
+msgstr "Minden melléklet mentése egy mappába"
+
+#, fuzzy
+msgid "Opens the message with a reply started."
+msgstr "Olvasott üzenet nyomtatása"
+
+#, fuzzy
+msgid "Opens the message with a forward started."
+msgstr "Minden melléklet mentése egy mappába"
+
+#, fuzzy
+msgid "Moves the message to Junk."
+msgstr "Minden melléklet mentése egy mappába"
+
 msgid "Style"
 msgstr "Stílus"
 
@@ -5030,6 +5053,18 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Mark as Read button"
+#~ msgstr "Megjelölés olvasottként"
+
+#, fuzzy
+#~ msgid "Archive button"
+#~ msgstr "Archiválás"
+
+#, fuzzy
+#~ msgid "Delete button"
+#~ msgstr "Törli a névjegyet?"
 
 #~ msgid "Label (defaults to email address)"
 #~ msgstr "Címke (alapértelmezés szerint az e-mail-cím)"

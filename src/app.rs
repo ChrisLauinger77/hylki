@@ -672,6 +672,8 @@ pub struct AppModel {
     notifications_enabled: bool,
     /// Whether new-mail notifications may name the sender and subject.
     notification_content: bool,
+    /// Which action buttons a new-mail notification carries (#244).
+    notification_buttons: config::NotificationButtons,
     /// Whether the sidebar's footer shows the "Attachments" row.
     show_attachments: bool,
     /// Whether the sidebar's footer shows the "Contacts" shortcut row.
@@ -986,6 +988,9 @@ pub struct AppModel {
     /// A forward (#240) waiting on the body, or the attachments, it is to
     /// carry, and whether it opens inline or in a window.
     pending_forward: Option<(Message, bool)>,
+    /// A reply started from a notification's button (#244), waiting for
+    /// the body it quotes.
+    pending_notified_reply: Option<Message>,
     /// Settings → System → Links: which browser a link in a message opens in
     /// (#232). Empty = the desktop's default, "ask" = its app chooser,
     /// otherwise a desktop entry id.
@@ -1105,6 +1110,10 @@ pub enum AppMsg {
     /// archive it, without raising the window.
     NotificationMarkRead { account_id: u32, folder_id: u32, message_id: u32 },
     NotificationArchive { account_id: u32, folder_id: u32, message_id: u32 },
+    NotificationDelete { account_id: u32, folder_id: u32, message_id: u32 },
+    NotificationReply { account_id: u32, folder_id: u32, message_id: u32 },
+    NotificationForward { account_id: u32, folder_id: u32, message_id: u32 },
+    NotificationSpam { account_id: u32, folder_id: u32, message_id: u32 },
     /// The search field became active/inactive — supply or drop the cross-folder
     /// search pool (every folder's messages, so search can span the mailbox).
     SearchActive(bool),
@@ -1316,6 +1325,7 @@ pub enum AppMsg {
     SetPush(bool),
     SetNotifications(bool),
     SetNotificationContent(bool),
+    SetNotificationButtons(config::NotificationButtons),
     SetAttachmentsRow(bool),
     SetContactsRow(bool),
     SetShowUnified(bool),
@@ -2963,6 +2973,7 @@ impl SimpleComponent for AppModel {
             pending_draft_pick: None,
             pending_edit_as_new: None,
             pending_forward: None,
+            pending_notified_reply: None,
             files_prefs: config::load_files_prefs(),
             link_browser: {
                 // The launcher reads its choice from here, not from disk, so
@@ -3052,6 +3063,7 @@ impl SimpleComponent for AppModel {
             push: config::load_push(),
             notifications_enabled: config::load_notifications(),
             notification_content: config::load_notification_content(),
+            notification_buttons: config::load_notification_buttons(),
             show_attachments,
             show_contacts,
             settings_open_accounts: config::load_settings_open_accounts(),
@@ -3619,6 +3631,12 @@ impl SimpleComponent for AppModel {
                 (crate::notify::ARCHIVE_ACTION, &|account_id, folder_id, message_id| {
                     AppMsg::NotificationArchive { account_id, folder_id, message_id }
                 }),
+                (crate::notify::DELETE_ACTION, &|account_id, folder_id, message_id| {
+                    AppMsg::NotificationDelete { account_id, folder_id, message_id }
+                }),
+                (crate::notify::SPAM_ACTION, &|account_id, folder_id, message_id| {
+                    AppMsg::NotificationSpam { account_id, folder_id, message_id }
+                }),
             ] {
                 let act = gtk::gio::SimpleAction::new(name, Some(ty));
                 let asender = sender.clone();
@@ -3626,6 +3644,41 @@ impl SimpleComponent for AppModel {
                     if let Some((account_id, folder_id, message_id)) =
                         param.and_then(|v| v.get::<(u32, u32, u32)>())
                     {
+                        asender.input(mk(account_id, folder_id, message_id));
+                    }
+                });
+                app.add_action(&act);
+            }
+            // Reply and Forward (#244) need the window: the message opens
+            // as a click on the notification would open it, and the
+            // composer follows once its body is in.
+            for (name, mk) in [
+                (
+                    crate::notify::REPLY_ACTION,
+                    (&|account_id, folder_id, message_id| AppMsg::NotificationReply {
+                        account_id,
+                        folder_id,
+                        message_id,
+                    }) as &dyn Fn(u32, u32, u32) -> AppMsg,
+                ),
+                (crate::notify::FORWARD_ACTION, &|account_id, folder_id, message_id| {
+                    AppMsg::NotificationForward { account_id, folder_id, message_id }
+                }),
+            ] {
+                let act = gtk::gio::SimpleAction::new(name, Some(ty));
+                let win = model.window.clone();
+                let asender = sender.clone();
+                act.connect_activate(move |_, param| {
+                    win.set_visible(true);
+                    win.present();
+                    if let Some((account_id, folder_id, message_id)) =
+                        param.and_then(|v| v.get::<(u32, u32, u32)>())
+                    {
+                        asender.input(AppMsg::OpenMessageFromNotification {
+                            account_id,
+                            folder_id,
+                            message_id,
+                        });
                         asender.input(mk(account_id, folder_id, message_id));
                     }
                 });
@@ -5177,6 +5230,51 @@ impl SimpleComponent for AppModel {
                 {
                     self.move_to(m, FolderKind::Archive);
                     crate::notify::withdraw_mail(account_id);
+                }
+            }
+
+            AppMsg::NotificationDelete { account_id, folder_id, message_id } => {
+                if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
+                {
+                    // The same path as the Delete key: to Trash, with the
+                    // usual undo; a message already there asks first.
+                    self.delete_messages(vec![m], &sender);
+                    crate::notify::withdraw_mail(account_id);
+                }
+            }
+
+            AppMsg::NotificationSpam { account_id, folder_id, message_id } => {
+                if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
+                {
+                    self.mark_spam_msg(m);
+                    crate::notify::withdraw_mail(account_id);
+                }
+            }
+
+            // The message is opening in the reader (the action sent
+            // OpenMessageFromNotification first); the composer waits for
+            // the body it quotes when that is still on its way.
+            AppMsg::NotificationReply { account_id, folder_id, message_id } => {
+                if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
+                {
+                    let m = self.with_cached_body(m);
+                    if m.body.is_empty() {
+                        self.pending_notified_reply = Some(m);
+                    } else {
+                        self.open_inline_reply(
+                            m.account_id,
+                            self.reply_pgp(&m, reply_prefill(&m)),
+                            Some((m.account_id, m.id)),
+                            &sender,
+                        );
+                    }
+                }
+            }
+
+            AppMsg::NotificationForward { account_id, folder_id, message_id } => {
+                if let Some(m) = notified_message(account_id, folder_id, message_id, &self.folders)
+                {
+                    self.forward(m, true, &sender);
                 }
             }
 
@@ -6749,6 +6847,13 @@ impl SimpleComponent for AppModel {
             AppMsg::SetNotificationContent(on) => {
                 if self.notification_content != on {
                     self.notification_content = on;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SetNotificationButtons(buttons) => {
+                if self.notification_buttons != buttons {
+                    self.notification_buttons = buttons;
                     self.save_settings();
                 }
             }
@@ -9337,6 +9442,22 @@ impl SimpleComponent for AppModel {
                     }
                     self.pending_forward = Some((pending, inline));
                 }
+                // A reply from a notification's button (#244): the message
+                // is opening in the reader too, so the body goes on to be
+                // shown as usual.
+                if let Some(mut m) = self.pending_notified_reply.take() {
+                    if m.account_id == account_id && m.id == message_id {
+                        m.body = body.clone();
+                        self.open_inline_reply(
+                            m.account_id,
+                            self.reply_pgp(&m, reply_prefill(&m)),
+                            Some((m.account_id, m.id)),
+                            &sender,
+                        );
+                    } else {
+                        self.pending_notified_reply = Some(m);
+                    }
+                }
                 // Likewise a reply picked for handed-in files.
                 if let Some((mut m, extra)) = self.pending_reply.take() {
                     if m.account_id == account_id && m.id == message_id {
@@ -10079,6 +10200,7 @@ impl AppModel {
             self.plain_font.clone(),
             self.notifications_enabled,
             self.notification_content,
+            self.notification_buttons,
             self.show_attachments,
             self.show_contacts,
             self.settings_open_accounts,
@@ -15971,6 +16093,7 @@ impl AppModel {
             signature_position: self.signature_position,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
+            notification_buttons: self.notification_buttons,
             show_attachments: self.show_attachments,
             show_contacts: self.show_contacts,
             show_unified: self.show_unified_pref,
@@ -16083,6 +16206,7 @@ impl AppModel {
                 PrefOutput::SetNotificationContent(on) => {
                     AppMsg::SetNotificationContent(on)
                 }
+                PrefOutput::SetNotificationButtons(b) => AppMsg::SetNotificationButtons(b),
                 PrefOutput::SetAttachmentsRow(show) => AppMsg::SetAttachmentsRow(show),
                 PrefOutput::SetContactsRow(show) => AppMsg::SetContactsRow(show),
                 PrefOutput::SetShowUnified(show) => AppMsg::SetShowUnified(show),

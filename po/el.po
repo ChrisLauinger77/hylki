@@ -3473,6 +3473,29 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Εμφάνιση αποστολέα και θέματος"
 
+#, fuzzy
+msgid "Notification Buttons"
+msgstr "Ειδοποιήσεις"
+
+msgid "Up to three buttons on a notification about one message."
+msgstr ""
+
+#, fuzzy
+msgid "Moves the message to Trash."
+msgstr "Μετακίνηση αυτού του μηνύματος σε φάκελο"
+
+#, fuzzy
+msgid "Opens the message with a reply started."
+msgstr "Εκτύπωση του μηνύματος που διαβάζετε"
+
+#, fuzzy
+msgid "Opens the message with a forward started."
+msgstr "Μετακίνηση αυτού του μηνύματος σε φάκελο"
+
+#, fuzzy
+msgid "Moves the message to Junk."
+msgstr "Μετακίνηση αυτού του μηνύματος σε φάκελο"
+
 msgid "Style"
 msgstr "Εμφάνιση"
 
@@ -5187,6 +5210,18 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Mark as Read button"
+#~ msgstr "Σήμανση ως αναγνωσμένο"
+
+#, fuzzy
+#~ msgid "Archive button"
+#~ msgstr "Αρχειοθέτηση"
+
+#, fuzzy
+#~ msgid "Delete button"
+#~ msgstr "Διαγραφή επαφής;"
 
 #~ msgid "Label (defaults to email address)"
 #~ msgstr "Ετικέτα (προεπιλογή η διεύθυνση email)"

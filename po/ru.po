@@ -3432,6 +3432,29 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Показывать отправителя и тему"
 
+#, fuzzy
+msgid "Notification Buttons"
+msgstr "Уведомления"
+
+msgid "Up to three buttons on a notification about one message."
+msgstr ""
+
+#, fuzzy
+msgid "Moves the message to Trash."
+msgstr "Переместить это сообщение в папку"
+
+#, fuzzy
+msgid "Opens the message with a reply started."
+msgstr "Печать открытого сообщения"
+
+#, fuzzy
+msgid "Opens the message with a forward started."
+msgstr "Переместить это сообщение в папку"
+
+#, fuzzy
+msgid "Moves the message to Junk."
+msgstr "Переместить это сообщение в папку"
+
 msgid "Style"
 msgstr "Стиль оформления"
 
@@ -5111,6 +5134,18 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Mark as Read button"
+#~ msgstr "Отметить как прочитанное"
+
+#, fuzzy
+#~ msgid "Archive button"
+#~ msgstr "Архив"
+
+#, fuzzy
+#~ msgid "Delete button"
+#~ msgstr "Удалить контакт?"
 
 #~ msgid "Label (defaults to email address)"
 #~ msgstr "Метка (по умолчанию адрес электронной почты)"

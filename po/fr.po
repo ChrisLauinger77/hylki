@@ -3466,6 +3466,29 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Afficher l'expéditeur et l'objet"
 
+#, fuzzy
+msgid "Notification Buttons"
+msgstr "Notifications"
+
+msgid "Up to three buttons on a notification about one message."
+msgstr ""
+
+#, fuzzy
+msgid "Moves the message to Trash."
+msgstr "Déplacer ce message vers un dossier"
+
+#, fuzzy
+msgid "Opens the message with a reply started."
+msgstr "Imprimer le message en cours de lecture"
+
+#, fuzzy
+msgid "Opens the message with a forward started."
+msgstr "Déplacer ce message vers un dossier"
+
+#, fuzzy
+msgid "Moves the message to Junk."
+msgstr "Déplacer ce message vers un dossier"
+
 msgid "Style"
 msgstr "Style"
 
@@ -5186,6 +5209,18 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Mark as Read button"
+#~ msgstr "Marquer comme lu"
+
+#, fuzzy
+#~ msgid "Archive button"
+#~ msgstr "Archiver"
+
+#, fuzzy
+#~ msgid "Delete button"
+#~ msgstr "Supprimer le contact ?"
 
 #~ msgid "Label (defaults to email address)"
 #~ msgstr "Étiquette (adresse e-mail par défaut)"
