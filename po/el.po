@@ -852,6 +852,13 @@ msgstr "Εμφάνιση ή απόκρυψη λογαριασμών στην π�
 msgid "Focus Mode on or off"
 msgstr ""
 
+#, fuzzy
+msgid "Message zoom in or out"
+msgstr "Γραμματοσειρά μηνυμάτων"
+
+msgid "Message zoom back to 100%"
+msgstr ""
+
 msgid "Console mode (when enabled in Settings)"
 msgstr "Λειτουργία κονσόλας (όταν είναι ενεργοποιημένη στις Ρυθμίσεις)"
 
@@ -2945,6 +2952,9 @@ msgstr "Επόμενη αντιστοιχία"
 
 msgid "Close find"
 msgstr "Κλείσιμο εύρεσης"
+
+msgid "Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back."
+msgstr ""
 
 msgid ""
 "Reader View shows a message as its text alone, in one plain format, without "

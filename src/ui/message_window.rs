@@ -35,6 +35,8 @@ pub struct MessageWindowInit {
     pub reader_style: crate::config::ReaderStyle,
     /// Reader View (the main window's header toggle), followed here too.
     pub reader_mode: bool,
+    /// Message zoom in percent (Ctrl+ / Ctrl-), followed here too.
+    pub zoom: u32,
     /// Whether the Reader View switch is shown at all.
     pub reader_switch: bool,
     /// What Reader View does when a message is opened.
@@ -86,6 +88,7 @@ pub enum MessageWindowInput {
     /// The reader's own fonts and colours changed (#56).
     SetReaderStyle(crate::config::ReaderStyle),
     SetReaderMode(bool),
+    SetZoom(u32),
     SetReaderSwitchShown(bool),
     SetReaderDefault(crate::config::ReaderDefault),
     /// This window's own Reader View toggle was flipped: handed up to the
@@ -358,6 +361,7 @@ impl Component for MessageWindow {
         view.emit(MessageViewInput::SetContentTheme(init.content_dark));
         view.emit(MessageViewInput::SetReaderStyle(init.reader_style.clone()));
         view.emit(MessageViewInput::SetReaderMode(init.reader_mode));
+        view.emit(MessageViewInput::SetZoom(init.zoom));
         view.emit(MessageViewInput::SetReaderSwitchShown(init.reader_switch));
         view.emit(MessageViewInput::SetReaderDefault(init.reader_default));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
@@ -420,6 +424,9 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetReaderStyle(style) => {
                 self.view.emit(MessageViewInput::SetReaderStyle(style));
+            }
+            MessageWindowInput::SetZoom(percent) => {
+                self.view.emit(MessageViewInput::SetZoom(percent));
             }
             MessageWindowInput::SetReaderMode(on) => {
                 self.view.emit(MessageViewInput::SetReaderMode(on));

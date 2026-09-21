@@ -3229,6 +3229,10 @@ struct StateFile {
     /// In-message attachment drawer: collapsed (showing only its header).
     #[serde(default)]
     drawer_collapsed: bool,
+    /// Message zoom (Ctrl+ / Ctrl-), in percent; 100 is the sender's size.
+    /// Scales the message bodies alone, never the reader's chrome.
+    #[serde(default = "default_reader_zoom")]
+    reader_zoom: u32,
     /// Expanded attachment-drawer height in px (the dragged split).
     #[serde(default = "default_drawer_height")]
     drawer_height: i32,
@@ -3434,6 +3438,24 @@ pub fn load_drawer_state() -> DrawerState {
 }
 
 /// Persist whether the attachment drawer is collapsed.
+/// The zoom steps Ctrl+ and Ctrl- walk, in percent.
+pub const READER_ZOOM_STEPS: [u32; 12] = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
+
+fn default_reader_zoom() -> u32 {
+    100
+}
+
+pub fn load_reader_zoom() -> u32 {
+    let z = load_state().reader_zoom;
+    if READER_ZOOM_STEPS.contains(&z) { z } else { 100 }
+}
+
+pub fn save_reader_zoom(percent: u32) {
+    let mut s = load_state();
+    s.reader_zoom = percent;
+    save_state(&s);
+}
+
 pub fn save_drawer_collapsed(collapsed: bool) {
     let mut s = load_state();
     s.drawer_collapsed = collapsed;

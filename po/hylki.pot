@@ -791,6 +791,12 @@ msgstr ""
 msgid "Focus Mode on or off"
 msgstr ""
 
+msgid "Message zoom in or out"
+msgstr ""
+
+msgid "Message zoom back to 100%"
+msgstr ""
+
 msgid "Console mode (when enabled in Settings)"
 msgstr ""
 
@@ -2648,6 +2654,9 @@ msgid "Next match"
 msgstr ""
 
 msgid "Close find"
+msgstr ""
+
+msgid "Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back."
 msgstr ""
 
 msgid ""

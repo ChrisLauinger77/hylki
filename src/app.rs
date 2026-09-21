@@ -823,6 +823,8 @@ pub struct AppModel {
     /// Reader View: every message in the reader shown as its content alone,
     /// in the reader's own sheet (see `crate::reader`). The toggle sits in
     /// the reader's subject block; the choice is remembered across runs.
+    /// Message zoom in percent (Ctrl+ / Ctrl-), saved in the state file.
+    zoom: u32,
     reader_mode: bool,
     /// The Reader View switch is shown in the reader header.
     reader_switch: bool,
@@ -1271,6 +1273,9 @@ pub enum AppMsg {
     SetSingleMessageCard(bool),
     /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
+    /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
+    /// back to 100%.
+    ZoomMessage(i8),
     /// Settings: show the Reader View switch in the reader header.
     SetReaderSwitchShown(bool),
     /// Settings: what Reader View does when a message is opened.
@@ -3146,6 +3151,7 @@ impl SimpleComponent for AppModel {
             body_hits: Default::default(),
             single_message_card: config::load_single_message_card(),
             reader_mode: config::load_reader_mode(),
+            zoom: config::load_reader_zoom(),
             reader_switch: config::load_reader_switch(),
             reader_default: config::load_reader_default(),
             card_attachments: config::load_card_attachments(),
@@ -3317,6 +3323,7 @@ impl SimpleComponent for AppModel {
             .message_view
             .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
         model.message_view.emit(MessageViewInput::SetReaderMode(model.effective_reader_mode()));
+        model.message_view.emit(MessageViewInput::SetZoom(model.zoom));
         model.message_view.emit(MessageViewInput::SetReaderSwitchShown(model.reader_switch));
         model.message_view.emit(MessageViewInput::SetReaderDefault(model.effective_reader_default()));
         model
@@ -3844,6 +3851,20 @@ impl SimpleComponent for AppModel {
                 "app.focus-mode",
                 &["<Ctrl><Shift>f"],
             );
+            // Ctrl+ / Ctrl- / Ctrl+0: message zoom, the bodies alone. The
+            // = key stands in for + on layouts where + needs Shift, and the
+            // keypad's keys count too, as in every browser.
+            for (name, step, keys) in [
+                ("zoom-in", 1i8, &["<Ctrl>plus", "<Ctrl>equal", "<Ctrl>KP_Add"][..]),
+                ("zoom-out", -1, &["<Ctrl>minus", "<Ctrl>KP_Subtract"][..]),
+                ("zoom-reset", 0, &["<Ctrl>0", "<Ctrl>KP_0"][..]),
+            ] {
+                let action = gtk::gio::SimpleAction::new(name, None);
+                let s = sender.clone();
+                action.connect_activate(move |_, _| s.input(AppMsg::ZoomMessage(step)));
+                app.add_action(&action);
+                gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, &format!("app.{name}"), keys);
+            }
             // Ctrl+W closes the window only (issue #64): with "run in the
             // background" on, mail keeps arriving — unlike Ctrl+Q, which
             // quits outright. GTK's built-in window.close action does
@@ -4141,6 +4162,16 @@ impl SimpleComponent for AppModel {
         // or the head of its conversation, real accounts included: a way to
         // open a conversation the reader assembles from the cache without a
         // pointer, so its log can be read (#236).
+        // HYLKI_SHOWCASE_ZOOM=N presses Ctrl+ N times (Ctrl- for a negative
+        // N) at 8 s, so the live zoom path can be captured.
+        if let Some(n) = std::env::var("HYLKI_SHOWCASE_ZOOM").ok().and_then(|v| v.parse::<i8>().ok()) {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(8, move || {
+                for _ in 0..n.unsigned_abs() {
+                    s.input(AppMsg::ZoomMessage(n.signum()));
+                }
+            });
+        }
         if let Some((a, id)) = std::env::var("HYLKI_SHOWCASE_SELECT").ok().and_then(|v| {
             let (a, id) = v.split_once(':')?;
             Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?))
@@ -7298,6 +7329,22 @@ impl SimpleComponent for AppModel {
                 if let Some((account_id, id)) = owner {
                     self.message_view
                         .emit(MessageViewInput::ScrollToAttachments { account_id, id });
+                }
+            }
+            AppMsg::ZoomMessage(step) => {
+                use config::READER_ZOOM_STEPS as STEPS;
+                let at = STEPS.iter().position(|&z| z == self.zoom).unwrap_or(5) as i32;
+                let zoom = match step {
+                    0 => 100,
+                    s => STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize],
+                };
+                if zoom != self.zoom {
+                    self.zoom = zoom;
+                    config::save_reader_zoom(zoom);
+                    self.message_view.emit(MessageViewInput::SetZoom(zoom));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetZoom(zoom));
+                    }
                 }
             }
             AppMsg::SetReaderMode(on) => {
@@ -13220,6 +13267,7 @@ impl AppModel {
             content_dark: self.message_theme.dark_override(),
             reader_style: self.reader_style(),
             reader_mode: self.effective_reader_mode(),
+            zoom: self.zoom,
             reader_switch: self.reader_switch,
             reader_default: self.effective_reader_default(),
             tags: self.tags.clone(),
@@ -18790,6 +18838,8 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+Shift+S", i18n_noop("Reveal the status bar (also: long-press Refresh)")),
             ("Ctrl+Shift+A", i18n_noop("Show or hide the accounts in the sidebar")),
             ("Ctrl+Shift+F", i18n_noop("Focus Mode on or off")),
+            ("Ctrl++  /  Ctrl+-", i18n_noop("Message zoom in or out")),
+            ("Ctrl+0", i18n_noop("Message zoom back to 100%")),
             ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
             ("Ctrl+Q", i18n_noop("Quit Hylki entirely")),
