@@ -359,6 +359,18 @@ impl Launcher {
         if user_path.exists() && !ours {
             return Launcher::Owned(user_path);
         }
+        // An AppImage installs nothing (#235): the only launcher is the one
+        // the integrator wrote (AppManager, Gear Lever), under a name of its
+        // own choosing and pointing at the bundle. Find it by what it runs
+        // and touch its `Icon` line alone, as for any other entry we did not
+        // write ourselves. Nothing to point at means nothing to do: an
+        // un-integrated bundle has no launcher at all.
+        if let Some(bundle) = crate::platform::appimage() {
+            return match launcher_running(&user_dir, &bundle) {
+                Some(path) => Launcher::Owned(path),
+                None => Launcher::None,
+            };
+        }
         let dirs = std::env::var("XDG_DATA_DIRS")
             .ok()
             .filter(|s| !s.is_empty())
@@ -393,6 +405,19 @@ impl Launcher {
             Launcher::None => {}
         }
     }
+}
+
+/// The launcher in `dir` whose `Exec` runs `bundle`, if one is there.
+fn launcher_running(dir: &std::path::Path, bundle: &std::path::Path) -> Option<PathBuf> {
+    let bundle = bundle.to_str()?;
+    std::fs::read_dir(dir).ok()?.flatten().find_map(|entry| {
+        let path = entry.path();
+        if path.extension()? != "desktop" {
+            return None;
+        }
+        let text = std::fs::read_to_string(&path).ok()?;
+        desktop_value(&text, "Exec")?.contains(bundle).then_some(path)
+    })
 }
 
 /// The `Exec` line Flatpak exports for this app (from `/.flatpak-info`), and
@@ -566,10 +591,21 @@ pub fn launch_restart_helper() -> Result<(), String> {
     }
 }
 
+/// What running Hylki again means for this install. From an AppImage it is
+/// the bundle, never `current_exe()`: that path is inside the runtime's
+/// temporary mount, which is unmounted as this process exits, so a helper
+/// holding it would re-exec a path that had stopped resolving.
+fn relaunch_path() -> Result<PathBuf, String> {
+    match crate::platform::appimage() {
+        Some(bundle) => Ok(bundle),
+        None => std::env::current_exe().map_err(|e| e.to_string()),
+    }
+}
+
 /// Outside Flatpak: run our own binary as a detached helper.
 fn spawn_restart_helper() -> Result<(), String> {
     use std::os::unix::process::CommandExt;
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = relaunch_path()?;
     std::process::Command::new(exe)
         .arg(RESTART_FLAG)
         .process_group(0)
@@ -636,7 +672,7 @@ pub fn run_restart_helper() -> ! {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
     drop(conn);
-    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("hylki"));
+    let exe = relaunch_path().unwrap_or_else(|_| PathBuf::from("hylki"));
     // A one-off launch's review and capture switches must not carry over
     // into the instance that comes back.
     let err = std::process::Command::new(exe)
