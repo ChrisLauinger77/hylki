@@ -989,7 +989,26 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Mail Account"),
 
-                                // Pick the provider first; the rest of the form
+                                // The nickname first: it is the one thing
+                                // most edits are for, and it names the
+                                // account wherever it is listed, the address
+                                // standing in while there is none. An
+                                // ActionRow rather than an EntryRow, which
+                                // has no subtitle to say where the name
+                                // shows up.
+                                adw::ActionRow {
+                                    set_title: &i18n("Nickname"),
+                                    set_subtitle: &i18n("Shown in the sidebar and in the Mail Accounts \
+                                                   list. Defaults to the email address."),
+                                    #[name = "label_row"]
+                                    add_suffix = &gtk::Entry {
+                                        set_valign: gtk::Align::Center,
+                                        set_hexpand: true,
+                                        set_width_chars: 18,
+                                    },
+                                },
+
+                                // Then the provider; the rest of the form
                                 // adapts (server fields vs. OAuth sign-in).
                                 #[name = "provider_row"]
                                 adw::ComboRow {
@@ -1167,23 +1186,6 @@ impl Component for AccountsWindow {
                                             set_hexpand: false,
                                             set_overflow: gtk::Overflow::Hidden,
                                         },
-                                    },
-                                },
-
-                                // The nickname names the account wherever
-                                // it is listed; the address stands in
-                                // while there is none. An ActionRow rather
-                                // than an EntryRow, which has no subtitle
-                                // to say where the name shows up.
-                                adw::ActionRow {
-                                    set_title: &i18n("Nickname"),
-                                    set_subtitle: &i18n("Shown in the sidebar and in the Mail Accounts \
-                                                   list. Defaults to the email address."),
-                                    #[name = "label_row"]
-                                    add_suffix = &gtk::Entry {
-                                        set_valign: gtk::Align::Center,
-                                        set_hexpand: true,
-                                        set_width_chars: 18,
                                     },
                                 },
 
