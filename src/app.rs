@@ -4067,6 +4067,32 @@ impl SimpleComponent for AppModel {
                 }
             });
         }
+        // HYLKI_SHOWCASE_SELECT=<account>:<id> opens that message at 5 s
+        // (HYLKI_SHOWCASE_SELECT_AT overrides the seconds) through its row,
+        // or the head of its conversation, real accounts included: a way to
+        // open a conversation the reader assembles from the cache without a
+        // pointer, so its log can be read (#236).
+        if let Some((a, id)) = std::env::var("HYLKI_SHOWCASE_SELECT").ok().and_then(|v| {
+            let (a, id) = v.split_once(':')?;
+            Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?))
+        }) {
+            let at: u32 = std::env::var("HYLKI_SHOWCASE_SELECT_AT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(5);
+            let list = model.message_list.sender().clone();
+            gtk::glib::timeout_add_seconds_local_once(at, move || {
+                let _ = list.send(MessageListInput::SelectAndLoad((a, id)));
+            });
+        }
+        // HYLKI_SHOWCASE_INBOX=1 switches to the first account's Inbox at
+        // 3 s, real accounts included, for the same probe from a folder view.
+        if std::env::var_os("HYLKI_SHOWCASE_INBOX").is_some() {
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(3, move || {
+                s.input(AppMsg::ShowcaseFolder(FolderKind::Inbox));
+            });
+        }
         // Timers leave room for the WebViews to load and settle between steps.
         if demo_mode() {
             if let Some(shot) = std::env::var("HYLKI_SHOWCASE").ok() {
@@ -5977,7 +6003,13 @@ impl SimpleComponent for AppModel {
                 {
                     self.thread_related_pending = false;
                 }
+                let found = messages.len();
                 self.merge_related(account_id, message_id, messages);
+                tracing::debug!(
+                    target: "hylki::undo",
+                    "related for {account_id}:{message_id}: {found} in the cache, conversation now {}",
+                    self.current_thread.len(),
+                );
                 // One render for the settled conversation, rather than one here
                 // and another for whatever this brought with it.
                 if self.current_thread.len() > 1 {
