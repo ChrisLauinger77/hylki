@@ -51,7 +51,9 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Four formats:** rich text, Markdown, hand-written HTML, or plain text,
   switched per message from the composer's format button. See
   [Writing in Markdown or HTML](DOCUMENTATION.md#writing-in-markdown-or-html).
-- **HTML signatures**, per account, with a default sender for new mail.
+- **HTML signatures**, per account, with a default sender for new mail. In a
+  reply or forward the signature sits above the quoted message, or below it
+  if you prefer.
 - **Drafts** that can be saved without a recipient, reopened inline, and
   deleted from the composer.
 - **Inline images:** dropped, pasted or picked from a file manager, resized

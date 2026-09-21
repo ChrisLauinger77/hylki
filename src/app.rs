@@ -869,6 +869,8 @@ pub struct AppModel {
     compose_format: crate::config::ComposeFormat,
     /// Where the split reply opens in the reading pane (#212).
     reply_position: config::ReplyPosition,
+    /// Where the signature sits in a reply or forward (#237).
+    signature_position: config::SignaturePosition,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -1414,6 +1416,7 @@ pub enum AppMsg {
     SetComposeFormat(crate::config::ComposeFormat),
     /// Settings: where the split reply opens in the reading pane (#212).
     SetReplyPosition(config::ReplyPosition),
+    SetSignaturePosition(config::SignaturePosition),
     /// Settings: each conversation message lists its own attachments (#213).
     SetCardAttachments(bool),
     /// Settings: the attachment drawer beneath the reader is shown (#213).
@@ -3143,6 +3146,7 @@ impl SimpleComponent for AppModel {
             paste_plain: config::load_paste_plain(),
             compose_format: config::load_compose_format(),
             reply_position: config::load_reply_position(),
+            signature_position: config::load_signature_position(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
@@ -7542,6 +7546,14 @@ impl SimpleComponent for AppModel {
                     self.save_settings();
                 }
             }
+            AppMsg::SetSignaturePosition(position) => {
+                // Composers already open keep their signature where it is;
+                // the next reply or forward opens with the new placement.
+                if self.signature_position != position {
+                    self.signature_position = position;
+                    self.save_settings();
+                }
+            }
             AppMsg::SetOverrideColors(on) => {
                 if self.override_colors != on {
                     self.override_colors = on;
@@ -9965,6 +9977,7 @@ impl AppModel {
             self.paste_plain,
             self.compose_format,
             self.reply_position,
+            self.signature_position,
             self.spellcheck,
             self.spellcheck_langs.clone(),
             self.preview_lines,
@@ -13358,15 +13371,18 @@ impl AppModel {
         // (Nautilus's "Send by email", #105) the composer opens before any
         // worker has connected, and the live list is still empty — which
         // hid the From row entirely.
+        // The demo's stand-in accounts count here too, so a demo reply
+        // carries a signature like a real one.
+        let config = self.effective_config();
         let mut emails: Vec<String> = Vec::new();
         for email in &self.account_order {
-            if self.config.iter().any(|c| c.enabled && &c.email == email)
+            if config.iter().any(|c| c.enabled && &c.email == email)
                 && !emails.contains(email)
             {
                 emails.push(email.clone());
             }
         }
-        for c in self.config.iter().filter(|c| c.enabled) {
+        for c in config.iter().filter(|c| c.enabled) {
             if !emails.contains(&c.email) {
                 emails.push(c.email.clone());
             }
@@ -13375,7 +13391,7 @@ impl AppModel {
             .iter()
             .flat_map(|email| {
                 let Some((idx, cfg)) =
-                    self.config.iter().enumerate().find(|(_, c)| &c.email == email)
+                    config.iter().enumerate().find(|(_, c)| &c.email == email)
                 else {
                     return Vec::new();
                 };
@@ -13462,6 +13478,7 @@ impl AppModel {
             compact: false,
             decorations: true,
             format: self.compose_format,
+            signature_position: self.signature_position,
         };
         (id, init)
     }
@@ -15736,6 +15753,7 @@ impl AppModel {
             plain_font: self.plain_font.clone(),
             compose_format: self.compose_format,
             reply_position: self.reply_position,
+            signature_position: self.signature_position,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             show_attachments: self.show_attachments,
@@ -15899,6 +15917,7 @@ impl AppModel {
                 PrefOutput::SetPlainFont(font) => AppMsg::SetPlainFont(font),
                 PrefOutput::SetComposeFormat(f) => AppMsg::SetComposeFormat(f),
                 PrefOutput::SetReplyPosition(p) => AppMsg::SetReplyPosition(p),
+                PrefOutput::SetSignaturePosition(p) => AppMsg::SetSignaturePosition(p),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(

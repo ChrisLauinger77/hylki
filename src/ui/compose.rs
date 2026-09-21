@@ -5,7 +5,7 @@ use relm4::prelude::*;
 
 use crate::contacts::Suggestion;
 use crate::models::DraftOrigin;
-use crate::config::ComposeFormat;
+use crate::config::{ComposeFormat, SignaturePosition};
 use crate::ui::rich_editor::{self, RichEditor, SourceKind, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
@@ -227,6 +227,8 @@ pub struct ComposeInit {
     /// What the message is written in: rich text, Markdown, HTML
     /// source, or plain text.
     pub format: ComposeFormat,
+    /// Where the signature goes against a quoted original (#237).
+    pub signature_position: SignaturePosition,
 }
 
 pub struct Compose {
@@ -235,6 +237,9 @@ pub struct Compose {
     editor: RichEditor,
     /// Signature currently appended to the body (so it can be swapped out).
     current_sig: String,
+    /// Where that signature sits against a quoted original (#237), so a
+    /// signature added on an account switch lands in the same place.
+    signature_position: SignaturePosition,
     /// Files to attach.
     attachments: Vec<std::path::PathBuf>,
     /// When editing a queued Outbox message, the row this replaces once sent.
@@ -810,6 +815,7 @@ impl Component for Compose {
             compact,
             decorations,
             format,
+            signature_position,
         } = init;
         let in_reply_to = prefill.in_reply_to.clone();
         let references = prefill.references.clone();
@@ -826,15 +832,25 @@ impl Component for Compose {
         completion.set_position(gtk::PositionType::Bottom);
         completion.add_css_class("menu");
 
-        // Initial editor content: a blank line to type on, the quoted
-        // reply/forward (if any), then the signature.
+        // Initial editor content: a blank line to type on, then the
+        // signature and the quoted reply/forward (if any), in the order
+        // the setting says (#237). A draft already contains its signature;
+        // don't add another.
         let mut content = String::from("<div><br></div>");
-        if !prefill.body_html.is_empty() {
-            content.push_str(&prefill.body_html);
-        }
-        // A draft already contains its signature; don't add another.
-        if draft_origin.is_none() && !current_sig.is_empty() {
-            content.push_str(&sig_html(&current_sig));
+        let sig = if draft_origin.is_none() && !current_sig.is_empty() {
+            sig_html(&current_sig)
+        } else {
+            String::new()
+        };
+        match signature_position {
+            SignaturePosition::AboveQuote => {
+                content.push_str(&sig);
+                content.push_str(&prefill.body_html);
+            }
+            SignaturePosition::BelowQuote => {
+                content.push_str(&prefill.body_html);
+                content.push_str(&sig);
+            }
         }
         let editor = RichEditor::new(&content);
         editor.set_formatting_visible(format == ComposeFormat::Rich);
@@ -914,6 +930,7 @@ impl Component for Compose {
             accounts,
             editor,
             current_sig,
+            signature_position,
             attachments: prefill_attachments,
             suggestions,
             completion,
@@ -1699,11 +1716,27 @@ impl Component for Compose {
                     } else {
                         sig_html(&new_sig)
                     };
+                    // No signature block to replace (the previous account
+                    // had none): a new one goes where the setting puts it,
+                    // above the quoted original or at the end (#237).
+                    let anchor = match self.signature_position {
+                        SignaturePosition::AboveQuote => {
+                            "var b=document.body;var q=null;\
+                             var cands=b.querySelectorAll('.vireo-quote-attr,blockquote');\
+                             for(var i=0;i<cands.length;i++){{var t=cands[i];\
+                             while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
+                             if(t.parentNode===b&&(!q||(t.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING)))q=t;}}\
+                             if(q){{q.insertAdjacentHTML('beforebegin',h);}}else{{b.insertAdjacentHTML('beforeend',h);}}"
+                        }
+                        SignaturePosition::BelowQuote => {
+                            "document.body.insertAdjacentHTML('beforeend',h);"
+                        }
+                    };
                     let js = format!(
                         "(function(){{var s=document.querySelector('.vireo-sig');\
                          var h='{}';\
                          if(s){{if(h){{s.outerHTML=h;}}else{{s.remove();}}}}\
-                         else if(h){{document.body.insertAdjacentHTML('beforeend',h);}}}})()",
+                         else if(h){{{anchor}}}}})()",
                         rich_editor::js_escape(&replacement)
                     );
                     self.editor.run_js(&js);

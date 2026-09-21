@@ -130,6 +130,14 @@ of the generated one.
   empty. Link passwords and expiry dates are a paid Dropbox feature; on a
   Basic plan leave both off, or the share step reports it.
 
+### Where the signature goes
+
+In a reply or forward the account's signature is placed above the quoted
+message, so it closes what you wrote rather than what the other person did.
+**Settings → Composing → Signature in replies** moves it below the quoted
+message instead, the placement Hylki had before 1.38. The setting applies
+when a composer opens; a draft keeps its signature wherever it was saved.
+
 ### Writing in Markdown or HTML
 
 A message can be written in any of four formats, chosen in **Settings →

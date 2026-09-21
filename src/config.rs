@@ -1024,6 +1024,10 @@ struct PrivacyFile {
     /// Where the split reply opens in the reading pane (#212).
     #[serde(default)]
     reply_position: ReplyPosition,
+    /// Where the signature sits in a reply or forward (#237): above the
+    /// quoted original, or below it.
+    #[serde(default)]
+    signature_position: SignaturePosition,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_spellcheck")]
     spellcheck: bool,
@@ -1350,6 +1354,7 @@ impl Default for PrivacyFile {
             compose_plain: false,
             compose_format: None,
             reply_position: ReplyPosition::default(),
+            signature_position: SignaturePosition::default(),
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -2387,6 +2392,22 @@ pub fn load_reply_position() -> ReplyPosition {
     load_privacy().reply_position
 }
 
+/// Where the signature goes in a reply or forward (#237). Above the quoted
+/// original is what Apple Mail and Thunderbird do, and what a reader
+/// expects: the signature closes the words above it, not the words
+/// somebody else wrote. Below is the placement Hylki had before.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SignaturePosition {
+    #[default]
+    AboveQuote,
+    BelowQuote,
+}
+
+pub fn load_signature_position() -> SignaturePosition {
+    load_privacy().signature_position
+}
+
 /// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
 pub fn load_compose_format() -> ComposeFormat {
@@ -2714,6 +2735,7 @@ pub fn save_privacy(
     paste_plain: bool,
     compose_format: ComposeFormat,
     reply_position: ReplyPosition,
+    signature_position: SignaturePosition,
     spellcheck: bool,
     spellcheck_langs: String,
     preview_lines: u32,
@@ -2804,6 +2826,7 @@ pub fn save_privacy(
         compose_plain: compose_format == ComposeFormat::Plain,
         compose_format: Some(compose_format),
         reply_position,
+        signature_position,
         spellcheck,
         // Every save is after the first load, which applied it.
         single_card_default_applied: true,
