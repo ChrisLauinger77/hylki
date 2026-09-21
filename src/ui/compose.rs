@@ -1207,6 +1207,17 @@ impl Component for Compose {
                 editor.paste(!crate::config::load_paste_plain());
                 return Propagation::Stop;
             }
+            // Ctrl+Enter sends (#238), as it does in Gmail, Apple Mail and
+            // Thunderbird. Ahead of the suggestion list's own Enter, so a
+            // press with the list open never both accepts a name and sends.
+            // Send itself refuses an unaddressed message, so the shortcut
+            // cannot post what the button would not.
+            if state.contains(gtk::gdk::ModifierType::CONTROL_MASK)
+                && (keyval == gtk::gdk::Key::Return || keyval == gtk::gdk::Key::KP_Enter)
+            {
+                s.input(ComposeInput::Send);
+                return Propagation::Stop;
+            }
             if !open.get() {
                 // Escape backs out of the whole composer — the same as Cancel,
                 // so an accidental reply is one key away from being undone. Only

@@ -18423,6 +18423,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
         i18n_noop("Everything else"),
         &[
             ("c", i18n_noop("Compose")),
+            ("Ctrl+Enter", i18n_noop("Send the message you are writing")),
             ("Esc", i18n_noop("Back out of a reply and return to the list")),
             ("Ctrl+Z", i18n_noop("Undo the last action, or the last edit while you are writing")),
             ("Ctrl+Shift+Z", i18n_noop("Redo it (Ctrl+Y does the same)")),
