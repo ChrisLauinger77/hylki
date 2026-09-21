@@ -4,8 +4,10 @@ The full list. The [README](../README.md) carries a shorter one.
 
 ## Accounts
 
-- **Multiple accounts:** IMAP and POP3, each on its own background worker,
-  with a unified *Inboxes* view across all of them.
+- **Multiple accounts:** IMAP, POP3 and JMAP, each on its own background
+  worker, with a unified *Inboxes* view across all of them.
+- **JMAP:** a Stalwart or Fastmail mailbox over the JSON mail protocol,
+  including push. See [Configuration](DOCUMENTATION.md#jmap-stalwart-fastmail).
 - **OAuth 2.0 sign-in:** Google, Microsoft and custom providers over
   XOAUTH2. See [Configuration](DOCUMENTATION.md#oauth-google--microsoft).
 - **GNOME Online Accounts:** import an account already set up in GNOME

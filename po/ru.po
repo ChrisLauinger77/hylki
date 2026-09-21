@@ -1105,6 +1105,11 @@ msgstr "Войдите через «Сетевые учётные записи G
 msgid "Requires Proton Mail Bridge running locally."
 msgstr "Требуется локально запущенный Proton Mail Bridge."
 
+msgid ""
+"Enter your Stalwart server's address. Mail is read and sent over JMAP; no "
+"SMTP settings are needed."
+msgstr ""
+
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Сначала включите доступ по POP/IMAP в настройках GMX."
 
@@ -1654,6 +1659,15 @@ msgid_plural "After {n} days"
 msgstr[0] "Через {n} день"
 msgstr[1] "Через {n} дня"
 msgstr[2] "Через {n} дней"
+
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
+msgid "Server (host name or URL)"
+msgstr ""
+
+#, fuzzy
+msgid "Port (default 443)"
+msgstr "Порт SMTP (по умолчанию 587)"
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -4741,6 +4755,8 @@ msgstr "Данные сервера"
 msgid "Filled in for known providers"
 msgstr "Заполняется автоматически для известных провайдеров"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Сервер IMAP"
 
@@ -4837,6 +4853,9 @@ msgstr "Начать работу"
 msgid "Continue"
 msgstr "Продолжить"
 
+msgid "Port"
+msgstr ""
+
 msgid "Enter your email address and password first."
 msgstr "Сначала введите адрес электронной почты и пароль."
 
@@ -4919,29 +4938,101 @@ msgstr "Уведомления о недоставке будут отправл
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "В имени отправителя указано «{claimed}», но адрес — {from}"
 
-msgid "the server's reply could not be read (it began: {reply})"
-msgstr ""
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Не удалось создать папку: {e}"
 
-msgid "runtime error: {e}"
-msgstr "ошибка выполнения: {e}"
+msgid "Could not list folders: {e}"
+msgstr "Не удалось получить список папок: {e}"
 
-msgid "Syncing…"
-msgstr "Синхронизация…"
+msgid "Sending…"
+msgstr "Отправка…"
 
-msgid "Could not load {path}: {e}"
-msgstr "Не удалось загрузить {path}: {e}"
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
 
 msgid "Could not load message: {e}"
 msgstr "Не удалось загрузить сообщение: {e}"
 
-msgid "Could not load conversation: {e}"
-msgstr "Не удалось загрузить обсуждение: {e}"
+msgid "Syncing…"
+msgstr "Синхронизация…"
+
+msgid "Could not fetch mail: {e}"
+msgstr "Не удалось получить почту: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Не удалось загрузить исходный код: {e}"
 
 msgid "Could not load attachments: {e}"
 msgstr "Не удалось загрузить вложения: {e}"
+
+msgid "Could not move message: {e}"
+msgstr "Не удалось переместить сообщение: {e}"
+
+msgid "Could not mark as spam: {e}"
+msgstr "Не удалось отметить как спам: {e}"
+
+msgid "Could not mark as not spam: {e}"
+msgstr "Не удалось отметить как не спам: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Не удалось отметить {len} сообщений как не спам: {e}"
+
+msgid "Could not move messages: {e}"
+msgstr "Не удалось переместить сообщения: {e}"
+
+msgid "Could not empty the folder: {e}"
+msgstr "Не удалось очистить папку: {e}"
+
+msgid "Undo failed: {e}"
+msgstr "Не удалось отменить действие: {e}"
+
+msgid "Could not create folder: {e}"
+msgstr "Не удалось создать папку: {e}"
+
+msgid "Could not rename folder: unknown folder"
+msgstr "Не удалось переименовать папку: неизвестная папка"
+
+msgid "Could not rename folder: {e}"
+msgstr "Не удалось переименовать папку: {e}"
+
+msgid "Could not delete folder: unknown folder"
+msgstr "Не удалось удалить папку: неизвестная папка"
+
+msgid "Could not delete folder: {e}"
+msgstr "Не удалось удалить папку: {e}"
+
+msgid "Saving draft…"
+msgstr "Сохранение черновика…"
+
+msgid "Could not save draft: {e}"
+msgstr "Не удалось сохранить черновик: {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "Не удалось переименовать папку: неизвестная папка"
+
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Не удалось отправить: {e}. Сообщение находится в папке «Исходящие» и будет "
+"отправлено при восстановлении соединения."
+
+msgid "Send failed: {e}"
+msgstr "Не удалось отправить: {e}"
+
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
+msgid "runtime error: {e}"
+msgstr "ошибка выполнения: {e}"
+
+msgid "Could not load {path}: {e}"
+msgstr "Не удалось загрузить {path}: {e}"
+
+msgid "Could not load conversation: {e}"
+msgstr "Не удалось загрузить обсуждение: {e}"
 
 msgid "Could not update message: {e}"
 msgstr "Не удалось обновить сообщение: {e}"
@@ -4961,67 +5052,21 @@ msgstr "Не удалось добавить тег к сообщению: {e}"
 msgid "Could not mark folder read: {e}"
 msgstr "Не удалось отметить папку прочитанной: {e}"
 
-msgid "Could not mark as spam: {e}"
-msgstr "Не удалось отметить как спам: {e}"
-
-msgid "Could not mark as not spam: {e}"
-msgstr "Не удалось отметить как не спам: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Не удалось отметить {len} сообщений как не спам: {e}"
-
-msgid "Could not move message: {e}"
-msgstr "Не удалось переместить сообщение: {e}"
-
 msgid "Could not move {len} messages: {e}"
 msgstr "Не удалось переместить сообщения ({len}): {e}"
-
-msgid "Undo failed: {e}"
-msgstr "Не удалось отменить действие: {e}"
 
 msgid "Could not delete permanently: {e}"
 msgstr "Не удалось удалить безвозвратно: {e}"
 
-msgid "Could not empty the folder: {e}"
-msgstr "Не удалось очистить папку: {e}"
-
-msgid "Could not create folder: {e}"
-msgstr "Не удалось создать папку: {e}"
-
 msgid "Could not move folder: {e}"
 msgstr "Не удалось переместить папку: {e}"
-
-msgid "Could not delete folder: {e}"
-msgstr "Не удалось удалить папку: {e}"
-
-msgid "Sending…"
-msgstr "Отправка…"
 
 msgid "Message sent, but saving to Sent failed: {e}"
 msgstr ""
 "Сообщение отправлено, но сохранить его в «Отправленные» не удалось: {e}"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Не удалось отправить: {e}. Сообщение находится в папке «Исходящие» и будет "
-"отправлено при восстановлении соединения."
-
-msgid "Send failed: {e}"
-msgstr "Не удалось отправить: {e}"
-
-msgid "Saving draft…"
-msgstr "Сохранение черновика…"
-
-msgid "Could not save draft: {e}"
-msgstr "Не удалось сохранить черновик: {e}"
-
 msgid "Connecting to {host}…"
 msgstr "Подключение к {host}…"
-
-msgid "Could not list folders: {e}"
-msgstr "Не удалось получить список папок: {e}"
 
 msgid "Connection failed: {e}"
 msgstr "Ошибка подключения: {e}"
@@ -5039,9 +5084,6 @@ msgid "Could not schedule the message: there is no local store to keep it in."
 msgstr ""
 "Не удалось отложить отправку сообщения: нет локального хранилища для него."
 
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
-
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
@@ -5051,9 +5093,6 @@ msgstr ""
 msgid "no OpenPGP key for {addr}"
 msgstr "нет ключа OpenPGP для {addr}"
 
-msgid "Could not fetch mail: {e}"
-msgstr "Не удалось получить почту: {e}"
-
 msgid "Could not delete message: {e}"
 msgstr "Не удалось удалить сообщение: {e}"
 
@@ -5062,18 +5101,6 @@ msgstr "Учётные записи POP3 не поддерживают папк�
 
 msgid "Inbox"
 msgstr "Входящие"
-
-msgid "Could not move messages: {e}"
-msgstr "Не удалось переместить сообщения: {e}"
-
-msgid "Could not rename folder: unknown folder"
-msgstr "Не удалось переименовать папку: неизвестная папка"
-
-msgid "Could not rename folder: {e}"
-msgstr "Не удалось переименовать папку: {e}"
-
-msgid "Could not delete folder: unknown folder"
-msgstr "Не удалось удалить папку: неизвестная папка"
 
 msgid "Email Client"
 msgstr "Почтовый клиент"

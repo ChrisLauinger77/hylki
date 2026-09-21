@@ -1107,6 +1107,11 @@ msgstr "Connectez-vous via GNOME Comptes en ligne."
 msgid "Requires Proton Mail Bridge running locally."
 msgstr "Nécessite l'exécution locale de Proton Mail Bridge."
 
+msgid ""
+"Enter your Stalwart server's address. Mail is read and sent over JMAP; no "
+"SMTP settings are needed."
+msgstr ""
+
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Activez d'abord l'accès POP/IMAP dans les paramètres GMX."
 
@@ -1669,6 +1674,15 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] "Au bout de {n} jour"
 msgstr[1] "Au bout de {n} jours"
+
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
+msgid "Server (host name or URL)"
+msgstr ""
+
+#, fuzzy
+msgid "Port (default 443)"
+msgstr "Port SMTP (par défaut 587)"
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -4802,6 +4816,8 @@ msgstr "Détails du serveur"
 msgid "Filled in for known providers"
 msgstr "Renseigné pour les fournisseurs connus"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Serveur IMAP"
 
@@ -4902,6 +4918,9 @@ msgstr "Commencer la lecture"
 msgid "Continue"
 msgstr "Continuer"
 
+msgid "Port"
+msgstr ""
+
 msgid "Enter your email address and password first."
 msgstr "Saisissez d'abord votre adresse e-mail et votre mot de passe."
 
@@ -4987,6 +5006,90 @@ msgstr "Les rejets iront à {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "Le nom de l'expéditeur indique « {claimed} » mais l'adresse est {from}"
 
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Impossible de créer le dossier : {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Impossible de lister les dossiers : {e}"
+
+msgid "Sending…"
+msgstr "Envoi en cours…"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Impossible d'envoyer « {subject} » : {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Impossible de charger le message : {e}"
+
+msgid "Syncing…"
+msgstr "Synchronisation…"
+
+msgid "Could not fetch mail: {e}"
+msgstr "Impossible de récupérer le courrier : {e}"
+
+msgid "Could not load source: {e}"
+msgstr "Impossible de charger le code source : {e}"
+
+msgid "Could not load attachments: {e}"
+msgstr "Impossible de charger les pièces jointes : {e}"
+
+msgid "Could not move message: {e}"
+msgstr "Impossible de déplacer le message : {e}"
+
+msgid "Could not mark as spam: {e}"
+msgstr "Impossible de marquer comme indésirable : {e}"
+
+msgid "Could not mark as not spam: {e}"
+msgstr "Impossible de marquer comme acceptable : {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Impossible de marquer {len} messages comme acceptables : {e}"
+
+msgid "Could not move messages: {e}"
+msgstr "Impossible de déplacer les messages : {e}"
+
+msgid "Could not empty the folder: {e}"
+msgstr "Impossible de vider le dossier : {e}"
+
+msgid "Undo failed: {e}"
+msgstr "L'annulation a échoué : {e}"
+
+msgid "Could not create folder: {e}"
+msgstr "Impossible de créer le dossier : {e}"
+
+msgid "Could not rename folder: unknown folder"
+msgstr "Impossible de renommer le dossier : dossier inconnu"
+
+msgid "Could not rename folder: {e}"
+msgstr "Impossible de renommer le dossier : {e}"
+
+msgid "Could not delete folder: unknown folder"
+msgstr "Impossible de supprimer le dossier : dossier inconnu"
+
+msgid "Could not delete folder: {e}"
+msgstr "Impossible de supprimer le dossier : {e}"
+
+msgid "Saving draft…"
+msgstr "Enregistrement du brouillon…"
+
+msgid "Could not save draft: {e}"
+msgstr "Impossible d'enregistrer le brouillon : {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "Impossible de renommer le dossier : dossier inconnu"
+
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Échec de l'envoi : {e}. Le message est dans la Boîte d'envoi et sera envoyé "
+"dès le rétablissement de la connexion."
+
+msgid "Send failed: {e}"
+msgstr "Échec de l'envoi : {e}"
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 "la réponse du serveur n'a pas pu être lue (elle commençait par : {reply})"
@@ -4994,23 +5097,11 @@ msgstr ""
 msgid "runtime error: {e}"
 msgstr "erreur d'exécution : {e}"
 
-msgid "Syncing…"
-msgstr "Synchronisation…"
-
 msgid "Could not load {path}: {e}"
 msgstr "Impossible de charger {path} : {e}"
 
-msgid "Could not load message: {e}"
-msgstr "Impossible de charger le message : {e}"
-
 msgid "Could not load conversation: {e}"
 msgstr "Impossible de charger la conversation : {e}"
-
-msgid "Could not load source: {e}"
-msgstr "Impossible de charger le code source : {e}"
-
-msgid "Could not load attachments: {e}"
-msgstr "Impossible de charger les pièces jointes : {e}"
 
 msgid "Could not update message: {e}"
 msgstr "Impossible de mettre à jour le message : {e}"
@@ -5030,66 +5121,20 @@ msgstr "Impossible d'ajouter un tag au message : {e}"
 msgid "Could not mark folder read: {e}"
 msgstr "Impossible de marquer le dossier comme lu : {e}"
 
-msgid "Could not mark as spam: {e}"
-msgstr "Impossible de marquer comme indésirable : {e}"
-
-msgid "Could not mark as not spam: {e}"
-msgstr "Impossible de marquer comme acceptable : {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Impossible de marquer {len} messages comme acceptables : {e}"
-
-msgid "Could not move message: {e}"
-msgstr "Impossible de déplacer le message : {e}"
-
 msgid "Could not move {len} messages: {e}"
 msgstr "Impossible de déplacer {len} messages : {e}"
-
-msgid "Undo failed: {e}"
-msgstr "L'annulation a échoué : {e}"
 
 msgid "Could not delete permanently: {e}"
 msgstr "Impossible de supprimer définitivement : {e}"
 
-msgid "Could not empty the folder: {e}"
-msgstr "Impossible de vider le dossier : {e}"
-
-msgid "Could not create folder: {e}"
-msgstr "Impossible de créer le dossier : {e}"
-
 msgid "Could not move folder: {e}"
 msgstr "Impossible de déplacer le dossier : {e}"
-
-msgid "Could not delete folder: {e}"
-msgstr "Impossible de supprimer le dossier : {e}"
-
-msgid "Sending…"
-msgstr "Envoi en cours…"
 
 msgid "Message sent, but saving to Sent failed: {e}"
 msgstr "Message envoyé, mais l'enregistrement dans Envoyés a échoué : {e}"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Échec de l'envoi : {e}. Le message est dans la Boîte d'envoi et sera envoyé "
-"dès le rétablissement de la connexion."
-
-msgid "Send failed: {e}"
-msgstr "Échec de l'envoi : {e}"
-
-msgid "Saving draft…"
-msgstr "Enregistrement du brouillon…"
-
-msgid "Could not save draft: {e}"
-msgstr "Impossible d'enregistrer le brouillon : {e}"
-
 msgid "Connecting to {host}…"
 msgstr "Connexion à {host}…"
-
-msgid "Could not list folders: {e}"
-msgstr "Impossible de lister les dossiers : {e}"
 
 msgid "Connection failed: {e}"
 msgstr "Échec de la connexion : {e}"
@@ -5107,9 +5152,6 @@ msgstr ""
 "Impossible de programmer l'envoi du message : aucun stockage local pour le "
 "conserver."
 
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Impossible d'envoyer « {subject} » : {e}"
-
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
@@ -5119,9 +5161,6 @@ msgstr ""
 msgid "no OpenPGP key for {addr}"
 msgstr "aucune clé OpenPGP pour {addr}"
 
-msgid "Could not fetch mail: {e}"
-msgstr "Impossible de récupérer le courrier : {e}"
-
 msgid "Could not delete message: {e}"
 msgstr "Impossible de supprimer le message : {e}"
 
@@ -5130,18 +5169,6 @@ msgstr "Les comptes POP3 ne prennent pas en charge les dossiers"
 
 msgid "Inbox"
 msgstr "Boîte de réception"
-
-msgid "Could not move messages: {e}"
-msgstr "Impossible de déplacer les messages : {e}"
-
-msgid "Could not rename folder: unknown folder"
-msgstr "Impossible de renommer le dossier : dossier inconnu"
-
-msgid "Could not rename folder: {e}"
-msgstr "Impossible de renommer le dossier : {e}"
-
-msgid "Could not delete folder: unknown folder"
-msgstr "Impossible de supprimer le dossier : dossier inconnu"
 
 msgid "Email Client"
 msgstr "Client e-mail"

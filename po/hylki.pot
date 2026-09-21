@@ -1026,6 +1026,11 @@ msgstr ""
 msgid "Requires Proton Mail Bridge running locally."
 msgstr ""
 
+msgid ""
+"Enter your Stalwart server's address. Mail is read and sent over JMAP; no "
+"SMTP settings are needed."
+msgstr ""
+
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr ""
 
@@ -1516,6 +1521,14 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] ""
 msgstr[1] ""
+
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
+msgid "Server (host name or URL)"
+msgstr ""
+
+msgid "Port (default 443)"
+msgstr ""
 
 msgid "Google (Gmail)"
 msgstr ""
@@ -4233,6 +4246,8 @@ msgstr ""
 msgid "Filled in for known providers"
 msgstr ""
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr ""
 
@@ -4322,6 +4337,9 @@ msgstr ""
 msgid "Continue"
 msgstr ""
 
+msgid "Port"
+msgstr ""
+
 msgid "Enter your email address and password first."
 msgstr ""
 
@@ -4398,28 +4416,96 @@ msgstr ""
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr ""
 
-msgid "the server's reply could not be read (it began: {reply})"
+msgid "Could not reach the JMAP server: {e}"
 msgstr ""
 
-msgid "runtime error: {e}"
+msgid "Could not list folders: {e}"
 msgstr ""
 
-msgid "Syncing…"
+msgid "Sending…"
 msgstr ""
 
-msgid "Could not load {path}: {e}"
+msgid "Still could not send “{subject}”: {e}"
 msgstr ""
 
 msgid "Could not load message: {e}"
 msgstr ""
 
-msgid "Could not load conversation: {e}"
+msgid "Syncing…"
+msgstr ""
+
+msgid "Could not fetch mail: {e}"
 msgstr ""
 
 msgid "Could not load source: {e}"
 msgstr ""
 
 msgid "Could not load attachments: {e}"
+msgstr ""
+
+msgid "Could not move message: {e}"
+msgstr ""
+
+msgid "Could not mark as spam: {e}"
+msgstr ""
+
+msgid "Could not mark as not spam: {e}"
+msgstr ""
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr ""
+
+msgid "Could not move messages: {e}"
+msgstr ""
+
+msgid "Could not empty the folder: {e}"
+msgstr ""
+
+msgid "Undo failed: {e}"
+msgstr ""
+
+msgid "Could not create folder: {e}"
+msgstr ""
+
+msgid "Could not rename folder: unknown folder"
+msgstr ""
+
+msgid "Could not rename folder: {e}"
+msgstr ""
+
+msgid "Could not delete folder: unknown folder"
+msgstr ""
+
+msgid "Could not delete folder: {e}"
+msgstr ""
+
+msgid "Saving draft…"
+msgstr ""
+
+msgid "Could not save draft: {e}"
+msgstr ""
+
+msgid "Could not save draft: unknown folder"
+msgstr ""
+
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+
+msgid "Send failed: {e}"
+msgstr ""
+
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
+msgid "runtime error: {e}"
+msgstr ""
+
+msgid "Could not load {path}: {e}"
+msgstr ""
+
+msgid "Could not load conversation: {e}"
 msgstr ""
 
 msgid "Could not update message: {e}"
@@ -4438,63 +4524,19 @@ msgstr ""
 msgid "Could not mark folder read: {e}"
 msgstr ""
 
-msgid "Could not mark as spam: {e}"
-msgstr ""
-
-msgid "Could not mark as not spam: {e}"
-msgstr ""
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr ""
-
-msgid "Could not move message: {e}"
-msgstr ""
-
 msgid "Could not move {len} messages: {e}"
-msgstr ""
-
-msgid "Undo failed: {e}"
 msgstr ""
 
 msgid "Could not delete permanently: {e}"
 msgstr ""
 
-msgid "Could not empty the folder: {e}"
-msgstr ""
-
-msgid "Could not create folder: {e}"
-msgstr ""
-
 msgid "Could not move folder: {e}"
-msgstr ""
-
-msgid "Could not delete folder: {e}"
-msgstr ""
-
-msgid "Sending…"
 msgstr ""
 
 msgid "Message sent, but saving to Sent failed: {e}"
 msgstr ""
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-
-msgid "Send failed: {e}"
-msgstr ""
-
-msgid "Saving draft…"
-msgstr ""
-
-msgid "Could not save draft: {e}"
-msgstr ""
-
 msgid "Connecting to {host}…"
-msgstr ""
-
-msgid "Could not list folders: {e}"
 msgstr ""
 
 msgid "Connection failed: {e}"
@@ -4511,17 +4553,11 @@ msgstr ""
 msgid "Could not schedule the message: there is no local store to keep it in."
 msgstr ""
 
-msgid "Still could not send “{subject}”: {e}"
-msgstr ""
-
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
 
 msgid "no OpenPGP key for {addr}"
-msgstr ""
-
-msgid "Could not fetch mail: {e}"
 msgstr ""
 
 msgid "Could not delete message: {e}"
@@ -4531,18 +4567,6 @@ msgid "POP3 accounts don't support folders"
 msgstr ""
 
 msgid "Inbox"
-msgstr ""
-
-msgid "Could not move messages: {e}"
-msgstr ""
-
-msgid "Could not rename folder: unknown folder"
-msgstr ""
-
-msgid "Could not rename folder: {e}"
-msgstr ""
-
-msgid "Could not delete folder: unknown folder"
 msgstr ""
 
 msgid "Email Client"

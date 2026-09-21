@@ -1096,6 +1096,11 @@ msgstr "Bejelentkezés a GNOME Online-fiókokon keresztül."
 msgid "Requires Proton Mail Bridge running locally."
 msgstr "A Proton Mail Bridge helyi futtatása szükséges."
 
+msgid ""
+"Enter your Stalwart server's address. Mail is read and sent over JMAP; no "
+"SMTP settings are needed."
+msgstr ""
+
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Először engedélyezze a POP/IMAP-hozzáférést a GMX beállításaiban."
 
@@ -1636,6 +1641,15 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] "{n} nap múlva"
 msgstr[1] "{n} nap múlva"
+
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
+msgid "Server (host name or URL)"
+msgstr ""
+
+#, fuzzy
+msgid "Port (default 443)"
+msgstr "SMTP-port (alapértelmezett: 587)"
 
 msgid "Google (Gmail)"
 msgstr ""
@@ -4658,6 +4672,8 @@ msgstr "Kiszolgáló adatai"
 msgid "Filled in for known providers"
 msgstr "Ismert szolgáltatókhoz kitöltve"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "IMAP-kiszolgáló"
 
@@ -4755,6 +4771,9 @@ msgstr "Olvasás megkezdése"
 msgid "Continue"
 msgstr "Folytatás"
 
+msgid "Port"
+msgstr ""
+
 msgid "Enter your email address and password first."
 msgstr "Először adja meg az e-mail-címét és a jelszavát."
 
@@ -4840,29 +4859,101 @@ msgstr "A visszapattanó levelek ide mennének: {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "A feladó neve „{claimed}”, de a cím: {from}"
 
-msgid "the server's reply could not be read (it began: {reply})"
-msgstr ""
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "A mappa nem hozható létre: {e}"
 
-msgid "runtime error: {e}"
-msgstr "futásidejű hiba: {e}"
+msgid "Could not list folders: {e}"
+msgstr "A mappák nem listázhatók: {e}"
 
-msgid "Syncing…"
-msgstr "Szinkronizálás…"
+msgid "Sending…"
+msgstr "Küldés…"
 
-msgid "Could not load {path}: {e}"
-msgstr "Nem tölthető be: {path}: {e}"
+msgid "Still could not send “{subject}”: {e}"
+msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
 
 msgid "Could not load message: {e}"
 msgstr "Az üzenet nem tölthető be: {e}"
 
-msgid "Could not load conversation: {e}"
-msgstr "A beszélgetés nem tölthető be: {e}"
+msgid "Syncing…"
+msgstr "Szinkronizálás…"
+
+msgid "Could not fetch mail: {e}"
+msgstr "A levelek nem kérhetők le: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "A forrás nem tölthető be: {e}"
 
 msgid "Could not load attachments: {e}"
 msgstr "A mellékletek nem tölthetők be: {e}"
+
+msgid "Could not move message: {e}"
+msgstr "Az üzenet nem helyezhető át: {e}"
+
+msgid "Could not mark as spam: {e}"
+msgstr "Nem jelölhető levélszemétként: {e}"
+
+msgid "Could not mark as not spam: {e}"
+msgstr ""
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr ""
+
+msgid "Could not move messages: {e}"
+msgstr "Az üzenetek nem helyezhetők át: {e}"
+
+msgid "Could not empty the folder: {e}"
+msgstr "A mappa nem üríthető ki: {e}"
+
+msgid "Undo failed: {e}"
+msgstr "A visszavonás sikertelen: {e}"
+
+msgid "Could not create folder: {e}"
+msgstr "A mappa nem hozható létre: {e}"
+
+msgid "Could not rename folder: unknown folder"
+msgstr "A mappa nem nevezhető át: ismeretlen mappa"
+
+msgid "Could not rename folder: {e}"
+msgstr "A mappa nem nevezhető át: {e}"
+
+msgid "Could not delete folder: unknown folder"
+msgstr "A mappa nem törölhető: ismeretlen mappa"
+
+msgid "Could not delete folder: {e}"
+msgstr "A mappa nem törölhető: {e}"
+
+msgid "Saving draft…"
+msgstr "Piszkozat mentése…"
+
+msgid "Could not save draft: {e}"
+msgstr "A piszkozat nem menthető: {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "A mappa nem nevezhető át: ismeretlen mappa"
+
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"A küldés sikertelen: {e}. Az üzenet a Kimenőben van, és a kapcsolat "
+"helyreállásakor elküldésre kerül."
+
+msgid "Send failed: {e}"
+msgstr "A küldés sikertelen: {e}"
+
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
+msgid "runtime error: {e}"
+msgstr "futásidejű hiba: {e}"
+
+msgid "Could not load {path}: {e}"
+msgstr "Nem tölthető be: {path}: {e}"
+
+msgid "Could not load conversation: {e}"
+msgstr "A beszélgetés nem tölthető be: {e}"
 
 msgid "Could not update message: {e}"
 msgstr "Az üzenet nem frissíthető: {e}"
@@ -4882,66 +4973,20 @@ msgstr "Az üzenet nem címkézhető: {e}"
 msgid "Could not mark folder read: {e}"
 msgstr "A mappa nem jelölhető olvasottként: {e}"
 
-msgid "Could not mark as spam: {e}"
-msgstr "Nem jelölhető levélszemétként: {e}"
-
-msgid "Could not mark as not spam: {e}"
-msgstr ""
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr ""
-
-msgid "Could not move message: {e}"
-msgstr "Az üzenet nem helyezhető át: {e}"
-
 msgid "Could not move {len} messages: {e}"
 msgstr "{len} üzenet nem helyezhető át: {e}"
-
-msgid "Undo failed: {e}"
-msgstr "A visszavonás sikertelen: {e}"
 
 msgid "Could not delete permanently: {e}"
 msgstr "Nem törölhető véglegesen: {e}"
 
-msgid "Could not empty the folder: {e}"
-msgstr "A mappa nem üríthető ki: {e}"
-
-msgid "Could not create folder: {e}"
-msgstr "A mappa nem hozható létre: {e}"
-
 msgid "Could not move folder: {e}"
 msgstr "A mappa nem helyezhető át: {e}"
-
-msgid "Could not delete folder: {e}"
-msgstr "A mappa nem törölhető: {e}"
-
-msgid "Sending…"
-msgstr "Küldés…"
 
 msgid "Message sent, but saving to Sent failed: {e}"
 msgstr "Az üzenet elküldve, de az Elküldött mappába mentés sikertelen: {e}"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"A küldés sikertelen: {e}. Az üzenet a Kimenőben van, és a kapcsolat "
-"helyreállásakor elküldésre kerül."
-
-msgid "Send failed: {e}"
-msgstr "A küldés sikertelen: {e}"
-
-msgid "Saving draft…"
-msgstr "Piszkozat mentése…"
-
-msgid "Could not save draft: {e}"
-msgstr "A piszkozat nem menthető: {e}"
-
 msgid "Connecting to {host}…"
 msgstr "Kapcsolódás ehhez: {host}…"
-
-msgid "Could not list folders: {e}"
-msgstr "A mappák nem listázhatók: {e}"
 
 msgid "Connection failed: {e}"
 msgstr "A kapcsolat sikertelen: {e}"
@@ -4957,9 +5002,6 @@ msgstr "A(z) „{subject}” küldése ekkor történik: {when}"
 msgid "Could not schedule the message: there is no local store to keep it in."
 msgstr "Az üzenet nem ütemezhető: nincs helyi tároló a megőrzéséhez."
 
-msgid "Still could not send “{subject}”: {e}"
-msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
-
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
@@ -4969,9 +5011,6 @@ msgstr ""
 msgid "no OpenPGP key for {addr}"
 msgstr "nincs OpenPGP-kulcs ehhez: {addr}"
 
-msgid "Could not fetch mail: {e}"
-msgstr "A levelek nem kérhetők le: {e}"
-
 msgid "Could not delete message: {e}"
 msgstr "Az üzenet nem törölhető: {e}"
 
@@ -4980,18 +5019,6 @@ msgstr "A POP3-fiókok nem támogatják a mappákat"
 
 msgid "Inbox"
 msgstr "Beérkezett üzenetek"
-
-msgid "Could not move messages: {e}"
-msgstr "Az üzenetek nem helyezhetők át: {e}"
-
-msgid "Could not rename folder: unknown folder"
-msgstr "A mappa nem nevezhető át: ismeretlen mappa"
-
-msgid "Could not rename folder: {e}"
-msgstr "A mappa nem nevezhető át: {e}"
-
-msgid "Could not delete folder: unknown folder"
-msgstr "A mappa nem törölhető: ismeretlen mappa"
 
 msgid "Email Client"
 msgstr "Levelezőkliens"

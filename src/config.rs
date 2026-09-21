@@ -169,18 +169,24 @@ pub enum Protocol {
     /// (issue #36). No servers to configure; everything runs over
     /// graph.microsoft.com with the GOA token.
     Graph,
+    /// JMAP (RFC 8620/8621) over HTTPS (issue #245): Stalwart, Fastmail. The
+    /// server is `imap_host` (a host, or a URL with its scheme) and the
+    /// session resource is found at `/.well-known/jmap`; sending goes
+    /// through the server too, so the SMTP fields are unused.
+    Jmap,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AccountConfig {
     pub name: String,
     pub email: String,
-    /// Incoming-mail protocol (IMAP or POP3).
+    /// Incoming-mail protocol (IMAP, POP3, Graph or JMAP).
     #[serde(default)]
     pub protocol: Protocol,
-    /// Incoming server host (IMAP or POP3, per `protocol`).
+    /// Incoming server host (IMAP, POP3 or JMAP, per `protocol`; a JMAP
+    /// account may give a URL with its scheme).
     pub imap_host: String,
-    /// Incoming server port (IMAP or POP3, per `protocol`).
+    /// Incoming server port (IMAP, POP3 or JMAP, per `protocol`).
     #[serde(default = "default_imap_port")]
     pub imap_port: u16,
     /// SMTP server. If empty, derived from `imap_host` (imap.* → smtp.*).

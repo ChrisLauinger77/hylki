@@ -1102,6 +1102,11 @@ msgstr "Inicie sessão através das Contas online do GNOME."
 msgid "Requires Proton Mail Bridge running locally."
 msgstr "Requer que o Proton Mail Bridge esteja em execução localmente."
 
+msgid ""
+"Enter your Stalwart server's address. Mail is read and sent over JMAP; no "
+"SMTP settings are needed."
+msgstr ""
+
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Ative primeiro o acesso POP/IMAP nas definições do GMX."
 
@@ -1665,6 +1670,15 @@ msgid "After {n} day"
 msgid_plural "After {n} days"
 msgstr[0] "Ao fim de {n} dia"
 msgstr[1] "Ao fim de {n} dias"
+
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
+msgid "Server (host name or URL)"
+msgstr ""
+
+#, fuzzy
+msgid "Port (default 443)"
+msgstr "Porta SMTP (predefinição: 587)"
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -4779,6 +4793,8 @@ msgstr "Dados do servidor"
 msgid "Filled in for known providers"
 msgstr "Preenchidos para os fornecedores conhecidos"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Servidor IMAP"
 
@@ -4876,6 +4892,9 @@ msgstr "Começar a ler"
 msgid "Continue"
 msgstr "Continuar"
 
+msgid "Port"
+msgstr ""
+
 msgid "Enter your email address and password first."
 msgstr "Introduza primeiro o seu endereço de e-mail e a palavra-passe."
 
@@ -4960,29 +4979,102 @@ msgstr "As mensagens devolvidas seriam enviadas para {rp}"
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "O nome do remetente indica «{claimed}», mas o endereço é {from}"
 
-msgid "the server's reply could not be read (it began: {reply})"
-msgstr ""
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Não foi possível criar a pasta: {e}"
 
-msgid "runtime error: {e}"
-msgstr "erro de execução: {e}"
+msgid "Could not list folders: {e}"
+msgstr "Não foi possível listar as pastas: {e}"
 
-msgid "Syncing…"
-msgstr "A sincronizar…"
+msgid "Sending…"
+msgstr "A enviar…"
 
-msgid "Could not load {path}: {e}"
-msgstr "Não foi possível carregar {path}: {e}"
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Continuou a não ser possível enviar «{subject}»: {e}"
 
 msgid "Could not load message: {e}"
 msgstr "Não foi possível carregar a mensagem: {e}"
 
-msgid "Could not load conversation: {e}"
-msgstr "Não foi possível carregar a conversa: {e}"
+msgid "Syncing…"
+msgstr "A sincronizar…"
+
+msgid "Could not fetch mail: {e}"
+msgstr "Não foi possível obter o correio: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Não foi possível carregar o código fonte: {e}"
 
 msgid "Could not load attachments: {e}"
 msgstr "Não foi possível carregar os anexos: {e}"
+
+msgid "Could not move message: {e}"
+msgstr "Não foi possível mover a mensagem: {e}"
+
+msgid "Could not mark as spam: {e}"
+msgstr "Não foi possível marcar como lixo eletrónico: {e}"
+
+msgid "Could not mark as not spam: {e}"
+msgstr "Não foi possível marcar como não sendo lixo eletrónico: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr ""
+"Não foi possível marcar {len} mensagens como não sendo lixo eletrónico: {e}"
+
+msgid "Could not move messages: {e}"
+msgstr "Não foi possível mover as mensagens: {e}"
+
+msgid "Could not empty the folder: {e}"
+msgstr "Não foi possível esvaziar a pasta: {e}"
+
+msgid "Undo failed: {e}"
+msgstr "Falha ao anular: {e}"
+
+msgid "Could not create folder: {e}"
+msgstr "Não foi possível criar a pasta: {e}"
+
+msgid "Could not rename folder: unknown folder"
+msgstr "Não foi possível renomear a pasta: pasta desconhecida"
+
+msgid "Could not rename folder: {e}"
+msgstr "Não foi possível renomear a pasta: {e}"
+
+msgid "Could not delete folder: unknown folder"
+msgstr "Não foi possível eliminar a pasta: pasta desconhecida"
+
+msgid "Could not delete folder: {e}"
+msgstr "Não foi possível eliminar a pasta: {e}"
+
+msgid "Saving draft…"
+msgstr "A guardar o rascunho…"
+
+msgid "Could not save draft: {e}"
+msgstr "Não foi possível guardar o rascunho: {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "Não foi possível renomear a pasta: pasta desconhecida"
+
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Falha ao enviar: {e}. A mensagem encontra-se na Caixa de saída e será "
+"enviada quando a ligação for restabelecida."
+
+msgid "Send failed: {e}"
+msgstr "Falha ao enviar: {e}"
+
+msgid "the server's reply could not be read (it began: {reply})"
+msgstr ""
+
+msgid "runtime error: {e}"
+msgstr "erro de execução: {e}"
+
+msgid "Could not load {path}: {e}"
+msgstr "Não foi possível carregar {path}: {e}"
+
+msgid "Could not load conversation: {e}"
+msgstr "Não foi possível carregar a conversa: {e}"
 
 msgid "Could not update message: {e}"
 msgstr "Não foi possível atualizar a mensagem: {e}"
@@ -5002,68 +5094,21 @@ msgstr "Não foi possível atribuir uma etiqueta à mensagem: {e}"
 msgid "Could not mark folder read: {e}"
 msgstr "Não foi possível marcar a pasta como lida: {e}"
 
-msgid "Could not mark as spam: {e}"
-msgstr "Não foi possível marcar como lixo eletrónico: {e}"
-
-msgid "Could not mark as not spam: {e}"
-msgstr "Não foi possível marcar como não sendo lixo eletrónico: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr ""
-"Não foi possível marcar {len} mensagens como não sendo lixo eletrónico: {e}"
-
-msgid "Could not move message: {e}"
-msgstr "Não foi possível mover a mensagem: {e}"
-
 msgid "Could not move {len} messages: {e}"
 msgstr "Não foi possível mover {len} mensagens: {e}"
-
-msgid "Undo failed: {e}"
-msgstr "Falha ao anular: {e}"
 
 msgid "Could not delete permanently: {e}"
 msgstr "Não foi possível eliminar permanentemente: {e}"
 
-msgid "Could not empty the folder: {e}"
-msgstr "Não foi possível esvaziar a pasta: {e}"
-
-msgid "Could not create folder: {e}"
-msgstr "Não foi possível criar a pasta: {e}"
-
 msgid "Could not move folder: {e}"
 msgstr "Não foi possível mover a pasta: {e}"
-
-msgid "Could not delete folder: {e}"
-msgstr "Não foi possível eliminar a pasta: {e}"
-
-msgid "Sending…"
-msgstr "A enviar…"
 
 msgid "Message sent, but saving to Sent failed: {e}"
 msgstr ""
 "A mensagem foi enviada, mas não foi possível guardá-la em Enviadas: {e}"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Falha ao enviar: {e}. A mensagem encontra-se na Caixa de saída e será "
-"enviada quando a ligação for restabelecida."
-
-msgid "Send failed: {e}"
-msgstr "Falha ao enviar: {e}"
-
-msgid "Saving draft…"
-msgstr "A guardar o rascunho…"
-
-msgid "Could not save draft: {e}"
-msgstr "Não foi possível guardar o rascunho: {e}"
-
 msgid "Connecting to {host}…"
 msgstr "A ligar a {host}…"
-
-msgid "Could not list folders: {e}"
-msgstr "Não foi possível listar as pastas: {e}"
 
 msgid "Connection failed: {e}"
 msgstr "Falha na ligação: {e}"
@@ -5081,9 +5126,6 @@ msgstr ""
 "Não foi possível agendar a mensagem: não existe armazenamento local onde a "
 "guardar."
 
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Continuou a não ser possível enviar «{subject}»: {e}"
-
 msgid ""
 "no OpenPGP key of your own for {addr}; generate one under Settings, OpenPGP"
 msgstr ""
@@ -5091,9 +5133,6 @@ msgstr ""
 
 msgid "no OpenPGP key for {addr}"
 msgstr "não existe uma chave OpenPGP para {addr}"
-
-msgid "Could not fetch mail: {e}"
-msgstr "Não foi possível obter o correio: {e}"
 
 msgid "Could not delete message: {e}"
 msgstr "Não foi possível eliminar a mensagem: {e}"
@@ -5103,18 +5142,6 @@ msgstr "As contas POP3 não suportam pastas"
 
 msgid "Inbox"
 msgstr "Caixa de entrada"
-
-msgid "Could not move messages: {e}"
-msgstr "Não foi possível mover as mensagens: {e}"
-
-msgid "Could not rename folder: unknown folder"
-msgstr "Não foi possível renomear a pasta: pasta desconhecida"
-
-msgid "Could not rename folder: {e}"
-msgstr "Não foi possível renomear a pasta: {e}"
-
-msgid "Could not delete folder: unknown folder"
-msgstr "Não foi possível eliminar a pasta: pasta desconhecida"
 
 msgid "Email Client"
 msgstr "Cliente de correio eletrónico"

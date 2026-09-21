@@ -28,6 +28,9 @@ use crate::config::AccountConfig;
 use crate::models::{Account, Folder, FolderKind, KeywordFinding, Message};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
+/// The JMAP path (#245), a child module so it shares this file's helpers.
+mod jmap;
+
 /// Number of most-recent messages to fetch attachment info (BODYSTRUCTURE) for;
 /// older messages get an envelope-only index row and resolve attachments on open.
 const PAGE_SIZE: u32 = 50;
@@ -806,6 +809,9 @@ async fn run(
         }
         Some(account) if account.protocol == crate::config::Protocol::Graph => {
             run_graph(account_id, account, rx, emit).await
+        }
+        Some(account) if account.protocol == crate::config::Protocol::Jmap => {
+            jmap::run_jmap(account_id, account, rx, emit).await
         }
         Some(account) => run_imap(account_id, account, rx, emit).await,
         None => run_mock(account_id, rx, emit).await,
@@ -5306,15 +5312,19 @@ pub struct ConnTest {
 
 /// Test that the account's servers accept the given credentials (no mail sent).
 pub async fn test_connection(account: &AccountConfig) -> ConnTest {
-    let incoming = if account.protocol == crate::config::Protocol::Pop3 {
-        test_pop3(account).await
-    } else {
-        test_imap(account).await
+    let incoming = match account.protocol {
+        crate::config::Protocol::Pop3 => test_pop3(account).await,
+        crate::config::Protocol::Jmap => jmap::test_jmap(account).await,
+        _ => test_imap(account).await,
     };
-    ConnTest {
-        incoming,
-        smtp: test_smtp(account).await,
-    }
+    // A JMAP account sends through the server itself: there is no SMTP to
+    // test, and the Accounts window leaves that line out.
+    let smtp = if account.protocol == crate::config::Protocol::Jmap {
+        Ok(())
+    } else {
+        test_smtp(account).await
+    };
+    ConnTest { incoming, smtp }
 }
 
 async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
@@ -10910,6 +10920,49 @@ async fn graph_flush_outbox(
     emit_outbox(Some(cache), account_id, emit);
 }
 
+/// A plain IMAP account for the tests here and in the child modules.
+#[cfg(test)]
+pub(super) fn sample_account() -> AccountConfig {
+    AccountConfig {
+        folder_roles: Default::default(),
+        hidden_folders: Vec::new(),
+        folders_seeded: false,
+        sent_copy_path: None,
+        server_saves_sent: false,
+        empty_junk_days: 0,
+        empty_trash_days: 0,
+        pgp_key: None,
+        push: None,
+        name: String::new(),
+        email: "me@example.com".into(),
+        protocol: crate::config::Protocol::Imap,
+        imap_host: "imap.example.com".into(),
+        imap_port: 993,
+        smtp_host: String::new(),
+        smtp_port: 587,
+        username: "me@example.com".into(),
+        password: String::new(),
+        smtp_separate: false,
+        smtp_username: String::new(),
+        smtp_password: String::new(),
+        color: None,
+        emoji: None,
+        avatar: None,
+        gravatar: false,
+        signature: None,
+        signature_html: false,
+        label: None,
+        aliases: Vec::new(),
+        enabled: true,
+        goa_id: None,
+        goa_mail_disabled: false,
+        goa_enabled_before_mail_disabled: true,
+        oauth: false,
+        oauth_settings: None,
+        oauth_refresh: String::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -10965,46 +11018,6 @@ mod tests {
         assert!(!attachment_prefetch_tried(8, "INBOX", 2383));
     }
 
-    fn sample_account() -> AccountConfig {
-        AccountConfig {
-            folder_roles: Default::default(),
-            hidden_folders: Vec::new(),
-            folders_seeded: false,
-            sent_copy_path: None,
-            server_saves_sent: false,
-            empty_junk_days: 0,
-            empty_trash_days: 0,
-            pgp_key: None,
-            push: None,
-            name: String::new(),
-            email: "me@example.com".into(),
-            protocol: crate::config::Protocol::Imap,
-            imap_host: "imap.example.com".into(),
-            imap_port: 993,
-            smtp_host: String::new(),
-            smtp_port: 587,
-            username: "me@example.com".into(),
-            password: String::new(),
-            smtp_separate: false,
-            smtp_username: String::new(),
-            smtp_password: String::new(),
-            color: None,
-            emoji: None,
-            avatar: None,
-            gravatar: false,
-            signature: None,
-            signature_html: false,
-            label: None,
-            aliases: Vec::new(),
-            enabled: true,
-            goa_id: None,
-            goa_mail_disabled: false,
-            goa_enabled_before_mail_disabled: true,
-            oauth: false,
-            oauth_settings: None,
-            oauth_refresh: String::new(),
-        }
-    }
 
     fn sample_outgoing() -> OutgoingMessage {
         OutgoingMessage {
