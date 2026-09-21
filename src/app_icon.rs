@@ -397,12 +397,21 @@ impl Launcher {
     /// Point the launcher at `icon` (an absolute path); `restore` instead
     /// puts the installed launcher back (the default, where a copy exists).
     fn point_at(&self, icon: &str, restore: bool) {
-        match self {
+        let placed = match self {
             Launcher::Shadow { base, user_path, ours, exec, try_exec, flatpak } => {
                 write_shadow(base, user_path, icon, restore, *ours, exec.as_deref(), try_exec, *flatpak)
+                    .then_some(user_path.as_path())
             }
-            Launcher::Owned(path) => edit_icon_line(path, icon),
-            Launcher::None => {}
+            Launcher::Owned(path) => {
+                edit_icon_line(path, icon);
+                Some(path.as_path())
+            }
+            Launcher::None => None,
+        };
+        // A launcher in the user's directory only counts as a handler for
+        // its MIME types once that directory's cache says so (#242).
+        if let Some(dir) = placed.and_then(|p| p.parent()) {
+            sync_mime_cache(dir);
         }
     }
 }
@@ -452,6 +461,8 @@ fn desktop_value(text: &str, key: &str) -> Option<String> {
         .map(|v| v.trim().to_string())
 }
 
+/// Returns whether the user's directory holds a copy of ours afterwards,
+/// or just stopped holding one: either way its MIME cache is out of date.
 #[allow(clippy::too_many_arguments)]
 fn write_shadow(
     base: &std::path::Path,
@@ -462,7 +473,7 @@ fn write_shadow(
     exec: Option<&str>,
     try_exec: &str,
     flatpak: bool,
-) {
+) -> bool {
     if restore {
         if ours {
             match std::fs::remove_file(user_path) {
@@ -473,11 +484,11 @@ fn write_shadow(
                 Err(e) => tracing::warn!("could not remove {}: {e}", user_path.display()),
             }
         }
-        return;
+        return ours;
     }
     let Ok(text) = std::fs::read_to_string(base) else {
         tracing::warn!("no launcher at {}", base.display());
-        return;
+        return false;
     };
     let mut out = String::new();
     for line in text.lines() {
@@ -503,7 +514,7 @@ fn write_shadow(
     }
     out.push_str(&format!("{LAUNCHER_MARK}=1\n"));
     if std::fs::read_to_string(user_path).map(|cur| cur == out).unwrap_or(false) {
-        return;
+        return true;
     }
     if let Some(dir) = user_path.parent() {
         let _ = std::fs::create_dir_all(dir);
@@ -512,8 +523,121 @@ fn write_shadow(
         Ok(()) => {
             tracing::info!("wrote {}", user_path.display());
             note_launcher_written();
+            true
         }
-        Err(e) => tracing::warn!("could not write {}: {e}", user_path.display()),
+        Err(e) => {
+            tracing::warn!("could not write {}: {e}", user_path.display());
+            false
+        }
+    }
+}
+
+/// Bring `<dir>/mimeinfo.cache` up to date with the entries in `dir`, as
+/// `update-desktop-database` would.
+///
+/// GIO finds a MIME type's handlers through each applications directory's
+/// own cache, and an entry in the user's directory masks every entry of
+/// the same id in the directories after it. So from the moment the icon
+/// chooser's copy of the launcher exists, the Flatpak export's cache no
+/// longer speaks for `co.hyprlab.Hylki.desktop`: unless the user
+/// directory's cache names it too, the desktop has no email client at all
+/// (Settings shows "No Apps Available" for Mail, a browser offers only web
+/// mail for a mailto: link, #242). Nothing on the host rebuilds that cache
+/// for a file an app wrote, and the sandbox cannot run the host's
+/// `update-desktop-database`, so the cache is written here in the tool's
+/// own format: every `.desktop` in the directory and, with a `<sub>-`
+/// prefix, its subdirectories, `Hidden=true` skipped, types and ids in
+/// byte order. Left alone when it is already right.
+pub fn sync_mime_cache(dir: &std::path::Path) {
+    if !dir.is_dir() {
+        return;
+    }
+    let cache = dir.join("mimeinfo.cache");
+    let out = mime_cache_text(dir);
+    if std::fs::read_to_string(&cache).map(|cur| cur == out).unwrap_or(false) {
+        return;
+    }
+    let tmp = dir.join(format!(".mimeinfo.cache.{}", std::process::id()));
+    let written = std::fs::write(&tmp, &out).and_then(|()| std::fs::rename(&tmp, &cache));
+    match written {
+        Ok(()) => tracing::info!("rebuilt {}", cache.display()),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp);
+            tracing::warn!("could not rebuild {}: {e}", cache.display());
+        }
+    }
+}
+
+/// The `mimeinfo.cache` for `dir`, as `update-desktop-database` writes it.
+fn mime_cache_text(dir: &std::path::Path) -> String {
+    let mut map: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
+        Default::default();
+    collect_mime_types(dir, "", &mut map);
+    let mut out = String::from("[MIME Cache]\n");
+    for (mime, ids) in &map {
+        out.push_str(mime);
+        out.push('=');
+        for id in ids {
+            out.push_str(id);
+            out.push(';');
+        }
+        out.push('\n');
+    }
+    out
+}
+
+fn collect_mime_types(
+    dir: &std::path::Path,
+    prefix: &str,
+    map: &mut std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if path.is_dir() {
+            collect_mime_types(&path, &format!("{prefix}{name}-"), map);
+            continue;
+        }
+        if !name.ends_with(".desktop") {
+            continue;
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else { continue };
+        let id = format!("{prefix}{name}");
+        for mime in desktop_mime_types(&text) {
+            map.entry(mime).or_default().insert(id.clone());
+        }
+    }
+}
+
+/// The `MimeType` list of a desktop entry's main group; empty for an entry
+/// that has none or is `Hidden`.
+fn desktop_mime_types(text: &str) -> Vec<String> {
+    let mut in_main = false;
+    let mut hidden = false;
+    let mut types = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_main = line == "[Desktop Entry]";
+            continue;
+        }
+        if !in_main || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else { continue };
+        match key.trim() {
+            "Hidden" => hidden = value.trim() == "true",
+            "MimeType" => {
+                types = value.split(';').map(str::trim).filter(|t| !t.is_empty()).map(String::from).collect()
+            }
+            _ => {}
+        }
+    }
+    if hidden {
+        Vec::new()
+    } else {
+        types
     }
 }
 
@@ -724,3 +848,59 @@ pub fn drag_envelope(scale: i32) -> Option<gtk::Picture> {
 
 /// The dragged-message envelope's edge, in logical px.
 pub const DRAG_ICON_SIZE: i32 = 16;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The same fixture `update-desktop-database` was run over by hand:
+    /// its output is what the expectation below is copied from.
+    fn fixture(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("hylki-mime-cache-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(
+            dir.join("a.desktop"),
+            "[Desktop Entry]\nType=Application\nName=A\nMimeType=x-scheme-handler/mailto;text/plain;\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("sub/b.desktop"),
+            "[Desktop Entry]\nName=B\nMimeType=text/plain\n[Desktop Action x]\nMimeType=image/png;\n",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("hidden.desktop"),
+            "[Desktop Entry]\nName=H\nHidden=true\nMimeType=text/plain;\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("nomime.desktop"), "[Desktop Entry]\nName=N\n").unwrap();
+        std::fs::write(dir.join("notes.txt"), "MimeType=text/plain;\n").unwrap();
+        dir
+    }
+
+    const EXPECTED: &str = "[MIME Cache]\ntext/plain=a.desktop;sub-b.desktop;\nx-scheme-handler/mailto=a.desktop;\n";
+
+    #[test]
+    fn cache_matches_update_desktop_database() {
+        let dir = fixture("text");
+        assert_eq!(mime_cache_text(&dir), EXPECTED);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn sync_writes_once_and_leaves_a_right_cache_alone() {
+        let dir = fixture("sync");
+        let cache = dir.join("mimeinfo.cache");
+        sync_mime_cache(&dir);
+        assert_eq!(std::fs::read_to_string(&cache).unwrap(), EXPECTED);
+        let stamp = std::fs::metadata(&cache).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        sync_mime_cache(&dir);
+        assert_eq!(std::fs::metadata(&cache).unwrap().modified().unwrap(), stamp);
+        // A missing directory is nothing to write into.
+        sync_mime_cache(&dir.join("absent"));
+        assert!(!dir.join("absent").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
