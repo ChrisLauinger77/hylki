@@ -23,6 +23,28 @@ account you only need the server and an app-specific password. See
 passwords you enter there are migrated into the system keyring on first run and
 removed from the file.
 
+### Hiding folders
+
+Right-click a folder in the sidebar and choose **Hide Folder** to take it out
+of the sidebar and out of syncing: the folder is not listed, its unread count
+is not fetched, and its mail is not indexed until it is shown again. Only
+plain folders can be hidden; the folders holding a role (Sent, Drafts,
+Trash, Junk, Archive) stay, since mail is filed into them. Hiding a folder
+hides its sub-folders with it.
+
+The hidden folders are listed under **Settings → Accounts → the account →
+Hidden Folders**, each with a **Show** button that brings it back on Save.
+They are stored on the account as `hidden_folders` in `accounts.toml`.
+
+An Exchange server lists its calendar, contacts, tasks, notes and journal
+folders over IMAP as if they were mail folders, along with Outbox, Sync
+Issues, Conversation History, Scheduled and Snoozed. Hylki hides these the
+first time it lists such an account, and only when the listing looks like
+Exchange (at least two of Calendar, Contacts, Tasks and Journal at the top
+level), so a "Notes" folder on any other server is left alone. The look is
+taken once per account; a folder brought back from the Hidden Folders list
+stays back.
+
 ### OAuth (Google / Microsoft)
 
 **Microsoft** works out of the box: pick *Microsoft* in the account editor and

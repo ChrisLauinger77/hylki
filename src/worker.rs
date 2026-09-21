@@ -388,6 +388,9 @@ pub enum MailRequest {
     RenameFolder { old_path: String, new_path: String },
     /// Delete a mailbox, first moving its contents to `trash` (if set).
     DeleteFolder { path: String, trash: Option<String> },
+    /// The account's hidden folders changed (#239): list again without
+    /// them, so they leave the sidebar and every sync at once.
+    SetHiddenFolders { paths: Vec<String> },
     /// Send a new message over SMTP, optionally APPENDing a copy to `sent_path`.
     Send {
         message: Box<OutgoingMessage>,
@@ -1920,7 +1923,7 @@ async fn run_imap(
                 // Hylki has never listed.
                 let sess = session.as_mut().unwrap();
                 let mut hit: Option<(String, u32)> = None;
-                match list_folders(account_id, sess, &account.folder_roles).await {
+                match list_folders(account_id, sess, &account.folder_roles, &account.hidden_folders).await {
                     Ok(folders) => {
                         for f in folders {
                             if sel(sess, &f.path).await.is_err() {
@@ -2055,7 +2058,7 @@ async fn run_imap(
                 // unused one is dropped here).
                 let sess = session.as_mut().unwrap();
                 let mut found: Vec<KeywordFinding> = Vec::new();
-                match list_folders(account_id, sess, &account.folder_roles).await {
+                match list_folders(account_id, sess, &account.folder_roles, &account.hidden_folders).await {
                     Ok(folders) => {
                         for f in &folders {
                             let Ok(mb) = exam(sess, &f.path).await else { continue };
@@ -2285,6 +2288,12 @@ async fn run_imap(
                         lost = true;
                     }
                 }
+            }
+
+            MailRequest::SetHiddenFolders { paths } => {
+                account.hidden_folders = paths;
+                let sess = session.as_mut().unwrap();
+                refresh_folders(account_id, &account, sess, cache.as_ref(), &emit).await;
             }
 
             MailRequest::DeleteFolder { path, trash } => {
@@ -2554,7 +2563,7 @@ async fn connect_and_list(
                 label: account.display_label(),
                 accent: accent_for(account_id).into(),
             }));
-            match list_folders(account_id, &mut session, &account.folder_roles).await {
+            match list_folders(account_id, &mut session, &account.folder_roles, &account.hidden_folders).await {
                 // An empty LIST can't be right — INBOX always exists (RFC
                 // 3501). Keep whatever the cache has instead of wiping it.
                 Ok(folders) if folders.is_empty() => {}
@@ -5439,6 +5448,7 @@ async fn list_folders(
     account_id: u32,
     session: &mut ImapSession,
     roles: &std::collections::BTreeMap<String, String>,
+    hidden: &[String],
 ) -> Result<Vec<Folder>, async_imap::error::Error> {
     let names: Vec<async_imap::types::Name> = session
         .list(Some(""), Some("*"))
@@ -5454,6 +5464,11 @@ async fn list_folders(
             continue;
         }
         let path = name.name().to_string();
+        // A hidden folder (#239) is left out here, ahead of everything
+        // that walks the listing: the sweep, the watchers, the counts.
+        if crate::models::folder_is_hidden(&path, name.delimiter(), hidden) {
+            continue;
+        }
         let (kind, by_special_use) = classify_with_source(&path, name.attributes());
         special_use.push(by_special_use);
         folders.push(Folder {
@@ -5719,7 +5734,7 @@ async fn refresh_folders(
     cache: Option<&Cache>,
     emit: &impl Fn(WorkerEvent),
 ) {
-    if let Ok(folders) = list_folders(account_id, session, &account.folder_roles).await {
+    if let Ok(folders) = list_folders(account_id, session, &account.folder_roles, &account.hidden_folders).await {
         // A mailbox always has at least INBOX (RFC 3501): an empty LIST is a
         // wedged or throttled session answering nonsense, not the truth.
         // Trusting one once wiped an account's whole folder list — cached,
@@ -8273,6 +8288,7 @@ async fn run_pop3(
             | MailRequest::RenameFolder { .. }
             | MailRequest::UndoMove { .. }
             | MailRequest::DeleteFolder { .. }
+            | MailRequest::SetHiddenFolders { .. }
             | MailRequest::SaveDraft { .. } => {
                 emit(WorkerEvent::Error {
                     text: i18n("POP3 accounts don't support folders"),
@@ -8621,6 +8637,7 @@ async fn run_mock(
             | MailRequest::CreateFolder { .. }
             | MailRequest::RenameFolder { .. }
             | MailRequest::DeleteFolder { .. }
+            | MailRequest::SetHiddenFolders { .. }
             | MailRequest::FlushOutbox { .. }
             | MailRequest::DeleteOutbox { .. }
             | MailRequest::RefreshUnread
@@ -9584,6 +9601,8 @@ struct GraphState {
     /// The account's manual Special Folders assignments (#82), applied to
     /// every listing.
     roles: std::collections::BTreeMap<String, String>,
+    /// The account's hidden folders (#239), left out of every listing.
+    hidden: Vec<String>,
 }
 
 impl GraphState {
@@ -9643,6 +9662,7 @@ async fn run_graph(
         drafts: None,
         inbox: None,
         roles: account.folder_roles.clone(),
+        hidden: account.hidden_folders.clone(),
     };
 
     // Fetch a token and the folder list. A GOA token failure here is the one
@@ -10176,6 +10196,12 @@ async fn run_graph(
                 }
             }
 
+            MailRequest::SetHiddenFolders { paths } => {
+                state.hidden = paths;
+                let Some(token) = graph_token(&account, &emit).await else { continue };
+                refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit).await;
+            }
+
             MailRequest::DeleteFolder { path, trash: _ } => {
                 // Graph's folder delete moves the folder (contents included) to
                 // Deleted Items itself; no separate content move needed.
@@ -10565,7 +10591,9 @@ async fn refresh_graph_folders(
         .await
         .unwrap_or_else(|_| Err("task failed".into()));
     match r {
-        Ok(list) => {
+        Ok(mut list) => {
+            // Hidden folders (#239) leave here, before the ids settle.
+            list.retain(|f| !crate::models::folder_is_hidden(&f.folder.path, Some("/"), &state.hidden));
             state.adopt_folders(&list);
             let folders: Vec<Folder> = list.into_iter().map(|f| f.folder).collect();
             if let Some(c) = cache {
@@ -10898,6 +10926,8 @@ mod tests {
     fn sample_account() -> AccountConfig {
         AccountConfig {
             folder_roles: Default::default(),
+            hidden_folders: Vec::new(),
+            folders_seeded: false,
             sent_copy_path: None,
             server_saves_sent: false,
             empty_junk_days: 0,

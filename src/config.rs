@@ -273,6 +273,16 @@ pub struct AccountConfig {
     /// "archive". Empty = fully automatic.
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub folder_roles: std::collections::BTreeMap<String, String>,
+    /// Folders kept out of the sidebar and out of every sync (#239), as
+    /// full paths; a sub-folder follows its parent. Managed from a folder's
+    /// context menu and the account editor's Hidden Folders list.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_folders: Vec<String>,
+    /// Whether the first folder listing has been looked over for Exchange's
+    /// non-mail folders (#239), which are hidden once, on that look. Kept
+    /// so a folder the user brought back is not hidden again.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub folders_seeded: bool,
     /// Where copies of sent mail are filed (#199): a full folder path, or
     /// `None` for the Sent folder. This is only a destination, not a role —
     /// the folder keeps whatever it already is, so the Inbox can be chosen
@@ -3832,6 +3842,8 @@ dest_path = "Lists"
             oauth_refresh: "TOKEN".into(),
             push: None,
             folder_roles: Default::default(),
+            hidden_folders: Vec::new(),
+            folders_seeded: false,
             sent_copy_path: None,
             server_saves_sent: false,
             empty_junk_days: 0,

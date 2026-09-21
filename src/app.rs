@@ -5530,6 +5530,9 @@ impl SimpleComponent for AppModel {
                 CtxAction::EmptyFolder { account_id, folder_id, name, path } => {
                     self.confirm_empty_folder(account_id, folder_id, name, path, &sender);
                 }
+                CtxAction::HideFolder { account_id, path } => {
+                    self.hide_folders(account_id, vec![path]);
+                }
             },
 
             AppMsg::DropMoveMessages { dest_account, dest, items } => {
@@ -8778,9 +8781,39 @@ impl SimpleComponent for AppModel {
                 {
                     return;
                 }
+                let mut folders = folders;
+                // The first listing of an account is looked over once for
+                // Exchange's non-mail folders (#239), which are hidden the
+                // way any folder is: the account editor lists them, and can
+                // bring any of them back. Noted as done either way, so a
+                // folder brought back stays back.
+                let seed = self
+                    .config
+                    .get(account_id as usize - 1)
+                    .filter(|cfg| !cfg.folders_seeded)
+                    .map(|_| crate::models::exchange_non_mail_folders(&folders));
+                if let Some(seed) = seed {
+                    if let Some(cfg) = self.config.get_mut(account_id as usize - 1) {
+                        cfg.folders_seeded = true;
+                        if let Err(e) = config::save(&self.config) {
+                            tracing::warn!("could not note the folder look-over: {e}");
+                        }
+                    }
+                    if !seed.is_empty() {
+                        tracing::info!("account {account_id}: hiding Exchange's non-mail folders {seed:?}");
+                        self.hide_folders(account_id, seed);
+                    }
+                }
+                // A listing from before a hide (the cache at startup, an
+                // answer already on its way) still carries what is hidden.
+                if let Some(cfg) = self.config.get(account_id as usize - 1) {
+                    if !cfg.hidden_folders.is_empty() {
+                        let hidden = cfg.hidden_folders.clone();
+                        folders.retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
+                    }
+                }
                 // Manual special-folder assignments (#82) ride over whatever
                 // the worker detected.
-                let mut folders = folders;
                 if let Some(cfg) = self.config.get(account_id as usize - 1) {
                     apply_folder_roles(&cfg.folder_roles.clone(), &mut folders);
                 }
@@ -14836,6 +14869,47 @@ impl AppModel {
 
     /// Remove a folder, its messages going to Trash first so nothing is lost
     /// even when this is undoing a folder someone has since filed mail into.
+    /// Hide folders (#239): remembered on the account, taken off the
+    /// sidebar at once, and the worker told so its next listing, and every
+    /// sync after it, leaves them out. A hidden folder that was open gives
+    /// way to nothing, like a deleted one.
+    fn hide_folders(&mut self, account_id: u32, paths: Vec<String>) {
+        let Some(cfg) = self.config.get_mut(account_id as usize - 1) else { return };
+        let mut changed = false;
+        for path in paths {
+            if !cfg.hidden_folders.contains(&path) {
+                cfg.hidden_folders.push(path);
+                changed = true;
+            }
+        }
+        if !changed {
+            return;
+        }
+        let hidden = cfg.hidden_folders.clone();
+        if let Err(e) = config::save(&self.config) {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
+                error: true,
+                connectivity: false,
+            });
+        }
+        if self
+            .selected
+            .as_ref()
+            .is_some_and(|s| s.account_id == account_id && crate::models::folder_is_hidden(&s.path, None, &hidden))
+        {
+            self.current = None;
+            self.current_thread.clear();
+            self.show_message(None, false);
+            self.message_list.emit(MessageListInput::SetLoading);
+        }
+        if let Some(folders) = self.folders.get_mut(&account_id) {
+            folders.retain(|f| !crate::models::folder_is_hidden(&f.path, None, &hidden));
+        }
+        self.rebuild_sidebar();
+        self.send_to(account_id, MailRequest::SetHiddenFolders { paths: hidden });
+    }
+
     fn delete_folder(&mut self, account_id: u32, path: String) {
         let trash = self
             .folders
@@ -18703,6 +18777,8 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         oauth_refresh: String::new(),
         push: None,
         folder_roles: Default::default(),
+        hidden_folders: Vec::new(),
+        folders_seeded: false,
         sent_copy_path: None,
         server_saves_sent: false,
         empty_junk_days: 0,

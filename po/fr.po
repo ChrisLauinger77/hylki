@@ -822,6 +822,10 @@ msgstr "Tout le reste"
 msgid "Compose"
 msgstr "Rédiger"
 
+#, fuzzy
+msgid "Send the message you are writing"
+msgstr "Imprimer le message en cours de lecture"
+
 msgid "Back out of a reply and return to the list"
 msgstr "Quitter la réponse et revenir à la liste"
 
@@ -1469,6 +1473,20 @@ msgstr "Corbeille"
 msgid "Junk"
 msgstr "Indésirables"
 
+#, fuzzy
+msgid "Hidden Folders"
+msgstr "Ajouter un dossier"
+
+msgid ""
+"Folders kept out of the sidebar and left unsynced. Hide one from its right-"
+"click menu in the sidebar; Show brings it back. An Exchange server's "
+"calendar, contacts and task folders are hidden here from the start."
+msgstr ""
+
+#, fuzzy
+msgid "No hidden folders."
+msgstr "Afficher ou masquer les sous-dossiers"
+
 msgid "OpenPGP"
 msgstr "OpenPGP"
 
@@ -1571,6 +1589,13 @@ msgstr "✓ SMTP : connecté"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP : {e}"
+
+msgid "Show"
+msgstr ""
+
+#, fuzzy
+msgid "Bring this folder back to the sidebar"
+msgstr "Afficher ou masquer les comptes dans la barre latérale"
 
 msgid "Sends through {host}"
 msgstr "Envoie via {host}"
@@ -4136,6 +4161,15 @@ msgstr ""
 "que courrier mis en forme ; le texte brut est envoyé sans mise en forme. Le "
 "bouton de format du compositeur permet de changer pour un message donné."
 
+#, fuzzy
+msgid "Signature in replies"
+msgstr "Signature"
+
+msgid ""
+"Where the signature goes in a reply or forward. Above the quoted message it "
+"closes what you wrote; below, it follows the whole conversation."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Orthographe"
 
@@ -4500,6 +4534,14 @@ msgstr "Restaurer les paramètres par défaut"
 msgid "Account of the current folder"
 msgstr "Informations sur le dossier actuel"
 
+#, fuzzy
+msgid "Above the quoted message"
+msgstr "Au-dessus des messages"
+
+#, fuzzy
+msgid "Below the quoted message"
+msgstr "Sous les messages"
+
 msgid "Above the messages"
 msgstr "Au-dessus des messages"
 
@@ -4672,6 +4714,12 @@ msgstr "Renommer le dossier…"
 
 msgid "Delete Folder…"
 msgstr "Supprimer le dossier…"
+
+#. And hidden (#239): only a plain folder, since a role folder out
+#. of sight would still be where mail is filed to.
+#, fuzzy
+msgid "Hide Folder"
+msgstr "Nouveau dossier"
 
 msgid "Empty Trash…"
 msgstr "Vider la Corbeille…"
