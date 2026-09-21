@@ -983,6 +983,9 @@ pub struct AppModel {
     /// "Edit as New Message" (#232) waiting on the body, or the attachments,
     /// it is to be copied from.
     pending_edit_as_new: Option<Message>,
+    /// A forward (#240) waiting on the body, or the attachments, it is to
+    /// carry, and whether it opens inline or in a window.
+    pending_forward: Option<(Message, bool)>,
     /// Settings → System → Links: which browser a link in a message opens in
     /// (#232). Empty = the desktop's default, "ask" = its app chooser,
     /// otherwise a desktop entry id.
@@ -1428,6 +1431,9 @@ pub enum AppMsg {
     ShowAttachmentInMessage(Attachment),
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
+    /// Forward one message of the open conversation by its id (#240), as
+    /// its card's Forward button would.
+    ShowcaseForward { account_id: u32, id: u32 },
     /// Showcase only (HYLKI_SHOWCASE_COMPOSE_CLOSE): cancel the inline
     /// composer, to check its web process goes with it.
     ShowcaseComposeClose,
@@ -2954,6 +2960,7 @@ impl SimpleComponent for AppModel {
             pending_reply: None,
             pending_draft_pick: None,
             pending_edit_as_new: None,
+            pending_forward: None,
             files_prefs: config::load_files_prefs(),
             link_browser: {
                 // The launcher reads its choice from here, not from disk, so
@@ -4530,6 +4537,26 @@ impl SimpleComponent for AppModel {
                         s.input(AppMsg::Reply);
                     });
                 }
+                // HYLKI_SHOWCASE_FORWARD=<seconds> does the same with
+                // Forward at that moment (4 s unless it parses), to check
+                // the original's attachments come along (#240). As
+                // <seconds>:<account>:<id> it forwards that message of the
+                // open conversation, the way its card's button would, so a
+                // message that is not the conversation's newest can be
+                // picked.
+                if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FORWARD") {
+                    let mut parts = v.split(':');
+                    let at = parts.next().and_then(|p| p.parse::<u32>().ok()).unwrap_or(4);
+                    let target = parts
+                        .next()
+                        .zip(parts.next())
+                        .and_then(|(a, id)| Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?)));
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(at, move || match target {
+                        Some((account_id, id)) => s.input(AppMsg::ShowcaseForward { account_id, id }),
+                        None => s.input(AppMsg::Forward),
+                    });
+                }
                 // HYLKI_SHOWCASE_COMPOSE_PREVIEW=1 turns the inline
                 // composer's preview on a beat after it opens, so a
                 // capture can show the rendered message rather than the
@@ -6067,7 +6094,7 @@ impl SimpleComponent for AppModel {
                         );
                     }
                     RowAction::Forward => {
-                        self.open_inline_reply(m.account_id, forward_prefill(&m), Some((m.account_id, m.id)), &sender);
+                        self.forward(m, true, &sender);
                     }
                     // Cards only carry the three above; anything else falls
                     // through to the ordinary row behaviour.
@@ -6132,8 +6159,7 @@ impl SimpleComponent for AppModel {
                     }
                     RowAction::Forward => {
                         let m = self.newest_to_answer(&conversation, m);
-                        let m = self.with_cached_body(m);
-                        self.open_compose(m.account_id, forward_prefill(&m), &sender);
+                        self.forward(m, false, &sender);
                     }
                     // A conversation row stands for its newest message here
                     // too: that is the one the row is showing.
@@ -6305,7 +6331,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Forward => {
                 if let Some(m) = self.compose_target() {
-                    self.open_inline_reply(m.account_id, forward_prefill(&m), Some((m.account_id, m.id)), &sender);
+                    self.forward(m, true, &sender);
                 }
             }
 
@@ -7500,6 +7526,24 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowcaseComposePreview => {
                 if let Some(r) = self.reader_compose.as_ref() {
                     r.controller.emit(ComposeInput::TogglePreview(true));
+                }
+            }
+            AppMsg::ShowcaseForward { account_id, id } => {
+                let found = self
+                    .current_thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .cloned()
+                    .or_else(|| {
+                        self.message_cache
+                            .values()
+                            .flatten()
+                            .find(|m| m.account_id == account_id && m.id == id)
+                            .cloned()
+                    });
+                match found {
+                    Some(m) => self.forward(m, true, &sender),
+                    None => tracing::warn!("showcase forward: {account_id}:{id} is not loaded"),
                 }
             }
             AppMsg::ShowcaseComposeUndo => {
@@ -9234,6 +9278,14 @@ impl SimpleComponent for AppModel {
                     }
                     self.pending_edit_as_new = Some(pending);
                 }
+                // And a forward waiting on the body it quotes.
+                if let Some((pending, inline)) = self.pending_forward.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        self.forward(pending, inline, &sender);
+                        return;
+                    }
+                    self.pending_forward = Some((pending, inline));
+                }
                 // Likewise a reply picked for handed-in files.
                 if let Some((mut m, extra)) = self.pending_reply.take() {
                     if m.account_id == account_id && m.id == message_id {
@@ -9455,6 +9507,14 @@ impl SimpleComponent for AppModel {
                         self.pending_edit_as_new = Some(pending);
                     }
                 }
+                // The same for a forward that carries them (#240).
+                if let Some((pending, inline)) = self.pending_forward.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        self.forward(pending, inline, &sender);
+                    } else {
+                        self.pending_forward = Some((pending, inline));
+                    }
+                }
             }
 
             AppMsg::AttachmentsPending { account_id, message_id } => {
@@ -9516,6 +9576,14 @@ impl SimpleComponent for AppModel {
                         self.edit_as_new(pending, &sender);
                     } else {
                         self.pending_edit_as_new = Some(pending);
+                    }
+                }
+                if let Some((mut pending, inline)) = self.pending_forward.take() {
+                    if pending.account_id == account_id && pending.id == message_id {
+                        pending.has_attachment = false;
+                        self.forward(pending, inline, &sender);
+                    } else {
+                        self.pending_forward = Some((pending, inline));
                     }
                 }
             }
@@ -13286,6 +13354,61 @@ impl AppModel {
             self.current_thread.clear();
             self.show_message(None, false);
             self.open_inline_reply(m.account_id, prefill, None, sender);
+        } else {
+            self.open_compose(m.account_id, prefill, sender);
+        }
+    }
+
+    /// Forward a message with its attachments (#240): the quoted original
+    /// in the body, and every file that came with it attached to the new
+    /// message, as Thunderbird, Apple Mail and Gmail do. Much of what gets
+    /// forwarded is forwarded for the file. A reply deliberately does not
+    /// do this: the sender already has what they sent.
+    ///
+    /// Built like `edit_as_new`: the body and the attachments may still be
+    /// on the server, so each is fetched at most once with the message held
+    /// in `pending_forward`, and the reply re-enters here. `inline` says
+    /// where the composer opens, over the reading pane or in a window.
+    fn forward(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
+        let m = self.with_cached_body(m);
+        let key = (m.account_id, m.id);
+        if m.body.is_empty() {
+            if let Some(path) = self.resolve_folder_path(&m) {
+                self.send_to(
+                    m.account_id,
+                    MailRequest::LoadBody { message_id: m.id, path, uid: m.uid },
+                );
+                self.pending_forward = Some((m, inline));
+                return;
+            }
+        }
+        if m.has_attachment && !self.attachment_cache.contains_key(&key) {
+            if let Some(path) = self.resolve_folder_path(&m) {
+                self.send_to(m.account_id, MailRequest::LoadAttachments {
+                    message_id: m.id,
+                    path,
+                    uid: m.uid,
+                    download: true,
+                });
+                self.pending_forward = Some((m, inline));
+                return;
+            }
+        }
+        let attachments = self
+            .attachment_cache
+            .get(&key)
+            .map(|items| stage_attachments(&format!("hylki-forward-{}-{}", m.account_id, m.id), items))
+            .unwrap_or_default();
+        tracing::info!(
+            "forward: {}:{} with {} attachment(s)",
+            m.account_id,
+            m.id,
+            attachments.len()
+        );
+        let mut prefill = forward_prefill(&m);
+        prefill.attachments = attachments;
+        if inline {
+            self.open_inline_reply(m.account_id, prefill, Some((m.account_id, m.id)), sender);
         } else {
             self.open_compose(m.account_id, prefill, sender);
         }

@@ -56,6 +56,8 @@ The full list. The [README](../README.md) carries a shorter one.
   if you prefer.
 - **Drafts** that can be saved without a recipient, reopened inline, and
   deleted from the composer.
+- **Forwarding keeps the attachments:** the original's files are attached to
+  the forward, ready to send on. A reply does not repeat them.
 - **Inline images:** dropped, pasted or picked from a file manager, resized
   by handle or menu, with an optional recompress on send.
 - **Spell check** through the system dictionaries.
