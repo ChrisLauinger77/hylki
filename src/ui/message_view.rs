@@ -1348,6 +1348,7 @@ impl Component for MessageView {
                             set_valign: gtk::Align::Center,
                             add_css_class: "caption",
                             add_css_class: "vireo-zoom-chip",
+                            set_cursor_from_name: Some("pointer"),
                             set_tooltip_text: Some(i18n("Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it back to the default from Settings.").as_str()),
                             add_controller = gtk::GestureClick {
                                 connect_released[sender] => move |_, _, _, _| {
