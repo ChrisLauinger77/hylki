@@ -529,6 +529,8 @@ pub struct AppModel {
     /// Accounts whose inbox has been requested for the unified view since
     /// launch (the cache-primed slices still need their catch-up sync).
     unified_boot_requested: HashSet<u32>,
+    /// Accounts whose sent mail has been asked for this run (#236).
+    sent_index_requested: HashSet<u32>,
     /// (account_id, folder_id) → last-seen message list, shown instantly on
     /// revisit while a fresh sync runs in the background.
     message_cache: HashMap<(u32, u32), Vec<Message>>,
@@ -2940,6 +2942,7 @@ impl SimpleComponent for AppModel {
             unified_view: UnifiedView::Kind(FolderKind::Inbox),
             unified_slices: HashMap::new(),
             unified_boot_requested: HashSet::new(),
+            sent_index_requested: HashSet::new(),
             message_cache: HashMap::new(),
             indexed_folders: HashSet::new(),
             body_cache: crate::ram_cache::RamCache::new(BODY_CACHE_BUDGET),
@@ -8794,6 +8797,7 @@ impl SimpleComponent for AppModel {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
+                self.index_sent_folders(account_id);
                 // A unified view merges one folder per account, and this
                 // account's folders may only now have arrived — so the set the
                 // completeness flag is measured over just changed. It is
@@ -17956,6 +17960,46 @@ impl AppModel {
     }
 
     /// Counted folders (#116) whose lists have never been loaded this run:
+    /// Index an account's sent mail without waiting for its folder to be
+    /// opened (#236). A conversation pulls the user's own replies in from
+    /// the cache, and the cache only held a folder once that folder had been
+    /// shown: a reply sent from another client stayed out of every
+    /// conversation until Sent was visited by hand. Asked once per account
+    /// per run, as soon as its folders are known; the worker lists the first
+    /// page and indexes the rest behind it. Both the folder the server files
+    /// sent mail in and the one Hylki copies to, when they differ.
+    fn index_sent_folders(&mut self, account_id: u32) {
+        if self.sent_index_requested.contains(&account_id) {
+            return;
+        }
+        let mut targets: Vec<(u32, String)> = self
+            .folder_of_kind(account_id, FolderKind::Sent)
+            .map(|f| (f.id, f.path.clone()))
+            .into_iter()
+            .collect();
+        if let Some(path) = self.sent_copy_path(account_id) {
+            let copy = self
+                .folders
+                .get(&account_id)
+                .and_then(|fs| fs.iter().find(|f| f.path == path))
+                .map(|f| (f.id, f.path.clone()));
+            if let Some(copy) = copy {
+                if !targets.iter().any(|(id, _)| *id == copy.0) {
+                    targets.push(copy);
+                }
+            }
+        }
+        // No sent folder listed yet: ask again when the next folder list
+        // arrives rather than never.
+        if targets.is_empty() {
+            return;
+        }
+        self.sent_index_requested.insert(account_id);
+        for (folder_id, path) in targets {
+            self.send_to(account_id, MailRequest::SyncFolder { folder_id, path });
+        }
+    }
+
     /// fetch them quietly, so the tray menu can show their unread mail
     /// without waiting for their counts to move.
     fn sync_unloaded_counted_folders(&self) {
