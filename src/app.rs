@@ -17977,12 +17977,12 @@ fn interface_font() -> String {
 }
 
 /// Where the whole release history lives.
-const RELEASE_NOTES_URL: &str = "https://github.com/hyprlab/hylki/blob/main/RELEASE_NOTES.md";
+const RELEASE_NOTES_URL: &str = "https://github.com/hyprlab/hylki/blob/main/docs/RELEASE_NOTES.md";
 
 /// This release's section of `RELEASE_NOTES.md` — the same text the GitHub
 /// release carries — headed by the version.
 fn current_release_notes() -> String {
-    let md = include_str!("../RELEASE_NOTES.md");
+    let md = include_str!("../docs/RELEASE_NOTES.md");
     let head = format!("## What's new in {}", crate::VERSION);
     let mut out = String::new();
     let mut on = false;
@@ -20204,7 +20204,7 @@ mod tests {
 
         for md in [
             include_str!("../CHANGELOG.md"),
-            include_str!("../RELEASE_NOTES.md"),
+            include_str!("../docs/RELEASE_NOTES.md"),
         ] {
             for line in md.lines() {
                 let markup = md_inline(line);

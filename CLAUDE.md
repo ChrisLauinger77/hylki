@@ -19,7 +19,7 @@ writing a word of documentation, decide where it goes:
 | A build dependency or step | `docs/BUILDING.md` |
 | Credit for somebody's work | `data/CONTRIBUTORS` or `data/TRANSLATORS` for the name, `docs/CREDITS.md` for what they did |
 | A licence or trademark note | `docs/LICENSE.md` |
-| What changed in a release | `CHANGELOG.md` (detail) and `RELEASE_NOTES.md` (the user-facing overview) |
+| What changed in a release | `CHANGELOG.md` (detail) and `docs/RELEASE_NOTES.md` (the user-facing overview) |
 | Artwork for the README or the docs | `data/repo/` — never `docs/`, which holds Markdown only |
 
 A new `docs/*.md` has to be listed in `docs/README.md` and linked from
