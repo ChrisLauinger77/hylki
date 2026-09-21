@@ -4385,14 +4385,20 @@ fn bracketed(ids: &str) -> String {
 }
 
 /// TLS settings for an SMTP connection, matching [`tls_connector`]: a local
-/// bridge's self-signed certificate is accepted, every other host is verified.
+/// bridge's self-signed certificate is accepted, a certificate in another
+/// name where the account asks for it (#246), every other host is verified.
 fn smtp_tls_parameters(
     host: &str,
+    accept_hostname_mismatch: bool,
 ) -> Result<lettre::transport::smtp::client::TlsParameters, lettre::transport::smtp::Error> {
     use lettre::transport::smtp::client::TlsParameters;
     if is_loopback_host(host) {
         TlsParameters::builder(host.to_string())
             .dangerous_accept_invalid_certs(true)
+            .dangerous_accept_invalid_hostnames(true)
+            .build()
+    } else if accept_hostname_mismatch {
+        TlsParameters::builder(host.to_string())
             .dangerous_accept_invalid_hostnames(true)
             .build()
     } else {
@@ -4421,10 +4427,11 @@ fn alias_with_own_smtp<'a>(
 fn smtp_transport_builder(
     host: &str,
     port: u16,
+    accept_hostname_mismatch: bool,
 ) -> Result<lettre::transport::smtp::AsyncSmtpTransportBuilder, SmtpError> {
     let implicit_tls = port == 465;
-    let builder = if is_loopback_host(host) {
-        let tls = smtp_tls_parameters(host)?;
+    let builder = if is_loopback_host(host) || accept_hostname_mismatch {
+        let tls = smtp_tls_parameters(host, accept_hostname_mismatch)?;
         let mode = if implicit_tls {
             lettre::transport::smtp::client::Tls::Wrapper(tls)
         } else {
@@ -4463,12 +4470,12 @@ async fn smtp_transport(
         } else {
             alias.smtp_password.clone()
         };
-        return Ok(smtp_transport_builder(alias.smtp_host.trim(), alias.smtp_port)?
+        return Ok(smtp_transport_builder(alias.smtp_host.trim(), alias.smtp_port, account.tls_accept_hostname_mismatch)?
             .credentials(Credentials::new(alias.smtp_username.clone(), password))
             .build());
     }
     let host = smtp_host(account);
-    let mut builder = smtp_transport_builder(&host, account.smtp_port)?;
+    let mut builder = smtp_transport_builder(&host, account.smtp_port, account.tls_accept_hostname_mismatch)?;
     if account.oauth {
         // XOAUTH2: the "password" is a fresh OAuth token from GOA.
         let token = fetch_oauth_token(account).await.ok_or_else(|| -> SmtpError {
@@ -5213,15 +5220,32 @@ fn is_loopback_host(host: &str) -> bool {
 }
 
 /// A TLS connector for a mail server: it tolerates a local bridge’s self-signed
-/// certificate and verifies everything else normally.
-fn tls_connector(host: &str) -> async_native_tls::TlsConnector {
+/// certificate, waives the name check alone where the account asks for it
+/// (#246: a valid certificate in another name, as shared hosting serves),
+/// and verifies everything else normally.
+fn tls_connector(host: &str, accept_hostname_mismatch: bool) -> async_native_tls::TlsConnector {
     let tls = async_native_tls::TlsConnector::new();
     if is_loopback_host(host) {
         tls.danger_accept_invalid_certs(true)
             .danger_accept_invalid_hostnames(true)
+    } else if accept_hostname_mismatch {
+        tls.danger_accept_invalid_hostnames(true)
     } else {
         tls
     }
+}
+
+/// Whether a connection error is the certificate's name not matching the
+/// host (#246), which the account's "Accept a certificate for another
+/// name" switch is for. The wording is OpenSSL's, via native-tls.
+pub fn is_hostname_mismatch(error: &str) -> bool {
+    let e = error.to_ascii_lowercase();
+    e.contains("hostname mismatch")
+        || e.contains("host name mismatch")
+        || e.contains("certificate name does not match")
+        || e.contains("does not match the")
+        || e.contains("invalid for name")
+        || e.contains("notvalidforname")
 }
 
 /// Whether the IMAP connection opens in plaintext and upgrades with STARTTLS
@@ -5252,7 +5276,7 @@ async fn connect(account: &AccountConfig) -> Result<ImapSession, Box<dyn std::er
 
 async fn connect_inner(account: &AccountConfig) -> Result<ImapSession, Box<dyn std::error::Error>> {
     let tcp = TcpStream::connect((account.imap_host.as_str(), account.imap_port)).await?;
-    let tls = tls_connector(&account.imap_host);
+    let tls = tls_connector(&account.imap_host, account.tls_accept_hostname_mismatch);
     let client = if imap_uses_starttls(account) {
         let mut plain = async_imap::Client::new(tcp);
         // Consume the plaintext greeting before issuing STARTTLS. Nothing secret
@@ -5379,7 +5403,7 @@ async fn test_smtp(account: &AccountConfig) -> Result<(), String> {
             &[Mechanism::Plain, Mechanism::Login],
         )
     };
-    smtp_auth_check(&host, account.smtp_port, &creds, mechanisms).await
+    smtp_auth_check(&host, account.smtp_port, &creds, mechanisms, account.tls_accept_hostname_mismatch).await
 }
 
 /// Test a send-as alias's own SMTP server and credentials (#34): connect,
@@ -5403,8 +5427,19 @@ pub async fn test_alias_smtp(
         alias.smtp_port,
         &creds,
         &[Mechanism::Plain, Mechanism::Login],
+        account_accepts_hostname_mismatch(account_email),
     )
     .await
+}
+
+/// The account's name-check waiver (#246), by its address: the alias test
+/// is handed the address alone.
+fn account_accepts_hostname_mismatch(account_email: &str) -> bool {
+    crate::config::load()
+        .unwrap_or_default()
+        .iter()
+        .find(|a| a.email.eq_ignore_ascii_case(account_email))
+        .is_some_and(|a| a.tls_accept_hostname_mismatch)
 }
 
 /// Blocking wrapper around [`test_alias_smtp`] — call from `spawn_blocking`,
@@ -5426,12 +5461,13 @@ async fn smtp_auth_check(
     port: u16,
     creds: &Credentials,
     mechanisms: &[lettre::transport::smtp::authentication::Mechanism],
+    accept_hostname_mismatch: bool,
 ) -> Result<(), String> {
     use lettre::transport::smtp::client::AsyncSmtpConnection;
     use lettre::transport::smtp::extension::ClientId;
 
     let hello = ClientId::default();
-    let tls = smtp_tls_parameters(host).map_err(|e| e.to_string())?;
+    let tls = smtp_tls_parameters(host, accept_hostname_mismatch).map_err(|e| e.to_string())?;
     // A (host, port) pair resolves bare IPv6 addresses correctly; a "host:port"
     // string would mis-parse their colons.
     let addr = (host, port);
@@ -7844,7 +7880,7 @@ impl Pop3 {
         let tcp = TcpStream::connect((host, port))
             .await
             .map_err(|e| e.to_string())?;
-        let tls = tls_connector(host);
+        let tls = tls_connector(host, account.tls_accept_hostname_mismatch);
 
         let stream = if port == 995 {
             tls.connect(host, tcp).await.map_err(|e| e.to_string())?
@@ -10920,6 +10956,21 @@ async fn graph_flush_outbox(
     emit_outbox(Some(cache), account_id, emit);
 }
 
+#[cfg(test)]
+mod hostname_mismatch_tests {
+    use super::is_hostname_mismatch;
+
+    #[test]
+    fn names_the_name_check_only() {
+        assert!(is_hostname_mismatch(
+            "error:0A000086:SSL routines:tls_post_process_server_certificate:certificate verify failed: Hostname mismatch"
+        ));
+        assert!(is_hostname_mismatch("The certificate's CN name does not match the passed value"));
+        assert!(!is_hostname_mismatch("certificate verify failed: self-signed certificate"));
+        assert!(!is_hostname_mismatch("connecting to imap.example.org timed out after 30 seconds"));
+    }
+}
+
 /// A plain IMAP account for the tests here and in the child modules.
 #[cfg(test)]
 pub(super) fn sample_account() -> AccountConfig {
@@ -10943,6 +10994,7 @@ pub(super) fn sample_account() -> AccountConfig {
         username: "me@example.com".into(),
         password: String::new(),
         smtp_separate: false,
+        tls_accept_hostname_mismatch: false,
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: None,

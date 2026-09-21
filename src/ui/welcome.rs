@@ -988,6 +988,7 @@ pub(crate) fn blank_account() -> AccountConfig {
         username: String::new(),
         password: String::new(),
         smtp_separate: false,
+        tls_accept_hostname_mismatch: false,
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: None,

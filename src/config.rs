@@ -202,6 +202,14 @@ pub struct AccountConfig {
     /// Use distinct SMTP credentials instead of the IMAP ones.
     #[serde(default)]
     pub smtp_separate: bool,
+    /// Accept a TLS certificate issued for a different host name than the
+    /// one connected to (#246): shared hosting serves mail for many domains
+    /// under one certificate in the host's own name. The chain is still
+    /// verified; only the name check is waived, for this account's IMAP,
+    /// POP3 and SMTP alike. Off unless the connection test says the names
+    /// differ.
+    #[serde(default)]
+    pub tls_accept_hostname_mismatch: bool,
     /// SMTP username (used only when `smtp_separate`).
     #[serde(default)]
     pub smtp_username: String,
@@ -4024,6 +4032,7 @@ dest_path = "Lists"
             username: "a@b.c".into(),
             password: "SECRET".into(),
             smtp_separate: false,
+            tls_accept_hostname_mismatch: false,
             smtp_username: String::new(),
             smtp_password: String::new(),
             color: None,

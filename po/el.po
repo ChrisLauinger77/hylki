@@ -1353,6 +1353,15 @@ msgstr "Όνομα χρήστη SMTP"
 msgid "SMTP Password"
 msgstr "Κωδικός πρόσβασης SMTP"
 
+msgid "Accept a certificate for another name"
+msgstr ""
+
+msgid ""
+"The server's certificate must still be valid and signed, but may be issued "
+"for a different host name than the one entered, as on shared hosting. Turn "
+"on only when the connection test says the names differ."
+msgstr ""
+
 msgid "Test Connection"
 msgstr "Δοκιμή σύνδεσης"
 
@@ -1596,6 +1605,11 @@ msgstr "Εντάξει"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Εισαγάγετε αναγνωριστικό πελάτη και συνδεθείτε πριν από την αποθήκευση"
+
+msgid ""
+"The certificate is for another name. If this server is the right one, turn "
+"on “Accept a certificate for another name” above and test again."
+msgstr ""
 
 msgid "✓ Signed in — save the account to finish"
 msgstr "✓ Έγινε σύνδεση — αποθηκεύστε τον λογαριασμό για ολοκλήρωση"

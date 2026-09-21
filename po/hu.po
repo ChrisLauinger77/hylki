@@ -1330,6 +1330,15 @@ msgstr "SMTP-felhasználónév"
 msgid "SMTP Password"
 msgstr "SMTP-jelszó"
 
+msgid "Accept a certificate for another name"
+msgstr ""
+
+msgid ""
+"The server's certificate must still be valid and signed, but may be issued "
+"for a different host name than the one entered, as on shared hosting. Turn "
+"on only when the connection test says the names differ."
+msgstr ""
+
 msgid "Test Connection"
 msgstr "Kapcsolat tesztelése"
 
@@ -1561,6 +1570,11 @@ msgstr "OK"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Mentés előtt adja meg az ügyfélazonosítót és jelentkezzen be"
+
+msgid ""
+"The certificate is for another name. If this server is the right one, turn "
+"on “Accept a certificate for another name” above and test again."
+msgstr ""
 
 msgid "✓ Signed in — save the account to finish"
 msgstr "✓ Bejelentkezve — a befejezéshez mentse a fiókot"

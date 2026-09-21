@@ -1135,6 +1135,11 @@ impl Component for AccountsWindow {
                                 adw::EntryRow { set_title: &i18n("SMTP Username") },
                                 #[name = "smtp_pass_row"]
                                 adw::PasswordEntryRow { set_title: &i18n("SMTP Password") },
+                                #[name = "tls_mismatch_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Accept a certificate for another name"),
+                                    set_subtitle: &i18n("The server's certificate must still be valid and signed, but may be issued for a different host name than the one entered, as on shared hosting. Turn on only when the connection test says the names differ."),
+                                },
 
                                 gtk::Box {
                                     set_orientation: gtk::Orientation::Vertical,
@@ -1153,6 +1158,10 @@ impl Component for AccountsWindow {
                                         set_halign: gtk::Align::Start,
                                         set_xalign: 0.0,
                                         set_wrap: true,
+                                        // The text can be copied out (#246):
+                                        // an error is often something to
+                                        // paste into a bug report.
+                                        set_selectable: true,
                                     },
                                 },
                             },
@@ -1921,6 +1930,7 @@ impl Component for AccountsWindow {
                         widgets.user_row.upcast_ref(),
                         widgets.pass_row.upcast_ref(),
                         widgets.smtp_separate_row.upcast_ref(),
+                        widgets.tls_mismatch_row.upcast_ref(),
                         widgets.smtp_user_row.upcast_ref(),
                         widgets.smtp_pass_row.upcast_ref(),
                         widgets.test_btn.upcast_ref(),
@@ -2781,6 +2791,10 @@ impl Component for AccountsWindow {
             AccountsCmd::Test(result) => {
                 let line = |label: &str, r: &Result<(), String>| match r {
                     Ok(()) => format!("✓ {label}: connected"),
+                    Err(e) if crate::worker::is_hostname_mismatch(e) => format!(
+                        "✗ {label}: {e}\n   {}",
+                        i18n("The certificate is for another name. If this server is the right one, turn on “Accept a certificate for another name” above and test again.")
+                    ),
                     Err(e) => format!("✗ {label}: {e}"),
                 };
                 let protocol = protocol_at(widgets.protocol_row.selected());
@@ -3489,6 +3503,7 @@ impl AccountsWindow {
         widgets.user_row.set_visible(is_password);
         widgets.pass_row.set_visible(is_password);
         widgets.smtp_separate_row.set_visible(is_password);
+        widgets.tls_mismatch_row.set_visible(is_password);
         widgets.test_btn.set_visible(is_password);
         if is_oauth {
             widgets.smtp_separate_row.set_active(false);
@@ -3841,6 +3856,7 @@ fn read_account(
         username: trimmed(&widgets.user_row),
         password: widgets.pass_row.text().to_string(),
         smtp_separate: widgets.smtp_separate_row.is_active(),
+        tls_accept_hostname_mismatch: widgets.tls_mismatch_row.is_active(),
         smtp_username: trimmed(&widgets.smtp_user_row),
         smtp_password: widgets.smtp_pass_row.text().to_string(),
         color: Some(crate::color::to_hex(&widgets.color_btn.rgba())),
@@ -4009,6 +4025,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.user_row.set_text(&acc.username);
     widgets.pass_row.set_text(&acc.password);
     widgets.smtp_separate_row.set_active(acc.smtp_separate);
+    widgets.tls_mismatch_row.set_active(acc.tls_accept_hostname_mismatch);
     widgets.smtp_user_row.set_text(&acc.smtp_username);
     widgets.smtp_pass_row.set_text(&acc.smtp_password);
     widgets.push_row.set_selected(match acc.push {
@@ -4067,6 +4084,7 @@ fn set_connection_editable(widgets: &AccountsWindowWidgets, editable: bool) {
     widgets.provider_row.set_sensitive(editable);
     widgets.protocol_row.set_sensitive(editable);
     widgets.smtp_separate_row.set_sensitive(editable);
+    widgets.tls_mismatch_row.set_sensitive(editable);
     // OAuth client details belong to a natively-added account; a GOA one gets its
     // tokens from the system.
     for row in [
@@ -4095,6 +4113,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.user_row.set_text("");
     widgets.pass_row.set_text("");
     widgets.smtp_separate_row.set_active(false);
+    widgets.tls_mismatch_row.set_active(false);
     widgets.push_row.set_selected(0);
     widgets.empty_junk_row.set_selected(0);
     widgets.empty_trash_row.set_selected(0);
@@ -4178,6 +4197,8 @@ fn apply_protocol(widgets: &AccountsWindowWidgets) {
     widgets.smtp_row.set_visible(servers_shown && !jmap);
     widgets.smtp_port_row.set_visible(servers_shown && !jmap);
     widgets.smtp_separate_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
+    // JMAP runs over a different TLS stack (rustls), which offers no such waiver.
+    widgets.tls_mismatch_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
     if jmap {
         widgets.smtp_separate_row.set_active(false);
         widgets.host_row.set_title(&i18n("Server (host name or URL)"));

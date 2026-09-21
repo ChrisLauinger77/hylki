@@ -23,6 +23,19 @@ account you only need the server and an app-specific password. See
 passwords you enter there are migrated into the system keyring on first run and
 removed from the file.
 
+### A certificate in another name
+
+Shared hosting often serves mail for many domains under one certificate in
+the host's own name, so `mail.example.org` answers with a certificate for
+`server12.hostingcompany.net` and the connection test reports that the names
+differ. **Settings → Accounts → the account → Accept a certificate for
+another name** waives that one check for the account's IMAP, POP3 and SMTP
+connections; the certificate must still be valid and signed by a trusted
+authority. Leave it off unless the test names this problem, and prefer
+entering the host the certificate is actually for when you know it. Stored
+on the account as `tls_accept_hostname_mismatch` in `accounts.toml`. The
+connection test's text can be selected and copied.
+
 ### JMAP (Stalwart, Fastmail)
 
 A JMAP account (RFC 8620 and 8621) reads and sends mail over HTTPS, so it

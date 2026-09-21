@@ -16,8 +16,9 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Per-alias SMTP:** each address on an account can send through its own
   server and credentials.
 - **Proton Bridge, Zimbra, iCloud, Mailfence and other awkward servers:**
-  STARTTLS with locally signed certificates, servers without MOVE, and
-  non-compliant fetch replies are all handled.
+  STARTTLS with locally signed certificates, a certificate in the hosting
+  company's name rather than yours, servers without MOVE, and non-compliant
+  fetch replies are all handled.
 
 ## Mail
 

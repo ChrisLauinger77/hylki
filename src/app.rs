@@ -18980,6 +18980,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         // without one, and the demo's private bus has no keyring to ask.
         password: "demo".into(),
         smtp_separate: false,
+        tls_accept_hostname_mismatch: false,
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: Some(color.into()),
