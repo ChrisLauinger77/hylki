@@ -106,7 +106,12 @@ weighing in, all in 1.33; and to [**EmmanuelP**](https://github.com/EmmanuelP)
 for the meeting-invitations request and
 [**yioannides**](https://github.com/yioannides) for the repository cleanup
 ([#230](https://github.com/hyprlab/hylki/issues/230)) this documentation
-follows, both in 1.36; and to everyone who files issues and ideas.
+follows, both in 1.36; to [**Romain Ferrali**](https://github.com/rferrali)
+for the Ctrl+Enter, signature placement, hidden folders and forwarded
+attachments requests, [**aia832003**](https://github.com/aia832003) for the
+unified-inbox conversation report and
+[**7system7**](https://github.com/7system7) for the file-only preview
+report, all in 1.38; and to everyone who files issues and ideas.
 
 ## Translations
 
