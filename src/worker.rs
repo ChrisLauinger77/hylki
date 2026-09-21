@@ -133,14 +133,52 @@ static PREVIEW_ITEMS_REJECTED: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashSet<u32>>,
 > = std::sync::LazyLock::new(Default::default);
 
+/// Whether the server has rejected the preview items for this account.
+fn previews_rejected(account_id: u32) -> bool {
+    PREVIEW_ITEMS_REJECTED
+        .lock()
+        .map(|r| r.contains(&account_id))
+        .unwrap_or(false)
+}
+
 /// Whether the account's fetches should read list previews at all: the
 /// setting is on and the server has not rejected the preview items.
 fn inline_previews_wanted(account_id: u32) -> bool {
-    crate::config::load_preview_lines() > 0
-        && !PREVIEW_ITEMS_REJECTED
-            .lock()
-            .map(|r| r.contains(&account_id))
-            .unwrap_or(false)
+    crate::config::load_preview_lines() > 0 && !previews_rejected(account_id)
+}
+
+/// Start the account at the summary-fetch mode that worked last time
+/// (#226), so a server that rejects the default is not failed against on
+/// every launch: two unreadable fetches and two reconnects before the list
+/// appeared, in the Mailfence log. Returns the `use_envelope` to begin with.
+fn seed_fetch_mode(account_id: u32, email: &str) -> bool {
+    let (use_envelope, rejected) = crate::config::load_fetch_mode(email);
+    if rejected {
+        if let Ok(mut r) = PREVIEW_ITEMS_REJECTED.lock() {
+            r.insert(account_id);
+        }
+    }
+    if !use_envelope || rejected {
+        tracing::info!(
+            target: "hylki::imap",
+            "summary fetch: starting with envelope={use_envelope} previews={} (remembered)",
+            !rejected
+        );
+    }
+    use_envelope
+}
+
+/// A parser error with its byte-array dump cut out: the same reply follows
+/// as text, which is the readable half, and the numbers were most of a
+/// 160 KB log for one user (#226).
+pub fn compact_parse_error(text: &str) -> String {
+    let Some(start) = text.find("input: [") else {
+        return text.to_string();
+    };
+    let Some(end) = text[start..].find(']').map(|i| start + i + 1) else {
+        return text.to_string();
+    };
+    format!("{}input: [{} bytes]{}", &text[..start], text[start + 8..end - 1].split(',').count(), &text[end..])
 }
 
 /// Whether the error is the IMAP parser giving up on a server's reply, as
@@ -1024,8 +1062,9 @@ async fn run_imap(
     let mut pending_resync = false;
     // Whether to use IMAP's structured ENVELOPE/BODYSTRUCTURE. Disabled for the
     // session (falling back to raw-header parsing) if the server sends responses
-    // our IMAP parser can't handle (e.g. iCloud).
-    let mut use_envelope = true;
+    // our IMAP parser can't handle (e.g. iCloud), and remembered across
+    // sessions once a way of asking has worked (#226).
+    let mut use_envelope = seed_fetch_mode(account_id, &account.email);
     // Whether the Outbox has been retried since this connection came up. A queued
     // message is almost always waiting on the network, so having a session again
     // is the moment worth retrying — not a timer.
@@ -2636,11 +2675,13 @@ async fn load_messages_retry(
     // moves the account one step down the [`step_fetch_mode`] ladder for the
     // rest of the session, until a way works or the ladder runs out. Any
     // other error is retried once as it was.
+    let mut stepped = false;
     for _ in 0..4 {
         if let Err(e) = &result {
             if is_parse_error(e) && !step_fetch_mode(account_id, use_envelope) {
                 return result;
             }
+            stepped |= is_parse_error(e);
         }
         match connect(account).await {
             Ok(fresh) => s = fresh,
@@ -2655,6 +2696,11 @@ async fn load_messages_retry(
         match &result {
             Ok(_) => {
                 *session = Some(s);
+                // A mode reached by stepping has now loaded a folder: the
+                // next launch starts here.
+                if stepped {
+                    crate::config::save_fetch_mode(&account.email, *use_envelope, previews_rejected(account_id));
+                }
                 return result;
             }
             Err(e) if is_parse_error(e) => continue,
@@ -4721,7 +4767,7 @@ fn wire(cmd: &str) {
 fn wired<T>(cmd: &str, r: &Result<T, async_imap::error::Error>) {
     match r {
         Ok(_) => tracing::debug!(target: "hylki::imap", "< OK ({})", cmd_head(cmd)),
-        Err(e) => tracing::warn!(target: "hylki::imap", "< {e} ({cmd})"),
+        Err(e) => tracing::warn!(target: "hylki::imap", "< {} ({cmd})", compact_parse_error(&e.to_string())),
     }
 }
 
@@ -6211,7 +6257,7 @@ async fn fetch_window(
         let query = format!(
             "(UID ENVELOPE FLAGS BODYSTRUCTURE INTERNALDATE{REFS_FETCH_ITEM}{preview_part})"
         );
-        let fetches: Vec<Fetch> = session.fetch(&range, query).await?.try_collect().await?;
+        let fetches = logged_fetch(session, &range, &query).await?;
         fetches
             .iter()
             .map(|f| {
@@ -6222,7 +6268,7 @@ async fn fetch_window(
             .collect()
     } else {
         let query = format!("(UID FLAGS BODY.PEEK[HEADER] INTERNALDATE{preview_part})");
-        let fetches: Vec<Fetch> = session.fetch(&range, query).await?.try_collect().await?;
+        let fetches = logged_fetch(session, &range, &query).await?;
         fetches
             .iter()
             .map(|f| {
@@ -6246,6 +6292,24 @@ async fn fetch_window(
     }
     messages.reverse(); // IMAP returns oldest-first; show newest at the top.
     Ok(messages)
+}
+
+/// A sequence-number FETCH through the conversation log, like the UID
+/// wrappers: the summary fetch is the one a server rejects (#226), and its
+/// command and verdict were the two lines missing from the export.
+async fn logged_fetch(
+    session: &mut ImapSession,
+    range: &str,
+    query: &str,
+) -> Result<Vec<Fetch>, async_imap::error::Error> {
+    let cmd = format!("FETCH {range} {query}");
+    wire(&cmd);
+    let r: Result<Vec<Fetch>, async_imap::error::Error> = async {
+        session.fetch(range, query).await?.try_collect().await
+    }
+    .await;
+    wired(&cmd, &r);
+    r
 }
 
 /// The preview snippet from a fetch that asked for `BODY.PEEK[1]` together with
@@ -10954,6 +11018,21 @@ async fn graph_flush_outbox(
         emit(WorkerEvent::Sent);
     }
     emit_outbox(Some(cache), account_id, emit);
+}
+
+#[cfg(test)]
+mod compact_parse_error_tests {
+    use super::compact_parse_error;
+
+    #[test]
+    fn drops_the_byte_dump_and_keeps_the_text() {
+        let e = "io: Error(Error { input: [42, 32, 55, 57, 56], code: Tag }) during parsing of \"* 798 FETCH\"";
+        assert_eq!(
+            compact_parse_error(e),
+            "io: Error(Error { input: [5 bytes], code: Tag }) during parsing of \"* 798 FETCH\""
+        );
+        assert_eq!(compact_parse_error("connection lost"), "connection lost");
+    }
 }
 
 #[cfg(test)]

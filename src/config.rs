@@ -3259,6 +3259,13 @@ struct StateFile {
     /// In-message attachment drawer: collapsed (showing only its header).
     #[serde(default)]
     drawer_collapsed: bool,
+    /// The way of asking for message summaries that worked for an account
+    /// whose server rejects the default (#226), by email: "headers",
+    /// "no-previews" or "headers-no-previews". Absent = the default. Written
+    /// only once a stepped-to mode has actually loaded a folder, so a
+    /// launch starts there instead of failing its way down the ladder.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    fetch_modes: std::collections::BTreeMap<String, String>,
     /// Expanded attachment-drawer height in px (the dragged split).
     #[serde(default = "default_drawer_height")]
     drawer_height: i32,
@@ -3464,6 +3471,43 @@ pub fn load_drawer_state() -> DrawerState {
 }
 
 /// Persist whether the attachment drawer is collapsed.
+/// The remembered summary-fetch mode for an account (#226), as
+/// (use ENVELOPE, preview items rejected). The default when nothing is known.
+pub fn load_fetch_mode(email: &str) -> (bool, bool) {
+    match load_state().fetch_modes.get(&email.to_ascii_lowercase()).map(String::as_str) {
+        Some("headers") => (false, false),
+        Some("no-previews") => (true, true),
+        Some("headers-no-previews") => (false, true),
+        _ => (true, false),
+    }
+}
+
+/// Remember the summary-fetch mode that worked for an account (#226); the
+/// default is remembered by forgetting.
+pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool) {
+    let mode = match (use_envelope, previews_rejected) {
+        (true, false) => None,
+        (false, false) => Some("headers"),
+        (true, true) => Some("no-previews"),
+        (false, true) => Some("headers-no-previews"),
+    };
+    let key = email.to_ascii_lowercase();
+    let mut s = load_state();
+    let current = s.fetch_modes.get(&key).map(String::as_str);
+    if current == mode {
+        return;
+    }
+    match mode {
+        Some(m) => {
+            s.fetch_modes.insert(key, m.to_string());
+        }
+        None => {
+            s.fetch_modes.remove(&key);
+        }
+    }
+    save_state(&s);
+}
+
 pub fn save_drawer_collapsed(collapsed: bool) {
     let mut s = load_state();
     s.drawer_collapsed = collapsed;
