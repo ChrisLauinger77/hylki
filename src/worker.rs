@@ -6211,9 +6211,7 @@ fn preview_of(fetch: &Fetch) -> String {
     // file — has no text to show. An empty preview here lets the BODY[TEXT]
     // retry look further into the message for the text part, instead of the
     // row wearing the file's first bytes.
-    if ctype.as_deref().is_some_and(|t| {
-        !(t.starts_with("text/") || t.starts_with("multipart/") || t.starts_with("message/"))
-    }) {
+    if ctype.as_deref().is_some_and(|t| !text_like(t)) {
         return String::new();
     }
     let charset = ctype.as_deref().and_then(charset_param);
@@ -6232,6 +6230,29 @@ fn preview_of(fetch: &Fetch) -> String {
     // GTK labels abort on interior NULs, and decoded message text can carry
     // them.
     if p.contains('\0') { p.replace('\0', " ") } else { p }
+}
+
+/// Whether a (lowercased) Content-Type can hold text to preview, or contain
+/// a part that does: text itself, a multipart, or an enclosed message. An
+/// image, an archive or a document is a file, whatever its bytes decode to.
+fn text_like(ctype: &str) -> bool {
+    ctype.starts_with("text/") || ctype.starts_with("multipart/") || ctype.starts_with("message/")
+}
+
+/// Whether decoded body bytes are a file rather than text: control
+/// characters that no text carries (a zip opens `PK\x03\x04`, a PDF's
+/// streams are full of them). A row showing such bytes as letters is worse
+/// than a row showing nothing.
+fn looks_binary(bytes: &[u8]) -> bool {
+    let sample = &bytes[..bytes.len().min(512)];
+    if sample.is_empty() {
+        return false;
+    }
+    let control = sample
+        .iter()
+        .filter(|&&b| b < 0x20 && !matches!(b, b'\t' | b'\n' | b'\r' | 0x0c) || b == 0x7f)
+        .count();
+    control > 0 && (sample.contains(&0) || control * 20 > sample.len())
 }
 
 /// The lowercased Content-Type section 1 declares, read from the
@@ -6413,9 +6434,21 @@ async fn retry_missing_previews_now(session: &mut ImapSession, messages: &mut [M
                 // section 1 is the body and they describe it exactly.
                 let charset = section_charset(f);
                 let encoding = section_encoding(f);
+                // Section 1 is a file, not text (#241: a DMARC report that is
+                // nothing but a zip). The summary fetch blanked the preview
+                // for that reason, and this read must not undo it by decoding
+                // the file: only a multipart body with a text part inside
+                // has anything to show.
+                let binary_first = section_content_type(f).is_some_and(|t| !text_like(&t));
                 let p = f
                     .section(&SectionPath::Full(MessageSection::Text))
-                    .map(|b| preview_from_part(b, charset.as_deref(), encoding.as_deref()))
+                    .map(|b| {
+                        if binary_first {
+                            text_in_multipart(b, 0).map(finish_preview).unwrap_or_default()
+                        } else {
+                            preview_from_part(b, charset.as_deref(), encoding.as_deref())
+                        }
+                    })
                     .unwrap_or_default()
                     .replace('\0', " ");
                 if p.is_empty() {
@@ -6457,7 +6490,11 @@ fn preview_from_part(bytes: &[u8], charset: Option<&str>, encoding: Option<&str>
             || e.starts_with("quoted-printable")
             || matches!(*e, "7bit" | "8bit" | "binary")
     }) {
-        return finish_preview(decode_mime_body(bytes, e, charset));
+        let text = decode_mime_body(bytes, e, charset);
+        if looks_binary(text.as_bytes()) {
+            return String::new();
+        }
+        return finish_preview(text);
     }
     let decoded = if looks_like_base64(bytes) {
         decode_base64_prefix(bytes)
@@ -6466,6 +6503,11 @@ fn preview_from_part(bytes: &[u8], charset: Option<&str>, encoding: Option<&str>
     } else {
         bytes.to_vec()
     };
+    // Whatever the headers said or failed to say, a file's bytes are not a
+    // preview (#241).
+    if looks_binary(&decoded) {
+        return String::new();
+    }
 
     finish_preview(decode_text(&decoded, charset))
 }
@@ -11276,6 +11318,21 @@ mod tests {
         let preview = preview_from_part(part.as_bytes(), None, None);
         assert!(preview.starts_with("Hi Camp crystal clear,"), "{preview}");
         assert!(!preview.contains("utm_campaign"), "{preview}");
+    }
+
+    #[test]
+    fn a_zip_as_the_whole_body_yields_no_preview() {
+        // #241: a DMARC report is a single application/zip part. Base64 or
+        // not, its bytes are a file, not a snippet.
+        let zip = b"PK\x03\x04\x14\x00\x00\x00\x08\x00\x8a\x1eGoogle report\x00\x00\x12\x03\x00PK\x01\x02";
+        let b64 = crate::oauth::base64_encode(zip);
+        assert_eq!(preview_from_part(b64.as_bytes(), None, Some("base64")), "");
+        assert_eq!(preview_from_part(b64.as_bytes(), None, None), "");
+        assert_eq!(preview_from_part(zip, None, Some("binary")), "");
+        // Ordinary text with a tab and line breaks is not "binary".
+        assert_eq!(preview_from_part(b"Hello\tthere\r\nSecond line", None, None), "Hello there Second line");
+        assert!(!text_like("application/zip"));
+        assert!(text_like("multipart/mixed; boundary=x"));
     }
 
     #[test]
