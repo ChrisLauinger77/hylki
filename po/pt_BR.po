@@ -854,8 +854,9 @@ msgstr ""
 msgid "Message zoom in or out"
 msgstr "Fonte das mensagens"
 
-msgid "Message zoom back to 100%"
-msgstr ""
+#, fuzzy
+msgid "Message zoom back to the default"
+msgstr "Fonte das mensagens"
 
 msgid "Console mode (when enabled in Settings)"
 msgstr "Modo de console (quando ativado nas Configurações)"
@@ -2919,7 +2920,9 @@ msgstr "Próxima correspondência"
 msgid "Close find"
 msgstr "Fechar pesquisa"
 
-msgid "Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back."
+msgid ""
+"Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back to the default "
+"from Settings."
 msgstr ""
 
 msgid ""
@@ -4120,6 +4123,15 @@ msgstr "Escrever mensagens em"
 msgid ""
 "Keep the switch where it was last set, or start every message in Reader View "
 "or as sent. The switch still changes the message on screen."
+msgstr ""
+
+#, fuzzy
+msgid "Default zoom"
+msgstr "Padrão"
+
+msgid ""
+"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
+"started; Ctrl+0 comes back to this."
 msgstr ""
 
 msgid "Compose in the main window"

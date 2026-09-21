@@ -918,6 +918,11 @@ struct PrivacyFile {
     /// or start every message on or off.
     #[serde(default)]
     reader_default: ReaderDefault,
+    /// The message zoom every launch starts at, in percent (Settings →
+    /// Reading). Ctrl+ and Ctrl- move away from it for the session; the
+    /// next launch is back here.
+    #[serde(default = "default_reader_zoom")]
+    reader_zoom: u32,
     /// Each conversation message lists its own attachments beneath its body
     /// (#213), so which file came with which message is never in doubt.
     #[serde(default = "default_card_attachments")]
@@ -1349,6 +1354,7 @@ impl Default for PrivacyFile {
             reader_mode: false,
             reader_switch: default_reader_switch(),
             reader_default: ReaderDefault::default(),
+            reader_zoom: default_reader_zoom(),
             card_attachments: default_card_attachments(),
             attachment_drawer: default_attachment_drawer(),
             confirm_thread_delete: default_confirm_thread_delete(),
@@ -2320,6 +2326,20 @@ pub fn load_reader_default() -> ReaderDefault {
     load_privacy().reader_default
 }
 
+/// The zoom steps Ctrl+ and Ctrl- walk, and Settings offers, in percent.
+pub const READER_ZOOM_STEPS: [u32; 12] = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
+
+fn default_reader_zoom() -> u32 {
+    100
+}
+
+/// The message zoom a launch starts at; anything off the step list reads
+/// as 100.
+pub fn load_reader_zoom() -> u32 {
+    let z = load_privacy().reader_zoom;
+    if READER_ZOOM_STEPS.contains(&z) { z } else { 100 }
+}
+
 /// What Reader View does each time a message is opened.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2861,6 +2881,7 @@ pub fn save_privacy(
     reader_mode: bool,
     reader_switch: bool,
     reader_default: ReaderDefault,
+    reader_zoom: u32,
     card_attachments: bool,
     attachment_drawer: bool,
     confirm_thread_delete: bool,
@@ -2951,6 +2972,7 @@ pub fn save_privacy(
         reader_mode,
         reader_switch,
         reader_default,
+        reader_zoom,
         card_attachments,
         attachment_drawer,
         confirm_thread_delete,
@@ -3229,10 +3251,6 @@ struct StateFile {
     /// In-message attachment drawer: collapsed (showing only its header).
     #[serde(default)]
     drawer_collapsed: bool,
-    /// Message zoom (Ctrl+ / Ctrl-), in percent; 100 is the sender's size.
-    /// Scales the message bodies alone, never the reader's chrome.
-    #[serde(default = "default_reader_zoom")]
-    reader_zoom: u32,
     /// Expanded attachment-drawer height in px (the dragged split).
     #[serde(default = "default_drawer_height")]
     drawer_height: i32,
@@ -3438,24 +3456,6 @@ pub fn load_drawer_state() -> DrawerState {
 }
 
 /// Persist whether the attachment drawer is collapsed.
-/// The zoom steps Ctrl+ and Ctrl- walk, in percent.
-pub const READER_ZOOM_STEPS: [u32; 12] = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200, 250];
-
-fn default_reader_zoom() -> u32 {
-    100
-}
-
-pub fn load_reader_zoom() -> u32 {
-    let z = load_state().reader_zoom;
-    if READER_ZOOM_STEPS.contains(&z) { z } else { 100 }
-}
-
-pub fn save_reader_zoom(percent: u32) {
-    let mut s = load_state();
-    s.reader_zoom = percent;
-    save_state(&s);
-}
-
 pub fn save_drawer_collapsed(collapsed: bool) {
     let mut s = load_state();
     s.drawer_collapsed = collapsed;

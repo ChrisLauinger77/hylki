@@ -36,9 +36,10 @@ with or without single-key shortcuts.
 
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
 in and out, with or without Reader View; <kbd>Ctrl+0</kbd> puts it back to
-100%. Only the message scales, not the header or the toolbar; a chip beside
-the Reader View switch shows the percentage while it is not 100%. The choice
-is kept between sessions.
+the default. Only the message scales, not the header or the toolbar; a chip
+beside the Reader View switch shows the percentage while it is not 100%.
+The zoom stays as set from message to message until Hylki is next started,
+which begins at the default from **Settings → Reading → Default zoom**.
 
 Keys never fire while you are typing: whatever has focus gets first refusal, so
 "archive" typed into the search box searches for it.

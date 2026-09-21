@@ -90,7 +90,8 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Your own font and colours** for message bodies, overriding the sender's.
 - **Message zoom:** Ctrl++ and Ctrl+- scale the message alone, in Reader
   View or out of it, with the percentage shown beside the Reader View switch
-  until it is back at 100% (Ctrl+0).
+  while it is not 100%. Settings → Reading sets the zoom every launch starts
+  at; Ctrl+0 returns to it.
 - **Meeting invitations:** what the meeting is, when it runs in your own
   clock and time zone, where it is and who organised it, with Accept, Maybe,
   Decline and Add to Calendar.

@@ -850,8 +850,9 @@ msgstr ""
 msgid "Message zoom in or out"
 msgstr "Üzenet betűtípusa"
 
-msgid "Message zoom back to 100%"
-msgstr ""
+#, fuzzy
+msgid "Message zoom back to the default"
+msgstr "Üzenet betűtípusa"
 
 msgid "Console mode (when enabled in Settings)"
 msgstr "Konzolmód (ha engedélyezve van a Beállításokban)"
@@ -2903,7 +2904,9 @@ msgstr "Következő találat"
 msgid "Close find"
 msgstr "Keresés bezárása"
 
-msgid "Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back."
+msgid ""
+"Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back to the default "
+"from Settings."
 msgstr ""
 
 msgid ""
@@ -4040,6 +4043,15 @@ msgstr "Üzenetek rendezése"
 msgid ""
 "Keep the switch where it was last set, or start every message in Reader View "
 "or as sent. The switch still changes the message on screen."
+msgstr ""
+
+#, fuzzy
+msgid "Default zoom"
+msgstr "Alapértelmezett"
+
+msgid ""
+"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
+"started; Ctrl+0 comes back to this."
 msgstr ""
 
 msgid "Compose in the main window"

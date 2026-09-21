@@ -42,6 +42,8 @@ pub struct PrefInit {
     pub reader_switch: bool,
     /// What Reader View does when a message is opened.
     pub reader_default: crate::config::ReaderDefault,
+    /// The message zoom every launch starts at, in percent.
+    pub reader_zoom: u32,
     /// Each conversation message lists its own attachments (#213).
     pub card_attachments: bool,
     /// The attachment drawer beneath the reader is shown (#213).
@@ -806,6 +808,7 @@ pub enum PrefInput {
     ToggleSingleMessageCard(bool),
     ToggleReaderSwitch(bool),
     ChangeReaderDefault(u32),
+    ChangeReaderZoom(u32),
     ToggleCardAttachments(bool),
     ToggleAttachmentDrawer(bool),
     ToggleThreadExpansion(bool),
@@ -948,6 +951,7 @@ pub enum PrefOutput {
     SetSingleMessageCard(bool),
     SetReaderSwitch(bool),
     SetReaderDefault(crate::config::ReaderDefault),
+    SetReaderZoom(u32),
     SetCardAttachments(bool),
     SetAttachmentDrawer(bool),
     SetThreadExpansion(bool),
@@ -2294,6 +2298,15 @@ impl Component for Preferences {
                                             sender.input(PrefInput::ChangeReaderDefault(row.selected()));
                                         },
                                     },
+
+                                    #[name = "reader_zoom_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Default zoom"),
+                                        set_subtitle: &i18n("How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next started; Ctrl+0 comes back to this."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeReaderZoom(row.selected()));
+                                        },
+                                    },
                                 },
                             },
 
@@ -3057,6 +3070,14 @@ impl Component for Preferences {
             crate::config::ReaderDefault::On => 1,
             crate::config::ReaderDefault::Off => 2,
         });
+        let zoom_labels: Vec<String> =
+            crate::config::READER_ZOOM_STEPS.iter().map(|z| format!("{z}%")).collect();
+        let zoom_labels: Vec<&str> = zoom_labels.iter().map(String::as_str).collect();
+        widgets.reader_zoom_row.set_model(Some(&gtk::StringList::new(&zoom_labels)));
+        no_truncate(&widgets.reader_zoom_row);
+        widgets.reader_zoom_row.set_selected(
+            crate::config::READER_ZOOM_STEPS.iter().position(|&z| z == init.reader_zoom).unwrap_or(5) as u32,
+        );
         widgets.card_attachments_row.set_active(init.card_attachments);
         widgets.attachment_drawer_row.set_active(init.attachment_drawer);
         widgets.thread_expansion_row.set_active(init.thread_expansion);
@@ -3605,6 +3626,11 @@ impl Component for Preferences {
                     _ => crate::config::ReaderDefault::Remember,
                 };
                 let _ = sender.output(PrefOutput::SetReaderDefault(policy));
+            }
+            PrefInput::ChangeReaderZoom(idx) => {
+                if let Some(&z) = crate::config::READER_ZOOM_STEPS.get(idx as usize) {
+                    let _ = sender.output(PrefOutput::SetReaderZoom(z));
+                }
             }
             PrefInput::ToggleCardAttachments(on) => {
                 let _ = sender.output(PrefOutput::SetCardAttachments(on));

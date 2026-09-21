@@ -858,8 +858,9 @@ msgstr "Activer ou désactiver le mode Focus"
 msgid "Message zoom in or out"
 msgstr "Police du message"
 
-msgid "Message zoom back to 100%"
-msgstr ""
+#, fuzzy
+msgid "Message zoom back to the default"
+msgstr "Police du message"
 
 msgid "Console mode (when enabled in Settings)"
 msgstr "Mode console (si activé dans les paramètres)"
@@ -2934,7 +2935,9 @@ msgstr "Résultat suivant"
 msgid "Close find"
 msgstr "Fermer la recherche"
 
-msgid "Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back."
+msgid ""
+"Message zoom. Ctrl+ and Ctrl- change it; Ctrl+0 puts it back to the default "
+"from Settings."
 msgstr ""
 
 msgid ""
@@ -4174,6 +4177,15 @@ msgstr ""
 "Conserver le commutateur dans sa dernière position, ou toujours ouvrir les "
 "messages en mode Lecture ou tel qu'envoyé. Le commutateur permet toujours de "
 "changer le message affiché à l'écran."
+
+#, fuzzy
+msgid "Default zoom"
+msgstr "Par défaut"
+
+msgid ""
+"How large messages are shown. Ctrl+ and Ctrl- change it until Hylki is next "
+"started; Ctrl+0 comes back to this."
+msgstr ""
 
 msgid "Compose in the main window"
 msgstr "Rédiger dans la fenêtre principale"

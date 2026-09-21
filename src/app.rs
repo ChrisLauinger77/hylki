@@ -823,8 +823,11 @@ pub struct AppModel {
     /// Reader View: every message in the reader shown as its content alone,
     /// in the reader's own sheet (see `crate::reader`). The toggle sits in
     /// the reader's subject block; the choice is remembered across runs.
-    /// Message zoom in percent (Ctrl+ / Ctrl-), saved in the state file.
+    /// The message zoom this session is at (Ctrl+ / Ctrl-). Starts at
+    /// `zoom_default` and is not saved: a launch begins at the setting.
     zoom: u32,
+    /// Settings → Reading: the zoom every launch starts at, in percent.
+    zoom_default: u32,
     reader_mode: bool,
     /// The Reader View switch is shown in the reader header.
     reader_switch: bool,
@@ -1274,8 +1277,10 @@ pub enum AppMsg {
     /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
     /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
-    /// back to 100%.
+    /// back to the default, for this session.
     ZoomMessage(i8),
+    /// Settings → Reading: the zoom every launch starts at.
+    SetZoomDefault(u32),
     /// Settings: show the Reader View switch in the reader header.
     SetReaderSwitchShown(bool),
     /// Settings: what Reader View does when a message is opened.
@@ -3152,6 +3157,7 @@ impl SimpleComponent for AppModel {
             single_message_card: config::load_single_message_card(),
             reader_mode: config::load_reader_mode(),
             zoom: config::load_reader_zoom(),
+            zoom_default: config::load_reader_zoom(),
             reader_switch: config::load_reader_switch(),
             reader_default: config::load_reader_default(),
             card_attachments: config::load_card_attachments(),
@@ -7335,17 +7341,18 @@ impl SimpleComponent for AppModel {
                 use config::READER_ZOOM_STEPS as STEPS;
                 let at = STEPS.iter().position(|&z| z == self.zoom).unwrap_or(5) as i32;
                 let zoom = match step {
-                    0 => 100,
+                    0 => self.zoom_default,
                     s => STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize],
                 };
-                if zoom != self.zoom {
-                    self.zoom = zoom;
-                    config::save_reader_zoom(zoom);
-                    self.message_view.emit(MessageViewInput::SetZoom(zoom));
-                    for p in self.popouts.values() {
-                        p.controller.emit(MessageWindowInput::SetZoom(zoom));
-                    }
+                self.set_zoom(zoom);
+            }
+            AppMsg::SetZoomDefault(zoom) => {
+                if self.zoom_default != zoom {
+                    self.zoom_default = zoom;
+                    self.save_settings();
                 }
+                // The setting is also what the user wants to see now.
+                self.set_zoom(zoom);
             }
             AppMsg::SetReaderMode(on) => {
                 // In Focus Mode with Reader View on, the switch changes the
@@ -10236,6 +10243,7 @@ impl AppModel {
             self.reader_mode,
             self.reader_switch,
             self.reader_default,
+            self.zoom_default,
             self.card_attachments,
             self.drawer_enabled,
             self.confirm_thread_delete,
@@ -12501,6 +12509,18 @@ impl AppModel {
 
     /// What Reader View does on each open: Focus Mode's "on" while it holds,
     /// else the setting.
+    /// The session's message zoom: every reader on screen follows.
+    fn set_zoom(&mut self, zoom: u32) {
+        if zoom == self.zoom {
+            return;
+        }
+        self.zoom = zoom;
+        self.message_view.emit(MessageViewInput::SetZoom(zoom));
+        for p in self.popouts.values() {
+            p.controller.emit(MessageWindowInput::SetZoom(zoom));
+        }
+    }
+
     fn effective_reader_default(&self) -> config::ReaderDefault {
         if self.focus.active(config::FocusPart::ReaderView) {
             config::ReaderDefault::On
@@ -16126,6 +16146,7 @@ impl AppModel {
             single_message_card: self.single_message_card,
             reader_switch: self.reader_switch,
             reader_default: self.reader_default,
+            reader_zoom: self.zoom_default,
             card_attachments: self.card_attachments,
             attachment_drawer: self.drawer_enabled,
             thread_expansion: self.thread_expansion,
@@ -16229,6 +16250,7 @@ impl AppModel {
                 PrefOutput::SetSingleMessageCard(on) => AppMsg::SetSingleMessageCard(on),
                 PrefOutput::SetReaderSwitch(on) => AppMsg::SetReaderSwitchShown(on),
                 PrefOutput::SetReaderDefault(p) => AppMsg::SetReaderDefault(p),
+                PrefOutput::SetReaderZoom(z) => AppMsg::SetZoomDefault(z),
                 PrefOutput::SetCardAttachments(on) => AppMsg::SetCardAttachments(on),
                 PrefOutput::SetAttachmentDrawer(on) => AppMsg::SetAttachmentDrawer(on),
                 PrefOutput::SetCardActionsMode { hover_toggle, hover_auto } => {
@@ -18839,7 +18861,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+Shift+A", i18n_noop("Show or hide the accounts in the sidebar")),
             ("Ctrl+Shift+F", i18n_noop("Focus Mode on or off")),
             ("Ctrl++  /  Ctrl+-", i18n_noop("Message zoom in or out")),
-            ("Ctrl+0", i18n_noop("Message zoom back to 100%")),
+            ("Ctrl+0", i18n_noop("Message zoom back to the default")),
             ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
             ("Ctrl+Q", i18n_noop("Quit Hylki entirely")),
