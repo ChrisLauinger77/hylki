@@ -74,6 +74,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.39.0" date="2026-09-21">
+      <description>
+        <p>JMAP accounts with Stalwart in the provider list, a zoom for the reading pane, a per-account waiver for a certificate in another name, notification buttons chosen in Settings, and a Mailfence mailbox that loads without blank messages.</p>
+      </description>
+    </release>
     <release version="1.38.0" date="2026-09-21">
       <description>
         <p>Ctrl+Enter sends, the signature sits above the quoted message, a forward carries the original's attachments, folders can be hidden from the sidebar, and a conversation opened from Inboxes shows every reply again.</p>
