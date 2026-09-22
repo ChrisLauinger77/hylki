@@ -16687,7 +16687,7 @@ impl AppModel {
         // wizard-style. Same Overlay-with-spacer cap as the wizard: a
         // Picture's texture wins over both width requests and clamps.
         use crate::ui::welcome::Wordmark;
-        const ABOUT_WORDMARK: i32 = 120;
+        const ABOUT_WORDMARK: i32 = 160;
         let wm_pic = crate::ui::welcome::wordmark_picture_of(Wordmark::WithIcon, ABOUT_WORDMARK);
         let wm_frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
         wm_frame.set_size_request(
@@ -16699,7 +16699,7 @@ impl AppModel {
         wm.add_overlay(&wm_pic);
         wm.set_clip_overlay(&wm_pic, true);
         wm.set_halign(gtk::Align::Center);
-        wm.set_margin_bottom(10);
+        wm.set_margin_bottom(16);
         page.append(&wm);
 
         let version = gtk::Label::new(Some(crate::VERSION));
