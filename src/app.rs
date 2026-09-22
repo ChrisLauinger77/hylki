@@ -842,6 +842,9 @@ pub struct AppModel {
     /// Whether conversation rows may expand into their members in the list
     /// (the row keeps its chip and chevron either way).
     thread_expansion: bool,
+    /// Whether a conversation's row speaks for the newest message anywhere in
+    /// the account, the replies you sent included (#236). Off by default.
+    thread_row_newest: bool,
     /// Whether deleting a whole selected conversation asks for confirmation.
     confirm_thread_delete: bool,
     /// Whether the current `list_selection` came from card clicks in the
@@ -1267,6 +1270,7 @@ pub enum AppMsg {
     WizardLanguage(String),
     SetThreading(bool),
     SetThreadExpansion(bool),
+    SetThreadRowNewest(bool),
     SetConfirmThreadDelete(bool),
     /// Delete requested on a whole conversation (a lone selected thread-head
     /// row): confirm (per preference), then delete every member.
@@ -3167,6 +3171,7 @@ impl SimpleComponent for AppModel {
             card_attachments: config::load_card_attachments(),
             drawer_enabled: config::load_attachment_drawer(),
             thread_expansion: config::load_thread_expansion(),
+            thread_row_newest: config::load_thread_row_newest(),
             confirm_thread_delete: config::load_confirm_thread_delete(),
             selection_from_cards: false,
             card_actions_hover: config::load_card_actions_hover(),
@@ -3313,6 +3318,9 @@ impl SimpleComponent for AppModel {
         model
             .message_list
             .emit(MessageListInput::SetThreadExpansion(model.thread_expansion));
+        model
+            .message_list
+            .emit(MessageListInput::SetThreadRowNewest(model.thread_row_newest));
         model
             .message_list
             .emit(MessageListInput::SetListPalette(model.list_palette));
@@ -7212,6 +7220,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetThreadRowNewest(on) => {
+                if self.thread_row_newest != on {
+                    self.thread_row_newest = on;
+                    self.save_settings();
+                    self.message_list.emit(MessageListInput::SetThreadRowNewest(on));
+                }
+            }
+
             AppMsg::SetConfirmThreadDelete(on) => {
                 if self.confirm_thread_delete != on {
                     self.confirm_thread_delete = on;
@@ -10242,6 +10258,7 @@ impl AppModel {
             self.threading,
             self.threads_expanded,
             self.thread_expansion,
+            self.thread_row_newest,
             self.thread_newest_first,
             self.always_show_recipients,
             self.single_message_card,
@@ -16158,6 +16175,7 @@ impl AppModel {
             card_attachments: self.card_attachments,
             attachment_drawer: self.drawer_enabled,
             thread_expansion: self.thread_expansion,
+            thread_row_newest: self.thread_row_newest,
             confirm_thread_delete: self.confirm_thread_delete,
             message_theme: self.message_theme,
             override_fonts: self.override_fonts,
@@ -16249,6 +16267,7 @@ impl AppModel {
                 PrefOutput::SetLanguage(code) => AppMsg::SetLanguage(code),
                 PrefOutput::SetThreading(on) => AppMsg::SetThreading(on),
                 PrefOutput::SetThreadExpansion(on) => AppMsg::SetThreadExpansion(on),
+                PrefOutput::SetThreadRowNewest(on) => AppMsg::SetThreadRowNewest(on),
                 PrefOutput::SetConfirmThreadDelete(on) => {
                     AppMsg::SetConfirmThreadDelete(on)
                 }

@@ -2349,10 +2349,11 @@ fn heads_its_row(
 /// screen (#236).
 ///
 /// A mail you answered is a single row in the Inbox, with the answer filed in
-/// Sent. The row went on showing the other side's last word and its time, so
-/// nothing short of opening the conversation said you had replied. `None`
+/// Sent. The row goes on showing the other side's last word and its time, so
+/// nothing short of opening the conversation says you have replied. `None`
 /// keeps the row exactly as the folder describes it: the cache knows of
-/// nothing newer, or knows of nothing at all yet.
+/// nothing newer, or knows of nothing at all yet. Whether it is asked at all
+/// is the "Show your own replies on the row" setting, off by default.
 fn latest_elsewhere(
     summary: Option<&crate::models::ThreadSummary>,
     newest_here: i64,
@@ -2560,6 +2561,10 @@ pub struct MessageList {
     /// and a row that never mentions your answer. Keyed by thread key, as
     /// `rebuild` groups them.
     thread_summaries: std::collections::HashMap<(u32, String), ThreadSummary>,
+    /// Whether a row may speak for a message in another folder at all (#236).
+    /// Off by default: the row describes the newest message this folder holds,
+    /// as it always has. The sizes on the badges are not affected either way.
+    thread_row_newest: bool,
     /// The conversations the last rebuild put on screen, as
     /// `(account, thread root, the Message-IDs it is threaded by)` — what the
     /// app needs to look their real sizes up.
@@ -2739,6 +2744,9 @@ pub enum MessageListInput {
     /// conversation: drop its summaries and let the next rebuild ask again
     /// (#222).
     ForgetThreadSummaries(u32),
+    /// Whether a conversation's row speaks for the newest message anywhere in
+    /// the account, the replies you sent included (#236).
+    SetThreadRowNewest(bool),
     /// Whether conversations start expanded (true) or collapsed (false).
     SetThreadsExpanded(bool),
     SetGravatar(bool),
@@ -3246,6 +3254,7 @@ impl SimpleComponent for MessageList {
             )),
             thread_links: Vec::new(),
             thread_summaries: std::collections::HashMap::new(),
+            thread_row_newest: false,
             listed_threads: Vec::new(),
             asked_threads: std::collections::HashSet::new(),
             drag_keys: DragKeys::default(),
@@ -3439,6 +3448,14 @@ impl SimpleComponent for MessageList {
                 // re-ask itself rides on the rebuild the new mail causes.
                 if self.thread_summaries.len() != before && self.threading {
                     self.queue_rebuild(true);
+                }
+            }
+            MessageListInput::SetThreadRowNewest(on) => {
+                if self.thread_row_newest != on {
+                    self.thread_row_newest = on;
+                    if self.threading {
+                        self.queue_rebuild(true);
+                    }
                 }
             }
             MessageListInput::SetThreading(on) => {
@@ -5085,7 +5102,10 @@ impl MessageList {
             // (#236). Cloned here so the row can be described without holding
             // a borrow of the summaries across the inserts below.
             let newest_here = msgs.last().expect("a group holds at least one message");
-            let elsewhere = latest_elsewhere(summary, newest_here.timestamp);
+            let elsewhere = self
+                .thread_row_newest
+                .then(|| latest_elsewhere(summary, newest_here.timestamp))
+                .flatten();
             // Ask about anything that could be bigger than it looks. A thread of
             // one is worth asking about too — a mail you answered twice is a
             // conversation of three and shows no badge at all today.
@@ -5116,11 +5136,13 @@ impl MessageList {
             // its preview and the time it landed, rather than the opener
             // re-shown every time a reply arrives.
             //
-            // Which message that is depends on more than this folder. A mail
-            // you answered is one row in the Inbox and the answer is in Sent,
-            // so the row quoted the other side however recently you had
-            // written back; the cache's newest wins whenever it is later than
-            // anything on screen (#236).
+            // Which message that is can depend on more than this folder. A
+            // mail you answered is one row in the Inbox and the answer is in
+            // Sent, so the row quotes the other side however recently you
+            // wrote back. With "Show your own replies on the row" turned on,
+            // the cache's newest wins whenever it is later than anything on
+            // screen (#236); off, which is how Hylki has always behaved, the
+            // folder has the last word.
             let (latest, latest_from, latest_preview) = if let Some(l) = &elsewhere {
                 (
                     Some(crate::models::datetime_list_at(l.timestamp, &l.date)),

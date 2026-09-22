@@ -3985,6 +3985,15 @@ msgstr ""
 "Mostrar na lista todas as mensagens de uma conversa. Quando desativada, as "
 "conversas começam recolhidas na mensagem mais recente."
 
+msgid "Show your own replies on the row"
+msgstr ""
+
+msgid ""
+"A conversation's row says who spoke in it last, the replies you sent "
+"included, even though they are filed in Sent. Off shows the last message "
+"that arrived."
+msgstr ""
+
 msgid "Newest message first"
 msgstr "Mensagem mais recente primeiro"
 

@@ -4010,6 +4010,15 @@ msgstr ""
 "Afficher chaque message d'une conversation dans la liste. Désactivé, les "
 "conversations apparaissent réduites à leur message le plus récent."
 
+msgid "Show your own replies on the row"
+msgstr ""
+
+msgid ""
+"A conversation's row says who spoke in it last, the replies you sent "
+"included, even though they are filed in Sent. Off shows the last message "
+"that arrived."
+msgstr ""
+
 msgid "Newest message first"
 msgstr "Message le plus récent en premier"
 

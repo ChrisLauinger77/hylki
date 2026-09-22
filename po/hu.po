@@ -3889,6 +3889,15 @@ msgstr ""
 "A beszélgetés minden üzenetének megjelenítése a listában. Kikapcsolva a "
 "beszélgetések a legújabb üzenetükre összecsukva indulnak."
 
+msgid "Show your own replies on the row"
+msgstr ""
+
+msgid ""
+"A conversation's row says who spoke in it last, the replies you sent "
+"included, even though they are filed in Sent. Off shows the last message "
+"that arrived."
+msgstr ""
+
 msgid "Newest message first"
 msgstr "Legújabb üzenet elöl"
 

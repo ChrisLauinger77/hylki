@@ -4005,6 +4005,15 @@ msgstr ""
 "Εμφάνιση κάθε μηνύματος μιας συζήτησης στη λίστα. Όταν είναι ανενεργό, οι "
 "συζητήσεις ξεκινούν συμπτυγμένες στο νεότερο μήνυμα."
 
+msgid "Show your own replies on the row"
+msgstr ""
+
+msgid ""
+"A conversation's row says who spoke in it last, the replies you sent "
+"included, even though they are filed in Sent. Off shows the last message "
+"that arrived."
+msgstr ""
+
 msgid "Newest message first"
 msgstr "Νεότερο μήνυμα πρώτο"
 
