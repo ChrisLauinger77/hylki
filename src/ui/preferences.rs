@@ -2068,20 +2068,6 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "thread_row_newest_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.threading,
-                                        set_title: &i18n("Show your own replies in the message list"),
-                                        set_subtitle: &i18n("A conversation's row says who spoke in it \
-                                                       last, the replies you sent included, even though \
-                                                       they are filed in Sent. Off shows the last \
-                                                       message that arrived."),
-                                        connect_active_notify[sender] => move |row| {
-                                            sender.input(PrefInput::ToggleThreadRowNewest(row.is_active()));
-                                        },
-                                    },
-
                                     #[name = "thread_newest_first_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Newest message first"),
@@ -2090,6 +2076,17 @@ impl Component for Preferences {
                                                        downward."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleThreadNewestFirst(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "thread_row_newest_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.threading,
+                                        set_title: &i18n("Show your own replies in the message list"),
+                                        set_subtitle: &i18n("Off shows the last message that arrived."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleThreadRowNewest(row.is_active()));
                                         },
                                     },
 

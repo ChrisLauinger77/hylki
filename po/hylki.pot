@@ -3570,10 +3570,7 @@ msgstr ""
 msgid "Show your own replies in the message list"
 msgstr ""
 
-msgid ""
-"A conversation's row says who spoke in it last, the replies you sent "
-"included, even though they are filed in Sent. Off shows the last message "
-"that arrived."
+msgid "Off shows the last message that arrived."
 msgstr ""
 
 msgid "Newest message first"

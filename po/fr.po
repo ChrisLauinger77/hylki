@@ -4014,11 +4014,9 @@ msgstr ""
 msgid "Show your own replies in the message list"
 msgstr "Palette d'actions dans la liste des messages"
 
-msgid ""
-"A conversation's row says who spoke in it last, the replies you sent "
-"included, even though they are filed in Sent. Off shows the last message "
-"that arrived."
-msgstr ""
+#, fuzzy
+msgid "Off shows the last message that arrived."
+msgstr "Déplacer ce message vers un dossier"
 
 msgid "Newest message first"
 msgstr "Message le plus récent en premier"

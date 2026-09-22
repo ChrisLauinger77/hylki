@@ -3893,11 +3893,9 @@ msgstr ""
 msgid "Show your own replies in the message list"
 msgstr "Műveletpaletta az üzenetlistában"
 
-msgid ""
-"A conversation's row says who spoke in it last, the replies you sent "
-"included, even though they are filed in Sent. Off shows the last message "
-"that arrived."
-msgstr ""
+#, fuzzy
+msgid "Off shows the last message that arrived."
+msgstr "Minden melléklet mentése egy mappába"
 
 msgid "Newest message first"
 msgstr "Legújabb üzenet elöl"

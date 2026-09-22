@@ -3961,11 +3961,9 @@ msgstr ""
 msgid "Show your own replies in the message list"
 msgstr "Палитра действий в списке сообщений"
 
-msgid ""
-"A conversation's row says who spoke in it last, the replies you sent "
-"included, even though they are filed in Sent. Off shows the last message "
-"that arrived."
-msgstr ""
+#, fuzzy
+msgid "Off shows the last message that arrived."
+msgstr "Переместить это сообщение в папку"
 
 msgid "Newest message first"
 msgstr "Сначала новые сообщения"
