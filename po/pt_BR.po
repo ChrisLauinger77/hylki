@@ -3964,8 +3964,9 @@ msgstr ""
 "Mostrar na lista todas as mensagens de uma conversa. Quando desativada, as "
 "conversas começam recolhidas na mensagem mais recente."
 
-msgid "Show your own replies on the row"
-msgstr ""
+#, fuzzy
+msgid "Show your own replies in the message list"
+msgstr "Paleta de ações na lista de mensagens"
 
 msgid ""
 "A conversation's row says who spoke in it last, the replies you sent "

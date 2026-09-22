@@ -4005,8 +4005,9 @@ msgstr ""
 "Εμφάνιση κάθε μηνύματος μιας συζήτησης στη λίστα. Όταν είναι ανενεργό, οι "
 "συζητήσεις ξεκινούν συμπτυγμένες στο νεότερο μήνυμα."
 
-msgid "Show your own replies on the row"
-msgstr ""
+#, fuzzy
+msgid "Show your own replies in the message list"
+msgstr "Παλέτα ενεργειών στη λίστα μηνυμάτων"
 
 msgid ""
 "A conversation's row says who spoke in it last, the replies you sent "

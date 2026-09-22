@@ -2353,7 +2353,8 @@ fn heads_its_row(
 /// nothing short of opening the conversation says you have replied. `None`
 /// keeps the row exactly as the folder describes it: the cache knows of
 /// nothing newer, or knows of nothing at all yet. Whether it is asked at all
-/// is the "Show your own replies on the row" setting, off by default.
+/// is the "Show your own replies in the message list" setting, off by
+/// default.
 fn latest_elsewhere(
     summary: Option<&crate::models::ThreadSummary>,
     newest_here: i64,
@@ -5139,10 +5140,10 @@ impl MessageList {
             // Which message that is can depend on more than this folder. A
             // mail you answered is one row in the Inbox and the answer is in
             // Sent, so the row quotes the other side however recently you
-            // wrote back. With "Show your own replies on the row" turned on,
-            // the cache's newest wins whenever it is later than anything on
-            // screen (#236); off, which is how Hylki has always behaved, the
-            // folder has the last word.
+            // wrote back. With "Show your own replies in the message list"
+            // turned on, the cache's newest wins whenever it is later than
+            // anything on screen (#236); off, which is how Hylki has always
+            // behaved, the folder has the last word.
             let (latest, latest_from, latest_preview) = if let Some(l) = &elsewhere {
                 (
                     Some(crate::models::datetime_list_at(l.timestamp, &l.date)),

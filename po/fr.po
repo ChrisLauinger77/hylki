@@ -4010,8 +4010,9 @@ msgstr ""
 "Afficher chaque message d'une conversation dans la liste. Désactivé, les "
 "conversations apparaissent réduites à leur message le plus récent."
 
-msgid "Show your own replies on the row"
-msgstr ""
+#, fuzzy
+msgid "Show your own replies in the message list"
+msgstr "Palette d'actions dans la liste des messages"
 
 msgid ""
 "A conversation's row says who spoke in it last, the replies you sent "

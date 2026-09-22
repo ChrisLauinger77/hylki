@@ -2072,7 +2072,7 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         #[watch]
                                         set_sensitive: model.threading,
-                                        set_title: &i18n("Show your own replies on the row"),
+                                        set_title: &i18n("Show your own replies in the message list"),
                                         set_subtitle: &i18n("A conversation's row says who spoke in it \
                                                        last, the replies you sent included, even though \
                                                        they are filed in Sent. Off shows the last \

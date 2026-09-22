@@ -3567,7 +3567,7 @@ msgid ""
 "start collapsed to their newest message."
 msgstr ""
 
-msgid "Show your own replies on the row"
+msgid "Show your own replies in the message list"
 msgstr ""
 
 msgid ""

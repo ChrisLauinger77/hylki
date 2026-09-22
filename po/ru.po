@@ -3957,8 +3957,9 @@ msgstr ""
 "Показывать каждое письмо из цепочки прямо в списке. Если отключено, "
 "обсуждения отображаются свёрнутыми до самого свежего сообщения."
 
-msgid "Show your own replies on the row"
-msgstr ""
+#, fuzzy
+msgid "Show your own replies in the message list"
+msgstr "Палитра действий в списке сообщений"
 
 msgid ""
 "A conversation's row says who spoke in it last, the replies you sent "

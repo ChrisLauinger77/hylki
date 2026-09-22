@@ -3889,8 +3889,9 @@ msgstr ""
 "A beszélgetés minden üzenetének megjelenítése a listában. Kikapcsolva a "
 "beszélgetések a legújabb üzenetükre összecsukva indulnak."
 
-msgid "Show your own replies on the row"
-msgstr ""
+#, fuzzy
+msgid "Show your own replies in the message list"
+msgstr "Műveletpaletta az üzenetlistában"
 
 msgid ""
 "A conversation's row says who spoke in it last, the replies you sent "
