@@ -125,7 +125,7 @@ fn wizard_providers() -> Vec<&'static Provider> {
 }
 
 /// The wordmark with the app icon beside it, for the About window: the
-/// script lettering, black or white, as an SVG on a 203x121 box (the
+/// script lettering, black or white, as an SVG on a 211x121 box (the
 /// pixbuf loader tells the formats apart by their bytes).
 const ABOUT_WORDMARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-black.svg");
 const ABOUT_WORDMARK_DARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-white.svg");
@@ -153,7 +153,7 @@ impl Wordmark {
     fn aspect(self) -> f64 {
         match self {
             Wordmark::Plain => 293.0 / 1024.0,
-            Wordmark::WithIcon => 121.0 / 203.0,
+            Wordmark::WithIcon => 121.0 / 211.0,
         }
     }
 }
