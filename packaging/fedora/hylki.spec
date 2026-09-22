@@ -42,6 +42,9 @@ for size in 256x256 512x512; do
 done
 install -Dm644 icons/scalable/%{appid}.svg \
     %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/%{appid}.svg
+%{_datadir}/icons/hicolor/symbolic/apps/%{appid}-symbolic.svg
+install -Dm644 icons/symbolic/%{appid}-symbolic.svg \
+    %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps/%{appid}-symbolic.svg
 # Message catalogues, staged by tools/build-packages.sh as
 # locale/<lang>/LC_MESSAGES/hylki.mo; the binary looks under
 # %{_datadir}/locale beside itself (src/i18n.rs).
