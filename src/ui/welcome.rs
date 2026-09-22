@@ -124,19 +124,25 @@ fn wizard_providers() -> Vec<&'static Provider> {
     PROVIDERS.iter().filter(|p| p.wizard_password_provider()).collect()
 }
 
-/// The wordmark with the app icon beside it, for the About window: "Hylki"
-/// set in Cantarell, dark or white, as an SVG on a 128x42 box (the pixbuf
-/// loader tells the formats apart by their bytes).
+/// The wordmark with the app icon beside it, for the About window and the
+/// wizard: "Hylki" set in Cantarell, dark or white, as an SVG on a 128x42
+/// box (the pixbuf loader tells the formats apart by their bytes). The
+/// wizard always takes the white one, since its ground is blue in both
+/// schemes.
 const ABOUT_WORDMARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-black.svg");
 const ABOUT_WORDMARK_DARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-white.svg");
 
 /// Which wordmark art a picture shows.
 #[derive(Clone, Copy)]
 pub(crate) enum Wordmark {
-    /// The lettering alone (the wizard's floating wordmark).
+    /// The script lettering alone (the carry-over notice).
     Plain,
-    /// The lettering with the app icon beside it (the About window).
+    /// The Cantarell lettering with the app icon beside it, dark or white
+    /// by scheme (the About window).
     WithIcon,
+    /// The same art, always with white lettering (the wizard's floating
+    /// wordmark, on the blue ground).
+    WithIconWhite,
 }
 
 impl Wordmark {
@@ -145,7 +151,7 @@ impl Wordmark {
             (Wordmark::Plain, false) => WORDMARK_PNG,
             (Wordmark::Plain, true) => WORDMARK_DARK_PNG,
             (Wordmark::WithIcon, false) => ABOUT_WORDMARK_SVG,
-            (Wordmark::WithIcon, true) => ABOUT_WORDMARK_DARK_SVG,
+            (Wordmark::WithIcon, true) | (Wordmark::WithIconWhite, _) => ABOUT_WORDMARK_DARK_SVG,
         }
     }
 
@@ -153,12 +159,13 @@ impl Wordmark {
     fn aspect(self) -> f64 {
         match self {
             Wordmark::Plain => 293.0 / 1024.0,
-            Wordmark::WithIcon => 42.0 / 128.0,
+            Wordmark::WithIcon | Wordmark::WithIconWhite => 42.0 / 128.0,
         }
     }
 }
 
-/// Render the wordmark at 2x for crisp HiDPI, displayed at `width` px.
+/// Render the script lettering at 2x for crisp HiDPI, displayed at
+/// `width` px.
 pub(crate) fn wordmark_picture(width: i32) -> gtk::Picture {
     wordmark_picture_of(Wordmark::Plain, width)
 }
@@ -294,7 +301,7 @@ const SMALL_TOP: f64 = 6.0;
 const SMALL_BOTTOM: f64 = 16.0;
 const SMALL_SIZE: f64 = 128.0;
 
-/// The wizard wordmark's height for a given width.
+/// The script lettering's height for a given width.
 pub(crate) fn wordmark_height(width: f64) -> i32 {
     wordmark_height_of(Wordmark::Plain, width)
 }
@@ -314,7 +321,7 @@ fn bind_wordmark_to_position(carousel: &adw::Carousel, frame: &gtk::Box, holder:
     carousel.connect_position_notify(move |car| {
         let p = car.position().clamp(0.0, 1.0);
         let s = HERO_SIZE + (SMALL_SIZE - HERO_SIZE) * p;
-        frame.set_size_request(s as i32, wordmark_height(s));
+        frame.set_size_request(s as i32, wordmark_height_of(Wordmark::WithIconWhite, s));
         holder
             .set_margin_top((HERO_TOP as f64 + (SMALL_TOP - HERO_TOP as f64) * p) as i32);
         // The small form also keeps 16px of air below itself; the hero's
@@ -375,9 +382,12 @@ impl Component for Welcome {
         // natural size is exactly its size request, so the animation drives
         // the spacer and the clipped Picture simply fills whatever the
         // overlay was given.
-        let wordmark_pic = wordmark_picture(300);
+        let wordmark_pic = wordmark_picture_of(Wordmark::WithIconWhite, 300);
         let wordmark_frame = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        wordmark_frame.set_size_request(HERO_SIZE as i32, wordmark_height(HERO_SIZE));
+        wordmark_frame.set_size_request(
+            HERO_SIZE as i32,
+            wordmark_height_of(Wordmark::WithIconWhite, HERO_SIZE),
+        );
         let wordmark_overlay = gtk::Overlay::new();
         wordmark_overlay.set_child(Some(&wordmark_frame));
         wordmark_overlay.add_overlay(&wordmark_pic);
