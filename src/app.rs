@@ -197,7 +197,9 @@ relm4::new_stateless_action!(UndoAction, WindowActionGroup, "undo");
 relm4::new_stateless_action!(RedoAction, WindowActionGroup, "redo");
 
 use crate::config::{self, split_identity, AccountConfig};
-use crate::models::{thread_ids, Account, Attachment, Folder, FolderKind, KeywordFinding, Message};
+use crate::models::{
+    thread_ids, Account, Attachment, Folder, FolderKind, KeywordFinding, Message, ThreadSummary,
+};
 use crate::ui::accounts::{AccountsOutput, AccountsWindow};
 use crate::ui::compose::{
     Compose, ComposeAccount, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill,
@@ -1150,9 +1152,10 @@ pub enum AppMsg {
     PurgeMessages(Vec<Message>),
     /// The rest of an open message's conversation, found in other folders.
     Related { account_id: u32, message_id: u32, messages: Vec<Message> },
-    /// True sizes for the conversations the list is showing, counted across
-    /// the account's folders (#222). Tags are the list's own thread keys.
-    ThreadCounts { account_id: u32, counts: Vec<(String, usize)> },
+    /// What the conversations on the list really look like, read across the
+    /// account's folders: their true size (#222) and their newest message
+    /// (#236). Tags are the list's own thread keys.
+    ThreadSummaries { account_id: u32, summaries: Vec<(String, ThreadSummary)> },
     /// The list rebuilt its rows: which conversations are on screen, and the
     /// Message-IDs each is threaded by, so their real sizes can be looked up.
     ThreadsListed { groups: Vec<(u32, String, Vec<String>)> },
@@ -6204,14 +6207,16 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ThreadsListed { groups } => {
-                self.request_thread_counts(groups);
+                self.request_thread_summaries(groups);
             }
 
-            AppMsg::ThreadCounts { account_id, counts } => {
-                let counts: Vec<((u32, String), usize)> =
-                    counts.into_iter().map(|(root, n)| ((account_id, root), n)).collect();
-                if !counts.is_empty() {
-                    self.message_list.emit(MessageListInput::SetThreadCounts(counts));
+            AppMsg::ThreadSummaries { account_id, summaries } => {
+                let summaries: Vec<((u32, String), ThreadSummary)> = summaries
+                    .into_iter()
+                    .map(|(root, summary)| ((account_id, root), summary))
+                    .collect();
+                if !summaries.is_empty() {
+                    self.message_list.emit(MessageListInput::SetThreadSummaries(summaries));
                 }
             }
 
@@ -9289,7 +9294,7 @@ impl SimpleComponent for AppModel {
                     // conversations are; the badges have to be counted again
                     // rather than kept from before it (#222).
                     self.message_list
-                        .emit(MessageListInput::ForgetThreadCounts(account_id));
+                        .emit(MessageListInput::ForgetThreadSummaries(account_id));
                 }
                 // After that sweep, not before it: a conversation carried over
                 // a move (#200) goes back under the id the message now has,
@@ -15765,18 +15770,19 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetThreadLinks(links));
     }
 
-    /// Ask each account's cache how big the conversations on the list's page
-    /// really are (#222).
+    /// Ask each account's cache what the conversations on the list's page
+    /// really are: how big (#222), and who spoke in them last (#236).
     ///
     /// The list counts what it lists, which in a folder view is one folder; the
-    /// replies you sent are in Sent and the badge was short by exactly them.
-    /// The lookup is the reader's own (`thread_counts` mirrors what
-    /// `messages_by_thread_ids` would find), so the number on the chip is the
-    /// number of cards the reader will show when the row is opened.
+    /// replies you sent are in Sent, so the badge was short by exactly them and
+    /// the row still read as the other side's last word. The lookup is the
+    /// reader's own (`thread_summaries` mirrors what `messages_by_thread_ids`
+    /// would find), so the number on the chip is the number of cards the reader
+    /// will show when the row is opened.
     ///
-    /// Nothing here blocks the page: the counts arrive as
-    /// [`AppMsg::ThreadCounts`] and settle the badges a beat later.
-    fn request_thread_counts(&mut self, groups: Vec<(u32, String, Vec<String>)>) {
+    /// Nothing here blocks the page: the answers arrive as
+    /// [`AppMsg::ThreadSummaries`] and settle the rows a beat later.
+    fn request_thread_summaries(&mut self, groups: Vec<(u32, String, Vec<String>)>) {
         if !self.threading || groups.is_empty() {
             return;
         }
@@ -15785,7 +15791,7 @@ impl AppModel {
             by_account.entry(account_id).or_default().push((root, ids));
         }
         for (account_id, groups) in by_account {
-            self.send_to(account_id, MailRequest::LoadThreadCounts { groups });
+            self.send_to(account_id, MailRequest::LoadThreadSummaries { groups });
         }
     }
 
@@ -19572,7 +19578,9 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::Related { message_id, messages } => {
             AppMsg::Related { account_id, message_id, messages }
         }
-        WorkerEvent::ThreadCounts { counts } => AppMsg::ThreadCounts { account_id, counts },
+        WorkerEvent::ThreadSummaries { summaries } => {
+            AppMsg::ThreadSummaries { account_id, summaries }
+        }
         WorkerEvent::Account(a) => AppMsg::SetAccount(a),
         WorkerEvent::Folders(folders) => AppMsg::SetFolders { account_id, folders },
         WorkerEvent::Messages { folder_id, messages } => {
