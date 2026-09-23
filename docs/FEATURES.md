@@ -29,6 +29,8 @@ The full list. The [README](../README.md) carries a shorter one.
   another client sync back automatically (IMAP IDLE plus reconciliation).
 - **Conversation threading**, with the count covering the whole conversation
   across folders, not just the folder you are looking at.
+- **Moving mail between accounts:** Move To lists every account's folders,
+  and mail dragged onto another account's folder goes there too.
 - **Full folder management:** create, rename, move and delete folders,
   assign the special roles (Drafts, Sent, Junk, Trash, Archive), and hide the
   ones you never open. An Exchange server's calendar, contacts and task

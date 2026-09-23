@@ -1316,6 +1316,18 @@ async fn jmap_flush_outbox(
 
 /// Save a draft: upload the bytes, import them into Drafts.
 fn jmap_import_draft(s: &JmapSession, raw: &[u8], drafts_mailbox: &str) -> Result<String, String> {
+    jmap_import(s, raw, drafts_mailbox, serde_json::json!({ "$draft": true, "$seen": true }))
+}
+
+/// Upload a message's bytes and import them into `mailbox` with
+/// `keywords`: a draft being saved, or mail moved in from another account
+/// (#265).
+fn jmap_import(
+    s: &JmapSession,
+    raw: &[u8],
+    mailbox: &str,
+    keywords: serde_json::Value,
+) -> Result<String, String> {
     let blob = jmap_upload(s, raw, "message/rfc822")?;
     let responses = jmap_call(
         s,
@@ -1327,8 +1339,8 @@ fn jmap_import_draft(s: &JmapSession, raw: &[u8], drafts_mailbox: &str) -> Resul
                 "accountId": s.account,
                 "emails": { "d": {
                     "blobId": blob,
-                    "mailboxIds": { drafts_mailbox: true },
-                    "keywords": { "$draft": true, "$seen": true },
+                    "mailboxIds": { mailbox: true },
+                    "keywords": keywords,
                 }},
             }),
         )],
@@ -1336,7 +1348,7 @@ fn jmap_import_draft(s: &JmapSession, raw: &[u8], drafts_mailbox: &str) -> Resul
     let r = args(&responses, 0);
     r["created"]["d"]["id"].as_str().map(str::to_string).ok_or_else(|| {
         let why = &r["notCreated"]["d"];
-        why["description"].as_str().or(why["type"].as_str()).unwrap_or("the server would not take the draft").to_string()
+        why["description"].as_str().or(why["type"].as_str()).unwrap_or("the server would not take the message").to_string()
     })
 }
 
@@ -2206,6 +2218,35 @@ pub(super) async fn run_jmap(
             }
 
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
+
+            MailRequest::ExportRaw { token, path, uid } => {
+                let raw = match jmap_session(&account, &mut state, &emit).await {
+                    Some(s) => jmap_fetch_raw(&s, &mut state, &path, uid).await,
+                    None => Err(i18n("Could not reach the server")),
+                };
+                emit(WorkerEvent::RawExported { token, raw });
+            }
+
+            MailRequest::ImportRaw { token, path, raw, seen, flagged } => {
+                let mailbox = state.folders.get(&path).map(|(_, id)| id.clone());
+                let result = match (jmap_session(&account, &mut state, &emit).await, mailbox) {
+                    (Some(s), Some(mailbox)) => {
+                        let mut keywords = serde_json::Map::new();
+                        if seen {
+                            keywords.insert("$seen".into(), true.into());
+                        }
+                        if flagged {
+                            keywords.insert("$flagged".into(), true.into());
+                        }
+                        blocking(move || jmap_import(&s, &raw, &mailbox, serde_json::Value::Object(keywords)))
+                            .await
+                            .map(|_| ())
+                    }
+                    (None, _) => Err(i18n("Could not reach the server")),
+                    (_, None) => Err(i18n("That folder is not on the server")),
+                };
+                emit(WorkerEvent::RawImported { token, result });
+            }
         }
     }
 }

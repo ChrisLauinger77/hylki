@@ -467,6 +467,12 @@ pub enum MailRequest {
     /// it went; until then a folder list fetched earlier still shows the
     /// mail, and the app keeps it off screen (#255).
     Settle { path: String, uids: Vec<u32> },
+    /// Moving mail to another account (#265), step one: the message's raw
+    /// bytes, answered with [`WorkerEvent::RawExported`] carrying `token`.
+    ExportRaw { token: u64, path: String, uid: u32 },
+    /// Step two, on the receiving account: add `raw` to `path` with its
+    /// read and starred state, answered with [`WorkerEvent::RawImported`].
+    ImportRaw { token: u64, path: String, raw: Vec<u8>, seen: bool, flagged: bool },
     /// The tag finder (Settings → Tags → Find Tags…): report every keyword
     /// in use across the account's folders as one
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
@@ -607,6 +613,10 @@ pub enum WorkerEvent {
     /// The answer to [`MailRequest::Settle`]: whatever took these messages
     /// out of `path` has been done or has failed.
     MovesSettled { path: String, uids: Vec<u32> },
+    /// The answer to [`MailRequest::ExportRaw`].
+    RawExported { token: u64, raw: Result<Vec<u8>, String> },
+    /// The answer to [`MailRequest::ImportRaw`].
+    RawImported { token: u64, result: Result<(), String> },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
@@ -1940,6 +1950,18 @@ async fn run_imap(
                     }
                 }
                 emit(WorkerEvent::BulkComplete);
+            }
+
+            MailRequest::ExportRaw { token, path, uid } => {
+                let raw = load_raw_retry(&mut session, &account, &path, uid).await.map_err(|e| e.to_string());
+                emit(WorkerEvent::RawExported { token, raw });
+            }
+
+            MailRequest::ImportRaw { token, path, raw, seen, flagged } => {
+                let sess = session.as_mut().unwrap();
+                let flags = import_flags(seen, flagged);
+                let result = append_msg(sess, &path, flags.as_deref(), &raw).await.map_err(|e| e.to_string());
+                emit(WorkerEvent::RawImported { token, result });
             }
 
             MailRequest::MoveMessage { path, uid, dest } => {
@@ -5147,6 +5169,13 @@ async fn box_status(session: &mut ImapSession, path: &str, items: &str) -> Resul
     let r = session.status(path, items).await;
     wired(&cmd, &r);
     r
+}
+
+/// The IMAP flags a message moved in from another account (#265) keeps.
+fn import_flags(seen: bool, flagged: bool) -> Option<String> {
+    let flags: Vec<&str> =
+        [(seen, "\\Seen"), (flagged, "\\Flagged")].into_iter().filter(|(on, _)| *on).map(|(_, f)| f).collect();
+    (!flags.is_empty()).then(|| format!("({})", flags.join(" ")))
 }
 
 async fn append_msg(
@@ -8713,6 +8742,17 @@ async fn run_pop3(
             }
 
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
+
+            MailRequest::ExportRaw { token, uid, .. } => {
+                let raw = pop3_fetch_raw(&account, uid).await;
+                emit(WorkerEvent::RawExported { token, raw });
+            }
+
+            // POP3 has nowhere to put mail: it is never offered as a destination.
+            MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
+                token,
+                result: Err(i18n("A POP3 account can't receive mail from another account")),
+            }),
         }
     }
 }
@@ -9004,6 +9044,23 @@ async fn run_mock(
             }
             MailRequest::SaveDraft { .. } => emit(WorkerEvent::DraftSaved),
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
+            MailRequest::ExportRaw { token, uid, .. } => emit(WorkerEvent::RawExported {
+                token,
+                // The sample's own raw form where it has one, else one made
+                // from what the list shows of it.
+                raw: crate::backend::demo_raw(uid)
+                    .or_else(|| {
+                        crate::backend::MockBackend::new().message(uid).map(|m| {
+                            format!(
+                                "From: {} <{}>\r\nSubject: {}\r\nDate: {}\r\n\r\n{}\r\n",
+                                m.from_name, m.from_addr, m.subject, m.date, m.body
+                            )
+                        })
+                    })
+                    .map(String::into_bytes)
+                    .ok_or_else(|| "no such demo message".to_string()),
+            }),
+            MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported { token, result: Ok(()) }),
             // Pretend the send succeeded so the compose flow is demoable offline.
             MailRequest::Send { .. } => emit(WorkerEvent::Sent),
         }
@@ -10805,6 +10862,18 @@ async fn run_graph(
             }
 
             MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
+
+            MailRequest::ExportRaw { token, path, uid } => {
+                let raw = graph_fetch_raw(&account, &mut state, &path, uid, &emit).await;
+                emit(WorkerEvent::RawExported { token, raw });
+            }
+
+            // Graph files a message posted to a folder as a draft; it is never
+            // offered as a destination.
+            MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
+                token,
+                result: Err(i18n("A Microsoft account can't receive mail from another account")),
+            }),
         }
     }
 }
@@ -11298,6 +11367,16 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+
+    /// A message moved in from another account keeps its read and starred
+    /// state as IMAP flags, and asks for none when it had neither (#265).
+    #[test]
+    fn imported_mail_keeps_its_flags() {
+        assert_eq!(import_flags(true, true).as_deref(), Some("(\\Seen \\Flagged)"));
+        assert_eq!(import_flags(true, false).as_deref(), Some("(\\Seen)"));
+        assert_eq!(import_flags(false, true).as_deref(), Some("(\\Flagged)"));
+        assert_eq!(import_flags(false, false), None);
+    }
 
     /// Where the time goes when a message is opened (#259): every step
     /// `render_raw` takes, per message of a directory of saved .eml files.
