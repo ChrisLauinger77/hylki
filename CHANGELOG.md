@@ -1,5 +1,77 @@
 # Changelog
 
+## 1.41.0 — 2026-09-23
+
+Mail moves between accounts, Settings can be searched, and deleting mail
+quickly no longer brings it back. Hylki speaks German.
+
+- **New: mail moves to another account** (#265, suggested by EmmanuelP).
+  Move To lists the folders of every other account that can take mail,
+  each under its account's name, and a drag onto another account's folder
+  moves the mail there. Each message is copied into the other account with
+  its read and starred state, and only once the copy is stored is the
+  original moved to its own account's Trash (erased where there is no
+  Trash); a failed copy leaves the message in place and says why. Undo
+  takes the originals back out of Trash and puts the copies in the other
+  account's Trash, and Redo moves them again. IMAP and JMAP accounts can
+  receive mail this way; Microsoft and POP3 accounts can only send it.
+- **New: search in Settings** (#260, suggested by yioannides). A search
+  button in the sidebar's header, or Ctrl+F, lists the rows and groups
+  whose title, description, page or group match every word typed; picking
+  one opens its page, scrolls to it and marks it. Escape closes the search
+  from anywhere in the window.
+- **New: Settings > Sidebar > "Open at startup"** (#256, suggested by
+  somePaulo): All Inboxes (the default), the last account's inbox, or the
+  last folder. The view open last is kept in `state.toml` by account
+  address and folder path.
+- **New: the tray icon can be symbolic** (#258, suggested by yioannides).
+  The choices are App icon and Symbolic, the default for new installs; the
+  panel draws the symbolic icon in its own color, and the unread dot stays
+  red. A saved white or black envelope reads as Symbolic. The App icon
+  choice draws the icon the dock shows.
+- **New: New Message in the launcher's menu** (#269, by Christian
+  Lauinger). Right-clicking Hylki in the dock opens a blank message,
+  whether Hylki is running or not.
+- **New: German,** by Christian Lauinger (#272). **Updated: French,** by
+  frenchy82 (#273). Settings choices that were inserted in English are
+  translated, and long translated labels fit (#262, by Daniel Miguel).
+- **New: app icons.** Blue, navy and yellow squares and squircles join the
+  gallery, the default envelope's letter is drawn bigger and bolder (#263,
+  by Yiannis Ioannides), and the About window and the wizard carry a
+  redrawn wordmark.
+- **Fixed: deleted mail came back** (#255, reported by somePaulo). A folder
+  list fetched before a queued delete had run put the mail back on screen,
+  and every delete started another sync of the folder. Mail taken out of a
+  folder now stays off its lists until the server has the move, and the
+  folder's counts wait for it. A message opened while mail was being
+  deleted no longer turned unread again, and Delete keeps working after a
+  sync rebuilds the list.
+- **Fixed: a reply to a deleted conversation showed it again as empty
+  messages** (#257, reported by somePaulo). Gmail takes every label off
+  mail moved to Trash, so the copies Hylki had cached under All Mail
+  outlived it. Members the server no longer has are dropped from the
+  conversation and the cache, and a move to Trash or Spam on Gmail drops
+  the label copies with it.
+- **Fixed: opening mail was slow on large accounts** (#259, reported by
+  yioannides). The conversation counts on the message list were worked
+  out with a lookup that took seconds on a big mailbox, on the thread that
+  also hands out cached messages. It now takes about a tenth of a second,
+  and a message's body is asked for before its conversation.
+- **Fixed: the default sender choice cut addresses off** (#261, reported
+  by EmmanuelP). The list shows each address whole, in the sidebar's
+  account order, and with no default chosen a new message in All Inboxes
+  starts from the first account in that order.
+- **Changed: a new message starts in the To field** (#266, suggested by
+  EmmanuelP), or in Subject when it arrives addressed; a reply puts the
+  cursor in its body.
+- **Changed: icons follow the icon theme** (#260). Icons are named as GNOME
+  names them, so an icon theme restyles the ones it has; Hylki's bundled
+  copies fill in its own icons and any a theme lacks.
+- **Changed: "color" throughout the app** (#264, reported by yioannides).
+- **Fixed:** undoing a move on a JMAP, Microsoft or POP3 account left the
+  refresh indicator spinning; the reader's date and the attachment count
+  were English in every language.
+
 ## 1.40.1 — 2026-09-22
 
 GNOME Online Accounts IMAP accounts connect, custom launcher icons stay,

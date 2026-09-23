@@ -74,6 +74,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.41.0" date="2026-09-23">
+      <description>
+        <p>Move mail to another account, search Settings, and choose what opens at startup. A symbolic tray icon, icons that follow the icon theme, New Message in the launcher's menu, new app icons, and German. Deleted mail no longer comes back while deleting quickly, and opening mail is faster on large accounts.</p>
+      </description>
+    </release>
     <release version="1.40.1" date="2026-09-22">
       <description>
         <p>IMAP and SMTP accounts from GNOME Online Accounts connect with the settings made in GNOME. A launcher icon you set yourself is no longer replaced at startup. New Spanish translation and updated French.</p>

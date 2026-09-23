@@ -2,6 +2,33 @@
 
 Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.41.0
+
+- **Move mail to another account** (#265): Move To lists every account's
+  folders, and a drag onto another account's folder works too. The
+  original goes to its own account's Trash once the copy is stored, and
+  Undo brings it back. Suggested by [@EmmanuelP](https://github.com/EmmanuelP).
+- **Search Settings** (#260): the search button in the sidebar, or Ctrl+F,
+  finds any setting and takes you to it. Suggested by
+  [@yioannides](https://github.com/yioannides).
+- **Choose what opens at startup** (#256): All Inboxes, the last account's
+  inbox, or the last folder, in Settings > Sidebar. Suggested by
+  [@somepaulo](https://github.com/somepaulo).
+- **A symbolic tray icon** (#258) that the panel colors itself, with a red
+  unread dot, and **icons that follow your icon theme** (#260).
+- **New Message in the launcher's menu** (#269) and **German** (#272), by
+  [@ChrisLauinger77](https://github.com/ChrisLauinger77); French updated by
+  [@frenchy82](https://github.com/frenchy82) (#273); translated settings
+  choices by [@danielmigueltejedor](https://github.com/danielmigueltejedor)
+  (#262).
+- **New app icons**: blue, navy and yellow squares and squircles, and a
+  bolder letter on the default envelope by
+  [@yioannides](https://github.com/yioannides) (#263).
+- **Fixed:** deleted mail coming back while deleting quickly (#255), empty
+  messages in a deleted conversation on Gmail (#257), slow opening on large
+  accounts (#259), cut-off addresses in the default sender choice (#261).
+  A new message starts in To and a reply in its body (#266).
+
 ## What's new in 1.40.1
 
 - **GNOME Online Accounts IMAP accounts connect** (#254): Hylki uses the
