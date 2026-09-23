@@ -443,6 +443,13 @@ System → GNOME Files** holds the same choices, so the questions can be
 skipped: what the files go into, what happens over the limit, and the limit
 itself.
 
+### Text size
+
+**Settings → Appearance → Text size** makes Hylki's text smaller or larger
+than the desktop's, from 90% to 150%: the sidebar, the message list,
+Settings and the text of messages. Icons keep their size. Default follows
+the desktop's own text scaling. Stored as `text_scale` in `privacy.toml`.
+
 ### App icon
 
 **Settings → Appearance → App icon** puts one of the gallery's icons on the

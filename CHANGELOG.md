@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **New: Settings > Appearance > Text size** (#267, asked by rsx-xp).
+  Hylki's text at 90% to 150% of the desktop's size, messages included;
+  icons keep their size. Default follows the desktop.
 - **Fixed: the message list lost the keyboard** (#274, reported by
   EmmanuelP). Rebuilding the list destroyed the focused row, and only a
   rebuild after a sync put focus back; a contact photo or Gravatar

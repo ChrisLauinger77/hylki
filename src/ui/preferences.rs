@@ -105,6 +105,7 @@ pub struct PrefInit {
     /// Where the signature sits in a reply or forward (#237).
     pub signature_position: crate::config::SignaturePosition,
     pub app_theme: AppTheme,
+    pub text_scale: u32,
     /// The appearance theme's id ("system" for the stock GNOME colors).
     pub theme: String,
     pub notifications: bool,
@@ -911,6 +912,7 @@ pub enum PrefInput {
     ChangeReplyPosition(u32),
     ChangeSignaturePosition(u32),
     ChangeAppTheme(u32),
+    ChangeTextScale(u32),
     ChangeTheme(String),
     ChangeSettingsOpen(u32),
     /// Switch the window to the Accounts panel (true) or Preferences (false).
@@ -1018,6 +1020,7 @@ pub enum PrefOutput {
     SetFocusMode(crate::config::FocusMode),
     SetRailFold(crate::config::RailFold),
     SetAppTheme(AppTheme),
+    SetTextScale(u32),
     /// A theme was picked in the gallery (its id, or "system").
     SetTheme(String),
     /// The "this window opens to" choice changed (true = Accounts).
@@ -1716,6 +1719,16 @@ impl Component for Preferences {
                                                        setting under Reading."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeAppTheme(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "text_scale_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Text size"),
+                                        set_subtitle: &i18n("All of Hylki's text, messages included, against \
+                                                       the desktop's text size. Icons keep their size."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeTextScale(row.selected()));
                                         },
                                     },
 
@@ -3220,6 +3233,7 @@ impl Component for Preferences {
             &widgets.message_theme_row,
             &widgets.card_actions_row,
             &widgets.app_theme_row,
+            &widgets.text_scale_row,
             &widgets.settings_open_row,
             &widgets.tray_icon_row,
             &widgets.date_style_row,
@@ -3697,6 +3711,20 @@ impl Component for Preferences {
             .position(|(_, t)| *t == init.app_theme)
             .unwrap_or(0);
         widgets.app_theme_row.set_selected(app_theme_sel as u32);
+        let text_scale_labels_owned: Vec<String> = crate::text_scale::STEPS
+            .iter()
+            .map(|p| match p {
+                100 => i18n("Default"),
+                p => i18n_f("{percent}%", &[("percent", &p.to_string())]),
+            })
+            .collect();
+        let text_scale_labels: Vec<&str> = text_scale_labels_owned.iter().map(String::as_str).collect();
+        widgets
+            .text_scale_row
+            .set_model(Some(&gtk::StringList::new(&text_scale_labels)));
+        let text_scale_sel =
+            crate::text_scale::STEPS.iter().position(|p| *p == init.text_scale).unwrap_or(1);
+        widgets.text_scale_row.set_selected(text_scale_sel as u32);
 
         let theme_labels_owned: Vec<String> = MESSAGE_THEMES.iter().map(|(l, _)| i18n(l)).collect();
         let theme_labels: Vec<&str> = theme_labels_owned.iter().map(String::as_str).collect();
@@ -4407,6 +4435,10 @@ impl Component for Preferences {
                     .map(|(_, t)| *t)
                     .unwrap_or_default();
                 let _ = sender.output(PrefOutput::SetAppTheme(theme));
+            }
+            PrefInput::ChangeTextScale(index) => {
+                let percent = crate::text_scale::STEPS.get(index as usize).copied().unwrap_or(100);
+                let _ = sender.output(PrefOutput::SetTextScale(percent));
             }
             PrefInput::ChangeTheme(id) => {
                 let _ = sender.output(PrefOutput::SetTheme(id));

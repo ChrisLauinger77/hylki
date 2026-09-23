@@ -651,6 +651,8 @@ pub struct AppModel {
     rail_fold: config::RailFold,
     /// The app chrome's theme preference (follow system / light / dark).
     app_theme: config::AppTheme,
+    /// The app's text size in percent of the desktop's (#267).
+    text_scale: u32,
     /// The appearance theme: a bundled palette's id, or "system" for the
     /// stock GNOME colors (see `theme.rs`).
     theme: String,
@@ -1430,6 +1432,7 @@ pub enum AppMsg {
     SetRailFold(config::RailFold),
     /// Preference: the app chrome's theme (follow system / light / dark).
     SetAppTheme(config::AppTheme),
+    SetTextScale(u32),
     /// Preference: the appearance theme (Settings gallery).
     SetTheme(String),
     /// The cursor entered the sidebar pane — open the hover peek (rail +
@@ -3129,6 +3132,7 @@ impl SimpleComponent for AppModel {
             rail_dots: config::load_rail_dots(),
             rail_fold: config::load_rail_fold(),
             app_theme: config::load_app_theme(),
+            text_scale: config::load_text_scale(),
             theme: config::load_theme(),
             current: None,
             allowed_senders: config::load_allowed_senders(),
@@ -3430,6 +3434,7 @@ impl SimpleComponent for AppModel {
 
         // The app-wide theme choice must be in force before the first frame.
         apply_app_theme(model.app_theme);
+        crate::text_scale::apply(model.text_scale);
         let reader_tag_btn = model.reader_tag_btn.clone();
         let reader_move_btn = model.reader_move_btn.clone();
         let widgets = view_output!();
@@ -5668,6 +5673,14 @@ impl SimpleComponent for AppModel {
                 if self.app_theme != theme {
                     self.app_theme = theme;
                     apply_app_theme(theme);
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SetTextScale(percent) => {
+                if self.text_scale != percent {
+                    self.text_scale = percent;
+                    crate::text_scale::apply(percent);
                     self.save_settings();
                 }
             }
@@ -10528,6 +10541,7 @@ impl AppModel {
             self.rail_dots,
             self.rail_fold,
             self.app_theme,
+            self.text_scale,
             self.theme.clone(),
             self.show_unified_pref,
             self.unified_chips,
@@ -16802,6 +16816,7 @@ impl AppModel {
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),
             app_theme: self.app_theme,
+            text_scale: self.text_scale,
             theme: self.theme.clone(),
             preview_lines: self.preview_lines,
             single_key_shortcuts: self.single_key.get(),
@@ -16913,6 +16928,7 @@ impl AppModel {
                 PrefOutput::SetFocusMode(focus) => AppMsg::SetFocusMode(focus),
                 PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
                 PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
+                PrefOutput::SetTextScale(percent) => AppMsg::SetTextScale(percent),
                 PrefOutput::SetTheme(id) => AppMsg::SetTheme(id),
                 PrefOutput::SetSettingsOpenAccounts(on) => {
                     AppMsg::SetSettingsOpenAccounts(on)

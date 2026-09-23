@@ -1130,6 +1130,9 @@ struct PrivacyFile {
     /// The app chrome's theme: follow the system, or force light/dark.
     #[serde(default)]
     app_theme: AppTheme,
+    /// The app's text size, in percent of the desktop's (#267).
+    #[serde(default = "default_text_scale")]
+    text_scale: u32,
     /// The appearance theme's id: a bundled palette (see `theme.rs`) painted
     /// over libadwaita's colors, or "system" for the stock GNOME look.
     /// Empty — a file written before themes existed — means the same.
@@ -1450,6 +1453,7 @@ impl Default for PrivacyFile {
             rail_dots: true,
             rail_fold: RailFold::default(),
             app_theme: AppTheme::default(),
+            text_scale: default_text_scale(),
             theme: String::new(),
             preview_lines: default_preview_lines(),
             single_key_shortcuts: false,
@@ -2885,6 +2889,17 @@ pub fn load_app_theme() -> AppTheme {
     load_privacy().app_theme
 }
 
+fn default_text_scale() -> u32 {
+    100
+}
+
+/// The app's text size in percent; anything Settings does not offer reads
+/// as the desktop's own size.
+pub fn load_text_scale() -> u32 {
+    let percent = load_privacy().text_scale;
+    if crate::text_scale::STEPS.contains(&percent) { percent } else { 100 }
+}
+
 /// The appearance theme's id; "system" (the stock look) when unset.
 pub fn load_theme() -> String {
     let id = load_privacy().theme;
@@ -3019,6 +3034,7 @@ pub fn save_privacy(
     rail_dots: bool,
     rail_fold: RailFold,
     app_theme: AppTheme,
+    text_scale: u32,
     theme: String,
     show_unified: bool,
     unified_chips: UnifiedChips,
@@ -3117,6 +3133,7 @@ pub fn save_privacy(
         rail_dots,
         rail_fold,
         app_theme,
+        text_scale,
         theme,
         show_unified,
         unified_chip: unified_chips.all_inboxes,

@@ -34,6 +34,7 @@ mod ram_cache;
 mod reader;
 mod rng;
 mod spell;
+mod text_scale;
 mod theme;
 mod theme_palettes;
 mod tray;
