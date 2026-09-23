@@ -1472,6 +1472,14 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Key"),
                                     set_subtitle: &i18n("Automatic uses the key whose address matches."),
                                 },
+                                // For an account whose mail is always signed
+                                // (#267): the composer's toggle starts on,
+                                // and still turns it off for one message.
+                                #[name = "sign_default_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Sign messages by default"),
+                                    set_subtitle: &i18n("New messages, replies and forwards start with signing on."),
+                                },
                             },
 
                             add = &adw::PreferencesGroup {
@@ -3935,6 +3943,7 @@ fn read_account(
             sel.checked_sub(1).and_then(|i| c.borrow().get(i).map(|k| k.fingerprint.clone()))
         }),
         in_unified: widgets.in_unified_row.is_active(),
+        sign_by_default: widgets.sign_default_row.is_active(),
     }
 }
 
@@ -4060,6 +4069,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
     fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
     widgets.in_unified_row.set_active(acc.in_unified);
+    widgets.sign_default_row.set_active(acc.sign_by_default);
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -4143,6 +4153,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.empty_trash_row.set_selected(0);
     fill_pgp_key_row(widgets, None);
     widgets.in_unified_row.set_active(true);
+    widgets.sign_default_row.set_active(false);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");
     widgets.label_row.set_text("");

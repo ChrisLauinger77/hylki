@@ -11345,6 +11345,7 @@ pub(super) fn sample_account() -> AccountConfig {
         empty_trash_days: 0,
         pgp_key: None,
         in_unified: true,
+        sign_by_default: false,
         push: None,
         name: String::new(),
         email: "me@example.com".into(),

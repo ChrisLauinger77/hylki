@@ -361,6 +361,11 @@ pub struct AccountConfig {
     /// off, so older files read the same.
     #[serde(default = "default_enabled", skip_serializing_if = "is_true")]
     pub in_unified: bool,
+    /// New messages, replies and forwards from this account open with
+    /// OpenPGP signing on (#267); the composer's toggle still turns it off
+    /// for one message.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub sign_by_default: bool,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -4259,6 +4264,7 @@ dest_path = "Lists"
             empty_trash_days: 0,
             pgp_key: None,
             in_unified: true,
+            sign_by_default: false,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {
@@ -4308,6 +4314,14 @@ dest_path = "Lists"
         assert!(text.contains("in_unified = false"), "{text}");
         let back: SettingsBundle = toml::from_str(&text).unwrap();
         assert!(!back.accounts[0].in_unified);
+        // Signing by default (#267) is written only when on.
+        assert!(!text.contains("sign_by_default"), "{text}");
+        let mut signing = apart;
+        signing.accounts[0].sign_by_default = true;
+        let text = toml::to_string_pretty(&signing).unwrap();
+        assert!(text.contains("sign_by_default = true"), "{text}");
+        let back: SettingsBundle = toml::from_str(&text).unwrap();
+        assert!(back.accounts[0].sign_by_default);
     }
 
     #[test]

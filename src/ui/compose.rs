@@ -159,6 +159,8 @@ pub struct ComposeAccount {
     pub email: String,
     /// The account's chosen OpenPGP key (fingerprint), if any (#133).
     pub pgp_key: Option<String>,
+    /// The account signs its mail by default (#267): Sign starts on.
+    pub sign_default: bool,
     /// Set for a send-as alias (#34): the full From to put on the wire
     /// ("Name <alias@host>"). `None` sends as the account itself.
     pub alias_from: Option<String>,
@@ -283,6 +285,12 @@ pub struct Compose {
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
+    /// Sign was set by hand, so it no longer follows the From account's
+    /// default (#267).
+    sign_touched: bool,
+    /// The state the composer itself last put the Sign toggle in, until its
+    /// `toggled` arrives: that one is not the user's.
+    sign_expected: Option<bool>,
     /// What this message is written in. Plain text hides the
     /// formatting toolbar and sends no HTML part (#180); Markdown and HTML
     /// are written as source and converted on the way out.
@@ -830,6 +838,7 @@ impl Component for Compose {
         let prefill_encrypt = prefill.encrypt;
         let send_at = prefill.send_at;
         let current_sig = accounts.get(selected).map(|a| a.signature.clone()).unwrap_or_default();
+        let sign_default = accounts.get(selected).is_some_and(|a| a.sign_default);
 
         let completion = gtk::Popover::new();
         completion.set_autohide(false); // don't steal focus from the entry
@@ -931,7 +940,7 @@ impl Component for Compose {
             });
         }
 
-        let model = Compose {
+        let mut model = Compose {
             accounts,
             editor,
             current_sig,
@@ -959,6 +968,8 @@ impl Component for Compose {
             narrow: false,
             fields_dirty: false,
             sign: false,
+            sign_touched: false,
+            sign_expected: None,
             format,
             format_btn,
             preview_btn,
@@ -976,6 +987,11 @@ impl Component for Compose {
         if prefill_encrypt && crate::pgp::available() {
             // Through the buttons, so the toggles and the model agree.
             widgets.encrypt_btn.set_active(true);
+        } else if sign_default && crate::pgp::available() {
+            // A draft does not record whether it was signed, so a reopened
+            // one starts as its account says, like any new message.
+            model.sign_expected = Some(true);
+            widgets.sign_btn.set_active(true);
         }
         widgets.editor_holder.append(&model.editor.widget);
 
@@ -1690,6 +1706,7 @@ impl Component for Compose {
             }
 
             ComposeInput::AccountChanged => {
+                self.follow_account_signing(widgets);
                 // Swap the editor's signature block for the new account's.
                 let idx = widgets.from_row.selected() as usize;
                 let new_sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
@@ -1829,7 +1846,14 @@ impl Component for Compose {
                 self.completion.popdown();
             }
 
-            ComposeInput::ToggleSign(on) => self.sign = on,
+            ComposeInput::ToggleSign(on) => {
+                self.sign = on;
+                // Anything but the composer's own setting is a choice for
+                // this message, which a later From change must not undo.
+                if self.sign_expected.take() != Some(on) {
+                    self.sign_touched = true;
+                }
+            }
 
             ComposeInput::FormatMenu => {
                 let btn = &self.format_btn;
@@ -2020,6 +2044,21 @@ impl Component for Compose {
 }
 
 impl Compose {
+    /// Put Sign where the From account's default has it (#267), until the
+    /// user has set it by hand. While encrypting it stays on: encrypted
+    /// mail is always signed.
+    fn follow_account_signing(&mut self, widgets: &ComposeWidgets) {
+        if self.sign_touched || self.encrypt || !crate::pgp::available() {
+            return;
+        }
+        let idx = widgets.from_row.selected() as usize;
+        let on = self.accounts.get(idx).is_some_and(|a| a.sign_default);
+        if on != widgets.sign_btn.is_active() {
+            self.sign_expected = Some(on);
+            widgets.sign_btn.set_active(on);
+        }
+    }
+
     /// Where the cursor starts: in To while the message is addressed to
     /// nobody, in Subject once it is addressed but untitled, and in the body
     /// when both are filled in, which is every reply. A new message used to

@@ -14186,12 +14186,14 @@ impl AppModel {
                 let cfg = Some(cfg);
                 let signature = cfg.and_then(|c| c.signature.clone()).unwrap_or_default();
                 let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
+                let sign_default = cfg.is_some_and(|c| c.sign_by_default);
                 let mut identities = vec![ComposeAccount {
                     id,
                     label,
                     signature: signature.clone(),
                     email: email.clone(),
                     pgp_key: pgp_key.clone(),
+                    sign_default,
                     alias_from: None,
                 }];
                 for alias in cfg.map(|c| c.aliases.as_slice()).unwrap_or_default() {
@@ -14210,6 +14212,7 @@ impl AppModel {
                         signature: signature.clone(),
                         email: addr,
                         pgp_key: pgp_key.clone(),
+                        sign_default,
                         alias_from: Some(display),
                     });
                 }
@@ -19714,6 +19717,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         empty_trash_days: 0,
         pgp_key: None,
         in_unified: true,
+        sign_by_default: false,
     };
     vec![
         mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", "🚀"),

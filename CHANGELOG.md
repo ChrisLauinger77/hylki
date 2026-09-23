@@ -47,6 +47,11 @@
   new-mail notifications still include it, and a search still covers it.
   With fewer than two accounts left in the unified section it is not shown,
   as with one account.
+- **New: an account can sign its mail by default** (#267, suggested by
+  rsx-xp). Settings > Accounts > the account > OpenPGP > "Sign messages by
+  default". New messages, replies and forwards from the account open with
+  Sign on. Changing From moves Sign to the new account's setting until
+  Sign is pressed by hand.
 
 ## 1.41.0 — 2026-09-23
 

@@ -384,6 +384,13 @@ Each account uses the key whose address matches. To use another key for an
 account, open the account in *Settings → Mail Accounts* and choose it under
 *OpenPGP*.
 
+To sign everything an account sends, turn on **Sign messages by default**
+under the same *OpenPGP* group. New messages, replies and forwards from that
+account then open with Sign on, and a reopened draft does too. Changing From
+in the composer moves Sign to the new account's setting until you press Sign
+yourself; after that the composer leaves it as you set it. Stored on the
+account as `sign_by_default = true` in `accounts.toml`.
+
 **Reading the result**
 
 Beside a sender's name, a lock means the message was encrypted and a shield
