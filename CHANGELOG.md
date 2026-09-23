@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixed: an empty tray icon on Cinnamon** (#275, reported by
+  mfreeman72). The Symbolic tray icon was handed to the panel as a file,
+  which only GNOME's AppIndicator extension draws in the panel's color;
+  Cinnamon's applet drew nothing, and other panels would draw it black.
+  Outside GNOME the Symbolic choice is now the grey envelope drawn by
+  Hylki, with the red dot, which reads on light and dark panels.
 - **Docs: installing with Bazaar** (#276, reported by giaaaacomo). Bazaar
   reads only the app ID from a `.flatpakref` and cannot find Hylki in a
   repository it does not know yet; docs/INSTALLING.md and the site's

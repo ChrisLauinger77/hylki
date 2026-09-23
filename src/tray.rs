@@ -168,6 +168,21 @@ fn symbolic_name(dotted: bool) -> &'static str {
     if dotted { "hylki_tray_unread-symbolic" } else { "hylki_tray-symbolic" }
 }
 
+/// Whether the panel draws a symbolic icon it is handed as a file, in its
+/// own color. GNOME's AppIndicator extension does. Cinnamon's does not: its
+/// applet takes any name with "symbolic" in it for a theme name, so a path
+/// drew an empty space (#275), and a name found under IconThemePath is
+/// turned back into a path on the way there. Other panels load the file
+/// but do not recolor it, which leaves a black envelope on a dark panel.
+/// Everywhere but GNOME the pixel icon is drawn instead, in a grey that
+/// reads on light and dark panels alike.
+fn panel_recolors_files() -> bool {
+    std::env::var("XDG_CURRENT_DESKTOP")
+        .unwrap_or_default()
+        .split(':')
+        .any(|d| d.eq_ignore_ascii_case("gnome"))
+}
+
 /// Where in the theme at `root` the symbolic icons are written.
 fn symbolic_dir(root: &std::path::Path) -> std::path::PathBuf {
     root.join("hicolor").join("scalable").join("apps")
@@ -177,7 +192,7 @@ fn symbolic_dir(root: &std::path::Path) -> std::path::PathBuf {
 /// our own and return its path; `None` for the app icon, or when the files
 /// cannot be written (the pixel fallback is drawn then).
 fn symbolic_theme(icon: TrayIcon) -> Option<String> {
-    if icon != TrayIcon::Symbolic {
+    if icon != TrayIcon::Symbolic || !panel_recolors_files() {
         return None;
     }
     let root = crate::config::data_base()?.join("hylki").join("tray-icons");
