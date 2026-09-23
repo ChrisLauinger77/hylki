@@ -1141,7 +1141,7 @@ msgstr ""
 "Vireóban való használatához."
 
 msgid ""
-"Label messages with one or more coloured tags. Tags are stored on the mail "
+"Label messages with one or more colored tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same "
 "tags.\n"
 "\n"
@@ -1745,7 +1745,7 @@ msgstr ""
 
 msgid ""
 "{n} tags are in use in your mailboxes but not set up here. Import them all, "
-"or choose which to add. Names and colours can be changed afterwards."
+"or choose which to add. Names and colors can be changed afterwards."
 msgstr ""
 
 msgid "Import Selected"
@@ -1781,13 +1781,13 @@ msgstr ""
 "A címke tárolása a kiszolgálón: betűk, számjegyek és a legtöbb írásjel, "
 "szóközök nélkül. A Thunderbird beépített címkéi a $label1–$label5."
 
-msgid "Colour"
+msgid "Color"
 msgstr "Szín"
 
-msgid "Custom colour…"
+msgid "Custom color…"
 msgstr "Egyéni szín…"
 
-msgid "Tag Colour"
+msgid "Tag Color"
 msgstr "Címke színe"
 
 msgid "Edit Filter"
@@ -2945,7 +2945,7 @@ msgstr ""
 
 msgid ""
 "Reader View shows a message as its text alone, in one plain format, without "
-"the sender's layout, colours and fonts."
+"the sender's layout, colors and fonts."
 msgstr ""
 
 msgid "Reader View"
@@ -3021,10 +3021,10 @@ msgstr "Üzenet törlése"
 msgid "View source"
 msgstr "Forrás megtekintése"
 
-msgid "Back to my fonts and colours"
+msgid "Back to my fonts and colors"
 msgstr "Vissza a saját betűtípusaimhoz és színeimhez"
 
-msgid "Show the sender's fonts and colours"
+msgid "Show the sender's fonts and colors"
 msgstr "Feladó betűtípusainak és színeinek megjelenítése"
 
 #, fuzzy
@@ -3756,7 +3756,7 @@ msgstr ""
 
 msgid ""
 "Mark folders and accounts that have unread mail with a dot in the accent "
-"colour rather than the number of messages. The count stays in the tooltip."
+"color rather than the number of messages. The count stays in the tooltip."
 msgstr ""
 
 msgid "Fold up expanded items"
@@ -4004,13 +4004,13 @@ msgstr "Üzenet betűtípusa"
 msgid "The interface font unless another is chosen."
 msgstr "A kezelőfelület betűtípusa, hacsak nincs más kiválasztva."
 
-msgid "Use my own colours"
+msgid "Use my own colors"
 msgstr "Saját színek használata"
 
 msgid ""
-"Ignore the text and background colours senders set, so every message reads "
+"Ignore the text and background colors senders set, so every message reads "
 "in the same black or white on the reader's ground. Pictures are kept; links "
-"take the accent colour."
+"take the accent color."
 msgstr ""
 "A feladók által beállított szöveg- és háttérszínek figyelmen kívül hagyása, "
 "hogy minden üzenet azonos fekete vagy fehér színnel jelenjen meg az olvasó "
@@ -4804,7 +4804,7 @@ msgstr ""
 msgid "Message text shown under each subject"
 msgstr "Az egyes tárgyak alatt megjelenő üzenetszöveg"
 
-msgid "Colourful initials beside each message"
+msgid "Colorful initials beside each message"
 msgstr "Színes monogramok minden üzenet mellett"
 
 msgid "Conversation view"
@@ -5154,7 +5154,7 @@ msgstr "Olvasás"
 
 #, fuzzy
 msgid ""
-"Reader View, your own font and colours, and per-message light or dark "
+"Reader View, your own font and colors, and per-message light or dark "
 "rendering"
 msgstr ""
 "A távoli tartalom alapértelmezés szerint blokkolva; üzenetenként világos "
@@ -5367,7 +5367,7 @@ msgstr "Hyprlab"
 #~ msgstr "Fiók hozzáadása"
 
 #~ msgid ""
-#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "Label messages with one or more colored tags. Tags are stored on the "
 #~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
 #~ "same tags."
 #~ msgstr ""

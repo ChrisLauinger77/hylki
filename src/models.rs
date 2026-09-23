@@ -11,7 +11,7 @@ pub struct Account {
     /// How the account is labelled in the UI (All Inboxes, reader chip). Defaults
     /// to the email address.
     pub label: String,
-    /// Accent colour used for the account dot, as a CSS colour string.
+    /// Accent color used for the account dot, as a CSS color string.
     pub accent: String,
 }
 
@@ -52,7 +52,7 @@ pub struct KeywordFinding {
     pub keyword: String,
     /// A display name the server itself carries (Microsoft 365 categories).
     pub name: Option<String>,
-    /// A colour the server itself carries, `#rrggbb`.
+    /// A color the server itself carries, `#rrggbb`.
     pub color: Option<String>,
     /// Messages carrying it, where the server could say (0 = not counted).
     pub count: usize,
@@ -298,7 +298,7 @@ impl SenderTrust {
     }
 
     /// Heading for the details popover, and the badge's tooltip. Not drawn on
-    /// screen: the toolbar badge is the icon alone, coloured by verdict.
+    /// screen: the toolbar badge is the icon alone, colored by verdict.
     pub fn label(self) -> String {
         i18n(match self {
             SenderTrust::Pass => "Verified sender",
@@ -308,7 +308,7 @@ impl SenderTrust {
         })
     }
 
-    /// CSS class for the badge's colour.
+    /// CSS class for the badge's color.
     pub fn css_class(self) -> &'static str {
         match self {
             SenderTrust::Pass => "trust-pass",
@@ -446,7 +446,7 @@ impl PgpStatus {
         }
     }
 
-    /// CSS class for the chip's colour: green when everything checks out,
+    /// CSS class for the chip's color: green when everything checks out,
     /// amber for a doubt, red for a failure.
     pub fn css_class(&self) -> &'static str {
         use PgpSignature as S;

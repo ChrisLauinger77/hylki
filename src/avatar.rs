@@ -1,7 +1,7 @@
 //! Sender-avatar loading and caching. Local GNOME Contacts / CardDAV photos are
 //! preferred. Gravatar is an optional fallback and is only queried when enabled.
 //! Below both sit the sender's domain icon (`crate::logo`, also opt-in) and the
-//! UI's coloured-initials fallback; `message_list::find_face` walks the chain.
+//! UI's colored-initials fallback; `message_list::find_face` walks the chain.
 //!
 //! Privacy note: local contact photos are read from Evolution Data Server's
 //! on-disk cache and make no network request. Gravatar sends a hash of the
@@ -103,7 +103,7 @@ pub struct OwnFace {
     pub picture: Option<std::path::PathBuf>,
     /// Its avatar emoji, for an account that chose one instead.
     pub emoji: Option<String>,
-    /// The account colour ("#rrggbb"), the ground behind the emoji.
+    /// The account color ("#rrggbb"), the ground behind the emoji.
     pub color: String,
 }
 

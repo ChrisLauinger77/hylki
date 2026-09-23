@@ -105,7 +105,7 @@ headerbar.rail-header {
   font-weight: 600;
 }
 
-/* Per-account avatar circle in the sidebar (background colour set at runtime). */
+/* Per-account avatar circle in the sidebar (background color set at runtime). */
 .account-circle {
   min-width: 30px;
   min-height: 30px;
@@ -121,8 +121,8 @@ headerbar.rail-header {
   min-height: 21px;
   border-radius: 10.5px;
 }
-/* The account editor's preview circle: a 72px disc whose colour comes
-   from a stylesheet the editor rewrites as the colour button changes. */
+/* The account editor's preview circle: a 72px disc whose color comes
+   from a stylesheet the editor rewrites as the color button changes. */
 .account-preview-disc {
   min-width: 72px;
   min-height: 72px;
@@ -252,7 +252,7 @@ headerbar.rail-header {
 }
 
 /* A set star (reader toolbar, list palette, popout): the flagged state is
-   colour alone — the glyph stays the same as every other icon. */
+   color alone — the glyph stays the same as every other icon. */
 button.star-active {
   color: #e5a50a;
 }
@@ -304,7 +304,7 @@ button.star-active {
   color: @accent_color;
 }
 
-/* Account chip in the reader header (colours set at runtime). */
+/* Account chip in the reader header (colors set at runtime). */
 .account-chip {
   border-radius: 8px;
   padding: 1px 9px;
@@ -435,7 +435,7 @@ button.star-active {
 }
 
 /* Icon rail, "Unread dots instead of counts": every mini chip becomes a dot
-   in the accent colour. The number is still the label's text (the in-place
+   in the accent color. The number is still the label's text (the in-place
    count updates keep working) — just unreadably small and transparent; the
    count itself lives in the row's tooltip. */
 .rail-dots .unread-badge-mini {
@@ -451,7 +451,7 @@ button.star-active {
 /* Unread count: a perfect circle for a single digit that grows horizontally
    into a pill for larger numbers, but never taller. */
 /* The small filter glyph on a main folder's icon corner (a filter files
-   into it): a sidebar-coloured halo keeps it legible over the icon. */
+   into it): a sidebar-colored halo keeps it legible over the icon. */
 .filter-mark {
   margin-top: -4px;
   margin-right: -6px;
@@ -473,7 +473,7 @@ button.star-active {
 
 /* Compact-rail variant: a smaller chip pinned to an icon/pill corner via an
    overlay, so unread counts stay visible when the sidebar is icon-only. The
-   ring in the sidebar's background colour separates it from the icon beneath. */
+   ring in the sidebar's background color separates it from the icon beneath. */
 .unread-badge-mini {
   min-width: 14px;
   min-height: 14px;
@@ -547,7 +547,7 @@ button.star-active {
   background: none;
 }
 
-/* Reactive hover highlight (kept below the selection colour). Every state
+/* Reactive hover highlight (kept below the selection color). Every state
    tint is suspended on a row mid-swipe (.swiping): the pill vanishes and the
    content slides bare over the strip, with no card outline to clash with the
    strip's edge. */
@@ -648,7 +648,7 @@ button.star-active {
 /* Thread heads: the conversation's message count and its expand/collapse
    caret, one grey borderless pill (the old count chip's styling, now
    clickable). */
-/* Tag chips (#71): a solid pill in the tag's colour, the colour class
+/* Tag chips (#71): a solid pill in the tag's color, the color class
    (.tag-<keyword>) coming from the app's tag stylesheet. Same geometry as
    the conversation chip so the two sit level on a row. */
 .tag-chip {
@@ -660,12 +660,12 @@ button.star-active {
 }
 
 .message-listbox > row:selected .message-row .tag-chip {
-  /* Keep the tag's own colour on a selected row; the selection paints
+  /* Keep the tag's own color on a selected row; the selection paints
      everything else white. */
   opacity: 0.95;
 }
 
-/* A tag row's glyph in the sidebar, in the tag's colour (.tag-tint keeps
+/* A tag row's glyph in the sidebar, in the tag's color (.tag-tint keeps
    the background off). */
 .tag-tint {
   background-color: transparent;
@@ -695,7 +695,7 @@ button.star-active {
 /* Expanded conversation members: inset rounded cards hung off a dotted rail,
    instead of full-width rectangles crossing the list separators (issue #62).
    The rail is the row's left border (pushed inward by the margin); all the
-   state colours — hover, unread, selected — move off the row and onto the
+   state colors — hover, unread, selected — move off the row and onto the
    inner .message-row box, so the highlight is a padded pill that never
    touches the list edges. */
 .message-listbox > row.thread-child {
@@ -740,7 +740,7 @@ button.star-active {
 
 /* Node dot where each member meets the rail: an 8px circle whose negative
    margin pulls it out of the row's content box to sit centred on the
-   border-drawn rail line. The window-coloured ring masks the rail where it
+   border-drawn rail line. The window-colored ring masks the rail where it
    passes behind the dot, so the dot reads as a node punched into the line. */
 .thread-node {
   min-width: 8px;
@@ -845,7 +845,7 @@ button.star-active {
 
 /* Swipe-to-act strip (#swipe): sits fixed under the row, revealed as the
    message content slides off it — dimmed until the drag passes the commit
-   threshold, then full colour ("armed") to say a release will fire it. */
+   threshold, then full color ("armed") to say a release will fire it. */
 .swipe-indicator {
   opacity: 0.55;
 }
@@ -861,7 +861,7 @@ button.star-active {
 
 .swipe-indicator.swipe-archive {
   /* The traditional archive green — libadwaita's "success" tokens, not
-     accent, so it stays green regardless of the user's accent colour. */
+     accent, so it stays green regardless of the user's accent color. */
   background: @success_bg_color;
   color: @success_fg_color;
 }
@@ -1020,7 +1020,7 @@ headerbar.compose-toolbar button.image-button {
 
 /* ---- Notifications ---- */
 
-/* The bar uses the desktop accent colour (libadwaita maps the GNOME accent to
+/* The bar uses the desktop accent color (libadwaita maps the GNOME accent to
    @accent_bg_color, defaulting to #3584e4); errors turn amber. */
 .notify-area {
   background-color: @accent_bg_color;
@@ -1044,7 +1044,7 @@ headerbar.compose-toolbar button.image-button {
   padding: 4px 12px 14px 12px;
 }
 
-/* Toast-like cards floating on the coloured bar. Fixed amber with dark text
+/* Toast-like cards floating on the colored bar. Fixed amber with dark text
    (no light/dark switch); slightly deeper than the bar behind for separation. */
 .toast-card {
   background-color: #ffca28;
@@ -1078,7 +1078,7 @@ headerbar.compose-toolbar button.image-button {
 
 /* Blocked-remote-content bar: a quiet tint over the theme's own ground, so
    it follows light/dark switching; amber is kept only where it carries
-   meaning — the shield icon, via the theme's warning colour. The action
+   meaning — the shield icon, via the theme's warning color. The action
    buttons stay libadwaita's standard grey. It's a standing notice, not an
    alarm, and must not eat into the reader. */
 .remote-alert {
@@ -1120,7 +1120,7 @@ headerbar.compose-toolbar button.image-button {
 /* Sender-check badge in the reader toolbar: an icon button like its neighbours,
    tinted by verdict. No padding or radius of its own — it has to line up with
    Reply/Archive/View Source, so it takes the toolbar's own button metrics.
-   libadwaita's named colours, not fixed hex: they shift per colour scheme, so
+   libadwaita's named colors, not fixed hex: they shift per color scheme, so
    the green (and the others) read correctly in dark mode too (issue #62). */
 .trust-pass {
   color: @success_color;
@@ -1290,7 +1290,7 @@ headerbar.compose-toolbar button.image-button {
   opacity: 0.85;
 }
 
-/* Type-tinted attachment icons (symbolic icons follow `color`). Colours read
+/* Type-tinted attachment icons (symbolic icons follow `color`). Colors read
    on both light and dark backgrounds. */
 .ftype-pdf      { color: #e01b24; } /* red    — PDF */
 .ftype-doc      { color: #3584e4; } /* blue   — Word / documents */
@@ -1534,7 +1534,7 @@ window.welcome-window,
 }
 
 /* The language picker sits on the ground: a white wash, white text. Only
-   the button, so the popover list keeps the theme's colours. */
+   the button, so the popover list keeps the theme's colors. */
 .welcome-window dropdown > button {
   background-color: alpha(#ffffff, 0.16);
   color: #ffffff;
@@ -1607,10 +1607,10 @@ window.welcome-window,
   font-weight: 700;
 }
 /* The strip's edges melt into the card where more icons lie beyond. Two
-   layers, because the dark card colour is a translucent white over the
+   layers, because the dark card color is a translucent white over the
    window ground: a gradient of it alone reads as a pale haze there. The
    card gradient over a window-ground gradient composites to the row's own
-   colour at the edge, in both schemes. */
+   color at the edge, in both schemes. */
 .icon-strip-fade.left {
   background:
     linear-gradient(to right, @card_bg_color, alpha(@card_bg_color, 0)),
@@ -1635,7 +1635,7 @@ window.welcome-window,
 
 /* ---- Console mode (notifications.rs): dracula on an old tube ---- */
 
-/* The bar fades between its normal colours and the terminal's. */
+/* The bar fades between its normal colors and the terminal's. */
 .notify-area {
   transition: background-color 0.4s ease, color 0.4s ease;
 }
@@ -1708,7 +1708,7 @@ textview.console-view text selection {
 }
 
 /* The composer's Send split (#145): Send and the Send Later dropdown as
-   one accent-coloured control, joined flush, with a short inset divider
+   one accent-colored control, joined flush, with a short inset divider
    line between them rather than a full-height seam. */
 .send-split {
   background: @accent_bg_color;

@@ -92,7 +92,7 @@ pub struct PrefInit {
     pub override_fonts: bool,
     /// That font, as a Pango description; empty = the interface font.
     pub reader_font: String,
-    /// Ignore the senders' text and background colours (#56).
+    /// Ignore the senders' text and background colors (#56).
     pub override_colors: bool,
     /// Plain-text messages in monospace (#181), and the font ("" = the
     /// desktop's monospace font).
@@ -105,7 +105,7 @@ pub struct PrefInit {
     /// Where the signature sits in a reply or forward (#237).
     pub signature_position: crate::config::SignaturePosition,
     pub app_theme: AppTheme,
-    /// The appearance theme's id ("system" for the stock GNOME colours).
+    /// The appearance theme's id ("system" for the stock GNOME colors).
     pub theme: String,
     pub notifications: bool,
     pub notification_content: bool,
@@ -1826,7 +1826,7 @@ impl Component for Preferences {
                                     adw::SwitchRow {
                                         set_title: &i18n("Unread dots instead of counts"),
                                         set_subtitle: &i18n("Mark folders and accounts that have unread mail with \
-                                                       a dot in the accent colour rather than the number \
+                                                       a dot in the accent color rather than the number \
                                                        of messages. The count stays in the tooltip."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleRailDots(row.is_active()));
@@ -2202,11 +2202,11 @@ impl Component for Preferences {
 
                                     #[name = "override_colors_row"]
                                     adw::SwitchRow {
-                                        set_title: &i18n("Use my own colours"),
-                                        set_subtitle: &i18n("Ignore the text and background colours senders \
+                                        set_title: &i18n("Use my own colors"),
+                                        set_subtitle: &i18n("Ignore the text and background colors senders \
                                                        set, so every message reads in the same black or \
                                                        white on the reader's ground. Pictures are kept; \
-                                                       links take the accent colour."),
+                                                       links take the accent color."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleOverrideColors(row.is_active()));
                                         },
@@ -2304,7 +2304,7 @@ impl Component for Preferences {
 
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Reader View"),
-                                    set_description: Some(&i18n("Reader View shows a message as its text alone, in one plain format, without the sender's layout, colours and fonts.")),
+                                    set_description: Some(&i18n("Reader View shows a message as its text alone, in one plain format, without the sender's layout, colors and fonts.")),
 
                                     #[name = "reader_switch_row"]
                                     adw::SwitchRow {

@@ -82,7 +82,7 @@ pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
 }
 
 /// Normalise a stored id to one this build offers. Every id from the
-/// Hylki galleries (birds, colours, patterns, the classic envelope) is
+/// Hylki galleries (birds, colors, patterns, the classic envelope) is
 /// gone; a stored one falls back to the default, which generation 3 puts
 /// on every install once anyway.
 fn effective(id: &str) -> &'static str {

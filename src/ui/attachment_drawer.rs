@@ -1,6 +1,6 @@
 //! In-message attachment drawer: a resizable footer beneath the reader body that
 //! shows every attachment on the open message as a wrapping grid of thumbnails
-//! (images and PDFs) or colour-coded type icons (everything else), each with the
+//! (images and PDFs) or color-coded type icons (everything else), each with the
 //! filename beneath it.
 //!
 //! It reuses the gallery's thumbnail/icon/open helpers ([`texture_from`],

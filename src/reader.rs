@@ -2,7 +2,7 @@
 //!
 //! The reader pane's Reader View toggle shows every message in the open
 //! conversation without the sender's design: no stylesheets, no layout
-//! tables, no colours, no hidden preview text, no tracking pixels. What is
+//! tables, no colors, no hidden preview text, no tracking pixels. What is
 //! left — headings, paragraphs, lists, quotes, links, real images, data
 //! tables — is set in one uniform sheet that follows the app's theme.
 //!
@@ -51,7 +51,7 @@ pub fn extract(body: &str) -> String {
     html
 }
 
-/// The reader's own sheet: one measure, one type scale, theme colours.
+/// The reader's own sheet: one measure, one type scale, theme colors.
 fn stylesheet(dark: bool, accent: &str) -> String {
     let (scheme, fg, muted) = if dark {
         ("dark", "#e6e6e6", "#b0b0b0")

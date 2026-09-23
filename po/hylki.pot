@@ -1065,7 +1065,7 @@ msgid "Mail accounts from GNOME Settings. Toggle one on to use it in Hylki."
 msgstr ""
 
 msgid ""
-"Label messages with one or more coloured tags. Tags are stored on the mail "
+"Label messages with one or more colored tags. Tags are stored on the mail "
 "server as IMAP keywords, so Thunderbird and other clients show the same "
 "tags.\n"
 "\n"
@@ -1615,7 +1615,7 @@ msgstr ""
 
 msgid ""
 "{n} tags are in use in your mailboxes but not set up here. Import them all, "
-"or choose which to add. Names and colours can be changed afterwards."
+"or choose which to add. Names and colors can be changed afterwards."
 msgstr ""
 
 msgid "Import Selected"
@@ -1649,13 +1649,13 @@ msgid ""
 "no spaces. Thunderbird's built-in tags are $label1 to $label5."
 msgstr ""
 
-msgid "Colour"
+msgid "Color"
 msgstr ""
 
-msgid "Custom colour…"
+msgid "Custom color…"
 msgstr ""
 
-msgid "Tag Colour"
+msgid "Tag Color"
 msgstr ""
 
 msgid "Edit Filter"
@@ -2693,7 +2693,7 @@ msgstr ""
 
 msgid ""
 "Reader View shows a message as its text alone, in one plain format, without "
-"the sender's layout, colours and fonts."
+"the sender's layout, colors and fonts."
 msgstr ""
 
 msgid "Reader View"
@@ -2763,10 +2763,10 @@ msgstr ""
 msgid "View source"
 msgstr ""
 
-msgid "Back to my fonts and colours"
+msgid "Back to my fonts and colors"
 msgstr ""
 
-msgid "Show the sender's fonts and colours"
+msgid "Show the sender's fonts and colors"
 msgstr ""
 
 msgid "Show remote content"
@@ -3450,7 +3450,7 @@ msgstr ""
 
 msgid ""
 "Mark folders and accounts that have unread mail with a dot in the accent "
-"colour rather than the number of messages. The count stays in the tooltip."
+"color rather than the number of messages. The count stays in the tooltip."
 msgstr ""
 
 msgid "Fold up expanded items"
@@ -3663,13 +3663,13 @@ msgstr ""
 msgid "The interface font unless another is chosen."
 msgstr ""
 
-msgid "Use my own colours"
+msgid "Use my own colors"
 msgstr ""
 
 msgid ""
-"Ignore the text and background colours senders set, so every message reads "
-"in the same black or white on the reader's ground. Pictures are kept; links "
-"take the accent colour."
+"Ignore the text and background colors senders set, so every message reads in "
+"the same black or white on the reader's ground. Pictures are kept; links "
+"take the accent color."
 msgstr ""
 
 msgid "Plain-text messages in monospace"
@@ -4365,7 +4365,7 @@ msgstr ""
 msgid "Message text shown under each subject"
 msgstr ""
 
-msgid "Colourful initials beside each message"
+msgid "Colorful initials beside each message"
 msgstr ""
 
 msgid "Conversation view"
@@ -4690,7 +4690,7 @@ msgid "Reading:"
 msgstr ""
 
 msgid ""
-"Reader View, your own font and colours, and per-message light or dark "
+"Reader View, your own font and colors, and per-message light or dark "
 "rendering"
 msgstr ""
 

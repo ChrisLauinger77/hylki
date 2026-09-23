@@ -17,7 +17,7 @@
 //! the sandbox and may not resolve our icon theme, and the dot has to be drawn
 //! on anyway. The Hylki icon is the app icon itself; the envelope variants are
 //! the app's own symbolic icon in plain white or black, for panels that
-//! don't recolour symbolic icons. On Cinnamon the icon is drawn smaller
+//! don't recolor symbolic icons. On Cinnamon the icon is drawn smaller
 //! inside the pixmap, see [`panel_fill`].
 
 use gtk::cairo;
@@ -65,7 +65,7 @@ pub struct TrayMailList {
 /// `app_icon.rs`), passed in as PNG bytes so a change follows live.
 pub type AppIconPng = &'static [u8];
 /// The app's symbolic icon (the opened envelope, drawn in black); its
-/// fill is swapped for the chosen colour.
+/// fill is swapped for the chosen color.
 const ENVELOPE_SVG: &str =
     include_str!("../data/icons/hicolor/symbolic/apps/co.hyprlab.Hylki-symbolic.svg");
 /// Panels ask for different sizes; a set covers them without upscaling blur.
@@ -305,7 +305,7 @@ pub fn clip(s: &str, max: usize) -> String {
 }
 
 /// The menu's picture for a sender: the contact or Gravatar picture when the
-/// avatar cache has one, else their initials on a colour picked by name — the
+/// avatar cache has one, else their initials on a color picked by name — the
 /// same fallback the message list shows.
 pub fn sender_icon(name: &str, email: &str, texture: Option<gtk::gdk::Texture>) -> Vec<u8> {
     const SIZE: i32 = 32;
@@ -384,7 +384,7 @@ fn render_set(icon: TrayIcon, app_png: AppIconPng, dotted: bool) -> Vec<Icon> {
 ///
 /// A panel draws the pixmap at whatever size it asked for, so the icon
 /// fills it. Cinnamon is the exception: its status applet takes a pixmap
-/// for a full-colour icon and draws it at the panel's colour icon size,
+/// for a full-color icon and draws it at the panel's color icon size,
 /// while the symbolic icons beside it get the smaller symbolic size, so
 /// ours towered over them. Drawing at five-eighths brings it level.
 fn panel_fill() -> f64 {
@@ -438,7 +438,7 @@ fn render(icon: TrayIcon, app_png: AppIconPng, dotted: bool, size: i32, fill: f6
 }
 
 /// The icon's pixels before any dot: the app icon scaled down, or the
-/// symbolic envelope rasterised in the chosen colour.
+/// symbolic envelope rasterised in the chosen color.
 fn base_pixbuf(icon: TrayIcon, app_png: AppIconPng, size: i32) -> Option<Pixbuf> {
     match icon {
         TrayIcon::Hylki => {

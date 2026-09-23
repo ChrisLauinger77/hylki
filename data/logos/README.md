@@ -22,12 +22,12 @@ recorded at the top of `logos.toml`:
 | `simple/` | [Simple Icons](https://simpleicons.org) | CC0 1.0 (the same trademark note applies; see their [legal disclaimer](https://github.com/simple-icons/simple-icons/blob/develop/DISCLAIMER.md)) |
 
 A Simple Icons glyph is drawn in white (or black, whichever reads) on the
-brand colour the collection records; a gilbarbara mark is drawn on a white
+brand color the collection records; a gilbarbara mark is drawn on a white
 tile, inset a little. Both are framed at render time (`logo::square_svg`),
 the files are not edited.
 
 `logos.toml` is generated: it maps each domain to its file and, for Simple
-Icons, the brand colour. `../../resources/logos.gresource.xml` lists the
+Icons, the brand color. `../../resources/logos.gresource.xml` lists the
 files `build.rs` compiles into the binary. To add a sender, add its domain
 to `domains.txt` (with an explicit `gilbarbara:<file>`, `simple:<slug>` or
 `brand:<id>` pick when the automatic match is wrong) and run:

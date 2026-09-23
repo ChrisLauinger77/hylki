@@ -634,7 +634,7 @@ fn sample_messages() -> Vec<Message> {
             subject: "This Week in Rust #612",
             preview: "Crate of the week, RFCs, and community updates. This issue: async closures stabilize, and a deep dive into…",
             // A designed newsletter, as they come: a preheader hidden from
-            // the message, a layout table with its own colours and fonts, a
+            // the message, a layout table with its own colors and fonts, a
             // button, a tracking pixel. The Reader View demo strips it to
             // the words.
             body: "<html><head><style>body{margin:0;background:#f4f1ea;font-family:Georgia,serif}.btn{background:#c0392b;color:#fff!important;padding:10px 18px;border-radius:4px;text-decoration:none;display:inline-block}</style></head>\
@@ -740,7 +740,7 @@ fn sample_messages() -> Vec<Message> {
         // mock backend never moves anything. Unread counts match the folders. ----
         Spec { id: 17, account_id: 1, folder_id: 8, from_name: "Design Systems Weekly", from_addr: "hello@designsystems.substack.com", to: ME,
             subject: "Issue 84: tokens that survive a rebrand",
-            preview: "This week: how three teams versioned their colour tokens through a rebrand without touching a component, plus…",
+            preview: "This week: how three teams versioned their color tokens through a rebrand without touching a component, plus…",
             body: "This week:\n\n  • Tokens that survive a rebrand: three teams, three approaches\n  • A11y contrast audits you can automate\n  • Reader question: when is a component too small to ship?\n\nRead the full issue online.\n\n— Design Systems Weekly",
             date: "7:40 AM", unread: true, starred: false, keywords: &[], has_attachment: false, in_reply_to: None },
         Spec { id: 18, account_id: 1, folder_id: 8, from_name: "The Pragmatic Engineer", from_addr: "pragmaticengineer@substack.com", to: ME,

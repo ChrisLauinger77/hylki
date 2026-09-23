@@ -236,7 +236,7 @@ impl RichEditor {
         // A live theme flip re-grounds the open document (#148): the scheme
         // and the ground are baked into the document at load, so without
         // this the editor stays in the scheme it was opened in. Deferred to
-        // the next main-loop pass — the theme's named colours are only
+        // the next main-loop pass — the theme's named colors are only
         // re-resolved after the signal fires.
         let theme_handler = {
             let weak = webview.downgrade();
@@ -244,7 +244,7 @@ impl RichEditor {
                 reground(&weak, sm.is_dark());
             })
         };
-        // An appearance theme moves the same colours with no scheme flip, so
+        // An appearance theme moves the same colors with no scheme flip, so
         // the editor re-grounds for that too — and drops out of the list
         // once its view is gone.
         {
@@ -1996,10 +1996,10 @@ pub(crate) fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Re-ground an open editor document (#148): the colour scheme and the page
+/// Re-ground an open editor document (#148): the color scheme and the page
 /// ground are baked into the document when it loads, so a theme change — a
 /// light/dark flip, or a new palette — has to be pushed into it. Deferred to
-/// the next main-loop pass, because the theme's named colours are only
+/// the next main-loop pass, because the theme's named colors are only
 /// re-resolved after the signal that announced the change. `false` means the
 /// view is gone and this editor needs telling no more.
 fn reground(weak: &gtk::glib::WeakRef<webkit6::WebView>, dark: bool) -> bool {

@@ -8,7 +8,7 @@
 //! preview is asked: *what will come out of the printer?*
 //!
 //! So the preview is a window of Hylki's own, showing the message with its print
-//! styling applied — the header block, light colours — laid out on a page-shaped
+//! styling applied — the header block, light colors — laid out on a page-shaped
 //! sheet. Printing from that window prints the very thing being looked at.
 
 use adw::prelude::*;
@@ -284,7 +284,7 @@ pub fn open(parent: &adw::ApplicationWindow, html: &str, job_name: &str) {
 }
 
 /// Styling that turns the reader's document into something page-shaped: the
-/// print-only header revealed, light colours, and a sheet with margins on a grey
+/// print-only header revealed, light colors, and a sheet with margins on a grey
 /// desk. Applied on screen only — printing uses the document's own `@media
 /// print` rules, which say the same thing.
 pub const PREVIEW_STYLES: &str = "\

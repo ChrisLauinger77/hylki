@@ -4,12 +4,12 @@
 //! that box evenly — a lone "J" or "T" drifts, and pairs lean — which is
 //! what this paintable corrects, at every size it is drawn at.
 //!
-//! Colours are libadwaita's own avatar palette (the same fourteen gradients
+//! Colors are libadwaita's own avatar palette (the same fourteen gradients
 //! `adw::Avatar` picks from, chosen by the same hash of the name), so a
-//! sender keeps the colour they have always had.
+//! sender keeps the color they have always had.
 //!
 //! The same drawing serves the sidebar's account circles (a glyph alone
-//! over the circle's own colour — see [`glyph_picture`]) and the reader's
+//! over the circle's own color — see [`glyph_picture`]) and the reader's
 //! cards, where it is rendered to a PNG the document embeds
 //! ([`png_data_uri`]).
 
@@ -150,7 +150,7 @@ glib::wrapper! {
 
 impl InitialsPaintable {
     /// The circle for `name` (a sender's display name): its initials in the
-    /// colour libadwaita would give that name. `None` when there is no
+    /// color libadwaita would give that name. `None` when there is no
     /// letter to show, so the avatar falls back to its silhouette.
     pub fn for_name(name: &str) -> Option<Self> {
         let initials = initials_of(name);
@@ -167,7 +167,7 @@ impl InitialsPaintable {
     }
 
     /// `text` alone (initials, or an emoji) in `fg`, over nothing: for a
-    /// circle that paints its own colour. `scale` is the text height as a
+    /// circle that paints its own color. `scale` is the text height as a
     /// share of the circle.
     pub fn glyph(text: &str, fg: gdk::RGBA, scale: f64) -> Self {
         let this: Self = glib::Object::new();
@@ -185,7 +185,7 @@ impl InitialsPaintable {
     }
 }
 
-/// A sidebar circle's glyph: `text` ink-centred in the colour that reads
+/// A sidebar circle's glyph: `text` ink-centred in the color that reads
 /// on `bg_hex` (the circle's own ground, painted by its CSS), exactly
 /// `size` square — sized outright rather than expanding, since an expand
 /// flag would climb into the row and stretch it.
@@ -368,7 +368,7 @@ mod tests {
         assert_eq!(initials_of("GNOME Foundation Board"), "GB");
         assert_eq!(initials_of("émile zola"), "ÉZ");
         assert_eq!(initials_of("  "), "");
-        // GLib's djb2, as libadwaita hashes the name for its colour.
+        // GLib's djb2, as libadwaita hashes the name for its color.
         assert_eq!(palette_index(""), (5381u32 % 14) as usize);
         assert!(palette_index("Marcus Chen") < PALETTE.len());
     }

@@ -148,7 +148,7 @@ pub enum RowAction {
 }
 
 /// Init for a row: the message, Gravatar flag, and optional account-ring class
-/// (the account colour drawn as a ring around the avatar in the unified view).
+/// (the account color drawn as a ring around the avatar in the unified view).
 pub struct RowInit {
     pub msg: Message,
     pub gravatar: bool,
@@ -242,7 +242,7 @@ const SWIPE_MAX: f64 = 120.0;
 /// reply's rail stub reaches 2px the same way. The swipe surface's clip
 /// leaves this much room on the left, or both come out cut in half.
 const THREAD_NODE_REACH: f32 = 8.0;
-/// Distance past which the indicator reads as "armed" (full colour) — purely
+/// Distance past which the indicator reads as "armed" (full color) — purely
 /// a visual cue; `AdwSwipeTracker` makes the real commit decision on
 /// release, factoring in velocity too.
 const SWIPE_ARM: f64 = 72.0;
@@ -284,7 +284,7 @@ const THREAD_EXPANDED_EXTRA: i32 = 12;
 /// A background face lookup's answer, correlated by sender address (a recycled
 /// row compares before using it). The tiers are personal-first: the contact's
 /// own photo, their Gravatar, then the icon their domain publishes (#30), with
-/// the UI's coloured initials as the implicit last resort.
+/// the UI's colored initials as the implicit last resort.
 #[derive(Debug)]
 pub enum FaceCmd {
     /// The avatar tiers (contact photo, Gravatar) answered. `logo` carries the
@@ -435,7 +435,7 @@ pub struct MessageRow {
     /// animation lands — the `.swiping` class squares the pill off and
     /// drops its margins for that whole span, so the content and the strip
     /// under it read as one full-width surface rather than a rounded card
-    /// sliding over a coloured band.
+    /// sliding over a colored band.
     swipe_active: bool,
     /// The row's `AdwSwipeTracker`, built once against its `SwipeSurface` in
     /// post_view — also doubles as the wiring guard, since the tracker has
@@ -566,7 +566,7 @@ fn drag_selection(src: &gtk::DragSource, keys: &DragKeys) -> Vec<(u32, u32, u32,
 
 impl MessageRow {
     /// Rebuild the row's tag chips (#71): one pill per keyword that names a
-    /// tag, in tag order, wearing the tag's colour class.
+    /// tag, in tag order, wearing the tag's color class.
     fn render_tags(&self, tags_box: &gtk::Box) {
         while let Some(child) = tags_box.first_child() {
             tags_box.remove(&child);
@@ -1177,7 +1177,7 @@ impl FactoryComponent for MessageRow {
                     set_size: 38,
                     set_valign: gtk::Align::Center,
                     set_show_initials: true,
-                    // Account colour ring (unified view only).
+                    // Account color ring (unified view only).
                     set_css_classes: &self.ring_classes(),
                     #[watch]
                     set_text: Some(&self.face_name()),
@@ -1315,7 +1315,7 @@ impl FactoryComponent for MessageRow {
                     set_visible: self.preview_lines > 0,
 
                     // An encrypted message (#133) shows a lock where its text
-                    // would be, in the preview's own dimmed colour: a symbolic
+                    // would be, in the preview's own dimmed color: a symbolic
                     // icon takes the label's foreground, so it follows the
                     // light and dark themes with it.
                     gtk::Image {
@@ -1985,7 +1985,7 @@ impl MessageRow {
     /// A released swipe that cleared the commit distance (#swipe): the row
     /// flies out the side it was dragged to while its Revealer closes over
     /// the same 200ms, and the action fires as the two land. The strip stays
-    /// pinned at full commit for the whole exit, so the colour and icon it
+    /// pinned at full commit for the whole exit, so the color and icon it
     /// leaves under are the ones the release chose.
     fn commit_swipe(&mut self) {
         self.swipe_committing = true;
@@ -1995,9 +1995,9 @@ impl MessageRow {
         self.revealed = false;
     }
 
-    /// The indicator panel's classes: coloured for whichever action is
+    /// The indicator panel's classes: colored for whichever action is
     /// active, and "armed" once the drag has cleared the commit distance —
-    /// full colour says a release now fires it, matching Gmail's own cue.
+    /// full color says a release now fires it, matching Gmail's own cue.
     fn swipe_indicator_classes(&self) -> Vec<&'static str> {
         let mut v = vec!["swipe-indicator"];
         v.push(match self.swipe_action() {
@@ -2069,7 +2069,7 @@ impl MessageRow {
         }
         let mut slot = self.initials_image.borrow_mut();
         // A message from one of your own mailboxes wears that mailbox's emoji
-        // on its colour (#189), the same face the sidebar circle shows. It
+        // on its color (#189), the same face the sidebar circle shows. It
         // shares the slot with the initials, keyed by what it draws rather
         // than by a name, so either way the avatar is handed the same object
         // on every refresh.
@@ -2521,7 +2521,7 @@ pub struct MessageList {
     preview_lines: u32,
     /// Whether rows draw their subject line (Focus Mode can take it away).
     show_subject: bool,
-    /// Whether the coloured avatars are drawn (#29).
+    /// Whether the colored avatars are drawn (#29).
     avatars: bool,
     /// The next rebuild draws the avatars folded away and slides them in
     /// (Focus Mode has just given them back).
@@ -2530,7 +2530,7 @@ pub struct MessageList {
     sender_logos: bool,
     /// Tint each row by its account (used in the unified inbox view).
     colorize: bool,
-    /// account_id → avatar colour, for tinting rows.
+    /// account_id → avatar color, for tinting rows.
     account_colors: std::collections::HashMap<u32, String>,
     /// Display-wide provider with each account's pale row-tint rule.
     color_provider: gtk::CssProvider,
@@ -2757,7 +2757,7 @@ pub enum MessageListInput {
     /// The open folder is (or stopped being) a Sent folder — rows name the
     /// recipient there instead of the sender (#27).
     SetShowRecipient(bool),
-    /// Show or hide the coloured avatars (#29).
+    /// Show or hide the colored avatars (#29).
     SetAvatars(bool),
     /// The avatars and preview lines together, as the settings and Focus
     /// Mode leave them. `animate` (a Focus Mode toggle) slides the avatars
@@ -5742,7 +5742,7 @@ impl MessageList {
     }
 
     /// Update the display-wide CSS that rings each account's avatar with its
-    /// colour (used in the unified "All Inboxes" view to identify the account).
+    /// color (used in the unified "All Inboxes" view to identify the account).
     fn refresh_tint_css(&self) {
         let mut css = String::new();
         for (id, color) in &self.account_colors {

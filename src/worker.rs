@@ -640,7 +640,7 @@ pub enum WorkerEvent {
 
 type ImapSession = Session<TlsStream<TcpStream>>;
 
-/// A distinct accent colour per account (cycles through a small palette).
+/// A distinct accent color per account (cycles through a small palette).
 pub(crate) fn accent_for(account_id: u32) -> &'static str {
     const PALETTE: [&str; 6] = [
         "#3584e4", "#2ec27e", "#e5a50a", "#e66100", "#9141ac", "#c01c28",
@@ -4883,12 +4883,12 @@ pub fn is_system_keyword(keyword: &str) -> bool {
         "$isnotification", "$ismailinglist", "$istrusted", "$notification",
     ];
     SYSTEM.contains(&k.as_str())
-        // Apple Mail's flag colours and Fastmail's internal annotations.
+        // Apple Mail's flag colors and Fastmail's internal annotations.
         || k.starts_with("$mailflagbit")
         || k.starts_with("$x-me-")
 }
 
-/// A Microsoft 365 category colour (`preset0`…`preset24`) as the nearest
+/// A Microsoft 365 category color (`preset0`…`preset24`) as the nearest
 /// `#rrggbb`; `None` for "none" or anything unknown.
 fn graph_preset_color(preset: &str) -> Option<String> {
     let hex = match preset.to_ascii_lowercase().as_str() {
@@ -9480,7 +9480,7 @@ fn consume_url(text: &str, start: usize) -> usize {
     start + trimmed.len()
 }
 
-/// Wrap plain text in a minimal, readable HTML document. Colours are left to
+/// Wrap plain text in a minimal, readable HTML document. Colors are left to
 /// the `color-scheme` the reader injects, so the message follows the
 /// light/dark theme — and no padding is baked in: the reader injects the
 /// default inset at render time, so it stays tunable without invalidating
@@ -9956,7 +9956,7 @@ async fn run_graph(
             }
             MailRequest::FindKeywords => {
                 // Categories are defined once per mailbox, with a name and a
-                // colour: the master list is the whole answer. Counts come
+                // color: the master list is the whole answer. Counts come
                 // from the cache, the only place Hylki has them.
                 let mut found: Vec<KeywordFinding> = Vec::new();
                 if let Some(token) = graph_token(&account, &emit).await {

@@ -6,7 +6,7 @@
 //!
 //! The thumbnails follow the GNOME Settings appearance chooser: a tiny
 //! window with a header bar, a sidebar with a selected row, and a raised
-//! card in the content pane, so every surface a theme colours is on show
+//! card in the content pane, so every surface a theme colors is on show
 //! at once.
 //!
 //! Lives in Settings → Appearance; the caller hears every pick.
@@ -58,7 +58,7 @@ struct Mini {
     accent_fg: &'static str,
 }
 
-/// The stock GNOME look, light and dark: the colours libadwaita paints
+/// The stock GNOME look, light and dark: the colors libadwaita paints
 /// without a theme (translucent ones flattened onto their grounds). The
 /// accent is not one of them — the System card shows whatever accent the
 /// desktop is set to, so the card shows the look it stands for rather than

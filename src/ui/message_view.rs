@@ -49,7 +49,7 @@ pub struct MessageView {
     /// having them in view can't undo the thing the user just asked for. Cleared
     /// whenever a conversation is opened afresh.
     no_autoread: std::collections::HashSet<(u32, u32)>,
-    /// The reader's own fonts and colours laid over every message (#56);
+    /// The reader's own fonts and colors laid over every message (#56);
     /// `NONE` shows each message as its sender formatted it.
     reader_style: crate::config::ReaderStyle,
     /// Messages the user asked to see with the sender's own formatting
@@ -88,7 +88,7 @@ pub struct MessageView {
     remote_allowed: bool,
     /// Owning account's display name (header chip).
     account_name: Option<String>,
-    /// Provider holding the header chip's per-account colours.
+    /// Provider holding the header chip's per-account colors.
     chip_provider: gtk::CssProvider,
     /// Paints the reader's spinner and its inter-document cover in the *message*
     /// theme rather than the app's. Reading a light message in a dark app used
@@ -207,7 +207,7 @@ impl MessageView {
     fn patch_verify_badge(&self, account_id: u32, id: u32) {
         let Some(check) = self.member_checks.get(&(account_id, id)) else { return };
         // The OpenPGP chip (#133) rides the same patch: shown with its
-        // lock/shield and colour once a verdict exists.
+        // lock/shield and color once a verdict exists.
         let pgp = match &check.pgp {
             Some(p) => format!(
                 "var p=document.querySelector('.vireo-pgp[data-key=\"{account_id}:{id}\"]');\
@@ -684,7 +684,7 @@ pub enum MessageViewInput {
         thread: Vec<Message>,
         /// The sender is trusted, so remote content may auto-load.
         allow_remote: bool,
-        /// Owning account's display name and colour, for the header chip.
+        /// Owning account's display name and color, for the header chip.
         account_name: Option<String>,
         account_color: Option<String>,
         /// The body is still being fetched — show a spinner.
@@ -723,7 +723,7 @@ pub enum MessageViewInput {
     /// Set the message-content theme: `None` follows the system, `Some(dark)`
     /// forces light/dark for email content only (not the app UI).
     SetContentTheme(Option<bool>),
-    /// The reader's own fonts and colours over the senders' (#56).
+    /// The reader's own fonts and colors over the senders' (#56).
     SetReaderStyle(crate::config::ReaderStyle),
     /// The card's "sender's formatting" toggle: show that one message as its
     /// sender formatted it, or back under the reader's style.
@@ -841,7 +841,7 @@ pub enum MessageViewInput {
     /// A message's keywords changed (#71): the card's chips are patched in
     /// place, like the star.
     SetCardKeywords { account_id: u32, id: u32, keywords: Vec<String> },
-    /// The tag definitions changed: re-render with the new names and colours.
+    /// The tag definitions changed: re-render with the new names and colors.
     SetTags(Vec<crate::config::Tag>),
     /// Read-marking policy changed (#100).
     SetReadMark(crate::config::ReadMark),
@@ -996,7 +996,7 @@ impl MessageView {
 }
 
 /// The tag chips of a card header (#71): one pill per keyword naming a tag,
-/// coloured inline (the document has no access to the app's stylesheet).
+/// colored inline (the document has no access to the app's stylesheet).
 /// A card's Unsubscribe banner: the container, always emitted so a verdict
 /// arriving later can be patched into it (empty, it is hidden by the
 /// stylesheet). `inner` is what [`MessageView::unsub_inner_html`] rendered.
@@ -1089,7 +1089,7 @@ fn att_row_html(key: (u32, u32), atts: Option<&[CardAttachment]>) -> String {
 }
 
 /// The chips for one card's attachments (#213): the gallery's type icon in
-/// its colour, the name, the size, and a save button. The chip opens the
+/// its color, the name, the size, and a save button. The chip opens the
 /// file; both post the message key and the attachment's index back.
 fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String {
     use crate::ui::attachments_gallery::{icon_color_class, icon_for};
@@ -1367,7 +1367,7 @@ impl Component for MessageView {
                             set_halign: gtk::Align::End,
                             set_valign: gtk::Align::Center,
                             add_css_class: "reader-toggle",
-                            set_tooltip_text: Some(i18n("Reader View shows a message as its text alone, in one plain format, without the sender's layout, colours and fonts.").as_str()),
+                            set_tooltip_text: Some(i18n("Reader View shows a message as its text alone, in one plain format, without the sender's layout, colors and fonts.").as_str()),
                             #[watch]
                             set_visible: model.current.is_some() && model.reader_switch_shown,
 
@@ -1901,7 +1901,7 @@ impl Component for MessageView {
         style_manager.connect_dark_notify(move |_| {
             theme_sender.input(MessageViewInput::ThemeChanged);
         });
-        // The same for an appearance theme, which moves the colours without
+        // The same for an appearance theme, which moves the colors without
         // touching the light/dark preference. The watcher holds the reader's
         // view weakly, so a closed message window stops being told.
         {
@@ -1991,7 +1991,7 @@ impl Component for MessageView {
                 self.blocked = has_remote && !allow_remote;
                 // Repaint the cover for what is arriving, even when the spinner
                 // is about to be shown instead of a document: the whole point is
-                // that the spinner already sits on the right colour.
+                // that the spinner already sits on the right color.
                 self.apply_webview_bg(self.effective_dark());
                 // While loading, the spinner page is shown; rendering the (empty)
                 // body would just flash blank, so wait for the real body.
@@ -2813,7 +2813,7 @@ impl Component for MessageView {
 }
 
 impl MessageView {
-    /// The desktop accent colour, as the document can use it. Read from the
+    /// The desktop accent color, as the document can use it. Read from the
     /// widget's style so it follows the user's choice; GNOME's own blue is the
     /// fallback when the theme doesn't define it.
     fn accent_hex(&self) -> String {
@@ -3228,7 +3228,7 @@ impl MessageView {
                                 unread_svg = inline_icon_svg("mail-unread-symbolic"),
                             ),
                             // The star keeps one glyph; the flagged state is
-                            // colour alone (`.on`, toggled optimistically on
+                            // color alone (`.on`, toggled optimistically on
                             // click too).
                             format!(
                                 "<button type=\"button\" class=\"vireo-act{on}\" data-act=\"star\" \
@@ -3246,7 +3246,7 @@ impl MessageView {
                             card_action_button(key, "contact", "contact-new-symbolic", &i18n("Add sender to Contacts")),
                             card_action_button(key, "viewsource", "code-symbolic", &i18n("View source")),
                             // The escape from the reader's own fonts and
-                            // colours (#56): only offered while an override
+                            // colors (#56): only offered while an override
                             // is on, lit while this card shows the sender's.
                             if style.active() && !reader {
                                 let on = sender_style.contains(&key);
@@ -3257,9 +3257,9 @@ impl MessageView {
                                     aid = key.0,
                                     id = key.1,
                                     title = gtk::glib::markup_escape_text(&if on {
-                                        i18n("Back to my fonts and colours")
+                                        i18n("Back to my fonts and colors")
                                     } else {
-                                        i18n("Show the sender's fonts and colours")
+                                        i18n("Show the sender's fonts and colors")
                                     }),
                                     svg = inline_icon_svg("format-text-rich-symbolic"),
                                 )
@@ -3331,7 +3331,7 @@ impl MessageView {
                     ava = {
                         // One of your own mailboxes wrote this card (#189):
                         // show what its account chose — the sidebar's picture,
-                        // or its emoji on the account colour — so your own
+                        // or its emoji on the account color — so your own
                         // replies in a conversation wear the face you gave
                         // that mailbox rather than plain initials.
                         let own = crate::avatar::own_face(&m.from_addr).and_then(|face| {
@@ -3461,9 +3461,9 @@ impl MessageView {
         }
         let scheme = if dark { "dark" } else { "light" };
         // The ⋯ actions toggle: plain white in dark mode — the inherited text
-        // colour reads too pale there.
+        // color reads too pale there.
         let toggle_color = if dark { "#ffffff" } else { "inherit" };
-        // Paint the wrapper and the (still-loading) iframes in the theme colour so
+        // Paint the wrapper and the (still-loading) iframes in the theme color so
         // there's no white flash before each message's content renders. The live
         // theme's grounds when the reader set them (issue #62); the stock GNOME
         // values otherwise (tests).
@@ -3478,7 +3478,7 @@ impl MessageView {
         // Each message card only reads as a card against a slightly deeper
         // ground than its own; a full-bleed single message sits on its own
         // ground — the chrome ground when it paints no background (see
-        // `plain_css` below) — so the whole view is one colour.
+        // `plain_css` below) — so the whole view is one color.
         let single_ground = if !carded && thread.len() == 1
             && (reader || !paints_own_background(&thread[0].body))
         {
@@ -3756,7 +3756,7 @@ impl MessageView {
                .vireo-act:active{{background:rgba(128,128,128,0.3);}}\
                .vireo-act svg{{width:14px;height:14px;display:block;}}\
                .vireo-act svg,.vireo-act svg *{{fill:currentColor;}}\
-               /* A set star: the one state that carries colour. */\
+               /* A set star: the one state that carries color. */\
                .vireo-act.on{{color:#e5a50a;opacity:1;}}\
                .vireo-acts-toggle{{display:none;}}\
                /* Behind-the-\u{22ef} mode: the palette overlays the header line as an\
@@ -3859,7 +3859,7 @@ impl MessageView {
                     body_html(&m.body)
                 };
                 let doc = if self.remote_allowed { doc } else { strip_remote(&doc) };
-                // The reader's own fonts and colours (#56) reach paper too,
+                // The reader's own fonts and colors (#56) reach paper too,
                 // scoped to this message's block; a card shown with the
                 // sender's formatting prints that way as well.
                 let style = if self.sender_style.contains(&(m.account_id, m.id)) {
@@ -3906,14 +3906,14 @@ impl MessageView {
         theme_grounds_for(&self.webview, dark)
     }
 
-    /// Paint the WebView canvas in the theme colour so unstyled bodies (and the
+    /// Paint the WebView canvas in the theme color so unstyled bodies (and the
     /// gap before a load) match light/dark mode instead of flashing white.
     fn apply_webview_bg(&self, dark: bool) {
         // Whatever is about to be shown: a conversation's cards sit on the
         // deeper page ground, a full-bleed single message on the plain ground
         // — or the chrome ground when it paints no background of its own.
         // The cover matches it so the spinner gives way to the document
-        // without a change of colour.
+        // without a change of color.
         let (ground, page, chrome) = self.theme_grounds(dark);
         let ground = if self.thread.len() > 1 || (!self.thread.is_empty() && self.single_message_card) {
             page
@@ -4262,7 +4262,7 @@ fn fetch_sender_key(pgp: &crate::models::PgpStatus) -> Result<String, String> {
 
 /// One icon button on a conversation card's action line. The icon is the same
 /// embedded symbolic SVG the toolbar draws, inlined (its paths carry no fill,
-/// so the document's `fill:currentColor` recolours it); when the resource
+/// so the document's `fill:currentColor` recolors it); when the resource
 /// bundle isn't registered (tests), the button simply has no glyph.
 fn card_action_button(key: (u32, u32), act: &str, icon: &str, title: &str) -> String {
     let svg = inline_icon_svg(icon);
@@ -4284,7 +4284,7 @@ const SENDER_STYLE_ICON: &str = "co.hyprlab.Hylki-format-text-rich-symbolic";
 const PGP_LOCK_ICON: &str = "co.hyprlab.Hylki-channel-secure-symbolic";
 
 /// An embedded symbolic icon's SVG, inlined for the wrapper document (its
-/// paths carry no fill, so the document's `fill:currentColor` recolours it);
+/// paths carry no fill, so the document's `fill:currentColor` recolors it);
 /// empty when the resource bundle isn't registered (tests).
 fn inline_icon_svg(icon: &str) -> String {
     let path =
@@ -4661,22 +4661,22 @@ fn has_remote_resources(html: &str) -> bool {
 /// [`has_remote_resources`]. That is what makes this an independent second line
 /// of defence: if the detector fails to spot a reference, the engine still
 /// refuses the fetch.
-// ===== Dark-mode colour adaptation (issue #35) =====
+// ===== Dark-mode color adaptation (issue #35) =====
 //
 // Emails are designed for light rendering: dark text, light (or absent)
 // backgrounds. In dark mode an email that sets `color:#333` but no background
 // paints near-black text on the reader's dark ground. The sandboxed frames run
 // no JavaScript, so the fix happens here, on the document text, at render
-// time (never in the on-disk body cache): every colour the message declares is
+// time (never in the on-disk body cache): every color the message declares is
 // checked and, when its lightness is wrong for a dark ground, flipped in HSL —
-// hue and saturation kept, lightness mirrored. Text colours darker than
+// hue and saturation kept, lightness mirrored. Text colors darker than
 // mid-grey become light; backgrounds lighter than mid-grey become dark;
 // everything already suited to a dark ground is left untouched, so mail
 // designed dark passes through unchanged.
 
-/// Parse a CSS colour token to linear [r, g, b, a] in 0..=1. Handles hex
+/// Parse a CSS color token to linear [r, g, b, a] in 0..=1. Handles hex
 /// (#rgb/#rgba/#rrggbb/#rrggbbaa), rgb()/rgba() with numbers or percentages,
-/// and the common named colours. `bare_hex` additionally accepts legacy
+/// and the common named colors. `bare_hex` additionally accepts legacy
 /// attribute values like `bgcolor=ffffff` with no `#`.
 fn parse_css_color(token: &str, bare_hex: bool) -> Option<[f32; 4]> {
     let t = token.trim();
@@ -4808,7 +4808,7 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
     (f(h + 1.0 / 3.0), f(h), f(h - 1.0 / 3.0))
 }
 
-/// Flip a colour for the dark ground when its lightness calls for it: text
+/// Flip a color for the dark ground when its lightness calls for it: text
 /// darker than mid-grey mirrors up (floored so it stays clearly readable),
 /// backgrounds lighter than mid-grey mirror down (floored above pure black so
 /// they read as surfaces, like the reader's own grounds). `None` = keep as is.
@@ -4841,7 +4841,7 @@ fn adapt_color(token: &str, background: bool, bare_hex: bool) -> Option<String> 
 /// Rewrite one CSS declaration list (an inline `style` attribute's content or
 /// a rule body). Declarations are split at `;` outside parentheses and quotes
 /// — data: URLs contain semicolons — and only `color`, `background-color`,
-/// and `background`'s colour tokens are touched.
+/// and `background`'s color tokens are touched.
 fn rewrite_declarations(decls: &str) -> String {
     let mut out = String::with_capacity(decls.len());
     let mut depth = 0usize;
@@ -4875,8 +4875,8 @@ fn rewrite_declarations(decls: &str) -> String {
     out
 }
 
-/// One `prop: value` declaration, colour-adapted when the property carries a
-/// colour whose direction we know. Anything unrecognised passes through
+/// One `prop: value` declaration, color-adapted when the property carries a
+/// color whose direction we know. Anything unrecognised passes through
 /// byte-for-byte.
 fn rewrite_one_declaration(decl: &str) -> String {
     // Step over any leading comments so `/* old */ background: #fff` still
@@ -4904,7 +4904,7 @@ fn rewrite_one_declaration(decl: &str) -> String {
         "background-color" | "background" => true,
         _ => return decl.to_string(),
     };
-    // Keep any !important, transform the value's colour tokens.
+    // Keep any !important, transform the value's color tokens.
     let (value_body, important) = match value.to_ascii_lowercase().find("!important") {
         Some(at) => (&value[..at], &value[at..]),
         None => (value, ""),
@@ -4923,14 +4923,14 @@ fn rewrite_one_declaration(decl: &str) -> String {
 }
 
 enum ValuePiece<'a> {
-    /// A candidate colour token (word or function call).
+    /// A candidate color token (word or function call).
     Token(&'a str),
     /// Whitespace, url(...), strings — copied verbatim.
     Raw(&'a str),
 }
 
-/// Split a CSS value into colour-candidate tokens and verbatim runs, keeping
-/// `url(...)` and quoted strings intact (their contents are not colours, and
+/// Split a CSS value into color-candidate tokens and verbatim runs, keeping
+/// `url(...)` and quoted strings intact (their contents are not colors, and
 /// data: URLs may contain anything).
 fn split_value_tokens(value: &str) -> Vec<ValuePiece<'_>> {
     let mut pieces = Vec::new();
@@ -5058,9 +5058,9 @@ fn rewrite_css(css: &str) -> String {
     out
 }
 
-/// Rewrite one tag's colour-bearing attributes: `style` (declarations),
+/// Rewrite one tag's color-bearing attributes: `style` (declarations),
 /// `color`/`text` (text direction), `bgcolor` (background direction). `text`
-/// only means a colour on `<body>`.
+/// only means a color on `<body>`.
 fn rewrite_tag_attrs(tag: &str) -> String {
     let lower = tag.to_ascii_lowercase();
     let is_body = lower.starts_with("<body");
@@ -5244,7 +5244,7 @@ fn adapt_colors_for_dark(doc: &str) -> String {
     out
 }
 
-/// The stylesheet that lays the reader's own fonts and colours over a message
+/// The stylesheet that lays the reader's own fonts and colors over a message
 /// (#56), or nothing when `style` overrides nothing.
 ///
 /// `scope` is the element the rules hang under: `:root` in a sandboxed frame,
@@ -5254,9 +5254,9 @@ fn adapt_colors_for_dark(doc: &str) -> String {
 /// goes in last, and at equal weight the later rule wins.
 ///
 /// Fonts: one family and size for everything, headings scaled from it so a
-/// message keeps its hierarchy, code kept monospaced. Colours: the reader's
+/// message keeps its hierarchy, code kept monospaced. Colors: the reader's
 /// text on a transparent ground (the frame paints the card's), links in the
-/// accent; `img` carries no colour, so pictures stand. Background images
+/// accent; `img` carries no color, so pictures stand. Background images
 /// go with the backgrounds: they are decoration in the same sense.
 fn reader_style_css(style: &crate::config::ReaderStyle, dark: bool, accent: &str, scope: &str) -> String {
     if !style.active() {
@@ -5409,9 +5409,9 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     // needed. The wrapper widens the frame to the content and scrolls it
     // in `.vireo-pan`; whatever is left over is clipped rather than
     // scrollable. `scrollWidth`/`scrollHeight` still measure the content.
-    // `color-scheme` makes the browser's default colours (for content that sets
+    // `color-scheme` makes the browser's default colors (for content that sets
     // none of its own) follow the app's light/dark setting; styled emails keep
-    // their own colours untouched.
+    // their own colors untouched.
     let scheme = if dark { "dark" } else { "light" };
     let supported = if dark { "dark light" } else { "light dark" };
     let theme = format!(
@@ -5459,7 +5459,7 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
 /// CHROME is the window's own ground. `widget` is only where the theme is
 /// read from. When the caller asks for a scheme the app isn't currently in,
 /// the theme can't answer for that mode, so the stock GNOME values stand in.
-#[allow(deprecated)] // lookup_color: named theme colours have no successor yet
+#[allow(deprecated)] // lookup_color: named theme colors have no successor yet
 pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String, String, String) {
     let style = widget.style_context();
     if dark == adw::StyleManager::default().is_dark() {
@@ -5478,7 +5478,7 @@ pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String,
             let page = hex(c.red() * f, c.green() * f, c.blue() * f);
             // The window's own ground — what the GTK reader header (the
             // subject block) sits on. A full-bleed single message paints
-            // its in-document header this colour so subject and header
+            // its in-document header this color so subject and header
             // read as one surface.
             let chrome = style
                 .lookup_color("window_bg_color")
@@ -5499,7 +5499,7 @@ const GROUND: (&str, &str) = ("#ffffff", "#1e1e1e");
 const PAGE: (&str, &str) = ("#f1f1f1", "#141414");
 /// The window chrome's ground (stock GNOME `window_bg_color`): what the GTK
 /// reader header — the subject block — sits on. A full-bleed single message
-/// paints its in-document header this colour so the two read as one surface.
+/// paints its in-document header this color so the two read as one surface.
 const CHROME: (&str, &str) = ("#fafafa", "#242424");
 
 thread_local! {
@@ -5528,7 +5528,7 @@ thread_local! {
         std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
-/// That ground as a colour the WebView itself can be painted with.
+/// That ground as a color the WebView itself can be painted with.
 fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
     let v = |i: usize| {
         u8::from_str_radix(&hex[i..i + 2], 16).unwrap_or(0) as f32 / 255.0
@@ -5888,8 +5888,8 @@ fn message_frame(
     zoom: u32,
 ) -> String {
     // Reader View: the message rebuilt from its content alone, in the
-    // reader's own sheet. It carries no colours of the sender's to adapt
-    // and needs none of the reader's colour override over it; the reader's
+    // reader's own sheet. It carries no colors of the sender's to adapt
+    // and needs none of the reader's color override over it; the reader's
     // font choice (#56) still applies, below.
     let doc = if reader { crate::reader::render(body, dark, accent) } else { body_html(body) };
     let own_style;
@@ -5900,18 +5900,18 @@ fn message_frame(
         style
     };
     let doc = if restrict { strip_remote(&doc) } else { doc };
-    // Dark mode: adapt the message's own colours so dark-on-dark text can't
+    // Dark mode: adapt the message's own colors so dark-on-dark text can't
     // happen (issue #35). `color-scheme` only helps unstyled mail; anything
-    // that sets explicit dark text without a background needs its colours
+    // that sets explicit dark text without a background needs its colors
     // transformed, and the sandboxed frames run no JS to do it live. Moot
-    // when the reader's own colours are laid over the message anyway.
+    // when the reader's own colors are laid over the message anyway.
     let doc = if dark && !style.colors && !reader { adapt_colors_for_dark(&doc) } else { doc };
     // Make the email's own light/dark rules follow the ground we chose rather
     // than the desktop's preference (see `pin_color_scheme`). Runs after the
     // dark adaptation so a message's hand-authored dark palette is used as-is,
     // not double-transformed.
     let doc = pin_color_scheme(&doc, dark);
-    // The reader's own fonts and colours (#56), last so they win. The zoom
+    // The reader's own fonts and colors (#56), last so they win. The zoom
     // (Ctrl+ / Ctrl-) rides the same sheet: CSS `zoom` on the root scales
     // the whole body, px-sized text included, which a font-size change
     // would leave alone. Applied to the frame document only, so the card
@@ -6381,7 +6381,7 @@ mod tests {
         assert_eq!(att_row_html((1, 8), None), "<div class=\"vireo-atts\" data-key=\"1:8\"></div>");
     }
 
-    // ===== Dark-mode colour adaptation (issue #35) =====
+    // ===== Dark-mode color adaptation (issue #35) =====
 
     /// The core failure: near-black text with no background of its own must
     /// come out light, or it vanishes on the dark ground.
@@ -6412,7 +6412,7 @@ mod tests {
         assert_eq!(adapt_colors_for_dark(doc), doc);
     }
 
-    /// Legacy attributes carry colours too — `<font color>` and `bgcolor`,
+    /// Legacy attributes carry colors too — `<font color>` and `bgcolor`,
     /// with or without the leading `#`.
     #[test]
     fn legacy_color_attributes_are_adapted() {
@@ -6463,7 +6463,7 @@ mod tests {
     }
 
     /// A data: URL inside a background shorthand contains semicolons and
-    /// base64 — it must pass through byte-for-byte while the colour beside it
+    /// base64 — it must pass through byte-for-byte while the color beside it
     /// is still adapted.
     #[test]
     fn urls_survive_color_adaptation() {
@@ -6473,7 +6473,7 @@ mod tests {
         assert!(out.contains("#141414"), "{out}");
     }
 
-    /// !important must survive, and colours in properties we don't understand
+    /// !important must survive, and colors in properties we don't understand
     /// must be left alone rather than guessed at.
     #[test]
     fn important_kept_and_unknown_props_untouched() {
@@ -6496,7 +6496,7 @@ mod tests {
         assert!(out.contains("/* x; */ color: #ffffff"), "{out}");
     }
 
-    /// Mid-lightness brand colours sit fine on either ground: leave them.
+    /// Mid-lightness brand colors sit fine on either ground: leave them.
     #[test]
     fn mid_tones_are_left_alone() {
         let doc = r#"<a style="color:#3584e4;background-color:#26a269">x</a>"#;
@@ -6537,15 +6537,15 @@ mod tests {
         assert!(frame.contains("DejaVu Serif&quot;,sans-serif !important;font-size:12pt !important"), "{frame}");
         assert!(frame.contains("h1:not(#vireo-a):not(#vireo-b):not(#vireo-c){font-size:calc(12pt * 1.6) !important"), "{frame}");
         assert!(frame.contains(":is(pre,code,kbd,samp,tt):not(#vireo-a):not(#vireo-b):not(#vireo-c){font-family:monospace !important"), "{frame}");
-        // Colours untouched: no colour rule was asked for.
+        // Colors untouched: no color rule was asked for.
         assert!(!frame.contains("-webkit-text-fill-color"), "{frame}");
     }
 
-    /// The colour override paints the reader's text and clears backgrounds,
+    /// The color override paints the reader's text and clears backgrounds,
     /// links in the accent; on the dark ground the dark adaptation is
-    /// skipped, since the sender's colours are not shown anyway.
+    /// skipped, since the sender's colors are not shown anyway.
     #[test]
-    fn reader_colours_force_text_and_links() {
+    fn reader_colors_force_text_and_links() {
         let style = crate::config::ReaderStyle { font: None, colors: true, plain_font: None };
         let body = r#"<p style="color:#000;background:#ff0">x <a href="https://e.example">l</a></p>"#;
         let light = message_frame(body, true, false, (1, 1), None, &style, "#3584e4", false, 100);
@@ -6554,7 +6554,7 @@ mod tests {
         assert!(!light.contains("font-family"), "no font rule was asked for: {light}");
         let dark = message_frame(body, true, true, (1, 1), None, &style, "#3584e4", false, 100);
         assert!(dark.contains("color:#e6e6e6 !important"), "{dark}");
-        assert!(dark.contains("color:#000"), "sender colours left as written when overridden: {dark}");
+        assert!(dark.contains("color:#000"), "sender colors left as written when overridden: {dark}");
     }
 
     /// Pango descriptions become a quoted CSS family list with a generic
@@ -6704,13 +6704,13 @@ mod tests {
         let grace = doc.find("Grace Hopper").expect("second sender present");
         assert!(ada < grace, "cards must keep the order they were handed");
         assert!(doc.contains("<body class=\"vireo-conv\">"), "conversation padding");
-        // The cards sit on the deeper page — the same colour the spinner and the
+        // The cards sit on the deeper page — the same color the spinner and the
         // cover behind the WebView are painted, so the handover is invisible.
         assert!(doc.contains(&format!("background:{}", PAGE.0)), "page ground: {doc}");
     }
 
     /// A card from a mailbox of your own wears the face that mailbox was given
-    /// (#189) — the picture it was handed, or its emoji on the account colour
+    /// (#189) — the picture it was handed, or its emoji on the account color
     /// — while every other sender keeps their tinted initials.
     #[test]
     fn a_card_from_your_own_mailbox_wears_that_mailboxs_face() {
@@ -7020,7 +7020,7 @@ mod tests {
         assert!(doc.contains("data-key=\"1:2\""), "{doc}");
     }
 
-    /// A selected message is outlined in the accent colour, and only that one.
+    /// A selected message is outlined in the accent color, and only that one.
     #[test]
     fn a_selected_card_is_outlined_in_the_accent() {
         let a = msg_for_print();

@@ -304,7 +304,7 @@ pub fn error_attrs(text: &str, cursor: Option<usize>) -> Option<gtk::pango::Attr
             a.set_start_index(start as u32);
             a.set_end_index(end as u32);
             attrs.insert(a);
-            // The error underline takes the text colour unless told
+            // The error underline takes the text color unless told
             // otherwise; misspellings are red (GNOME's @error_color).
             let mut c = gtk::pango::AttrColor::new_underline_color(0xe0e0, 0x1b1b, 0x2424);
             c.set_start_index(start as u32);

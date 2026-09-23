@@ -1,9 +1,9 @@
 //! Appearance themes: whole palettes the app can wear, on top of the
 //! light/dark preference.
 //!
-//! Hylki normally paints itself in the system's own colours — stock
+//! Hylki normally paints itself in the system's own colors — stock
 //! libadwaita plus the desktop accent — and that is still the default
-//! ([`SYSTEM_ID`]). A theme replaces those colours wholesale: each one
+//! ([`SYSTEM_ID`]). A theme replaces those colors wholesale: each one
 //! carries a light and a dark palette, so "Follow system", "Light" and
 //! "Dark" keep working exactly as before and simply pick which of the two
 //! is on screen.
@@ -11,10 +11,10 @@
 //! The palettes themselves are T3 Code's theme library (MIT), converted to
 //! sRGB by `tools/gen-themes.py` into [`crate::theme_palettes`]. This module
 //! maps their product roles (canvas, surface, sidebar…) onto libadwaita's
-//! named colours and keeps a single CSS provider up to date with the active
+//! named colors and keeps a single CSS provider up to date with the active
 //! palette.
 //!
-//! Everything downstream follows from those named colours: the static
+//! Everything downstream follows from those named colors: the static
 //! stylesheet references them (`@window_bg_color` and friends), and the
 //! reader, the composer and the scheme-dependent CSS all read them back off
 //! the live theme (`message_view::theme_grounds_for`), so a theme reaches
@@ -25,15 +25,15 @@ use std::cell::RefCell;
 use crate::theme_palettes::THEMES;
 
 /// The stock GNOME look: no palette of our own, just libadwaita and the
-/// desktop's accent colour. The default, and what "no theme" saves as.
+/// desktop's accent color. The default, and what "no theme" saves as.
 pub const SYSTEM_ID: &str = "system";
 
-/// One palette — a theme's colours for a single appearance (light or dark).
+/// One palette — a theme's colors for a single appearance (light or dark).
 ///
 /// The roles are T3 Code's own; [`css`] is where they become libadwaita
-/// colours. Fields are kept in the generator's order, and the whole palette
+/// colors. Fields are kept in the generator's order, and the whole palette
 /// is carried even where nothing reads a role yet: it is a faithful copy of
-/// the upstream theme, and the next surface that needs a colour should find
+/// the upstream theme, and the next surface that needs a color should find
 /// it here rather than invent one.
 #[allow(dead_code)]
 pub struct Palette {
@@ -121,7 +121,7 @@ thread_local! {
     /// The active theme's id, as saved.
     static CURRENT: RefCell<String> = const { RefCell::new(String::new()) };
     /// Who wants telling when the theme changes — the reader and the
-    /// composer, which bake colours into their documents. A watcher that
+    /// composer, which bake colors into their documents. A watcher that
     /// returns `false` (its widget is gone) is dropped.
     static WATCHERS: RefCell<Vec<Box<dyn Fn() -> bool>>> = const { RefCell::new(Vec::new()) };
 }
@@ -129,15 +129,15 @@ thread_local! {
 /// Install the theme provider and paint `id`'s palette.
 ///
 /// Call once, early in app startup and *before* anything else listens for
-/// the colour scheme: the palette has to be in place by the time the
-/// scheme-dependent CSS and the reader read the theme's colours back on a
+/// the color scheme: the palette has to be in place by the time the
+/// scheme-dependent CSS and the reader read the theme's colors back on a
 /// light/dark flip, and GTK runs `notify::dark` handlers in the order they
 /// were connected.
 pub fn install(id: &str) {
     let provider = gtk::CssProvider::new();
     if let Some(display) = gtk::gdk::Display::default() {
         // Above the static stylesheet (APPLICATION) and the scheme-dependent
-        // provider (+1), so a theme's colours win wherever they are defined.
+        // provider (+1), so a theme's colors win wherever they are defined.
         gtk::style_context_add_provider_for_display(
             &display,
             &provider,
@@ -152,7 +152,7 @@ pub fn install(id: &str) {
 }
 
 /// Switch to `id` (or [`SYSTEM_ID`] for the stock look) and tell everything
-/// that has colours baked into it.
+/// that has colors baked into it.
 pub fn set(id: &str) {
     let changed = CURRENT.with(|c| {
         if *c.borrow() == id {
@@ -197,7 +197,7 @@ fn repaint() {
     });
 }
 
-/// A palette as libadwaita's named colours, plus the one rule that needs
+/// A palette as libadwaita's named colors, plus the one rule that needs
 /// writing out.
 ///
 /// Only the backgrounds and foregrounds are set: `accent_color`,
@@ -206,12 +206,12 @@ fn repaint() {
 /// palettes whose accent is very light or very dark.
 ///
 /// The divider between the message list and the reading pane is the
-/// exception: a GtkPaned separator takes no named colour, so it is painted
+/// exception: a GtkPaned separator takes no named color, so it is painted
 /// here by class. (The sidebar's own divider needs nothing — it is an
 /// Adwaita split view, and already follows `sidebar_border_color`.) The
 /// border and shadow resets are load-bearing: libadwaita draws the
 /// separator's hairline as a shadow, which would otherwise sit over the
-/// palette colour and lighten it. It is painted a fifth darker than the
+/// palette color and lighten it. It is painted a fifth darker than the
 /// palette's border role, which every theme pitches brighter than the list
 /// and the reader on either side of it. Because this string is empty under
 /// the stock look, none of it reaches an unthemed window.
@@ -223,13 +223,13 @@ fn repaint() {
 /// look does.
 ///
 /// `shade_color` is black at libadwaita's own opacity for the same reason,
-/// and it is not optional: it is not a line colour at all but the colour
+/// and it is not optional: it is not a line color at all but the color
 /// libadwaita dims and shadows *with*. It paints the scrim behind the
 /// hovering sidebar (`overlay-split-view > dimming`) and that panel's drop
 /// shadow, so a palette's opaque `border` there slid a solid sheet over the
 /// whole window instead of letting it show through.
 fn css(p: &Palette, dark: bool) -> String {
-    // libadwaita's sidebar-border and shade colours, light and dark. The
+    // libadwaita's sidebar-border and shade colors, light and dark. The
     // sidebar's shade and the general one happen to share a value.
     let (sidebar_border, shade) = if dark {
         ("rgba(0, 0, 0, 0.36)", "rgba(0, 0, 0, 0.25)")

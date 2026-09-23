@@ -51,7 +51,7 @@ pub fn strip(selected: &str, tile: i32, on_pick: Rc<dyn Fn(&str)>) -> gtk::Overl
         });
     }
 
-    // The fades: a gradient from the card's colour to nothing over each
+    // The fades: a gradient from the card's color to nothing over each
     // edge, drawn only as far as there is content hidden beyond it, so a
     // row scrolled fully to one end shows a clean edge there.
     const FADE: f64 = 36.0;

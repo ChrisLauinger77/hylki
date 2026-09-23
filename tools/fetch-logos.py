@@ -2,14 +2,14 @@
 """Fetch the bundled sender logos (data/logos/) from their upstream sets.
 
 Reads data/logos/domains.txt, resolves each domain against gilbarbara/logos
-(full-colour SVGs) and Simple Icons (monochrome SVGs with a brand colour),
+(full-color SVGs) and Simple Icons (monochrome SVGs with a brand color),
 downloads the chosen file into data/logos/<source>/, and writes
 data/logos/logos.toml (what src/logo.rs embeds and consults) plus
 resources/logos.gresource.xml (what build.rs compiles in).
 
-A colour icon from gilbarbara wins when it is roughly square (an "-icon"
+A color icon from gilbarbara wins when it is roughly square (an "-icon"
 file, or a mark whose viewBox is no wider than 1.6:1); Simple Icons' glyph
-comes next, drawn white on the brand colour; a gilbarbara wordmark is the
+comes next, drawn white on the brand color; a gilbarbara wordmark is the
 last resort, shown on a white tile. Both upstream sets are pinned to the
 commits below; bump them and re-run to refresh.
 

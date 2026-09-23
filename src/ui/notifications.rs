@@ -3,7 +3,7 @@
 //! A transient bar slides down for new messages and auto-collapses after a few
 //! seconds. Messages that need attention (errors) are also kept in a list that
 //! can be expanded into toast-like cards via a button in the header. The bar is
-//! tinted with the desktop accent colour (`@accent_bg_color`, default GNOME
+//! tinted with the desktop accent color (`@accent_bg_color`, default GNOME
 //! blue) and turns amber for errors.
 
 use std::time::Duration;
@@ -100,7 +100,7 @@ pub struct NotificationCenter {
     console_open: bool,
     /// The dracula styling, applied the moment console mode is requested —
     /// the console's own reveal is staged (see ShowConsole), and the bar must
-    /// never map in its normal colours first and fade over.
+    /// never map in its normal colors first and fade over.
     console_theme: bool,
     /// Whether opening the console is what opened the bar — closing the
     /// console then takes the bar back down with it.
@@ -622,10 +622,10 @@ impl NotificationCenter {
             vec!["notify-area"]
         };
         if self.console_theme || self.console_open {
-            // CSS transitions on the bar colours fade it into (and out of)
+            // CSS transitions on the bar colors fade it into (and out of)
             // the dracula terminal look — console_theme is set before the
             // bar maps, so a shortcut-opened console never flashes the
-            // normal bar colours first.
+            // normal bar colors first.
             classes.push("console-on");
         }
         classes

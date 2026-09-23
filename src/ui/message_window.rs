@@ -31,7 +31,7 @@ pub struct MessageWindowInit {
     pub attachments_loading: bool,
     /// Message-content theme override (`None` follows the system).
     pub content_dark: Option<bool>,
-    /// The reader's own fonts and colours over the senders' (#56).
+    /// The reader's own fonts and colors over the senders' (#56).
     pub reader_style: crate::config::ReaderStyle,
     /// Reader View (the main window's header toggle), followed here too.
     pub reader_mode: bool,
@@ -87,7 +87,7 @@ pub enum MessageWindowInput {
     AttachmentsPending,
     /// Update the message-content theme (`None` follows the system).
     SetContentTheme(Option<bool>),
-    /// The reader's own fonts and colours changed (#56).
+    /// The reader's own fonts and colors changed (#56).
     SetReaderStyle(crate::config::ReaderStyle),
     SetReaderMode(bool),
     SetZoom(u32),

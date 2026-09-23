@@ -205,7 +205,7 @@ fn push_text(out: &mut Vec<Event<'static>>, text: &str, linkable: bool, mark_ope
             if *mark_open {
                 "</mark>"
             } else {
-                // The colours are named outright: a recipient reading on a
+                // The colors are named outright: a recipient reading on a
                 // dark ground would otherwise get black-on-black from a
                 // `background` alone.
                 "<mark style=\"background:#fff3a3;color:#000\">"

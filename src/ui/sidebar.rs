@@ -1,5 +1,5 @@
 //! Left pane: an optional "All Inboxes" (unified) row, then one section per
-//! account. Each account has a coloured avatar circle + header button (chevron
+//! account. Each account has a colored avatar circle + header button (chevron
 //! on the right) and an animated `gtk::Revealer` holding its folder list, so
 //! expanding/collapsing slides smoothly. Exactly one thing is selected across
 //! the unified row and all account folder lists.
@@ -150,7 +150,7 @@ pub struct SectionData {
     pub collapsed: bool,
     /// Whether this account's custom-folders section is expanded (default hidden).
     pub custom_expanded: bool,
-    /// Resolved avatar background colour ("#rrggbb").
+    /// Resolved avatar background color ("#rrggbb").
     pub color: String,
     /// Avatar emoji; when absent, account-name initials are shown.
     pub emoji: Option<String>,
@@ -285,7 +285,7 @@ pub struct Sidebar {
     busy: bool,
     /// The "Outbox" row list box (one row), while anything is queued.
     outbox_list: Option<gtk::ListBox>,
-    /// Display-wide provider holding each account's avatar colour rules.
+    /// Display-wide provider holding each account's avatar color rules.
     color_provider: gtk::CssProvider,
     selected: Sel,
     /// Icon-only mode: hide all text, show just icons and account pills.
@@ -1543,7 +1543,7 @@ impl Sidebar {
 
 impl Sidebar {
     /// Rebuild the list: optional unified row, then per-account headers with
-    /// animated folder revealers, and refresh the per-account colour rules.
+    /// animated folder revealers, and refresh the per-account color rules.
     /// Flip one tree node, restyle its caret, and re-apply visibility across
     /// the account's tree — no rebuild, so nothing flickers. Reports the new
     /// state for persistence.
@@ -2630,7 +2630,7 @@ impl Sidebar {
             self.build_tags_section(container, Slot::Unified, filtered_below, sender);
         }
 
-        // Per-account avatar colours (background + readable text).
+        // Per-account avatar colors (background + readable text).
         let mut css = String::new();
         for s in &sections {
             let text = crate::color::readable_text(&s.color);
@@ -2973,7 +2973,7 @@ impl Sidebar {
                     let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
                         continue;
                     };
-                    // The glyph in the account's colour says whose folder
+                    // The glyph in the account's color says whose folder
                     // this is; the tooltip names the account.
                     let icon = filtered_folder_icon(&r.folder, section.account.id);
                     pin_icon_size(&icon);
@@ -3259,7 +3259,7 @@ impl Sidebar {
 
     /// A Filtered Folders section — the unified one, or an account's own:
     /// a toggle header and, under an animated revealer, one row per folder
-    /// (the filter-folder glyph in the account's colour, the folder name,
+    /// (the filter-folder glyph in the account's color, the folder name,
     /// its unread chip). In the rail the header is a glyph button and the
     /// rows are glyphs. The unified heading reads like the All Inboxes row
     /// (full-strength label); an account's reads like its "Folders" heading.
@@ -3360,7 +3360,7 @@ impl Sidebar {
             // Laid out exactly like a folder under an account's "Folders"
             // heading — same builder, same leaf expander slot — so folders
             // read the same wherever they sit in the sidebar. Only the
-            // colour differs: the account's, which says whose folder this is.
+            // color differs: the account's, which says whose folder this is.
             let icon = filtered_folder_icon(&r.folder, section.account.id);
             let lead: Option<gtk::Widget> = if self.collapsed {
                 None
@@ -3432,7 +3432,7 @@ impl Sidebar {
 
     /// A Tags section (#71) — the unified one, or an account's own: a
     /// toggle header and, under an animated revealer, one row per tag
-    /// (colour disc, its name). From the unified section a tag shows every
+    /// (color disc, its name). From the unified section a tag shows every
     /// account's mail with it; from an account's, that account's alone.
     /// In the rail the header is a tag glyph and the rows are discs.
     fn build_tags_section(
@@ -4198,7 +4198,7 @@ fn build_unified_inbox_row(
     // easy to tell apart in the All Inboxes view.
     let label = &section.account.label;
 
-    // Small account pill (colour + initials/emoji), like the header circle.
+    // Small account pill (color + initials/emoji), like the header circle.
     let id = section.account.id;
     let circle = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     circle.add_css_class("account-circle-sm");
@@ -4365,7 +4365,7 @@ pub(crate) fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
 }
 
 /// The icon a folder row wears when a filter rule files into it: the
-/// filter-folder glyph in the account's colour, in place in the hierarchy.
+/// filter-folder glyph in the account's color, in place in the hierarchy.
 fn filter_icon(section: &SectionData, folder: &Folder) -> FolderGlyph {
     if !section.filtered.iter().any(|f| f.id == folder.id) {
         return FolderGlyph::Plain;
@@ -4384,14 +4384,14 @@ enum FolderGlyph {
     /// The caller's icon in place of it (a filter destination's tinted glyph).
     Icon(gtk::Image),
     /// The kind's own icon, grey as ever, with a small filter glyph in the
-    /// account's colour riding its corner: a main folder (Archive, Junk…)
+    /// account's color riding its corner: a main folder (Archive, Junk…)
     /// that a filter files into.
     Marked(u32),
 }
 
 /// The icon of a folder a filter files into: a custom folder wears the
 /// filter-folder glyph, a main folder (Archive, Junk…) keeps its own —
-/// either in the account's colour, which is what says "part of a filter".
+/// either in the account's color, which is what says "part of a filter".
 fn filtered_folder_icon(folder: &Folder, account_id: u32) -> gtk::Image {
     let name = if folder.kind == FolderKind::Custom {
         "co.hyprlab.Hylki-filter-folder-symbolic"

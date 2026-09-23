@@ -1,4 +1,4 @@
-//! Sender logos (opt-in): the brand's logo in place of coloured initials, so
+//! Sender logos (opt-in): the brand's logo in place of colored initials, so
 //! mail from Apple, Amazon or PayPal is recognisable at a glance (#30).
 //!
 //! Three sources, best first:
@@ -9,8 +9,8 @@
 //!    authoritative, and what Apple Mail and Gmail show. The sending host is
 //!    asked first, then the registrable domain.
 //! 2. **Bundled** — `data/logos/`: a curated map of sender domains to marks
-//!    from gilbarbara/logos (full colour) and Simple Icons (a glyph on the
-//!    brand colour), plus the app's own service marks (`data/brands/`).
+//!    from gilbarbara/logos (full color) and Simple Icons (a glyph on the
+//!    brand color), plus the app's own service marks (`data/brands/`).
 //!    Shipped in the binary, so these show with no request at all.
 //! 3. **The site's own icon**, the largest it declares first: the icons its
 //!    home page links (`<link rel="icon" sizes="192x192">`,
@@ -22,7 +22,7 @@
 //! Addresses at a **mailbox host** (Gmail, Outlook, iCloud, Yahoo, Proton and
 //! the rest of `MAILBOX_HOSTS`) are skipped entirely, whichever source might
 //! have answered: such an address belongs to a person, not to the provider, so
-//! it keeps its coloured initials rather than wearing the provider's mark.
+//! it keeps its colored initials rather than wearing the provider's mark.
 //!
 //! No third-party service is involved and no per-user identifier is sent,
 //! but the BIMI and site requests do tell that domain your IP address —
@@ -538,8 +538,8 @@ pub fn has_bundled(email: &str) -> bool {
 }
 
 /// A bundled mark's bytes: the app's service marks as their PNG, the SVG
-/// sets framed to a `LOGO_PX` square — a Simple Icons glyph in the colour
-/// that reads on its brand colour, over that colour; a gilbarbara mark
+/// sets framed to a `LOGO_PX` square — a Simple Icons glyph in the color
+/// that reads on its brand color, over that color; a gilbarbara mark
 /// over white, inset a little, since many are dark on transparent.
 fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
     match entry.source.as_str() {
@@ -563,7 +563,7 @@ fn bundled_bytes(entry: &LogoEntry) -> Option<Vec<u8>> {
 
 /// `svg` re-framed as a `px`-square document: its drawing centred and
 /// scaled to fit, inset by `pad` (a fraction of the edge) on each side,
-/// over `bg` when given, with `fill` as the colour of content that sets
+/// over `bg` when given, with `fill` as the color of content that sets
 /// none (Simple Icons' glyphs). The original root's attributes ride on
 /// the nested element, so namespaces, styles and gradients keep working;
 /// a root with no `viewBox` gets one from its width and height. `None`

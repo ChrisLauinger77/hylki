@@ -23,11 +23,11 @@ use gtk::prelude::*;
 pub struct MenuEntry {
     label: String,
     icon: Option<String>,
-    /// A colour swatch in the icon slot instead of an icon (a tag's colour,
+    /// A color swatch in the icon slot instead of an icon (a tag's color,
     /// #71): filled when the entry's state is on, a ring when off.
     swatch: Option<(String, bool)>,
     enabled: bool,
-    /// The entry the menu is currently set to: drawn in the accent colour,
+    /// The entry the menu is currently set to: drawn in the accent color,
     /// icon and label together, rather than having its icon swapped for a
     /// tick. A tick costs the icon that says what the entry *is*, which is
     /// the part worth keeping in a list of alternatives.
@@ -65,8 +65,8 @@ impl MenuEntry {
         }
     }
 
-    /// A coloured disc in the icon slot — `on` fills it, off draws a ring —
-    /// for entries that toggle something with a colour of its own (tags).
+    /// A colored disc in the icon slot — `on` fills it, off draws a ring —
+    /// for entries that toggle something with a color of its own (tags).
     pub fn swatch(mut self, color: impl Into<String>, on: bool) -> Self {
         self.swatch = Some((color.into(), on));
         self
@@ -280,8 +280,8 @@ fn build_page(
     list.upcast()
 }
 
-/// A 16px colour swatch for a menu row: a filled disc when `on`, a ring when
-/// not, in `color` (`#rrggbb`; an unparsable colour falls back to grey).
+/// A 16px color swatch for a menu row: a filled disc when `on`, a ring when
+/// not, in `color` (`#rrggbb`; an unparsable color falls back to grey).
 pub fn swatch_widget(color: &str, on: bool) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_content_width(16);

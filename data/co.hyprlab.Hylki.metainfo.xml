@@ -36,7 +36,7 @@
     </ul>
     <p>Reading:</p>
     <ul>
-      <li>Reader View, your own font and colours, and per-message light or dark rendering</li>
+      <li>Reader View, your own font and colors, and per-message light or dark rendering</li>
       <li>OpenPGP signing, encryption and reading; DKIM, SPF and DMARC checked on arrival</li>
       <li>Meeting invitations answered in place, and one-click unsubscribe from list mail</li>
     </ul>
@@ -136,7 +136,7 @@
     </release>
     <release version="1.35.1" date="2026-09-18">
       <description>
-        <p>The welcome wizard, About window and carry-over notice follow the theme's light or dark colours, with a light-lettered wordmark in dark mode. The final icon set, with a full-size default and the classic icon at the end of the gallery. About shows this release's notes with a link to the full history.</p>
+        <p>The welcome wizard, About window and carry-over notice follow the theme's light or dark colors, with a light-lettered wordmark in dark mode. The final icon set, with a full-size default and the classic icon at the end of the gallery. About shows this release's notes with a link to the full history.</p>
       </description>
     </release>
     <release version="1.35.0" date="2026-09-18">
@@ -292,7 +292,7 @@
     </release>
     <release version="1.24.2" date="2026-09-08">
       <description>
-        <p>Tags can take any colour from the GTK colour chooser; the composer's background and editor follow the GTK theme and a live light/dark switch.</p>
+        <p>Tags can take any color from the GTK color chooser; the composer's background and editor follow the GTK theme and a live light/dark switch.</p>
       </description>
     </release>
     <release version="1.24.1" date="2026-09-08">
@@ -302,7 +302,7 @@
     </release>
     <release version="1.24.0" date="2026-09-08">
       <description>
-        <p>Your own font and colours over every message; Junk and Trash that empty themselves; a settings window with a sidebar of categories and searchable lists; and OpenPGP end to end: read encrypted and signed mail, manage keys without a terminal, sign and encrypt what you send.</p>
+        <p>Your own font and colors over every message; Junk and Trash that empty themselves; a settings window with a sidebar of categories and searchable lists; and OpenPGP end to end: read encrypted and signed mail, manage keys without a terminal, sign and encrypt what you send.</p>
       </description>
     </release>
     <release version="1.23.1" date="2026-09-07">
@@ -312,12 +312,12 @@
     </release>
     <release version="1.23.0" date="2026-09-07">
 
-      <description><p>Tags: coloured labels stored on the server as IMAP keywords, with a Tags section in the sidebar and rules that tag; swipe a message row to archive or delete it; a redrawn icon set with a new default; a log export for bug reports; fixes for an account vanishing from All Inboxes, forwards without a To field, leaving a quote in the editor, and restoring mail from Trash; the French translation completed.</p></description>
+      <description><p>Tags: colored labels stored on the server as IMAP keywords, with a Tags section in the sidebar and rules that tag; swipe a message row to archive or delete it; a redrawn icon set with a new default; a log export for bug reports; fixes for an account vanishing from All Inboxes, forwards without a To field, leaving a quote in the editor, and restoring mail from Trash; the French translation completed.</p></description>
 
     </release>
     <release version="1.22.0" date="2026-09-06">
 
-      <description><p>A translatable interface with a French translation; pictures dropped from the file manager and picture resizing in the composer; HTML signatures; mid: links open a message by its Message-ID; deleting works on servers without the IMAP MOVE extension; Ctrl+C copies from the reader; a redrawn envelope icon in four colours.</p></description>
+      <description><p>A translatable interface with a French translation; pictures dropped from the file manager and picture resizing in the composer; HTML signatures; mid: links open a message by its Message-ID; deleting works on servers without the IMAP MOVE extension; Ctrl+C copies from the reader; a redrawn envelope icon in four colors.</p></description>
 
     </release>
     <release version="1.21.1" date="2026-09-05">
@@ -413,7 +413,7 @@
     <release version="1.16.0" date="2026-08-27" type="stable">
       <url type="details">https://github.com/hyprlab/hylki/releases/tag/v1.16.0</url>
       <description>
-        <p>Nested folders render as a collapsible tree with drag-and-drop moving; dark mode adapts every email's colours so text always reads; a new app-wide light/dark/system preference; the sidebar can float over the panes on hover; thread messages show as cards on a rail; GNOME-styled context menus with icons; plus server-robustness hardening.</p>
+        <p>Nested folders render as a collapsible tree with drag-and-drop moving; dark mode adapts every email's colors so text always reads; a new app-wide light/dark/system preference; the sidebar can float over the panes on hover; thread messages show as cards on a rail; GNOME-styled context menus with icons; plus server-robustness hardening.</p>
       </description>
     </release>
     <release version="1.15.7" date="2026-08-26" type="stable">
@@ -467,7 +467,7 @@
     <release version="1.14.4" date="2026-08-26" type="stable">
       <url type="details">https://github.com/hyprlab/hylki/releases/tag/v1.14.4</url>
       <description>
-        <p>Sender avatars now show your GNOME Contacts photos, contributed by Anton Palgunov. The circle beside a message resolves personal-first — the contact's own photo, then Gravatar and the sender's site icon when enabled, then coloured initials — reading photos from the local address-book cache with no network request, picking up changes within moments, and hiding a tier's images immediately when it is switched off.</p>
+        <p>Sender avatars now show your GNOME Contacts photos, contributed by Anton Palgunov. The circle beside a message resolves personal-first — the contact's own photo, then Gravatar and the sender's site icon when enabled, then colored initials — reading photos from the local address-book cache with no network request, picking up changes within moments, and hiding a tier's images immediately when it is switched off.</p>
       </description>
     </release>
     <release version="1.14.3" date="2026-08-26" type="stable">
@@ -551,7 +551,7 @@
     <release version="1.12.3" date="2026-08-22" type="stable">
       <url type="details">https://github.com/hyprlab/hylki/releases/tag/v1.12.3</url>
       <description>
-        <p>The coloured sender circles can now be turned off, in the message list and the reader.</p>
+        <p>The colored sender circles can now be turned off, in the message list and the reader.</p>
       </description>
     </release>
     <release version="1.12.2" date="2026-08-22" type="stable">
@@ -755,7 +755,7 @@
     <release version="1.3.3" date="2026-07-12" type="stable">
       <url type="details">https://github.com/hyprlab/hylki/releases/tag/v1.3.3</url>
       <description>
-        <p>Attachment gallery icons are now colour-coded by file type — PDFs red, documents blue, spreadsheets green, and more.</p>
+        <p>Attachment gallery icons are now color-coded by file type — PDFs red, documents blue, spreadsheets green, and more.</p>
       </description>
     </release>
     <release version="1.3.2" date="2026-07-12" type="stable">

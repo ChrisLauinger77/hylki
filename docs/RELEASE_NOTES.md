@@ -96,7 +96,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 - **Fixed: the reading pane's actions fold into the ⋯ menu again** on a narrow
   window. They had stopped folding at any width.
 - **Fixed: the hovering sidebar dims the window behind it** instead of covering
-  it in flat colour when a theme is on.
+  it in flat color when a theme is on.
 - **About names the translators**, in their own list beside the contributors.
 - **The repository is readable** (#230, [@yioannides](https://github.com/yioannides)).
   The README is a page rather than a manual, and the documentation lives in
@@ -110,11 +110,11 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Focus Mode.** Press Ctrl+Shift+F (or pick it from the main menu) and the window gets out of the way: toolbars fold into their ⋯ menus, the sidebar's accounts and unified rows fold up, the list drops to one preview line without avatars, and every message opens in Reader View. Everything slides away and comes back the same way. Settings → Appearance lets you choose which parts it does, and Focus Mode never changes your ordinary settings.
 
-**Smaller fixes.** Changing how message rows look — avatars, logos, preview lines, the date style, the recipient column, colouring — now redraws the rows already on screen instead of waiting for the next folder.
+**Smaller fixes.** Changing how message rows look — avatars, logos, preview lines, the date style, the recipient column, coloring — now redraws the rows already on screen instead of waiting for the next folder.
 
 ## What's new in 1.35.4
 
-**Reader View.** A switch on the account chip's line of the reader header shows every message of the open conversation as its content alone: headings, paragraphs, lists, quotes, links, pictures and real tables, set in one clean sheet that follows your theme. The sender's layout, colours, fonts, hidden preview text and tracking pixels are gone. The choice follows into popped-out windows and into printing. Settings → Reading lets you hide the switch, or choose whether a message opens the way it was sent, in Reader View, or however you last left the switch.
+**Reader View.** A switch on the account chip's line of the reader header shows every message of the open conversation as its content alone: headings, paragraphs, lists, quotes, links, pictures and real tables, set in one clean sheet that follows your theme. The sender's layout, colors, fonts, hidden preview text and tracking pixels are gone. The choice follows into popped-out windows and into printing. Settings → Reading lets you hide the switch, or choose whether a message opens the way it was sent, in Reader View, or however you last left the switch.
 
 **Memory no longer grows with every message you write** (#221). Each composer, pop-out window and print preview runs in a WebKit process of its own, and those processes were left running after their window closed, a few hundred MB each. They now end with what used them. The exported log's Memory section also lists how many of these views are alive, since inside Flatpak they run outside the log's own process tree.
 
@@ -128,7 +128,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Replies through Proton Bridge join their conversation.** A reply sent through Bridge went out and landed in Sent, but never threaded with the message it answered: the app wrote the parent's Message-ID in lowercase, and Bridge matches ids exactly. Ids are now sent spelt the way they arrived.
 
-**The theme chooser shows each theme as a window.** Settings → Appearance draws every theme as a small window, light on the left and dark on the right, so every surface a theme colours is on show. The System card follows the desktop's accent colour.
+**The theme chooser shows each theme as a window.** Settings → Appearance draws every theme as a small window, light on the left and dark on the right, so every surface a theme colors is on show. The System card follows the desktop's accent color.
 
 **New icon and wordmark art,** and the wizard and About window draw the wordmark with its soft shadow.
 
@@ -142,7 +142,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 ## What's new in 1.35.1
 
-**The welcome wizard follows your theme.** The yellow ground is gone: the wizard, the About window and the carry-over notice use the theme's light or dark colours, with the wordmark switching to its light-lettered version in dark mode.
+**The welcome wizard follows your theme.** The yellow ground is gone: the wizard, the About window and the carry-over notice use the theme's light or dark colors, with the wordmark switching to its light-lettered version in dark mode.
 
 **The final icon set.** Every app icon comes from the latest artwork, and the gallery gains two entries at the end: the default drawn at full size, and the classic yellow icon.
 
@@ -250,7 +250,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 ## What's new in 1.31.0
 
-**Appearance themes.** Settings → Appearance gained a **Theme** gallery: **System**, the stock GNOME look and still the default, plus **Midnight**, **Tidal**, **Rose**, **Earth** and **Forest**. Every theme has a light and a dark palette, so the Style setting keeps doing what it did and picks which of the two you see; each card shows both halves, with a ring round the one currently on screen. A theme colours the whole window, the reader and the composer included, and switches at once without a restart. The palettes come from the theme library of [T3 Code](https://github.com/pingdotgg/t3code) (MIT).
+**Appearance themes.** Settings → Appearance gained a **Theme** gallery: **System**, the stock GNOME look and still the default, plus **Midnight**, **Tidal**, **Rose**, **Earth** and **Forest**. Every theme has a light and a dark palette, so the Style setting keeps doing what it did and picks which of the two you see; each card shows both halves, with a ring round the one currently on screen. A theme colors the whole window, the reader and the composer included, and switches at once without a restart. The palettes come from the theme library of [T3 Code](https://github.com/pingdotgg/t3code) (MIT).
 
 **Fixed: a Drafts folder chosen under Special Folders showed no count.** When the Drafts folder was assigned by hand rather than detected from the server, its sidebar chip counted unread mail, which drafts never are, so it stayed hidden however many drafts were waiting. It now counts every draft, like a detected Drafts folder does. Reported from a laposte.net account.
 
@@ -262,7 +262,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Swipe actions can be tuned to your trackpad.** Settings → Message List gained **Trackpad swipe sensitivity**, a dial from 1 to 10 in half steps. Until now a two-finger swipe had to travel a fixed distance that few trackpads manage in one go, so on some laptops a message never slid far enough to archive or delete. Raise the number if a swipe never gets far enough, lower it if messages slide when you did not mean them to. The default is 3.5, which puts the row roughly under your fingers. Mouse and touchscreen drags follow the pointer exactly as before and are not affected by the setting.
 
-**A swiped message leaves the list properly.** Once a swipe goes far enough to archive or delete, the message carries on off the side you sent it, with the action's colour filling behind it, while the row closes up and the messages below slide into its place. Before, it simply vanished the moment you let go.
+**A swiped message leaves the list properly.** Once a swipe goes far enough to archive or delete, the message carries on off the side you sent it, with the action's color filling behind it, while the row closes up and the messages below slide into its place. Before, it simply vanished the moment you let go.
 
 ## What's new in 1.30.0
 
@@ -290,7 +290,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 ## What's new in 1.29.2
 
-**Your own messages show your mailbox's face** (#189, reported by [@yioannides](https://github.com/yioannides)). The picture you choose for a mailbox in Accounts now appears on the messages you sent too, in the conversation and in the message list, not only in the sidebar. An account with an emoji instead shows the emoji on its colour, as the sidebar does.
+**Your own messages show your mailbox's face** (#189, reported by [@yioannides](https://github.com/yioannides)). The picture you choose for a mailbox in Accounts now appears on the messages you sent too, in the conversation and in the message list, not only in the sidebar. An account with an emoji instead shows the emoji on its color, as the sidebar does.
 
 **Or keep it the old way.** Settings → Message List → "Your own mail shows your account circle" is on by default; off, your own messages get the same circle as anyone else's mail: their contact photo, their Gravatar when that is on, else initials.
 
@@ -314,7 +314,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **No more busy pointer after opening the app** (#187, reported by [@yioannides](https://github.com/yioannides)). With "Run in Background" on, clicking the icon left the mouse pointer spinning for about fifteen seconds, during which clicking the icon again did nothing. The window now completes the launch the moment it appears.
 
-**People on Gmail no longer wear the Gmail logo.** Sender logos are for brands; an address at Gmail, Outlook, iCloud, Proton and the other mailbox hosts keeps its coloured initials.
+**People on Gmail no longer wear the Gmail logo.** Sender logos are for brands; an address at Gmail, Outlook, iCloud, Proton and the other mailbox hosts keeps its colored initials.
 
 ## What's new in 1.28.2
 
@@ -388,13 +388,13 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Smaller things.** The Send Later menu's rows are no longer bold (reported by [@yioannides](https://github.com/yioannides), #167). Find in message sits beside Print and greys out when nothing is open rather than disappearing, so the toolbar keeps its layout. Add Alias… looks like the other panels' add buttons.
 
-**Find your tags.** Settings, Tags has "Find Tags…". It reads every mailbox on every account for the tags other clients have already set, Thunderbird's built-ins included, and lists the ones not set up here with a proposed name and colour. Import them all, or tick the ones you want. Microsoft 365 accounts offer their categories, colours and all.
+**Find your tags.** Settings, Tags has "Find Tags…". It reads every mailbox on every account for the tags other clients have already set, Thunderbird's built-ins included, and lists the ones not set up here with a proposed name and color. Import them all, or tick the ones you want. Microsoft 365 accounts offer their categories, colors and all.
 
 **Not Spam.** In Junk, everywhere that offered "Mark as Spam" now offers "Not Spam": the right-click menu, the bulk bar, the row's action palette, the reader toolbar and the spam shortcut. The server is told the message is wanted and it goes back to the Inbox. Reported by [@frenchy82](https://github.com/frenchy82) (#168).
 
 **Sender logos at full size.** Vireo only ever asked a site for its root favicon, so many senders showed a tiny icon scaled up. It now reads the icons the site's home page and web manifest declare and takes the largest. Logos already on disk refresh within a week; delete `~/.local/share/vireo/logos` to see the difference at once.
 
-**Initials, centred.** The letters in the message list's circles, the sidebar's account circles and the reader cards' circles are centred by the ink they draw, so a lone letter no longer drifts and pairs no longer lean. Colours are unchanged.
+**Initials, centred.** The letters in the message list's circles, the sidebar's account circles and the reader cards' circles are centred by the ink they draw, so a lone letter no longer drifts and pairs no longer lean. Colors are unchanged.
 
 **Composing in a narrow pane.** When the reader pane is too narrow for the full compose toolbar, the actions fold into a ⋯ menu so Cancel, Send and the window's close button always fit. The Send button's label, Delete Draft and the cloud button also now update as they should while composing.
 
@@ -404,7 +404,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Settings.** Add Account…, Add Filter…, Add Tag… and Find Tags… are the same kind of button in the same place on every panel.
 
-**Filters.** The unified row is called Filters. Every folder a rule files into is listed there; the section switches on and off as a whole, and the per-rule "Show under All Inboxes" switch is gone. Under each account, a folder that a filter files into is marked in place: a custom folder shows the filter-folder glyph in the account's colour, and a main folder such as Archive keeps its own icon with a small filter mark on the corner in the account's colour. Right-click any of them, under the account or in the Filters row, for "Edit Filter…", which opens that rule. The folder menu is the same wherever the folder appears.
+**Filters.** The unified row is called Filters. Every folder a rule files into is listed there; the section switches on and off as a whole, and the per-rule "Show under All Inboxes" switch is gone. Under each account, a folder that a filter files into is marked in place: a custom folder shows the filter-folder glyph in the account's color, and a main folder such as Archive keeps its own icon with a small filter mark on the corner in the account's color. Right-click any of them, under the account or in the Filters row, for "Edit Filter…", which opens that rule. The folder menu is the same wherever the folder appears.
 
 **Tags.** Each account's Tags section sits above its folder list. Right-click a tag anywhere it appears for "Edit Tag…".
 
@@ -426,7 +426,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **The sidebar remembers itself.** Which accounts, folders and sections are open comes back after a restart. "Remember the sidebar layout" turns that off, in which case every launch starts with everything folded up; "Remember icon rail state" decides separately whether the sidebar reopens as the icon rail.
 
-**The icon rail.** Unread counts can be a dot in the accent colour instead of a number. "Fold up expanded items" makes the items you tick start folded whenever the sidebar collapses to the rail; a long-press in the rail still expands or collapses any of them, and the full sidebar comes back exactly as you left it. The rail has no chevron buttons any more: long-press an icon instead (the full sidebar keeps its chevrons and takes the long-press too). Two headings that sat slightly off-centre in the rail are centred.
+**The icon rail.** Unread counts can be a dot in the accent color instead of a number. "Fold up expanded items" makes the items you tick start folded whenever the sidebar collapses to the rail; a long-press in the rail still expands or collapses any of them, and the full sidebar comes back exactly as you left it. The rail has no chevron buttons any more: long-press an icon instead (the full sidebar keeps its chevrons and takes the long-press too). Two headings that sat slightly off-centre in the rail are centred.
 
 **Faster.** Switching folders, including into the combined views, now paints in tens of milliseconds rather than several hundred, whatever the size of the mailbox, and Settings opens in tens of milliseconds rather than a second or more (with many accounts, several seconds). Sent folders no longer show an unread chip, tag rows line up with the filtered folder rows, and the Settings window switches sections without a fade.
 
@@ -488,23 +488,23 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 ## What's new in 1.24.3
 
-**French translation updated.** Almost every string added in 1.23 and 1.24 is now translated, including the OpenPGP pages, tags, automatic Junk and Trash emptying, the reader font and colour settings and the new settings window. Translation by [@frenchy82](https://github.com/frenchy82) (#149).
+**French translation updated.** Almost every string added in 1.23 and 1.24 is now translated, including the OpenPGP pages, tags, automatic Junk and Trash emptying, the reader font and color settings and the new settings window. Translation by [@frenchy82](https://github.com/frenchy82) (#149).
 
 ## What's new in 1.24.2
 
-**Any colour for a tag.** The tag dialog has a ninth colour disc after the eight palette colours. It opens the GTK colour chooser, and the picked colour shows on the disc and everywhere the tag appears. Requested by [@yioannides](https://github.com/yioannides) (#147).
+**Any color for a tag.** The tag dialog has a ninth color disc after the eight palette colors. It opens the GTK color chooser, and the picked color shows on the disc and everywhere the tag appears. Requested by [@yioannides](https://github.com/yioannides) (#147).
 
-**The composer matches your theme.** The composer's background and the editor's writing area were fixed GNOME shades, so under a custom GTK theme they stood out from the rest of the window. They now take their colours from the theme like the reader does, and follow a switch between light and dark while the composer is open. Reported by [@yioannides](https://github.com/yioannides) (#148).
+**The composer matches your theme.** The composer's background and the editor's writing area were fixed GNOME shades, so under a custom GTK theme they stood out from the rest of the window. They now take their colors from the theme like the reader does, and follow a switch between light and dark while the composer is open. Reported by [@yioannides](https://github.com/yioannides) (#148).
 
 ## What's new in 1.24.1
 
 **Message previews show every line again.** With the list set to two or three preview lines, the second line was cut through and the third missing, since 1.23.0. Every line shows now.
 
-**Swiping a message looks cleaner.** While you drag a row to archive or delete it, the row's rounded highlight goes away and the coloured strip under it fills the full width of the list, so the two meet without a seam. The list no longer moves while you drag.
+**Swiping a message looks cleaner.** While you drag a row to archive or delete it, the row's rounded highlight goes away and the colored strip under it fills the full width of the list, so the two meet without a seam. The list no longer moves while you drag.
 
 ## What's new in 1.24.0
 
-**Your own font and colours for every message.** Two switches in Settings under Reading. "Use my own font" shows every message in one font and size instead of whatever the sender chose: the interface font, or any font you pick under the switch. Headings stay larger than body text and code stays monospaced. "Use my own colours" ignores the sender's text and background colours, so each message reads as plain text on the reader's ground, with links in the accent colour; pictures are kept. Each message card has a toggle on its action line that shows that one message as its sender formatted it, and back. Both settings apply to printing as well. Requested by [@yioannides](https://github.com/yioannides) (#56).
+**Your own font and colors for every message.** Two switches in Settings under Reading. "Use my own font" shows every message in one font and size instead of whatever the sender chose: the interface font, or any font you pick under the switch. Headings stay larger than body text and code stays monospaced. "Use my own colors" ignores the sender's text and background colors, so each message reads as plain text on the reader's ground, with links in the accent color; pictures are kept. Each message card has a toggle on its action line that shows that one message as its sender formatted it, and back. Both settings apply to printing as well. Requested by [@yioannides](https://github.com/yioannides) (#56).
 
 **Junk and Trash empty themselves.** In each account's settings, under Syncing, choose to delete junk mail or trashed mail for good after 7, 14 or 30 days. Vireo checks at each sync and removes what has passed the age, counted from the day the message arrived. Off unless you turn it on. Requested by [@typedev](https://github.com/typedev) (#140).
 
@@ -522,9 +522,9 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 ## What's new in 1.23.0
 
-**Tags.** Label messages with one or more coloured tags, alongside their folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.
+**Tags.** Label messages with one or more colored tags, alongside their folder. Define them in Settings under Accounts, then put them on a message from its right-click menu, the Actions Palette or the reader toolbar. Each tag has its own row in the sidebar that lists everything carrying it, across all your accounts, and rules can tag incoming mail (with or without moving it). Tags are stored on the server as IMAP keywords, the same mechanism Thunderbird and Apple Mail use, so a tag set here is the tag you see there and back. Microsoft 365 stores them as categories; POP3 accounts keep them in Vireo. Requested by [@yioannides](https://github.com/yioannides) (#71), with the design shaped by the discussion there.
 
-**Swipe a message to archive or delete it.** Drag a row sideways with the mouse, or swipe it with two fingers on a trackpad: left deletes, right archives, and a coloured strip under the row names the action as you go. Swap the two in Settings if you prefer, or turn swiping off there. Dragging a message to a folder now shows a small envelope under the pointer, and the account rows under All Inboxes and the Filtered Folders rows accept drops as well. Contributed by [Isaac](https://github.com/thecalamityjoe87) (#135), answering [@taprobane99](https://github.com/taprobane99)'s request (#92).
+**Swipe a message to archive or delete it.** Drag a row sideways with the mouse, or swipe it with two fingers on a trackpad: left deletes, right archives, and a colored strip under the row names the action as you go. Swap the two in Settings if you prefer, or turn swiping off there. Dragging a message to a folder now shows a small envelope under the pointer, and the account rows under All Inboxes and the Filtered Folders rows accept drops as well. Contributed by [Isaac](https://github.com/thecalamityjoe87) (#135), answering [@taprobane99](https://github.com/taprobane99)'s request (#92).
 
 **A new icon, and a redrawn gallery.** Vireo's icon is now a blue envelope with the bird on it. The gallery in Settings is redrawn to GNOME's icon guidelines: more Vireo envelopes in yellow, white, beige and faded blue, plain envelopes from blue to starfield, the Vireo bird, and the squircle that was the default since 1.21 staying on as "Logotype". The beta channel wears the development-build version of the icon, with GNOME's hazard stripe. This release puts the new icon on every install once, whatever was chosen before; pick another in Settings any time and that choice stands.
 
@@ -548,7 +548,7 @@ Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Ru
 
 **Ctrl+C in the reader.** Text selected in a message body can be copied with Ctrl+C, with a "Copied" pill to confirm it; before, only the right-click menu worked.
 
-**A redrawn envelope, in four colours.** The envelope icon is new, and cream, blue and white versions join it in the gallery.
+**A redrawn envelope, in four colors.** The envelope icon is new, and cream, blue and white versions join it in the gallery.
 
 Thanks to everyone above for the patches, the translations and the reports.
 
@@ -558,7 +558,7 @@ Thanks to everyone above for the patches, the translations and the reports.
 
 ## What's new in 1.21.0
 
-**Pick your app icon.** Settings → System & Appearance has a new "App icon" row: scroll through the set — the yellow default, colour and pattern variants, the bird, and the classic envelope — and click one. The dock, app grid, app switcher and the tray icon follow. New installs choose on the "Make it yours" page of the welcome wizard.
+**Pick your app icon.** Settings → System & Appearance has a new "App icon" row: scroll through the set — the yellow default, color and pattern variants, the bird, and the classic envelope — and click one. The dock, app grid, app switcher and the tray icon follow. New installs choose on the "Make it yours" page of the welcome wizard.
 
 ![The app icon row in Settings](https://raw.githubusercontent.com/hyprlab/vireo/v1.21.0/docs/screenshots/1.21.0/settings-app-icon.png)
 
@@ -572,11 +572,11 @@ Thanks to everyone above for the patches, the translations and the reports.
 
 **Edit a filter.** Click a rule in Settings → Accounts → Filters (each row now carries a pencil beside its trash button) to open it in the filter dialog with everything filled in: account, field, match, text, destination folder, and both switches. Save replaces the rule in place. Adding a filter works as before.
 
-**More room in the rule rows.** The rows have padding around the title and the stacked switches, and the pencil and switch labels match the colour of the rest of the row.
+**More room in the rule rows.** The rows have padding around the title and the stacked switches, and the pencil and switch labels match the color of the rest of the row.
 
 ## What's new in 1.20.1
 
-**Filtered folders under All Inboxes.** Each filter rule now has a "Show under All Inboxes" switch, next to "Count unread mail" in Settings → Accounts → Filters and in the Add Filter dialog. It is off by default. Folders of rules you switch on appear in a collapsible "Filtered Folders" section inside All Inboxes, below the per-account inbox rows, each marked with a folder-and-funnel icon in its account's colour and carrying its own unread count. Click one to open the folder; right-click for Mark as Read and Refresh. Folded up, the heading shows the section's combined unread count. The section folds away with All Inboxes and has its own toggle in the icon-only sidebar.
+**Filtered folders under All Inboxes.** Each filter rule now has a "Show under All Inboxes" switch, next to "Count unread mail" in Settings → Accounts → Filters and in the Add Filter dialog. It is off by default. Folders of rules you switch on appear in a collapsible "Filtered Folders" section inside All Inboxes, below the per-account inbox rows, each marked with a folder-and-funnel icon in its account's color and carrying its own unread count. Click one to open the folder; right-click for Mark as Read and Refresh. Folded up, the heading shows the section's combined unread count. The section folds away with All Inboxes and has its own toggle in the icon-only sidebar.
 
 **A switch for the whole section.** Settings → Sidebar gains "Filtered folders under All Inboxes", on by default. Turn it off to hide the section regardless of what each rule says.
 
@@ -708,7 +708,7 @@ retired — and GOA accounts became first-class citizens in the Accounts
 window: switching one off returns it to the import list (it stays in
 GNOME), the Remove button works on them (removing from Vireo only), the
 irrelevant greyed-out server fields are gone from their editor, and
-editing the things Vireo does own — label, signature, colour, aliases —
+editing the things Vireo does own — label, signature, color, aliases —
 saves properly.
 
 The chrome got calmer too:
@@ -731,7 +731,7 @@ and send-as aliases with their own SMTP servers.
   reading pane — toolbar and all — as a full-height editor, with a
   pop-out button when you'd rather have the old separate window (and a
   preference to keep composing in a window permanently). The sidebar
-  gains a proper accent-coloured **New message** row to start from.
+  gains a proper accent-colored **New message** row to start from.
 - **Ctrl+Z undoes it.** Deleted a message by accident? Moved a thread to
   the wrong folder? Marked something spam too fast? Every move — single,
   bulk, drag-and-drop, or spam — can be undone, without limit, straight
@@ -757,7 +757,7 @@ and send-as aliases with their own SMTP servers.
   automatically while hovering: your choice in Preferences, sharing one
   auto-collapse timeout with the message list's palette (which can now
   also open on hover). Mark as Read/Unread joins the reader toolbar too.
-- **A bolder, calmer message list.** Selection is now a full accent-colour
+- **A bolder, calmer message list.** Selection is now a full accent-color
   pill with white text in both schemes, the unread dot alone marks unread
   mail (white on a selected row), thread count and caret merge into one
   quiet grey chip that inverts when selected, threads date themselves by
@@ -801,11 +801,11 @@ that floats.
   folders by drag-and-drop**: drop one on another to nest it, or on the
   "Folders" header to bring it to the top level. Moves apply instantly and
   sync in the background. (Requested by JeremiahCornelius, issue #51.)
-- **Dark mode emails are always readable.** Vireo now adapts every colour a
+- **Dark mode emails are always readable.** Vireo now adapts every color a
   message declares — dark text lightens, light backgrounds deepen, mail
   designed dark passes through untouched — so black-on-black text can't
   happen. The reader's own backgrounds follow your GTK theme instead of
-  fixed colours, and the verified-sender check uses the theme's proper
+  fixed colors, and the verified-sender check uses the theme's proper
   green in both schemes. (Reported by isorropisths, issue #35.)
 - **Pick your look.** New Appearance preference: follow the system, or
   force the app light or dark — independent of the message-content theme.
@@ -829,7 +829,7 @@ that floats.
 
 With thanks to **yioannides** and **p-mitana**, whose detailed GNOME design
 feedback in issue #62 shaped the thread cards, the banner, the menus, and
-the theme-colour work — and to **Isaac** (thecalamityjoe87) for the shared
+the theme-color work — and to **Isaac** (thecalamityjoe87) for the shared
 context-menu builder (PR #63), **JeremiahCornelius** for the folder-tree
 request, and **isorropisths** for the dark-mode report.
 
@@ -967,7 +967,7 @@ pull request:
 
 - **Personal first.** The circle shows the contact's own photo when there is
   one; only then Gravatar (if you've turned it on), then the sender's site
-  icon (likewise), then the familiar coloured initials.
+  icon (likewise), then the familiar colored initials.
 - **Private by design.** Photos are read from your address book's local cache —
   no network request, and nothing a vCard says can make Vireo read files
   outside it or fetch a remote picture. When Gravatar is consulted at all, it
@@ -989,7 +989,7 @@ pull request:
   of the default one.
 - **The Mail switch in GNOME Settings pauses instead of forgetting.** Turn an
   account's Mail service off and Vireo sets the account aside — turn it back on
-  and it returns exactly as you left it: label, colour, signature and sidebar
+  and it returns exactly as you left it: label, color, signature and sidebar
   place intact.
 - **Vireo reacts to Online Accounts changes instantly and smoothly**, without
   the brief stutters a Settings edit could cause before.
@@ -1159,7 +1159,7 @@ who reviewed the whole codebase and wrote it up carefully. Thank you.
 
 ## In 1.10.2
 
-- **Accounts from GNOME Online Accounts are now read-only in Vireo.** Their address, servers and password belong to the system, so Vireo greys those fields out and points you to Settings → Online Accounts, where changing them actually works. Your display name, signature, colour and label are still yours to edit here, and the switch at the top of the account still hides an account in Vireo without removing it from your system.
+- **Accounts from GNOME Online Accounts are now read-only in Vireo.** Their address, servers and password belong to the system, so Vireo greys those fields out and points you to Settings → Online Accounts, where changing them actually works. Your display name, signature, color and label are still yours to edit here, and the switch at the top of the account still hides an account in Vireo without removing it from your system.
 
 ## In 1.10.1
 
@@ -1259,7 +1259,7 @@ This is the first Vireo release built partly from other people's code. Thanks to
 - Fixed the paperclip showing on some iCloud messages that don't actually have attachments (typically newsletters and other HTML mail). Veem now clears the false indicator as soon as it has looked at the message, and remembers the correction.
 
 ## In 1.4.0
-- New in-message attachment drawer. Open a message with attachments and a footer appears beneath it, showing every attachment as a thumbnail — images as picture previews, other files as colour-coded type icons — with the filename under each. Drag the divider to resize it, or collapse it to a slim header with the chevron; a slider adjusts how big the thumbnails are.
+- New in-message attachment drawer. Open a message with attachments and a footer appears beneath it, showing every attachment as a thumbnail — images as picture previews, other files as color-coded type icons — with the filename under each. Drag the divider to resize it, or collapse it to a slim header with the chevron; a slider adjusts how big the thumbnails are.
 - Click an image thumbnail for a full lightbox (step through images with the arrow keys, Esc to close), or use the hover/right-click actions to Download or Open any attachment.
 - The attachments dropdown in the reader header now shows image thumbnails too, with Preview, Open, and Download for each file — so you can see what a picture is before opening it.
 
@@ -1283,7 +1283,7 @@ This is the first Vireo release built partly from other people's code. Thanks to
 - The attachments gallery can now be searched and sorted. Search by sender, subject, filename, folder, or file type (like "pdf" or "image"), and sort by date, name, sender, size, or type — each ascending or descending. Every attachment also shows its message's date alongside the folder and size.
 
 ## In 1.3.3
-- Attachment icons in the gallery are now colour-coded by type — PDFs red, Word docs blue, spreadsheets green, presentations orange, archives amber, and more — so you can spot the file you want at a glance.
+- Attachment icons in the gallery are now color-coded by type — PDFs red, Word docs blue, spreadsheets green, presentations orange, archives amber, and more — so you can spot the file you want at a glance.
 
 ## In 1.3.2
 - Fixed newsletter subjects (like The Marginalian's) that showed up as a string of `=?utf-8?Q?…?=` code and stretched the window so wide the close button disappeared. Those subjects now decode correctly, and no subject — however long — can push the window controls off-screen. Already-affected messages fix themselves on upgrade.
@@ -1363,7 +1363,7 @@ This is the first Vireo release built partly from other people's code. Thanks to
 
 ## Desktop integration
 - Native GNOME / libadwaita interface with an adaptive three-pane layout, designed for Wayland.
-- Per-account colours and emoji avatars, with optional Gravatar (off by default).
+- Per-account colors and emoji avatars, with optional Gravatar (off by default).
 - Light and dark themes that follow the system.
 - Remembers its window size between launches and supports GNOME edge-tiling.
 - Optional GNOME Contacts integration via Evolution Data Server.

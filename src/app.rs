@@ -413,7 +413,7 @@ pub struct AppModel {
     config: Vec<AccountConfig>,
     /// Demo mode's stand-in account configs (the sample accounts live only
     /// at the backend): what the Accounts panel edits, kept in memory so a
-    /// changed colour, emoji or picture shows without touching disk.
+    /// changed color, emoji or picture shows without touching disk.
     demo_config: Vec<AccountConfig>,
     window: adw::ApplicationWindow,
     prefs: Option<Controller<Preferences>>,
@@ -628,7 +628,7 @@ pub struct AppModel {
     /// The app chrome's theme preference (follow system / light / dark).
     app_theme: config::AppTheme,
     /// The appearance theme: a bundled palette's id, or "system" for the
-    /// stock GNOME colours (see `theme.rs`).
+    /// stock GNOME colors (see `theme.rs`).
     theme: String,
     /// Held so the in-flight collapse/expand width animation isn't dropped.
     sidebar_anim: Option<adw::TimedAnimation>,
@@ -656,7 +656,7 @@ pub struct AppModel {
     card_palette_collapse_secs: u64,
     /// Whether to load sender avatars from Gravatar.
     gravatar: bool,
-    /// Whether the coloured avatars are drawn at all (#29).
+    /// Whether the colored avatars are drawn at all (#29).
     avatars: bool,
     /// Whether the mail you sent wears its mailbox's face rather than the
     /// circle any other sender would get (#189).
@@ -786,7 +786,7 @@ pub struct AppModel {
     read_mark: config::ReadMark,
     /// Mail filter rules (#47), applied to inbox syncs.
     filters: Vec<config::FilterRule>,
-    /// Tags (#71): a name and colour per keyword.
+    /// Tags (#71): a name and color per keyword.
     tags: Vec<config::Tag>,
     /// The tag view, if that is the view — alongside `unified` and
     /// `selected`, never with: the account it is scoped to (`None` spans
@@ -804,7 +804,7 @@ pub struct AppModel {
     /// (#166), so reopening a tag view within a few seconds does not scan
     /// every folder again.
     keyword_sync_at: HashMap<u32, std::time::Instant>,
-    /// The tag colours as `.tag-<keyword>` classes, app-wide (the list's
+    /// The tag colors as `.tag-<keyword>` classes, app-wide (the list's
     /// chips, the sidebar's rows, the menus' swatches).
     tag_provider: gtk::CssProvider,
     /// The on-disk index, for reads the main thread makes itself: the tag
@@ -891,7 +891,7 @@ pub struct AppModel {
     override_fonts: bool,
     /// That font, as a Pango description; empty = the interface font.
     reader_font: String,
-    /// Ignore the senders' text and background colours (#56).
+    /// Ignore the senders' text and background colors (#56).
     override_colors: bool,
     /// Plain-text messages in monospace (#181), and the font ("" = the
     /// desktop's monospace font).
@@ -2185,7 +2185,7 @@ impl SimpleComponent for AppModel {
                                     gtk::Button {
                                         set_tooltip_text: Some(i18n("Flag").as_str()),
                                         // One glyph in both states, like every other
-                                        // icon; the flagged state carries colour only.
+                                        // icon; the flagged state carries color only.
                                         set_icon_name: "co.hyprlab.Hylki-non-starred-symbolic",
                                         #[watch]
                                         set_css_classes: if model.toolbar_star_lit() {
@@ -2537,7 +2537,7 @@ impl SimpleComponent for AppModel {
         relm4::set_global_css(include_str!("styles.css"));
         register_icons();
         // Before install_scheme_css and before the reader exists: both read
-        // the theme's colours back, and both listen for the light/dark flip
+        // the theme's colors back, and both listen for the light/dark flip
         // that swaps a theme's two palettes — GTK runs those handlers in
         // connection order, so the palette has to be in place first.
         crate::theme::install(&config::load_theme());
@@ -5586,7 +5586,7 @@ impl SimpleComponent for AppModel {
                 if self.theme != id {
                     self.theme = id.clone();
                     // Repaints the chrome and tells the reader and any open
-                    // composer to re-ground their documents. The colours the
+                    // composer to re-ground their documents. The colors the
                     // scheme-dependent CSS reads back are taken a main-loop
                     // pass later, as they are on a light/dark flip, so the
                     // lookups answer for the palette that just landed.
@@ -8163,7 +8163,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::AccountSaved { original_email, account } => {
                 // Demo mode: the edit lands on the in-memory stand-in (so a
-                // new colour, emoji or picture shows in the sidebar and the
+                // new color, emoji or picture shows in the sidebar and the
                 // reader at once) and nothing is written or reconnected.
                 if self.config.is_empty() && demo_mode() {
                     let slot = original_email
@@ -10220,7 +10220,7 @@ impl AppModel {
             .append(Some(format!("{} {}", i18n("About"), crate::APP_NAME).as_str()), Some("win.about"));
     }
 
-    /// The reader's font-and-colour override (#56) as the reader applies it:
+    /// The reader's font-and-color override (#56) as the reader applies it:
     /// the font only when the switch is on, the interface font standing in
     /// where none was chosen.
     fn reader_style(&self) -> config::ReaderStyle {
@@ -10785,7 +10785,7 @@ impl AppModel {
         self.spawn_workers(sender);
     }
 
-    /// Resolved avatar/accent colour for an account (custom, else auto accent).
+    /// Resolved avatar/accent color for an account (custom, else auto accent).
     fn account_color(&self, account_id: u32) -> String {
         self.effective_config()
             .get(account_id.saturating_sub(1) as usize)
@@ -12074,7 +12074,7 @@ impl AppModel {
             tags_placement: self.tags_placement,
         });
 
-        // Keep the list's per-account tint colours in sync.
+        // Keep the list's per-account tint colors in sync.
         let colors: std::collections::HashMap<u32, String> = self
             .accounts
             .iter()
@@ -16004,8 +16004,8 @@ impl AppModel {
         messages
     }
 
-    /// The tag colours as CSS: `.tag-<keyword>` fills (chips), and the same
-    /// class on a `.tag-tint` widget colours its glyph instead.
+    /// The tag colors as CSS: `.tag-<keyword>` fills (chips), and the same
+    /// class on a `.tag-tint` widget colors its glyph instead.
     fn refresh_tag_css(&self) {
         let mut css = String::new();
         for t in &self.tags {
@@ -16494,7 +16494,7 @@ impl AppModel {
 
     /// The tag finder's scan is over: fold every account's findings into one
     /// list (a keyword seen on two accounts is one entry), drop the keywords
-    /// that are tags already, propose a name and colour for each, and hand
+    /// that are tags already, propose a name and color for each, and hand
     /// the report to the Tags page — bringing Settings back if it was closed
     /// meanwhile.
     fn finish_tag_scan(&mut self, sender: &ComponentSender<Self>) {
@@ -18992,7 +18992,7 @@ fn set_split_shrink(split: &gtk::Paned, bottom: bool, shrink: bool) {
 
 /// `HYLKI_DEMO` is set, so removing all real accounts leaves the app blank.
 /// Stand-in [`AccountConfig`]s mirroring the demo backend's three accounts
-/// (same names, colours and emoji), so the Accounts window has something to
+/// (same names, colors and emoji), so the Accounts window has something to
 /// show in demo screenshots.
 /// The demo's stand-in accounts as last edited in the Accounts panel, or
 /// the stock ones. The stand-in secret is not serialised, so it is put
@@ -19062,7 +19062,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
 }
 
 /// The demo's tags (#71): the keywords its sample messages carry, so the
-/// Tags section has rows and the row chips have colours.
+/// Tags section has rows and the row chips have colors.
 fn demo_tags() -> Vec<config::Tag> {
     let mk = |name: &str, keyword: &str, color: &str| config::Tag {
         name: name.into(),
@@ -19408,7 +19408,7 @@ struct GoaReconcile {
 /// whose GOA account no longer exists, and pause — rather than remove — the ones
 /// whose Mail service is switched off there, restoring their previous enabled
 /// state when it comes back on. Pausing keeps every local setting (label,
-/// colour, signature, sidebar state) intact. The servers follow GOA's too,
+/// color, signature, sidebar state) intact. The servers follow GOA's too,
 /// so an edit in GNOME Settings needs no re-import (#254). `live` is a snapshot the caller
 /// obtained while GOA was reachable — when it isn't, skip reconciliation
 /// entirely, so a momentarily-unavailable GOA never wipes imported accounts.
@@ -19586,7 +19586,7 @@ fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWi
 /// app is held light until the wizard closes.
 static WIZARD_HOLDS_LIGHT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-/// Force (or release) the app-wide colour scheme per the appearance
+/// Force (or release) the app-wide color scheme per the appearance
 /// preference — the whole chrome, not just message content, which has its own
 /// setting.
 fn apply_app_theme(theme: config::AppTheme) {
@@ -19705,14 +19705,14 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
 }
 
 thread_local! {
-    /// Reloads the scheme-dependent provider with the colours the live theme
+    /// Reloads the scheme-dependent provider with the colors the live theme
     /// answers with now (see [`install_scheme_css`]).
     static SCHEME_REFRESH: std::cell::RefCell<Option<Box<dyn Fn()>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Re-read the theme's colours into the scheme-dependent CSS, for a change
-/// that moves them without flipping the colour scheme.
+/// Re-read the theme's colors into the scheme-dependent CSS, for a change
+/// that moves them without flipping the color scheme.
 fn refresh_scheme_css() {
     SCHEME_REFRESH.with(|slot| {
         if let Some(refresh) = slot.borrow().as_ref() {
@@ -19721,7 +19721,7 @@ fn refresh_scheme_css() {
     });
 }
 
-/// Styles that branch on the colour scheme, which static CSS cannot do: a
+/// Styles that branch on the color scheme, which static CSS cannot do: a
 /// dedicated provider (above the static stylesheet's priority) carries the
 /// scheme-dependent values and reloads whenever the scheme flips.
 ///
@@ -19733,7 +19733,7 @@ fn refresh_scheme_css() {
 ///   live theme (#148) rather than the stock GNOME values, so a custom theme
 ///   carries through to the composer like it does to the reader.
 ///
-/// `window` is only where the theme's named colours are read from.
+/// `window` is only where the theme's named colors are read from.
 fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     let provider = gtk::CssProvider::new();
     if let Some(display) = gtk::gdk::Display::default() {
@@ -19764,7 +19764,7 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     };
     let style = adw::StyleManager::default();
     apply(&provider, style.is_dark());
-    // A theme change moves the same colours without any scheme flip, so the
+    // A theme change moves the same colors without any scheme flip, so the
     // provider has to be reloadable on demand as well (AppMsg::SetTheme).
     SCHEME_REFRESH.with(|slot| {
         let provider = provider.clone();
@@ -19774,7 +19774,7 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
         }));
     });
     style.connect_dark_notify(move |sm| {
-        // The theme's named colours are re-resolved after this signal, not
+        // The theme's named colors are re-resolved after this signal, not
         // before it: read them now and the lookup answers for the scheme
         // just left (a light-grey composer in dark mode). Apply once the
         // main loop comes round, as the reader does through its own message.
