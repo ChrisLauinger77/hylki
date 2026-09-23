@@ -409,8 +409,10 @@ pub enum ComposeInput {
     /// Whether the inline header should carry the window decorations: off
     /// while the pane sits beneath the reader, whose header stays (#212).
     SetDecorations(bool),
-    /// Re-grab keyboard focus into the editor (after a host move).
-    FocusEditor,
+    /// Put keyboard focus where writing starts, once the composer is on
+    /// screen (opened, or moved between inline and window): see
+    /// [`Compose::focus_initial`].
+    FocusInitial,
     /// A recipient/subject field changed — mark dirty.
     MarkFieldsDirty,
     /// Save to Drafts only if edited, then close (used when superseded / on nav).
@@ -1268,12 +1270,6 @@ impl Component for Compose {
         });
         root.add_controller(key);
 
-        if prefill.to.is_empty() {
-            widgets.to_row.grab_focus();
-        } else {
-            model.editor.grab_focus();
-        }
-
         ComponentParts { model, widgets }
     }
 
@@ -1569,7 +1565,7 @@ impl Component for Compose {
                 widgets.fields_list.set_visible(!(self.compact && !windowed) || self.fields_shown);
             }
 
-            ComposeInput::FocusEditor => self.editor.grab_focus(),
+            ComposeInput::FocusInitial => self.focus_initial(widgets),
 
             ComposeInput::MarkFieldsDirty => self.fields_dirty = true,
 
@@ -2024,6 +2020,23 @@ impl Component for Compose {
 }
 
 impl Compose {
+    /// Where the cursor starts: in To while the message is addressed to
+    /// nobody, in Subject once it is addressed but untitled, and in the body
+    /// when both are filled in, which is every reply. A new message used to
+    /// open in the body like a reply, where other mail clients start from
+    /// the recipients (#266). A compact reply with its field rows folded
+    /// away always starts in the body.
+    fn focus_initial(&self, widgets: &ComposeWidgets) {
+        let fields = widgets.fields_list.is_visible();
+        if fields && widgets.to_row.text().trim().is_empty() {
+            widgets.to_row.grab_focus();
+        } else if fields && widgets.subject_row.text().trim().is_empty() {
+            widgets.subject_row.grab_focus();
+        } else {
+            self.editor.grab_focus();
+        }
+    }
+
     /// The format chooser's icon and tooltip for the format it is currently
     /// set to, and whether the preview toggle can afford its label.
     fn dress_format_buttons(&self) {

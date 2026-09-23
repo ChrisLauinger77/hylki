@@ -4660,6 +4660,39 @@ impl SimpleComponent for AppModel {
                         s.input(AppMsg::Reply);
                     });
                 }
+                // HYLKI_SHOWCASE_NEW=<seconds>[:<address>] opens a new message
+                // at that moment (4 s unless it parses), addressed when an
+                // address follows, and, a second later, logs
+                // where keyboard focus landed: the field row's title, or the
+                // focused widget's type (#266).
+                if let Ok(v) = std::env::var("HYLKI_SHOWCASE_NEW") {
+                    let (at, to) = v.split_once(':').unwrap_or((v.as_str(), ""));
+                    let at = at.parse::<u32>().unwrap_or(4);
+                    let to = to.to_string();
+                    let s = sender.clone();
+                    let window = root.clone();
+                    gtk::glib::timeout_add_seconds_local_once(at, move || {
+                        s.input(if to.is_empty() { AppMsg::Compose } else { AppMsg::ComposeTo(to) });
+                        gtk::glib::timeout_add_seconds_local_once(1, move || {
+                            let tops = gtk::Window::toplevels();
+                            let focus = (0..tops.n_items())
+                                .filter_map(|i| tops.item(i).and_downcast::<gtk::Window>())
+                                .filter(|w| w.is_visible())
+                                .map(|w| if w == window.clone().upcast::<gtk::Window>() { (0, w) } else { (1, w) })
+                                .max_by_key(|(rank, _)| *rank)
+                                .and_then(|(_, w)| gtk::prelude::GtkWindowExt::focus(&w));
+                            let row = focus.as_ref().and_then(|f| {
+                                f.ancestor(adw::EntryRow::static_type())
+                                    .and_downcast::<adw::EntryRow>()
+                            });
+                            match (row, focus) {
+                                (Some(row), _) => tracing::info!("showcase: focus in the {:?} row", row.title()),
+                                (None, Some(f)) => tracing::info!("showcase: focus on {}", f.type_().name()),
+                                (None, None) => tracing::info!("showcase: no focus"),
+                            }
+                        });
+                    });
+                }
                 // HYLKI_SHOWCASE_FORWARD=<seconds> does the same with
                 // Forward at that moment (4 s unless it parses), to check
                 // the original's attachments come along (#240). As
@@ -14481,6 +14514,7 @@ impl AppModel {
         let (id, init) = self.build_compose_init(account_id, prefill, true, false);
         let controller = self.spawn_compose(init, sender);
         let window = self.compose_window_host(controller.widget(), id, sender);
+        controller.emit(ComposeInput::FocusInitial);
         self.composers.push(ComposeHost { id, controller, window });
     }
 
@@ -14834,7 +14868,7 @@ impl AppModel {
             let s = slot.clone();
             gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
         }
-        controller.emit(ComposeInput::FocusEditor);
+        controller.emit(ComposeInput::FocusInitial);
         self.reader_compose = Some(ReaderCompose { id, controller, window: None });
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
@@ -14909,7 +14943,7 @@ impl AppModel {
                 r.controller.emit(ComposeInput::SetWindowed(false));
             }
         }
-        r.controller.emit(ComposeInput::FocusEditor);
+        r.controller.emit(ComposeInput::FocusInitial);
         self.reader_compose = Some(r);
     }
 
