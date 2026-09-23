@@ -1678,6 +1678,8 @@ pub enum AppMsg {
     /// The worker has run (or failed) the move that took these messages
     /// out of `path`: its lists can be believed about them again.
     MovesSettled { account_id: u32, path: String, uids: Vec<u32> },
+    /// A message the cache listed is no longer in `path` on the server.
+    MessageGone { account_id: u32, message_id: u32, path: String, uid: u32 },
     /// `path` is the folder the body was read from — a UID only identifies a
     /// message within its own folder, so applying a body to a message means
     /// checking the folder too.
@@ -9643,6 +9645,48 @@ impl SimpleComponent for AppModel {
                         id: message_id,
                         body: body.clone(),
                     });
+                }
+            }
+
+            AppMsg::MessageGone { account_id, message_id, path, uid } => {
+                // A conversation member the cache still listed turned out to
+                // be gone from the server (#257): take it out of the open
+                // conversation rather than show it as a blank card.
+                let folder = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == path))
+                    .map(|f| f.id);
+                if let Some(fid) = folder {
+                    if let Some(msgs) = self.message_cache.get_mut(&(account_id, fid)) {
+                        msgs.retain(|m| m.uid != uid);
+                    }
+                }
+                // The message the reader was opened on stays: that one is
+                // the list's to settle, by its own sync.
+                let opened = self.current.as_ref().map(|c| (c.account_id, c.id, c.folder_id));
+                let before = self.current_thread.len();
+                self.current_thread.retain(|m| {
+                    let gone = m.account_id == account_id
+                        && m.id == message_id
+                        && folder.is_none_or(|fid| m.folder_id == fid);
+                    !gone || opened == Some((m.account_id, m.id, m.folder_id))
+                });
+                // Remembered conversations may hold it too, and the list's
+                // badges counted it.
+                self.forget_threads(account_id);
+                self.message_list
+                    .emit(MessageListInput::ForgetThreadSummaries(account_id));
+                if self.current_thread.len() != before {
+                    if self.current_thread.len() > 1 {
+                        self.queue_thread_render(&sender);
+                    } else {
+                        // Nothing left to make a conversation of.
+                        self.current_thread.clear();
+                        let current = self.current.clone();
+                        let loading = current.as_ref().is_some_and(|c| c.body.is_empty());
+                        self.show_message(current, loading);
+                    }
                 }
             }
 
@@ -19784,6 +19828,9 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         }
         WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
         WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
+        WorkerEvent::Gone { message_id, path, uid } => {
+            AppMsg::MessageGone { account_id, message_id, path, uid }
+        }
         WorkerEvent::RefsRepaired { folder_id } => {
             AppMsg::RefsRepaired { account_id, folder_id }
         }

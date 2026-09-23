@@ -2088,6 +2088,53 @@ impl Cache {
         })
     }
 
+    /// Gmail files one message under every label it carries, and moving it
+    /// to Trash or Spam takes all of them off: the copies cached under All
+    /// Mail, Important and the rest are gone from the server too, but only
+    /// the folder the move started in is ever told. Left behind, they put
+    /// the conversation back together, as blank cards, the next time a
+    /// reply arrived (#257). Drops every cached copy of the messages at
+    /// `uids` in `from_path`, found by Message-ID, except the one in
+    /// `keep_path` (where they went) and the rows in `from_path` itself,
+    /// which the caller removes. Returns how many were dropped.
+    pub fn drop_label_copies(
+        &self,
+        account_id: u32,
+        from_path: &str,
+        uids: &[u32],
+        keep_path: &str,
+    ) -> usize {
+        let mut copies: Vec<(String, u32)> = Vec::new();
+        for uid in uids {
+            let msgid: Option<String> = self
+                .conn
+                .query_row(
+                    "SELECT message_id FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+                    params![account_id, from_path, uid],
+                    |row| row.get(0),
+                )
+                .ok();
+            let Some(msgid) = msgid.filter(|m| !m.is_empty()) else { continue };
+            let Ok(mut stmt) = self.conn.prepare(
+                "SELECT folder_path, uid FROM messages \
+                 WHERE account_id = ?1 AND message_id = ?2 AND folder_path <> ?3 AND folder_path <> ?4",
+            ) else {
+                continue;
+            };
+            let found: Vec<(String, u32)> = stmt
+                .query_map(params![account_id, msgid, from_path, keep_path], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default();
+            copies.extend(found);
+        }
+        for (path, uid) in &copies {
+            self.delete_message(account_id, path, *uid);
+        }
+        copies.len()
+    }
+
     pub fn delete_message(&self, account_id: u32, folder_path: &str, uid: u32) {
         let _ = self.conn.execute(
             "DELETE FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
@@ -2815,6 +2862,29 @@ mod tests {
 
         let groups = vec![("t".to_string(), vec!["root@x".to_string()])];
         assert_eq!(counts(&c, &groups), vec![("t".to_string(), 2)]);
+    }
+
+    /// Moving mail to Trash on Gmail takes it out of every label, so its
+    /// copies go from the cache too, but not the one in Trash and not an
+    /// unrelated message (#257).
+    #[test]
+    fn label_copies_go_with_a_move_to_trash() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_folder(&c, "[Gmail]/All Mail", FolderKind::Archive);
+        add_folder(&c, "[Gmail]/Trash", FolderKind::Trash);
+        add_threaded(&c, "INBOX", 1, 500, "root@x", "");
+        add_threaded(&c, "[Gmail]/All Mail", 10, 500, "root@x", "");
+        add_threaded(&c, "[Gmail]/Trash", 30, 500, "root@x", "");
+        add_threaded(&c, "INBOX", 2, 600, "other@x", "");
+        add_threaded(&c, "[Gmail]/All Mail", 11, 600, "other@x", "");
+
+        assert_eq!(c.drop_label_copies(1, "INBOX", &[1], "[Gmail]/Trash"), 1);
+        let left = c.locate_by_message_id("root@x");
+        assert_eq!(left.len(), 2);
+        assert!(left.iter().any(|(_, p, u)| p == "INBOX" && *u == 1));
+        assert!(left.iter().any(|(_, p, u)| p == "[Gmail]/Trash" && *u == 30));
+        assert_eq!(c.locate_by_message_id("other@x").len(), 2);
     }
 
     /// An id that matches nothing gets no entry at all, so the row keeps the

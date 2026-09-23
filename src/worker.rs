@@ -614,6 +614,9 @@ pub enum WorkerEvent {
     /// is showing may now group differently.
     RefsRepaired { folder_id: u32 },
     Body { message_id: u32, path: String, body: String },
+    /// A message the cache listed is no longer in `path` on the server; its
+    /// cached row has been dropped.
+    Gone { message_id: u32, path: String, uid: u32 },
     /// Whether the message's From: address survived its provider's SPF/DKIM/DMARC
     /// checks. Sent right after `Body`, from the same fetch.
     SenderChecked { message_id: u32, check: crate::models::SenderCheck },
@@ -1679,18 +1682,12 @@ async fn run_imap(
                     let uids: Vec<u32> = group.iter().map(|(_, uid)| *uid).collect();
                     match load_bodies_retry(&mut session, &account, &path, &uids).await {
                         Ok(mut fetched) => {
+                            // The UIDs the server answered without a body.
+                            let mut missing: Vec<(u32, u32)> = Vec::new();
                             for (message_id, uid) in group {
                                 let Some((body, check, has_attachments)) = fetched.remove(uid)
                                 else {
-                                    // The server answered the set but not this
-                                    // UID — the message is gone from the folder.
-                                    // Say so in place, rather than leaving one
-                                    // member of the conversation blank forever.
-                                    emit(WorkerEvent::Body {
-                                        message_id: *message_id,
-                                        path: path.clone(),
-                                        body: "(empty message)".to_string(),
-                                    });
+                                    missing.push((*message_id, *uid));
                                     continue;
                                 };
                                 if let Some(c) = cache.as_ref() {
@@ -1714,6 +1711,12 @@ async fn run_imap(
                                 } else {
                                     WorkerEvent::NoAttachments { message_id: *message_id }
                                 });
+                            }
+                            if !missing.is_empty() {
+                                settle_missing_bodies(
+                                    &mut session, account_id, &path, missing, cache.as_ref(), &emit,
+                                )
+                                .await;
                             }
                         }
                         Err(e) => {
@@ -1877,6 +1880,7 @@ async fn run_imap(
                 match mark_spam(sess, &path, uid, &dest).await {
                     Ok(created) => {
                         if let Some(c) = cache.as_ref() {
+                            drop_gmail_label_copies(c, account_id, &account, &path, &[uid], &dest);
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
@@ -1943,6 +1947,7 @@ async fn run_imap(
                 match move_message(sess, &path, uid, &dest).await {
                     Ok(created) => {
                         if let Some(c) = cache.as_ref() {
+                            drop_gmail_label_copies(c, account_id, &account, &path, &[uid], &dest);
                             c.delete_message(account_id, &path, uid);
                         }
                         if created {
@@ -1964,6 +1969,7 @@ async fn run_imap(
                 match move_messages(sess, &path, &uids, &dest).await {
                     Ok(created) => {
                         if let Some(c) = cache.as_ref() {
+                            drop_gmail_label_copies(c, account_id, &account, &path, &uids, &dest);
                             for uid in &uids {
                                 c.delete_message(account_id, &path, *uid);
                             }
@@ -2780,6 +2786,76 @@ async fn load_bodies_retry(
         *session = Some(s);
     }
     res
+}
+
+/// After a move into Trash or Spam on Gmail, drop the moved mail's copies
+/// under its other labels from the cache: Gmail removed them with the move
+/// (see [`Cache::drop_label_copies`]). Any other server keeps a copy in
+/// another folder as a message of its own, so nothing is dropped there.
+fn drop_gmail_label_copies(
+    cache: &Cache,
+    account_id: u32,
+    account: &AccountConfig,
+    from: &str,
+    uids: &[u32],
+    dest: &str,
+) {
+    let folders = cache.load_folders(account_id);
+    let host = account.imap_host.to_ascii_lowercase();
+    let labels = host.ends_with("gmail.com")
+        || host.ends_with("googlemail.com")
+        || folders
+            .iter()
+            .any(|f| f.path.starts_with("[Gmail]/") || f.path.starts_with("[Google Mail]/"));
+    let binned = folders
+        .iter()
+        .any(|f| f.path == dest && matches!(f.kind, FolderKind::Trash | FolderKind::Junk));
+    if labels && binned {
+        let n = cache.drop_label_copies(account_id, from, uids, dest);
+        if n > 0 {
+            tracing::debug!("dropped {n} cached label copies of mail moved to {dest}");
+        }
+    }
+}
+
+/// Account for conversation members a body fetch came back without.
+///
+/// Either the message is no longer in the folder, or the server lists it and
+/// will not hand it over (#226). The cache cannot tell: Gmail takes every
+/// label off mail moved to Trash, so the copies cached under All Mail and
+/// the other labels outlive it there, and a reply to a deleted conversation
+/// brought them all back as blank cards (#257). The server is asked which
+/// of the UIDs it still has. The ones it does not are dropped from the
+/// cache and the reader is told they are gone; the rest keep the
+/// placeholder, which says in place that the server gave nothing.
+async fn settle_missing_bodies(
+    session: &mut Option<ImapSession>,
+    account_id: u32,
+    path: &str,
+    missing: Vec<(u32, u32)>,
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    let uids: Vec<u32> = missing.iter().map(|(_, uid)| *uid).collect();
+    // The folder is still selected from the fetch.
+    let present = match session.as_mut() {
+        Some(sess) => search_uids(sess, format!("UID {}", uid_set(&uids))).await.ok(),
+        None => None,
+    };
+    for (message_id, uid) in missing {
+        if present.as_ref().is_some_and(|p| !p.contains(&uid)) {
+            if let Some(c) = cache {
+                c.delete_message(account_id, path, uid);
+            }
+            emit(WorkerEvent::Gone { message_id, path: path.to_string(), uid });
+        } else {
+            emit(WorkerEvent::Body {
+                message_id,
+                path: path.to_string(),
+                body: "(empty message)".to_string(),
+            });
+        }
+    }
 }
 
 async fn load_source_retry(
