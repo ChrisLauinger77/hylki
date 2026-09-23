@@ -5,7 +5,7 @@
 <h1 align="center">Hylki</h1>
 
 <p align="center">
-  An email client for GNOME, written in Rust with libadwaita.
+  A fast, <strong>GNOME-native</strong> email client, built with Rust and libadwaita. Open source and private by default. 
 </p>
 
 <p align="center">
@@ -143,7 +143,7 @@ is often as useful as a patch. **[How to contribute →](docs/CONTRIBUTING.md)**
 - Discord: [discord.gg/YfEJ4b6PFW](https://discord.gg/YfEJ4b6PFW)
 - Email: [hyprlab@proton.me](mailto:hyprlab@proton.me)
 - Security issues: see [SECURITY.md](docs/SECURITY.md)
-- [Buy me a coffee](https://buymeacoffee.com/hyprlab)
+- [Buy me a coffee](https://buymeacoffee.com/hyprlab) ☕
 
 ## License
 
