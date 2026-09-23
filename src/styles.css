@@ -1472,8 +1472,9 @@ headerbar.compose-toolbar button.image-button {
 
 /* ---- First-run welcome wizard (welcome.rs) ---- */
 
-/* The window is the brand blue in both schemes, the website hero's own
-   #005bff; every page floats on it and the text on the ground is white. */
+/* The window is the brand blue, the website hero's own #005bff; every page
+   floats on it and the text on the ground is white. The wizard is always
+   light (app.rs holds the scheme while it is open). */
 window.welcome-window,
 .welcome-window > * {
   background-color: #005bff;
@@ -1506,13 +1507,10 @@ window.welcome-window,
   margin-left: 6px;
 }
 
-/* Content cards keep the theme's surface. The dark card colour is a
-   translucent white, so it is laid over the theme's window colour here,
-   or the blue would show through it. */
+/* Content cards: the theme's card surface, lifted off the blue. */
 .welcome-card {
   border-radius: 14px;
-  background-color: @window_bg_color;
-  background-image: linear-gradient(@card_bg_color, @card_bg_color);
+  background-color: @card_bg_color;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
@@ -1522,17 +1520,17 @@ window.welcome-window,
   font-weight: 700;
 }
 
-/* Wizard action buttons are white with blue lettering on the blue
-   ground, like the wordmark they sit under. */
+/* Wizard action buttons are the icon's amber with dark brown lettering,
+   like the website's primary buttons on the same blue. */
 .welcome-window button.suggested-action {
-  background-color: #ffffff;
-  color: #005bff;
+  background-color: #fec11e;
+  color: #3a2b00;
 }
 .welcome-window button.suggested-action:hover {
-  background-color: shade(#ffffff, 0.94);
+  background-color: shade(#fec11e, 1.06);
 }
 .welcome-window button.suggested-action:active {
-  background-color: shade(#ffffff, 0.86);
+  background-color: shade(#fec11e, 0.92);
 }
 
 /* The language picker sits on the ground: a white wash, white text. Only

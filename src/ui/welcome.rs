@@ -127,8 +127,7 @@ fn wizard_providers() -> Vec<&'static Provider> {
 /// The wordmark with the app icon beside it, for the About window and the
 /// wizard: "Hylki" set in Cantarell, dark or white, as an SVG on a 128x42
 /// box (the pixbuf loader tells the formats apart by their bytes). The
-/// wizard always takes the white one, since its ground is blue in both
-/// schemes.
+/// wizard always takes the white one, on its blue ground.
 const ABOUT_WORDMARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-black.svg");
 const ABOUT_WORDMARK_DARK_SVG: &[u8] = include_bytes!("../../data/about/wordmark-white.svg");
 

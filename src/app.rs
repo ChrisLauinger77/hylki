@@ -11534,6 +11534,14 @@ impl AppModel {
             });
         welcome.widget().set_transient_for(Some(&self.window));
         welcome.widget().set_modal(true);
+        // Light only while it is up; the preference returns when it goes,
+        // however it goes (finished, closed, or replaced on a restart).
+        WIZARD_HOLDS_LIGHT.store(true, std::sync::atomic::Ordering::Relaxed);
+        apply_app_theme(self.app_theme);
+        welcome.widget().connect_unmap(|_| {
+            WIZARD_HOLDS_LIGHT.store(false, std::sync::atomic::Ordering::Relaxed);
+            apply_app_theme(config::load_app_theme());
+        });
         // On a true first run the main window stays hidden (see main.rs)
         // until the wizard finishes — or is dismissed.
         {
@@ -19553,14 +19561,23 @@ fn save_all_attachments(atts: Vec<Attachment>, parent: Option<adw::ApplicationWi
     });
 }
 
+/// Set while the welcome wizard is open. Its blue ground is designed for the
+/// light scheme only, and libadwaita has no per-window scheme, so the whole
+/// app is held light until the wizard closes.
+static WIZARD_HOLDS_LIGHT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Force (or release) the app-wide colour scheme per the appearance
 /// preference — the whole chrome, not just message content, which has its own
 /// setting.
 fn apply_app_theme(theme: config::AppTheme) {
-    let scheme = match theme {
-        config::AppTheme::System => adw::ColorScheme::Default,
-        config::AppTheme::Light => adw::ColorScheme::ForceLight,
-        config::AppTheme::Dark => adw::ColorScheme::ForceDark,
+    let scheme = if WIZARD_HOLDS_LIGHT.load(std::sync::atomic::Ordering::Relaxed) {
+        adw::ColorScheme::ForceLight
+    } else {
+        match theme {
+            config::AppTheme::System => adw::ColorScheme::Default,
+            config::AppTheme::Light => adw::ColorScheme::ForceLight,
+            config::AppTheme::Dark => adw::ColorScheme::ForceDark,
+        }
     };
     adw::StyleManager::default().set_color_scheme(scheme);
 }
