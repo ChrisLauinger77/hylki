@@ -54,17 +54,19 @@ macro_rules! alt {
 }
 
 /// The gallery, in display order: the build's own icon (the opened
-/// envelope, so it has no entry of its own), the same envelope on a blue
-/// square and squircle and on a dark one of each, the two-tone wave envelope
+/// envelope, so it has no entry of its own), the same envelope on a blue,
+/// a navy and a yellow tile, square and squircle, the two-tone wave envelope
 /// that was the default from 1.35 to 1.39, the plain envelopes, the two
 /// with the bird, the wave drawn at full size rather than to the GNOME
 /// icon grid, and the classic icon last.
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
-    alt!("square", "Square"),
-    alt!("squircle", "Squircle"),
-    alt!("square-dark", "Dark square"),
-    alt!("squircle-dark", "Dark squircle"),
+    alt!("square", "Blue square"),
+    alt!("squircle", "Blue squircle"),
+    alt!("square-dark", "Navy square"),
+    alt!("squircle-dark", "Navy squircle"),
+    alt!("square-yellow", "Yellow square"),
+    alt!("squircle-yellow", "Yellow squircle"),
     alt!("envelope-wave", "Wave"),
     alt!("envelope-blue", "Blue"),
     alt!("envelope-yellow", "Yellow"),
