@@ -99,6 +99,31 @@ pub fn png_for(id: &str) -> &'static [u8] {
     CATALOG.iter().find(|c| c.id == id).map(|c| c.png).unwrap_or(DEFAULT_PNG)
 }
 
+/// The image the tray's App icon option draws: the icon the dock shows.
+/// That is the launcher's own icon when somebody set one outside Hylki
+/// (#252), a file or a name in the icon theme, and otherwise the gallery
+/// choice. An icon that cannot be read falls back to the choice.
+pub fn tray_image(id: &str) -> std::borrow::Cow<'static, [u8]> {
+    use std::borrow::Cow;
+    let Some(icon) = custom_icon() else {
+        return Cow::Borrowed(png_for(id));
+    };
+    let path = if std::path::Path::new(&icon).is_absolute() {
+        Some(std::path::PathBuf::from(&icon))
+    } else {
+        gtk::gdk::Display::default().and_then(|display| {
+            gtk::IconTheme::for_display(&display)
+                .lookup_icon(&icon, &[], 256, 1, gtk::TextDirection::None, gtk::IconLookupFlags::empty())
+                .file()
+                .and_then(|f| gtk::gio::prelude::FileExt::path(&f))
+        })
+    };
+    match path.and_then(|p| std::fs::read(p).ok()) {
+        Some(bytes) => Cow::Owned(bytes),
+        None => Cow::Borrowed(png_for(id)),
+    }
+}
+
 /// The choice in force, settling it on the first start that finds none
 /// (the default; the wizard lets a fresh install pick). The override on
 /// disk is brought in line either way, so a reinstall (or a changed

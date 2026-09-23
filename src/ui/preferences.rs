@@ -162,9 +162,8 @@ pub struct PrefInit {
 
 /// App-chrome appearance options, in combo order.
 const TRAY_ICONS: &[(&str, TrayIcon)] = &[
-    (i18n_noop("Hylki icon"), TrayIcon::Hylki),
-    (i18n_noop("Envelope, white"), TrayIcon::EnvelopeLight),
-    (i18n_noop("Envelope, black"), TrayIcon::EnvelopeDark),
+    (i18n_noop("App icon"), TrayIcon::Hylki),
+    (i18n_noop("Symbolic"), TrayIcon::Symbolic),
 ];
 
 const APP_THEMES: &[(&str, AppTheme)] = &[
@@ -2588,8 +2587,8 @@ impl Component for Preferences {
                                     #[name = "tray_icon_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Tray icon"),
-                                        set_subtitle: &i18n("The Hylki icon, or a plain envelope in white or black \
-                                                       to match the panel."),
+                                        set_subtitle: &i18n("The app icon in full color, or its symbolic \
+                                                       outline, which the panel draws in its own color."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeTrayIcon(row.selected()));
                                         },

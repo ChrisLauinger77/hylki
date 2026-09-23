@@ -7029,8 +7029,13 @@ impl SimpleComponent for AppModel {
                 if self.tray_icon != icon {
                     self.tray_icon = icon;
                     self.save_settings();
-                    if let Some(tray) = &self.tray {
-                        tray.set_icon(icon, crate::app_icon::png_for(&self.app_icon));
+                    // A fresh item rather than a new icon on the old one: the
+                    // AppIndicator extension, taken from a picture back to a
+                    // symbolic icon's file, kept drawing the picture (#258).
+                    // A new item is set up from nothing, as at startup.
+                    if let Some(tray) = self.tray.take() {
+                        tray.stop();
+                        self.start_tray(&sender);
                     }
                 }
             }
@@ -7043,7 +7048,7 @@ impl SimpleComponent for AppModel {
                 if self.app_icon != id || replaces_custom {
                     self.app_icon = id;
                     if let Some(tray) = &self.tray {
-                        tray.set_icon(self.tray_icon, crate::app_icon::png_for(&self.app_icon));
+                        tray.set_icon(self.tray_icon, &crate::app_icon::tray_image(&self.app_icon));
                     }
                     self.offer_restart_for_icon(&sender);
                 }
@@ -12038,7 +12043,7 @@ impl AppModel {
         self.tray = crate::tray::TrayHandle::start(
             sender.input_sender().clone(),
             self.tray_icon,
-            crate::app_icon::png_for(&self.app_icon),
+            &crate::app_icon::tray_image(&self.app_icon),
             unified,
             mail,
         );

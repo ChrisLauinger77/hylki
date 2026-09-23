@@ -13,12 +13,16 @@
 //! portal, which this never touches. The item keeps waiting, so enabling a
 //! tray extension later picks it up without a restart.
 //!
-//! Icons are sent as pixel data rather than by name: the panel lives outside
-//! the sandbox and may not resolve our icon theme, and the dot has to be drawn
-//! on anyway. The Hylki icon is the app icon itself; the envelope variants are
-//! the app's own symbolic icon in plain white or black, for panels that
-//! don't recolor symbolic icons. On Cinnamon the icon is drawn smaller
-//! inside the pixmap, see [`panel_fill`].
+//! The app icon is sent as pixel data, with the dot drawn on. The symbolic
+//! icon (#258) is sent as an SVG file, so the panel paints it in its own
+//! color like the icons beside it: the panel lives outside the sandbox, so
+//! the two icons, with and without the dot, are written to a small icon
+//! theme in the data directory (a path the host sees too) and the item
+//! names the file's path, see [`Tray::icon_name`] below. The dot is a
+//! shape of class `error`, which a symbolic icon's recoloring paints in the
+//! theme's error red rather than the foreground. The pixel icons stay as
+//! the fallback for a panel that cannot load the file; on Cinnamon those
+//! are drawn smaller, see [`panel_fill`].
 
 use gtk::cairo;
 use gtk::gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
@@ -61,15 +65,20 @@ pub struct TrayMailList {
     pub unread: u32,
 }
 
-/// The app icon the tray shows: the one the user chose for the app (see
-/// `app_icon.rs`), passed in as PNG bytes so a change follows live.
-pub type AppIconPng = &'static [u8];
+/// The app icon the tray shows: the one the dock shows (see
+/// `app_icon::tray_image`), passed in as image bytes (PNG, SVG or any
+/// format the loader reads) so a change follows live.
+pub type AppIconPng<'a> = &'a [u8];
 /// The app's symbolic icon (the opened envelope, drawn in black); its
 /// fill is swapped for the chosen color.
 const ENVELOPE_SVG: &str =
     include_str!("../data/icons/hicolor/symbolic/apps/co.hyprlab.Hylki-symbolic.svg");
 /// Panels ask for different sizes; a set covers them without upscaling blur.
 const SIZES: [i32; 6] = [16, 22, 24, 32, 48, 64];
+/// Symbolic icons, when the file is read as one, are painted mid-grey on no
+/// particular panel: the fallback pixmap's envelope is that grey, visible
+/// on a light panel and a dark one alike.
+const SYMBOLIC_GREY: &str = "#bebebe";
 /// GNOME's red (`@error_color`).
 const DOT_RGB: (f64, f64, f64) = (0xe0 as f64 / 255.0, 0x1b as f64 / 255.0, 0x24 as f64 / 255.0);
 
@@ -97,6 +106,7 @@ impl TrayHandle {
             unread,
             mail,
             sender,
+            symbolic: symbolic_theme(icon),
         };
         match tray.disable_dbus_name(true).assume_sni_available(true).spawn() {
             Ok(handle) => Some(Self { handle, last_unread: std::cell::Cell::new(unread) }),
@@ -119,9 +129,11 @@ impl TrayHandle {
     pub fn set_icon(&self, icon: TrayIcon, app_png: AppIconPng) {
         let plain = render_set(icon, app_png, false);
         let dotted = render_set(icon, app_png, true);
+        let symbolic = symbolic_theme(icon);
         self.handle.update(move |t| {
             t.plain = plain;
             t.dotted = dotted;
+            t.symbolic = symbolic;
         });
     }
 
@@ -143,6 +155,72 @@ struct HylkiTray {
     /// Unread inbox mail for the menu, or `None` when that section is off.
     mail: Option<TrayMailList>,
     sender: relm4::Sender<AppMsg>,
+    /// With the symbolic icon chosen, the icon theme it was written to.
+    symbolic: Option<String>,
+}
+
+/// The symbolic icon's file names in the theme `symbolic_theme` writes. The
+/// `-symbolic` ending is what makes the panel recolor them; a panel that
+/// looks the name up falls back through its dash-separated prefixes, so the
+/// rest has no prefix an installed icon has (`co.hyprlab.Hylki-tray` found
+/// the app icon).
+fn symbolic_name(dotted: bool) -> &'static str {
+    if dotted { "hylki_tray_unread-symbolic" } else { "hylki_tray-symbolic" }
+}
+
+/// Where in the theme at `root` the symbolic icons are written.
+fn symbolic_dir(root: &std::path::Path) -> std::path::PathBuf {
+    root.join("hicolor").join("scalable").join("apps")
+}
+
+/// Write the symbolic icon, plain and with the dot, into an icon theme of
+/// our own and return its path; `None` for the app icon, or when the files
+/// cannot be written (the pixel fallback is drawn then).
+fn symbolic_theme(icon: TrayIcon) -> Option<String> {
+    if icon != TrayIcon::Symbolic {
+        return None;
+    }
+    let root = crate::config::data_base()?.join("hylki").join("tray-icons");
+    let dir = symbolic_dir(&root);
+    let written = std::fs::create_dir_all(&dir)
+        .and_then(|_| std::fs::write(dir.join(format!("{}.svg", symbolic_name(false))), ENVELOPE_SVG))
+        .and_then(|_| std::fs::write(dir.join(format!("{}.svg", symbolic_name(true))), envelope_with_dot()))
+        .and_then(|_| {
+            std::fs::write(
+                root.join("hicolor").join("index.theme"),
+                "[Icon Theme]\nName=Hicolor\nDirectories=scalable/apps\n\n\
+                 [scalable/apps]\nSize=16\nMinSize=8\nMaxSize=512\nType=Scalable\n",
+            )
+        });
+    match written {
+        Ok(()) => Some(root.to_string_lossy().into_owned()),
+        Err(e) => {
+            tracing::warn!("tray: could not write the symbolic icon: {e}");
+            None
+        }
+    }
+}
+
+/// The symbolic envelope with the dot in its top-right corner, where the
+/// pixel icons draw it. The dot is of class `error`, which the panel's
+/// recoloring paints red where everything else takes its foreground, and a
+/// ring round it is masked out of the envelope so it reads as sitting on top.
+fn envelope_with_dot() -> String {
+    let (cx, cy, r, ring) = (12.32, 3.68, 3.04, 4.04);
+    let open = ENVELOPE_SVG.find("<svg").and_then(|i| ENVELOPE_SVG[i..].find('>').map(|j| i + j + 1));
+    let close = ENVELOPE_SVG.rfind("</svg>");
+    let inner = match (open, close) {
+        (Some(a), Some(b)) if a < b => &ENVELOPE_SVG[a..b],
+        _ => "",
+    };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"16px\" viewBox=\"0 0 16 16\" width=\"16px\">\n\
+         <defs><mask id=\"ring\"><rect width=\"16\" height=\"16\" fill=\"#ffffff\"/>\
+         <circle cx=\"{cx}\" cy=\"{cy}\" r=\"{ring}\" fill=\"#000000\"/></mask></defs>\n\
+         <g mask=\"url(#ring)\">{inner}</g>\n\
+         <circle class=\"error\" cx=\"{cx}\" cy=\"{cy}\" r=\"{r}\" style=\"fill:#e01b24\"/>\n</svg>\n"
+    )
 }
 
 impl Tray for HylkiTray {
@@ -162,8 +240,29 @@ impl Tray for HylkiTray {
         Status::Active
     }
 
+    // With the symbolic icon the panel uses the name and falls back on
+    // these pixels only when it cannot load it.
     fn icon_pixmap(&self) -> Vec<Icon> {
         if self.unread > 0 { self.dotted.clone() } else { self.plain.clone() }
+    }
+
+    fn icon_theme_path(&self) -> String {
+        self.symbolic.clone().unwrap_or_default()
+    }
+
+    // The file's own path rather than a name to look up in the theme. The
+    // AppIndicator extension reads a path directly, and recolors it by its
+    // `-symbolic.svg` ending; a name has it scan the theme directory, and
+    // that scan is kept: icons rewritten under it were not found, and the
+    // extension then kept drawing whatever icon it had before, silently.
+    fn icon_name(&self) -> String {
+        match &self.symbolic {
+            Some(root) => symbolic_dir(std::path::Path::new(root))
+                .join(format!("{}.svg", symbolic_name(self.unread > 0)))
+                .to_string_lossy()
+                .into_owned(),
+            None => String::new(),
+        }
     }
 
     fn tool_tip(&self) -> ToolTip {
@@ -438,18 +537,19 @@ fn render(icon: TrayIcon, app_png: AppIconPng, dotted: bool, size: i32, fill: f6
 }
 
 /// The icon's pixels before any dot: the app icon scaled down, or the
-/// symbolic envelope rasterised in the chosen color.
+/// symbolic envelope rasterised in mid-grey.
 fn base_pixbuf(icon: TrayIcon, app_png: AppIconPng, size: i32) -> Option<Pixbuf> {
     match icon {
         TrayIcon::Hylki => {
-            let loader = PixbufLoader::with_type("png").ok()?;
+            // Sniffed rather than assumed: an icon set on the launcher by
+            // hand can be an SVG as well as a PNG.
+            let loader = PixbufLoader::new();
             loader.write(app_png).ok()?;
             loader.close().ok()?;
             loader.pixbuf()?.scale_simple(size, size, InterpType::Hyper)
         }
-        TrayIcon::EnvelopeLight | TrayIcon::EnvelopeDark => {
-            let fill = if icon == TrayIcon::EnvelopeLight { "#ffffff" } else { "#000000" };
-            let svg = ENVELOPE_SVG.replace("#000000", fill);
+        TrayIcon::Symbolic => {
+            let svg = ENVELOPE_SVG.replace("#000000", SYMBOLIC_GREY);
             let loader = PixbufLoader::with_type("svg").ok()?;
             loader.set_size(size, size);
             loader.write(svg.as_bytes()).ok()?;
@@ -497,7 +597,7 @@ mod tests {
 
     #[test]
     fn every_icon_renders_at_every_size() {
-        for icon in [TrayIcon::Hylki, TrayIcon::EnvelopeLight, TrayIcon::EnvelopeDark] {
+        for icon in [TrayIcon::Hylki, TrayIcon::Symbolic] {
             for dotted in [false, true] {
                 let set = render_set(icon, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), dotted);
                 assert_eq!(set.len(), SIZES.len(), "{icon:?} dotted={dotted}");
@@ -507,6 +607,37 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The dotted symbolic icon keeps every shape of the envelope, under the
+    /// mask that clears the ring, and adds the dot as the one `error` shape.
+    #[test]
+    fn the_symbolic_dot_is_the_error_shape() {
+        let svg = envelope_with_dot();
+        let count = |s: &str, pat: &str| s.matches(pat).count();
+        assert_eq!(count(&svg, "<path"), count(ENVELOPE_SVG, "<path"));
+        assert_eq!(count(&svg, "<rect") - 1, count(ENVELOPE_SVG, "<rect"), "one rect is the mask's");
+        let group = svg.find("<g mask=\"url(#ring)\">").unwrap();
+        assert!(svg.find("<path").unwrap() > group);
+        assert_eq!(count(&svg, "class=\"error\""), 1);
+        assert!(!symbolic_name(false).contains('.') && symbolic_name(true).ends_with("-symbolic"));
+    }
+
+    /// A choice saved as one of the two envelopes it replaced reads as the
+    /// symbolic icon, rather than failing the whole settings file.
+    #[test]
+    fn old_envelope_choices_read_as_symbolic() {
+        #[derive(serde::Deserialize)]
+        struct T {
+            tray_icon: TrayIcon,
+        }
+        for old in ["envelope-light", "envelope-dark", "symbolic"] {
+            let t: T = toml::from_str(&format!("tray_icon = \"{old}\"")).unwrap();
+            assert_eq!(t.tray_icon, TrayIcon::Symbolic, "{old}");
+        }
+        let t: T = toml::from_str("tray_icon = \"hylki\"").unwrap();
+        assert_eq!(t.tray_icon, TrayIcon::Hylki);
+        assert_eq!(TrayIcon::default(), TrayIcon::Symbolic);
     }
 
     #[test]
@@ -526,8 +657,8 @@ mod tests {
     #[test]
     fn the_dot_is_red_and_only_when_asked() {
         let size = 32usize;
-        let plain = render(TrayIcon::EnvelopeLight, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), false, size as i32, 1.0).unwrap();
-        let dotted = render(TrayIcon::EnvelopeLight, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), true, size as i32, 1.0).unwrap();
+        let plain = render(TrayIcon::Symbolic, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), false, size as i32, 1.0).unwrap();
+        let dotted = render(TrayIcon::Symbolic, crate::app_icon::png_for(crate::app_icon::DEFAULT_ID), true, size as i32, 1.0).unwrap();
         // The dot's centre, per `render`.
         let s = size as f64;
         let r = s * 0.19;

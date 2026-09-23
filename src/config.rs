@@ -786,12 +786,13 @@ pub enum AppTheme {
 #[serde(rename_all = "kebab-case")]
 pub enum TrayIcon {
     /// The app icon.
-    #[default]
     Hylki,
-    /// The app's symbolic icon in white, for dark panels.
-    EnvelopeLight,
-    /// The app's symbolic icon in black, for light panels.
-    EnvelopeDark,
+    /// The app's symbolic icon, which the panel draws in its own color, as
+    /// it does the icons beside it (#258). It replaced a white and a black
+    /// envelope, which read as it.
+    #[default]
+    #[serde(alias = "envelope-light", alias = "envelope-dark")]
+    Symbolic,
 }
 
 /// How email message content is themed, independent of the app UI theme.
