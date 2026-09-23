@@ -15446,8 +15446,9 @@ impl AppModel {
         self.transfer_step();
     }
 
-    /// After each message: the status line, and once all are through, the
-    /// report and a fresh look at the folders the mail went into.
+    /// After each message: the status line, and once all are through, a
+    /// fresh look at the folders the mail went into and, if any failed, the
+    /// one error report.
     fn transfer_step(&mut self) {
         let tally = &self.transfer_tally;
         if tally.done + tally.failed < tally.total {
@@ -15467,34 +15468,22 @@ impl AppModel {
                 self.send_to(*account_id, MailRequest::SyncFolder { folder_id, path: path.clone() });
             }
         }
-        let names: Vec<String> = tally.dest_accounts.iter().map(|a| self.account_name(*a)).collect();
-        let account = names.join(", ");
-        let (text, error) = if tally.failed == 0 {
-            (
-                ni18n_f(
-                    "Moved one message to {account}",
-                    "Moved {n} messages to {account}",
-                    tally.done as u32,
-                    &[("n", &tally.done.to_string()), ("account", &account)],
-                ),
-                false,
-            )
-        } else {
-            (
-                ni18n_f(
-                    "One message could not be moved to {account}: {error}",
-                    "{n} messages could not be moved to {account}: {error}",
-                    tally.failed as u32,
-                    &[
-                        ("n", &tally.failed.to_string()),
-                        ("account", &account),
-                        ("error", tally.error.as_deref().unwrap_or("")),
-                    ],
-                ),
-                true,
-            )
-        };
-        self.notifications.emit(NotifyInput::Push { text, error, connectivity: false });
+        // The bar only speaks up for a failure: a move that worked shows
+        // itself, in the folders.
+        if tally.failed > 0 {
+            let names: Vec<String> = tally.dest_accounts.iter().map(|a| self.account_name(*a)).collect();
+            let text = ni18n_f(
+                "One message could not be moved to {account}: {error}",
+                "{n} messages could not be moved to {account}: {error}",
+                tally.failed as u32,
+                &[
+                    ("n", &tally.failed.to_string()),
+                    ("account", &names.join(", ")),
+                    ("error", tally.error.as_deref().unwrap_or("")),
+                ],
+            );
+            self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+        }
     }
 
     /// One undo step for everything a batch of moves to other accounts put

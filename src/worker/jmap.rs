@@ -1938,7 +1938,10 @@ pub(super) async fn run_jmap(
             }
 
             MailRequest::UndoMove { path, dest, dest_folder_id, message_ids } => {
-                let Some(s) = jmap_session(&account, &mut state, &emit).await else { continue };
+                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
+                    emit(WorkerEvent::BulkComplete);
+                    continue;
+                };
                 match jmap_undo_move(&s, account_id, &mut state, &path, &dest, &message_ids, cache.as_ref()).await {
                     Ok(0) => tracing::info!("undo: the messages are no longer where that move put them"),
                     Ok(_) => {
@@ -1953,6 +1956,8 @@ pub(super) async fn run_jmap(
                         connectivity: false,
                     }),
                 }
+                // The app spins its busy indicator until an undo answers.
+                emit(WorkerEvent::BulkComplete);
             }
 
             MailRequest::CreateFolder { path } => {

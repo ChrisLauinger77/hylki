@@ -8658,10 +8658,20 @@ async fn run_pop3(
                 emit(WorkerEvent::BulkComplete);
             }
 
+            // A POP3 move deletes the message on the server: there is
+            // nothing to bring back. Answered all the same, so the app's
+            // busy indicator stops.
+            MailRequest::UndoMove { .. } => {
+                emit(WorkerEvent::Error {
+                    text: i18n("POP3 accounts don't support folders"),
+                    connectivity: false,
+                });
+                emit(WorkerEvent::BulkComplete);
+            }
+
             // POP3 has no folders beyond the inbox.
             MailRequest::CreateFolder { .. }
             | MailRequest::RenameFolder { .. }
-            | MailRequest::UndoMove { .. }
             | MailRequest::DeleteFolder { .. }
             | MailRequest::SetHiddenFolders { .. }
             | MailRequest::SaveDraft { .. } => {
@@ -9021,7 +9031,6 @@ async fn run_mock(
             | MailRequest::MarkSpam { .. }
             | MailRequest::MarkHam { .. }
             | MailRequest::MoveMessage { .. }
-            | MailRequest::UndoMove { .. }
             | MailRequest::CreateFolder { .. }
             | MailRequest::RenameFolder { .. }
             | MailRequest::DeleteFolder { .. }
@@ -9039,7 +9048,10 @@ async fn run_mock(
             // The demo backend sends nothing, so its Outbox is always empty.
             MailRequest::LoadOutbox => emit(WorkerEvent::Outbox { items: Vec::new() }),
             // Signal completion so the demo's bulk spinner clears.
-            MailRequest::MoveMessages { .. } | MailRequest::MarkHamMany { .. } | MailRequest::PurgeMessages { .. } => {
+            MailRequest::MoveMessages { .. }
+            | MailRequest::MarkHamMany { .. }
+            | MailRequest::PurgeMessages { .. }
+            | MailRequest::UndoMove { .. } => {
                 emit(WorkerEvent::BulkComplete)
             }
             MailRequest::SaveDraft { .. } => emit(WorkerEvent::DraftSaved),
@@ -10538,6 +10550,8 @@ async fn run_graph(
                         connectivity: false,
                     }),
                 }
+                // The app spins its busy indicator until an undo answers.
+                emit(WorkerEvent::BulkComplete);
             }
 
             MailRequest::CreateFolder { path } => {
