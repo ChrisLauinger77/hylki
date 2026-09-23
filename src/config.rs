@@ -354,10 +354,21 @@ pub struct AccountConfig {
     /// matches.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pgp_key: Option<String>,
+    /// Whether this account's mail is merged into the unified section
+    /// (#267): Inboxes, Starred, Sent, Drafts, Archive, Filters and Tags.
+    /// Off keeps it to its own section; the tray and new-mail notifications
+    /// still count it, as they answer for every account. Written only when
+    /// off, so older files read the same.
+    #[serde(default = "default_enabled", skip_serializing_if = "is_true")]
+    pub in_unified: bool,
 }
 
 fn is_zero(v: &u32) -> bool {
     *v == 0
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 /// A send-as alias (#34): an extra From identity the composer offers. By
@@ -4247,6 +4258,7 @@ dest_path = "Lists"
             empty_junk_days: 0,
             empty_trash_days: 0,
             pgp_key: None,
+            in_unified: true,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {
@@ -4286,6 +4298,16 @@ dest_path = "Lists"
         let back: SettingsBundle = toml::from_str(&text).unwrap();
         assert_eq!(back.accounts[0].empty_trash_days, 30);
         assert_eq!(back.accounts[0].empty_junk_days, 0);
+        // Left out of the unified section (#267): only "out" is written,
+        // and a file without the key keeps the account in.
+        assert!(!text.contains("in_unified"), "{text}");
+        assert!(back.accounts[0].in_unified);
+        let mut apart = aged;
+        apart.accounts[0].in_unified = false;
+        let text = toml::to_string_pretty(&apart).unwrap();
+        assert!(text.contains("in_unified = false"), "{text}");
+        let back: SettingsBundle = toml::from_str(&text).unwrap();
+        assert!(!back.accounts[0].in_unified);
     }
 
     #[test]

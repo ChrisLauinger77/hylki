@@ -5351,7 +5351,10 @@ impl SimpleComponent for AppModel {
                     // unfolds the account to show where that is. Both emit
                     // the (cached) list synchronously, so the SelectAndLoad
                     // that follows finds the row and opens it.
-                    if kind == FolderKind::Inbox && self.unified_inboxes_shown() {
+                    if kind == FolderKind::Inbox
+                        && self.unified_inboxes_shown()
+                        && self.in_unified(account_id)
+                    {
                         self.open_unified(UnifiedView::Kind(FolderKind::Inbox));
                     } else {
                         self.select_folder(account_id, folder_id, name, path);
@@ -5714,9 +5717,11 @@ impl SimpleComponent for AppModel {
                     }
                 }
                 CtxAction::MarkAllInboxesRead => {
+                    // The inboxes the row merges, as its chip counts them.
                     let inboxes: Vec<(u32, u32)> = self
                         .accounts
                         .iter()
+                        .filter(|a| self.in_unified(a.id))
                         .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id)))
                         .collect();
                     for (account_id, folder_id) in inboxes {
@@ -5727,6 +5732,7 @@ impl SimpleComponent for AppModel {
                     let reqs: Vec<(u32, u32, String)> = self
                         .accounts
                         .iter()
+                        .filter(|a| self.in_unified(a.id))
                         .filter_map(|a| self.inbox_of(a.id).map(|f| (a.id, f.id, f.path.clone())))
                         .collect();
                     for (account_id, folder_id, path) in reqs {
@@ -7147,9 +7153,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::TrayViewUnread => {
-                let unified = self.show_unified_pref
-                    && (self.config.iter().filter(|c| c.enabled).count() > 1
-                        || (demo_mode() && self.accounts.len() > 1));
+                // The tray counts every inbox (#267): when all of its unread
+                // mail is in accounts left out of All Inboxes, that view
+                // would show none of it.
+                let unified = self.unified_inboxes_shown()
+                    && (self.unified_inboxes_unread() > 0 || self.inboxes_unread() == 0);
                 if unified {
                     // Through the sidebar, so its highlight moves too; it
                     // answers with UnifiedSelected.
@@ -8298,6 +8306,12 @@ impl SimpleComponent for AppModel {
             AppMsg::AddFirstAccount => self.open_settings_window(&sender, true, true),
 
             AppMsg::AccountSaved { original_email, account } => {
+                // Whether the account joined or left the unified section
+                // (#267): the merged views open now are redrawn without it.
+                let unified_changed = original_email
+                    .as_ref()
+                    .and_then(|orig| self.effective_config().iter().find(|c| &c.email == orig))
+                    .is_some_and(|old| old.in_unified != account.in_unified);
                 // Demo mode: the edit lands on the in-memory stand-in (so a
                 // new color, emoji or picture shows in the sidebar and the
                 // reader at once) and nothing is written or reconnected.
@@ -8315,8 +8329,12 @@ impl SimpleComponent for AppModel {
                     self.rebuild_sidebar();
                     self.warm_own_gravatars(&sender);
                     self.refresh_faces();
+                    if unified_changed {
+                        self.reload_unified_views(self.unified.then_some(self.unified_view), &sender);
+                    }
                     return;
                 }
+                let open_unified = self.unified.then_some(self.unified_view);
                 let new_email = account.email.clone();
                 // Remember the secret we expect to persist, so we can verify the
                 // keyring actually stored it (a silent keyring failure would
@@ -8393,6 +8411,9 @@ impl SimpleComponent for AppModel {
                         self.warm_own_gravatars(&sender);
                         self.refresh_faces();
                         self.reconnect_all(&sender);
+                        if unified_changed {
+                            self.reload_unified_views(open_unified, &sender);
+                        }
                     }
                     Err(e) => self.notifications.emit(NotifyInput::Push {
                         text: i18n_f("Could not save account: {e}", &[("e", &(e).to_string())]),
@@ -12105,7 +12126,7 @@ impl AppModel {
     fn push_unread_counts(&self) {
         let folders = self.folder_unread.clone();
         let unified = self.unified_unread();
-        self.sidebars_emit(SidebarInput::SetUnread { folders, unified: self.inboxes_unread() });
+        self.sidebars_emit(SidebarInput::SetUnread { folders, unified: self.unified_inboxes_unread() });
         // The counted total is what GNOME shows beside Hylki in Background
         // Apps, so a process with no window still says what it is there for.
         if self.run_in_background.get() {
@@ -12347,6 +12368,7 @@ impl AppModel {
                     .iter()
                     .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
                 Some(SectionData {
+                    in_unified: self.in_unified(account.id),
                     has_filters,
                     collapsed: self.collapsed.contains(email),
                     custom_expanded: self.folders_expanded.contains(email),
@@ -12373,7 +12395,7 @@ impl AppModel {
         // The other unified rows are as pointless with one account.
         let unified_kinds =
             if multi_account { self.unified_kinds } else { config::UnifiedKinds::NONE };
-        let unified_unread = self.inboxes_unread();
+        let unified_unread = self.unified_inboxes_unread();
         let unified_folders = self.unified_folder_refs();
         self.sidebars_emit(SidebarInput::SetContents {
             sections,
@@ -13088,24 +13110,50 @@ impl AppModel {
         }
     }
 
-    /// More than one account is switched on. Counted from config, not from
-    /// the workers that have reported in: at startup the accounts stream in
-    /// one by one, and counting only the connected ones made the first
-    /// sidebar build look single-account — its default selection then
+    /// More than one switched-on account takes part in the unified section:
+    /// with one, or none (every other account left out of it, #267), its
+    /// rows would only repeat an account's own. Counted from config, not
+    /// from the workers that have reported in: at startup the accounts
+    /// stream in one by one, and counting only the connected ones made the
+    /// first sidebar build look single-account — its default selection then
     /// landed on that account's inbox (possibly inside a collapsed section,
     /// so nothing visibly highlighted) instead of the "All Inboxes" the app
     /// should open with.
     fn multi_account(&self) -> bool {
-        self.config.iter().filter(|c| c.enabled).count() > 1
-            // The demo has no config-file accounts, but its two mock accounts
+        self.config.iter().filter(|c| c.enabled && c.in_unified).count() > 1
+            // The demo has no config-file accounts, but its mock accounts
             // deserve the same All Inboxes opening as a real multi-account setup.
-            || (demo_mode() && self.accounts.len() > 1)
+            || (demo_mode() && self.accounts.iter().filter(|a| self.in_unified(a.id)).count() > 1)
     }
 
     /// The sidebar has an Inboxes row: the preference is on and there is
     /// more than one account to merge.
     fn unified_inboxes_shown(&self) -> bool {
         self.show_unified_pref && self.multi_account()
+    }
+
+    /// An account joined or left the unified section (#267): the unified
+    /// Tags lists are read again, and the unified view that was open
+    /// (`open`) is loaded afresh over the accounts now in it. When its row
+    /// went with the change (one account or none left in the section), the
+    /// sidebar has already moved to the first inbox instead.
+    fn reload_unified_views(&mut self, open: Option<UnifiedView>, sender: &ComponentSender<Self>) {
+        self.tag_view_cache.retain(|(scope, _), _| scope.is_some());
+        if self.tag_view.as_ref().is_some_and(|(scope, _)| scope.is_none()) {
+            self.refresh_tag_view(sender);
+        }
+        let Some(view) = open else { return };
+        let listed = match view {
+            UnifiedView::Kind(FolderKind::Inbox) => self.unified_inboxes_shown(),
+            UnifiedView::Kind(kind) => self.multi_account() && self.unified_kinds.has(kind),
+            UnifiedView::Filtered => self.unified_filtered,
+        };
+        if listed {
+            // A reconnect has emptied the account list; each account's
+            // folders asks for its slice again as they arrive.
+            self.unified_boot_requested.clear();
+            self.open_unified(view);
+        }
     }
 
     /// Open a unified view (Inboxes, Starred, Sent, …, Filtered): the merged
@@ -16430,7 +16478,7 @@ impl AppModel {
             .accounts
             .iter()
             .map(|a| a.id)
-            .filter(|id| scope.map_or(true, |s| s == *id))
+            .filter(|id| self.in_tag_scope(scope, *id))
             .collect();
         for id in ids {
             if self.keyword_sync_at.get(&id).is_some_and(|t| now.duration_since(*t) < PAUSE) {
@@ -16439,6 +16487,12 @@ impl AppModel {
             self.keyword_sync_at.insert(id, now);
             self.send_to(id, MailRequest::RefreshKeywords { keywords: keywords.clone() });
         }
+    }
+
+    /// Whether a tag view covers an account: its own, or for the unified
+    /// Tags row every account merged into the unified section (#267).
+    fn in_tag_scope(&self, scope: Option<u32>, account_id: u32) -> bool {
+        scope.map_or_else(|| self.in_unified(account_id), |id| id == account_id)
     }
 
     fn tag_view_keywords(&self, kw: &Option<String>) -> Vec<String> {
@@ -16485,7 +16539,7 @@ impl AppModel {
             .accounts
             .iter()
             .map(|a| a.id)
-            .filter(|id| scope.map_or(true, |s| s == *id))
+            .filter(|id| self.in_tag_scope(scope, *id))
             .collect();
         let s = sender.clone();
         std::thread::spawn(move || {
@@ -16514,7 +16568,7 @@ impl AppModel {
         rows: Vec<(u32, String, Message)>,
     ) -> Vec<Message> {
         let (scope, kw) = key;
-        let in_scope = |account_id: u32| scope.map_or(true, |id| id == account_id);
+        let in_scope = |account_id: u32| self.in_tag_scope(*scope, account_id);
         let keywords = self.tag_view_keywords(kw);
         let mut out: Vec<Message> = Vec::new();
         let mut seen_rows: std::collections::HashSet<(u32, u32, u32)> =
@@ -18856,6 +18910,7 @@ impl AppModel {
             UnifiedView::Kind(kind) => self
                 .accounts
                 .iter()
+                .filter(|a| self.in_unified(a.id))
                 .filter_map(|a| self.folder_of_kind(a.id, kind).map(|f| (a.id, f.id, f.path.clone())))
                 .collect(),
             UnifiedView::Filtered => self
@@ -18870,7 +18925,8 @@ impl AppModel {
     fn is_unified_target(&self, account_id: u32, folder_id: u32) -> bool {
         match self.unified_view {
             UnifiedView::Kind(kind) => {
-                self.folder_of_kind(account_id, kind).is_some_and(|f| f.id == folder_id)
+                self.in_unified(account_id)
+                    && self.folder_of_kind(account_id, kind).is_some_and(|f| f.id == folder_id)
             }
             UnifiedView::Filtered => self
                 .unified_folder_refs()
@@ -18931,7 +18987,9 @@ impl AppModel {
     /// The folders the unified "Filtered Folders" section lists: the
     /// destination of every rule, in account order then rule order, without
     /// repeats; nothing when Settings → Sidebar has the section off. An
-    /// inbox destination is already an All Inboxes row and is skipped.
+    /// inbox destination is already an All Inboxes row and is skipped, and
+    /// an account left out of the unified section (#267) lists its rules'
+    /// folders under its own section only.
     fn unified_folder_refs(&self) -> Vec<UnifiedFolderRef> {
         let mut out: Vec<UnifiedFolderRef> = Vec::new();
         if !self.unified_filtered {
@@ -18939,6 +18997,9 @@ impl AppModel {
         }
         for email in self.ordered_emails() {
             let Some(account) = self.accounts.iter().find(|a| a.email == email) else { continue };
+            if !self.in_unified(account.id) {
+                continue;
+            }
             let Some(folders) = self.folders.get(&account.id) else { continue };
             let rules = self.filters.iter().filter(|r| r.account_email.eq_ignore_ascii_case(&email));
             for r in rules {
@@ -18980,15 +19041,36 @@ impl AppModel {
         self.accounts.iter().map(|a| self.counted_unread(a.id)).sum()
     }
 
-    /// The number behind the unified Inboxes chip: the inboxes alone. A
-    /// filter's destination has its own row (under Filters, and in its
-    /// account), with its own chip, so it is not counted here as well.
+    /// The number behind the tray icon's dot and its menu: every
+    /// account's inbox alone, whether or not the account is in the unified
+    /// section (#267). A filter's destination has its own row (under
+    /// Filters, and in its account), with its own chip, so it is not
+    /// counted here as well.
     fn inboxes_unread(&self) -> u32 {
         self.accounts
             .iter()
             .filter_map(|a| self.inbox_of(a.id))
             .map(|f| self.folder_unread_of(f))
             .sum()
+    }
+
+    /// The number behind the unified Inboxes chip: the inboxes that view
+    /// merges, which leaves out the accounts kept apart from it (#267).
+    fn unified_inboxes_unread(&self) -> u32 {
+        self.accounts
+            .iter()
+            .filter(|a| self.in_unified(a.id))
+            .filter_map(|a| self.inbox_of(a.id))
+            .map(|f| self.folder_unread_of(f))
+            .sum()
+    }
+
+    /// Whether an account's mail is merged into the unified section (#267).
+    /// An account with no config (never the case outside a test) is in.
+    fn in_unified(&self, account_id: u32) -> bool {
+        self.effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+            .is_none_or(|c| c.in_unified)
     }
 
     /// A watcher or sweep reported a changed unread count for `folder_id`.
@@ -19631,6 +19713,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         empty_junk_days: 0,
         empty_trash_days: 0,
         pgp_key: None,
+        in_unified: true,
     };
     vec![
         mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", "🚀"),

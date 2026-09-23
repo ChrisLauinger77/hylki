@@ -39,6 +39,14 @@
   same count as the tray icon's dot, where it draws badges: KDE Plasma, and
   GNOME with Dash to Dock or Dash to Panel. Settings > System has a switch
   to turn it off.
+- **New: an account can be kept out of All Inboxes** (#267, suggested by
+  rsx-xp). Settings > Accounts > the account > "Show in All Inboxes", on
+  by default. Switched off, the account's mail is left out of the unified
+  Inboxes, Starred, Sent, Drafts and Archive rows, the unified Filters and
+  Tags, and their unread counts; its own section stays. The tray count and
+  new-mail notifications still include it, and a search still covers it.
+  With fewer than two accounts left in the unified section it is not shown,
+  as with one account.
 
 ## 1.41.0 — 2026-09-23
 

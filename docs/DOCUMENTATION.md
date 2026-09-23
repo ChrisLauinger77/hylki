@@ -107,6 +107,24 @@ level), so a "Notes" folder on any other server is left alone. The look is
 taken once per account; a folder brought back from the Hidden Folders list
 stays back.
 
+### Keeping an account out of All Inboxes
+
+**Settings → Accounts → the account → Show in All Inboxes** decides whether
+the account's mail is merged into the unified section at the top of the
+sidebar. Switched off, the account's folders are left out of the unified
+Inboxes, Starred, Sent, Drafts and Archive rows, their account lists and
+unread counts, and the account's filter folders and tagged mail are left
+out of the unified Filters and Tags. The account keeps its own section in
+the sidebar, and a search still covers its mail.
+
+The tray icon's count and new-mail notifications still include the
+account. Clicking a notification for it opens the account's own Inbox.
+With fewer than two accounts left in the unified section, it is not shown,
+as with a single account, and **Open at startup: All Inboxes** opens the
+first account's Inbox instead.
+Stored on the account as `in_unified = false` in `accounts.toml`; without
+the key an account is included.
+
 ### Moving mail to another account
 
 **Move To** lists the folders of the account the mail is in first, then those

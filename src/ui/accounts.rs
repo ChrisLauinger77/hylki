@@ -1305,6 +1305,18 @@ impl Component for AccountsWindow {
                                         connect_clicked => AccountsInput::ClearGlyph,
                                     },
                                 },
+
+                                // Off keeps a mailbox read on its own out of
+                                // the merged lists (#267); its own section,
+                                // the tray and notifications are unchanged.
+                                #[name = "in_unified_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Show in All Inboxes"),
+                                    set_subtitle: &i18n("Include this account's mail in the unified Inboxes, \
+                                                   Starred, Sent, Drafts and Archive, and in the unified \
+                                                   Filters and Tags."),
+                                    set_active: true,
+                                },
                             },
 
                             // Send-as aliases (#34): extra From identities the
@@ -3922,6 +3934,7 @@ fn read_account(
             let sel = widgets.pgp_key_row.selected() as usize;
             sel.checked_sub(1).and_then(|i| c.borrow().get(i).map(|k| k.fingerprint.clone()))
         }),
+        in_unified: widgets.in_unified_row.is_active(),
     }
 }
 
@@ -4046,6 +4059,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.empty_junk_row.set_selected(auto_empty_index(acc.empty_junk_days));
     widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
     fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
+    widgets.in_unified_row.set_active(acc.in_unified);
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -4128,6 +4142,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.empty_junk_row.set_selected(0);
     widgets.empty_trash_row.set_selected(0);
     fill_pgp_key_row(widgets, None);
+    widgets.in_unified_row.set_active(true);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");
     widgets.label_row.set_text("");

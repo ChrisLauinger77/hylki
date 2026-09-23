@@ -1070,5 +1070,6 @@ pub(crate) fn blank_account() -> AccountConfig {
         empty_junk_days: 0,
         empty_trash_days: 0,
         pgp_key: None,
+        in_unified: true,
     }
 }

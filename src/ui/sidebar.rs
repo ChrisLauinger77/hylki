@@ -167,6 +167,10 @@ pub struct SectionData {
     pub has_filters: bool,
     /// Whether this account's own "Tags" section is open.
     pub tags_expanded: bool,
+    /// Whether the account takes part in the unified section (#267): off,
+    /// its folders are left out of every unified row and chip, and only
+    /// its own section lists them.
+    pub in_unified: bool,
 }
 
 /// Initial state for the sidebar.
@@ -889,6 +893,31 @@ impl Sidebar {
                 }
                 if self.selected == Sel::UnifiedFiltered && self.unified_folders.is_empty() {
                     self.selected = Sel::None;
+                }
+                // All Inboxes gone (one account or none left in the unified
+                // section, #267): the usual first view is picked again.
+                if self.selected == Sel::Unified && !self.show_unified {
+                    self.selected = Sel::None;
+                }
+                // An inbox or folder picked under a unified row whose account
+                // has just left the unified section is still the open
+                // folder: carry the highlight to the account's own row.
+                let left_unified = |acc: u32| {
+                    self.sections.iter().find(|s| s.account.id == acc).map(|s| !s.in_unified)
+                };
+                let moved = match &self.selected {
+                    Sel::UnifiedInbox(acc) => Some((*acc, FolderKind::Inbox)),
+                    Sel::UnifiedKindRow(kind, acc) => Some((*acc, *kind)),
+                    _ => None,
+                };
+                if let Some((acc, kind)) = moved.filter(|(acc, _)| left_unified(*acc) == Some(true)) {
+                    let path = self
+                        .sections
+                        .iter()
+                        .find(|s| s.account.id == acc)
+                        .and_then(|s| s.folders.iter().find(|f| f.kind == kind))
+                        .map(|f| f.path.clone());
+                    self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
                 }
                 if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
                     self.selected = Sel::None;
@@ -1949,7 +1978,9 @@ impl Sidebar {
         if unified_shown && self.unified_tags_shown() && self.tags_placement == AllInboxes {
             unified_rows.push(UnifiedRow::Tags);
         }
-        self.build_unified_run(container, &unified_rows, &sections, sender);
+        let unified_sections: Vec<SectionData> =
+            sections.iter().filter(|s| s.in_unified).cloned().collect();
+        self.build_unified_run(container, &unified_rows, &unified_sections, sender);
 
         // Contacts and Attachments live in the pinned footer against the
         // sidebar's bottom edge — they keep out of the way of the account
@@ -3648,6 +3679,7 @@ impl Sidebar {
         }
         self.sections
             .iter()
+            .filter(|s| s.in_unified)
             .flat_map(|s| s.folders.iter())
             .filter(|f| f.kind == kind)
             .map(|f| f.unread)
