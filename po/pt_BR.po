@@ -4828,11 +4828,9 @@ msgid "Test & Add"
 msgstr "Testar e adicionar"
 
 msgid ""
-"Google and Microsoft accounts sign in through GNOME Settings → Online "
-"Accounts, then appear above."
+"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
+"SMTP ones included. Google and Microsoft sign in only that way."
 msgstr ""
-"As contas do Google e da Microsoft entram pelas Configurações do GNOME → "
-"Contas online e depois aparecem acima."
 
 msgid "Scan Again"
 msgstr "Procurar novamente"
@@ -5271,6 +5269,13 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
+#~ "Accounts, then appear above."
+#~ msgstr ""
+#~ "As contas do Google e da Microsoft entram pelas Configurações do GNOME → "
+#~ "Contas online e depois aparecem acima."
 
 #~ msgid "A clean, fast GNOME-native email client"
 #~ msgstr "Um cliente de email simples, rápido e nativo do GNOME"

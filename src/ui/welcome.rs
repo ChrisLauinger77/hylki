@@ -555,7 +555,7 @@ impl Component for Welcome {
         status_box.append(&status_lbl);
         acct.append(&status_box);
 
-        let goa_note = tagline(&i18n("Google and Microsoft accounts sign in through GNOME Settings → Online Accounts, then appear above."));
+        let goa_note = tagline(&i18n("Accounts added in GNOME Settings → Online Accounts appear above, IMAP and SMTP ones included. Google and Microsoft sign in only that way."));
         goa_note.add_css_class("welcome-hint");
         let rescan = gtk::Button::with_label(&i18n("Scan Again"));
         rescan.add_css_class("flat");
@@ -1043,6 +1043,7 @@ pub(crate) fn blank_account() -> AccountConfig {
         password: String::new(),
         smtp_separate: false,
         tls_accept_hostname_mismatch: false,
+        security: None,
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: None,

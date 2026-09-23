@@ -4732,11 +4732,9 @@ msgid "Test & Add"
 msgstr "Tesztelés és hozzáadás"
 
 msgid ""
-"Google and Microsoft accounts sign in through GNOME Settings → Online "
-"Accounts, then appear above."
+"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
+"SMTP ones included. Google and Microsoft sign in only that way."
 msgstr ""
-"A Google- és Microsoft-fiókok a GNOME Beállítások → Online-fiókok menüjén "
-"keresztül jelentkeznek be, majd fent jelennek meg."
 
 msgid "Scan Again"
 msgstr "Újraellenőrzés"
@@ -5175,6 +5173,13 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
+#~ "Accounts, then appear above."
+#~ msgstr ""
+#~ "A Google- és Microsoft-fiókok a GNOME Beállítások → Online-fiókok menüjén "
+#~ "keresztül jelentkeznek be, majd fent jelennek meg."
 
 #~ msgid "A clean, fast GNOME-native email client"
 #~ msgstr "Tiszta, gyors, GNOME-ba illeszkedő levelezőkliens"

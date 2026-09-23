@@ -2325,6 +2325,7 @@ impl Component for AccountsWindow {
                         account.smtp_separate = orig.smtp_separate;
                         account.smtp_username = orig.smtp_username.clone();
                         account.smtp_password = orig.smtp_password.clone();
+                        account.security = orig.security.clone();
                     }
                 }
 
@@ -3857,6 +3858,8 @@ fn read_account(
         password: widgets.pass_row.text().to_string(),
         smtp_separate: widgets.smtp_separate_row.is_active(),
         tls_accept_hostname_mismatch: widgets.tls_mismatch_row.is_active(),
+        // GNOME Online Accounts' own, carried over from the account edited.
+        security: None,
         smtp_username: trimmed(&widgets.smtp_user_row),
         smtp_password: widgets.smtp_pass_row.text().to_string(),
         color: Some(crate::color::to_hex(&widgets.color_btn.rgba())),

@@ -2604,7 +2604,7 @@ impl SimpleComponent for AppModel {
             sidebar_state.tags_expanded_accounts.retain(|e| !goa_removed.contains(e));
             config::save_sidebar_state(&sidebar_state);
         }
-        if !goa_removed.is_empty() || goa_outcome.paused_changed {
+        if !goa_removed.is_empty() || goa_outcome.paused_changed || goa_outcome.servers_changed {
             let _ = config::save(&config);
         }
         let order = sidebar_state.order;
@@ -8856,7 +8856,7 @@ impl SimpleComponent for AppModel {
                     }
                     self.save_sidebar_state();
                 }
-                if !outcome.removed.is_empty() || outcome.paused_changed {
+                if !outcome.removed.is_empty() || outcome.paused_changed || outcome.servers_changed {
                     if let Err(e) = config::save(&self.config) {
                         tracing::error!("could not save config after GOA change: {e}");
                     }
@@ -19021,6 +19021,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         password: "demo".into(),
         smtp_separate: false,
         tls_accept_hostname_mismatch: false,
+        security: None,
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: Some(color.into()),
@@ -19394,13 +19395,16 @@ pub(crate) fn showcase_capture(win: &gtk::Widget, path: &str) {
 struct GoaReconcile {
     removed: Vec<String>,
     paused_changed: bool,
+    /// An account's servers or their security changed in GNOME Settings.
+    servers_changed: bool,
 }
 
 /// Reconcile imported accounts against GNOME Online Accounts: drop the ones
 /// whose GOA account no longer exists, and pause — rather than remove — the ones
 /// whose Mail service is switched off there, restoring their previous enabled
 /// state when it comes back on. Pausing keeps every local setting (label,
-/// colour, signature, sidebar state) intact. `live` is a snapshot the caller
+/// colour, signature, sidebar state) intact. The servers follow GOA's too,
+/// so an edit in GNOME Settings needs no re-import (#254). `live` is a snapshot the caller
 /// obtained while GOA was reachable — when it isn't, skip reconciliation
 /// entirely, so a momentarily-unavailable GOA never wipes imported accounts.
 fn reconcile_goa(config: &mut Vec<AccountConfig>, live: &crate::goa::GoaLiveState) -> GoaReconcile {
@@ -19413,8 +19417,14 @@ fn reconcile_goa(config: &mut Vec<AccountConfig>, live: &crate::goa::GoaLiveStat
         _ => true,
     });
     for c in config.iter_mut() {
-        let Some(id) = &c.goa_id else { continue };
-        let mail_disabled = live.disabled_mail_ids.contains(id);
+        let Some(id) = c.goa_id.clone() else { continue };
+        if let Some(g) = live.mail.get(&id) {
+            if g.apply_servers(c) {
+                tracing::info!("servers for {} updated from GNOME Online Accounts", c.email);
+                outcome.servers_changed = true;
+            }
+        }
+        let mail_disabled = live.disabled_mail_ids.contains(&id);
         if mail_disabled && !c.goa_mail_disabled {
             c.goa_mail_disabled = true;
             c.goa_enabled_before_mail_disabled = c.enabled;
