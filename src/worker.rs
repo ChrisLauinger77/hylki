@@ -460,6 +460,13 @@ pub enum MailRequest {
     RefreshUnread,
     /// Force a fresh connection and re-list folders (e.g. after a failure).
     Reconnect,
+    /// Sent right behind a request that takes mail out of `path` (a move,
+    /// a purge, Spam/Not Spam) and answered with
+    /// [`WorkerEvent::MovesSettled`] once the worker reaches it. The worker
+    /// serves requests in order, so by then the one ahead has run, however
+    /// it went; until then a folder list fetched earlier still shows the
+    /// mail, and the app keeps it off screen (#255).
+    Settle { path: String, uids: Vec<u32> },
     /// The tag finder (Settings → Tags → Find Tags…): report every keyword
     /// in use across the account's folders as one
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
@@ -597,6 +604,9 @@ pub enum WorkerEvent {
     /// A `SetSeen` has been stored (or failed): the app stops holding its own
     /// read state for that message over what the server reports.
     SeenSettled { path: String, uid: u32 },
+    /// The answer to [`MailRequest::Settle`]: whatever took these messages
+    /// out of `path` has been done or has failed.
+    MovesSettled { path: String, uids: Vec<u32> },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
@@ -1387,6 +1397,11 @@ async fn run_imap(
 
         if matches!(req, MailRequest::Reconnect) {
             session = connect_and_list(account_id, &account, cache.as_ref(), &emit).await;
+            continue;
+        }
+        // Answered offline too: a move that could not run has still settled.
+        if let MailRequest::Settle { path, uids } = req {
+            emit(WorkerEvent::MovesSettled { path, uids });
             continue;
         }
 
@@ -2586,7 +2601,7 @@ async fn run_imap(
                 }
             }
 
-            MailRequest::Reconnect => unreachable!("handled above"),
+            MailRequest::Reconnect | MailRequest::Settle { .. } => unreachable!("handled above"),
         }
 
         if lost {
@@ -8620,6 +8635,8 @@ async fn run_pop3(
             MailRequest::Reconnect => {
                 emit(WorkerEvent::Folders(pop3_folders(account_id)));
             }
+
+            MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
         }
     }
 }
@@ -8910,6 +8927,7 @@ async fn run_mock(
                 emit(WorkerEvent::BulkComplete)
             }
             MailRequest::SaveDraft { .. } => emit(WorkerEvent::DraftSaved),
+            MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
             // Pretend the send succeeded so the compose flow is demoable offline.
             MailRequest::Send { .. } => emit(WorkerEvent::Sent),
         }
@@ -10709,6 +10727,8 @@ async fn run_graph(
                         .await;
                 }
             }
+
+            MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
         }
     }
 }

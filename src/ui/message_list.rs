@@ -2477,6 +2477,10 @@ pub struct MessageList {
     /// built ones); an idle callback builds them a chunk at a time.
     pending_rows: std::collections::VecDeque<RowInit>,
     fill_scheduled: bool,
+    /// The list had keyboard focus when a rebuild took its rows away, and
+    /// the selected row it belongs on is not built yet: `fill_rows` hands
+    /// focus to it when it is.
+    refocus_selected: bool,
     /// Row lists a folder switch left behind, torn down a chunk at a time
     /// at idle: destroying a page of rows costs about as much as building
     /// one, and it need not happen before the new page shows.
@@ -3211,6 +3215,7 @@ impl SimpleComponent for MessageList {
             input: sender.input_sender().clone(),
             pending_rows: std::collections::VecDeque::new(),
             fill_scheduled: false,
+            refocus_selected: false,
             retired: Vec::new(),
             retire_scheduled: false,
             row_sigs: Vec::new(),
@@ -3404,10 +3409,19 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::RunQueuedRebuild => {
                 if let Some(preserve) = self.rebuild_queued.take() {
+                    // A rebuild destroys the focused row (or the whole list
+                    // box), and focus falls to the window, where Delete does
+                    // nothing: a background sync in the middle of deleting
+                    // mail one by one left the key dead until a row was
+                    // clicked (#255). Put focus back where it was.
+                    let had_focus = self.focus_in_list();
                     if preserve {
                         self.rebuild_preserving_scroll();
                     } else {
                         self.rebuild();
+                    }
+                    if had_focus {
+                        self.restore_list_focus();
                     }
                 }
                 // The rows exist now: run the selection that waited for them.
@@ -5491,6 +5505,17 @@ impl MessageList {
             }
         }
         self.select_current();
+        // Only while focus is still on the list: anything focused since
+        // (the search box, the reader) keeps it.
+        if self.refocus_selected {
+            if !self.focus_in_list() {
+                self.refocus_selected = false;
+            } else {
+                let mut done = false;
+                self.preserving_scroll(|this| done = this.focus_selected_row());
+                self.refocus_selected = !done;
+            }
+        }
         if !self.pending_rows.is_empty() && !self.fill_scheduled {
             self.fill_scheduled = true;
             let input = self.input.clone();
@@ -5720,6 +5745,42 @@ impl MessageList {
         {
             win.set_focus_visible(false);
         }
+    }
+
+    /// Whether keyboard focus is on the list or one of its rows.
+    fn focus_in_list(&self) -> bool {
+        let list = self.rows.widget().upcast_ref::<gtk::Widget>();
+        list.root()
+            .and_then(|r| r.focus())
+            .is_some_and(|f| f == *list || f.is_ancestor(list))
+    }
+
+    /// Give focus back to the selected row after a rebuild, scroll kept and
+    /// no focus ring drawn. Until that row is built the list box holds
+    /// focus, so the list's keys work in between.
+    fn restore_list_focus(&mut self) {
+        self.preserving_scroll(|this| {
+            if this.focus_selected_row() {
+                this.refocus_selected = false;
+            } else {
+                this.rows.widget().grab_focus();
+                this.refocus_selected = !this.selected_ids.is_empty();
+            }
+        });
+        self.hide_focus_ring();
+    }
+
+    /// Focus the built row of the first selected message, if there is one.
+    fn focus_selected_row(&self) -> bool {
+        let list = self.rows.widget();
+        let Some(row) = list.selected_rows().into_iter().next() else {
+            return false;
+        };
+        let focused = row.grab_focus();
+        if focused {
+            self.hide_focus_ring();
+        }
+        focused
     }
 
     /// Re-apply the whole selection (the viewed message plus any multi-selected

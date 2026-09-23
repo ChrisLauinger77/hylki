@@ -50,8 +50,15 @@ const READER_MIN_WIDTH: i32 = 400;
 
 /// How long a read/unread change sent to a worker keeps overriding what the
 /// server reports for its message and folder, should the worker's
-/// confirmation never come (a dropped connection mid-request).
-const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(20);
+/// confirmation never come (a dropped connection mid-request). A worker
+/// busy with a large sync can take well over 20 seconds to reach a mark,
+/// and read mail used to turn unread again in the meantime (#255).
+const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The same for mail taken out of a folder (moved, deleted, marked as
+/// spam): how long it stays off that folder's list without the worker's
+/// word that the move has run.
+const PENDING_MOVE_MAX: std::time::Duration = std::time::Duration::from_secs(120);
 
 /// How long a manual "Apply Filters" run (#198) waits for the folders it asked
 /// for before reporting on whatever came back. A folder that is offline, or
@@ -559,6 +566,13 @@ pub struct AppModel {
     /// ahead of the STORE still shows the old state; while an entry is
     /// young the app's own state for that message and folder wins over it.
     pending_seen: HashMap<(u32, String, u32), (bool, std::time::Instant)>,
+    /// Mail taken out of a folder whose move the worker has not reached
+    /// yet, keyed by (account, folder path, uid) → when it was sent. A list
+    /// the worker fetched ahead of the move still holds it, and putting it
+    /// back on screen made deleted mail come back, to be deleted again for
+    /// a request that had already run (#255). Filled by [`Self::send_to`],
+    /// which every such request goes through.
+    pending_moves: std::cell::RefCell<HashMap<(u32, String, u32), std::time::Instant>>,
     /// The account-list split view, narrowed to icon-only width when collapsed.
     sidebar_split: Option<adw::OverlaySplitView>,
     /// The "Hylki" title label, hidden while the sidebar is collapsed.
@@ -1661,6 +1675,9 @@ pub enum AppMsg {
     /// The worker stored (or failed to store) a read/unread change the app
     /// had applied ahead of it.
     SeenSettled { account_id: u32, path: String, uid: u32 },
+    /// The worker has run (or failed) the move that took these messages
+    /// out of `path`: its lists can be believed about them again.
+    MovesSettled { account_id: u32, path: String, uids: Vec<u32> },
     /// `path` is the folder the body was read from — a UID only identifies a
     /// message within its own folder, so applying a body to a message means
     /// checking the folder too.
@@ -3016,6 +3033,7 @@ impl SimpleComponent for AppModel {
             related_ids: HashMap::new(),
             folder_unread: HashMap::new(),
             pending_seen: HashMap::new(),
+            pending_moves: std::cell::RefCell::new(HashMap::new()),
             sidebar_split: None,
             app_title: None,
             sidebar_menu: None,
@@ -9112,6 +9130,16 @@ impl SimpleComponent for AppModel {
                 if self.pending_seen_in_folder(account_id, folder_id) {
                     return;
                 }
+                // Likewise while mail is being taken out of the folder: each
+                // move changes the server's count before the app hears the
+                // move is done, and every change started another sync of the
+                // folder, which put the mail back on the list (#255).
+                if self
+                    .folder_path(account_id, folder_id)
+                    .is_some_and(|p| self.pending_moves_in(account_id, &p))
+                {
+                    return;
+                }
                 let prev = self.folder_unread.insert((account_id, folder_id), unread);
                 if prev != Some(unread) {
                     self.sync_background_folder(account_id, folder_id);
@@ -9124,8 +9152,16 @@ impl SimpleComponent for AppModel {
                 self.pending_seen.retain(|_, (_, at)| at.elapsed() < PENDING_SEEN_MAX);
             }
 
+            AppMsg::MovesSettled { account_id, path, uids } => {
+                let mut pending = self.pending_moves.borrow_mut();
+                for uid in uids {
+                    pending.remove(&(account_id, path.clone(), uid));
+                }
+                pending.retain(|_, at| at.elapsed() < PENDING_MOVE_MAX);
+            }
+
             AppMsg::FolderUnreadByPath { account_id, path, unread } => {
-                if self.pending_seen_in(account_id, &path) {
+                if self.pending_seen_in(account_id, &path) || self.pending_moves_in(account_id, &path) {
                     return;
                 }
                 // Resolve against the current list; a path the app no longer
@@ -9160,6 +9196,9 @@ impl SimpleComponent for AppModel {
             AppMsg::Messages { account_id, folder_id, messages } => {
                 self.notifications.emit(NotifyInput::ClearConnectivity);
                 let messages = self.merge_local_tags(account_id, messages);
+                // Mail already moved or deleted here, in a list fetched before
+                // the worker got to the move.
+                let messages = self.drop_pending_moves(account_id, folder_id, messages);
                 // Auto-delete blacklisted senders from the inbox before anything
                 // else sees them.
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
@@ -9421,6 +9460,7 @@ impl SimpleComponent for AppModel {
                 // Background backfill: grow the folder's search index without
                 // disturbing the current view (no title/query reset).
                 let messages = self.merge_local_tags(account_id, messages);
+                let messages = self.drop_pending_moves(account_id, folder_id, messages);
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
                 let entry = self.message_cache.entry((account_id, folder_id)).or_default();
                 let existing: std::collections::HashSet<u32> =
@@ -9670,12 +9710,9 @@ impl SimpleComponent for AppModel {
                         (m.uid, m.folder_id)
                     });
                 let Some((uid, folder_id)) = target else { return };
-                if let Some(path) = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
-                    .map(|f| f.path.clone())
-                {
+                if let Some(path) = self.folder_path(account_id, folder_id) {
+                    self.pending_seen
+                        .insert((account_id, path.clone(), uid), (true, std::time::Instant::now()));
                     self.send_to(account_id, MailRequest::SetSeen { path, uid, seen: true });
                 }
                 self.message_list.emit(MessageListInput::MarkRead(id));
@@ -10628,10 +10665,69 @@ impl AppModel {
     }
 
     /// Send a request to a specific account's worker.
+    ///
+    /// A request that takes mail out of a folder is recorded in
+    /// `pending_moves` and followed by a [`MailRequest::Settle`], so the
+    /// mail stays off that folder's list until the worker has run it,
+    /// whichever of the many move paths sent it.
     fn send_to(&self, account_id: u32, req: MailRequest) {
-        if let Some(worker) = self.workers.get(&account_id) {
-            let _ = worker.send(req);
+        let Some(worker) = self.workers.get(&account_id) else { return };
+        let taken = match &req {
+            MailRequest::MoveMessage { path, uid, .. }
+            | MailRequest::MarkSpam { path, uid, .. }
+            | MailRequest::MarkHam { path, uid, .. } => Some((path.clone(), vec![*uid])),
+            MailRequest::MoveMessages { path, uids, .. }
+            | MailRequest::MarkHamMany { path, uids, .. }
+            | MailRequest::PurgeMessages { path, uids } => Some((path.clone(), uids.clone())),
+            _ => None,
+        };
+        let _ = worker.send(req);
+        if let Some((path, uids)) = taken {
+            let now = std::time::Instant::now();
+            let mut pending = self.pending_moves.borrow_mut();
+            for uid in &uids {
+                pending.insert((account_id, path.clone(), *uid), now);
+            }
+            let _ = worker.send(MailRequest::Settle { path, uids });
         }
+    }
+
+    /// Whether mail taken out of `path` is still waiting on its move.
+    fn pending_moves_in(&self, account_id: u32, path: &str) -> bool {
+        self.pending_moves.borrow().iter().any(|((a, p, _), at)| {
+            *a == account_id && p == path && at.elapsed() < PENDING_MOVE_MAX
+        })
+    }
+
+    /// Take the mail whose move is still on its way off a folder list the
+    /// worker fetched before running it.
+    fn drop_pending_moves(
+        &self,
+        account_id: u32,
+        folder_id: u32,
+        mut messages: Vec<Message>,
+    ) -> Vec<Message> {
+        let Some(path) = self.folder_path(account_id, folder_id) else {
+            return messages;
+        };
+        if !self.pending_moves_in(account_id, &path) {
+            return messages;
+        }
+        let pending = self.pending_moves.borrow();
+        messages.retain(|m| {
+            pending
+                .get(&(account_id, path.clone(), m.uid))
+                .is_none_or(|at| at.elapsed() >= PENDING_MOVE_MAX)
+        });
+        messages
+    }
+
+    /// The path of one of an account's folders, by id.
+    fn folder_path(&self, account_id: u32, folder_id: u32) -> Option<String> {
+        self.folders
+            .get(&account_id)
+            .and_then(|fs| fs.iter().find(|f| f.id == folder_id))
+            .map(|f| f.path.clone())
     }
 
     /// The account to act on by default: the selected folder's account,
@@ -11575,6 +11671,10 @@ impl AppModel {
     fn mark_opened_read(&mut self, m: &Message) {
         let account_id = m.account_id;
         if let Some(path) = self.resolve_folder_path(m) {
+            // Held like any other read mark, or a list fetched before the
+            // worker stores it shows the message unread again (#255).
+            self.pending_seen
+                .insert((account_id, path.clone(), m.uid), (true, std::time::Instant::now()));
             self.send_to(account_id, MailRequest::SetSeen { path, uid: m.uid, seen: true });
         }
         // Reading new mail clears that account's new-mail notification.
@@ -19683,6 +19783,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::FolderUnreadByPath { account_id, path, unread }
         }
         WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
+        WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
         WorkerEvent::RefsRepaired { folder_id } => {
             AppMsg::RefsRepaired { account_id, folder_id }
         }

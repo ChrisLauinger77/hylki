@@ -2204,6 +2204,8 @@ pub(super) async fn run_jmap(
                     refresh_jmap_folders(&s, account_id, cache.as_ref(), &mut state, &emit).await;
                 }
             }
+
+            MailRequest::Settle { path, uids } => emit(WorkerEvent::MovesSettled { path, uids }),
         }
     }
 }
