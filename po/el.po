@@ -1671,6 +1671,17 @@ msgstr "Κωδικός πρόσβασης SMTP"
 msgid "Test SMTP"
 msgstr "Δοκιμή SMTP"
 
+msgid "Automatic"
+msgstr "Αυτόματα"
+
+#. "Disabled", not "Automatic": the rows around it auto-detect a folder
+#. from the server's markings, and this one detects nothing. It is an
+#. override that is either set or not, and unset means the Sent folder
+#. above keeps taking the copies as it always has.
+#, fuzzy
+msgid "Disabled"
+msgstr "Πίνακας"
+
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
 "Το Microsoft 365 αρχειοθετεί δικό του αντίγραφο στα Απεσταλμένα· αυτό δεν "
@@ -1698,9 +1709,6 @@ msgstr "Ενεργοποίηση αυτού του λογαριασμού"
 
 msgid "Use this account in Hylki"
 msgstr "Χρήση αυτού του λογαριασμού στο Hylki"
-
-msgid "Automatic"
-msgstr "Αυτόματα"
 
 msgid "Never"
 msgstr "Ποτέ"

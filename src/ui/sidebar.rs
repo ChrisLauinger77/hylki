@@ -1775,7 +1775,16 @@ impl Sidebar {
             } else {
                 let label_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
                 label_box.append(&gtk::Image::from_icon_name("co.hyprlab.Hylki-list-add-symbolic"));
-                label_box.append(&gtk::Label::new(Some(i18n("Add first account").as_str())));
+
+                let add_label = gtk::Label::new(Some(i18n("Add first account").as_str()));
+                add_label.set_wrap(true);
+                add_label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+                add_label.set_justify(gtk::Justification::Center);
+                add_label.set_xalign(0.5);
+                add_label.set_hexpand(true);
+                label_box.append(&add_label);
+
+                add.set_halign(gtk::Align::Fill);
                 add.set_child(Some(&label_box));
                 let empty = gtk::Box::new(gtk::Orientation::Vertical, 12);
                 empty.set_valign(gtk::Align::Start);

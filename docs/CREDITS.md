@@ -55,9 +55,11 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   [#194](https://github.com/hyprlab/hylki/pull/194)): the Portuguese (Portugal)
   and Brazilian Portuguese translations, the request for a language chooser, and
   the report that the chosen language never reached the Flatpak.
-- [**Daniel Miguel**](https://github.com/danielmigueltejedor) ([#251](https://github.com/hyprlab/hylki/pull/251)): the
-  Spanish translation, and the counters, today's date and special folder
-  names that could not be translated.
+- [**Daniel Miguel**](https://github.com/danielmigueltejedor) ([#251](https://github.com/hyprlab/hylki/pull/251),
+  [#262](https://github.com/hyprlab/hylki/pull/262)): the Spanish
+  translation; the counters, today's date, special folder names and settings
+  choices that could not be translated; and layouts that make room for
+  longer translated labels.
 - [**Anton Palgunov**](https://github.com/Toxblh) ([#7](https://github.com/hyprlab/hylki/pull/7),
   [#8](https://github.com/hyprlab/hylki/pull/8)): sender avatars from GNOME
   Contacts photos, and GNOME Online Accounts refinements: custom server ports

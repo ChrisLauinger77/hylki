@@ -3103,7 +3103,8 @@ impl AccountsWindow {
             .cloned()
             .collect();
         self.populate_sent_copy_combo(widgets, acc, &all);
-        let mut labels: Vec<&str> = vec!["Automatic"];
+        let automatic = i18n("Automatic");
+        let mut labels: Vec<&str> = vec![automatic.as_str()];
         labels.extend(choices.iter().map(|(_, display)| display.as_str()));
         self.folder_paths = choices.iter().map(|(path, _)| path.clone()).collect();
         for (role, row) in [
@@ -3137,7 +3138,8 @@ impl AccountsWindow {
         // from the server's markings, and this one detects nothing. It is an
         // override that is either set or not, and unset means the Sent folder
         // above keeps taking the copies as it always has.
-        let mut labels: Vec<&str> = vec!["Disabled"];
+        let disabled = i18n("Disabled");
+        let mut labels: Vec<&str> = vec![disabled.as_str()];
         labels.extend(all.iter().map(|(_, display)| display.as_str()));
         self.sent_copy_paths = all.iter().map(|(path, _)| path.clone()).collect();
         let row = &widgets.folder_sent_copy_row;

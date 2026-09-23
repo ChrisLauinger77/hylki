@@ -1513,6 +1513,16 @@ msgstr ""
 msgid "Test SMTP"
 msgstr ""
 
+msgid "Automatic"
+msgstr ""
+
+#. "Disabled", not "Automatic": the rows around it auto-detect a folder
+#. from the server's markings, and this one detects nothing. It is an
+#. override that is either set or not, and unset means the Sent folder
+#. above keeps taking the copies as it always has.
+msgid "Disabled"
+msgstr ""
+
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
 
@@ -1535,9 +1545,6 @@ msgid "Enable this account"
 msgstr ""
 
 msgid "Use this account in Hylki"
-msgstr ""
-
-msgid "Automatic"
 msgstr ""
 
 msgid "Never"

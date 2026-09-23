@@ -1436,17 +1436,17 @@ impl Component for Preferences {
                                                the right group folds into a ⋯ menu when the reading \
                                                pane is narrow. Changes apply at once."),
                                     ),
-                                    #[wrap(Some)]
-                                    set_header_suffix = &gtk::Button {
-                                        set_label: &i18n("Restore Defaults"),
-                                        set_valign: gtk::Align::Center,
-                                        connect_clicked => PrefInput::ToolbarRestore,
-                                    },
-
                                     #[name = "toolbar_editor_box"]
                                     gtk::Box {
                                         set_orientation: gtk::Orientation::Vertical,
                                         set_spacing: 12,
+
+                                        gtk::Button {
+                                            set_label: &i18n("Restore Defaults"),
+                                            set_halign: gtk::Align::End,
+                                            set_valign: gtk::Align::Center,
+                                            connect_clicked => PrefInput::ToolbarRestore,
+                                        },
                                     },
                                 },
 
@@ -3417,7 +3417,10 @@ impl Component for Preferences {
 
         widgets
             .settings_open_row
-            .set_model(Some(&gtk::StringList::new(&["Settings", "Accounts"])));
+            .set_model(Some(&gtk::StringList::new(&[
+                i18n("Settings").as_str(),
+                i18n("Accounts").as_str(),
+            ])));
         widgets
             .settings_open_row
             .set_selected(if init.settings_open_accounts { 1 } else { 0 });

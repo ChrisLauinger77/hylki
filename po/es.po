@@ -1654,6 +1654,16 @@ msgstr "Contraseña SMTP"
 msgid "Test SMTP"
 msgstr "Probar SMTP"
 
+msgid "Automatic"
+msgstr "Automático"
+
+#. "Disabled", not "Automatic": the rows around it auto-detect a folder
+#. from the server's markings, and this one detects nothing. It is an
+#. override that is either set or not, and unset means the Sent folder
+#. above keeps taking the copies as it always has.
+msgid "Disabled"
+msgstr "Desactivado"
+
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
 "Microsoft 365 guarda su propia copia en Elementos enviados; esto no se puede "
@@ -1680,9 +1690,6 @@ msgstr "Activar esta cuenta"
 
 msgid "Use this account in Hylki"
 msgstr "Usar esta cuenta en Hylki"
-
-msgid "Automatic"
-msgstr "Automático"
 
 msgid "Never"
 msgstr "Nunca"
@@ -4554,6 +4561,8 @@ msgstr "3 líneas"
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."
 msgstr ""
+"El lanzador muestra un icono configurado fuera de Hylki. Al elegir uno aquí, "
+"se reemplazará."
 
 msgid "When displayed"
 msgstr "Al mostrarse"
@@ -4846,6 +4855,9 @@ msgid ""
 "Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
 "SMTP ones included. Google and Microsoft sign in only that way."
 msgstr ""
+"Las cuentas añadidas en Ajustes de GNOME → Cuentas en línea aparecen arriba, "
+"incluidas las cuentas IMAP y SMTP. Google y Microsoft solo inician sesión de "
+"esa forma."
 
 msgid "Scan Again"
 msgstr "Buscar de nuevo"

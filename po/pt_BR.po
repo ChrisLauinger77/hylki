@@ -1654,6 +1654,17 @@ msgstr "Senha SMTP"
 msgid "Test SMTP"
 msgstr "Testar SMTP"
 
+msgid "Automatic"
+msgstr "Automático"
+
+#. "Disabled", not "Automatic": the rows around it auto-detect a folder
+#. from the server's markings, and this one detects nothing. It is an
+#. override that is either set or not, and unset means the Sent folder
+#. above keeps taking the copies as it always has.
+#, fuzzy
+msgid "Disabled"
+msgstr "Tabela"
+
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
 "O Microsoft 365 arquiva sua própria cópia em Itens Enviados; isso não pode "
@@ -1679,9 +1690,6 @@ msgstr "Ativar esta conta"
 
 msgid "Use this account in Hylki"
 msgstr "Usar esta conta no Hylki"
-
-msgid "Automatic"
-msgstr "Automático"
 
 msgid "Never"
 msgstr "Nunca"
