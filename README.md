@@ -30,7 +30,7 @@
 Hylki is a GNOME-native desktop email client for the Linux desktop. It talks
 IMAP/SMTP directly, keeps your mail and credentials on your machine, and blocks
 trackers by default: no telemetry, no analytics. It is free software, built
-for GNOME first, and it would rather be beautiful *and* complete than pick one
+for GNOME, to be feature rich and beautiful
 ([the manifesto](docs/MANIFESTO.md)).
 
 > [!NOTE]
