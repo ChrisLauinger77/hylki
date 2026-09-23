@@ -474,12 +474,31 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr "Δεν υπάρχει διαθέσιμος φάκελος {v1}"
 
-msgid "One message stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid "One message could not be moved to {account}: {error}"
+msgid_plural "{n} messages could not be moved to {account}: {error}"
+msgstr[0] ""
+"Ένα μήνυμα παρέμεινε στη θέση του — η αλληλογραφία δεν μπορεί να μετακινηθεί "
+"μεταξύ λογαριασμών"
+msgstr[1] ""
+"Ένα μήνυμα παρέμεινε στη θέση του — η αλληλογραφία δεν μπορεί να μετακινηθεί "
+"μεταξύ λογαριασμών"
+
+#, fuzzy
+msgid "Moving one message to {account}…"
+msgid_plural "Moving {n} messages to {account}…"
+msgstr[0] "Μετακίνηση αυτού του μηνύματος σε φάκελο"
+msgstr[1] "Μετακίνηση αυτού του μηνύματος σε φάκελο"
+
+#, fuzzy
+msgid "One message stayed put: this account can't take mail from another"
 msgstr ""
 "Ένα μήνυμα παρέμεινε στη θέση του — η αλληλογραφία δεν μπορεί να μετακινηθεί "
 "μεταξύ λογαριασμών"
 
-msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid ""
+"{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
 "{foreign} μηνύματα παρέμειναν στη θέση τους — η αλληλογραφία δεν μπορεί να "
 "μετακινηθεί μεταξύ λογαριασμών"
@@ -3342,14 +3361,11 @@ msgstr[1] "Εισήχθησαν {n} κλειδιά."
 msgid "That key was already in your keyring."
 msgstr "Αυτό το κλειδί υπήρχε ήδη στην κλειδοθήκη σας."
 
-msgid "Hylki icon"
-msgstr "Εικονίδιο Hylki"
+msgid "App icon"
+msgstr "Εικονίδιο εφαρμογής"
 
-msgid "Envelope, white"
-msgstr "Φάκελος, λευκός"
-
-msgid "Envelope, black"
-msgstr "Φάκελος, μαύρος"
+msgid "Symbolic"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Ακολούθηση συστήματος"
@@ -3479,6 +3495,17 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Εγκατεστημένο, αλλά όχι το αντίγραφο αυτής της έκδοσης"
 
+#, fuzzy
+msgid "Search Settings"
+msgstr "Ρυθμίσεις"
+
+#, fuzzy
+msgid "Search settings"
+msgstr "Αναζήτηση αποστολέων"
+
+msgid "No Results"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr "Αποθήκευση του φίλτρου;"
 
@@ -3567,9 +3594,6 @@ msgstr ""
 
 msgid "Theme"
 msgstr "Θέμα"
-
-msgid "App icon"
-msgstr "Εικονίδιο εφαρμογής"
 
 msgid "This window opens to"
 msgstr "Αυτό το παράθυρο ανοίγει στο"
@@ -3687,6 +3711,12 @@ msgstr ""
 msgid ""
 "Every message opens in Reader View. The header's switch still changes the "
 "one on screen."
+msgstr ""
+
+msgid "Open at startup"
+msgstr ""
+
+msgid "What the window shows when Hylki starts."
 msgstr ""
 
 msgid "Accounts in the sidebar"
@@ -4131,8 +4161,8 @@ msgid "Use my own colors"
 msgstr "Χρήση δικών μου χρωμάτων"
 
 msgid ""
-"Ignore the text and background colors senders set, so every message reads "
-"in the same black or white on the reader's ground. Pictures are kept; links "
+"Ignore the text and background colors senders set, so every message reads in "
+"the same black or white on the reader's ground. Pictures are kept; links "
 "take the accent color."
 msgstr ""
 "Παράβλεψη των χρωμάτων κειμένου και φόντου που ορίζουν οι αποστολείς, ώστε "
@@ -4436,10 +4466,9 @@ msgid "Tray icon"
 msgstr "Εικονίδιο περιοχής ειδοποιήσεων"
 
 msgid ""
-"The Hylki icon, or a plain envelope in white or black to match the panel."
+"The app icon in full color, or its symbolic outline, which the panel draws "
+"in its own color."
 msgstr ""
-"Το εικονίδιο του Hylki ή ένας απλός λευκός ή μαύρος φάκελος που ταιριάζει "
-"στον πίνακα."
 
 msgid "Unread mail in the tray menu"
 msgstr "Μη αναγνωσμένα μηνύματα στο μενού περιοχής ειδοποιήσεων"
@@ -4587,6 +4616,17 @@ msgstr "Πάνω από τους λογαριασμούς"
 
 msgid "Below the accounts"
 msgstr "Κάτω από τους λογαριασμούς"
+
+#, fuzzy
+msgid "All Inboxes"
+msgstr "Εισερχόμενα"
+
+msgid "The last account's inbox"
+msgstr ""
+
+#, fuzzy
+msgid "The last folder"
+msgstr "Αυτός ο φάκελος"
 
 msgid "Left"
 msgstr "Αριστερά"
@@ -5160,6 +5200,14 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr "Η αποστολή απέτυχε: {e}"
 
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "Δεν ήταν δυνατή η δημιουργία φακέλου: {e}"
+
+#, fuzzy
+msgid "That folder is not on the server"
+msgstr "Οι φάκελοι κάτω από τη σειρά Φίλτρα."
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 "η απάντηση από τον διακομιστή δεν μπόρεσε να διαβαστεί (ξεκίνησε: {reply})"
@@ -5237,8 +5285,14 @@ msgstr "Δεν ήταν δυνατή η διαγραφή του μηνύματο
 msgid "POP3 accounts don't support folders"
 msgstr "Οι λογαριασμοί POP3 δεν υποστηρίζουν φακέλους"
 
+msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
 msgid "Inbox"
 msgstr "Εισερχόμενα"
+
+msgid "A Microsoft account can't receive mail from another account"
+msgstr ""
 
 msgid "Email Client"
 msgstr "Πρόγραμμα-πελάτης email"
@@ -5347,6 +5401,21 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Hylki icon"
+#~ msgstr "Εικονίδιο Hylki"
+
+#~ msgid "Envelope, white"
+#~ msgstr "Φάκελος, λευκός"
+
+#~ msgid "Envelope, black"
+#~ msgstr "Φάκελος, μαύρος"
+
+#~ msgid ""
+#~ "The Hylki icon, or a plain envelope in white or black to match the panel."
+#~ msgstr ""
+#~ "Το εικονίδιο του Hylki ή ένας απλός λευκός ή μαύρος φάκελος που ταιριάζει "
+#~ "στον πίνακα."
 
 #~ msgid ""
 #~ "Google and Microsoft accounts sign in through GNOME Settings → Online "

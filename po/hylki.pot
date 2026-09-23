@@ -439,10 +439,21 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr ""
 
-msgid "One message stayed put — mail can't be moved between accounts"
+msgid "One message could not be moved to {account}: {error}"
+msgid_plural "{n} messages could not be moved to {account}: {error}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Moving one message to {account}…"
+msgid_plural "Moving {n} messages to {account}…"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "One message stayed put: this account can't take mail from another"
 msgstr ""
 
-msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+msgid ""
+"{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
 
 msgid "Move Folder"
@@ -3008,13 +3019,10 @@ msgstr[1] ""
 msgid "That key was already in your keyring."
 msgstr ""
 
-msgid "Hylki icon"
+msgid "App icon"
 msgstr ""
 
-msgid "Envelope, white"
-msgstr ""
-
-msgid "Envelope, black"
+msgid "Symbolic"
 msgstr ""
 
 msgid "Follow system"
@@ -3141,6 +3149,15 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr ""
 
+msgid "Search Settings"
+msgstr ""
+
+msgid "Search settings"
+msgstr ""
+
+msgid "No Results"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr ""
 
@@ -3213,9 +3230,6 @@ msgid "The app itself. Message content has its own setting under Reading."
 msgstr ""
 
 msgid "Theme"
-msgstr ""
-
-msgid "App icon"
 msgstr ""
 
 msgid "This window opens to"
@@ -3321,6 +3335,12 @@ msgstr ""
 msgid ""
 "Every message opens in Reader View. The header's switch still changes the "
 "one on screen."
+msgstr ""
+
+msgid "Open at startup"
+msgstr ""
+
+msgid "What the window shows when Hylki starts."
 msgstr ""
 
 msgid "Accounts in the sidebar"
@@ -3896,7 +3916,8 @@ msgid "Tray icon"
 msgstr ""
 
 msgid ""
-"The Hylki icon, or a plain envelope in white or black to match the panel."
+"The app icon in full color, or its symbolic outline, which the panel draws "
+"in its own color."
 msgstr ""
 
 msgid "Unread mail in the tray menu"
@@ -4012,6 +4033,15 @@ msgid "Above the accounts"
 msgstr ""
 
 msgid "Below the accounts"
+msgstr ""
+
+msgid "All Inboxes"
+msgstr ""
+
+msgid "The last account's inbox"
+msgstr ""
+
+msgid "The last folder"
 msgstr ""
 
 msgid "Left"
@@ -4555,6 +4585,12 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr ""
 
+msgid "Could not reach the server"
+msgstr ""
+
+msgid "That folder is not on the server"
+msgstr ""
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 
@@ -4625,7 +4661,13 @@ msgstr ""
 msgid "POP3 accounts don't support folders"
 msgstr ""
 
+msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
 msgid "Inbox"
+msgstr ""
+
+msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 
 msgid "Email Client"

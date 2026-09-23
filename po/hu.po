@@ -471,11 +471,28 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr "Nem érhető el {v1} mappa"
 
-msgid "One message stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid "One message could not be moved to {account}: {error}"
+msgid_plural "{n} messages could not be moved to {account}: {error}"
+msgstr[0] ""
+"Egy üzenet a helyén maradt — a levelek nem helyezhetők át fiókok között"
+msgstr[1] ""
+"Egy üzenet a helyén maradt — a levelek nem helyezhetők át fiókok között"
+
+#, fuzzy
+msgid "Moving one message to {account}…"
+msgid_plural "Moving {n} messages to {account}…"
+msgstr[0] "Minden melléklet mentése egy mappába"
+msgstr[1] "Minden melléklet mentése egy mappába"
+
+#, fuzzy
+msgid "One message stayed put: this account can't take mail from another"
 msgstr ""
 "Egy üzenet a helyén maradt — a levelek nem helyezhetők át fiókok között"
 
-msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid ""
+"{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
 "{foreign} üzenet a helyén maradt — a levelek nem helyezhetők át fiókok között"
 
@@ -3290,14 +3307,11 @@ msgstr[1] "{n} kulcs importálva."
 msgid "That key was already in your keyring."
 msgstr "Ez a kulcs már a kulcstartóján volt."
 
-msgid "Hylki icon"
-msgstr "Hylki ikonja"
+msgid "App icon"
+msgstr "Alkalmazásikon"
 
-msgid "Envelope, white"
-msgstr "Boríték, fehér"
-
-msgid "Envelope, black"
-msgstr "Boríték, fekete"
+msgid "Symbolic"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Rendszer követése"
@@ -3425,6 +3439,17 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr ""
 
+#, fuzzy
+msgid "Search Settings"
+msgstr "Beállítások"
+
+#, fuzzy
+msgid "Search settings"
+msgstr "Feladók keresése"
+
+msgid "No Results"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr ""
 
@@ -3510,9 +3535,6 @@ msgstr ""
 
 msgid "Theme"
 msgstr ""
-
-msgid "App icon"
-msgstr "Alkalmazásikon"
 
 msgid "This window opens to"
 msgstr "Az ablak megnyitási helye"
@@ -3623,6 +3645,12 @@ msgstr ""
 msgid ""
 "Every message opens in Reader View. The header's switch still changes the "
 "one on screen."
+msgstr ""
+
+msgid "Open at startup"
+msgstr ""
+
+msgid "What the window shows when Hylki starts."
 msgstr ""
 
 msgid "Accounts in the sidebar"
@@ -4008,8 +4036,8 @@ msgid "Use my own colors"
 msgstr "Saját színek használata"
 
 msgid ""
-"Ignore the text and background colors senders set, so every message reads "
-"in the same black or white on the reader's ground. Pictures are kept; links "
+"Ignore the text and background colors senders set, so every message reads in "
+"the same black or white on the reader's ground. Pictures are kept; links "
 "take the accent color."
 msgstr ""
 "A feladók által beállított szöveg- és háttérszínek figyelmen kívül hagyása, "
@@ -4297,9 +4325,9 @@ msgid "Tray icon"
 msgstr "Tálcaikon"
 
 msgid ""
-"The Hylki icon, or a plain envelope in white or black to match the panel."
+"The app icon in full color, or its symbolic outline, which the panel draws "
+"in its own color."
 msgstr ""
-"A Hylki ikonja, vagy a panelhez illő fehér vagy fekete egyszerű boríték."
 
 msgid "Unread mail in the tray menu"
 msgstr "Olvasatlan levelek a tálcamenüben"
@@ -4432,6 +4460,16 @@ msgstr "A fiókok felett"
 
 msgid "Below the accounts"
 msgstr "A fiókok alatt"
+
+msgid "All Inboxes"
+msgstr "Összes beérkezett"
+
+msgid "The last account's inbox"
+msgstr ""
+
+#, fuzzy
+msgid "The last folder"
+msgstr "Ez a mappa"
 
 msgid "Left"
 msgstr "Balra"
@@ -5009,6 +5047,13 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr "A küldés sikertelen: {e}"
 
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "A mappa nem hozható létre: {e}"
+
+msgid "That folder is not on the server"
+msgstr ""
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 
@@ -5083,8 +5128,14 @@ msgstr "Az üzenet nem törölhető: {e}"
 msgid "POP3 accounts don't support folders"
 msgstr "A POP3-fiókok nem támogatják a mappákat"
 
+msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
 msgid "Inbox"
 msgstr "Beérkezett üzenetek"
+
+msgid "A Microsoft account can't receive mail from another account"
+msgstr ""
 
 msgid "Email Client"
 msgstr "Levelezőkliens"
@@ -5193,6 +5244,20 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Hylki icon"
+#~ msgstr "Hylki ikonja"
+
+#~ msgid "Envelope, white"
+#~ msgstr "Boríték, fehér"
+
+#~ msgid "Envelope, black"
+#~ msgstr "Boríték, fekete"
+
+#~ msgid ""
+#~ "The Hylki icon, or a plain envelope in white or black to match the panel."
+#~ msgstr ""
+#~ "A Hylki ikonja, vagy a panelhez illő fehér vagy fekete egyszerű boríték."
 
 #~ msgid ""
 #~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
@@ -5367,9 +5432,9 @@ msgstr "Hyprlab"
 #~ msgstr "Fiók hozzáadása"
 
 #~ msgid ""
-#~ "Label messages with one or more colored tags. Tags are stored on the "
-#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
-#~ "same tags."
+#~ "Label messages with one or more colored tags. Tags are stored on the mail "
+#~ "server as IMAP keywords, so Thunderbird and other clients show the same "
+#~ "tags."
 #~ msgstr ""
 #~ "Üzenetek címkézése egy vagy több színes címkével. A címkék IMAP-"
 #~ "kulcsszóként tárolódnak a levelezőkiszolgálón, így a Thunderbird és más "
@@ -5424,9 +5489,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Account name, such as Personal Dropbox (optional)"
 #~ msgstr "Fióknév, például Személyes Dropbox (nem kötelező)"
-
-#~ msgid "All Inboxes"
-#~ msgstr "Összes beérkezett"
 
 #~ msgid "All Inboxes unread count"
 #~ msgstr "Az Összes beérkezett olvasatlan üzeneteinek száma"

@@ -475,12 +475,35 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr "Нет доступной папки {v1}"
 
-msgid "One message stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid "One message could not be moved to {account}: {error}"
+msgid_plural "{n} messages could not be moved to {account}: {error}"
+msgstr[0] ""
+"Одно сообщение осталось на месте — почту нельзя перемещать между учётными "
+"записями"
+msgstr[1] ""
+"Одно сообщение осталось на месте — почту нельзя перемещать между учётными "
+"записями"
+msgstr[2] ""
+"Одно сообщение осталось на месте — почту нельзя перемещать между учётными "
+"записями"
+
+#, fuzzy
+msgid "Moving one message to {account}…"
+msgid_plural "Moving {n} messages to {account}…"
+msgstr[0] "Переместить это сообщение в папку"
+msgstr[1] "Переместить это сообщение в папку"
+msgstr[2] "Переместить это сообщение в папку"
+
+#, fuzzy
+msgid "One message stayed put: this account can't take mail from another"
 msgstr ""
 "Одно сообщение осталось на месте — почту нельзя перемещать между учётными "
 "записями"
 
-msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid ""
+"{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
 "{foreign} сообщений осталось на месте — почту нельзя перемещать между "
 "учётными записями"
@@ -3301,14 +3324,11 @@ msgstr[2] "Импортировано {n} ключей."
 msgid "That key was already in your keyring."
 msgstr "Этот ключ уже находился в вашей связке ключей."
 
-msgid "Hylki icon"
-msgstr "Иконка Hylki"
+msgid "App icon"
+msgstr "Иконка приложения"
 
-msgid "Envelope, white"
-msgstr "Конверт, белый"
-
-msgid "Envelope, black"
-msgstr "Конверт, чёрный"
+msgid "Symbolic"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Как в системе"
@@ -3438,6 +3458,17 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Установлено, но используется копия от другой версии"
 
+#, fuzzy
+msgid "Search Settings"
+msgstr "Настройки"
+
+#, fuzzy
+msgid "Search settings"
+msgstr "Поиск отправителей"
+
+msgid "No Results"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr "Сохранить фильтр?"
 
@@ -3526,9 +3557,6 @@ msgstr ""
 
 msgid "Theme"
 msgstr "Тема"
-
-msgid "App icon"
-msgstr "Иконка приложения"
 
 msgid "This window opens to"
 msgstr "При открытии окна показывать"
@@ -3645,6 +3673,12 @@ msgstr ""
 msgid ""
 "Every message opens in Reader View. The header's switch still changes the "
 "one on screen."
+msgstr ""
+
+msgid "Open at startup"
+msgstr ""
+
+msgid "What the window shows when Hylki starts."
 msgstr ""
 
 msgid "Accounts in the sidebar"
@@ -4076,8 +4110,8 @@ msgid "Use my own colors"
 msgstr "Использовать свои цвета"
 
 msgid ""
-"Ignore the text and background colors senders set, so every message reads "
-"in the same black or white on the reader's ground. Pictures are kept; links "
+"Ignore the text and background colors senders set, so every message reads in "
+"the same black or white on the reader's ground. Pictures are kept; links "
 "take the accent color."
 msgstr ""
 "Игнорировать цвета текста и фона, заданные отправителем, чтобы все сообщения "
@@ -4372,9 +4406,9 @@ msgid "Tray icon"
 msgstr "Значок в трее"
 
 msgid ""
-"The Hylki icon, or a plain envelope in white or black to match the panel."
+"The app icon in full color, or its symbolic outline, which the panel draws "
+"in its own color."
 msgstr ""
-"Иконка Hylki или обычный конверт белого либо чёрного цвета под стиль панели."
 
 msgid "Unread mail in the tray menu"
 msgstr "Непрочитанная почта в меню трея"
@@ -4519,6 +4553,17 @@ msgstr "Над учётными записями"
 
 msgid "Below the accounts"
 msgstr "Под учётными записями"
+
+msgid "All Inboxes"
+msgstr "Все входящие"
+
+#, fuzzy
+msgid "The last account's inbox"
+msgstr "Список учётных записей под строкой «Входящие»."
+
+#, fuzzy
+msgid "The last folder"
+msgstr "Эта папка"
 
 msgid "Left"
 msgstr "Слева"
@@ -5088,6 +5133,14 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr "Не удалось отправить: {e}"
 
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "Не удалось создать папку: {e}"
+
+#, fuzzy
+msgid "That folder is not on the server"
+msgstr "Папки под строкой «Фильтры»."
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 
@@ -5165,8 +5218,14 @@ msgstr "Не удалось удалить сообщение: {e}"
 msgid "POP3 accounts don't support folders"
 msgstr "Учётные записи POP3 не поддерживают папки"
 
+msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
 msgid "Inbox"
 msgstr "Входящие"
+
+msgid "A Microsoft account can't receive mail from another account"
+msgstr ""
 
 msgid "Email Client"
 msgstr "Почтовый клиент"
@@ -5275,6 +5334,21 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Hylki icon"
+#~ msgstr "Иконка Hylki"
+
+#~ msgid "Envelope, white"
+#~ msgstr "Конверт, белый"
+
+#~ msgid "Envelope, black"
+#~ msgstr "Конверт, чёрный"
+
+#~ msgid ""
+#~ "The Hylki icon, or a plain envelope in white or black to match the panel."
+#~ msgstr ""
+#~ "Иконка Hylki или обычный конверт белого либо чёрного цвета под стиль "
+#~ "панели."
 
 #~ msgid ""
 #~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
@@ -5401,9 +5475,6 @@ msgstr "Hyprlab"
 #~ "клику на стрелку) либо выше или ниже учётных записей в виде отдельного "
 #~ "заголовка со своим списком."
 
-#~ msgid "The account list under Inboxes."
-#~ msgstr "Список учётных записей под строкой «Входящие»."
-
 #~ msgid ""
 #~ "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
 #~ "archive it. Turning this on swaps the two: left archives, right deletes."
@@ -5463,9 +5534,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Show name initials instead of an emoji"
 #~ msgstr "Показывать инициалы имени вместо эмодзи"
-
-#~ msgid "All Inboxes"
-#~ msgstr "Все входящие"
 
 #~ msgid "All Inboxes unread count"
 #~ msgstr "Счётчик непрочитанных в «Все входящие»"

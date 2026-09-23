@@ -469,10 +469,25 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr "No hay ninguna carpeta {v1} disponible"
 
-msgid "One message stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid "One message could not be moved to {account}: {error}"
+msgid_plural "{n} messages could not be moved to {account}: {error}"
+msgstr[0] "Un mensaje no se movió: el correo no se puede mover entre cuentas"
+msgstr[1] "Un mensaje no se movió: el correo no se puede mover entre cuentas"
+
+#, fuzzy
+msgid "Moving one message to {account}…"
+msgid_plural "Moving {n} messages to {account}…"
+msgstr[0] "Mueve el mensaje a Correo no deseado."
+msgstr[1] "Mueve el mensaje a Correo no deseado."
+
+#, fuzzy
+msgid "One message stayed put: this account can't take mail from another"
 msgstr "Un mensaje no se movió: el correo no se puede mover entre cuentas"
 
-msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+#, fuzzy
+msgid ""
+"{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
 "{foreign} mensajes no se movieron: el correo no se puede mover entre cuentas"
 
@@ -3288,14 +3303,11 @@ msgstr[1] "Se han importado {n} claves."
 msgid "That key was already in your keyring."
 msgstr "Esa clave ya estaba en tu llavero."
 
-msgid "Hylki icon"
-msgstr "Icono de Hylki"
+msgid "App icon"
+msgstr "Icono de la aplicación"
 
-msgid "Envelope, white"
-msgstr "Sobre, blanco"
-
-msgid "Envelope, black"
-msgstr "Sobre, negro"
+msgid "Symbolic"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Seguir el sistema"
@@ -3433,6 +3445,17 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Instalado, pero no corresponde a esta versión"
 
+#, fuzzy
+msgid "Search Settings"
+msgstr "Ajustes"
+
+#, fuzzy
+msgid "Search settings"
+msgstr "Buscar remitentes"
+
+msgid "No Results"
+msgstr ""
+
 msgid "Save the filter?"
 msgstr "¿Guardar el filtro?"
 
@@ -3516,9 +3539,6 @@ msgstr ""
 
 msgid "Theme"
 msgstr "Tema"
-
-msgid "App icon"
-msgstr "Icono de la aplicación"
 
 msgid "This window opens to"
 msgstr "Esta ventana se abre en"
@@ -3650,6 +3670,12 @@ msgid ""
 msgstr ""
 "Todos los mensajes se abren en Vista de lectura. El interruptor de la "
 "cabecera sigue permitiendo cambiar el mensaje mostrado."
+
+msgid "Open at startup"
+msgstr ""
+
+msgid "What the window shows when Hylki starts."
+msgstr ""
 
 msgid "Accounts in the sidebar"
 msgstr "Cuentas en la barra lateral"
@@ -4091,8 +4117,8 @@ msgid "Use my own colors"
 msgstr "Usar mis propios colores"
 
 msgid ""
-"Ignore the text and background colors senders set, so every message reads "
-"in the same black or white on the reader's ground. Pictures are kept; links "
+"Ignore the text and background colors senders set, so every message reads in "
+"the same black or white on the reader's ground. Pictures are kept; links "
 "take the accent color."
 msgstr ""
 "Ignorar los colores de texto y fondo establecidos por los remitentes para "
@@ -4394,10 +4420,9 @@ msgid "Tray icon"
 msgstr "Icono de bandeja"
 
 msgid ""
-"The Hylki icon, or a plain envelope in white or black to match the panel."
+"The app icon in full color, or its symbolic outline, which the panel draws "
+"in its own color."
 msgstr ""
-"El icono de Hylki o un sobre sencillo blanco o negro que combine con el "
-"panel."
 
 msgid "Unread mail in the tray menu"
 msgstr "Correo sin leer en el menú de la bandeja"
@@ -4542,6 +4567,17 @@ msgstr "Encima de las cuentas"
 
 msgid "Below the accounts"
 msgstr "Debajo de las cuentas"
+
+#, fuzzy
+msgid "All Inboxes"
+msgstr "Bandejas de entrada"
+
+msgid "The last account's inbox"
+msgstr ""
+
+#, fuzzy
+msgid "The last folder"
+msgstr "Esta carpeta"
 
 msgid "Left"
 msgstr "Izquierda"
@@ -5112,6 +5148,14 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr "El envío ha fallado: {e}"
 
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "No se pudo contactar con el servidor JMAP: {e}"
+
+#, fuzzy
+msgid "That folder is not on the server"
+msgstr "Las carpetas bajo la fila Filtros."
+
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "no se pudo leer la respuesta del servidor (comenzaba por: {reply})"
 
@@ -5188,8 +5232,14 @@ msgstr "No se pudo eliminar el mensaje: {e}"
 msgid "POP3 accounts don't support folders"
 msgstr "Las cuentas POP3 no admiten carpetas"
 
+msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
 msgid "Inbox"
 msgstr "Bandeja de entrada"
+
+msgid "A Microsoft account can't receive mail from another account"
+msgstr ""
 
 msgid "Email Client"
 msgstr "Cliente de correo electrónico"
@@ -5324,6 +5374,21 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Hylki icon"
+#~ msgstr "Icono de Hylki"
+
+#~ msgid "Envelope, white"
+#~ msgstr "Sobre, blanco"
+
+#~ msgid "Envelope, black"
+#~ msgstr "Sobre, negro"
+
+#~ msgid ""
+#~ "The Hylki icon, or a plain envelope in white or black to match the panel."
+#~ msgstr ""
+#~ "El icono de Hylki o un sobre sencillo blanco o negro que combine con el "
+#~ "panel."
 
 #~ msgid ""
 #~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
