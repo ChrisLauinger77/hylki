@@ -20,6 +20,15 @@ flatpak install --user --from https://hylki.hyprlab.co/flatpak/co.hyprlab.Hylki.
 and signing key, so it still receives updates from the official repo. (A bundle
 holds a single architecture; the repo above holds both.)
 
+**Bazaar** does not install from a `.flatpakref` whose repository it does not
+already know: it reads only the app's ID from the file and reports "ID
+'co.hyprlab.Hylki' was not found". Add the repository once, and Hylki then
+shows up in Bazaar's search:
+
+```sh
+flatpak remote-add --user --if-not-exists hylki https://hylki.hyprlab.co/flatpak/co.hyprlab.Hylki.flatpakrepo
+```
+
 ## Fedora
 
 Download the `.rpm` from the

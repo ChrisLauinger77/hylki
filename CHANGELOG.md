@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Docs: installing with Bazaar** (#276, reported by giaaaacomo). Bazaar
+  reads only the app ID from a `.flatpakref` and cannot find Hylki in a
+  repository it does not know yet; docs/INSTALLING.md and the site's
+  install window give the command that adds the repository first.
 - **Fixed: CPU use with the window open** (#275, reported by mfreeman72).
   The "Loading more…" spinner under the list kept spinning while it was
   scrolled out of sight, and it shows until a folder's whole index is in,
