@@ -584,29 +584,7 @@ fn write_shadow(
         tracing::warn!("no launcher at {}", base.display());
         return false;
     };
-    let mut out = String::new();
-    for line in text.lines() {
-        if line.starts_with("Icon=") {
-            out.push_str(&format!("Icon={icon}\n"));
-        } else if line.starts_with("Exec=") && exec.is_some() {
-            out.push_str(&format!("Exec={}\n", exec.unwrap_or("")));
-        } else if line.starts_with("TryExec=")
-            || line.starts_with("X-Flatpak=")
-            || line.starts_with(LAUNCHER_MARK)
-        {
-            // Re-added below.
-        } else {
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    if !try_exec.is_empty() {
-        out.push_str(&format!("TryExec={try_exec}\n"));
-    }
-    if flatpak {
-        out.push_str(&format!("X-Flatpak={}\n", crate::APP_ID));
-    }
-    out.push_str(&format!("{LAUNCHER_MARK}=1\n"));
+    let out = shadow_text(&text, icon, exec, try_exec, flatpak);
     if std::fs::read_to_string(user_path).map(|cur| cur == out).unwrap_or(false) {
         return true;
     }
@@ -624,6 +602,73 @@ fn write_shadow(
             false
         }
     }
+}
+
+/// The launcher copy's text: `base` with our icon, and, under Flatpak, the
+/// host's command in place of the sandbox's. Only the main group's `Exec`
+/// is the app's own command; a `[Desktop Action]` group (New Message, #269)
+/// runs the app with arguments of its own, which the host command has to
+/// carry. The keys added at the end of the main group stay in it: appended
+/// after an action group they would belong to the action.
+fn shadow_text(text: &str, icon: &str, exec: Option<&str>, try_exec: &str, flatpak: bool) -> String {
+    let mut out = String::new();
+    let mut main = false;
+    let mut added = false;
+    let add_keys = |out: &mut String| {
+        if !try_exec.is_empty() {
+            out.push_str(&format!("TryExec={try_exec}\n"));
+        }
+        if flatpak {
+            out.push_str(&format!("X-Flatpak={}\n", crate::APP_ID));
+        }
+        out.push_str(&format!("{LAUNCHER_MARK}=1\n"));
+    };
+    for line in text.lines() {
+        if line.starts_with('[') {
+            if main && !added {
+                // Before the blank line that ends the group, if it has one.
+                let trimmed = out.trim_end_matches('\n').len();
+                let tail = out.split_off(trimmed);
+                out.push('\n');
+                add_keys(&mut out);
+                out.push_str(&tail[1.min(tail.len())..]);
+                added = true;
+            }
+            main = line.trim() == "[Desktop Entry]";
+        }
+        if main && line.starts_with("Icon=") {
+            out.push_str(&format!("Icon={icon}\n"));
+        } else if main && line.starts_with("Exec=") && exec.is_some() {
+            out.push_str(&format!("Exec={}\n", exec.unwrap_or("")));
+        } else if !main && exec.is_some() && line.starts_with("Exec=") {
+            let args = line["Exec=".len()..].split_once(' ').map_or("", |(_, a)| a);
+            out.push_str(&format!("Exec={}\n", action_exec(exec.unwrap_or(""), args)));
+        } else if main
+            && (line.starts_with("TryExec=")
+                || line.starts_with("X-Flatpak=")
+                || line.starts_with(LAUNCHER_MARK))
+        {
+            // Re-added at the end of the group.
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    if !added {
+        add_keys(&mut out);
+    }
+    out
+}
+
+/// The host command for a launcher action under Flatpak: the app's own
+/// command (see [`flatpak_exec`]) with the action's arguments in place of
+/// the forwarded files.
+fn action_exec(exec: &str, args: &str) -> String {
+    let base = exec
+        .strip_suffix(" @@u %U @@")
+        .unwrap_or(exec)
+        .replace(" --file-forwarding", "");
+    if args.is_empty() { base } else { format!("{base} {args}") }
 }
 
 /// Bring `<dir>/mimeinfo.cache` up to date with the entries in `dir`, as
@@ -1009,6 +1054,33 @@ mod tests {
         assert!(!icon_is_ours(&format!("{id}-symbolic")));
         assert!(!icon_is_ours("/home/u/icons/hylki-square.svg"));
         assert!(!icon_is_ours(&format!("{id}-default.png")));
+    }
+
+    /// A launcher with an action (#269): the main group's command becomes
+    /// the host's, the action's keeps its arguments, and the keys the copy
+    /// adds stay in the main group.
+    #[test]
+    fn a_launcher_copy_keeps_its_actions() {
+        let base = "[Desktop Entry]\nName=Hylki\nExec=hylki %U\nIcon=co.hyprlab.Hylki\nActions=new-message;\n\n[Desktop Action new-message]\nName=New Message\nExec=hylki mailto:\n";
+        let host = format!("flatpak run --branch=stable --arch=x86_64 --command=hylki --file-forwarding {} @@u %U @@", crate::APP_ID);
+        let out = shadow_text(base, "/icons/x.png", Some(&host), "/exports/bin/x", true);
+        let (main, action) = out.split_once("[Desktop Action new-message]").unwrap();
+        assert!(main.contains(&format!("Exec={host}\n")));
+        assert!(main.contains("Icon=/icons/x.png\n"));
+        assert!(main.contains("TryExec=/exports/bin/x\n"));
+        assert!(main.contains(&format!("{LAUNCHER_MARK}=1\n")));
+        assert!(main.ends_with("=1\n\n"), "the group keeps its blank line: {main:?}");
+        assert_eq!(
+            action,
+            format!("\nName=New Message\nExec=flatpak run --branch=stable --arch=x86_64 --command=hylki {} mailto:\n", crate::APP_ID)
+        );
+        // Outside Flatpak the action is left as it is.
+        let out = shadow_text(base, "/icons/x.png", None, "/usr/bin/hylki", false);
+        assert!(out.contains("Exec=hylki %U\n") && out.contains("Exec=hylki mailto:\n"));
+        assert!(out.split_once("[Desktop Action").unwrap().0.contains("TryExec=/usr/bin/hylki"));
+        // A launcher with no action still ends with the added keys.
+        let out = shadow_text("[Desktop Entry]\nName=Hylki\nExec=hylki %U\n", "i", None, "", false);
+        assert!(out.ends_with(&format!("{LAUNCHER_MARK}=1\n")));
     }
 
     #[test]
