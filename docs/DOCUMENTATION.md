@@ -450,6 +450,14 @@ app's launcher. An icon set on the launcher some other way, with a menu
 editor or by editing its `.desktop` file, is left alone when Hylki starts;
 Settings says so above the gallery, and picking an icon there replaces it.
 
+### Unread count on the app icon
+
+Hylki puts the number of unread inbox messages on its icon in the dock or
+task manager, the same count as the tray icon's dot. KDE Plasma's task
+manager shows it, and so do the Dash to Dock and Dash to Panel extensions
+for GNOME; GNOME's own dash has no badges. **Settings → System → Unread count
+on the app icon** turns it off. Stored as `launcher_count` in `privacy.toml`.
+
 ### Notifications
 
 A new-mail notification opens the message when clicked. When it is about a

@@ -1161,6 +1161,10 @@ struct PrivacyFile {
     /// the message.
     #[serde(default = "default_tray_mail")]
     tray_mail: bool,
+    /// Whether the launcher icon in a dock or task manager shows the unread
+    /// count (#271).
+    #[serde(default = "default_launcher_count")]
+    launcher_count: bool,
     /// Whether to say anything at all when remote content is blocked. Off hides
     /// the banner; it never changes what is blocked, only whether you're told.
     #[serde(default = "default_show_remote_banner")]
@@ -1454,6 +1458,7 @@ impl Default for PrivacyFile {
             tray: false,
             tray_icon: TrayIcon::default(),
             tray_mail: default_tray_mail(),
+            launcher_count: default_launcher_count(),
         }
     }
 }
@@ -2931,6 +2936,15 @@ pub fn load_tray_mail() -> bool {
     load_privacy().tray_mail
 }
 
+fn default_launcher_count() -> bool {
+    true
+}
+
+/// Whether the launcher icon shows the unread count.
+pub fn load_launcher_count() -> bool {
+    load_privacy().launcher_count
+}
+
 /// Persist all app settings together (so no field is clobbered).
 #[allow(clippy::too_many_arguments)]
 pub fn save_privacy(
@@ -2997,6 +3011,7 @@ pub fn save_privacy(
     tray: bool,
     tray_icon: TrayIcon,
     tray_mail: bool,
+    launcher_count: bool,
     show_remote_banner: bool,
     sidebar_hover_expand: bool,
     remember_sidebar: bool,
@@ -3094,6 +3109,7 @@ pub fn save_privacy(
         tray,
         tray_icon,
         tray_mail,
+        launcher_count,
         show_remote_banner,
         sidebar_hover_expand,
         remember_sidebar,

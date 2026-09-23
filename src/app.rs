@@ -725,6 +725,8 @@ pub struct AppModel {
     tray_enabled: bool,
     tray_icon: config::TrayIcon,
     tray_mail: bool,
+    /// The unread count on the launcher icon (#271).
+    launcher_count: bool,
     /// The chosen app icon (an `app_icon::catalog` id); the tray draws it.
     app_icon: String,
     /// A restart is on its way (Restart Now clicked, settle timer running).
@@ -1440,6 +1442,7 @@ pub enum AppMsg {
     SetTray(bool),
     SetTrayIcon(config::TrayIcon),
     SetTrayMail(bool),
+    SetLauncherCount(bool),
     /// Preference: the app icon (Settings gallery or the wizard).
     SetAppIcon(String),
     /// "Restart Now" from the app-icon heads-up: quit into the restart
@@ -3161,6 +3164,7 @@ impl SimpleComponent for AppModel {
             tray_enabled: config::load_tray(),
             tray_icon: config::load_tray_icon(),
             tray_mail: config::load_tray_mail(),
+            launcher_count: config::load_launcher_count(),
             app_icon: crate::app_icon::init_on_startup(),
             restart_pending: false,
             tray: None,
@@ -7116,6 +7120,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetLauncherCount(on) => {
+                if self.launcher_count != on {
+                    self.launcher_count = on;
+                    self.save_settings();
+                    self.push_launcher_count();
+                }
+            }
+
             AppMsg::QuitFromTray => {
                 // The same teardown as Ctrl+Q: geometry saved, then exit.
                 relm4::main_application().activate_action("quit", None);
@@ -10508,6 +10520,7 @@ impl AppModel {
             self.tray_enabled,
             self.tray_icon,
             self.tray_mail,
+            self.launcher_count,
             self.show_remote_banner,
             self.sidebar_hover_expand,
             self.remember_sidebar,
@@ -12089,7 +12102,15 @@ impl AppModel {
         if let Some(tray) = &self.tray {
             tray.set_unread(self.inboxes_unread());
         }
+        self.push_launcher_count();
         self.push_tray_mail();
+    }
+
+    /// The launcher icon's badge (#271): the same inboxes total as the tray
+    /// icon's dot, or nothing when Settings has it off.
+    fn push_launcher_count(&self) {
+        let count = if self.launcher_count { self.inboxes_unread() } else { 0 };
+        crate::launcher_badge::set_count(count);
     }
 
     /// Publish the tray item with the current icon, unread total and mail list.
@@ -16789,6 +16810,7 @@ impl AppModel {
             tray: self.tray_enabled,
             tray_icon: self.tray_icon,
             tray_mail: self.tray_mail,
+            launcher_count: self.launcher_count,
             app_icon: self.app_icon.clone(),
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
             accounts_sender: accounts.sender().clone(),
@@ -16902,6 +16924,7 @@ impl AppModel {
                 PrefOutput::SetTray(on) => AppMsg::SetTray(on),
                 PrefOutput::SetTrayIcon(icon) => AppMsg::SetTrayIcon(icon),
                 PrefOutput::SetTrayMail(on) => AppMsg::SetTrayMail(on),
+                PrefOutput::SetLauncherCount(on) => AppMsg::SetLauncherCount(on),
                 PrefOutput::SetAppIcon(id) => AppMsg::SetAppIcon(id),
                 PrefOutput::SetPaletteCollapse(secs) => AppMsg::SetPaletteCollapse(secs),
                 PrefOutput::SetCardPaletteCollapse(secs) => AppMsg::SetCardPaletteCollapse(secs),

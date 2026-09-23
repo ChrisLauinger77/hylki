@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **New: the unread count on the app icon** (#271). The dock or task
+  manager shows the number of unread inbox messages on Hylki's icon, the
+  same count as the tray icon's dot, where it draws badges: KDE Plasma, and
+  GNOME with Dash to Dock or Dash to Panel. Settings > System has a switch
+  to turn it off.
+
 ## 1.41.0 — 2026-09-23
 
 Mail moves between accounts, Settings can be searched, and deleting mail

@@ -140,6 +140,7 @@ pub struct PrefInit {
     pub tray: bool,
     pub tray_icon: TrayIcon,
     pub tray_mail: bool,
+    pub launcher_count: bool,
     /// The chosen app icon (an `app_icon::catalog` id).
     pub app_icon: String,
     /// The accounts panel (built by the AccountsWindow component), shown
@@ -896,6 +897,7 @@ pub enum PrefInput {
     ToggleTray(bool),
     ChangeTrayIcon(u32),
     ToggleTrayMail(bool),
+    ToggleLauncherCount(bool),
     ChangeAppIcon(String),
     ChangePaletteCollapse(u64),
     ChangeCardPaletteCollapse(u64),
@@ -1027,6 +1029,7 @@ pub enum PrefOutput {
     SetTray(bool),
     SetTrayIcon(TrayIcon),
     SetTrayMail(bool),
+    SetLauncherCount(bool),
     SetAppIcon(String),
     SetPaletteCollapse(u64),
     SetCardPaletteCollapse(u64),
@@ -2925,6 +2928,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "launcher_count_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Unread count on the app icon"),
+                                        set_subtitle: &i18n("The number of unread inbox messages on Hylki's \
+                                                       icon in the dock or task manager. KDE Plasma shows it; \
+                                                       GNOME needs a dock extension such as Dash to Dock."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleLauncherCount(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "single_key_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Single-key shortcuts"),
@@ -3405,6 +3419,7 @@ impl Component for Preferences {
             .unwrap_or(0);
         widgets.tray_icon_row.set_selected(tray_icon_sel as u32);
         widgets.tray_mail_row.set_active(init.tray_mail);
+        widgets.launcher_count_row.set_active(init.launcher_count);
         // The icon choice and the menu's mail list only mean anything with
         // a tray icon shown.
         widgets.tray_icon_row.set_sensitive(init.tray);
@@ -4361,6 +4376,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleTrayMail(on) => {
                 let _ = sender.output(PrefOutput::SetTrayMail(on));
+            }
+            PrefInput::ToggleLauncherCount(on) => {
+                let _ = sender.output(PrefOutput::SetLauncherCount(on));
             }
             PrefInput::ChangeAppIcon(id) => {
                 let _ = sender.output(PrefOutput::SetAppIcon(id));

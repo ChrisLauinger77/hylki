@@ -17,6 +17,7 @@ mod desktop;
 mod goa;
 mod i18n;
 mod invite;
+mod launcher_badge;
 mod legacy;
 mod logo;
 mod memory_report;
