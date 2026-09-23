@@ -34,6 +34,9 @@ no recipient is not sent, and one scheduled for later is queued.
 <kbd>Ctrl+Shift+F</kbd> turns [Focus Mode](FEATURES.md#the-app) on and off,
 with or without single-key shortcuts.
 
+<kbd>Ctrl+F</kbd> in the Settings window opens its search, and closes it
+again; <kbd>Esc</kbd> in the search field closes it too.
+
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
 in and out, with or without Reader View; <kbd>Ctrl+0</kbd> puts it back to
 the default. Only the message scales, not the header or the toolbar; a chip
