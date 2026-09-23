@@ -4428,6 +4428,10 @@ msgstr "2 sor"
 msgid "3 lines"
 msgstr "3 sor"
 
+msgid ""
+"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgstr ""
+
 msgid "When displayed"
 msgstr "Megjelenítés ideje"
 

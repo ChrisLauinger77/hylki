@@ -4583,6 +4583,10 @@ msgstr "2 γραμμές"
 msgid "3 lines"
 msgstr "3 γραμμές"
 
+msgid ""
+"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgstr ""
+
 msgid "When displayed"
 msgstr "Κατά την εμφάνιση"
 

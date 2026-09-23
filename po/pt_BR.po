@@ -4531,6 +4531,10 @@ msgstr "2 linhas"
 msgid "3 lines"
 msgstr "3 linhas"
 
+msgid ""
+"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgstr ""
+
 msgid "When displayed"
 msgstr "Quando apresentado"
 

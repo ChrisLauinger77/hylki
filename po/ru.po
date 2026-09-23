@@ -4515,6 +4515,10 @@ msgstr "2 строки"
 msgid "3 lines"
 msgstr "3 строки"
 
+msgid ""
+"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgstr ""
+
 msgid "When displayed"
 msgstr "Условие отметки прочитанным"
 

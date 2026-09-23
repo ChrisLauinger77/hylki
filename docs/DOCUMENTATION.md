@@ -407,6 +407,13 @@ System → GNOME Files** holds the same choices, so the questions can be
 skipped: what the files go into, what happens over the limit, and the limit
 itself.
 
+### App icon
+
+**Settings → Appearance → App icon** puts one of the gallery's icons on the
+app's launcher. An icon set on the launcher some other way, with a menu
+editor or by editing its `.desktop` file, is left alone when Hylki starts;
+Settings says so above the gallery, and picking an icon there replaces it.
+
 ### Notifications
 
 A new-mail notification opens the message when clicked. When it is about a

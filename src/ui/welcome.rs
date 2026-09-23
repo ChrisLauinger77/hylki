@@ -36,7 +36,8 @@ pub struct WelcomePrefs {
     pub preview_lines: u32,
     pub avatars: bool,
     pub threading: bool,
-    /// The app icon picked from the gallery (an `app_icon::catalog` id).
+    /// The app icon picked from the gallery (an `app_icon::catalog` id), or
+    /// empty when nothing was picked over an icon set outside Hylki.
     pub app_icon: String,
 }
 
@@ -630,9 +631,13 @@ impl Component for Welcome {
         icon_hdr.set_halign(gtk::Align::Start);
         icon_hdr.set_margin_top(6);
         pers.append(&icon_hdr);
-        let icon_choice = std::rc::Rc::new(std::cell::RefCell::new(
-            crate::config::load_app_icon().unwrap_or_else(|| crate::app_icon::DEFAULT_ID.to_string()),
-        ));
+        // With an icon set outside Hylki on the launcher (#252), nothing is
+        // preselected, and only an actual pick replaces it.
+        let icon_choice = std::rc::Rc::new(std::cell::RefCell::new(if crate::app_icon::custom_icon().is_some() {
+            String::new()
+        } else {
+            crate::config::load_app_icon().unwrap_or_else(|| crate::app_icon::DEFAULT_ID.to_string())
+        }));
         let icon_card = card();
         let icon_row = gtk::ListBoxRow::new();
         icon_row.set_activatable(false);

@@ -6954,8 +6954,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAppIcon(id) => {
+                // Picking the stored choice again still changes the desktop
+                // when it replaces an icon set outside Hylki (#252).
+                let replaces_custom = crate::app_icon::custom_icon().is_some();
                 let id = crate::app_icon::set(&id);
-                if self.app_icon != id {
+                if self.app_icon != id || replaces_custom {
                     self.app_icon = id;
                     if let Some(tray) = &self.tray {
                         tray.set_icon(self.tray_icon, crate::app_icon::png_for(&self.app_icon));
@@ -8769,7 +8772,9 @@ impl SimpleComponent for AppModel {
                 sender.input(AppMsg::SetPreviewLines(p.preview_lines));
                 sender.input(AppMsg::SetAvatars(p.avatars));
                 sender.input(AppMsg::SetThreading(p.threading));
-                sender.input(AppMsg::SetAppIcon(p.app_icon));
+                if !p.app_icon.is_empty() {
+                    sender.input(AppMsg::SetAppIcon(p.app_icon));
+                }
                 self.welcome = None;
             }
 
