@@ -359,6 +359,10 @@ struct UndoEntry {
     /// Whether applying this entry puts `rows` back on screen (undoing a
     /// move) or takes them away again (redoing it).
     rows_return: bool,
+    /// Steps on other accounts that belong to the same action, applied with
+    /// `step`: a move to another account (#265) is undone by bringing the
+    /// original back on one account and taking the copy away on the other.
+    also: Vec<(u32, UndoStep)>,
 }
 
 struct ReaderCompose {
@@ -11272,6 +11276,7 @@ impl AppModel {
             rows,
             threads,
             rows_return: true,
+            also: Vec::new(),
         });
     }
 
@@ -11320,6 +11325,7 @@ impl AppModel {
             rows: Vec::new(),
             threads: Vec::new(),
             rows_return: true,
+            also: Vec::new(),
         });
     }
 
@@ -11376,6 +11382,7 @@ impl AppModel {
             rows: entry.rows.clone(),
             threads: entry.threads.clone(),
             rows_return: !entry.rows_return,
+            also: entry.also.iter().map(|(a, step)| (*a, step.inverse())).collect(),
         };
         // Hold on to the bodies whatever happens: the move is about to change
         // these messages' UIDs, and the reload that follows would otherwise
@@ -11411,6 +11418,22 @@ impl AppModel {
         // fail again every time. The entries under it are usually about other
         // messages entirely, so the rest of the history stands.
         if self.apply_undo_step(entry.account_id, &entry.step) {
+            for (account_id, step) in &entry.also {
+                if self.apply_undo_step(*account_id, step) {
+                    // The step reloads the folder the mail goes into; the one
+                    // it leaves is looked at again here, so its rows go too.
+                    if let UndoStep::Move { from, .. } = step {
+                        if let Some(folder_id) = self
+                            .folders
+                            .get(account_id)
+                            .and_then(|fs| fs.iter().find(|f| &f.path == from))
+                            .map(|f| f.id)
+                        {
+                            self.send_to(*account_id, MailRequest::SyncFolder { folder_id, path: from.clone() });
+                        }
+                    }
+                }
+            }
             if redo {
                 self.undo_stack.push(back);
             } else {
@@ -15366,6 +15389,7 @@ impl AppModel {
                 dest_path: dest.clone(),
                 seen: cached.as_ref().is_none_or(|m| !m.unread),
                 flagged: cached.as_ref().is_some_and(|m| m.starred),
+                row: cached.clone(),
             });
             // Off the source's lists until the move has landed or failed.
             self.pending_moves.borrow_mut().insert((aid, src.clone(), uid), std::time::Instant::now());
@@ -15391,6 +15415,16 @@ impl AppModel {
         let trash = self
             .folder_path_for(t.src_account, FolderKind::Trash)
             .filter(|trash| *trash != t.src_path);
+        if let Some(row) = t.row.filter(|m| !m.message_id.is_empty()) {
+            self.transfer_tally.landed.push(Landed {
+                src_account: t.src_account,
+                src_path: t.src_path.clone(),
+                src_trash: trash.clone(),
+                dest_account: t.dest_account,
+                dest_path: t.dest_path.clone(),
+                row,
+            });
+        }
         let req = match trash {
             Some(dest) => MailRequest::MoveMessage { path: t.src_path, uid: t.uid, dest },
             None => MailRequest::PurgeMessages { path: t.src_path, uids: vec![t.uid] },
@@ -15420,8 +15454,9 @@ impl AppModel {
             self.show_transfer_status();
             return;
         }
-        let tally = std::mem::take(&mut self.transfer_tally);
+        let mut tally = std::mem::take(&mut self.transfer_tally);
         self.notifications.emit(NotifyInput::SetStatus(String::new()));
+        self.record_transfer_undo(std::mem::take(&mut tally.landed));
         for (account_id, path) in &tally.dest_folders {
             if let Some(folder_id) = self
                 .folders
@@ -15460,6 +15495,57 @@ impl AppModel {
             )
         };
         self.notifications.emit(NotifyInput::Push { text, error, connectivity: false });
+    }
+
+    /// One undo step for everything a batch of moves to other accounts put
+    /// down (#265): per source folder, the originals come back out of their
+    /// account's Trash, and the copies go into the receiving account's.
+    /// Mail that was erased at the source, or that went to an account with
+    /// no Trash, is left out: undoing it would leave a copy behind.
+    fn record_transfer_undo(&mut self, landed: Vec<Landed>) {
+        let mut groups: Vec<((u32, String, String, u32, String, String), Vec<Message>)> = Vec::new();
+        for l in landed {
+            let Some(src_trash) = l.src_trash else { continue };
+            let Some(dest_trash) = self
+                .folder_path_for(l.dest_account, FolderKind::Trash)
+                .filter(|t| *t != l.dest_path)
+            else {
+                continue;
+            };
+            let key = (l.src_account, l.src_path, src_trash, l.dest_account, l.dest_path, dest_trash);
+            match groups.iter_mut().find(|(k, _)| *k == key) {
+                Some((_, rows)) => rows.push(l.row),
+                None => groups.push((key, vec![l.row])),
+            }
+        }
+        let Some(((src_account, src_path, src_trash, dest_account, dest_path, dest_trash), rows)) =
+            groups.first().cloned()
+        else {
+            return;
+        };
+        let ids = |rows: &[Message]| rows.iter().map(|m| m.message_id.clone()).collect::<Vec<_>>();
+        // The first source folder is the entry's own step, so a quick undo
+        // puts its rows straight back; everything else rides along.
+        let mut also = vec![(
+            dest_account,
+            UndoStep::Move { from: dest_path.clone(), to: dest_trash, message_ids: ids(&rows) },
+        )];
+        for ((sa, sp, st, da, dp, dt), rows) in groups.iter().skip(1) {
+            also.push((*sa, UndoStep::Move { from: st.clone(), to: sp.clone(), message_ids: ids(rows) }));
+            also.push((*da, UndoStep::Move { from: dp.clone(), to: dt.clone(), message_ids: ids(rows) }));
+        }
+        let what = self.move_label(dest_account, &dest_path);
+        let threads = Vec::new();
+        self.push_undo_entry(UndoEntry {
+            account_id: src_account,
+            what,
+            step: UndoStep::Move { from: src_trash, to: src_path, message_ids: ids(&rows) },
+            at: std::time::Instant::now(),
+            rows,
+            threads,
+            rows_return: true,
+            also,
+        });
     }
 
     fn show_transfer_status(&self) {
@@ -20109,6 +20195,21 @@ struct Transfer {
     dest_path: String,
     seen: bool,
     flagged: bool,
+    /// The message as the list had it, for the undo step.
+    row: Option<Message>,
+}
+
+/// A message that has landed in another account, and where its original
+/// went: what undoing the move needs (#265).
+struct Landed {
+    src_account: u32,
+    src_path: String,
+    /// The source account's Trash, where the original now is; `None` when
+    /// it was erased, which cannot be undone.
+    src_trash: Option<String>,
+    dest_account: u32,
+    dest_path: String,
+    row: Message,
 }
 
 /// The moves to other accounts under way, all batches together.
@@ -20123,6 +20224,8 @@ struct TransferTally {
     dest_accounts: std::collections::BTreeSet<u32>,
     /// The folders mail went into, synced once everything has landed.
     dest_folders: std::collections::BTreeSet<(u32, String)>,
+    /// What has landed so far, recorded as one undo step at the end.
+    landed: Vec<Landed>,
 }
 
 /// A running tag-finder scan (see `AppMsg::FindTags`).

@@ -116,9 +116,11 @@ Dragging messages onto another account's folder in the sidebar does the same.
 The message is copied into the other account with its read and starred state.
 Only once that copy is stored is the original moved to its own account's
 Trash (or erased, where the account has no Trash), so a move that fails leaves
-the message where it was and says why. Nothing is deleted from the original
-account for good, and a move to another account cannot be undone with
-Ctrl+Z; the original is still in that account's Trash.
+the message where it was and says why.
+
+**Undo** (Ctrl+Z) takes the original back out of its account's Trash and puts
+the copy in the other account's Trash; Redo does the move again. A move from
+or to an account without a Trash folder cannot be undone.
 
 IMAP and JMAP accounts can receive mail this way. A Microsoft account and a
 POP3 account can be moved from but not into: Microsoft files a message added
