@@ -4683,10 +4683,14 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
+                // Two seconds on, it logs where focus landed (#266).
                 if std::env::var("HYLKI_SHOWCASE_REPLY").is_ok() {
                     let s = sender.clone();
+                    let window = root.clone();
                     gtk::glib::timeout_add_seconds_local_once(4, move || {
                         s.input(AppMsg::Reply);
+                        // After the split's slide, which focus waits for.
+                        gtk::glib::timeout_add_seconds_local_once(2, move || showcase_log_focus(&window));
                     });
                 }
                 // HYLKI_SHOWCASE_NEW=<seconds>[:<address>] opens a new message
@@ -4702,24 +4706,7 @@ impl SimpleComponent for AppModel {
                     let window = root.clone();
                     gtk::glib::timeout_add_seconds_local_once(at, move || {
                         s.input(if to.is_empty() { AppMsg::Compose } else { AppMsg::ComposeTo(to) });
-                        gtk::glib::timeout_add_seconds_local_once(1, move || {
-                            let tops = gtk::Window::toplevels();
-                            let focus = (0..tops.n_items())
-                                .filter_map(|i| tops.item(i).and_downcast::<gtk::Window>())
-                                .filter(|w| w.is_visible())
-                                .map(|w| if w == window.clone().upcast::<gtk::Window>() { (0, w) } else { (1, w) })
-                                .max_by_key(|(rank, _)| *rank)
-                                .and_then(|(_, w)| gtk::prelude::GtkWindowExt::focus(&w));
-                            let row = focus.as_ref().and_then(|f| {
-                                f.ancestor(adw::EntryRow::static_type())
-                                    .and_downcast::<adw::EntryRow>()
-                            });
-                            match (row, focus) {
-                                (Some(row), _) => tracing::info!("showcase: focus in the {:?} row", row.title()),
-                                (None, Some(f)) => tracing::info!("showcase: focus on {}", f.type_().name()),
-                                (None, None) => tracing::info!("showcase: no focus"),
-                            }
-                        });
+                        gtk::glib::timeout_add_seconds_local_once(1, move || showcase_log_focus(&window));
                     });
                 }
                 // HYLKI_SHOWCASE_FORWARD=<seconds> does the same with
@@ -14894,11 +14881,17 @@ impl AppModel {
             );
             anim.set_easing(adw::Easing::EaseOutCubic);
             let cell = self.split_close_anim.clone();
+            // Focus waits for the slide: the pane opens from nothing, and a
+            // Paned child with no height is hidden, so focus given to it at
+            // once fell to the Paned and the reply opened with no cursor in
+            // it (#266).
+            let compose = controller.sender().clone();
             anim.connect_done({
                 let cell = cell.clone();
                 move |_| {
                     cell.borrow_mut().take();
                     set_split_shrink(&split, bottom, false);
+                    compose.emit(ComposeInput::FocusInitial);
                 }
             });
             *cell.borrow_mut() = Some(anim.clone());
@@ -14924,8 +14917,8 @@ impl AppModel {
             // skipped — the composer pops in instead of sliding down.
             let s = slot.clone();
             gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
+            controller.emit(ComposeInput::FocusInitial);
         }
-        controller.emit(ComposeInput::FocusInitial);
         self.reader_compose = Some(ReaderCompose { id, controller, window: None });
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
@@ -19880,6 +19873,61 @@ struct TagScan {
     gen: u32,
     remaining: usize,
     found: Vec<(u32, Vec<KeywordFinding>)>,
+}
+
+/// Showcase: log where keyboard focus is (#266), in the newest visible
+/// window, the main one only when nothing else is up: the field row's
+/// title when it is in one, else the focused widget's type and the classes
+/// of the views around it, and for a WebView where its document's own
+/// focus and caret are.
+fn showcase_log_focus(main: &adw::ApplicationWindow) {
+    let tops = gtk::Window::toplevels();
+    let main: gtk::Window = main.clone().upcast();
+    let focus = (0..tops.n_items())
+        .filter_map(|i| tops.item(i).and_downcast::<gtk::Window>())
+        .filter(|w| w.is_visible())
+        .max_by_key(|w| *w != main)
+        .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w));
+    let row = focus
+        .as_ref()
+        .and_then(|f| f.ancestor(adw::EntryRow::static_type()).and_downcast::<adw::EntryRow>());
+    match (row, focus) {
+        (Some(row), _) => tracing::info!("showcase: focus in the {:?} row", row.title()),
+        (None, Some(f)) => {
+            // A few ancestors' classes say which view a WebView belongs to.
+            let mut path = vec![f.type_().name().to_string()];
+            let mut w = f.parent();
+            while let Some(p) = w {
+                let classes = p.css_classes();
+                if !classes.is_empty() {
+                    path.push(classes.iter().map(|c| c.to_string()).collect::<Vec<_>>().join("."));
+                }
+                if path.len() > 5 {
+                    break;
+                }
+                w = p.parent();
+            }
+            tracing::info!("showcase: focus on {}", path.join(" < "));
+            // In a WebView, where the document's own focus and caret are.
+            if let Some(view) = f.downcast_ref::<webkit6::WebView>() {
+                use webkit6::prelude::WebViewExt;
+                view.evaluate_javascript(
+                    "(document.activeElement ? document.activeElement.tagName : 'none') + \
+                     ' has focus, selection ranges ' + getSelection().rangeCount + \
+                     ', collapsed ' + (getSelection().rangeCount ? getSelection().isCollapsed : '-')",
+                    None,
+                    None,
+                    None::<&gtk::gio::Cancellable>,
+                    |r| {
+                        if let Ok(v) = r {
+                            tracing::info!("showcase: document: {}", v.to_str());
+                        }
+                    },
+                );
+            }
+        }
+        (None, None) => tracing::info!("showcase: no focus"),
+    }
 }
 
 fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {

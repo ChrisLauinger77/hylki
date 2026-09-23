@@ -220,6 +220,12 @@ impl RichEditor {
         webview.connect_load_changed(|v, ev| {
             if ev == webkit6::LoadEvent::Finished {
                 fade_in(v);
+                // Focus given before the document was there reached the
+                // view but no caret: place it now.
+                let root_focus = v.root().and_then(|r| r.focus());
+                if root_focus.is_some_and(|f| f == *v.upcast_ref::<gtk::Widget>() || f.is_ancestor(v)) {
+                    exec(v, PLACE_CARET);
+                }
             }
         });
         {
@@ -648,6 +654,8 @@ impl RichEditor {
         if self.source.get().is_some() {
             // The document's own field is what takes the caret.
             exec(&self.webview, "var t=document.getElementById('src');if(t)t.focus();");
+        } else {
+            exec(&self.webview, PLACE_CARET);
         }
     }
 
@@ -761,6 +769,21 @@ pub fn history_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> Opti
     }
     None
 }
+
+/// Give the rich document's body the caret. Keyboard focus on the view
+/// alone left no caret in it, so a reply opened with nowhere to type
+/// until the body was clicked (#266). A caret already in the body stays
+/// where it is; otherwise it goes to the top, above any quote. Only a
+/// contenteditable body is touched: the source document's field takes
+/// focus itself.
+const PLACE_CARET: &str = "(function(){var b=document.body;\
+    if(!b||!b.isContentEditable)return;\
+    var s=getSelection();\
+    var kept=s.rangeCount&&b.contains(s.anchorNode)?s.getRangeAt(0).cloneRange():null;\
+    b.focus();\
+    var r=kept;\
+    if(!r){r=document.createRange();r.setStart(b,0);r.collapse(true);}\
+    s.removeAllRanges();s.addRange(r);})()";
 
 fn exec(webview: &webkit6::WebView, js: &str) {
     webview.evaluate_javascript(js, None, None, gtk::gio::Cancellable::NONE, |_| {});
