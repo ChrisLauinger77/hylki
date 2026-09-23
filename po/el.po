@@ -952,6 +952,10 @@ msgstr "Σε αυτόν τον υπολογιστή"
 msgid "CardDAV Address Book"
 msgstr "Βιβλίο διευθύνσεων CardDAV"
 
+#, fuzzy
+msgid "{date} at {time}"
+msgstr "Δευτέρα πρωί ({time})"
+
 msgid "Encrypted message"
 msgstr "Κρυπτογραφημένο μήνυμα"
 
@@ -1938,6 +1942,11 @@ msgstr "Εμφάνιση συνημμένων"
 msgid "Hide the attachments"
 msgstr "Απόκρυψη συνημμένων"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} συνημμένο"
+msgstr[1] "{n} συνημμένα"
+
 msgid "Thumbnail size"
 msgstr "Μέγεθος μικρογραφιών"
 
@@ -2095,11 +2104,6 @@ msgstr "Ευρετηρίαση {n} μηνυμάτων…"
 
 msgid "Loading more…"
 msgstr "Φόρτωση περισσότερων…"
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} συνημμένο"
-msgstr[1] "{n} συνημμένα"
 
 #, fuzzy
 msgid "{shown} of {total}"

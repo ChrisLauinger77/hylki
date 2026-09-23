@@ -940,6 +940,10 @@ msgstr "Sur cet ordinateur"
 msgid "CardDAV Address Book"
 msgstr "Carnet d'adresses CardDAV"
 
+#, fuzzy
+msgid "{date} at {time}"
+msgstr "Aujourd'hui, {time}"
+
 msgid "Encrypted message"
 msgstr "Message chiffré"
 
@@ -1923,6 +1927,11 @@ msgstr "Afficher les pièces jointes"
 msgid "Hide the attachments"
 msgstr "Masquer les pièces jointes"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} pièce jointe"
+msgstr[1] "{n} pièces jointes"
+
 msgid "Thumbnail size"
 msgstr "Taille des vignettes"
 
@@ -2080,11 +2089,6 @@ msgstr "Indexation de {n} messages…"
 
 msgid "Loading more…"
 msgstr "Chargement en cours…"
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} pièce jointe"
-msgstr[1] "{n} pièces jointes"
 
 msgid "{shown} of {total}"
 msgstr "{shown} sur {total}"

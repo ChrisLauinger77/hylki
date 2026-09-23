@@ -254,7 +254,7 @@ pub fn date_time(ts: i64) -> String {
     if local(ts).is_none() {
         return String::new();
     }
-    format!("{} at {}", day_month_year(ts), time(ts))
+    crate::i18n::i18n_f("{date} at {time}", &[("date", &day_month_year(ts)), ("time", &time(ts))])
 }
 
 /// The day an event falls on, with its weekday: "Monday, 2 Nov 2026".

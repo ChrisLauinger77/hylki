@@ -877,6 +877,9 @@ msgstr ""
 msgid "CardDAV Address Book"
 msgstr ""
 
+msgid "{date} at {time}"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr ""
 
@@ -1751,6 +1754,11 @@ msgstr ""
 msgid "Hide the attachments"
 msgstr ""
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Thumbnail size"
 msgstr ""
 
@@ -1903,11 +1911,6 @@ msgstr ""
 
 msgid "Loading more…"
 msgstr ""
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] ""
-msgstr[1] ""
 
 msgid "{shown} of {total}"
 msgstr ""

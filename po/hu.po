@@ -947,6 +947,10 @@ msgstr "Ezen a számítógépen"
 msgid "CardDAV Address Book"
 msgstr "CardDAV-címjegyzék"
 
+#, fuzzy
+msgid "{date} at {time}"
+msgstr "Hétfő délelőtt (8:00)"
+
 msgid "Encrypted message"
 msgstr "Titkosított üzenet"
 
@@ -1897,6 +1901,12 @@ msgstr "Nincsenek mellékletek"
 msgid "Hide the attachments"
 msgstr "Nincsenek mellékletek"
 
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Nincsenek mellékletek"
+msgstr[1] "Nincsenek mellékletek"
+
 msgid "Thumbnail size"
 msgstr "Bélyegkép mérete"
 
@@ -2057,12 +2067,6 @@ msgstr "{n} üzenet törlése"
 
 msgid "Loading more…"
 msgstr "Továbbiak betöltése…"
-
-#, fuzzy
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "Nincsenek mellékletek"
-msgstr[1] "Nincsenek mellékletek"
 
 #, fuzzy
 msgid "{shown} of {total}"

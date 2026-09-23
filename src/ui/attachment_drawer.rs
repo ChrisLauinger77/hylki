@@ -39,7 +39,7 @@ use crate::ui::attachments_gallery::{
     icon_color_class, icon_for, is_pdf_name, open_bytes, spawn_thumbnail_render, texture_from,
     thumbnail_texture, Thumbnail,
 };
-use crate::i18n::i18n;
+use crate::i18n::{i18n, ni18n_f};
 
 /// Whether an attachment can be shown in the drawer's lightbox: a decodable
 /// image, or a PDF (whose first page renders on demand).
@@ -276,10 +276,11 @@ impl SimpleComponent for AttachmentDrawer {
                             },
                             gtk::Label {
                                 #[watch]
-                                set_label: &format!(
-                                    "{} attachment{}",
-                                    model.items.len(),
-                                    if model.items.len() == 1 { "" } else { "s" },
+                                set_label: &ni18n_f(
+                                    "{n} attachment",
+                                    "{n} attachments",
+                                    model.items.len() as u32,
+                                    &[("n", &model.items.len().to_string())],
                                 ),
                                 add_css_class: "heading",
                             },

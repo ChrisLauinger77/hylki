@@ -966,6 +966,10 @@ msgstr "На этом компьютере"
 msgid "CardDAV Address Book"
 msgstr "Адресная книга CardDAV"
 
+#, fuzzy
+msgid "{date} at {time}"
+msgstr "В понедельник утром ({time})"
+
 msgid "Encrypted message"
 msgstr "Зашифрованное сообщение"
 
@@ -1920,6 +1924,12 @@ msgstr "Нет вложений"
 msgid "Hide the attachments"
 msgstr "Нет вложений"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} вложение"
+msgstr[1] "{n} вложения"
+msgstr[2] "{n} вложений"
+
 msgid "Thumbnail size"
 msgstr "Размер миниатюр"
 
@@ -2078,12 +2088,6 @@ msgstr "Индексация {n} сообщений…"
 
 msgid "Loading more…"
 msgstr "Загрузка остальных…"
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} вложение"
-msgstr[1] "{n} вложения"
-msgstr[2] "{n} вложений"
 
 #, fuzzy
 msgid "{shown} of {total}"

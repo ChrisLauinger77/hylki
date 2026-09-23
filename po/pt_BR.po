@@ -948,6 +948,10 @@ msgstr "Neste computador"
 msgid "CardDAV Address Book"
 msgstr "Catálogo de endereços CardDAV"
 
+#, fuzzy
+msgid "{date} at {time}"
+msgstr "Segunda-feira de manhã ({time})"
+
 msgid "Encrypted message"
 msgstr "Mensagem criptografada"
 
@@ -1915,6 +1919,11 @@ msgstr "Mostrar os anexos"
 msgid "Hide the attachments"
 msgstr "Ocultar os anexos"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} anexo"
+msgstr[1] "{n} anexos"
+
 msgid "Thumbnail size"
 msgstr "Tamanho das miniaturas"
 
@@ -2071,11 +2080,6 @@ msgstr "Indexando {n} mensagens…"
 
 msgid "Loading more…"
 msgstr "Carregando mais…"
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} anexo"
-msgstr[1] "{n} anexos"
 
 #, fuzzy
 msgid "{shown} of {total}"
