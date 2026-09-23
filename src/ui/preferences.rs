@@ -121,6 +121,7 @@ pub struct PrefInit {
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
     pub chevrons_left: bool,
+    pub start_view: crate::config::StartView,
     pub console_mode: bool,
     pub read_mark: crate::config::ReadMark,
     pub sidebar_hover_expand: bool,
@@ -859,6 +860,7 @@ pub enum PrefInput {
     /// The main menu flipped "Show Accounts": the switch follows.
     SetShowAccounts(bool),
     ChangeChevronSide(u32),
+    ChangeStartView(u32),
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
     ToggleSidebarHoverExpand(bool),
@@ -992,6 +994,7 @@ pub enum PrefOutput {
     SetUnifiedTags(bool),
     SetShowAccounts(bool),
     SetChevronsLeft(bool),
+    SetStartView(crate::config::StartView),
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
     SetConsoleMode(bool),
@@ -1597,6 +1600,15 @@ impl Component for Preferences {
                             add_named[Some("sidebar")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Sidebar"),
+
+                                    #[name = "start_view_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Open at startup"),
+                                        set_subtitle: &i18n("What the window shows when Hylki starts."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeStartView(row.selected()));
+                                        },
+                                    },
 
                                     #[name = "show_accounts_row"]
                                     adw::SwitchRow {
@@ -2879,6 +2891,7 @@ impl Component for Preferences {
             &widgets.clock_style_row,
             &widgets.language_row,
             &widgets.chevron_side_row,
+            &widgets.start_view_row,
         ] {
             no_truncate(row);
         }
@@ -2945,6 +2958,16 @@ impl Component for Preferences {
             ])));
             row.set_selected(placement_index(placement));
         }
+        widgets.start_view_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("All Inboxes").as_str(),
+            i18n("The last account's inbox").as_str(),
+            i18n("The last folder").as_str(),
+        ])));
+        widgets.start_view_row.set_selected(match init.start_view {
+            crate::config::StartView::AllInboxes => 0,
+            crate::config::StartView::AccountInbox => 1,
+            crate::config::StartView::LastFolder => 2,
+        });
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
@@ -3839,6 +3862,15 @@ impl Component for Preferences {
             }
             PrefInput::ChangeTagsPlacement(idx) => {
                 let _ = sender.output(PrefOutput::SetTagsPlacement(placement_from_index(idx)));
+            }
+            PrefInput::ChangeStartView(idx) => {
+                use crate::config::StartView;
+                let view = match idx {
+                    1 => StartView::AccountInbox,
+                    2 => StartView::LastFolder,
+                    _ => StartView::AllInboxes,
+                };
+                let _ = sender.output(PrefOutput::SetStartView(view));
             }
             PrefInput::ChangeChevronSide(idx) => {
                 let _ = sender.output(PrefOutput::SetChevronsLeft(idx == 0));

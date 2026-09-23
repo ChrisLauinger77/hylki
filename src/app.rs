@@ -794,6 +794,8 @@ pub struct AppModel {
     list_header_widgets: std::cell::OnceCell<ListHeaderWidgets>,
     /// Whether the sidebar's disclosure chevrons lead their rows.
     chevrons_left: bool,
+    /// What the window shows at launch (#256).
+    start_view: config::StartView,
     /// Console mode offered in the status bar (Settings → System & Appearance).
     console_mode: bool,
     /// Read-marking policy (#100).
@@ -1379,6 +1381,7 @@ pub enum AppMsg {
     ToggleAccountFiltered(u32),
     ToggleAccountTags(u32),
     SetChevronsLeft(bool),
+    SetStartView(config::StartView),
     /// Where the Filtered Folders / Tags sections sit (Settings → Sidebar).
     SetFilteredPlacement(config::SectionPlacement),
     SetTagsPlacement(config::SectionPlacement),
@@ -2638,6 +2641,21 @@ impl SimpleComponent for AppModel {
         let demo_data = demo_mode() && config.is_empty();
         let show_attachments = config::load_show_attachments();
         let show_contacts = config::load_show_contacts();
+        let start_view = config::load_start_view();
+        let start = {
+            use crate::ui::sidebar::StartTarget;
+            let (last, last_account) = config::load_last_view();
+            match start_view {
+                config::StartView::AllInboxes => None,
+                config::StartView::AccountInbox => {
+                    Some(last_account).filter(|e| !e.is_empty()).map(StartTarget::Inbox)
+                }
+                config::StartView::LastFolder => last
+                    .filter(|v| !v.email.is_empty())
+                    .map(|v| StartTarget::Folder(v.email, v.path)),
+            }
+        };
+        let start_pending = start.is_some();
         let sidebar = Sidebar::builder()
             .launch(SidebarInit {
                 collapsed: rail_now,
@@ -2651,8 +2669,17 @@ impl SimpleComponent for AppModel {
                 archive_expanded,
                 show_attachments,
                 show_contacts,
+                start,
             })
             .forward(sender.input_sender(), sidebar_output_msg);
+        // The sidebar waits for the launch view's account to list its
+        // folders; one that is offline with nothing cached never does.
+        if start_pending {
+            let s = sidebar.sender().clone();
+            gtk::glib::timeout_add_seconds_local_once(5, move || {
+                let _ = s.send(SidebarInput::DropStart);
+            });
+        }
         // The peek panel's rows: a second, always-expanded instance.
         let peek_sidebar = Sidebar::builder()
             .launch(SidebarInit {
@@ -2667,6 +2694,7 @@ impl SimpleComponent for AppModel {
                 archive_expanded,
                 show_attachments,
                 show_contacts,
+                start: None,
             })
             .forward(sender.input_sender(), sidebar_output_msg);
 
@@ -3147,6 +3175,7 @@ impl SimpleComponent for AppModel {
             focus_action,
             list_header_widgets: std::cell::OnceCell::new(),
             chevrons_left: config::load_chevrons_left(),
+            start_view,
             console_mode: config::load_console_mode(),
             read_mark: config::load_read_mark(),
             // The demo (no accounts of its own) ships with tags and filter
@@ -7255,6 +7284,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetStartView(view) => {
+                if self.start_view != view {
+                    self.start_view = view;
+                    self.save_settings();
+                }
+            }
+
             AppMsg::SetChevronsLeft(left) => {
                 if self.chevrons_left != left {
                     self.chevrons_left = left;
@@ -10450,6 +10486,7 @@ impl AppModel {
             self.read_mark,
             self.files_prefs,
             self.link_browser.clone(),
+            self.start_view,
         );
     }
 
@@ -12979,6 +13016,9 @@ impl AppModel {
     /// sidebar row does; a notification click lands here too.
     fn open_unified(&mut self, view: UnifiedView) {
         let t_open = std::time::Instant::now();
+        if view == UnifiedView::Kind(FolderKind::Inbox) && !demo_mode() {
+            config::save_last_view(config::LastView::default());
+        }
         self.close_sidebar_peek();
         self.mirror_selection(match view {
             UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
@@ -13228,6 +13268,10 @@ impl AppModel {
     /// messages instantly (if any), and kick off a background sync. Shared by the
     /// sidebar selection and the "open message from notification" flow.
     fn select_folder(&mut self, account_id: u32, folder_id: u32, _name: String, path: String) {
+        // For "Open at startup" (#256). The demo's accounts are not real.
+        if let Some(email) = self.email_of(account_id).filter(|_| !demo_mode()) {
+            config::save_last_view(config::LastView { email, path: path.clone() });
+        }
         self.leave_gallery();
         self.showing_contacts = false;
         self.showing_outbox = false;
@@ -16406,6 +16450,7 @@ impl AppModel {
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
+            start_view: self.start_view,
             console_mode: self.console_mode,
             read_mark: self.read_mark,
             settings_open_accounts: self.settings_open_accounts,
@@ -16526,6 +16571,7 @@ impl AppModel {
                 PrefOutput::SetFilteredPlacement(p) => AppMsg::SetFilteredPlacement(p),
                 PrefOutput::SetTagsPlacement(p) => AppMsg::SetTagsPlacement(p),
                 PrefOutput::SetChevronsLeft(left) => AppMsg::SetChevronsLeft(left),
+                PrefOutput::SetStartView(view) => AppMsg::SetStartView(view),
                 PrefOutput::SetConsoleMode(on) => AppMsg::SetConsoleMode(on),
                 PrefOutput::SetReadMark(policy) => AppMsg::SetReadMark(policy),
                 PrefOutput::ExportSettings => AppMsg::ExportSettings,

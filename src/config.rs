@@ -1226,6 +1226,9 @@ struct PrivacyFile {
     /// ("brave-browser.desktop") launched directly.
     #[serde(default)]
     link_browser: String,
+    /// What the main window shows at launch (#256).
+    #[serde(default)]
+    start_view: StartView,
 }
 
 fn default_chevrons_left() -> bool {
@@ -1379,6 +1382,7 @@ impl Default for PrivacyFile {
             files_large: FilesLarge::default(),
             files_limit_mb: default_files_limit_mb(),
             link_browser: String::new(),
+            start_view: StartView::default(),
             gravatar: false,
             avatars: default_avatars(),
             own_mailbox_face: default_own_mailbox_face(),
@@ -1710,6 +1714,24 @@ pub enum SectionPlacement {
     AboveAccounts,
     /// In the scrolling sidebar, after the last account.
     BelowAccounts,
+}
+
+/// What the main window shows at launch (#256).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartView {
+    /// All Inboxes, or with that row hidden the first account's first
+    /// folder.
+    #[default]
+    AllInboxes,
+    /// The inbox of the account whose mail was open last.
+    AccountInbox,
+    /// Whichever folder was open last, All Inboxes included.
+    LastFolder,
+}
+
+pub fn load_start_view() -> StartView {
+    load_privacy().start_view
 }
 
 pub fn load_chevrons_left() -> bool {
@@ -2995,6 +3017,7 @@ pub fn save_privacy(
     read_mark: ReadMark,
     files: FilesPrefs,
     link_browser: String,
+    start_view: StartView,
 ) {
     let Some(path) = privacy_path() else {
         return;
@@ -3094,6 +3117,7 @@ pub fn save_privacy(
         files_large: files.large,
         files_limit_mb: files.limit_mb,
         link_browser,
+        start_view,
     };
     match toml::to_string_pretty(&file) {
         Ok(toml) => {
@@ -3363,6 +3387,15 @@ struct StateFile {
     /// restart right after the wizard, for the app icon, must not loop.
     #[serde(default)]
     wizard_completed: bool,
+    /// The mail view open last (#256): an account's folder, or All Inboxes
+    /// when `email` is empty. Accounts are named by address, which stays
+    /// true across launches where an account's number may not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_view: Option<LastView>,
+    /// The account whose mail was open last, kept through a visit to All
+    /// Inboxes so "the last account's inbox" still has an account to mean.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    last_account: String,
     /// The icon generation whose default has been asserted over the stored
     /// choice (see `app_icon::ICON_GENERATION`): a release that brings a new
     /// authoritative icon bumps the constant, and the first start on it puts
@@ -3424,6 +3457,36 @@ fn save_state(state: &StateFile) {
     if let Ok(toml) = toml::to_string_pretty(state) {
         let _ = std::fs::write(&path, toml);
     }
+}
+
+/// A mail view to reopen at launch (#256).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct LastView {
+    /// The account's address; empty for All Inboxes.
+    #[serde(default)]
+    pub email: String,
+    /// The folder's path on the server.
+    #[serde(default)]
+    pub path: String,
+}
+
+/// The view open last and the account whose mail was open last.
+pub fn load_last_view() -> (Option<LastView>, String) {
+    let s = load_state();
+    (s.last_view, s.last_account)
+}
+
+/// Record the view just opened, unless it is the one already recorded:
+/// this runs on every folder switch.
+pub fn save_last_view(view: LastView) {
+    let mut s = load_state();
+    let account = if view.email.is_empty() { s.last_account.clone() } else { view.email.clone() };
+    if s.last_view.as_ref() == Some(&view) && s.last_account == account {
+        return;
+    }
+    s.last_view = Some(view);
+    s.last_account = account;
+    save_state(&s);
 }
 
 /// Whether the welcome wizard has been completed before.

@@ -191,6 +191,16 @@ pub struct SidebarInit {
     pub show_attachments: bool,
     /// Whether the "Contacts" row is shown.
     pub show_contacts: bool,
+    /// Where the first pick lands instead of All Inboxes (#256).
+    pub start: Option<StartTarget>,
+}
+
+/// A view to open at launch (#256), by account address: an account's
+/// inbox, or one of its folders by path.
+#[derive(Clone, Debug)]
+pub enum StartTarget {
+    Inbox(String),
+    Folder(String, String),
 }
 
 /// What is currently selected in the sidebar.
@@ -299,6 +309,9 @@ pub struct Sidebar {
     quiet: std::rc::Rc<std::cell::Cell<bool>>,
     /// See `SidebarInit::mirror`.
     mirror: bool,
+    /// The launch view still to be picked (#256): kept until the account
+    /// it names has its folders listed, then taken by the first pick.
+    start: Option<StartTarget>,
     /// Whether the "Attachments" row is shown (in the pinned footer).
     show_attachments: bool,
     /// Whether the "Contacts" row is shown (in the pinned footer).
@@ -453,6 +466,9 @@ pub enum SidebarInput {
     /// back (the docked rail and the floating peek panel are two instances
     /// of this component; the app pushes every navigation to both).
     MirrorSelection(Sel),
+    /// Stop waiting for the launch view's account (#256): its folders did
+    /// not arrive in time, so the usual first view is picked instead.
+    DropStart,
     /// Toggle the collapsible "Folders" (custom folders) section for an account.
     ToggleCustomFoldersLocal(u32),
     /// Collapse/expand one folder-tree node (a parent folder's chevron, #51).
@@ -699,6 +715,7 @@ impl Component for Sidebar {
             collapsed: init.collapsed,
             quiet: std::rc::Rc::new(std::cell::Cell::new(false)),
             mirror: init.mirror,
+            start: if init.mirror { None } else { init.start },
             show_attachments: init.show_attachments,
             show_contacts: init.show_contacts,
             outbox_count: 0,
@@ -777,6 +794,12 @@ impl Sidebar {
         _root: &<Self as Component>::Root,
     ) {
         match msg {
+            SidebarInput::DropStart => {
+                if self.start.take().is_some() && self.selected == Sel::None {
+                    self.restore_selection();
+                }
+            }
+
             SidebarInput::MirrorSelection(sel) => {
                 if self.selected != sel {
                     self.selected = sel.clone();
@@ -3776,6 +3799,11 @@ impl Sidebar {
     }
 
     fn restore_selection_inner(&mut self) {
+        // A view has been picked and has stuck: the launch view is done
+        // with, whichever it was.
+        if self.selected != Sel::None {
+            self.start = None;
+        }
         match self.selected.clone() {
             Sel::Unified => self.select_unified(),
             Sel::Attachments => self.select_attachments(),
@@ -3799,6 +3827,22 @@ impl Sidebar {
                 }
             }
             Sel::None => {
+                // The launch view (#256) is picked again on every pass until
+                // one sticks: the sections are rebuilt as each account's
+                // folders arrive, and a pick only takes once its row's
+                // selection has been handled. Until the account it names is
+                // listed with its folders, nothing else is picked, or All
+                // Inboxes would be on screen first and stay.
+                let start = self.start.clone();
+                if let Some(target) = start {
+                    match self.resolve_start(&target) {
+                        Some(Sel::UnifiedInbox(acc)) => return self.select_unified_inbox(acc),
+                        Some(Sel::Folder(acc, path)) => return self.select_folder(acc, &path),
+                        _ if !self.start_account_ready(&target) => return,
+                        // Listed, but with nowhere to land: the usual view.
+                        _ => self.start = None,
+                    }
+                }
                 if self.show_unified {
                     self.select_unified();
                 } else if let Some(acc) = self
@@ -3812,6 +3856,49 @@ impl Sidebar {
                 }
             }
         }
+    }
+
+    /// The row a launch view names, if it is on screen: an inbox in the
+    /// Inboxes list when that is open (or the accounts' own sections are
+    /// hidden), otherwise the folder in its account's section.
+    fn resolve_start(&self, target: &StartTarget) -> Option<Sel> {
+        let (email, path) = match target {
+            StartTarget::Inbox(email) => (email, None),
+            StartTarget::Folder(email, path) => (email, Some(path)),
+        };
+        let section = self
+            .sections
+            .iter()
+            .find(|s| s.account.email.eq_ignore_ascii_case(email))?;
+        let acc = section.account.id;
+        let inbox = section
+            .folders
+            .iter()
+            .find(|f| f.kind == FolderKind::Inbox)
+            .map(|f| f.path.clone());
+        // A folder since deleted or hidden: that account's inbox instead.
+        let path = path
+            .filter(|p| section.folders.iter().any(|f| &f.path == *p))
+            .cloned()
+            .or_else(|| inbox.clone())?;
+        let accounts_shown = self.show_accounts && !self.focus_hide_accounts;
+        let in_inboxes =
+            self.show_unified && self.unified_inboxes.iter().any(|r| r.account_id == acc);
+        if inbox.as_ref() == Some(&path) && in_inboxes && (self.unified_expanded || !accounts_shown) {
+            return Some(Sel::UnifiedInbox(acc));
+        }
+        if accounts_shown && section.folders.iter().any(|f| f.path == path) {
+            return Some(Sel::Folder(acc, path));
+        }
+        None
+    }
+
+    /// Whether the account a launch view names is listed with its folders.
+    fn start_account_ready(&self, target: &StartTarget) -> bool {
+        let (StartTarget::Inbox(email) | StartTarget::Folder(email, _)) = target;
+        self.sections
+            .iter()
+            .any(|s| s.account.email.eq_ignore_ascii_case(email) && !s.folders.is_empty())
     }
 
     fn select_unified(&self) {
