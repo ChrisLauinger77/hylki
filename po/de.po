@@ -1441,6 +1441,14 @@ msgstr "Initialen verwenden"
 msgid "A photo or logo from this computer"
 msgstr "Ein Foto oder Logo von diesem Computer"
 
+msgid "Show in All Inboxes"
+msgstr ""
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr "Absender-Aliasse"
 
@@ -1553,6 +1561,13 @@ msgstr "Schlüssel"
 
 msgid "Automatic uses the key whose address matches."
 msgstr "„Automatisch“ verwendet den Schlüssel mit der passenden Adresse."
+
+#, fuzzy
+msgid "Sign messages by default"
+msgstr "Einzelne Nachrichten als Karten"
+
+msgid "New messages, replies and forwards start with signing on."
+msgstr ""
 
 msgid "Signature"
 msgstr "Signatur"
@@ -3563,6 +3578,14 @@ msgid "The app itself. Message content has its own setting under Reading."
 msgstr ""
 "Die App selbst. Nachrichteninhalte haben eine eigene Einstellung unter Lesen."
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr "Erscheinungsbild"
 
@@ -4454,6 +4477,16 @@ msgstr ""
 "Listen Sie die neuesten ungelesenen Posteingangsnachrichten im Menü des "
 "Symbols auf; Klicken Sie auf eins, um es zu öffnen."
 
+#, fuzzy
+msgid "Unread count on the app icon"
+msgstr "Punkte statt Zahlen für ungelesene Nachrichten"
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr "Einzeltasten-Kürzel"
 
@@ -4687,6 +4720,9 @@ msgstr "Systemsprache — {language}"
 
 msgid "Add a word"
 msgstr "Wort hinzufügen"
+
+msgid "{percent}%"
+msgstr ""
 
 msgid "Could not install the extension"
 msgstr "Konnte die Erweiterung nicht installieren"

@@ -1445,6 +1445,15 @@ msgstr "Использовать инициалы"
 msgid "A photo or logo from this computer"
 msgstr "Фотография или логотип с этого компьютера"
 
+#, fuzzy
+msgid "Show in All Inboxes"
+msgstr "Все входящие"
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr "Псевдонимы для отправки"
 
@@ -1550,6 +1559,13 @@ msgstr "Ключ"
 
 msgid "Automatic uses the key whose address matches."
 msgstr "В автоматическом режиме используется ключ с совпадающим адресом."
+
+#, fuzzy
+msgid "Sign messages by default"
+msgstr "Одиночные сообщения в виде карточек"
+
+msgid "New messages, replies and forwards start with signing on."
+msgstr ""
 
 msgid "Signature"
 msgstr "Подпись"
@@ -3559,6 +3575,14 @@ msgstr ""
 "Сам интерфейс приложения. У содержимого сообщений свои настройки в разделе "
 "«Чтение»."
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr "Тема"
 
@@ -4424,6 +4448,16 @@ msgstr ""
 "Отображать список последних непрочитанных сообщений в меню значка; нажмите "
 "на письмо, чтобы открыть его."
 
+#, fuzzy
+msgid "Unread count on the app icon"
+msgstr "Точки непрочитанного вместо счётчиков"
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr "Одноклавишные сочетания"
 
@@ -4663,6 +4697,9 @@ msgstr "Системный язык — {language}"
 
 msgid "Add a word"
 msgstr "Добавить слово"
+
+msgid "{percent}%"
+msgstr ""
 
 msgid "Could not install the extension"
 msgstr "Не удалось установить расширение"

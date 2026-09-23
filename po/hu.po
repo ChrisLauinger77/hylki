@@ -1419,6 +1419,15 @@ msgstr "Monogram használata"
 msgid "A photo or logo from this computer"
 msgstr ""
 
+#, fuzzy
+msgid "Show in All Inboxes"
+msgstr "Megjelenítés az Összes beérkezett között"
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr "Küldési aliasok"
 
@@ -1525,6 +1534,13 @@ msgstr "Kulcs"
 
 msgid "Automatic uses the key whose address matches."
 msgstr "Az automatikus beállítás a megfelelő címhez tartozó kulcsot használja."
+
+#, fuzzy
+msgid "Sign messages by default"
+msgstr "Önálló üzenetek kártyaként"
+
+msgid "New messages, replies and forwards start with signing on."
+msgstr ""
 
 msgid "Signature"
 msgstr "Aláírás"
@@ -3537,6 +3553,14 @@ msgstr ""
 "Maga az alkalmazás. Az üzenettartalom saját beállítással rendelkezik az "
 "Olvasás alatt."
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr ""
 
@@ -4343,6 +4367,16 @@ msgstr ""
 "A legújabb olvasatlan beérkezett üzenetek listázása az ikon menüjében; "
 "kattintson egyre a megnyitásához."
 
+#, fuzzy
+msgid "Unread count on the app icon"
+msgstr "Olvasatlan levelek a tálcamenüben"
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr "Egybillentyűs parancsikonok"
 
@@ -4571,6 +4605,9 @@ msgstr "Rendszernyelv — {language}"
 
 msgid "Add a word"
 msgstr "Szó hozzáadása"
+
+msgid "{percent}%"
+msgstr ""
 
 #, fuzzy
 msgid "Could not install the extension"
@@ -5458,9 +5495,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "A mappa olvasatlan leveleinek beszámítása az olvasatlanok számába és a "
 #~ "tálcaikonba"
-
-#~ msgid "Show under All Inboxes"
-#~ msgstr "Megjelenítés az Összes beérkezett között"
 
 #~ msgid "Nextcloud, ownCloud or OpenCloud"
 #~ msgstr "Nextcloud, ownCloud vagy OpenCloud"

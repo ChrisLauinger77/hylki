@@ -1451,6 +1451,15 @@ msgstr "Χρήση αρχικών"
 msgid "A photo or logo from this computer"
 msgstr "Φωτογραφία ή λογότυπο από αυτόν τον υπολογιστή"
 
+#, fuzzy
+msgid "Show in All Inboxes"
+msgstr "Εισερχόμενα"
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr "Ψευδώνυμα αποστολέα"
 
@@ -1561,6 +1570,13 @@ msgstr "Κλειδί"
 msgid "Automatic uses the key whose address matches."
 msgstr ""
 "Η αυτόματη επιλογή χρησιμοποιεί το κλειδί του οποίου η διεύθυνση ταιριάζει."
+
+#, fuzzy
+msgid "Sign messages by default"
+msgstr "Μεμονωμένα μηνύματα ως κάρτες"
+
+msgid "New messages, replies and forwards start with signing on."
+msgstr ""
 
 msgid "Signature"
 msgstr "Υπογραφή"
@@ -3596,6 +3612,14 @@ msgstr ""
 "Η ίδια η εφαρμογή. Το περιεχόμενο μηνυμάτων έχει δική του ρύθμιση στην "
 "ενότητα Ανάγνωση."
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr "Θέμα"
 
@@ -4484,6 +4508,16 @@ msgstr ""
 "Εμφάνιση των νεότερων μη αναγνωσμένων μηνυμάτων εισερχομένων στο μενού του "
 "εικονιδίου· κάντε κλικ σε ένα για να το ανοίξετε."
 
+#, fuzzy
+msgid "Unread count on the app icon"
+msgstr "Κουκκίδες αντί για πλήθος μη αναγνωσμένων"
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr "Συντομεύσεις ενός πλήκτρου"
 
@@ -4723,6 +4757,9 @@ msgstr "Γλώσσα συστήματος — {language}"
 
 msgid "Add a word"
 msgstr "Προσθήκη λέξης"
+
+msgid "{percent}%"
+msgstr ""
 
 msgid "Could not install the extension"
 msgstr "Δεν ήταν δυνατή η εγκατάσταση της επέκτασης"

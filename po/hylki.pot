@@ -1312,6 +1312,14 @@ msgstr ""
 msgid "A photo or logo from this computer"
 msgstr ""
 
+msgid "Show in All Inboxes"
+msgstr ""
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr ""
 
@@ -1402,6 +1410,12 @@ msgid "Key"
 msgstr ""
 
 msgid "Automatic uses the key whose address matches."
+msgstr ""
+
+msgid "Sign messages by default"
+msgstr ""
+
+msgid "New messages, replies and forwards start with signing on."
 msgstr ""
 
 msgid "Signature"
@@ -3232,6 +3246,14 @@ msgstr ""
 msgid "The app itself. Message content has its own setting under Reading."
 msgstr ""
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr ""
 
@@ -3931,6 +3953,15 @@ msgid ""
 "it."
 msgstr ""
 
+msgid "Unread count on the app icon"
+msgstr ""
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr ""
 
@@ -4133,6 +4164,9 @@ msgid "System language — {language}"
 msgstr ""
 
 msgid "Add a word"
+msgstr ""
+
+msgid "{percent}%"
 msgstr ""
 
 msgid "Could not install the extension"

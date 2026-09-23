@@ -1439,6 +1439,15 @@ msgstr "Utiliser les initiales"
 msgid "A photo or logo from this computer"
 msgstr "Une photo ou un logo depuis cet ordinateur"
 
+#, fuzzy
+msgid "Show in All Inboxes"
+msgstr "Afficher sous Toutes les boîtes"
+
+msgid ""
+"Include this account's mail in the unified Inboxes, Starred, Sent, Drafts "
+"and Archive, and in the unified Filters and Tags."
+msgstr ""
+
 msgid "Send-as aliases"
 msgstr "Alias d'expédition"
 
@@ -1550,6 +1559,13 @@ msgstr "Clé"
 
 msgid "Automatic uses the key whose address matches."
 msgstr "La fonction « Automatique » utilise la clé dont l'adresse correspond."
+
+#, fuzzy
+msgid "Sign messages by default"
+msgstr "Messages isolés sous forme de cartes"
+
+msgid "New messages, replies and forwards start with signing on."
+msgstr ""
 
 msgid "Signature"
 msgstr "Signature"
@@ -3574,6 +3590,14 @@ msgstr ""
 "L'application elle-même. Le contenu des messages dispose de son propre "
 "réglage sous « Lecture »."
 
+msgid "Text size"
+msgstr ""
+
+msgid ""
+"All of Hylki's text, messages included, against the desktop's text size. "
+"Icons keep their size."
+msgstr ""
+
 msgid "Theme"
 msgstr "Thème"
 
@@ -4474,6 +4498,16 @@ msgstr ""
 "Lister les plus récents messages non lus dans le menu de l'icône ; cliquez "
 "sur l'un d'eux pour l'ouvrir."
 
+#, fuzzy
+msgid "Unread count on the app icon"
+msgstr "Puces de non-lus au lieu des nombres"
+
+msgid ""
+"The number of unread inbox messages on Hylki's icon in the dock or task "
+"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
+"Dock."
+msgstr ""
+
 msgid "Single-key shortcuts"
 msgstr "Raccourcis à touche unique"
 
@@ -4707,6 +4741,9 @@ msgstr "Langue du système — {language}"
 
 msgid "Add a word"
 msgstr "Ajouter un mot"
+
+msgid "{percent}%"
+msgstr ""
 
 msgid "Could not install the extension"
 msgstr "Impossible d'installer l'extension"
@@ -5665,9 +5702,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Inclure les e-mails non lus du dossier dans le compteur global et l'icône "
 #~ "de la zone de notification"
-
-#~ msgid "Show under All Inboxes"
-#~ msgstr "Afficher sous Toutes les boîtes"
 
 #~ msgid "All Inboxes unread count"
 #~ msgstr "Nombre de non lus dans Toutes les boîtes"
