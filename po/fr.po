@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: hylki\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-22 17:58+0200\n"
+"PO-Revision-Date: 2026-09-23 17:46+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -321,7 +321,7 @@ msgid "Restart Now"
 msgstr "Redémarrer maintenant"
 
 msgid "{name} · {current} of {total}"
-msgstr ""
+msgstr "{name} · {current} sur {total}"
 
 msgid "View Source"
 msgstr "Afficher le code source"
@@ -473,34 +473,22 @@ msgstr ""
 msgid "No {v1} folder available"
 msgstr "Aucun dossier {v1} disponible"
 
-#, fuzzy
 msgid "One message could not be moved to {account}: {error}"
 msgid_plural "{n} messages could not be moved to {account}: {error}"
 msgstr[0] ""
-"Un message n'a pas été déplacé — les e-mails ne peuvent pas être déplacés "
-"entre différents comptes"
 msgstr[1] ""
-"Un message n'a pas été déplacé — les e-mails ne peuvent pas être déplacés "
-"entre différents comptes"
 
-#, fuzzy
 msgid "Moving one message to {account}…"
 msgid_plural "Moving {n} messages to {account}…"
-msgstr[0] "Déplace le message vers les indésirables."
-msgstr[1] "Déplace le message vers les indésirables."
+msgstr[0] ""
+msgstr[1] ""
 
-#, fuzzy
 msgid "One message stayed put: this account can't take mail from another"
 msgstr ""
-"Un message n'a pas été déplacé — les e-mails ne peuvent pas être déplacés "
-"entre différents comptes"
 
-#, fuzzy
 msgid ""
 "{foreign} messages stayed put: this account can't take mail from another"
 msgstr ""
-"{foreign} messages n'ont pas été déplacés — les e-mails ne peuvent pas être "
-"déplacés entre différents comptes"
 
 msgid "Move Folder"
 msgstr "Déplacer le dossier"
@@ -1022,7 +1010,7 @@ msgid "Scheduled for {when}"
 msgstr "Programmé pour {when}"
 
 msgid "Today, {time}"
-msgstr ""
+msgstr "Aujourd'hui, {time}"
 
 msgid "New message"
 msgstr "Nouveau message"
@@ -1698,9 +1686,8 @@ msgstr "Automatique"
 #. from the server's markings, and this one detects nothing. It is an
 #. override that is either set or not, and unset means the Sent folder
 #. above keeps taking the copies as it always has.
-#, fuzzy
 msgid "Disabled"
-msgstr "Tableau"
+msgstr ""
 
 msgid "Microsoft 365 files its own copy in Sent Items; this cannot be changed."
 msgstr ""
@@ -2100,7 +2087,7 @@ msgstr[0] "{n} pièce jointe"
 msgstr[1] "{n} pièces jointes"
 
 msgid "{shown} of {total}"
-msgstr ""
+msgstr "{shown} sur {total}"
 
 msgid "The file could not be opened"
 msgstr "Le fichier n'a pas pu être ouvert"
@@ -3493,13 +3480,11 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Installée, mais pas la copie de cette version"
 
-#, fuzzy
 msgid "Search Settings"
-msgstr "Paramètres"
+msgstr ""
 
-#, fuzzy
 msgid "Search settings"
-msgstr "Rechercher les expéditeurs"
+msgstr ""
 
 msgid "No Results"
 msgstr ""
@@ -4623,13 +4608,11 @@ msgstr "Sous les comptes"
 msgid "All Inboxes"
 msgstr "Toutes les boîtes"
 
-#, fuzzy
 msgid "The last account's inbox"
-msgstr "La liste des comptes sous Boîtes de réception."
+msgstr ""
 
-#, fuzzy
 msgid "The last folder"
-msgstr "Ce dossier"
+msgstr ""
 
 msgid "Left"
 msgstr "Gauche"
@@ -4649,6 +4632,8 @@ msgstr "3 lignes"
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."
 msgstr ""
+"Le lanceur affiche une icône définie en dehors de Hylki. En choisir une ici "
+"la remplace."
 
 msgid "When displayed"
 msgstr "Lors de l'affichage"
@@ -4941,6 +4926,9 @@ msgid ""
 "Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
 "SMTP ones included. Google and Microsoft sign in only that way."
 msgstr ""
+"Les comptes ajoutés dans Paramètres GNOME → Comptes en ligne apparaissent ci-"
+"dessus, IMAP et SMTP compris. Google et Microsoft ne peuvent se connecter "
+"que de cette façon."
 
 msgid "Scan Again"
 msgstr "Analyser à nouveau"
@@ -5196,13 +5184,11 @@ msgstr ""
 msgid "Send failed: {e}"
 msgstr "Échec de l'envoi : {e}"
 
-#, fuzzy
 msgid "Could not reach the server"
-msgstr "Impossible de contacter le serveur JMAP : {e}"
+msgstr ""
 
-#, fuzzy
 msgid "That folder is not on the server"
-msgstr "Les dossiers sous la ligne Filtres."
+msgstr ""
 
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
@@ -5427,6 +5413,16 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "One message stayed put — mail can't be moved between accounts"
+#~ msgstr ""
+#~ "Un message n'a pas été déplacé — les e-mails ne peuvent pas être déplacés "
+#~ "entre différents comptes"
+
+#~ msgid "{foreign} messages stayed put — mail can't be moved between accounts"
+#~ msgstr ""
+#~ "{foreign} messages n'ont pas été déplacés — les e-mails ne peuvent pas "
+#~ "être déplacés entre différents comptes"
+
 #~ msgid "Hylki icon"
 #~ msgstr "Icône Hylki"
 
@@ -5491,18 +5487,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Mots de passe et jetons OAuth conservés en sécurité dans le trousseau de "
 #~ "clés système"
-
-#, fuzzy
-#~ msgid "Mark as Read button"
-#~ msgstr "Marquer comme lu"
-
-#, fuzzy
-#~ msgid "Archive button"
-#~ msgstr "Archiver"
-
-#, fuzzy
-#~ msgid "Delete button"
-#~ msgstr "Supprimer le contact ?"
 
 #~ msgid "Label (defaults to email address)"
 #~ msgstr "Étiquette (adresse e-mail par défaut)"
@@ -5591,6 +5575,9 @@ msgstr "Hyprlab"
 #~ "dont le chevron ouvre les dossiers ; ou au-dessus ou en dessous des "
 #~ "comptes, comme un en-tête avec sa propre liste."
 
+#~ msgid "The account list under Inboxes."
+#~ msgstr "La liste des comptes sous Boîtes de réception."
+
 #~ msgid ""
 #~ "Swipe (mouse-drag or trackpad) a message left to delete it and right to "
 #~ "archive it. Turning this on swaps the two: left archives, right deletes."
@@ -5648,10 +5635,10 @@ msgstr "Hyprlab"
 #~ msgstr "Ajouter un compte"
 
 #~ msgid ""
-#~ "Label messages with one or more colored tags. Tags are stored on the mail "
-#~ "server as IMAP keywords, so Thunderbird and other clients show the same "
-#~ "tags. Drag a tag to reorder: the order here is the sidebar's, and the "
-#~ "first nine answer to the 1–9 keys."
+#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
+#~ "same tags. Drag a tag to reorder: the order here is the sidebar's, and "
+#~ "the first nine answer to the 1–9 keys."
 #~ msgstr ""
 #~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
 #~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
@@ -5741,9 +5728,9 @@ msgstr "Hyprlab"
 #~ "restent dans le trousseau de clés du système et ne sont jamais exportés."
 
 #~ msgid ""
-#~ "Label messages with one or more colored tags. Tags are stored on the mail "
-#~ "server as IMAP keywords, so Thunderbird and other clients show the same "
-#~ "tags."
+#~ "Label messages with one or more coloured tags. Tags are stored on the "
+#~ "mail server as IMAP keywords, so Thunderbird and other clients show the "
+#~ "same tags."
 #~ msgstr ""
 #~ "Attribuez à vos messages une ou plusieurs étiquettes de couleur. Les "
 #~ "étiquettes sont stockées sur le serveur de messagerie sous forme de mots-"
