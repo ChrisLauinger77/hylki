@@ -10634,11 +10634,18 @@ impl AppModel {
         }
     }
 
-    /// The account to act on by default (selected folder's account, else first).
+    /// The account to act on by default: the selected folder's account,
+    /// else the first in sidebar order. With All Inboxes open that is the
+    /// account a new message starts from, so it has to be the one the
+    /// person put on top, not the one added first (#261).
     fn active_account(&self) -> u32 {
         self.selected
             .as_ref()
             .map(|s| s.account_id)
+            .or_else(|| {
+                let first = self.ordered_emails().into_iter().next()?;
+                self.accounts.iter().find(|a| a.email == first).map(|a| a.id)
+            })
             .or_else(|| self.accounts.first().map(|a| a.id))
             .unwrap_or(1)
     }
@@ -16259,17 +16266,22 @@ impl AppModel {
             app_icon: self.app_icon.clone(),
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
             accounts_sender: accounts.sender().clone(),
-            identities: self
-                .config
-                .iter()
-                .filter(|a| a.enabled)
-                .flat_map(|a| {
-                    std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(|al| {
-                        let (name, addr) = crate::config::split_identity(&al.identity);
-                        (if name.is_empty() { a.name.clone() } else { name }, addr)
-                    }))
-                })
-                .collect(),
+            // Sidebar order, so the list reads like the accounts do (#261).
+            identities: {
+                let mut enabled: Vec<&AccountConfig> = self.config.iter().filter(|a| a.enabled).collect();
+                enabled.sort_by_key(|a| {
+                    self.account_order.iter().position(|e| *e == a.email).unwrap_or(usize::MAX)
+                });
+                enabled
+            }
+            .into_iter()
+            .flat_map(|a| {
+                std::iter::once((a.name.clone(), a.email.clone())).chain(a.aliases.iter().map(|al| {
+                    let (name, addr) = crate::config::split_identity(&al.identity);
+                    (if name.is_empty() { a.name.clone() } else { name }, addr)
+                }))
+            })
+            .collect(),
             start_on_accounts: on_accounts,
             start_page: if on_accounts { Some("accounts".to_string()) } else { self.last_settings_page.clone() },
         };

@@ -3198,7 +3198,7 @@ impl Component for Preferences {
                 .unwrap_or(0);
             widgets.default_from_row.set_selected(sel as u32);
             widgets.default_from_row.set_visible(model.identities.len() > 1);
-            widen_combo_value(&widgets.default_from_row, 50);
+            middle_ellipsize(&widgets.default_from_row);
         }
         widgets.paste_plain_row.set_active(init.paste_plain);
         widgets.compose_format_row.set_model(Some(&gtk::StringList::new(&[
@@ -4165,6 +4165,46 @@ fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
         2 => BelowAccounts,
         _ => AllInboxes,
     }
+}
+
+/// Addresses on one domain differ at the front and share the end, so the
+/// libadwaita default, which cuts the end off, left every choice reading
+/// "Jane Doe <jane.doe@exam…" (#261). The selected value shows the address
+/// alone, the part that tells the choices apart, and gives way in the
+/// middle; the popup list shows every choice whole.
+fn middle_ellipsize(row: &adw::ComboRow) {
+    fn factory(selected: bool) -> gtk::SignalListItemFactory {
+        let factory = gtk::SignalListItemFactory::new();
+        factory.connect_setup(move |_, item| {
+            if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
+                let label = gtk::Label::new(None);
+                label.set_xalign(if selected { 1.0 } else { 0.0 });
+                if selected {
+                    label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+                    label.set_width_chars(24);
+                }
+                item.set_child(Some(&label));
+            }
+        });
+        factory.connect_bind(move |_, item| {
+            let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+            if let (Some(label), Some(s)) = (
+                item.child().and_downcast::<gtk::Label>(),
+                item.item().and_downcast::<gtk::StringObject>(),
+            ) {
+                let full = s.string();
+                let shown = match (selected, full.rfind('<')) {
+                    (true, Some(i)) if full.ends_with('>') => &full[i + 1..full.len() - 1],
+                    _ => full.as_str(),
+                };
+                label.set_label(shown);
+                label.set_tooltip_text(selected.then_some(full.as_str()));
+            }
+        });
+        factory
+    }
+    row.set_factory(Some(&factory(true)));
+    row.set_list_factory(Some(&factory(false)));
 }
 
 /// Give a combo row's selected-value label `extra` more pixels than the
