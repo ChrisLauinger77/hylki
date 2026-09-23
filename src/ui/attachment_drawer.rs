@@ -271,7 +271,7 @@ impl SimpleComponent for AttachmentDrawer {
                             set_orientation: gtk::Orientation::Horizontal,
                             set_spacing: 8,
                             gtk::Image {
-                                set_icon_name: Some("co.hyprlab.Hylki-mail-attachment-symbolic"),
+                                set_icon_name: Some("mail-attachment-symbolic"),
                                 add_css_class: "dim-label",
                             },
                             gtk::Label {
@@ -286,9 +286,9 @@ impl SimpleComponent for AttachmentDrawer {
                             gtk::Image {
                                 #[watch]
                                 set_icon_name: Some(if model.collapsed {
-                                    "co.hyprlab.Hylki-pan-up-symbolic"
+                                    "pan-up-symbolic"
                                 } else {
-                                    "co.hyprlab.Hylki-pan-down-symbolic"
+                                    "pan-down-symbolic"
                                 }),
                                 add_css_class: "dim-label",
                                 set_pixel_size: 12,
@@ -297,7 +297,7 @@ impl SimpleComponent for AttachmentDrawer {
                     },
                     gtk::Box { set_hexpand: true },
                     gtk::Image {
-                        set_icon_name: Some("co.hyprlab.Hylki-image-x-generic-symbolic"),
+                        set_icon_name: Some("image-x-generic-symbolic"),
                         add_css_class: "dim-label",
                         set_pixel_size: 12,
                         // The size slider is meaningless with the grid hidden
@@ -321,7 +321,7 @@ impl SimpleComponent for AttachmentDrawer {
                         },
                     },
                     gtk::Image {
-                        set_icon_name: Some("co.hyprlab.Hylki-image-x-generic-symbolic"),
+                        set_icon_name: Some("image-x-generic-symbolic"),
                         add_css_class: "dim-label",
                         set_pixel_size: 22,
                         #[watch]
@@ -335,9 +335,9 @@ impl SimpleComponent for AttachmentDrawer {
                         set_visible: !model.collapsed && model.list_view,
                         #[watch]
                         set_icon_name: if model.sort_desc {
-                            "co.hyprlab.Hylki-view-sort-descending-symbolic"
+                            "view-sort-descending-symbolic"
                         } else {
-                            "co.hyprlab.Hylki-view-sort-ascending-symbolic"
+                            "view-sort-ascending-symbolic"
                         },
                         #[watch]
                         set_tooltip_text: Some(if model.sort_desc { i18n("Sorted Z to A — switch to A to Z") } else { i18n("Sorted A to Z — switch to Z to A") }.as_str()),
@@ -352,9 +352,9 @@ impl SimpleComponent for AttachmentDrawer {
                         set_visible: !model.collapsed,
                         #[watch]
                         set_icon_name: if model.list_view {
-                            "co.hyprlab.Hylki-view-grid-symbolic"
+                            "view-grid-symbolic"
                         } else {
-                            "co.hyprlab.Hylki-view-list-bullet-symbolic"
+                            "view-list-bullet-symbolic"
                         },
                         #[watch]
                         set_tooltip_text: Some(if model.list_view { i18n("Show as thumbnails") } else { i18n("Show as a list") }.as_str()),
@@ -1012,18 +1012,18 @@ impl AttachmentDrawer {
     fn show_context_menu(&self, index: usize, x: f64, y: f64, sender: &ComponentSender<Self>) {
         let s = sender.clone();
         let open = MenuEntry::new(i18n("Open"), move || s.input(AttachmentDrawerInput::Open(index)))
-            .icon("co.hyprlab.Hylki-document-open-symbolic");
+            .icon("document-open-symbolic");
         let s = sender.clone();
         let download =
             MenuEntry::new(i18n("Download…"), move || s.input(AttachmentDrawerInput::Download(index)))
-                .icon("co.hyprlab.Hylki-folder-download-symbolic");
+                .icon("folder-download-symbolic");
         // The drawer gathers the whole conversation's files; this finds the
         // message a file came with (#213).
         let s = sender.clone();
         let show = MenuEntry::new(i18n("Show in Message"), move || {
             s.input(AttachmentDrawerInput::ShowInMessage(index))
         })
-        .icon("co.hyprlab.Hylki-mail-unread-symbolic");
+        .icon("mail-unread-symbolic");
 
         // Anchor on the clicked cell itself so the click point (already
         // relative to it) needs no coordinate translation.
@@ -1132,17 +1132,17 @@ fn build_cell(
         b.set_tooltip_text(Some(tip));
         b
     };
-    let download = action_btn("co.hyprlab.Hylki-folder-download-symbolic", "Download");
+    let download = action_btn("folder-download-symbolic", "Download");
     let s = sender.clone();
     download.connect_clicked(move |_| s.input(AttachmentDrawerInput::Download(index)));
     actions.append(&download);
-    let open = action_btn("co.hyprlab.Hylki-document-open-symbolic", "Open");
+    let open = action_btn("document-open-symbolic", "Open");
     let s = sender.clone();
     open.connect_clicked(move |_| s.input(AttachmentDrawerInput::Open(index)));
     actions.append(&open);
     // An attached public key (#133): one click puts it in the keyring.
     if is_key_attachment(att) {
-        let import = action_btn("co.hyprlab.Hylki-channel-secure-symbolic", &i18n("Import OpenPGP key"));
+        let import = action_btn("channel-secure-symbolic", &i18n("Import OpenPGP key"));
         let s = sender.clone();
         import.connect_clicked(move |_| s.input(AttachmentDrawerInput::ImportKey(index)));
         actions.append(&import);
@@ -1234,11 +1234,11 @@ fn build_list_row(
         b.set_tooltip_text(Some(tip));
         b
     };
-    let download = action_btn("co.hyprlab.Hylki-folder-download-symbolic", "Download");
+    let download = action_btn("folder-download-symbolic", "Download");
     let s = sender.clone();
     download.connect_clicked(move |_| s.input(AttachmentDrawerInput::Download(index)));
     row.append(&download);
-    let open = action_btn("co.hyprlab.Hylki-document-open-symbolic", "Open");
+    let open = action_btn("document-open-symbolic", "Open");
     let s = sender.clone();
     open.connect_clicked(move |_| s.input(AttachmentDrawerInput::Open(index)));
     row.append(&open);

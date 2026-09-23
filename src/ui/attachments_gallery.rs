@@ -316,13 +316,13 @@ impl Component for AttachmentsGallery {
                     },
 
                     add_named[Some("empty")] = &adw::StatusPage {
-                        set_icon_name: Some("co.hyprlab.Hylki-mail-attachment-symbolic"),
+                        set_icon_name: Some("mail-attachment-symbolic"),
                         set_title: &i18n("No attachments"),
                         set_description: Some(i18n("Attachments from your inboxes will appear here.").as_str()),
                     },
 
                     add_named[Some("noresults")] = &adw::StatusPage {
-                        set_icon_name: Some("co.hyprlab.Hylki-system-search-symbolic"),
+                        set_icon_name: Some("system-search-symbolic"),
                         set_title: &i18n("No matching attachments"),
                         set_description: Some(i18n("Try a different search, or check which accounts and folders the footer is pulling from.").as_str()),
                     },
@@ -474,7 +474,7 @@ impl Component for AttachmentsGallery {
                         add_css_class: "linked",
 
                         gtk::ToggleButton {
-                            set_icon_name: "co.hyprlab.Hylki-view-grid-symbolic",
+                            set_icon_name: "view-grid-symbolic",
                             set_tooltip_text: Some(i18n("Thumbnail grid").as_str()),
                             #[watch]
                             #[block_signal(grid_toggle)]
@@ -484,7 +484,7 @@ impl Component for AttachmentsGallery {
                             } @grid_toggle,
                         },
                         gtk::ToggleButton {
-                            set_icon_name: "co.hyprlab.Hylki-view-list-bullet-symbolic",
+                            set_icon_name: "view-list-bullet-symbolic",
                             set_tooltip_text: Some(i18n("Table").as_str()),
                             #[watch]
                             #[block_signal(table_toggle)]
@@ -511,7 +511,7 @@ impl Component for AttachmentsGallery {
 
                     #[name = "folders_button"]
                     pack_start = &gtk::MenuButton {
-                        set_icon_name: "co.hyprlab.Hylki-folder-symbolic",
+                        set_icon_name: "folder-symbolic",
                         set_tooltip_text: Some(i18n("Folders to pull from").as_str()),
 
                         #[wrap(Some)]
@@ -675,7 +675,7 @@ impl Component for AttachmentsGallery {
                     },
                     #[wrap(Some)]
                     set_end_widget = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-window-close-symbolic",
+                        set_icon_name: "window-close-symbolic",
                         set_tooltip_text: Some(i18n("Close").as_str()),
                         add_css_class: "circular",
                         add_css_class: "flat",
@@ -690,7 +690,7 @@ impl Component for AttachmentsGallery {
                     set_spacing: 8,
 
                     gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-go-previous-symbolic",
+                        set_icon_name: "go-previous-symbolic",
                         set_tooltip_text: Some(i18n("Previous").as_str()),
                         set_valign: gtk::Align::Center,
                         add_css_class: "circular",
@@ -757,7 +757,7 @@ impl Component for AttachmentsGallery {
                     },
 
                     gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-go-next-symbolic",
+                        set_icon_name: "go-next-symbolic",
                         set_tooltip_text: Some(i18n("Next").as_str()),
                         set_valign: gtk::Align::Center,
                         add_css_class: "circular",
@@ -1569,13 +1569,13 @@ impl AttachmentsGallery {
         // attachments are known but not held.
         let s = sender.clone();
         let open = MenuEntry::new(i18n("Open"), move || s.input(GalleryInput::OpenItem(index)))
-            .icon("co.hyprlab.Hylki-document-open-symbolic");
+            .icon("document-open-symbolic");
         let s = sender.clone();
         let download = MenuEntry::new(i18n("Download…"), move || s.input(GalleryInput::DownloadItem(index)))
-            .icon("co.hyprlab.Hylki-folder-download-symbolic");
+            .icon("folder-download-symbolic");
         let s = sender.clone();
         let goto = MenuEntry::new(i18n("Go to Message"), move || s.input(GalleryInput::GoToItem(index)))
-            .icon("co.hyprlab.Hylki-mail-unread-symbolic");
+            .icon("mail-unread-symbolic");
         let sections = vec![vec![open, download, goto]];
 
         // Anchor on the clicked cell/row itself so the click point (already
@@ -1663,17 +1663,17 @@ fn build_cell(
         b
     };
     if item.data.is_some() {
-        let download = action_btn("co.hyprlab.Hylki-folder-download-symbolic", "Download");
+        let download = action_btn("folder-download-symbolic", "Download");
         let s = sender.clone();
         download.connect_clicked(move |_| s.input(GalleryInput::DownloadItem(index)));
         actions.append(&download);
 
-        let open = action_btn("co.hyprlab.Hylki-document-open-symbolic", "Open");
+        let open = action_btn("document-open-symbolic", "Open");
         let s = sender.clone();
         open.connect_clicked(move |_| s.input(GalleryInput::OpenItem(index)));
         actions.append(&open);
     }
-    let goto = action_btn("co.hyprlab.Hylki-mail-unread-symbolic", &i18n("Go to Message"));
+    let goto = action_btn("mail-unread-symbolic", &i18n("Go to Message"));
     let s = sender.clone();
     goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
     actions.append(&goto);
@@ -1858,16 +1858,16 @@ fn build_row(
         b
     };
     if item.data.is_some() {
-        let download = act("co.hyprlab.Hylki-folder-download-symbolic", "Download");
+        let download = act("folder-download-symbolic", "Download");
         let s = sender.clone();
         download.connect_clicked(move |_| s.input(GalleryInput::DownloadItem(index)));
         actions.append(&download);
-        let open = act("co.hyprlab.Hylki-document-open-symbolic", "Open");
+        let open = act("document-open-symbolic", "Open");
         let s = sender.clone();
         open.connect_clicked(move |_| s.input(GalleryInput::OpenItem(index)));
         actions.append(&open);
     }
-    let goto = act("co.hyprlab.Hylki-mail-unread-symbolic", &i18n("Go to Message"));
+    let goto = act("mail-unread-symbolic", &i18n("Go to Message"));
     let s = sender.clone();
     goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
     actions.append(&goto);
@@ -2266,18 +2266,18 @@ pub(crate) fn icon_for(name: &str) -> &'static str {
     let lower = name.to_ascii_lowercase();
     let ext = lower.rsplit('.').next().unwrap_or("");
     match ext {
-        "pdf" => "co.hyprlab.Hylki-x-office-document-symbolic",
-        "doc" | "docx" | "odt" | "rtf" | "txt" | "md" => "co.hyprlab.Hylki-x-office-document-symbolic",
-        "xls" | "xlsx" | "ods" | "csv" => "co.hyprlab.Hylki-x-office-spreadsheet-symbolic",
-        "ppt" | "pptx" | "odp" => "co.hyprlab.Hylki-x-office-presentation-symbolic",
-        "zip" | "gz" | "tar" | "7z" | "rar" | "xz" | "bz2" => "co.hyprlab.Hylki-package-x-generic-symbolic",
-        "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" => "co.hyprlab.Hylki-audio-x-generic-symbolic",
-        "mp4" | "mov" | "mkv" | "webm" | "avi" | "m4v" => "co.hyprlab.Hylki-video-x-generic-symbolic",
+        "pdf" => "x-office-document-symbolic",
+        "doc" | "docx" | "odt" | "rtf" | "txt" | "md" => "x-office-document-symbolic",
+        "xls" | "xlsx" | "ods" | "csv" => "x-office-spreadsheet-symbolic",
+        "ppt" | "pptx" | "odp" => "x-office-presentation-symbolic",
+        "zip" | "gz" | "tar" | "7z" | "rar" | "xz" | "bz2" => "package-x-generic-symbolic",
+        "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" => "audio-x-generic-symbolic",
+        "mp4" | "mov" | "mkv" | "webm" | "avi" | "m4v" => "video-x-generic-symbolic",
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "heic" | "heif" | "avif" | "ico" => {
-            "co.hyprlab.Hylki-image-x-generic-symbolic"
+            "image-x-generic-symbolic"
         }
-        "ics" => "co.hyprlab.Hylki-x-office-calendar-symbolic",
-        _ => "co.hyprlab.Hylki-text-x-generic-symbolic",
+        "ics" => "x-office-calendar-symbolic",
+        _ => "text-x-generic-symbolic",
     }
 }
 

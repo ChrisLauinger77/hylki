@@ -1055,19 +1055,19 @@ fn build_toolbar(
     // one, and each command both opens and leaves its block (the lists
     // through execCommand's own toggling, the quote through __hylkiQuote).
     let commands: &[(&str, &str, &str, Option<char>)] = &[
-        ("co.hyprlab.Hylki-format-text-bold-symbolic", i18n_noop("Bold"), "document.execCommand('bold')", None),
-        ("co.hyprlab.Hylki-format-text-italic-symbolic", i18n_noop("Italic"), "document.execCommand('italic')", None),
-        ("co.hyprlab.Hylki-format-text-underline-symbolic", i18n_noop("Underline"), "document.execCommand('underline')", None),
-        ("co.hyprlab.Hylki-format-text-strikethrough-symbolic", i18n_noop("Strikethrough"), "document.execCommand('strikeThrough')", None),
+        ("format-text-bold-symbolic", i18n_noop("Bold"), "document.execCommand('bold')", None),
+        ("format-text-italic-symbolic", i18n_noop("Italic"), "document.execCommand('italic')", None),
+        ("format-text-underline-symbolic", i18n_noop("Underline"), "document.execCommand('underline')", None),
+        ("format-text-strikethrough-symbolic", i18n_noop("Strikethrough"), "document.execCommand('strikeThrough')", None),
         ("SEP", "", "", None),
-        ("co.hyprlab.Hylki-view-list-bullet-symbolic", i18n_noop("Bulleted list"), "document.execCommand('insertUnorderedList')", Some('u')),
-        ("co.hyprlab.Hylki-view-list-ordered-symbolic", i18n_noop("Numbered list"), "document.execCommand('insertOrderedList')", Some('o')),
+        ("view-list-bullet-symbolic", i18n_noop("Bulleted list"), "document.execCommand('insertUnorderedList')", Some('u')),
+        ("view-list-ordered-symbolic", i18n_noop("Numbered list"), "document.execCommand('insertOrderedList')", Some('o')),
         // Adwaita has no blockquote glyph; the indent icon reads as "quote".
-        ("co.hyprlab.Hylki-format-indent-more-symbolic", i18n_noop("Quote"), "window.__hylkiQuote()", Some('q')),
+        ("format-indent-more-symbolic", i18n_noop("Quote"), "window.__hylkiQuote()", Some('q')),
         // `LINK` is a sentinel command (handled specially); the icon is real.
-        ("co.hyprlab.Hylki-insert-link-symbolic", i18n_noop("Insert link"), "LINK", None),
+        ("insert-link-symbolic", i18n_noop("Insert link"), "LINK", None),
         ("SEP", "", "", None),
-        ("co.hyprlab.Hylki-edit-clear-symbolic", i18n_noop("Clear formatting"), "document.execCommand('removeFormat')", None),
+        ("edit-clear-symbolic", i18n_noop("Clear formatting"), "document.execCommand('removeFormat')", None),
     ];
 
     let mut toggles = Vec::new();

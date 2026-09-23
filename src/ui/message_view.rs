@@ -1095,9 +1095,7 @@ fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String {
     use crate::ui::attachments_gallery::{icon_color_class, icon_for};
     let mut out = String::new();
     for (idx, a) in atts.iter().enumerate() {
-        // The gallery names its icons with the app prefix; the inliner adds
-        // that itself.
-        let icon = icon_for(&a.name).trim_start_matches("co.hyprlab.Hylki-");
+        let icon = icon_for(&a.name);
         out.push_str(&format!(
             "<span class=\"vireo-attw\">\
              <button type=\"button\" class=\"vireo-attc {cls}\" data-key=\"{aid}:{id}\" \
@@ -1149,7 +1147,7 @@ impl Component for MessageView {
             add_named[Some("empty")] = &adw::StatusPage {
                 // Drafts open in the editor, so the empty pane says so there.
                 #[watch]
-                set_icon_name: Some(if model.drafts_view { "co.hyprlab.Hylki-document-edit-symbolic" } else { "co.hyprlab.Hylki-mail-read-symbolic" }),
+                set_icon_name: Some(if model.drafts_view { "document-edit-symbolic" } else { "hylki-mail-read-symbolic" }),
                 #[watch]
                 set_title: &if model.drafts_view { i18n("No draft selected") } else { i18n("No message selected") },
                 #[watch]
@@ -1173,7 +1171,7 @@ impl Component for MessageView {
                         add_css_class: "spoof-alert",
                         set_spacing: 8,
 
-                        gtk::Image { set_icon_name: Some("co.hyprlab.Hylki-dialog-warning-symbolic") },
+                        gtk::Image { set_icon_name: Some("dialog-warning-symbolic") },
                         gtk::Label {
                             #[watch]
                             set_label: model
@@ -1198,7 +1196,7 @@ impl Component for MessageView {
                         add_css_class: "remote-alert",
                         set_spacing: 8,
 
-                        gtk::Image { set_icon_name: Some("co.hyprlab.Hylki-security-high-symbolic") },
+                        gtk::Image { set_icon_name: Some("security-high-symbolic") },
                         gtk::Label {
                             set_label: &i18n("Remote content (images, trackers) is blocked to protect your privacy."),
                             set_hexpand: true,
@@ -1274,19 +1272,19 @@ impl Component for MessageView {
                         },
 
                         gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-pan-up-symbolic",
+                            set_icon_name: "pan-up-symbolic",
                             set_tooltip_text: Some(i18n("Previous match").as_str()),
                             add_css_class: "flat",
                             connect_clicked => MessageViewInput::FindPrev,
                         },
                         gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-pan-down-symbolic",
+                            set_icon_name: "pan-down-symbolic",
                             set_tooltip_text: Some(i18n("Next match").as_str()),
                             add_css_class: "flat",
                             connect_clicked => MessageViewInput::FindNext,
                         },
                         gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-window-close-symbolic",
+                            set_icon_name: "window-close-symbolic",
                             set_tooltip_text: Some(i18n("Close find").as_str()),
                             add_css_class: "flat",
                             connect_clicked => MessageViewInput::CloseFind,
@@ -3224,7 +3222,7 @@ impl MessageView {
                                 aid = key.0,
                                 id = key.1,
                                 title = gtk::glib::markup_escape_text(&i18n("Mark as read or unread")),
-                                read_svg = inline_icon_svg("mail-read-symbolic"),
+                                read_svg = inline_icon_svg("hylki-mail-read-symbolic"),
                                 unread_svg = inline_icon_svg("mail-unread-symbolic"),
                             ),
                             // The star keeps one glyph; the flagged state is
@@ -3237,7 +3235,7 @@ impl MessageView {
                                 title = gtk::glib::markup_escape_text(&i18n("Flag this message")),
                                 aid = key.0,
                                 id = key.1,
-                                svg = inline_icon_svg("non-starred-symbolic"),
+                                svg = inline_icon_svg("hylki-non-starred-symbolic"),
                             ),
                             card_action_button(key, "moveto", "folder-symbolic", &i18n("Move this message to a folder")),
                             card_action_button(key, "archive", "mail-archive-symbolic", &i18n("Archive this message")),
@@ -4278,17 +4276,17 @@ fn card_action_button(key: (u32, u32), act: &str, icon: &str, title: &str) -> St
 /// so `tools/gen-icon-gresource.sh` (which scans for the prefixed literal)
 /// bundles it; the card draws it inline through `inline_icon_svg`.
 #[allow(dead_code)]
-const SENDER_STYLE_ICON: &str = "co.hyprlab.Hylki-format-text-rich-symbolic";
+const SENDER_STYLE_ICON: &str = "format-text-rich-symbolic";
 /// The OpenPGP chip's lock (#133), named in full for the same reason.
 #[allow(dead_code)]
-const PGP_LOCK_ICON: &str = "co.hyprlab.Hylki-channel-secure-symbolic";
+const PGP_LOCK_ICON: &str = "channel-secure-symbolic";
 
 /// An embedded symbolic icon's SVG, inlined for the wrapper document (its
 /// paths carry no fill, so the document's `fill:currentColor` recolors it);
 /// empty when the resource bundle isn't registered (tests).
 fn inline_icon_svg(icon: &str) -> String {
     let path =
-        format!("/co/hyprlab/Hylki/icons/scalable/actions/co.hyprlab.Hylki-{icon}.svg");
+        format!("/co/hyprlab/Hylki/icons/scalable/actions/{icon}.svg");
     gtk::gio::resources_lookup_data(&path, gtk::gio::ResourceLookupFlags::NONE)
         .ok()
         .and_then(|b| String::from_utf8(b.to_vec()).ok())

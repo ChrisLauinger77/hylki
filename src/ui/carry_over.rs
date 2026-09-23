@@ -90,17 +90,17 @@ fn command_row(cmd: &str) -> gtk::Box {
     frame.set_child(Some(&text));
     frame.set_hexpand(true);
     row.append(&frame);
-    let copy = gtk::Button::from_icon_name("co.hyprlab.Hylki-edit-copy-symbolic");
+    let copy = gtk::Button::from_icon_name("edit-copy-symbolic");
     copy.set_tooltip_text(Some(i18n("Copy").as_str()));
     copy.set_valign(gtk::Align::Center);
     {
         let cmd = cmd.to_string();
         copy.connect_clicked(move |b| {
             b.clipboard().set_text(&cmd);
-            b.set_icon_name("co.hyprlab.Hylki-verified-checkmark-symbolic");
+            b.set_icon_name("verified-checkmark-symbolic");
             let b = b.clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
-                b.set_icon_name("co.hyprlab.Hylki-edit-copy-symbolic");
+                b.set_icon_name("edit-copy-symbolic");
             });
         });
     }

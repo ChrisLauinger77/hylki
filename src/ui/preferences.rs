@@ -271,7 +271,7 @@ impl FactoryComponent for SenderRow {
         adw::ActionRow {
             set_title: &self.addr,
             add_suffix = &gtk::Button {
-                set_icon_name: "co.hyprlab.Hylki-user-trash-symbolic",
+                set_icon_name: "user-trash-symbolic",
                 set_valign: gtk::Align::Center,
                 set_tooltip_text: Some(i18n("Remove").as_str()),
                 add_css_class: "flat",
@@ -643,28 +643,28 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
     (
         i18n_noop("Accounts"),
         &[
-            SidePage { id: "accounts", title: i18n_noop("Mail Accounts"), icon: "co.hyprlab.Hylki-avatar-default-symbolic", accounts: true },
-            SidePage { id: "tags", title: i18n_noop("Tags"), icon: "co.hyprlab.Hylki-tag-outline-symbolic", accounts: true },
-            SidePage { id: "filters", title: i18n_noop("Filters"), icon: "co.hyprlab.Hylki-filter-folder-symbolic", accounts: true },
-            SidePage { id: "senders", title: i18n_noop("Senders"), icon: "co.hyprlab.Hylki-contact-new-symbolic", accounts: true },
-            SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "co.hyprlab.Hylki-channel-secure-symbolic", accounts: false },
-            SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "co.hyprlab.Hylki-cloud-symbolic", accounts: false },
+            SidePage { id: "accounts", title: i18n_noop("Mail Accounts"), icon: "avatar-default-symbolic", accounts: true },
+            SidePage { id: "tags", title: i18n_noop("Tags"), icon: "tag-outline-symbolic", accounts: true },
+            SidePage { id: "filters", title: i18n_noop("Filters"), icon: "filter-folder-symbolic", accounts: true },
+            SidePage { id: "senders", title: i18n_noop("Senders"), icon: "contact-new-symbolic", accounts: true },
+            SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "channel-secure-symbolic", accounts: false },
+            SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "cloud-symbolic", accounts: false },
         ],
     ),
     (
         i18n_noop("Settings"),
         &[
-            SidePage { id: "general", title: i18n_noop("General"), icon: "co.hyprlab.Hylki-puzzle-piece-symbolic", accounts: false },
-            SidePage { id: "appearance", title: i18n_noop("Appearance"), icon: "co.hyprlab.Hylki-preferences-desktop-appearance-symbolic", accounts: false },
-            SidePage { id: "sidebar", title: i18n_noop("Sidebar"), icon: "co.hyprlab.Hylki-sidebar-show-symbolic", accounts: false },
-            SidePage { id: "list", title: i18n_noop("Message List"), icon: "co.hyprlab.Hylki-view-list-bullet-symbolic", accounts: false },
-            SidePage { id: "conversations", title: i18n_noop("Conversations"), icon: "co.hyprlab.Hylki-chat-bubbles-text-symbolic", accounts: false },
-            SidePage { id: "reading", title: i18n_noop("Reading"), icon: "co.hyprlab.Hylki-mail-read-symbolic", accounts: false },
-            SidePage { id: "composing", title: i18n_noop("Composing"), icon: "co.hyprlab.Hylki-document-edit-symbolic", accounts: false },
-            SidePage { id: "privacy", title: i18n_noop("Privacy"), icon: "co.hyprlab.Hylki-security-high-symbolic", accounts: false },
-            SidePage { id: "datetime", title: i18n_noop("Date and Time"), icon: "co.hyprlab.Hylki-x-office-calendar-symbolic", accounts: false },
-            SidePage { id: "system", title: i18n_noop("System"), icon: "co.hyprlab.Hylki-applications-system-symbolic", accounts: false },
-            SidePage { id: "backup", title: i18n_noop("Backup"), icon: "co.hyprlab.Hylki-document-save-symbolic", accounts: false },
+            SidePage { id: "general", title: i18n_noop("General"), icon: "puzzle-piece-symbolic", accounts: false },
+            SidePage { id: "appearance", title: i18n_noop("Appearance"), icon: "preferences-desktop-appearance-symbolic", accounts: false },
+            SidePage { id: "sidebar", title: i18n_noop("Sidebar"), icon: "sidebar-show-symbolic", accounts: false },
+            SidePage { id: "list", title: i18n_noop("Message List"), icon: "view-list-bullet-symbolic", accounts: false },
+            SidePage { id: "conversations", title: i18n_noop("Conversations"), icon: "chat-bubbles-text-symbolic", accounts: false },
+            SidePage { id: "reading", title: i18n_noop("Reading"), icon: "hylki-mail-read-symbolic", accounts: false },
+            SidePage { id: "composing", title: i18n_noop("Composing"), icon: "document-edit-symbolic", accounts: false },
+            SidePage { id: "privacy", title: i18n_noop("Privacy"), icon: "security-high-symbolic", accounts: false },
+            SidePage { id: "datetime", title: i18n_noop("Date and Time"), icon: "x-office-calendar-symbolic", accounts: false },
+            SidePage { id: "system", title: i18n_noop("System"), icon: "applications-system-symbolic", accounts: false },
+            SidePage { id: "backup", title: i18n_noop("Backup"), icon: "document-save-symbolic", accounts: false },
         ],
     ),
 ];
@@ -1086,7 +1086,7 @@ impl SettingsSearch {
         sender: &ComponentSender<Preferences>,
     ) -> Self {
         let button = gtk::ToggleButton::new();
-        button.set_icon_name("co.hyprlab.Hylki-system-search-symbolic");
+        button.set_icon_name("system-search-symbolic");
         button.set_tooltip_text(Some(&i18n("Search Settings")));
         header.pack_start(&button);
 
@@ -1114,7 +1114,7 @@ impl SettingsSearch {
         results_scroller.set_child(Some(&results));
 
         let empty = adw::StatusPage::new();
-        empty.set_icon_name(Some("co.hyprlab.Hylki-system-search-symbolic"));
+        empty.set_icon_name(Some("system-search-symbolic"));
         empty.set_title(&i18n("No Results"));
         empty.add_css_class("compact");
 
@@ -2953,7 +2953,7 @@ impl Component for Preferences {
                                         set_activatable: true,
                                         connect_activated => PrefInput::ExportLog,
                                         add_suffix = &gtk::Image {
-                                            set_icon_name: Some("co.hyprlab.Hylki-go-next-symbolic"),
+                                            set_icon_name: Some("go-next-symbolic"),
                                         },
                                     },
                                 },
@@ -3008,16 +3008,16 @@ impl Component for Preferences {
                                             && !model.nautilus.loaded
                                             && model.nautilus.loader != Some(true),
                                         add_suffix = &gtk::Button {
-                                            set_icon_name: "co.hyprlab.Hylki-edit-copy-symbolic",
+                                            set_icon_name: "edit-copy-symbolic",
                                             set_valign: gtk::Align::Center,
                                             set_tooltip_text: Some(i18n("Copy").as_str()),
                                             add_css_class: "flat",
                                             connect_clicked[cmd = model.nautilus_cmd.unwrap_or_default().to_string()] => move |b| {
                                                 b.clipboard().set_text(&cmd);
-                                                b.set_icon_name("co.hyprlab.Hylki-verified-checkmark-symbolic");
+                                                b.set_icon_name("verified-checkmark-symbolic");
                                                 let b = b.clone();
                                                 gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
-                                                    b.set_icon_name("co.hyprlab.Hylki-edit-copy-symbolic");
+                                                    b.set_icon_name("edit-copy-symbolic");
                                                 });
                                             },
                                         },
@@ -3102,7 +3102,7 @@ impl Component for Preferences {
                                         set_activatable: true,
                                         connect_activated => PrefInput::ExportSettings,
                                         add_suffix = &gtk::Image {
-                                            set_icon_name: Some("co.hyprlab.Hylki-go-next-symbolic"),
+                                            set_icon_name: Some("go-next-symbolic"),
                                         },
                                     },
 
@@ -3115,7 +3115,7 @@ impl Component for Preferences {
                                         set_activatable: true,
                                         connect_activated => PrefInput::ImportSettings,
                                         add_suffix = &gtk::Image {
-                                            set_icon_name: Some("co.hyprlab.Hylki-go-next-symbolic"),
+                                            set_icon_name: Some("go-next-symbolic"),
                                         },
                                     },
                                 },
@@ -4524,7 +4524,7 @@ fn rebuild_personal_words(exp: &adw::ExpanderRow) {
     for w in words {
         let row = adw::ActionRow::builder().title(&w).build();
         row.set_widget_name("vireo-spell-word");
-        let del = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+        let del = gtk::Button::from_icon_name("user-trash-symbolic");
         del.add_css_class("flat");
         del.set_valign(gtk::Align::Center);
         del.set_tooltip_text(Some(i18n("Forget this word").as_str()));

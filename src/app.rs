@@ -1825,7 +1825,7 @@ impl SimpleComponent for AppModel {
                                 },
                             },
                             pack_end = &gtk::MenuButton {
-                                set_icon_name: "co.hyprlab.Hylki-open-menu-symbolic",
+                                set_icon_name: "open-menu-symbolic",
                                 set_tooltip_text: Some(i18n("Main Menu").as_str()),
                                 add_css_class: "flat",
                                 set_menu_model: Some(&model.menu),
@@ -1859,7 +1859,7 @@ impl SimpleComponent for AppModel {
                             pack_start: &model.sidebar_refresh,
                             #[name = "sidebar_menu"]
                             pack_end = &gtk::MenuButton {
-                                set_icon_name: "co.hyprlab.Hylki-open-menu-symbolic",
+                                set_icon_name: "open-menu-symbolic",
                                 set_tooltip_text: Some(i18n("Main Menu").as_str()),
                                 add_css_class: "flat",
                                 set_menu_model: Some(&model.menu),
@@ -1953,7 +1953,7 @@ impl SimpleComponent for AppModel {
                                 // sidebar expand/collapse toggle (moved here from
                                 // the sidebar's own footer).
                                 pack_start = &gtk::Button {
-                                    set_icon_name: "co.hyprlab.Hylki-sidebar-show-symbolic",
+                                    set_icon_name: "sidebar-show-symbolic",
                                     #[watch]
                                     set_tooltip_text: Some(if model.rail_active { i18n("Expand sidebar") } else { i18n("Collapse sidebar") }.as_str()),
                                     add_css_class: "flat",
@@ -1967,7 +1967,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-system-search-symbolic",
+                                        set_icon_name: "system-search-symbolic",
                                         set_tooltip_text: Some(i18n("Search messages (Ctrl+F)").as_str()),
                                         add_css_class: "flat",
                                         connect_clicked[sender] => move |_| {
@@ -1991,7 +1991,7 @@ impl SimpleComponent for AppModel {
                                     add_css_class: "focus-fade",
                                     set_reveal_child: false,
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-view-more-horizontal-symbolic",
+                                        set_icon_name: "view-more-horizontal-symbolic",
                                         set_tooltip_text: Some(i18n("Search, filters and sort").as_str()),
                                         set_valign: gtk::Align::Center,
                                         add_css_class: "flat",
@@ -2004,7 +2004,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::ToggleButton {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-unread-symbolic",
+                                        set_icon_name: "mail-unread-symbolic",
                                         set_tooltip_text: Some(i18n("Show only unread").as_str()),
                                         set_valign: gtk::Align::Center,
                                         add_css_class: "flat",
@@ -2019,7 +2019,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::ToggleButton {
-                                        set_icon_name: "co.hyprlab.Hylki-starred-symbolic",
+                                        set_icon_name: "starred-symbolic",
                                         set_tooltip_text: Some(i18n("Show only starred").as_str()),
                                         set_valign: gtk::Align::Center,
                                         add_css_class: "flat",
@@ -2036,7 +2036,7 @@ impl SimpleComponent for AppModel {
                                     add_css_class: "focus-fade",
                                     #[name = "list_sort_btn"]
                                     gtk::MenuButton {
-                                        set_icon_name: "co.hyprlab.Hylki-view-sort-descending-symbolic",
+                                        set_icon_name: "view-sort-descending-symbolic",
                                         set_tooltip_text: Some(i18n("Sort messages").as_str()),
                                         set_valign: gtk::Align::Center,
                                         add_css_class: "flat",
@@ -2098,7 +2098,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-document-edit-symbolic",
+                                        set_icon_name: "document-edit-symbolic",
                                         set_tooltip_text: Some(i18n("Edit this message").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2115,7 +2115,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-send-symbolic",
+                                        set_icon_name: "mail-send-symbolic",
                                         set_tooltip_text: Some(i18n("Try to send this message now").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2153,7 +2153,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-reply-sender-symbolic",
+                                        set_icon_name: "mail-reply-sender-symbolic",
                                         set_tooltip_text: Some(i18n("Reply").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2173,7 +2173,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-reply-all-symbolic",
+                                        set_icon_name: "mail-reply-all-symbolic",
                                         set_tooltip_text: Some(i18n("Reply All").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2189,7 +2189,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-forward-symbolic",
+                                        set_icon_name: "mail-forward-symbolic",
                                         set_tooltip_text: Some(i18n("Forward").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2208,7 +2208,7 @@ impl SimpleComponent for AppModel {
                                         set_tooltip_text: Some(i18n("Flag").as_str()),
                                         // One glyph in both states, like every other
                                         // icon; the flagged state carries color only.
-                                        set_icon_name: "co.hyprlab.Hylki-non-starred-symbolic",
+                                        set_icon_name: "hylki-non-starred-symbolic",
                                         #[watch]
                                         set_css_classes: if model.toolbar_star_lit() {
                                             &["flat", "star-active"]
@@ -2228,7 +2228,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-mail-archive-symbolic",
+                                        set_icon_name: "mail-archive-symbolic",
                                         set_tooltip_text: Some(i18n("Archive").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2244,7 +2244,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-user-trash-symbolic",
+                                        set_icon_name: "user-trash-symbolic",
                                         #[watch]
                                         set_tooltip_text: Some(&model.delete_tooltip()),
                                         add_css_class: "flat",
@@ -2270,7 +2270,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-printer-symbolic",
+                                        set_icon_name: "printer-symbolic",
                                         set_tooltip_text: Some(i18n("Print Preview (Ctrl+Shift+P)").as_str()),
                                         add_css_class: "flat",
                                         #[watch]
@@ -2290,7 +2290,7 @@ impl SimpleComponent for AppModel {
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
                                     gtk::Button {
-                                        set_icon_name: "co.hyprlab.Hylki-loupe-with-arrow-symbolic",
+                                        set_icon_name: "loupe-with-arrow-symbolic",
                                         set_tooltip_text: Some(i18n("Find in message (Ctrl+F)").as_str()),
                                         add_css_class: "flat",
                                         // Greyed out, not hidden, with no message
@@ -2330,9 +2330,9 @@ impl SimpleComponent for AppModel {
                                     gtk::Button {
                                         #[watch]
                                         set_icon_name: if model.target_in_junk() {
-                                            "co.hyprlab.Hylki-mail-mark-notjunk-symbolic"
+                                            "mail-mark-notjunk-symbolic"
                                         } else {
-                                            "co.hyprlab.Hylki-mail-mark-junk-symbolic"
+                                            "mail-mark-junk-symbolic"
                                         },
                                         #[watch]
                                         set_tooltip_text: Some(if model.target_in_junk() { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
@@ -2358,9 +2358,9 @@ impl SimpleComponent for AppModel {
                                         // "mark as read"), matching the menus.
                                         #[watch]
                                         set_icon_name: if model.reply_target().is_some_and(|m| m.unread) {
-                                            "co.hyprlab.Hylki-mail-read-symbolic"
+                                            "hylki-mail-read-symbolic"
                                         } else {
-                                            "co.hyprlab.Hylki-mail-unread-symbolic"
+                                            "mail-unread-symbolic"
                                         },
                                         #[watch]
                                         set_tooltip_text: Some(if model.reply_target().is_some_and(|m| m.unread) { i18n("Mark as Read") } else { i18n("Mark as Unread") }.as_str()),
@@ -2443,7 +2443,7 @@ impl SimpleComponent for AppModel {
                         },
                         #[wrap(Some)]
                         set_end_widget = &gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-window-close-symbolic",
+                            set_icon_name: "window-close-symbolic",
                             set_tooltip_text: Some(i18n("Close").as_str()),
                             add_css_class: "circular",
                             add_css_class: "flat",
@@ -2457,7 +2457,7 @@ impl SimpleComponent for AppModel {
                         set_spacing: 8,
 
                         gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-go-previous-symbolic",
+                            set_icon_name: "go-previous-symbolic",
                             set_tooltip_text: Some(i18n("Previous").as_str()),
                             set_valign: gtk::Align::Center,
                             add_css_class: "circular",
@@ -2508,7 +2508,7 @@ impl SimpleComponent for AppModel {
                         },
 
                         gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-go-next-symbolic",
+                            set_icon_name: "go-next-symbolic",
                             set_tooltip_text: Some(i18n("Next").as_str()),
                             set_valign: gtk::Align::Center,
                             add_css_class: "circular",
@@ -2533,13 +2533,13 @@ impl SimpleComponent for AppModel {
                         set_end_widget = &gtk::Box {
                             set_spacing: 6,
                             gtk::Button {
-                                set_icon_name: "co.hyprlab.Hylki-document-open-symbolic",
+                                set_icon_name: "document-open-symbolic",
                                 set_tooltip_text: Some(i18n("Open").as_str()),
                                 add_css_class: "flat",
                                 connect_clicked => AppMsg::LightboxOpenCurrent,
                             },
                             gtk::Button {
-                                set_icon_name: "co.hyprlab.Hylki-folder-download-symbolic",
+                                set_icon_name: "folder-download-symbolic",
                                 set_tooltip_text: Some(i18n("Download…").as_str()),
                                 add_css_class: "flat",
                                 connect_clicked => AppMsg::LightboxDownloadCurrent,
@@ -3004,7 +3004,7 @@ impl SimpleComponent for AppModel {
             reader_toolbar_widgets: std::cell::OnceCell::new(),
             reader_overflow_btn: {
                 let b = gtk::Button::from_icon_name(
-                    "co.hyprlab.Hylki-view-more-horizontal-symbolic",
+                    "view-more-horizontal-symbolic",
                 );
                 b.set_tooltip_text(Some(i18n("Actions").as_str()));
                 b.add_css_class("flat");
@@ -3012,13 +3012,13 @@ impl SimpleComponent for AppModel {
                 b
             },
             reader_tag_btn: {
-                let b = gtk::Button::from_icon_name("co.hyprlab.Hylki-tag-outline-symbolic");
+                let b = gtk::Button::from_icon_name("tag-outline-symbolic");
                 b.set_tooltip_text(Some(i18n("Tags").as_str()));
                 b.add_css_class("flat");
                 b
             },
             reader_move_btn: {
-                let b = gtk::Button::from_icon_name("co.hyprlab.Hylki-folder-symbolic");
+                let b = gtk::Button::from_icon_name("folder-symbolic");
                 b.set_tooltip_text(Some(i18n("Move To…").as_str()));
                 b.add_css_class("flat");
                 b
@@ -3625,7 +3625,7 @@ impl SimpleComponent for AppModel {
             // Leftmost, same spot as the message list header's: the sidebar
             // collapse/expand toggle.
             let sidebar_btn =
-                gtk::Button::from_icon_name("co.hyprlab.Hylki-sidebar-show-symbolic");
+                gtk::Button::from_icon_name("sidebar-show-symbolic");
             sidebar_btn.set_tooltip_text(Some(i18n("Toggle sidebar").as_str()));
             sidebar_btn.add_css_class("flat");
             let s = sender.input_sender().clone();
@@ -3834,7 +3834,7 @@ impl SimpleComponent for AppModel {
         model.sidebar_menu = Some(widgets.sidebar_menu.clone());
         // The header Refresh's icon/spinner faces, and its click.
         {
-            let icon = gtk::Image::from_icon_name("co.hyprlab.Hylki-view-refresh-symbolic");
+            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
             model.sidebar_refresh_stack.add_named(&icon, Some("icon"));
             model
                 .sidebar_refresh_stack
@@ -3858,7 +3858,7 @@ impl SimpleComponent for AppModel {
         }
         // The peek panel's Refresh: the same icon/spinner faces.
         {
-            let icon = gtk::Image::from_icon_name("co.hyprlab.Hylki-view-refresh-symbolic");
+            let icon = gtk::Image::from_icon_name("view-refresh-symbolic");
             model.peek_refresh_stack.add_named(&icon, Some("icon"));
             model
                 .peek_refresh_stack
@@ -7764,7 +7764,7 @@ impl SimpleComponent for AppModel {
                     let entry = MenuEntry::new(i18n("Customize Toolbar…"), move || {
                         let _ = s.send(AppMsg::CustomizeToolbar);
                     })
-                    .icon("co.hyprlab.Hylki-preferences-desktop-appearance-symbolic");
+                    .icon("preferences-desktop-appearance-symbolic");
                     show_context_menu(header, x, y, vec![vec![entry]]);
                 }
             }
@@ -12458,7 +12458,7 @@ impl AppModel {
                 MenuEntry::new($label, move || {
                     let _ = s.send($msg);
                 })
-                .icon(concat!("co.hyprlab.Hylki-", $icon, "-symbolic"))
+                .icon(concat!($icon, "-symbolic"))
                 .enabled($enabled)
             }};
         }
@@ -12514,7 +12514,7 @@ impl AppModel {
                     T::ReplyAll => section.push(entry!(i18n("Reply All"), "mail-reply-all", AppMsg::ReplyAll, acts)),
                     T::Forward => section.push(entry!(i18n("Forward"), "mail-forward", AppMsg::Forward, acts)),
                     T::Star => section.push(if starred {
-                        entry!(i18n("Remove Flag"), "non-starred", AppMsg::ToggleStar, acts)
+                        entry!(i18n("Remove Flag"), "hylki-non-starred", AppMsg::ToggleStar, acts)
                     } else {
                         entry!(i18n("Flag"), "starred", AppMsg::ToggleStar, acts)
                     }),
@@ -12526,7 +12526,7 @@ impl AppModel {
                         entry!(i18n("Mark as Spam"), "mail-mark-junk", AppMsg::MarkSpam, acts)
                     }),
                     T::ReadUnread => section.push(if target_unread {
-                        entry!(i18n("Mark as Read"), "mail-read", AppMsg::ToggleReadCurrent, acts)
+                        entry!(i18n("Mark as Read"), "hylki-mail-read", AppMsg::ToggleReadCurrent, acts)
                     } else {
                         entry!(i18n("Mark as Unread"), "mail-unread", AppMsg::ToggleReadCurrent, acts)
                     }),
@@ -12535,7 +12535,7 @@ impl AppModel {
                     T::Tags => {
                         if let Some(entries) = self.reader_tag_entries(sender) {
                             section.push(
-                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Hylki-tag-outline-symbolic"),
+                                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic"),
                             );
                         }
                     }
@@ -12581,20 +12581,20 @@ impl AppModel {
         let search = MenuEntry::new(i18n("Search Messages…"), move || {
             let _ = s.send(AppMsg::OpenListSearch);
         })
-        .icon("co.hyprlab.Hylki-system-search-symbolic");
+        .icon("system-search-symbolic");
         let unread = lh.unread.clone();
         let unread_on = unread.is_active();
         let unread_entry = MenuEntry::new(i18n("Show only unread"), move || {
             unread.set_active(!unread.is_active());
         })
-        .icon("co.hyprlab.Hylki-mail-unread-symbolic")
+        .icon("mail-unread-symbolic")
         .selected(unread_on);
         let starred = lh.starred.clone();
         let starred_on = starred.is_active();
         let starred_entry = MenuEntry::new(i18n("Show only starred"), move || {
             starred.set_active(!starred.is_active());
         })
-        .icon("co.hyprlab.Hylki-starred-symbolic")
+        .icon("starred-symbolic")
         .selected(starred_on);
         let current = lh.sort.state().and_then(|v| v.str().map(String::from)).unwrap_or_default();
         let orders: Vec<MenuEntry> = [
@@ -12614,7 +12614,7 @@ impl AppModel {
         })
         .collect();
         let sort = MenuEntry::submenu(i18n("Sort"), vec![orders])
-            .icon("co.hyprlab.Hylki-view-sort-descending-symbolic");
+            .icon("view-sort-descending-symbolic");
         let sections = vec![vec![search], vec![unread_entry, starred_entry], vec![sort]];
         // The message count heads the menu, where the header showed it.
         let header = (!self.list_count.is_empty()).then(|| self.list_count.clone());
@@ -13134,7 +13134,7 @@ impl AppModel {
             MenuEntry::new(label, move || {
                 let _ = s.send(AppMsg::CardAction { action, message: Box::new(message.clone()) });
             })
-            .icon(format!("co.hyprlab.Hylki-{icon}-symbolic"))
+            .icon(format!("{icon}-symbolic"))
         };
         let kind = self.folder_kind(m.account_id, m.folder_id);
         let in_junk = kind == Some(FolderKind::Junk);
@@ -13148,12 +13148,12 @@ impl AppModel {
             ],
             vec![
                 if m.starred {
-                    item(RowAction::ToggleStar, i18n("Remove Star"), "non-starred")
+                    item(RowAction::ToggleStar, i18n("Remove Star"), "hylki-non-starred")
                 } else {
                     item(RowAction::ToggleStar, i18n("Star"), "starred")
                 },
                 if m.unread {
-                    item(RowAction::ToggleRead, i18n("Mark as Read"), "mail-read")
+                    item(RowAction::ToggleRead, i18n("Mark as Read"), "hylki-mail-read")
                 } else {
                     item(RowAction::ToggleRead, i18n("Mark as Unread"), "mail-unread")
                 },
@@ -13171,7 +13171,7 @@ impl AppModel {
                     });
                 });
             sections.push(vec![
-                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("co.hyprlab.Hylki-tag-outline-symbolic"),
+                MenuEntry::submenu(i18n("Tags"), vec![entries]).icon("tag-outline-symbolic"),
             ]);
         }
         let mut acts = Vec::new();
@@ -13195,7 +13195,7 @@ impl AppModel {
                         y,
                     });
                 })
-                .icon("co.hyprlab.Hylki-folder-symbolic"),
+                .icon("folder-symbolic"),
             );
         }
         acts.push(item(RowAction::Archive, i18n("Archive"), "mail-archive"));
@@ -13219,7 +13219,7 @@ impl AppModel {
             sections.push(vec![MenuEntry::new(label, move || {
                 let _ = s.send(AppMsg::SetRemoteContent { account_id, id, show: !showing });
             })
-            .icon(format!("co.hyprlab.Hylki-{icon}-symbolic"))]);
+            .icon(format!("{icon}-symbolic"))]);
         }
         sections.push(vec![item(RowAction::ViewSource, i18n("View Source"), "code")]);
         show_context_menu(&self.window, x, y, sections);
@@ -17008,7 +17008,7 @@ impl AppModel {
             .subtitle(format!("What's new in {}", crate::VERSION))
             .activatable(true)
             .build();
-        notes_row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic"));
+        notes_row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
         {
             let nav = nav.clone();
             notes_row.connect_activated(move |_| nav.push_by_tag("notes"));
@@ -17023,7 +17023,7 @@ impl AppModel {
                 .subtitle(&i18n("Make account passwords persist on Linux Mint"))
                 .activatable(true)
                 .build();
-            keyring_row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic"));
+            keyring_row.add_suffix(&gtk::Image::from_icon_name("go-next-symbolic"));
             let sender = sender.clone();
             keyring_row.connect_activated(move |_| {
                 sender.input(AppMsg::ShowKeyringHelp { problem: false });
@@ -17047,7 +17047,7 @@ impl AppModel {
         let mk_row = |title: &str, url: &str| -> adw::ActionRow {
             let row = adw::ActionRow::builder().title(title).activatable(true).build();
             row.set_tooltip_text(Some(url));
-            row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic"));
+            row.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
             let u = url.to_string();
             row.connect_activated(move |_| crate::oauth::open_uri(&u));
             row
@@ -17071,7 +17071,7 @@ impl AppModel {
         let cup = gtk::Label::new(Some("☕"));
         cup.add_css_class("about-coffee");
         coffee.add_prefix(&cup);
-        coffee.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic"));
+        coffee.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
         coffee.connect_activated(move |_| crate::oauth::open_uri("https://buymeacoffee.com/hyprlab"));
         links.append(&coffee);
         page.append(&links);
@@ -17101,7 +17101,7 @@ impl AppModel {
                     .build();
                 let url = format!("https://github.com/{handle}");
                 row.set_tooltip_text(Some(&url));
-                row.add_suffix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic"));
+                row.add_suffix(&gtk::Image::from_icon_name("adw-external-link-symbolic"));
                 row.connect_activated(move |_| crate::oauth::open_uri(&url));
                 list.append(&row);
             }
@@ -19869,6 +19869,14 @@ fn register_icons() {
         if let Some(home) = std::env::var_os("HOME") {
             theme.add_search_path(std::path::Path::new(&home).join(".local/share/icons"));
         }
+    }
+    // HYLKI_SHOWCASE_ICON_THEME=<name> draws the app in that icon theme, to
+    // check a theme's icons replace Hylki's and the bundle fills in any it
+    // lacks (#260).
+    if let (Ok(name), Some(settings)) =
+        (std::env::var("HYLKI_SHOWCASE_ICON_THEME"), gtk::Settings::default())
+    {
+        settings.set_gtk_icon_theme_name(Some(&name));
     }
     gtk::Window::set_default_icon_name(crate::APP_ID);
 }

@@ -302,9 +302,10 @@ fn relay_to_primary(args: &[String]) -> bool {
 /// baked into the binary. Registering it makes the icons available under the
 /// resource path `/co/hyprlab/Hylki/icons`. Because the app's resource base
 /// path is derived from `APP_ID`, GTK automatically appends that `icons`
-/// subdirectory to the default icon theme's search path — so every
-/// `co.hyprlab.Hylki-*-symbolic` name resolves from the bundle on any distro,
-/// no filesystem install required.
+/// subdirectory to the default icon theme's search path, as part of hicolor.
+/// Icons are named plainly (`edit-find-symbolic`), so the user's icon theme
+/// draws any it has, and the bundle supplies the rest on any distro: the
+/// app's own icons, and GNOME's for a theme that lacks them.
 fn register_resources() {
     use gtk::{gio, glib};
     let bytes = glib::Bytes::from_static(include_bytes!(concat!(

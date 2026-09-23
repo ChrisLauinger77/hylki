@@ -846,7 +846,7 @@ impl Component for AccountsWindow {
                                         },
 
                                         add_suffix = &gtk::Button {
-                                            set_icon_name: "co.hyprlab.Hylki-list-add-symbolic",
+                                            set_icon_name: "list-add-symbolic",
                                             set_tooltip_text: Some(i18n("Allow this sender").as_str()),
                                             set_valign: gtk::Align::Center,
                                             add_css_class: "flat",
@@ -886,7 +886,7 @@ impl Component for AccountsWindow {
                                         },
 
                                         add_suffix = &gtk::Button {
-                                            set_icon_name: "co.hyprlab.Hylki-list-add-symbolic",
+                                            set_icon_name: "list-add-symbolic",
                                             set_tooltip_text: Some(i18n("Block this sender").as_str()),
                                             set_valign: gtk::Align::Center,
                                             add_css_class: "flat",
@@ -2920,11 +2920,11 @@ impl AccountsWindow {
             }));
 
             // A dim pencil says "activate to edit"; the trash button removes.
-            let edit = gtk::Image::from_icon_name("co.hyprlab.Hylki-document-edit-symbolic");
+            let edit = gtk::Image::from_icon_name("document-edit-symbolic");
             edit.add_css_class("dim-label");
             row.add_suffix(&edit);
 
-            let remove = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+            let remove = gtk::Button::from_icon_name("user-trash-symbolic");
             remove.set_valign(gtk::Align::Center);
             remove.add_css_class("flat");
             remove.set_tooltip_text(Some(i18n("Remove this alias").as_str()));
@@ -3251,7 +3251,7 @@ impl AccountsWindow {
             let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
             hbox.add_css_class("account-list-row");
 
-            let handle = gtk::Image::from_icon_name("co.hyprlab.Hylki-list-drag-handle-symbolic");
+            let handle = gtk::Image::from_icon_name("list-drag-handle-symbolic");
             handle.add_css_class("dim-label");
             hbox.append(&handle);
 
@@ -3376,7 +3376,7 @@ impl AccountsWindow {
             });
             hbox.append(&toggle);
 
-            let next = gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic");
+            let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
             hbox.append(&next);
 
@@ -4447,14 +4447,14 @@ impl AccountsWindow {
             // The trash button removes; a chevron says the row opens the
             // rule's editor, as the account and cloud rows do. The rule's
             // "count unread" switch lives in the editor.
-            let rm = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+            let rm = gtk::Button::from_icon_name("user-trash-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
             rm.set_tooltip_text(Some(i18n("Remove filter").as_str()));
             let s = sender.clone();
             rm.connect_clicked(move |_| s.input(AccountsInput::RemoveFilter(i)));
             row.add_suffix(&rm);
-            let next = gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic");
+            let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
             row.add_suffix(&next);
             list.append(&row);
@@ -4605,7 +4605,7 @@ impl AccountsWindow {
             row.connect_activated(move |_| s.input(AccountsInput::EditTag(i)));
             row.set_title(&gtk::glib::markup_escape_text(&t.name));
             row.set_subtitle(&gtk::glib::markup_escape_text(&t.keyword));
-            let handle = gtk::Image::from_icon_name("co.hyprlab.Hylki-list-drag-handle-symbolic");
+            let handle = gtk::Image::from_icon_name("list-drag-handle-symbolic");
             handle.add_css_class("dim-label");
             row.add_prefix(&handle);
             row.add_prefix(&crate::ui::context_menu::swatch_widget(&t.color, true));
@@ -4640,7 +4640,7 @@ impl AccountsWindow {
                 }
             });
             row.add_controller(drop);
-            let rm = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+            let rm = gtk::Button::from_icon_name("user-trash-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
             rm.set_tooltip_text(Some(i18n("Remove tag").as_str()));
@@ -4649,7 +4649,7 @@ impl AccountsWindow {
             row.add_suffix(&rm);
             // A chevron says the row opens the tag's editor, as the
             // account and cloud rows do.
-            let next = gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic");
+            let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
             row.add_suffix(&next);
             list.append(&row);
@@ -5012,7 +5012,7 @@ impl AccountsWindow {
             let match_names = match_names.clone();
             move |init: Option<&crate::config::FilterCondition>| -> CondRows {
                 let group = adw::PreferencesGroup::new();
-                let remove = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+                let remove = gtk::Button::from_icon_name("user-trash-symbolic");
                 remove.add_css_class("flat");
                 remove.set_valign(gtk::Align::Center);
                 remove.set_tooltip_text(Some(i18n("Remove condition").as_str()));
@@ -5070,7 +5070,7 @@ impl AccountsWindow {
         let add_row = adw::ActionRow::new();
         add_row.set_title(&i18n("Add Condition"));
         add_row.set_activatable(true);
-        add_row.add_prefix(&gtk::Image::from_icon_name("co.hyprlab.Hylki-list-add-symbolic"));
+        add_row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
         // All or any (#192); only shown once there is a second condition.
         let combine_row = adw::ComboRow::new();
         combine_row.set_title(&i18n("Condition matching"));

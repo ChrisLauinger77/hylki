@@ -171,7 +171,7 @@ fn build_page(
             // The way back: a row with a leading chevron and the submenu's
             // name, then a hairline before its entries.
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-            let img = gtk::Image::from_icon_name("co.hyprlab.Hylki-go-previous-symbolic");
+            let img = gtk::Image::from_icon_name("go-previous-symbolic");
             img.set_pixel_size(16);
             row.append(&img);
             let lbl = gtk::Label::new(Some(title));
@@ -248,7 +248,7 @@ fn build_page(
 
             if let Some(sections) = submenu {
                 // A trailing chevron says the row opens rather than acts.
-                let chevron = gtk::Image::from_icon_name("co.hyprlab.Hylki-pan-end-symbolic");
+                let chevron = gtk::Image::from_icon_name("pan-end-symbolic");
                 chevron.set_pixel_size(16);
                 chevron.add_css_class("dim-label");
                 row.append(&chevron);

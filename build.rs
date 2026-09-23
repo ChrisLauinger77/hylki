@@ -1,8 +1,8 @@
 //! Compile the bundled icon set (resources/hylki.gresource.xml) into a
 //! `.gresource` blob that is embedded in the binary and registered at startup
-//! (see `main.rs`). This lets every symbolic icon Hylki draws render identically
-//! on any distribution, regardless of the host icon theme — the icons are
-//! prefixed with the app ID so no system theme can override them.
+//! (see `main.rs`). The icons are named plainly, so the user's icon theme draws
+//! those it has; the bundle supplies Hylki's own and any a theme lacks, so none
+//! goes missing on any distribution (#260).
 
 fn main() {
     println!("cargo:rerun-if-changed=resources/hylki.gresource.xml");

@@ -120,7 +120,7 @@ impl Component for ContactsPage {
                         add_css_class: "pane-title",
                     },
                     pack_start = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-sidebar-show-symbolic",
+                        set_icon_name: "sidebar-show-symbolic",
                         set_tooltip_text: Some(i18n("Toggle sidebar").as_str()),
                         add_css_class: "flat",
                         connect_clicked[sender] => move |_| {
@@ -128,7 +128,7 @@ impl Component for ContactsPage {
                         },
                     },
                     pack_end = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-x-office-address-book-symbolic",
+                        set_icon_name: "x-office-address-book-symbolic",
                         set_tooltip_text: Some(i18n("Open GNOME Contacts").as_str()),
                         add_css_class: "flat",
                         connect_clicked => move |_| {
@@ -136,7 +136,7 @@ impl Component for ContactsPage {
                         },
                     },
                     pack_end = &gtk::Button {
-                        set_icon_name: "co.hyprlab.Hylki-list-add-symbolic",
+                        set_icon_name: "list-add-symbolic",
                         set_tooltip_text: Some(i18n("New contact").as_str()),
                         add_css_class: "flat",
                         connect_clicked => ContactsPageInput::NewContact,
@@ -145,7 +145,7 @@ impl Component for ContactsPage {
 
                 #[wrap(Some)]
                 set_content = &adw::StatusPage {
-                    set_icon_name: Some("co.hyprlab.Hylki-x-office-address-book-symbolic"),
+                    set_icon_name: Some("x-office-address-book-symbolic"),
                     #[watch]
                     set_title: &if model.loading { i18n("Loading Contacts…") } else { i18n("No Contacts") },
                     #[watch]
@@ -205,7 +205,7 @@ impl Component for ContactsPage {
                         // Leftmost, mirroring the pane it acts on — same spot
                         // as in the message list's header.
                         pack_start = &gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-sidebar-show-symbolic",
+                            set_icon_name: "sidebar-show-symbolic",
                             set_tooltip_text: Some(i18n("Toggle sidebar").as_str()),
                             add_css_class: "flat",
                             connect_clicked[sender] => move |_| {
@@ -217,7 +217,7 @@ impl Component for ContactsPage {
                         // the GNOME Contacts launcher, then "+".
                         #[name = "sort_btn"]
                         pack_end = &gtk::MenuButton {
-                            set_icon_name: "co.hyprlab.Hylki-view-sort-descending-symbolic",
+                            set_icon_name: "view-sort-descending-symbolic",
                             set_tooltip_text: Some(i18n("Sort contacts").as_str()),
                             set_valign: gtk::Align::Center,
                             add_css_class: "flat",
@@ -228,7 +228,7 @@ impl Component for ContactsPage {
                             add_css_class: "list-count",
                         },
                         pack_end = &gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-x-office-address-book-symbolic",
+                            set_icon_name: "x-office-address-book-symbolic",
                             set_tooltip_text: Some(i18n("Open GNOME Contacts").as_str()),
                             add_css_class: "flat",
                             connect_clicked => move |_| {
@@ -236,7 +236,7 @@ impl Component for ContactsPage {
                             },
                         },
                         pack_end = &gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-list-add-symbolic",
+                            set_icon_name: "list-add-symbolic",
                             set_tooltip_text: Some(i18n("New contact").as_str()),
                             add_css_class: "flat",
                             connect_clicked => ContactsPageInput::NewContact,
@@ -293,7 +293,7 @@ impl Component for ContactsPage {
                         set_show_start_title_buttons: false,
                         // Top-left of the card pane: edit the shown contact.
                         pack_start = &gtk::Button {
-                            set_icon_name: "co.hyprlab.Hylki-document-edit-symbolic",
+                            set_icon_name: "document-edit-symbolic",
                             set_tooltip_text: Some(i18n("Edit contact").as_str()),
                             add_css_class: "flat",
                             connect_clicked => ContactsPageInput::Edit,
@@ -675,16 +675,16 @@ impl ContactsPage {
                             MenuEntry::new(i18n("Edit"), move || {
                                 let _ = se.send(ContactsPageInput::EditIndex(idx));
                             })
-                            .icon("co.hyprlab.Hylki-document-edit-symbolic"),
+                            .icon("document-edit-symbolic"),
                             MenuEntry::new(i18n("Open in GNOME Contacts"), move || {
                                 let _ = sg.send(ContactsPageInput::OpenInGnome(idx));
                             })
-                            .icon("co.hyprlab.Hylki-adw-external-link-symbolic"),
+                            .icon("adw-external-link-symbolic"),
                         ],
                         vec![MenuEntry::new(i18n("Delete…"), move || {
                             let _ = sd.send(ContactsPageInput::DeleteRequest(idx));
                         })
-                        .icon("co.hyprlab.Hylki-user-trash-symbolic")],
+                        .icon("user-trash-symbolic")],
                     ],
                 );
             });
@@ -777,7 +777,7 @@ impl ContactsPage {
             for e in &c.emails {
                 let row = labeled_row(e);
                 let compose = flat_button(
-                    "co.hyprlab.Hylki-mail-message-new-symbolic",
+                    "mail-message-new-symbolic",
                     &i18n("New message"),
                 );
                 let s = sender.input_sender().clone();
@@ -822,7 +822,7 @@ impl ContactsPage {
                 row.set_title(&gtk::glib::markup_escape_text(url));
                 row.set_activatable(true);
                 let icon =
-                    gtk::Image::from_icon_name("co.hyprlab.Hylki-adw-external-link-symbolic");
+                    gtk::Image::from_icon_name("adw-external-link-symbolic");
                 icon.add_css_class("dim-label");
                 row.add_suffix(&icon);
                 let s = sender.input_sender().clone();
@@ -985,7 +985,7 @@ fn editable_values(
     add_box.set_margin_top(10);
     add_box.set_margin_bottom(10);
     add_box.set_margin_start(12);
-    let plus = gtk::Image::from_icon_name("co.hyprlab.Hylki-list-add-symbolic");
+    let plus = gtk::Image::from_icon_name("list-add-symbolic");
     plus.add_css_class("dim-label");
     let label = gtk::Label::new(Some(add_label));
     label.add_css_class("dim-label");
@@ -1002,7 +1002,7 @@ fn editable_values(
             let entry = adw::EntryRow::new();
             entry.set_title(&if label.is_empty() { field.clone() } else { label.clone() });
             entry.set_text(value);
-            let remove = gtk::Button::from_icon_name("co.hyprlab.Hylki-user-trash-symbolic");
+            let remove = gtk::Button::from_icon_name("user-trash-symbolic");
             remove.set_tooltip_text(Some(i18n("Remove").as_str()));
             remove.set_valign(gtk::Align::Center);
             remove.add_css_class("flat");
@@ -1097,14 +1097,14 @@ fn flat_button(icon: &str, tooltip: &str) -> gtk::Button {
 /// A suffix button that puts `text` on the clipboard, confirming by briefly
 /// swapping its icon for a checkmark.
 fn copy_button(text: &str) -> gtk::Button {
-    let b = flat_button("co.hyprlab.Hylki-edit-copy-symbolic", "Copy");
+    let b = flat_button("edit-copy-symbolic", "Copy");
     let text = text.to_string();
     b.connect_clicked(move |b| {
         b.clipboard().set_text(&text);
-        b.set_icon_name("co.hyprlab.Hylki-verified-checkmark-symbolic");
+        b.set_icon_name("verified-checkmark-symbolic");
         let b = b.clone();
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
-            b.set_icon_name("co.hyprlab.Hylki-edit-copy-symbolic");
+            b.set_icon_name("edit-copy-symbolic");
         });
     });
     b

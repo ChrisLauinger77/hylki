@@ -660,7 +660,7 @@ impl Component for Welcome {
 
         // ---- Page 5: done ----
         let done = gtk::Box::new(gtk::Orientation::Vertical, 16);
-        let check = gtk::Image::from_icon_name("co.hyprlab.Hylki-verified-checkmark-symbolic");
+        let check = gtk::Image::from_icon_name("verified-checkmark-symbolic");
         check.set_pixel_size(72);
         check.add_css_class("welcome-check");
         done.append(&check);
@@ -686,7 +686,7 @@ impl Component for Welcome {
         let hb = adw::HeaderBar::new();
         hb.set_show_title(false);
         hb.add_css_class("flat");
-        let back_btn = gtk::Button::from_icon_name("co.hyprlab.Hylki-go-previous-symbolic");
+        let back_btn = gtk::Button::from_icon_name("go-previous-symbolic");
         back_btn.add_css_class("flat");
         back_btn.set_visible(false);
         {

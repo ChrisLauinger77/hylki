@@ -4352,18 +4352,18 @@ impl ToolbarItem {
     /// The symbolic icon the button (and the settings chip) wears.
     pub fn icon(self) -> &'static str {
         match self {
-            ToolbarItem::Reply => "co.hyprlab.Hylki-mail-reply-sender-symbolic",
-            ToolbarItem::ReplyAll => "co.hyprlab.Hylki-mail-reply-all-symbolic",
-            ToolbarItem::Forward => "co.hyprlab.Hylki-mail-forward-symbolic",
-            ToolbarItem::Star => "co.hyprlab.Hylki-non-starred-symbolic",
-            ToolbarItem::Archive => "co.hyprlab.Hylki-mail-archive-symbolic",
-            ToolbarItem::Delete => "co.hyprlab.Hylki-user-trash-symbolic",
-            ToolbarItem::Spam => "co.hyprlab.Hylki-mail-mark-junk-symbolic",
-            ToolbarItem::ReadUnread => "co.hyprlab.Hylki-mail-unread-symbolic",
-            ToolbarItem::Tags => "co.hyprlab.Hylki-tag-outline-symbolic",
-            ToolbarItem::MoveTo => "co.hyprlab.Hylki-folder-symbolic",
-            ToolbarItem::Find => "co.hyprlab.Hylki-loupe-with-arrow-symbolic",
-            ToolbarItem::Print => "co.hyprlab.Hylki-printer-symbolic",
+            ToolbarItem::Reply => "mail-reply-sender-symbolic",
+            ToolbarItem::ReplyAll => "mail-reply-all-symbolic",
+            ToolbarItem::Forward => "mail-forward-symbolic",
+            ToolbarItem::Star => "hylki-non-starred-symbolic",
+            ToolbarItem::Archive => "mail-archive-symbolic",
+            ToolbarItem::Delete => "user-trash-symbolic",
+            ToolbarItem::Spam => "mail-mark-junk-symbolic",
+            ToolbarItem::ReadUnread => "mail-unread-symbolic",
+            ToolbarItem::Tags => "tag-outline-symbolic",
+            ToolbarItem::MoveTo => "folder-symbolic",
+            ToolbarItem::Find => "loupe-with-arrow-symbolic",
+            ToolbarItem::Print => "printer-symbolic",
         }
     }
 

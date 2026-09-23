@@ -440,7 +440,7 @@ impl CloudAccounts {
                 gtk::glib::Propagation::Proceed
             });
             hbox.append(&toggle);
-            let next = gtk::Image::from_icon_name("co.hyprlab.Hylki-go-next-symbolic");
+            let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
             hbox.append(&next);
             row.set_child(Some(&hbox));
@@ -509,7 +509,7 @@ fn build_editor(
         move |id: &str| {
             match crate::brand::texture(id, 112) {
                 Some(t) => header_mark.set_paintable(Some(&t)),
-                None => header_mark.set_icon_name(Some("co.hyprlab.Hylki-cloud-symbolic")),
+                None => header_mark.set_icon_name(Some("cloud-symbolic")),
             }
         }
     };
