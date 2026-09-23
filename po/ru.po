@@ -317,6 +317,10 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Перезапустить сейчас"
 
+#, fuzzy
+msgid "{name} · {current} of {total}"
+msgstr "{cur} из {total}"
+
 msgid "View Source"
 msgstr "Просмотр исходного кода"
 
@@ -1006,6 +1010,10 @@ msgstr "Ожидает с {ago}"
 
 msgid "Scheduled for {when}"
 msgstr "Запланировано на {when}"
+
+#, fuzzy
+msgid "Today, {time}"
+msgstr "В понедельник утром ({time})"
 
 msgid "New message"
 msgstr "Новое сообщение"
@@ -2040,6 +2048,16 @@ msgstr "Индексация {n} сообщений…"
 msgid "Loading more…"
 msgstr "Загрузка остальных…"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} вложение"
+msgstr[1] "{n} вложения"
+msgstr[2] "{n} вложений"
+
+#, fuzzy
+msgid "{shown} of {total}"
+msgstr "{cur} из {total}"
+
 msgid "The file could not be opened"
 msgstr "Не удалось открыть файл"
 
@@ -2565,12 +2583,6 @@ msgstr "Это время уже прошло"
 
 msgid "Choose a time later than now."
 msgstr "Выберите время позже текущего."
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} вложение"
-msgstr[1] "{n} вложения"
-msgstr[2] "{n} вложений"
 
 msgid "Contacts"
 msgstr "Контакты"

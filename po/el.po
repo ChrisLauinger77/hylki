@@ -321,6 +321,10 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Επανεκκίνηση τώρα"
 
+#, fuzzy
+msgid "{name} · {current} of {total}"
+msgstr "{cur} από {total}"
+
 msgid "View Source"
 msgstr "Προβολή πηγαίου κώδικα"
 
@@ -998,6 +1002,10 @@ msgstr "Σε αναμονή από {ago}"
 
 msgid "Scheduled for {when}"
 msgstr "Προγραμματισμένο για {when}"
+
+#, fuzzy
+msgid "Today, {time}"
+msgstr "Δευτέρα πρωί ({time})"
 
 msgid "New message"
 msgstr "Νέο μήνυμα"
@@ -2061,6 +2069,15 @@ msgstr "Ευρετηρίαση {n} μηνυμάτων…"
 msgid "Loading more…"
 msgstr "Φόρτωση περισσότερων…"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} συνημμένο"
+msgstr[1] "{n} συνημμένα"
+
+#, fuzzy
+msgid "{shown} of {total}"
+msgstr "{cur} από {total}"
+
 msgid "The file could not be opened"
 msgstr "Δεν ήταν δυνατό το άνοιγμα του αρχείου"
 
@@ -2604,11 +2621,6 @@ msgstr "Αυτή η ώρα έχει παρέλθει"
 
 msgid "Choose a time later than now."
 msgstr "Επιλέξτε ώρα μεταγενέστερη από την τρέχουσα."
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} συνημμένο"
-msgstr[1] "{n} συνημμένα"
 
 msgid "Contacts"
 msgstr "Επαφές"

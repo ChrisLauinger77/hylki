@@ -9023,6 +9023,8 @@ impl SimpleComponent for AppModel {
                 if let Some(cfg) = self.config.get(account_id as usize - 1) {
                     apply_folder_roles(&cfg.folder_roles.clone(), &mut folders);
                 }
+                // After the look-over above, which goes by the English names.
+                crate::models::localize_special_folder_names(&mut folders);
                 // Keep the settings editor's folder choices current while open.
                 if let Some(acc) = &self.accounts_win {
                     acc.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
@@ -10683,10 +10685,11 @@ impl AppModel {
                 continue;
             }
             let account_id = (i + 1) as u32;
-            let folders = cache.load_folders(account_id);
+            let mut folders = cache.load_folders(account_id);
             if folders.is_empty() {
                 continue;
             }
+            crate::models::localize_special_folder_names(&mut folders);
             if let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox) {
                 let messages = cache.load_messages(account_id, &inbox.path, inbox.id);
                 if !messages.is_empty() {
@@ -12101,11 +12104,13 @@ impl AppModel {
     /// "name · n of m" for the lightbox's bottom bar.
     fn lightbox_caption(&self) -> String {
         match self.lightbox_items.get(self.lightbox_pos) {
-            Some(att) => format!(
-                "{} \u{b7} {} of {}",
-                att.name,
-                self.lightbox_pos + 1,
-                self.lightbox_items.len()
+            Some(att) => i18n_f(
+                "{name} · {current} of {total}",
+                &[
+                    ("name", &att.name),
+                    ("current", &(self.lightbox_pos + 1).to_string()),
+                    ("total", &self.lightbox_items.len().to_string()),
+                ],
             ),
             None => String::new(),
         }

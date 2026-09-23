@@ -320,6 +320,10 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Redémarrer maintenant"
 
+#, fuzzy
+msgid "{name} · {current} of {total}"
+msgstr "{cur} sur {total}"
+
 msgid "View Source"
 msgstr "Afficher le code source"
 
@@ -1000,6 +1004,10 @@ msgstr "En attente depuis {ago}"
 
 msgid "Scheduled for {when}"
 msgstr "Programmé pour {when}"
+
+#, fuzzy
+msgid "Today, {time}"
+msgstr "Lundi matin ({time})"
 
 msgid "New message"
 msgstr "Nouveau message"
@@ -2056,6 +2064,15 @@ msgstr "Indexation de {n} messages…"
 msgid "Loading more…"
 msgstr "Chargement en cours…"
 
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "{n} pièce jointe"
+msgstr[1] "{n} pièces jointes"
+
+#, fuzzy
+msgid "{shown} of {total}"
+msgstr "{cur} sur {total}"
+
 msgid "The file could not be opened"
 msgstr "Le fichier n'a pas pu être ouvert"
 
@@ -2598,11 +2615,6 @@ msgstr "Cette heure est déjà passée"
 
 msgid "Choose a time later than now."
 msgstr "Choisissez une heure ultérieure à maintenant."
-
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "{n} pièce jointe"
-msgstr[1] "{n} pièces jointes"
 
 msgid "Contacts"
 msgstr "Contacts"

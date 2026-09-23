@@ -318,6 +318,10 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Újraindítás most"
 
+#, fuzzy
+msgid "{name} · {current} of {total}"
+msgstr "{cur} / {total}"
+
 msgid "View Source"
 msgstr "Forrás megtekintése"
 
@@ -992,6 +996,10 @@ msgstr "Várakozás {ago} óta"
 
 msgid "Scheduled for {when}"
 msgstr "Ütemezve ekkorra: {when}"
+
+#, fuzzy
+msgid "Today, {time}"
+msgstr "Hétfő délelőtt (8:00)"
 
 msgid "New message"
 msgstr "Új üzenet"
@@ -2025,6 +2033,16 @@ msgstr "{n} üzenet törlése"
 msgid "Loading more…"
 msgstr "Továbbiak betöltése…"
 
+#, fuzzy
+msgid "{n} attachment"
+msgid_plural "{n} attachments"
+msgstr[0] "Nincsenek mellékletek"
+msgstr[1] "Nincsenek mellékletek"
+
+#, fuzzy
+msgid "{shown} of {total}"
+msgstr "{cur} / {total}"
+
 msgid "The file could not be opened"
 msgstr "A fájl nem nyitható meg"
 
@@ -2552,12 +2570,6 @@ msgstr "Ez az időpont már elmúlt"
 
 msgid "Choose a time later than now."
 msgstr "Válasszon a jelenleginél későbbi időpontot."
-
-#, fuzzy
-msgid "{n} attachment"
-msgid_plural "{n} attachments"
-msgstr[0] "Nincsenek mellékletek"
-msgstr[1] "Nincsenek mellékletek"
 
 msgid "Contacts"
 msgstr "Névjegyek"
