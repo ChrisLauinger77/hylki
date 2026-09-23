@@ -1357,6 +1357,38 @@ impl Component for AccountsWindow {
                                 },
                             },
 
+                            add = &adw::PreferencesGroup {
+                                set_title: &i18n("Signature"),
+                                set_description: Some(
+                                    i18n("Appended to new messages sent from this account.").as_str()
+                                ),
+                                // A designed signature usually exists as HTML
+                                // already (#120): bring it in from its file, or
+                                // paste and edit the source directly.
+                                #[wrap(Some)]
+                                set_header_suffix = &gtk::Box {
+                                    set_spacing: 6,
+                                    set_valign: gtk::Align::Center,
+                                    gtk::Button {
+                                        set_label: &i18n("Edit HTML…"),
+                                        add_css_class: "flat",
+                                        connect_clicked => AccountsInput::SignatureEditSource,
+                                    },
+                                    gtk::Button {
+                                        set_label: &i18n("Import File…"),
+                                        add_css_class: "flat",
+                                        connect_clicked => AccountsInput::SignatureImport,
+                                    },
+                                },
+
+                                #[name = "sig_holder"]
+                                gtk::Box {
+                                    set_orientation: gtk::Orientation::Vertical,
+                                    set_height_request: 180,
+                                    set_margin_top: 6,
+                                },
+                            },
+
                             // Per-account push override (#91): some servers
                             // mishandle IDLE, and one bad account shouldn't
                             // cost the good ones their instant delivery.
@@ -1479,38 +1511,6 @@ impl Component for AccountsWindow {
                                 adw::SwitchRow {
                                     set_title: &i18n("Sign messages by default"),
                                     set_subtitle: &i18n("New messages, replies and forwards start with signing on."),
-                                },
-                            },
-
-                            add = &adw::PreferencesGroup {
-                                set_title: &i18n("Signature"),
-                                set_description: Some(
-                                    i18n("Appended to new messages sent from this account.").as_str()
-                                ),
-                                // A designed signature usually exists as HTML
-                                // already (#120): bring it in from its file, or
-                                // paste and edit the source directly.
-                                #[wrap(Some)]
-                                set_header_suffix = &gtk::Box {
-                                    set_spacing: 6,
-                                    set_valign: gtk::Align::Center,
-                                    gtk::Button {
-                                        set_label: &i18n("Edit HTML…"),
-                                        add_css_class: "flat",
-                                        connect_clicked => AccountsInput::SignatureEditSource,
-                                    },
-                                    gtk::Button {
-                                        set_label: &i18n("Import File…"),
-                                        add_css_class: "flat",
-                                        connect_clicked => AccountsInput::SignatureImport,
-                                    },
-                                },
-
-                                #[name = "sig_holder"]
-                                gtk::Box {
-                                    set_orientation: gtk::Orientation::Vertical,
-                                    set_height_request: 180,
-                                    set_margin_top: 6,
                                 },
                             },
 
