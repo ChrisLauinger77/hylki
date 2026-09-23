@@ -2,6 +2,23 @@
 
 Hylki (formerly Vireo) is a clean, fast, GNOME-native email client built with Rust and libadwaita for Wayland desktops. Privacy-first: no telemetry, remote content blocked by default, and credentials kept in the system keyring.
 
+## What's new in 1.41.1
+
+- **Text size** (#267): Settings > Appearance makes Hylki's text 90% to
+  150% of the desktop's size. Asked for by [@rsx-xp](https://github.com/rsx-xp).
+- **Keep an account out of All Inboxes, or sign its mail by default**
+  (#267): two new switches in each account's settings. Also asked for by
+  [@rsx-xp](https://github.com/rsx-xp).
+- **The unread count on the dock icon** (#271), on KDE Plasma and on GNOME
+  with Dash to Dock or Dash to Panel.
+- **The message list keeps the keyboard** (#274): refreshes no longer
+  leave Delete and Enter dead, and the selected message turns grey when
+  the list does not have the keyboard. Reported by
+  [@EmmanuelP](https://github.com/EmmanuelP).
+- **Fixed:** an idle window using CPU and an empty Symbolic tray icon on
+  Cinnamon (#275), reported by [@mfreeman72](https://github.com/mfreeman72).
+  Installing with Bazaar is explained in the install guide (#276).
+
 ## What's new in 1.41.0
 
 - **Move mail to another account** (#265): Move To lists every account's

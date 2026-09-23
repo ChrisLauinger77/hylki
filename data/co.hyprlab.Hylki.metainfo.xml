@@ -74,6 +74,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.41.1" date="2026-09-23">
+      <description>
+        <p>A text size setting, accounts that stay out of All Inboxes or sign their mail by default, and the unread count on the dock icon. The message list keeps the keyboard, an idle window no longer uses CPU, and the symbolic tray icon shows on Cinnamon.</p>
+      </description>
+    </release>
     <release version="1.41.0" date="2026-09-23">
       <description>
         <p>Move mail to another account, search Settings, and choose what opens at startup. A symbolic tray icon, icons that follow the icon theme, New Message in the launcher's menu, new app icons, and German. Deleted mail no longer comes back while deleting quickly, and opening mail is faster on large accounts.</p>

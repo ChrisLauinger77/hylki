@@ -1,44 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.41.1 — 2026-09-23
 
-- **Fixed: an empty tray icon on Cinnamon** (#275, reported by
-  mfreeman72). The Symbolic tray icon was handed to the panel as a file,
-  which only GNOME's AppIndicator extension draws in the panel's color;
-  Cinnamon's applet drew nothing, and other panels would draw it black.
-  Outside GNOME the Symbolic choice is now the grey envelope drawn by
-  Hylki, with the red dot, which reads on light and dark panels.
-- **Docs: installing with Bazaar** (#276, reported by giaaaacomo). Bazaar
-  reads only the app ID from a `.flatpakref` and cannot find Hylki in a
-  repository it does not know yet; docs/INSTALLING.md and the site's
-  install window give the command that adds the repository first.
-- **Fixed: CPU use with the window open** (#275, reported by mfreeman72).
-  The "Loading more…" spinner under the list kept spinning while it was
-  scrolled out of sight, and it shows until a folder's whole index is in,
-  which for a large Gmail folder can take hours: the window was redrawn
-  about thirty times a second while nothing changed. It now spins only
-  while it is on screen. On the demo mailbox idle CPU fell from 4% to
-  under 1%.
+A text size setting, an account can stay out of All Inboxes or sign its
+mail by default, and the dock shows the unread count. The message list
+keeps the keyboard, and an idle window no longer keeps the CPU busy.
+
 - **New: Settings > Appearance > Text size** (#267, asked by rsx-xp).
   Hylki's text at 90% to 150% of the desktop's size, messages included;
   icons keep their size. Default follows the desktop.
-- **Fixed: the message list lost the keyboard** (#274, reported by
-  EmmanuelP). Rebuilding the list destroyed the focused row, and only a
-  rebuild after a sync put focus back; a contact photo or Gravatar
-  arriving, the date turning over or a change of view left focus nowhere,
-  where Delete and Enter did nothing and Tab or an arrow key could carry
-  it into the reader. Every rebuild now returns focus to the selected row.
-  Ctrl+C in the list, copying text selected in a message, no longer moves
-  the keyboard into the reader either.
-- **Changed: the selected message turns grey when the list does not have
-  the keyboard** (#274), as a sidebar's selection does: while the composer,
-  a search entry or the reader has it. The accent comes back with focus. A
-  window in the background keeps the accent.
-- **New: the unread count on the app icon** (#271). The dock or task
-  manager shows the number of unread inbox messages on Hylki's icon, the
-  same count as the tray icon's dot, where it draws badges: KDE Plasma, and
-  GNOME with Dash to Dock or Dash to Panel. Settings > System has a switch
-  to turn it off.
 - **New: an account can be kept out of All Inboxes** (#267, suggested by
   rsx-xp). Settings > Accounts > the account > "Show in All Inboxes", on
   by default. Switched off, the account's mail is left out of the unified
@@ -52,6 +22,42 @@
   default". New messages, replies and forwards from the account open with
   Sign on. Changing From moves Sign to the new account's setting until
   Sign is pressed by hand.
+- **New: the unread count on the app icon** (#271). The dock or task
+  manager shows the number of unread inbox messages on Hylki's icon, the
+  same count as the tray icon's dot, where it draws badges: KDE Plasma, and
+  GNOME with Dash to Dock or Dash to Panel. Settings > System has a switch
+  to turn it off.
+- **Changed: the selected message turns grey when the list does not have
+  the keyboard** (#274), as a sidebar's selection does: while the composer,
+  a search entry or the reader has it. The accent comes back with focus. A
+  window in the background keeps the accent.
+- **Changed: the account editor's Signature follows Send-as aliases**,
+  after the identities it signs for, instead of sitting below OpenPGP.
+- **Fixed: the message list lost the keyboard** (#274, reported by
+  EmmanuelP). Rebuilding the list destroyed the focused row, and only a
+  rebuild after a sync put focus back; a contact photo or Gravatar
+  arriving, the date turning over or a change of view left focus nowhere,
+  where Delete and Enter did nothing and Tab or an arrow key could carry
+  it into the reader. Every rebuild now returns focus to the selected row.
+  Ctrl+C in the list, copying text selected in a message, no longer moves
+  the keyboard into the reader either.
+- **Fixed: CPU use with the window open** (#275, reported by mfreeman72).
+  The "Loading more…" spinner under the list kept spinning while it was
+  scrolled out of sight, and it shows until a folder's whole index is in,
+  which for a large Gmail folder can take hours: the window was redrawn
+  about thirty times a second while nothing changed. It now spins only
+  while it is on screen. On the demo mailbox idle CPU fell from 4% to
+  under 1%.
+- **Fixed: an empty tray icon on Cinnamon** (#275, reported by
+  mfreeman72). The Symbolic tray icon was handed to the panel as a file,
+  which only GNOME's AppIndicator extension draws in the panel's color;
+  Cinnamon's applet drew nothing, and other panels would draw it black.
+  Outside GNOME the Symbolic choice is now the grey envelope drawn by
+  Hylki, with the red dot, which reads on light and dark panels.
+- **Docs: installing with Bazaar** (#276, reported by giaaaacomo). Bazaar
+  reads only the app ID from a `.flatpakref` and cannot find Hylki in a
+  repository it does not know yet; docs/INSTALLING.md and the site's
+  install window give the command that adds the repository first.
 
 ## 1.41.0 — 2026-09-23
 
