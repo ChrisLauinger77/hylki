@@ -64,7 +64,7 @@ for GNOME, to be feature rich and beautiful
 - **GNOME-native:** adaptive three-pane layout, five appearance themes, Focus
   Mode, light and dark following the system, optional background running.
 
-**[All of it, in detail →](docs/FEATURES.md)**
+**[All features →](docs/FEATURES.md)**
 
 ## Installing
 
