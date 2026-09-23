@@ -2931,11 +2931,11 @@ async fn run_one_prefetch(
                     emit(WorkerEvent::Status(prefetch_status(prefetch.len())));
                     return;
                 }
-                let (_, check, _) = render_raw(&raw);
+                let (body, check, _) = render_raw(&raw);
                 let (attachments, _) = attachments_of(&raw);
                 emit(WorkerEvent::SenderChecked { message_id: uid, check: check.clone() });
                 if let Some(c) = cache {
-                    c.save_body(account_id, &path, uid, &render_raw(&raw).0);
+                    c.save_body(account_id, &path, uid, &body);
                     c.save_sender_check(account_id, &path, uid, &check);
                     c.save_attachments(account_id, &path, uid, &attachments);
                     // Mark as fetched so it's never re-downloaded to re-check,
@@ -11298,6 +11298,64 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+
+    /// Where the time goes when a message is opened (#259): every step
+    /// `render_raw` takes, per message of a directory of saved .eml files.
+    /// `HYLKI_OPEN_TIMING=<dir> cargo test --release --bin hylki
+    /// worker::tests::open_timing -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn open_timing() {
+        use std::time::{Duration, Instant};
+        let Ok(dir) = std::env::var("HYLKI_OPEN_TIMING") else { return };
+        let mut paths: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "eml"))
+            .collect();
+        paths.sort();
+        const STEPS: [&str; 7] = ["parse", "unsubscribe", "invite", "check", "pgp", "body", "attach"];
+        let mut total = [Duration::ZERO; 7];
+        let mut whole: Vec<(Duration, [Duration; 7], String, usize)> = Vec::new();
+        for p in &paths {
+            let raw = std::fs::read(p).unwrap();
+            let mut t = [Duration::ZERO; 7];
+            let mut lap = |i: usize, f: &mut dyn FnMut()| {
+                let at = Instant::now();
+                f();
+                t[i] = at.elapsed();
+            };
+            let mut parsed = None;
+            lap(0, &mut || parsed = mail_parser::MessageParser::default().parse(&raw[..]));
+            if let Some(m) = parsed.as_ref() {
+                lap(1, &mut || drop(crate::unsubscribe::detect(m)));
+                lap(2, &mut || drop(crate::invite::detect(m)));
+            }
+            lap(3, &mut || drop(crate::verify::check_sender(&raw)));
+            lap(4, &mut || drop(crate::pgp::detect(&raw)));
+            lap(5, &mut || drop(extract_body(&raw)));
+            lap(6, &mut || drop(extract_attachments(&raw)));
+            for i in 0..7 {
+                total[i] += t[i];
+            }
+            let sum: Duration = [t[3], t[4], t[5], t[6]].iter().sum();
+            whole.push((sum, t, p.file_name().unwrap().to_string_lossy().into_owned(), raw.len()));
+        }
+        let n = paths.len().max(1) as u32;
+        println!("{} messages", paths.len());
+        for (i, step) in STEPS.iter().enumerate() {
+            println!("{step:>12}: total {:>9.1?}  mean {:>8.2?}", total[i], total[i] / n);
+        }
+        whole.sort_by(|a, b| b.0.cmp(&a.0));
+        println!("slowest (render_raw ~ check+pgp+body+attach):");
+        for (sum, t, name, len) in whole.iter().take(12) {
+            println!(
+                "{sum:>9.2?} {name} {len}B  parse {:.2?} unsub {:.2?} invite {:.2?} check {:.2?} pgp {:.2?} body {:.2?} attach {:.2?}",
+                t[0], t[1], t[2], t[3], t[4], t[5], t[6]
+            );
+        }
+    }
 
     fn flagged_message(uid: u32) -> Message {
         Message {

@@ -5949,14 +5949,15 @@ impl SimpleComponent for AppModel {
                 // …unless the user picked this reply out of a conversation already
                 // on screen. They asked for one message; assembling its thread
                 // again would swap the conversation back in under them.
+                // Asked for after the body, below: the cache lane answers both,
+                // one after the other, and a cached body is what the reader is
+                // waiting to show (#259).
+                let mut related = None;
                 if self.threading && !solo {
                     let only = [m.clone()];
                     let ids = thread_ids(if thread.is_empty() { &only[..] } else { &thread });
                     if !ids.is_empty() {
-                        self.send_to(account_id, MailRequest::LoadRelated {
-                            message_id: m.id,
-                            ids,
-                        });
+                        related = Some(MailRequest::LoadRelated { message_id: m.id, ids });
                         self.thread_related_pending = true;
                     }
                 }
@@ -5987,6 +5988,9 @@ impl SimpleComponent for AppModel {
                         self.thread_related_pending = false;
                         self.show_thread();
                         self.load_thread_attachments();
+                        if let Some(req) = related.take() {
+                            self.send_to(account_id, req);
+                        }
                     } else {
                         // Conversation: assemble the thread with any cached bodies,
                         // request the rest, and render it as a scrollable conversation.
@@ -6026,6 +6030,9 @@ impl SimpleComponent for AppModel {
                         for ((aid, path), items) in batch_bodies_by_folder(to_load) {
                             self.send_to(aid, MailRequest::LoadBodies { items, path });
                         }
+                        if let Some(req) = related.take() {
+                            self.send_to(account_id, req);
+                        }
                         self.show_thread();
                         self.load_thread_attachments();
                     }
@@ -6054,6 +6061,9 @@ impl SimpleComponent for AppModel {
                         m.id,
                     );
                     if unchanged {
+                        if let Some(req) = related.take() {
+                            self.send_to(account_id, req);
+                        }
                         return;
                     }
                     // Request the body FIRST so it renders before attachments — the
@@ -6066,6 +6076,9 @@ impl SimpleComponent for AppModel {
                                 uid: m.uid,
                             });
                         }
+                    }
+                    if let Some(req) = related.take() {
+                        self.send_to(account_id, req);
                     }
                     self.show_message(Some(display), needs_body);
                 }

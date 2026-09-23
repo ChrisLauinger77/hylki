@@ -209,6 +209,12 @@ fn split_keywords(col: String) -> Vec<String> {
 /// Most messages one tag view lists per account; the list pages within it.
 const TAG_VIEW_LIMIT: i64 = 5000;
 
+/// Rowids written into a query as a literal list: they are integers, and a
+/// conversation can match more rows than a statement takes bound values.
+fn rowid_list(rowids: &[i64]) -> String {
+    rowids.iter().map(i64::to_string).collect::<Vec<_>>().join(",")
+}
+
 /// Most Message-IDs one cross-folder conversation lookup matches against. A
 /// thread's ancestry is short in practice, and the references half of that query
 /// is a scan — this keeps a pathological References header (some mailing lists
@@ -222,10 +228,10 @@ const THREAD_MEMBER_LIMIT: usize = 100;
 
 /// Most Message-IDs one *batched* conversation count matches against, across
 /// every thread on the page put together (#222). The references half of the
-/// query is a scan, and batching exists precisely so a page of threads costs
-/// one scan instead of fifty — but a page of long mailing-list threads would
-/// otherwise put thousands of `instr` calls on every row, so the union is
-/// capped. Threads past the cap keep their folder-local count.
+/// lookup is a scan, and batching exists precisely so a page of threads costs
+/// one scan instead of fifty; the cap bounds how much a page of long
+/// mailing-list threads can pull in. Threads past the cap keep their
+/// folder-local count.
 const THREAD_COUNT_ID_LIMIT: usize = 256;
 
 /// Most rows one batched conversation count inspects. Counting is per-thread,
@@ -898,6 +904,45 @@ impl Cache {
         run().unwrap_or_default()
     }
 
+    /// The rows of the account's messages that are one of `ids` or name one
+    /// of them in their References: what both conversation lookups match on.
+    ///
+    /// The own-id half is answered by the index. The References half is a
+    /// scan either way, but it is one pass over the column with every token
+    /// looked up in a set. It used to be SQL, an `instr` per id on every
+    /// row, which cost rows times ids: four seconds for one page's badges
+    /// over a 95,000-message Gmail cache, on the cache lane that every
+    /// cached body waits behind (#259).
+    fn thread_member_rowids(&self, account_id: u32, ids: &[&String]) -> rusqlite::Result<Vec<i64>> {
+        let wanted: std::collections::HashSet<&str> = ids.iter().map(|i| i.as_str()).collect();
+        let mut rowids: Vec<i64> = Vec::new();
+        let slots = (0..ids.len()).map(|i| format!("?{}", i + 2)).collect::<Vec<_>>().join(", ");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT rowid FROM messages WHERE account_id = ?1 AND message_id IN ({slots})"
+        ))?;
+        let mut binds: Vec<&dyn rusqlite::ToSql> = vec![&account_id];
+        for i in ids {
+            binds.push(*i as &dyn rusqlite::ToSql);
+        }
+        let own = stmt.query_map(binds.as_slice(), |row| row.get::<_, i64>(0))?;
+        for rowid in own {
+            rowids.push(rowid?);
+        }
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT rowid, references_ FROM messages WHERE account_id = ?1 AND references_ <> ''",
+        )?;
+        let mut rows = stmt.query([account_id])?;
+        while let Some(row) = rows.next()? {
+            let refs = row.get_ref(1)?.as_str().unwrap_or("");
+            if refs.split_whitespace().any(|r| wanted.contains(r)) {
+                rowids.push(row.get(0)?);
+            }
+        }
+        rowids.sort_unstable();
+        rowids.dedup();
+        Ok(rowids)
+    }
+
     /// Every cached message across the account's folders that belongs to the same
     /// conversation as `ids` — messages naming one of those ids as their own
     /// Message-ID (an ancestor), or referencing one (a descendant, e.g. the reply
@@ -919,44 +964,20 @@ impl Cache {
         if ids.is_empty() {
             return Vec::new();
         }
-        // One placeholder per id, twice: matched against message_id, then looked
-        // for inside the space-separated references list.
-        let slots = |offset: usize| -> String {
-            (0..ids.len()).map(|i| format!("?{}", offset + i + 1)).collect::<Vec<_>>().join(", ")
-        };
-        // Binds are pushed ids-then-padded-then-account, so the padded copies sit
-        // at n+1..2n. Reading from n+2 shifted every one of these by a slot and
-        // ran the last comparison against the *account id* — which, coerced to
-        // text, matched every message whose References contained that digit. A
-        // one-message lookup came back with thousands.
-        let refs_match = (0..ids.len())
-            .map(|i| format!("instr(' ' || references_ || ' ', ?{}) > 0", ids.len() + i + 1))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-        let sql = format!(
-            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred,                     has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords}              FROM messages             WHERE account_id = ?{account} AND (message_id IN ({in_list}) OR {refs_match})              ORDER BY ts DESC LIMIT ?{limit}",
-            keywords = KEYWORDS_COL,
-            account = ids.len() * 2 + 1,
-            limit = ids.len() * 2 + 2,
-            in_list = slots(0),
-            refs_match = refs_match,
-        );
         let run = || -> rusqlite::Result<Vec<(String, Message)>> {
+            let members = self.thread_member_rowids(account_id, &ids)?;
+            if members.is_empty() {
+                return Ok(Vec::new());
+            }
+            let sql = format!(
+                "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
+                        has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords} \
+                 FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
+                keywords = KEYWORDS_COL,
+                members = rowid_list(&members),
+            );
             let mut stmt = self.conn.prepare(&sql)?;
-            // Bind order: the ids themselves, then each padded with spaces so a
-            // substring match can't half-match a longer id, then the account.
-            let padded: Vec<String> = ids.iter().map(|i| format!(" {i} ")).collect();
-            let mut binds: Vec<&dyn rusqlite::ToSql> = Vec::new();
-            for i in &ids {
-                binds.push(*i as &dyn rusqlite::ToSql);
-            }
-            for p in &padded {
-                binds.push(p as &dyn rusqlite::ToSql);
-            }
-            binds.push(&account_id as &dyn rusqlite::ToSql);
-            let limit = THREAD_MEMBER_LIMIT as i64;
-            binds.push(&limit as &dyn rusqlite::ToSql);
-            let rows = stmt.query_map(binds.as_slice(), |row| {
+            let rows = stmt.query_map([THREAD_MEMBER_LIMIT as i64], |row| {
                 let uid: u32 = row.get(1)?;
                 let mut m = Message {
                         id: uid,
@@ -1056,39 +1077,19 @@ impl Cache {
         }
 
         // Same matching as `messages_by_thread_ids`: the id itself, or the id
-        // as a whole token inside someone's References. See that function for
-        // why the padded copies are bound where they are.
-        let slots = |offset: usize| -> String {
-            (0..ids.len()).map(|i| format!("?{}", offset + i + 1)).collect::<Vec<_>>().join(", ")
-        };
-        let refs_match = (0..ids.len())
-            .map(|i| format!("instr(' ' || references_ || ' ', ?{}) > 0", ids.len() + i + 1))
-            .collect::<Vec<_>>()
-            .join(" OR ");
-        let sql = format!(
-            "SELECT folder_path, message_id, references_, from_name, from_addr, preview, date, ts \
-             FROM messages \
-             WHERE account_id = ?{account} AND (message_id IN ({in_list}) OR {refs_match}) \
-             ORDER BY ts DESC LIMIT ?{limit}",
-            account = ids.len() * 2 + 1,
-            limit = ids.len() * 2 + 2,
-            in_list = slots(0),
-            refs_match = refs_match,
-        );
-
+        // as a whole token inside someone's References.
         let run = || -> rusqlite::Result<Vec<Row>> {
+            let members = self.thread_member_rowids(account_id, &ids)?;
+            if members.is_empty() {
+                return Ok(Vec::new());
+            }
+            let sql = format!(
+                "SELECT folder_path, message_id, references_, from_name, from_addr, preview, date, ts \
+                 FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
+                members = rowid_list(&members),
+            );
             let mut stmt = self.conn.prepare(&sql)?;
-            let padded: Vec<String> = ids.iter().map(|i| format!(" {i} ")).collect();
-            let mut binds: Vec<&dyn rusqlite::ToSql> = Vec::new();
-            for i in &ids {
-                binds.push(*i as &dyn rusqlite::ToSql);
-            }
-            for p in &padded {
-                binds.push(p as &dyn rusqlite::ToSql);
-            }
-            binds.push(&account_id as &dyn rusqlite::ToSql);
-            binds.push(&THREAD_COUNT_ROW_LIMIT as &dyn rusqlite::ToSql);
-            let rows = stmt.query_map(binds.as_slice(), |row| {
+            let rows = stmt.query_map([THREAD_COUNT_ROW_LIMIT], |row| {
                 Ok(Row {
                     folder_path: row.get(0)?,
                     message_id: row.get(1)?,
@@ -2192,6 +2193,49 @@ fn kind_from_i64(v: i64) -> FolderKind {
 
 #[cfg(test)]
 mod tests {
+
+    /// How long the conversation lookups take on a real cache (#259):
+    /// `HYLKI_CACHE_TIMING=<copy of cache.db> cargo test --release --bin hylki
+    /// cache::tests::thread_lookup_timing -- --ignored --nocapture`. Takes
+    /// each account's newest 256 Message-IDs as one page of badges, and the
+    /// newest reply's ids as one opened conversation.
+    #[test]
+    #[ignore]
+    fn thread_lookup_timing() {
+        let Ok(path) = std::env::var("HYLKI_CACHE_TIMING") else { return };
+        let c = Cache { conn: Connection::open(path).unwrap() };
+        let accounts: Vec<u32> = c
+            .conn
+            .prepare("SELECT DISTINCT account_id FROM messages")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .flatten()
+            .collect();
+        for account in accounts {
+            let ids: Vec<String> = c
+                .conn
+                .prepare("SELECT message_id FROM messages WHERE account_id = ?1 AND message_id <> '' ORDER BY ts DESC LIMIT 256")
+                .unwrap()
+                .query_map([account], |r| r.get(0))
+                .unwrap()
+                .flatten()
+                .collect();
+            let groups: Vec<(String, Vec<String>)> =
+                ids.iter().map(|i| (i.clone(), vec![i.clone()])).collect();
+            let at = std::time::Instant::now();
+            let found = c.thread_summaries(account, &groups).len();
+            let page = at.elapsed();
+            let open_ids: Vec<String> = ids.iter().take(3).cloned().collect();
+            let at = std::time::Instant::now();
+            let members = c.messages_by_thread_ids(account, &open_ids).len();
+            println!(
+                "account {account}: page of {} ids {page:.1?} ({found} groups), open {:.1?} ({members} members)",
+                ids.len(),
+                at.elapsed()
+            );
+        }
+    }
     use super::*;
 
     /// The cache holds message bodies, attachment bytes and the address book, so
