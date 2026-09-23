@@ -35,7 +35,8 @@ no recipient is not sent, and one scheduled for later is queued.
 with or without single-key shortcuts.
 
 <kbd>Ctrl+F</kbd> in the Settings window opens its search, and closes it
-again; <kbd>Esc</kbd> in the search field closes it too.
+again. <kbd>Esc</kbd> closes it too, wherever the focus is in the window,
+including after you have picked a result.
 
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
 in and out, with or without Reader View; <kbd>Ctrl+0</kbd> puts it back to

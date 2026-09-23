@@ -1145,6 +1145,21 @@ impl SettingsSearch {
                 gtk::glib::Propagation::Stop
             })),
         ));
+        // Escape closes the search from anywhere in the window, not only
+        // from its entry: after a result is picked, focus is on the list or
+        // the page. With the search closed the key goes on as before.
+        let b = bar.clone();
+        shortcuts.add_shortcut(gtk::Shortcut::new(
+            gtk::ShortcutTrigger::parse_string("Escape"),
+            Some(gtk::CallbackAction::new(move |_, _| {
+                if b.is_search_mode() {
+                    b.set_search_mode(false);
+                    gtk::glib::Propagation::Stop
+                } else {
+                    gtk::glib::Propagation::Proceed
+                }
+            })),
+        ));
         window.add_controller(shortcuts);
 
         Self {
