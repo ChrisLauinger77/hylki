@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fixed: CPU use with the window open** (#275, reported by mfreeman72).
+  The "Loading more…" spinner under the list kept spinning while it was
+  scrolled out of sight, and it shows until a folder's whole index is in,
+  which for a large Gmail folder can take hours: the window was redrawn
+  about thirty times a second while nothing changed. It now spins only
+  while it is on screen. On the demo mailbox idle CPU fell from 4% to
+  under 1%.
 - **New: Settings > Appearance > Text size** (#267, asked by rsx-xp).
   Hylki's text at 90% to 150% of the desktop's size, messages included;
   icons keep their size. Default follows the desktop.
