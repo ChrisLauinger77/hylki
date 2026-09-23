@@ -3409,19 +3409,10 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::RunQueuedRebuild => {
                 if let Some(preserve) = self.rebuild_queued.take() {
-                    // A rebuild destroys the focused row (or the whole list
-                    // box), and focus falls to the window, where Delete does
-                    // nothing: a background sync in the middle of deleting
-                    // mail one by one left the key dead until a row was
-                    // clicked (#255). Put focus back where it was.
-                    let had_focus = self.focus_in_list();
                     if preserve {
                         self.rebuild_preserving_scroll();
                     } else {
                         self.rebuild();
-                    }
-                    if had_focus {
-                        self.restore_list_focus();
                     }
                 }
                 // The rows exist now: run the selection that waited for them.
@@ -5343,11 +5334,22 @@ impl MessageList {
                     swipe_sensitivity: self.swipe_sensitivity.clone(),
                 });
             }
+            // Discarding the rows destroys the focused one (or hides the
+            // whole list box), and focus falls to the window, where Delete,
+            // Enter and Shift+arrows do nothing and Tab or an arrow key can
+            // carry it into the reader. A background sync did it in the
+            // middle of deleting mail one by one (#255), and so did every
+            // other full rebuild: a contact photo or Gravatar arriving, the
+            // date turning over (#274). Put focus back where it was.
+            let had_focus = !append_only && self.focus_in_list();
             if !append_only {
                 self.discard_rows();
             }
             self.pending_rows = inits;
             self.fill_rows(FIRST_ROWS);
+            if had_focus {
+                self.restore_list_focus();
+            }
         }
 
         tracing::debug!(

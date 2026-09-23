@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Fixed: the message list lost the keyboard** (#274, reported by
+  EmmanuelP). Rebuilding the list destroyed the focused row, and only a
+  rebuild after a sync put focus back; a contact photo or Gravatar
+  arriving, the date turning over or a change of view left focus nowhere,
+  where Delete and Enter did nothing and Tab or an arrow key could carry
+  it into the reader. Every rebuild now returns focus to the selected row.
+  Ctrl+C in the list, copying text selected in a message, no longer moves
+  the keyboard into the reader either.
+- **Changed: the selected message turns grey when the list does not have
+  the keyboard** (#274), as a sidebar's selection does: while the composer,
+  a search entry or the reader has it. The accent comes back with focus. A
+  window in the background keeps the accent.
 - **New: the unread count on the app icon** (#271). The dock or task
   manager shows the number of unread inbox messages on Hylki's icon, the
   same count as the tray icon's dot, where it draws badges: KDE Plasma, and

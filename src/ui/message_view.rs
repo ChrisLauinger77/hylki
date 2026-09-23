@@ -2433,12 +2433,28 @@ impl Component for MessageView {
                 let _ = sender.output(MessageViewOutput::SelectCards(keys));
             }
             MessageViewInput::CopySelection => {
+                // Copying from a body frame focuses the frame and then the
+                // page, and a page focusing itself takes GTK focus: Ctrl+C
+                // pressed in the message list left the keyboard in the
+                // reader (#274). The script has run by the time its result
+                // comes back, so hand focus back to where it was then.
+                let before = self.webview.root().and_then(|r| r.focus());
+                let webview = self.webview.clone();
                 self.webview.evaluate_javascript(
                     "window.__hylkiCopySel && window.__hylkiCopySel()",
                     None,
                     None,
                     gtk::gio::Cancellable::NONE,
-                    |_| {},
+                    move |_| {
+                        let Some(before) = before else { return };
+                        let now = webview.root().and_then(|r| r.focus());
+                        let taken = now.is_some_and(|f| {
+                            f == *webview.upcast_ref::<gtk::Widget>() || f.is_ancestor(&webview)
+                        });
+                        if taken && before != *webview.upcast_ref::<gtk::Widget>() {
+                            before.grab_focus();
+                        }
+                    },
                 );
             }
             MessageViewInput::SelectAllCards => {

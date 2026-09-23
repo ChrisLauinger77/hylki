@@ -20421,8 +20421,13 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     let window = window.clone().upcast::<gtk::Widget>();
     let apply = move |provider: &gtk::CssProvider, dark: bool| {
         // The selection is the GNOME accent itself at full saturation, with
-        // high-contrast white text — and it stays full whether or not the
-        // list holds focus, so clicking into the reader never dims it.
+        // high-contrast white text, while the list holds the keyboard. A
+        // click into the reader hands focus straight back to the list, so
+        // that is nearly always; when something else really has it (the
+        // composer, a search entry, or focus lost in a rebuild) the row
+        // turns grey, as a sidebar's does, so it is plain that the list's
+        // keys will not reach it (#274). An inactive window keeps the
+        // accent: focus is not lost, the window is just behind another.
         let shield = if dark { "#ffca28" } else { "#ff7800" };
         // The compose surface sits on the reader's deeper page ground — the
         // same shade the threaded cards float on, as the theme defines it.
@@ -20432,6 +20437,14 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
              .message-listbox > row.activatable:selected:hover .message-row, \
              .message-listbox > row.activatable:selected:active .message-row {{ \
                background-color: @accent_bg_color; color: white; }}\
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row, \
+             .message-listbox:not(:focus-within):not(:backdrop) > row.activatable:selected:hover .message-row, \
+             .message-listbox:not(:focus-within):not(:backdrop) > row.activatable:selected:active .message-row {{ \
+               background-color: alpha(@window_fg_color, 0.14); color: @window_fg_color; }}\
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row label {{ \
+               color: @window_fg_color; }}\
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row .unread-dot {{ \
+               background: @accent_bg_color; }}\
              .remote-alert image {{ color: {shield}; }}\
              .inline-compose-surface, .compose-pane {{ background-color: {page}; }}\
              .reader-split > separator {{ background-color: {page}; }}"
