@@ -50,7 +50,9 @@ to 72 characters, lower case after the colon, with no full stop
 
 The body is optional. When there is one, it says in a few lines why the change
 exists, in factual language with no marketing, no emoji and no em dashes, and
-stays under 100 words.
+stays under 100 words. Write each paragraph as a single line: GitHub shows a
+commit body with its line breaks kept, so a body wrapped by hand breaks again
+wherever the screen is narrower than the wrap.
 Trailers are for people: a `Co-Authored-By:` line credits somebody whose work
 is in the commit, using the `users.noreply.github.com` address that resolves to
 their profile, and not for the tools anyone wrote it with. The README's

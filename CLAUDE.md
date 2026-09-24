@@ -61,11 +61,12 @@ Subjects follow [Conventional Commits](https://www.conventionalcommits.org):
 - Releases: `chore(release): 1.42.0`, `build(flatpak): pin the manifest to
   v1.42.0`, `build(rpm): sync the package version to 1.42.0`.
 
-The body is optional and short: why the change exists, in a few lines wrapped
-at 72, and nothing the diff already says. Past 100 words the detail belongs in
-`docs/` or `CHANGELOG.md`, or the commit wants splitting. The prose rules
-above apply too, plus one more: no em dashes, which a colon, a comma or a full
-stop replaces.
+The body is optional and short: why the change exists, and nothing the diff
+already says. Past 100 words the detail belongs in `docs/` or `CHANGELOG.md`,
+or the commit wants splitting. Each paragraph of the body is one line, not
+wrapped: GitHub keeps every line break in a body, so text wrapped at 72 breaks
+a second time on a phone. The prose rules above apply too, plus one more: no
+em dashes, which a colon, a comma or a full stop replaces.
 
 `tools/git-hooks/commit-msg` refuses the attribution lines, em dashes, a
 subject without a type, and an overlong subject or body. A clone is pointed at
