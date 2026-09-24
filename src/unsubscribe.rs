@@ -832,21 +832,35 @@ fn percent_decode(s: &str) -> String {
 }
 
 /// Send the RFC 8058 one-click request: a POST of `List-Unsubscribe=One-Click`
-/// to the list's handle. Blocking; run it off the UI thread. Any 2xx
-/// answer means the list took the request.
+/// to the list's handle. Blocking; run it off the UI thread. Only a 2xx
+/// answer to the POST itself means the list took the request.
 pub fn one_click_post(url: &str) -> Result<(), String> {
     let l = url.to_ascii_lowercase();
     if !l.starts_with("https://") && !l.starts_with("http://") {
         return Err("the list's unsubscribe handle is not a web address".to_string());
     }
-    match ureq::post(url)
+    // Redirects are not followed: ureq turns a redirected POST into a GET,
+    // and the page it lands on (a login, a "confirm" form) answers 200
+    // without anything having been unsubscribed (#284).
+    let agent = ureq::AgentBuilder::new().redirects(0).build();
+    match agent
+        .post(url)
         .set("User-Agent", crate::logo::USER_AGENT)
         .timeout(std::time::Duration::from_secs(20))
         .send_form(&[("List-Unsubscribe", "One-Click")])
     {
-        Ok(_) => Ok(()),
-        Err(ureq::Error::Status(code, _)) => Err(format!("the list's server answered {code}")),
+        Ok(resp) => post_status(resp.status()),
+        Err(ureq::Error::Status(code, _)) => post_status(code),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Whether the one-click answer's status says the list took the request.
+fn post_status(code: u16) -> Result<(), String> {
+    if (200..300).contains(&code) {
+        Ok(())
+    } else {
+        Err(format!("the list's server answered {code}"))
     }
 }
 
@@ -1153,6 +1167,38 @@ Subject: Hello\r\n\r\nBody\r\n";
         assert_eq!(attr("<a class=x href='https://a/b' title=\"T\">", "href").as_deref(), Some("https://a/b"));
         assert_eq!(attr("<a data-href=\"no\" href=https://a/c>", "href").as_deref(), Some("https://a/c"));
         assert_eq!(tag_text("Un<b>sub</b>scribe <img alt=\"now\"> <style>p{}</style>x"), "Un sub scribe now x");
+    }
+
+    /// A local server that answers the first request with `status` and a
+    /// second one, should a redirect be followed, with 200.
+    fn answer_once(status: &str) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let reply = format!(
+            "HTTP/1.1 {status}\r\nLocation: http://127.0.0.1:{port}/done\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        std::thread::spawn(move || {
+            let ok = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string();
+            for answer in [reply, ok] {
+                let Ok((mut s, _)) = listener.accept() else { return };
+                let mut buf = [0u8; 4096];
+                let _ = s.read(&mut buf);
+                let _ = s.write_all(answer.as_bytes());
+            }
+        });
+        format!("http://127.0.0.1:{port}/unsub")
+    }
+
+    #[test]
+    fn one_click_takes_only_a_direct_success() {
+        assert!(one_click_post(&answer_once("200 OK")).is_ok());
+        assert!(one_click_post(&answer_once("202 Accepted")).is_ok());
+        // A redirect is not followed: the page behind it would answer 200
+        // to a GET and pass for a list that took the request (#284).
+        assert!(one_click_post(&answer_once("302 Found")).is_err());
+        assert!(one_click_post(&answer_once("303 See Other")).is_err());
+        assert!(one_click_post(&answer_once("404 Not Found")).is_err());
     }
 
     /// Survey a directory of saved messages: `HYLKI_UNSUB_SURVEY=<dir>

@@ -18844,6 +18844,14 @@ impl AppModel {
                     tracing::warn!("one-click unsubscribe failed ({why}); writing to the list instead");
                     s.input(AppMsg::UnsubscribeByMail { message, info });
                 }
+                // The one-click handle is the list's web page as well: a
+                // POST it refused (a redirect, most often) may still work
+                // in the browser, which is the last route anyway.
+                Err(why) if info.web.is_some() => {
+                    tracing::warn!("one-click unsubscribe failed ({why}); opening the list's page instead");
+                    let info = Box::new(crate::models::Unsubscribe { one_click: None, ..*info });
+                    s.input(AppMsg::UnsubscribeGo { message, info });
+                }
                 Err(why) => s.input(AppMsg::UnsubscribeDone { message, result: Err(why) }),
             });
             return;
