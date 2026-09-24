@@ -1661,7 +1661,7 @@ impl Component for AccountsWindow {
         widgets.goa_group.set_visible(!model.goa.is_empty());
         widgets
             .protocol_row
-            .set_model(Some(&gtk::StringList::new(&["IMAP", "POP3", "JMAP"])));
+            .set_model(Some(&gtk::StringList::new(&["IMAP", "POP3"])));
 
         // The Provider dropdown picks both the sign-in method and (for known
         // providers) the servers. The default popup ellipsizes items; a factory
@@ -2825,7 +2825,7 @@ impl Component for AccountsWindow {
                     ),
                     Err(e) => format!("✗ {label}: {e}"),
                 };
-                let protocol = protocol_at(widgets.protocol_row.selected());
+                let protocol = form_protocol(widgets);
                 let incoming_label = match protocol {
                     Protocol::Pop3 => "POP3",
                     Protocol::Jmap => "JMAP",
@@ -3506,8 +3506,8 @@ impl AccountsWindow {
         let p = provider_at(widgets.provider_row.selected());
         let editing_goa = self.editing.and_then(|i| self.accounts.get(i)).filter(|a| a.goa_id.is_some());
         let brand = editing_goa.map(brand_for_account).unwrap_or_else(|| {
-            if matches!(p.kind, ProviderKind::Manual) {
-                manual_brand(protocol_at(widgets.protocol_row.selected()), &widgets.host_row.text())
+            if matches!(p.kind, ProviderKind::Manual | ProviderKind::Jmap) {
+                manual_brand(form_protocol(widgets), &widgets.host_row.text())
             } else {
                 p.brand
             }
@@ -3540,7 +3540,8 @@ impl AccountsWindow {
         widgets.provider_row.set_subtitle(&hint);
 
         // Server/credential fields (password or Custom-OAuth manual servers).
-        widgets.protocol_row.set_visible(is_password);
+        // JMAP is the Stalwart entry's own protocol, not a choice.
+        widgets.protocol_row.set_visible(is_password && p.kind != ProviderKind::Jmap);
         widgets.host_row.set_visible(show_servers);
         widgets.port_row.set_visible(show_servers);
         widgets.smtp_row.set_visible(show_servers);
@@ -3586,7 +3587,6 @@ impl AccountsWindow {
             widgets.smtp_port_row.set_text(&sp.to_string());
         }
         if p.kind == ProviderKind::Jmap {
-            widgets.protocol_row.set_selected(protocol_index(Protocol::Jmap));
             widgets.port_row.set_text("443");
             widgets.smtp_row.set_text("");
         }
@@ -3884,7 +3884,7 @@ fn read_account(
     emoji: Option<String>,
     avatar: Option<String>,
 ) -> AccountConfig {
-    let protocol = protocol_at(widgets.protocol_row.selected());
+    let protocol = form_protocol(widgets);
     let default_port = match protocol {
         Protocol::Pop3 => 995,
         Protocol::Jmap => 443,
@@ -4229,11 +4229,22 @@ fn provider_index_for_account(acc: &AccountConfig) -> u32 {
     preset_index_for_host(&acc.imap_host)
 }
 
-/// The Incoming Protocol row's entries, in dropdown order.
-const PROTOCOLS: [Protocol; 3] = [Protocol::Imap, Protocol::Pop3, Protocol::Jmap];
+/// The Incoming Protocol row's entries, in dropdown order. JMAP is not one:
+/// it comes with the Stalwart entry in the Provider picker.
+const PROTOCOLS: [Protocol; 2] = [Protocol::Imap, Protocol::Pop3];
 
 fn protocol_at(idx: u32) -> Protocol {
     PROTOCOLS.get(idx as usize).copied().unwrap_or_default()
+}
+
+/// The protocol the form stands for: the provider's own for one that has
+/// one (Stalwart's JMAP), otherwise the Incoming Protocol row's.
+fn form_protocol(widgets: &AccountsWindowWidgets) -> Protocol {
+    if provider_at(widgets.provider_row.selected()).kind == ProviderKind::Jmap {
+        Protocol::Jmap
+    } else {
+        protocol_at(widgets.protocol_row.selected())
+    }
 }
 
 fn protocol_index(protocol: Protocol) -> u32 {
@@ -4244,7 +4255,7 @@ fn protocol_index(protocol: Protocol) -> u32 {
 /// through its server, so the SMTP rows go, and the server row takes a host
 /// or a URL rather than an IMAP host and port.
 fn apply_protocol(widgets: &AccountsWindowWidgets) {
-    let jmap = protocol_at(widgets.protocol_row.selected()) == Protocol::Jmap;
+    let jmap = form_protocol(widgets) == Protocol::Jmap;
     // Only where the servers are shown at all (OAuth providers hide them).
     let servers_shown = widgets.host_row.is_visible();
     widgets.smtp_row.set_visible(servers_shown && !jmap);
@@ -4383,7 +4394,10 @@ mod tests {
         assert!(p.is_password());
         assert_eq!(p.wizard_protocol(), Protocol::Jmap);
         assert!(p.imap_host.is_empty(), "a self-hosted server has no preset host");
-        assert_eq!(protocol_at(protocol_index(Protocol::Jmap)), Protocol::Jmap);
+        // The Incoming Protocol row offers IMAP and POP3 only; a JMAP
+        // account's comes from its provider.
+        assert_eq!(protocol_at(protocol_index(Protocol::Pop3)), Protocol::Pop3);
+        assert_eq!(protocol_index(Protocol::Jmap), 0);
         assert_eq!(protocol_at(99), Protocol::Imap);
         let acc = AccountConfig { protocol: Protocol::Jmap, imap_host: "mail.example.org".into(), ..crate::ui::welcome::blank_account() };
         assert_eq!(provider_at(provider_index_for_account(&acc)).label, p.label);

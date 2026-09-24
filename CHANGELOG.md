@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Changed: JMAP is set up through the Stalwart (JMAP) provider only.**
+  The Incoming Protocol row of an IMAP/POP3 account offers IMAP and POP3,
+  and is hidden for Stalwart, whose protocol is always JMAP. Accounts
+  already on JMAP open under Stalwart as before.
 - **Changed: Mail Accounts marks an account with no provider logo by how it
   connects** (#277): a blue IMAP, red POP3 or yellow OAuth tile in place
   of the blue and yellow envelopes, in the account list, the Provider
