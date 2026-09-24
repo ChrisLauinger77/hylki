@@ -19704,7 +19704,7 @@ fn demo_account_configs_saved() -> Vec<AccountConfig> {
 }
 
 fn demo_account_configs() -> Vec<AccountConfig> {
-    let mk = |name: &str, email: &str, color: &str, emoji: &str| AccountConfig {
+    let mk = |name: &str, email: &str, color: &str, emoji: Option<&str>| AccountConfig {
         name: name.into(),
         email: email.into(),
         protocol: Default::default(),
@@ -19722,7 +19722,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         smtp_username: String::new(),
         smtp_password: String::new(),
         color: Some(color.into()),
-        emoji: Some(emoji.into()),
+        emoji: emoji.map(Into::into),
         avatar: None,
         gravatar: false,
         signature: None,
@@ -19749,9 +19749,9 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         sign_by_default: false,
     };
     vec![
-        mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", "🚀"),
-        mk("Hyprlab", "hello@hyprlab.dev", "#2ec27e", "🦀"),
-        mk("Jason (Personal)", "jason.m@fastmail.com", "#9141ac", "🌿"),
+        mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", Some("🚀")),
+        mk("Hyprlab", "hello@hyprlab.dev", "#f6d32d", None),
+        mk("Jason (Personal)", "jason.m@fastmail.com", "#f66151", Some("🌎")),
     ]
 }
 

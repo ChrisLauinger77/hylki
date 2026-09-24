@@ -43,14 +43,14 @@ impl MockBackend {
                 name: "Hyprlab".into(),
                 email: "hello@hyprlab.dev".into(),
                 label: "hello@hyprlab.dev".into(),
-                accent: "#2ec27e".into(),
+                accent: "#f6d32d".into(),
             },
             Account {
                 id: 3,
                 name: "Jason (Personal)".into(),
                 email: "jason.m@fastmail.com".into(),
                 label: "jason.m@fastmail.com".into(),
-                accent: "#9141ac".into(),
+                accent: "#f66151".into(),
             },
         ];
 

@@ -8859,8 +8859,11 @@ async fn pop3_delete(account: &AccountConfig, uid: u32) -> Result<(), String> {
 // Mock path (offline fallback)
 // ---------------------------------------------------------------------------
 
-/// The files a demo message "carries": a 1x1 PNG and a short text note.
-fn demo_attachment_files() -> Vec<crate::models::Attachment> {
+/// The files a demo message "carries": a 1x1 PNG and a short text note. The
+/// Q3 roadmap thread carries a drawn PDF instead of the PNG, whose first page
+/// makes a real thumbnail in the drawer where a transparent pixel reads as an
+/// empty square (tools/gen-demo-pdfs.py draws them).
+fn demo_attachment_files(message_id: u32) -> Vec<crate::models::Attachment> {
     const PNG_1X1: &[u8] = &[
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
         0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
@@ -8868,8 +8871,19 @@ fn demo_attachment_files() -> Vec<crate::models::Attachment> {
         0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
         0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
+    let first = match message_id {
+        23 => crate::models::Attachment {
+            name: "Q3-roadmap-draft.pdf".into(),
+            data: include_bytes!("../data/demo/q3-roadmap-draft.pdf").to_vec(),
+        },
+        21 => crate::models::Attachment {
+            name: "migration-timeline.pdf".into(),
+            data: include_bytes!("../data/demo/migration-timeline.pdf").to_vec(),
+        },
+        _ => crate::models::Attachment { name: "palette-hover.png".into(), data: PNG_1X1.to_vec() },
+    };
     vec![
-        crate::models::Attachment { name: "palette-hover.png".into(), data: PNG_1X1.to_vec() },
+        first,
         crate::models::Attachment {
             name: "notes.txt".into(),
             data: b"Hover palette: reserved-space fade vs. layout shift.\n".to_vec(),
@@ -9017,7 +9031,7 @@ async fn run_mock(
                         data: inv.ics.into_bytes(),
                     }]
                 } else if backend.message(message_id).is_some_and(|m| m.has_attachment) {
-                    demo_attachment_files()
+                    demo_attachment_files(message_id)
                 } else {
                     Vec::new()
                 };
