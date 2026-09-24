@@ -902,6 +902,18 @@ msgstr "(kein Betreff)"
 msgid "Default"
 msgstr "Standard"
 
+msgid "Blue square"
+msgstr ""
+
+msgid "Navy square"
+msgstr ""
+
+msgid "Yellow square"
+msgstr ""
+
+msgid "Classic"
+msgstr ""
+
 msgid ""
 "Hylki checks for new mail and shows notifications while its window is closed."
 msgstr ""

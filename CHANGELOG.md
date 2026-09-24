@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Changed: the app icon gallery offers five icons** (#277, suggested by
+  yioannides): the default, the blue, navy and yellow squares, and the
+  classic icon. The squircles, the envelopes and the birds are gone. A
+  squircle that was chosen becomes the square of the same color, and any
+  other retired choice becomes the default.
 - **New: Settings > Privacy > Warn when the addressing doesn't match.**
   Turned off, a message marked "Check this sender" (its replies go to
   another domain, or its sender's name claims a domain the address is not

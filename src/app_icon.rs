@@ -43,41 +43,34 @@ const DEFAULT_PNG: &[u8] = include_bytes!("../data/icons/hicolor/512x512/apps/co
 const DEFAULT_PNG: &[u8] =
     include_bytes!("../data/icons/hicolor/512x512/apps/co.hyprlab.Hylki.Beta.png");
 
-macro_rules! alt {
-    ($id:literal, $label:literal) => {
-        IconChoice {
-            id: $id,
-            label: i18n_noop($label),
-            png: include_bytes!(concat!("../data/icons/alt/", $id, ".png")),
-        }
-    };
-}
-
 /// The gallery, in display order: the build's own icon (the opened
 /// envelope, so it has no entry of its own), the same envelope on a blue,
-/// a navy and a yellow tile, square and squircle, the two-tone wave envelope
-/// that was the default from 1.35 to 1.39, the plain envelopes, the two
-/// with the bird, the wave drawn at full size rather than to the GNOME
-/// icon grid, and the classic icon last.
+/// a navy and a yellow square, and the classic icon last. It was eighteen
+/// entries until #277 asked for one look rather than every one the app had
+/// worn. The labels are written out rather than passed through a macro,
+/// where the translation template's extractor never saw them.
 const CATALOG: &[IconChoice] = &[
     IconChoice { id: DEFAULT_ID, label: i18n_noop("Default"), png: DEFAULT_PNG },
-    alt!("square", "Blue square"),
-    alt!("squircle", "Blue squircle"),
-    alt!("square-dark", "Navy square"),
-    alt!("squircle-dark", "Navy squircle"),
-    alt!("square-yellow", "Yellow square"),
-    alt!("squircle-yellow", "Yellow squircle"),
-    alt!("envelope-wave", "Wave"),
-    alt!("envelope-blue", "Blue"),
-    alt!("envelope-yellow", "Yellow"),
-    alt!("envelope-white", "White"),
-    alt!("envelope-manilla", "Manila"),
-    alt!("envelope-faded-blue", "Faded blue"),
-    alt!("envelope-starfield", "Starfield"),
-    alt!("envelope-bird-blue", "Blue with bird"),
-    alt!("envelope-bird-yellow", "Yellow with bird"),
-    alt!("non-hig", "Wave, full size"),
-    alt!("classic", "Classic"),
+    IconChoice {
+        id: "square",
+        label: i18n_noop("Blue square"),
+        png: include_bytes!("../data/icons/alt/square.png"),
+    },
+    IconChoice {
+        id: "square-dark",
+        label: i18n_noop("Navy square"),
+        png: include_bytes!("../data/icons/alt/square-dark.png"),
+    },
+    IconChoice {
+        id: "square-yellow",
+        label: i18n_noop("Yellow square"),
+        png: include_bytes!("../data/icons/alt/square-yellow.png"),
+    },
+    IconChoice {
+        id: "classic",
+        label: i18n_noop("Classic"),
+        png: include_bytes!("../data/icons/alt/classic.png"),
+    },
 ];
 
 /// Every choice the gallery offers.
@@ -85,11 +78,16 @@ pub fn catalog() -> impl Iterator<Item = &'static IconChoice> {
     CATALOG.iter()
 }
 
-/// Normalise a stored id to one this build offers. Every id from the
-/// Hylki galleries (birds, colors, patterns, the classic envelope) is
-/// gone; a stored one falls back to the default, which generation 3 puts
-/// on every install once anyway.
+/// Normalise a stored id to one this build offers. A squircle becomes the
+/// square of its color, the nearest thing left (#277); every other retired
+/// id (the envelopes, the birds, the patterns) falls back to the default.
 fn effective(id: &str) -> &'static str {
+    let id = match id {
+        "squircle" => "square",
+        "squircle-dark" => "square-dark",
+        "squircle-yellow" => "square-yellow",
+        other => other,
+    };
     catalog().find(|c| c.id == id).map(|c| c.id).unwrap_or(DEFAULT_ID)
 }
 
@@ -950,8 +948,8 @@ pub fn run_restart_helper() -> ! {
     std::process::exit(1);
 }
 
-/// The white envelope from the icon gallery as the image a dragged message
-/// travels under: a cursor-sized picture whose texture holds `scale` device
+/// The white envelope (`data/icons/drag/`, once a gallery icon) as the
+/// image a dragged message travels under: a cursor-sized picture whose texture holds `scale` device
 /// pixels per logical one, so it stays crisp on a HiDPI display (a plain
 /// 32px texture drawn there was upscaled and fuzzy). One texture per scale
 /// is decoded, then shared.
@@ -967,7 +965,7 @@ pub fn drag_envelope(scale: i32) -> Option<gtk::Picture> {
         if let Some(tex) = t.borrow().get(&scale) {
             return Some(tex.clone());
         }
-        let png = CATALOG.iter().find(|c| c.id == "envelope-white")?.png;
+        let png: &[u8] = include_bytes!("../data/icons/drag/envelope.png");
         let loader = gtk::gdk_pixbuf::PixbufLoader::new();
         loader.write(png).ok()?;
         loader.close().ok()?;
@@ -1041,6 +1039,14 @@ mod tests {
         sync_mime_cache(&dir.join("absent"));
         assert!(!dir.join("absent").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_retired_icon_choice_lands_on_one_still_offered() {
+        assert_eq!(effective("squircle-dark"), "square-dark");
+        assert_eq!(effective("square-yellow"), "square-yellow");
+        assert_eq!(effective("envelope-wave"), DEFAULT_ID);
+        assert_eq!(effective("classic"), "classic");
     }
 
     #[test]

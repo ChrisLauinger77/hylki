@@ -913,6 +913,18 @@ msgstr "(sem assunto)"
 msgid "Default"
 msgstr "Padrão"
 
+msgid "Blue square"
+msgstr ""
+
+msgid "Navy square"
+msgstr ""
+
+msgid "Yellow square"
+msgstr ""
+
+msgid "Classic"
+msgstr ""
+
 msgid ""
 "Hylki checks for new mail and shows notifications while its window is closed."
 msgstr ""
