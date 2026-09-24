@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed: the tray icon was published three times at every startup**
+  (#275, reported by mfreeman72). Settings is built hidden a moment after
+  startup so that it opens at once, and setting its rows to the saved
+  values fired the same signals a change by hand does: the tray icon choice
+  was reported twice, the first time wrong, and the tray item was taken
+  down and published again for each, with the settings file written each
+  time. Cinnamon's status applet crashed on the churn. A row now reports
+  only a change made after the window is built.
+
 ## 1.41.1 — 2026-09-23
 
 A text size setting, an account can stay out of All Inboxes or sign its

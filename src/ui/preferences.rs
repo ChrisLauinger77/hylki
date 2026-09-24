@@ -1478,6 +1478,34 @@ impl Preferences {
     }
 }
 
+/// The `sender` the view's handlers report through. Setting a row's initial
+/// value fires the same signal a change by hand does: a combo row's model
+/// going in moves its selection to the first entry, and the saved value then
+/// moves it again. Built hidden a moment after startup (`AppMsg::PrewarmSettings`),
+/// the window so reported every choice twice, the first time wrong: the tray
+/// item was taken down and published again for each, which Cinnamon's status
+/// applet answered by crashing (#275). Nothing is reported until `ready` is
+/// set, at the end of `init`, once the saved values are in.
+#[derive(Clone)]
+struct ViewSender {
+    inner: ComponentSender<Preferences>,
+    ready: Rc<std::cell::Cell<bool>>,
+}
+
+impl ViewSender {
+    fn input(&self, msg: PrefInput) {
+        if self.ready.get() {
+            self.inner.input(msg);
+        } else {
+            tracing::debug!("settings window: {msg:?} while the rows are being set, not reported");
+        }
+    }
+
+    fn output(&self, msg: PrefOutput) -> Result<(), PrefOutput> {
+        self.inner.output(msg)
+    }
+}
+
 #[relm4::component(pub)]
 impl Component for Preferences {
     type Init = PrefInit;
@@ -3198,7 +3226,16 @@ impl Component for Preferences {
             editor_page: "accounts",
         };
 
+        // The view's handlers report through `ViewSender`, silent until the
+        // rows below hold their saved values.
+        let component_sender = sender;
+        let sender = ViewSender {
+            inner: component_sender.clone(),
+            ready: Rc::new(std::cell::Cell::new(false)),
+        };
         let widgets = view_output!();
+        let ready = sender.ready.clone();
+        let sender = component_sender;
         tracing::debug!("settings window: preferences view built in {:?}", t_init.elapsed());
 
         // Settings never truncates. AdwComboRow's DEFAULT item factory builds
@@ -3930,6 +3967,8 @@ impl Component for Preferences {
         model.host_header = Some(widgets.host_header.clone());
 
         tracing::debug!("settings window: preferences init {:?}", t_init.elapsed());
+        // From here on a row's signal is the user's doing.
+        ready.set(true);
         ComponentParts { model, widgets }
     }
 
