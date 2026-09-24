@@ -4915,11 +4915,27 @@ msgstr ""
 msgid "Get Started"
 msgstr "Перейти к почте"
 
+#, fuzzy
+msgid "Import your online accounts"
+msgstr "Импортировано из «Сетевых учётных записей GNOME»"
+
+#, fuzzy
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+"Учётные записи Google и Microsoft подключаются через Параметры GNOME → "
+"Сетевые учётные записи, после чего отображаются выше."
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr "Повторить поиск"
+
 msgid "Add your email account"
 msgstr "Добавление учётной записи электронной почты"
-
-msgid "Found in GNOME Online Accounts"
-msgstr "Найдено в «Сетевых учётных записях GNOME»"
 
 msgid "Your name"
 msgstr "Ваше имя"
@@ -4940,14 +4956,6 @@ msgstr "Порт IMAP"
 
 msgid "Test & Add"
 msgstr "Проверить и добавить"
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-
-msgid "Scan Again"
-msgstr "Повторить поиск"
 
 msgid "Privacy, your way"
 msgstr "Конфиденциальность под вашим контролем"
@@ -5017,28 +5025,16 @@ msgstr ""
 "предложить новую функцию,\n"
 "пожалуйста, создайте обращение на нашем <a href=\"{url}\">GitHub</a>."
 
-msgid "Start Reading"
-msgstr "Начать работу"
+msgid "Finish"
+msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr "Продолжить"
 
-#, fuzzy
-msgid "Set Up in Settings"
-msgstr "Настройки"
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
 
 msgid "Port"
-msgstr ""
-
-msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."
@@ -5050,6 +5046,10 @@ msgstr "Проверка соединения…"
 msgid "✓ {email} — added"
 msgstr "✓ {email} — добавлено"
 
+#, fuzzy
+msgid "Add another email account"
+msgstr "Добавление учётной записи электронной почты"
+
 msgid "✓ {email} — connected and added"
 msgstr "✓ {email} — подключено и добавлено"
 
@@ -5058,6 +5058,17 @@ msgstr "{email} — почтовый сервер: {e}"
 
 msgid "{email} — sending (SMTP): {e}"
 msgstr "{email} — отправка (SMTP): {e}"
+
+#, fuzzy
+msgid "✓ {email} — signed in and added"
+msgstr "✓ {email} — подключено и добавлено"
+
+msgid "Skip"
+msgstr ""
+
+#, fuzzy
+msgid "Enter your email address, the client ID and both OAuth URLs first."
+msgstr "Сначала введите адрес электронной почты и пароль."
 
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
@@ -5413,6 +5424,16 @@ msgstr "Общие входящие в светлом режиме"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Found in GNOME Online Accounts"
+#~ msgstr "Найдено в «Сетевых учётных записях GNOME»"
+
+#~ msgid "Start Reading"
+#~ msgstr "Начать работу"
+
+#, fuzzy
+#~ msgid "Set Up in Settings"
+#~ msgstr "Настройки"
+
 #~ msgid "Hylki icon"
 #~ msgstr "Иконка Hylki"
 
@@ -5427,13 +5448,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Иконка Hylki или обычный конверт белого либо чёрного цвета под стиль "
 #~ "панели."
-
-#~ msgid ""
-#~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
-#~ "Accounts, then appear above."
-#~ msgstr ""
-#~ "Учётные записи Google и Microsoft подключаются через Параметры GNOME → "
-#~ "Сетевые учётные записи, после чего отображаются выше."
 
 #~ msgid "A clean, fast GNOME-native email client"
 #~ msgstr "Простой и быстрый почтовый клиент для GNOME"

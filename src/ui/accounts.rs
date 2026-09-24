@@ -52,14 +52,16 @@ pub(crate) struct Provider {
 }
 
 impl Provider {
-    /// Wizard accessors (src/ui/welcome.rs): the fields stay private to this
-    /// module, which owns the table's meaning.
-    pub(crate) fn wizard_password_provider(&self) -> bool {
-        self.is_password()
+    // Wizard accessors (src/ui/welcome.rs): the fields stay private to this
+    // module, which owns the table's meaning.
+
+    /// Google and Microsoft stay out of the wizard's manual form: they are
+    /// imported from GNOME Online Accounts on the page before it.
+    pub(crate) fn wizard_listed(&self) -> bool {
+        !matches!(self.kind, ProviderKind::Google | ProviderKind::Microsoft)
     }
-    /// Custom OAuth, which the wizard lists but hands to Settings: its
-    /// client and endpoint fields live in the account editor only.
-    pub(crate) fn wizard_opens_settings(&self) -> bool {
+    /// Custom OAuth, the one OAuth entry the wizard's form signs in itself.
+    pub(crate) fn wizard_is_oauth(&self) -> bool {
         self.kind == ProviderKind::CustomOAuth
     }
     pub(crate) fn wizard_label(&self) -> &'static str {
@@ -274,9 +276,6 @@ pub enum AccountsInput {
     /// The app's live folder lists per account email (for Special Folders).
     SetFolderChoices(std::collections::HashMap<String, Vec<(String, String)>>),
     AddAccount,
-    /// A new account with Custom (OAuth) already picked: the welcome
-    /// wizard's hand-off for the one provider it does not set up itself.
-    AddCustomOAuthAccount,
     EditAccount(usize),
     /// Open the editor for the account with this address (the sidebar's
     /// "Account Settings…"), leaving another account's editor if one is up.
@@ -1840,7 +1839,7 @@ impl Component for AccountsWindow {
                 self.senders.widget().invalidate_filter();
                 self.blacklist.widget().invalidate_filter();
             }
-            m @ (AccountsInput::AddAccount | AccountsInput::AddCustomOAuthAccount) => {
+            AccountsInput::AddAccount => {
                 self.editing = None;
                 self.emoji = None;
                 self.avatar = None;
@@ -1857,9 +1856,6 @@ impl Component for AccountsWindow {
                 set_connection_editable(widgets, true);
                 widgets.goa_banner.set_visible(false);
                 widgets.keyring_note.set_visible(true);
-                if matches!(m, AccountsInput::AddCustomOAuthAccount) {
-                    widgets.provider_row.set_selected(kind_index(ProviderKind::CustomOAuth));
-                }
                 self.apply_provider(widgets);
                 self.sig_editor(widgets).set_html("");
                 widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));
@@ -3636,7 +3632,7 @@ impl AccountsWindow {
 /// Open GNOME Settings → Online Accounts. Uses D-Bus app activation so it works
 /// both natively and inside a Flatpak (with `--talk-name=org.gnome.Settings`);
 /// falls back to the CLI on non-GNOME/older setups.
-fn open_online_accounts() {
+pub(crate) fn open_online_accounts() {
     if activate_online_accounts_panel().is_err() {
         let _ = std::process::Command::new("gnome-control-center")
             .arg("online-accounts")

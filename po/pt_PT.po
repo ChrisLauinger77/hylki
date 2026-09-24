@@ -4956,11 +4956,28 @@ msgstr ""
 msgid "Get Started"
 msgstr "Começar"
 
+#, fuzzy
+msgid "Import your online accounts"
+msgstr "Conta importada das Contas online do GNOME"
+
+#, fuzzy
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+"As contas adicionadas em Definições do GNOME → Contas online aparecem acima, "
+"incluindo as de IMAP e SMTP. As contas Google e Microsoft só iniciam sessão "
+"dessa forma."
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr "Procurar novamente"
+
 msgid "Add your email account"
 msgstr "Adicione a sua conta de e-mail"
-
-msgid "Found in GNOME Online Accounts"
-msgstr "Encontrada nas Contas online do GNOME"
 
 msgid "Your name"
 msgstr "O seu nome"
@@ -4981,17 +4998,6 @@ msgstr "Porta IMAP"
 
 msgid "Test & Add"
 msgstr "Testar e adicionar"
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-"As contas adicionadas em Definições do GNOME → Contas online aparecem acima, "
-"incluindo as de IMAP e SMTP. As contas Google e Microsoft só iniciam sessão "
-"dessa forma."
-
-msgid "Scan Again"
-msgstr "Procurar novamente"
 
 msgid "Privacy, your way"
 msgstr "Privacidade à sua maneira"
@@ -5062,30 +5068,17 @@ msgstr ""
 "funcionalidade,\n"
 "abra um pedido no nosso <a href=\"{url}\">Github</a>."
 
-msgid "Start Reading"
-msgstr "Começar a ler"
+msgid "Finish"
+msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr "Continuar"
 
-msgid "Set Up in Settings"
-msgstr "Configurar nas Definições"
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
-"Uma conta OAuth precisa dos dados de início de sessão do seu fornecedor. As "
-"Definições abrem essa conta quando terminar aqui."
 
 msgid "Port"
 msgstr "Porta"
-
-msgid "✓ Settings opens on your OAuth account at the end"
-msgstr "✓ As Definições abrem a sua conta OAuth no final"
 
 msgid "Enter your email address and password first."
 msgstr "Introduza primeiro o seu endereço de e-mail e a palavra-passe."
@@ -5096,6 +5089,10 @@ msgstr "A verificar a ligação…"
 msgid "✓ {email} — added"
 msgstr "✓ {email} — adicionada"
 
+#, fuzzy
+msgid "Add another email account"
+msgstr "Adicione a sua conta de e-mail"
+
 msgid "✓ {email} — connected and added"
 msgstr "✓ {email} — ligada e adicionada"
 
@@ -5104,6 +5101,17 @@ msgstr "{email} — servidor de correio: {e}"
 
 msgid "{email} — sending (SMTP): {e}"
 msgstr "{email} — envio (SMTP): {e}"
+
+#, fuzzy
+msgid "✓ {email} — signed in and added"
+msgstr "✓ {email} — ligada e adicionada"
+
+msgid "Skip"
+msgstr ""
+
+#, fuzzy
+msgid "Enter your email address, the client ID and both OAuth URLs first."
+msgstr "Introduza primeiro o seu endereço de e-mail e a palavra-passe."
 
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
@@ -5484,3 +5492,31 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "An OAuth account needs your provider's sign-in details. Settings opens on "
+#~ "it when the wizard is done."
+#~ msgstr ""
+#~ "Uma conta OAuth precisa dos dados de início de sessão do seu fornecedor. "
+#~ "As Definições abrem essa conta quando terminar aqui."
+
+#, fuzzy
+#~ msgid ""
+#~ "This account signs in from Settings, which opens on it when the wizard is "
+#~ "done."
+#~ msgstr ""
+#~ "Uma conta OAuth precisa dos dados de início de sessão do seu fornecedor. "
+#~ "As Definições abrem essa conta quando terminar aqui."
+
+#~ msgid "Found in GNOME Online Accounts"
+#~ msgstr "Encontrada nas Contas online do GNOME"
+
+#~ msgid "Start Reading"
+#~ msgstr "Começar a ler"
+
+#~ msgid "Set Up in Settings"
+#~ msgstr "Configurar nas Definições"
+
+#~ msgid "✓ Settings opens on your OAuth account at the end"
+#~ msgstr "✓ As Definições abrem a sua conta OAuth no final"

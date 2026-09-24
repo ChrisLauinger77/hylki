@@ -4975,11 +4975,27 @@ msgstr ""
 msgid "Get Started"
 msgstr "Έναρξη"
 
+#, fuzzy
+msgid "Import your online accounts"
+msgstr "Εισηγμένος διαδικτυακός λογαριασμός GNOME"
+
+#, fuzzy
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+"Οι λογαριασμοί Google και Microsoft συνδέονται μέσω Ρυθμίσεις GNOME → "
+"Διαδικτυακοί λογαριασμοί και έπειτα εμφανίζονται παραπάνω."
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr "Νέα σάρωση"
+
 msgid "Add your email account"
 msgstr "Προσθέστε τον λογαριασμό email σας"
-
-msgid "Found in GNOME Online Accounts"
-msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
 
 msgid "Your name"
 msgstr "Το όνομά σας"
@@ -5000,14 +5016,6 @@ msgstr "Θύρα IMAP"
 
 msgid "Test & Add"
 msgstr "Δοκιμή και προσθήκη"
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-
-msgid "Scan Again"
-msgstr "Νέα σάρωση"
 
 msgid "Privacy, your way"
 msgstr "Απόρρητο όπως το θέλετε"
@@ -5080,28 +5088,16 @@ msgstr ""
 "Καλή χρήση! Αν αντιμετωπίσετε κάποιο πρόβλημα ή έχετε πρόταση λειτουργίας,\n"
 "ανοίξτε ένα ζήτημα στο <a href=\"{url}\">Github</a> μας."
 
-msgid "Start Reading"
-msgstr "Έναρξη ανάγνωσης"
+msgid "Finish"
+msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr "Συνέχεια"
 
-#, fuzzy
-msgid "Set Up in Settings"
-msgstr "Ρυθμίσεις"
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
 
 msgid "Port"
-msgstr ""
-
-msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."
@@ -5113,6 +5109,10 @@ msgstr "Έλεγχος σύνδεσης…"
 msgid "✓ {email} — added"
 msgstr "✓ {email} — προστέθηκε"
 
+#, fuzzy
+msgid "Add another email account"
+msgstr "Προσθέστε τον λογαριασμό email σας"
+
 msgid "✓ {email} — connected and added"
 msgstr "✓ {email} — συνδέθηκε και προστέθηκε"
 
@@ -5121,6 +5121,17 @@ msgstr "{email} — διακομιστής αλληλογραφίας: {e}"
 
 msgid "{email} — sending (SMTP): {e}"
 msgstr "{email} — αποστολή (SMTP): {e}"
+
+#, fuzzy
+msgid "✓ {email} — signed in and added"
+msgstr "✓ {email} — συνδέθηκε και προστέθηκε"
+
+msgid "Skip"
+msgstr ""
+
+#, fuzzy
+msgid "Enter your email address, the client ID and both OAuth URLs first."
+msgstr "Εισαγάγετε πρώτα τη διεύθυνση email και τον κωδικό πρόσβασής σας."
 
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
@@ -5480,6 +5491,16 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Found in GNOME Online Accounts"
+#~ msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
+
+#~ msgid "Start Reading"
+#~ msgstr "Έναρξη ανάγνωσης"
+
+#, fuzzy
+#~ msgid "Set Up in Settings"
+#~ msgstr "Ρυθμίσεις"
+
 #~ msgid "Hylki icon"
 #~ msgstr "Εικονίδιο Hylki"
 
@@ -5494,13 +5515,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Το εικονίδιο του Hylki ή ένας απλός λευκός ή μαύρος φάκελος που ταιριάζει "
 #~ "στον πίνακα."
-
-#~ msgid ""
-#~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
-#~ "Accounts, then appear above."
-#~ msgstr ""
-#~ "Οι λογαριασμοί Google και Microsoft συνδέονται μέσω Ρυθμίσεις GNOME → "
-#~ "Διαδικτυακοί λογαριασμοί και έπειτα εμφανίζονται παραπάνω."
 
 #~ msgid "A clean, fast GNOME-native email client"
 #~ msgstr "Μια καθαρή, γρήγορη εφαρμογή email, εγγενή στο GNOME"

@@ -4923,11 +4923,28 @@ msgstr ""
 msgid "Get Started"
 msgstr "Comenzar"
 
+#, fuzzy
+msgid "Import your online accounts"
+msgstr "Cuenta importada de Cuentas en línea de GNOME"
+
+#, fuzzy
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+"Las cuentas añadidas en Ajustes de GNOME → Cuentas en línea aparecen arriba, "
+"incluidas las cuentas IMAP y SMTP. Google y Microsoft solo inician sesión de "
+"esa forma."
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr "Buscar de nuevo"
+
 msgid "Add your email account"
 msgstr "Añade tu cuenta de correo"
-
-msgid "Found in GNOME Online Accounts"
-msgstr "Encontrada en Cuentas en línea de GNOME"
 
 msgid "Your name"
 msgstr "Tu nombre"
@@ -4948,17 +4965,6 @@ msgstr "Puerto IMAP"
 
 msgid "Test & Add"
 msgstr "Probar y añadir"
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-"Las cuentas añadidas en Ajustes de GNOME → Cuentas en línea aparecen arriba, "
-"incluidas las cuentas IMAP y SMTP. Google y Microsoft solo inician sesión de "
-"esa forma."
-
-msgid "Scan Again"
-msgstr "Buscar de nuevo"
 
 msgid "Privacy, your way"
 msgstr "Privacidad a tu manera"
@@ -5029,29 +5035,17 @@ msgstr ""
 "¡Disfruta! Si encuentras algún problema o quieres solicitar una función, "
 "abre una incidencia en nuestro <a href=\"{url}\">GitHub</a>."
 
-msgid "Start Reading"
-msgstr "Empezar a leer"
+msgid "Finish"
+msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr "Continuar"
 
-#, fuzzy
-msgid "Set Up in Settings"
-msgstr "Ajustes"
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
 
 msgid "Port"
 msgstr "Puerto"
-
-msgid "✓ Settings opens on your OAuth account at the end"
-msgstr ""
 
 msgid "Enter your email address and password first."
 msgstr "Introduce primero tu dirección de correo electrónico y contraseña."
@@ -5062,6 +5056,10 @@ msgstr "Comprobando la conexión…"
 msgid "✓ {email} — added"
 msgstr "✓ {email} — añadida"
 
+#, fuzzy
+msgid "Add another email account"
+msgstr "Añade tu cuenta de correo"
+
 msgid "✓ {email} — connected and added"
 msgstr "✓ {email} — conectada y añadida"
 
@@ -5070,6 +5068,17 @@ msgstr "{email} — servidor de correo: {e}"
 
 msgid "{email} — sending (SMTP): {e}"
 msgstr "{email} — envío (SMTP): {e}"
+
+#, fuzzy
+msgid "✓ {email} — signed in and added"
+msgstr "✓ {email} — conectada y añadida"
+
+msgid "Skip"
+msgstr ""
+
+#, fuzzy
+msgid "Enter your email address, the client ID and both OAuth URLs first."
+msgstr "Introduce primero tu dirección de correo electrónico y contraseña."
 
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
@@ -5452,6 +5461,16 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Found in GNOME Online Accounts"
+#~ msgstr "Encontrada en Cuentas en línea de GNOME"
+
+#~ msgid "Start Reading"
+#~ msgstr "Empezar a leer"
+
+#, fuzzy
+#~ msgid "Set Up in Settings"
+#~ msgstr "Ajustes"
 
 #~ msgid "Hylki icon"
 #~ msgstr "Icono de Hylki"

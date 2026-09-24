@@ -4825,11 +4825,27 @@ msgstr ""
 msgid "Get Started"
 msgstr "Kezdés"
 
+#, fuzzy
+msgid "Import your online accounts"
+msgstr "Importálva a GNOME Online-fiókokból"
+
+#, fuzzy
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+"A Google- és Microsoft-fiókok a GNOME Beállítások → Online-fiókok menüjén "
+"keresztül jelentkeznek be, majd fent jelennek meg."
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr "Újraellenőrzés"
+
 msgid "Add your email account"
 msgstr "E-mail-fiók hozzáadása"
-
-msgid "Found in GNOME Online Accounts"
-msgstr "Megtalálható a GNOME Online-fiókok között"
 
 msgid "Your name"
 msgstr "Az Ön neve"
@@ -4850,14 +4866,6 @@ msgstr "IMAP-port"
 
 msgid "Test & Add"
 msgstr "Tesztelés és hozzáadás"
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-
-msgid "Scan Again"
-msgstr "Újraellenőrzés"
 
 msgid "Privacy, your way"
 msgstr "Adatvédelem az Ön módján"
@@ -4928,28 +4936,16 @@ msgstr ""
 "Jó használatot! Ha hibát tapasztal, vagy funkciót szeretne kérni,\n"
 "nyisson hibajegyet a <a href=\"{url}\">GitHubon</a>."
 
-msgid "Start Reading"
-msgstr "Olvasás megkezdése"
+msgid "Finish"
+msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr "Folytatás"
 
-#, fuzzy
-msgid "Set Up in Settings"
-msgstr "Beállítások"
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
 
 msgid "Port"
-msgstr ""
-
-msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."
@@ -4961,6 +4957,10 @@ msgstr "Kapcsolat ellenőrzése…"
 msgid "✓ {email} — added"
 msgstr "✓ {email} — hozzáadva"
 
+#, fuzzy
+msgid "Add another email account"
+msgstr "E-mail-fiók hozzáadása"
+
 msgid "✓ {email} — connected and added"
 msgstr "✓ {email} — kapcsolódva és hozzáadva"
 
@@ -4969,6 +4969,17 @@ msgstr "{email} — levelezőkiszolgáló: {e}"
 
 msgid "{email} — sending (SMTP): {e}"
 msgstr "{email} — küldés (SMTP): {e}"
+
+#, fuzzy
+msgid "✓ {email} — signed in and added"
+msgstr "✓ {email} — kapcsolódva és hozzáadva"
+
+msgid "Skip"
+msgstr ""
+
+#, fuzzy
+msgid "Enter your email address, the client ID and both OAuth URLs first."
+msgstr "Először adja meg az e-mail-címét és a jelszavát."
 
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
@@ -5323,6 +5334,16 @@ msgstr "Az egységes beérkezett nézet világos módban"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Found in GNOME Online Accounts"
+#~ msgstr "Megtalálható a GNOME Online-fiókok között"
+
+#~ msgid "Start Reading"
+#~ msgstr "Olvasás megkezdése"
+
+#, fuzzy
+#~ msgid "Set Up in Settings"
+#~ msgstr "Beállítások"
+
 #~ msgid "Hylki icon"
 #~ msgstr "Hylki ikonja"
 
@@ -5336,13 +5357,6 @@ msgstr "Hyprlab"
 #~ "The Hylki icon, or a plain envelope in white or black to match the panel."
 #~ msgstr ""
 #~ "A Hylki ikonja, vagy a panelhez illő fehér vagy fekete egyszerű boríték."
-
-#~ msgid ""
-#~ "Google and Microsoft accounts sign in through GNOME Settings → Online "
-#~ "Accounts, then appear above."
-#~ msgstr ""
-#~ "A Google- és Microsoft-fiókok a GNOME Beállítások → Online-fiókok menüjén "
-#~ "keresztül jelentkeznek be, majd fent jelennek meg."
 
 #~ msgid "A clean, fast GNOME-native email client"
 #~ msgstr "Tiszta, gyors, GNOME-ba illeszkedő levelezőkliens"

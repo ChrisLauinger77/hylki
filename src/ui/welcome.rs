@@ -3,9 +3,9 @@
 //!
 //! The whole window is the theme's own ground, light or dark, with the wordmark as the
 //! hero, and content floating on window-colored cards — deliberate and warm,
-//! not a form dump. Steps: welcome → add an account (one-click GNOME Online
-//! Accounts imports + a manual IMAP form with provider presets) → privacy →
-//! personalize → done. Accounts and settings apply through the app's existing
+//! not a form dump. Steps: welcome → import from GNOME Online Accounts
+//! (skippable) → add an account by hand (provider presets, custom OAuth) →
+//! privacy → personalize → done. Accounts and settings apply through the app's existing
 //! pipelines ([`WelcomeOutput`]), so the wizard owns no persistence of its own.
 
 use adw::prelude::*;
@@ -49,6 +49,9 @@ pub enum WelcomeInput {
     TestAndAdd,
     ImportGoa(usize),
     RescanGoa,
+    OpenOnlineAccounts,
+    /// The page or the manual form changed: relabel the footer button.
+    RefreshFooter,
     Finish,
     /// The hero page's language drop-down moved to choice `n`.
     LanguageChanged(u32),
@@ -56,7 +59,8 @@ pub enum WelcomeInput {
 
 #[derive(Debug)]
 pub enum WelcomeOutput {
-    /// A manual account passed its connection test: save + connect it.
+    /// A manual account passed its connection test, or a custom OAuth one
+    /// signed in: save + connect it.
     AddAccount(Box<AccountConfig>),
     /// A GNOME Online Accounts import was chosen.
     ImportGoa(Box<AccountConfig>),
@@ -67,14 +71,14 @@ pub enum WelcomeOutput {
     /// A language was picked on the first page: its locale code, "" for
     /// the system's. The app saves it and comes back in that language.
     Language(String),
-    /// Custom (OAuth) was chosen: open Settings on a new account with it
-    /// picked, once the wizard is done (sent after `Done`).
-    SetUpCustomOAuth,
 }
 
 #[derive(Debug)]
 pub enum WelcomeCmd {
     Tested { account: Box<AccountConfig>, result: ConnTest, seq: u32 },
+    /// The browser sign-in for a custom OAuth account ended: its refresh
+    /// token, or why not.
+    SignedIn { account: Box<AccountConfig>, result: Result<String, String>, seq: u32 },
 }
 
 pub struct Welcome {
@@ -86,9 +90,10 @@ pub struct Welcome {
     /// supersedes the running test (its late result is ignored), so the
     /// button never has to lock while a slow/wrong server times out.
     test_seq: u32,
-    /// Custom (OAuth) was chosen and handed to Settings, which opens on it
-    /// when the wizard finishes.
-    oauth_in_settings: bool,
+    /// Something was imported from Online Accounts, or added by hand: that
+    /// page's footer button reads Continue rather than Skip.
+    goa_imported: bool,
+    manual_added: bool,
 }
 
 pub struct WelcomeWidgets {
@@ -107,11 +112,22 @@ pub struct WelcomeWidgets {
     port_row: adw::EntryRow,
     smtp_row: adw::EntryRow,
     smtp_port_row: adw::EntryRow,
+    oauth_client_id_row: adw::EntryRow,
+    oauth_secret_row: adw::PasswordEntryRow,
+    oauth_auth_url_row: adw::EntryRow,
+    oauth_token_url_row: adw::EntryRow,
+    oauth_scope_row: adw::EntryRow,
     status_lbl: gtk::Label,
     test_spinner: gtk::Spinner,
     add_btn: gtk::Button,
-    goa_card: gtk::Box,
+    /// The manual page's title, which becomes "Add another email account"
+    /// once one came in from Online Accounts.
+    acct_title: gtk::Label,
+    // Online Accounts page.
+    goa_empty: gtk::Label,
     goa_list: gtk::ListBox,
+    goa_status: gtk::Label,
+    footer_next: gtk::Button,
     // Prefs pages.
     sw_remote: adw::SwitchRow,
     sw_gravatar: adw::SwitchRow,
@@ -122,18 +138,17 @@ pub struct WelcomeWidgets {
     sw_threading: adw::SwitchRow,
     /// The gallery's latest pick, read when the wizard finishes.
     icon_choice: std::rc::Rc<std::cell::RefCell<String>>,
-    finish_btn: gtk::Button,
 }
 
-/// The shared provider table less Google and Microsoft, which sign in
-/// through GNOME Online Accounts (the page lists those separately). Custom
-/// OAuth is listed but set up in Settings, whose account editor has the
-/// client and endpoint fields it needs.
-fn wizard_providers() -> Vec<&'static Provider> {
-    PROVIDERS
-        .iter()
-        .filter(|p| p.wizard_password_provider() || p.wizard_opens_settings())
-        .collect()
+/// The providers the manual form offers: the shared table less Google and
+/// Microsoft, which come in through the Online Accounts page before it.
+fn wizard_providers() -> impl Iterator<Item = &'static Provider> {
+    PROVIDERS.iter().filter(|p| p.wizard_listed())
+}
+
+/// The manual form's provider at a drop-down index.
+fn wizard_provider(sel: u32) -> Option<&'static Provider> {
+    wizard_providers().nth(sel as usize)
 }
 
 /// The wordmark with the app icon beside it, for the About window and the
@@ -305,6 +320,10 @@ fn entrance(widgets: &[gtk::Widget]) {
     }
 }
 
+/// Extra space above the Online Accounts page's list (or its empty note)
+/// and its buttons.
+const GOA_GAP: i32 = 26;
+
 /// Hero and shrunk geometry for the floating wordmark.
 const HERO_TOP: i32 = 150;
 const HERO_SIZE: f64 = 240.0;
@@ -373,7 +392,8 @@ impl Component for Welcome {
             goa,
             added: Vec::new(),
             test_seq: 0,
-            oauth_in_settings: false,
+            goa_imported: false,
+            manual_added: false,
         };
 
         let carousel = adw::Carousel::new();
@@ -474,31 +494,74 @@ impl Component for Welcome {
             gtk::glib::timeout_add_seconds_local_once(4, move || lang.set_selected(n));
         }
 
-        // ---- Page 2: account ----
-        let acct = gtk::Box::new(gtk::Orientation::Vertical, 14);
-        acct.append(&title(&i18n("Add your email account")));
-
-        // One-click imports from GNOME Online Accounts.
-        let goa_card_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        let goa_hdr = gtk::Label::new(Some(i18n("Found in GNOME Online Accounts").as_str()));
-        goa_hdr.add_css_class("welcome-section");
-        goa_hdr.set_halign(gtk::Align::Start);
+        // ---- Page 2: GNOME Online Accounts ----
+        // The accounts already signed in on this computer, Google and
+        // Microsoft among them (their only sign-in), one click each. Nothing
+        // here is required: the footer reads Skip until something is added.
+        let goa_pg = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        let import = gtk::Image::from_icon_name("arrow-into-box-symbolic");
+        import.set_pixel_size(36);
+        import.add_css_class("welcome-check");
+        goa_pg.append(&import);
+        goa_pg.append(&title(&i18n("Import your online accounts")));
+        goa_pg.append(&tagline(&i18n(
+            "Mail accounts signed in under GNOME Settings → Online Accounts can be added here in one click. Google and Microsoft accounts are only supported through Online Accounts.",
+        )));
         let goa_list = card();
-        goa_card_box.append(&goa_hdr);
-        goa_card_box.append(&goa_list);
-        goa_card_box.set_visible(!model.goa.is_empty());
-        acct.append(&goa_card_box);
+        goa_list.set_visible(!model.goa.is_empty());
+        // As far from the tagline as the buttons are from the list.
+        goa_list.set_margin_top(GOA_GAP);
+        goa_pg.append(&goa_list);
+        let goa_empty = tagline(&i18n("No mail accounts were found in Online Accounts."));
+        goa_empty.add_css_class("welcome-hint");
+        goa_empty.set_visible(model.goa.is_empty());
+        // The empty note sits as far from the tagline as the buttons sit
+        // from it: 47px each to the eye, page spacing and margin together.
+        goa_empty.set_margin_top(GOA_GAP);
+        goa_pg.append(&goa_empty);
+        // Hidden until an import reports, so an empty line never widens the
+        // gap above the buttons.
+        let goa_status = gtk::Label::new(None);
+        goa_status.add_css_class("welcome-hint");
+        goa_status.set_wrap(true);
+        goa_status.set_justify(gtk::Justification::Center);
+        goa_status.set_visible(false);
+        goa_pg.append(&goa_status);
+        let goa_links = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        goa_links.set_halign(gtk::Align::Center);
+        // 4px more: a button's edge has none of a text line's leading.
+        goa_links.set_margin_top(GOA_GAP + 4);
+        let open_goa = gtk::Button::with_label(&i18n("Open Online Accounts…"));
+        let rescan = gtk::Button::with_label(&i18n("Scan Again"));
+        for b in [&open_goa, &rescan] {
+            b.add_css_class("pill");
+            b.add_css_class("welcome-secondary");
+        }
+        {
+            let s = sender.clone();
+            open_goa.connect_clicked(move |_| s.input(WelcomeInput::OpenOnlineAccounts));
+            let s = sender.clone();
+            rescan.connect_clicked(move |_| s.input(WelcomeInput::RescanGoa));
+        }
+        goa_links.append(&open_goa);
+        goa_links.append(&rescan);
+        goa_pg.append(&goa_links);
+        carousel.append(&scrolled(&page(&goa_pg)));
 
-        // Manual form.
+        // ---- Page 3: an account by hand ----
+        let acct = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        let acct_title = title(&i18n("Add your email account"));
+        acct.append(&acct_title);
+
         let form = card();
         let provider_row = adw::ComboRow::new();
         provider_row.set_title(&i18n("Provider"));
-        let labels: Vec<&str> = wizard_providers().iter().map(|p| p.wizard_label()).collect();
+        let labels: Vec<&str> = wizard_providers().map(|p| p.wizard_label()).collect();
         provider_row.set_model(Some(&gtk::StringList::new(&labels)));
         // The providers' marks before their names, as in Settings.
         provider_row.set_factory(Some(&crate::ui::accounts::provider_factory()));
         // Default to the plain IMAP/POP3 entry.
-        let manual = wizard_providers().iter().position(|p| p.wizard_is_manual()).unwrap_or(0);
+        let manual = wizard_providers().position(|p| p.wizard_is_manual()).unwrap_or(0);
         provider_row.set_selected(manual as u32);
         {
             let s = sender.clone();
@@ -532,10 +595,31 @@ impl Component for Welcome {
         server_exp.add_row(&port_row);
         server_exp.add_row(&smtp_row);
         server_exp.add_row(&smtp_port_row);
+        // Custom OAuth's client, the same fields as the account editor's.
+        let oauth_client_id_row = adw::EntryRow::new();
+        oauth_client_id_row.set_title(&i18n("OAuth Client ID"));
+        let oauth_secret_row = adw::PasswordEntryRow::new();
+        oauth_secret_row.set_title(&i18n("OAuth Client Secret (optional)"));
+        let oauth_auth_url_row = adw::EntryRow::new();
+        oauth_auth_url_row.set_title(&i18n("Authorization URL"));
+        let oauth_token_url_row = adw::EntryRow::new();
+        oauth_token_url_row.set_title(&i18n("Token URL"));
+        let oauth_scope_row = adw::EntryRow::new();
+        oauth_scope_row.set_title(&i18n("Scopes (space-separated)"));
         form.append(&provider_row);
         form.append(&name_row);
         form.append(&email_row);
         form.append(&pass_row);
+        for row in [
+            oauth_client_id_row.upcast_ref::<gtk::Widget>(),
+            oauth_secret_row.upcast_ref(),
+            oauth_auth_url_row.upcast_ref(),
+            oauth_token_url_row.upcast_ref(),
+            oauth_scope_row.upcast_ref(),
+        ] {
+            row.set_visible(false);
+            form.append(row);
+        }
         form.append(&server_exp);
         acct.append(&form);
 
@@ -567,25 +651,13 @@ impl Component for Welcome {
         status_box.append(&status_lbl);
         acct.append(&status_box);
 
-        let goa_note = tagline(&i18n("Accounts added in GNOME Settings → Online Accounts appear above, IMAP and SMTP ones included. Google and Microsoft sign in only that way."));
-        goa_note.add_css_class("welcome-hint");
-        let rescan = gtk::Button::with_label(&i18n("Scan Again"));
-        rescan.add_css_class("flat");
-        rescan.add_css_class("welcome-link");
-        rescan.set_halign(gtk::Align::Center);
-        {
-            let s = sender.clone();
-            rescan.connect_clicked(move |_| s.input(WelcomeInput::RescanGoa));
-        }
-        let note_row = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        note_row.set_halign(gtk::Align::Center);
-        note_row.append(&goa_note);
-        note_row.append(&rescan);
-        acct.append(&note_row);
+        // Full width, as the form was when the Online Accounts note beside
+        // it set the page's width.
+        let acct_page = page(&acct);
+        acct_page.set_halign(gtk::Align::Fill);
+        carousel.append(&scrolled(&acct_page));
 
-        carousel.append(&scrolled(&page(&acct)));
-
-        // ---- Page 3: privacy ----
+        // ---- Page 4: privacy ----
         let priv_pg = gtk::Box::new(gtk::Orientation::Vertical, 14);
         priv_pg.append(&title(&i18n("Privacy, your way")));
         priv_pg.append(&tagline(&i18n("Hylki sends no telemetry, ever. These control what leaves your machine while you read.")));
@@ -613,7 +685,7 @@ impl Component for Welcome {
         priv_pg.append(&priv_card);
         carousel.append(&scrolled(&page(&priv_pg)));
 
-        // ---- Page 4: personalize ----
+        // ---- Page 5: personalize ----
         let pers = gtk::Box::new(gtk::Orientation::Vertical, 14);
         pers.append(&title(&i18n("Make it yours")));
         pers.append(&tagline(&i18n("A few popular choices — everything can be changed later in Settings.")));
@@ -670,7 +742,7 @@ impl Component for Welcome {
         pers.append(&icon_card);
         carousel.append(&scrolled(&page(&pers)));
 
-        // ---- Page 5: done ----
+        // ---- Page 6: done ----
         let done = gtk::Box::new(gtk::Orientation::Vertical, 16);
         let check = gtk::Image::from_icon_name("verified-checkmark-symbolic");
         check.set_pixel_size(72);
@@ -684,13 +756,6 @@ impl Component for Welcome {
             &[("url", "https://github.com/hyprlab/hylki")],
         ));
         done.append(&done_sub);
-        let finish_btn = pill(&i18n("Start Reading"));
-        finish_btn.set_margin_top(8);
-        {
-            let s = sender.clone();
-            finish_btn.connect_clicked(move |_| s.input(WelcomeInput::Finish));
-        }
-        done.append(&finish_btn);
         carousel.append(&scrolled(&page(&done)));
 
         // ---- Chrome: draggable top strip with Back button ----
@@ -711,8 +776,8 @@ impl Component for Welcome {
         content.append(&wordmark_box);
         content.append(&carousel);
         // Fixed footer: Continue lives with the dots so it never scrolls
-        // away with a tall page. Hidden on the hero and final pages, which
-        // carry their own calls to action.
+        // away with a tall page, and reads Finish on the last one. Hidden on
+        // the hero page, which has its own Get Started.
         let footer_next = pill(&i18n("Continue"));
         footer_next.set_visible(false);
         footer_next.set_margin_top(16);
@@ -728,10 +793,28 @@ impl Component for Welcome {
         content.append(&dots);
         {
             let btn = footer_next.clone();
+            let s = sender.clone();
             carousel.connect_position_notify(move |car| {
                 let r = car.position().round() as u32;
-                btn.set_visible(r >= 1 && r + 1 < car.n_pages());
+                btn.set_visible(r >= 1);
+                s.input(WelcomeInput::RefreshFooter);
             });
+        }
+        // Typing in the manual form turns its Skip into Continue.
+        for entry in [
+            name_row.upcast_ref::<gtk::Editable>(),
+            email_row.upcast_ref(),
+            pass_row.upcast_ref(),
+            host_row.upcast_ref(),
+            smtp_row.upcast_ref(),
+            oauth_client_id_row.upcast_ref(),
+            oauth_secret_row.upcast_ref(),
+            oauth_auth_url_row.upcast_ref(),
+            oauth_token_url_row.upcast_ref(),
+            oauth_scope_row.upcast_ref(),
+        ] {
+            let s = sender.clone();
+            entry.connect_changed(move |_| s.input(WelcomeInput::RefreshFooter));
         }
         tv.set_content(Some(&content));
         root.set_content(Some(&tv));
@@ -751,11 +834,19 @@ impl Component for Welcome {
             port_row,
             smtp_row,
             smtp_port_row,
+            oauth_client_id_row,
+            oauth_secret_row,
+            oauth_auth_url_row,
+            oauth_token_url_row,
+            oauth_scope_row,
             status_lbl,
             test_spinner,
             add_btn,
-            goa_card: goa_card_box,
+            goa_empty,
             goa_list,
+            goa_status,
+            footer_next,
+            acct_title,
             sw_remote,
             sw_gravatar,
             sw_logos,
@@ -764,7 +855,6 @@ impl Component for Welcome {
             sw_avatars,
             sw_threading,
             icon_choice,
-            finish_btn,
         };
         rebuild_goa_rows(&widgets.goa_list, &model.goa, &sender);
         bind_wordmark_to_position(&widgets.carousel, &widgets.wordmark_frame, &widgets.wordmark_box);
@@ -821,10 +911,13 @@ impl Component for Welcome {
                 // position() is fractional mid-scroll; round to the page the
                 // user sees as current, so rapid clicks don't repeat a page.
                 let pos = widgets.carousel.position().round() as u32;
-                if pos + 1 < widgets.carousel.n_pages() {
-                    let next = widgets.carousel.nth_page(pos + 1);
-                    widgets.carousel.scroll_to(&next, true);
+                if pos + 1 >= widgets.carousel.n_pages() {
+                    // The footer button on the last page is Finish.
+                    sender.input(WelcomeInput::Finish);
+                    return;
                 }
+                let next = widgets.carousel.nth_page(pos + 1);
+                widgets.carousel.scroll_to(&next, true);
                 widgets.back_btn.set_visible(true);
             }
             WelcomeInput::Back => {
@@ -836,31 +929,29 @@ impl Component for Welcome {
                 }
             }
             WelcomeInput::ProviderChanged => {
-                let sel = widgets.provider_row.selected() as usize;
-                let settings = wizard_providers().get(sel).is_some_and(|p| p.wizard_opens_settings());
-                // Picking another provider takes back a hand-off already made.
-                self.oauth_in_settings = false;
+                let sel = widgets.provider_row.selected();
+                let oauth = wizard_provider(sel).is_some_and(|p| p.wizard_is_oauth());
+                // A newer choice supersedes a sign-in still waiting in the
+                // browser; its late result is ignored.
+                self.test_seq += 1;
+                widgets.test_spinner.stop();
+                widgets.test_spinner.set_visible(false);
+                widgets.add_btn.set_sensitive(true);
                 widgets.status_lbl.set_text("");
+                widgets.pass_row.set_visible(!oauth);
                 for row in [
-                    widgets.name_row.upcast_ref::<gtk::Widget>(),
-                    widgets.email_row.upcast_ref(),
-                    widgets.pass_row.upcast_ref(),
-                    widgets.server_exp.upcast_ref(),
+                    widgets.oauth_client_id_row.upcast_ref::<gtk::Widget>(),
+                    widgets.oauth_secret_row.upcast_ref(),
+                    widgets.oauth_auth_url_row.upcast_ref(),
+                    widgets.oauth_token_url_row.upcast_ref(),
+                    widgets.oauth_scope_row.upcast_ref(),
                 ] {
-                    row.set_visible(!settings);
+                    row.set_visible(oauth);
                 }
                 widgets
                     .add_btn
-                    .set_label(&if settings { i18n("Set Up in Settings") } else { i18n("Test & Add") });
-                if settings {
-                    widgets.hint_lbl.set_visible(true);
-                    widgets.hint_lbl.set_text(&i18n(
-                        "An OAuth account needs your provider's sign-in details. \
-                         Settings opens on it when you finish here.",
-                    ));
-                    return;
-                }
-                if let Some(p) = wizard_providers().get(sel) {
+                    .set_label(&if oauth { i18n("Sign In & Add") } else { i18n("Test & Add") });
+                if let Some(p) = wizard_provider(sel) {
                     let (ih, ip, sh, sp) = p.wizard_servers();
                     let jmap = p.wizard_protocol() == Protocol::Jmap;
                     if !ih.is_empty() {
@@ -887,22 +978,13 @@ impl Component for Welcome {
                 }
             }
             WelcomeInput::TestAndAdd => {
-                let sel = widgets.provider_row.selected() as usize;
-                if wizard_providers().get(sel).is_some_and(|p| p.wizard_opens_settings()) {
-                    self.oauth_in_settings = true;
-                    widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
-                    widgets.status_lbl.set_text(&i18n("✓ Settings opens on your OAuth account at the end"));
-                    sender.input(WelcomeInput::Next);
-                    return;
-                }
                 let email = widgets.email_row.text().trim().to_string();
                 let password = widgets.pass_row.text().to_string();
                 // Derive missing servers from the address's domain — the common
                 // convention, and the expander is right there to correct it.
-                let protocol = wizard_providers()
-                    .get(widgets.provider_row.selected() as usize)
-                    .map(|p| p.wizard_protocol())
-                    .unwrap_or_default();
+                let provider = wizard_provider(widgets.provider_row.selected());
+                let oauth = provider.is_some_and(|p| p.wizard_is_oauth());
+                let protocol = provider.map(|p| p.wizard_protocol()).unwrap_or_default();
                 let domain = email.split('@').nth(1).unwrap_or("").to_string();
                 let mut host = widgets.host_row.text().trim().to_string();
                 // A JMAP server's address is the user's to give; imap.<domain>
@@ -915,6 +997,10 @@ impl Component for Welcome {
                 if smtp.is_empty() && !domain.is_empty() && protocol != Protocol::Jmap {
                     smtp = format!("smtp.{domain}");
                     widgets.smtp_row.set_text(&smtp);
+                }
+                if oauth {
+                    self.sign_in_and_add(widgets, &sender, email, host, smtp);
+                    return;
                 }
                 if email.is_empty() || password.is_empty() || host.is_empty() {
                     widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
@@ -964,22 +1050,29 @@ impl Component for Welcome {
                     let account = g.to_config(password, oauth);
                     self.added.push(account.email.clone());
                     self.goa.remove(index);
-                    widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
+                    widgets.goa_status.set_visible(true);
+                    widgets.goa_status.set_css_classes(&["welcome-hint", "success"]);
                     widgets
-                        .status_lbl
+                        .goa_status
                         .set_text(&i18n_f("✓ {email} — added", &[("email", &(account.email).to_string())]));
                     let _ = sender.output(WelcomeOutput::ImportGoa(Box::new(account)));
                     rebuild_goa_rows(&widgets.goa_list, &self.goa, &sender);
-                    widgets.goa_card.set_visible(!self.goa.is_empty());
-                    self.show_added(widgets);
+                    widgets.goa_list.set_visible(!self.goa.is_empty());
+                    self.goa_imported = true;
+                    self.refresh_footer(widgets);
+                    widgets.acct_title.set_text(&i18n("Add another email account"));
                 }
             }
             WelcomeInput::RescanGoa => {
                 self.goa = crate::goa::list_mail_accounts();
                 self.goa.retain(|g| !self.added.contains(&g.email));
                 rebuild_goa_rows(&widgets.goa_list, &self.goa, &sender);
-                widgets.goa_card.set_visible(!self.goa.is_empty());
+                widgets.goa_list.set_visible(!self.goa.is_empty());
+                // Everything found was added already: say so, not "none found".
+                widgets.goa_empty.set_visible(self.goa.is_empty() && self.added.is_empty());
             }
+            WelcomeInput::OpenOnlineAccounts => crate::ui::accounts::open_online_accounts(),
+            WelcomeInput::RefreshFooter => self.refresh_footer(widgets),
             WelcomeInput::Finish => {
                 let prefs = WelcomePrefs {
                     block_remote: widgets.sw_remote.is_active(),
@@ -993,9 +1086,6 @@ impl Component for Welcome {
                 };
                 let _ = sender.output(WelcomeOutput::Prefs(prefs));
                 let _ = sender.output(WelcomeOutput::Done);
-                if self.oauth_in_settings {
-                    let _ = sender.output(WelcomeOutput::SetUpCustomOAuth);
-                }
                 root.close();
             }
         }
@@ -1026,7 +1116,8 @@ impl Component for Welcome {
                         widgets.pass_row.set_text("");
                         widgets.email_row.set_text("");
                         let _ = sender.output(WelcomeOutput::AddAccount(account));
-                        self.show_added(widgets);
+                        self.manual_added = true;
+                        self.refresh_footer(widgets);
                     }
                     (Err(e), _) => {
                         widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
@@ -1038,14 +1129,135 @@ impl Component for Welcome {
                     }
                 }
             }
+            WelcomeCmd::SignedIn { mut account, result, seq } => {
+                if seq != self.test_seq {
+                    return;
+                }
+                widgets.test_spinner.stop();
+                widgets.test_spinner.set_visible(false);
+                widgets.add_btn.set_sensitive(true);
+                let email = account.email.clone();
+                match result {
+                    Ok(refresh) => {
+                        account.oauth_refresh = refresh;
+                        self.added.push(email.clone());
+                        widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
+                        widgets.status_lbl.set_text(&i18n_f("✓ {email} — signed in and added", &[("email", &email)]));
+                        widgets.email_row.set_text("");
+                        let _ = sender.output(WelcomeOutput::AddAccount(account));
+                        self.manual_added = true;
+                        self.refresh_footer(widgets);
+                    }
+                    Err(e) => {
+                        widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
+                        widgets.status_lbl.set_text(&i18n_f("Sign-in failed: {e}", &[("e", &e)]));
+                    }
+                }
+            }
         }
     }
 }
 
 impl Welcome {
-    fn show_added(&self, widgets: &WelcomeWidgets) {
-        widgets.finish_btn.set_label(&i18n("Start Reading"));
+    /// The footer button reads Skip on the two account pages while nothing
+    /// was added there and, on the manual page, nothing is typed in the
+    /// form; Finish on the last page; Continue everywhere else.
+    fn refresh_footer(&self, widgets: &WelcomeWidgets) {
+        let page = widgets.carousel.position().round() as u32;
+        let label = if page + 1 >= widgets.carousel.n_pages() {
+            i18n("Finish")
+        } else if match page {
+            1 => !self.goa_imported,
+            2 => !self.manual_added && !form_has_input(widgets),
+            _ => false,
+        } {
+            i18n("Skip")
+        } else {
+            i18n("Continue")
+        };
+        widgets.footer_next.set_label(&label);
     }
+
+    /// Custom OAuth: sign in through the browser with the form's client,
+    /// then add the account with the refresh token that comes back (the
+    /// connection test is skipped, as in Settings: it reads the token from
+    /// the keyring, where it lands only once the account is saved).
+    fn sign_in_and_add(
+        &mut self,
+        widgets: &WelcomeWidgets,
+        sender: &ComponentSender<Self>,
+        email: String,
+        host: String,
+        smtp: String,
+    ) {
+        let text = |row: &adw::EntryRow| row.text().trim().to_string();
+        let settings = crate::config::OAuthSettings {
+            auth_url: text(&widgets.oauth_auth_url_row),
+            token_url: text(&widgets.oauth_token_url_row),
+            client_id: text(&widgets.oauth_client_id_row),
+            client_secret: widgets.oauth_secret_row.text().to_string(),
+            scopes: text(&widgets.oauth_scope_row),
+        };
+        if email.is_empty()
+            || host.is_empty()
+            || settings.client_id.is_empty()
+            || settings.auth_url.is_empty()
+            || settings.token_url.is_empty()
+        {
+            widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
+            widgets.status_lbl.set_text(&i18n(
+                "Enter your email address, the client ID and both OAuth URLs first.",
+            ));
+            return;
+        }
+        let account = AccountConfig {
+            name: widgets.name_row.text().trim().to_string(),
+            email: email.clone(),
+            imap_host: host,
+            imap_port: widgets.port_row.text().trim().parse().unwrap_or(993),
+            smtp_host: smtp,
+            smtp_port: widgets.smtp_port_row.text().trim().parse().unwrap_or(587),
+            username: email,
+            oauth: true,
+            oauth_settings: Some(settings.clone()),
+            ..blank_account()
+        };
+        self.test_seq += 1;
+        let seq = self.test_seq;
+        widgets.add_btn.set_sensitive(false);
+        widgets.test_spinner.set_visible(true);
+        widgets.test_spinner.start();
+        widgets.status_lbl.set_css_classes(&["welcome-hint"]);
+        widgets.status_lbl.set_text(&i18n("Opening browser… complete sign-in there."));
+        sender.oneshot_command(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                crate::oauth::run_flow(&settings).map(|f| f.refresh_token)
+            })
+            .await
+            .unwrap_or_else(|_| Err("sign-in task failed".into()));
+            WelcomeCmd::SignedIn { account: Box::new(account), result, seq }
+        });
+    }
+}
+
+/// Whether the user typed anything into the manual form. Servers count only
+/// where they differ from what the chosen provider fills in, and the ports,
+/// always filled in, not at all.
+fn form_has_input(widgets: &WelcomeWidgets) -> bool {
+    let (preset_host, _, preset_smtp, _) = wizard_provider(widgets.provider_row.selected())
+        .map(|p| p.wizard_servers())
+        .unwrap_or_default();
+    let typed = |row: &adw::EntryRow| row.is_visible() && !row.text().trim().is_empty();
+    typed(&widgets.name_row)
+        || typed(&widgets.email_row)
+        || typed(widgets.pass_row.upcast_ref())
+        || typed(&widgets.oauth_client_id_row)
+        || typed(widgets.oauth_secret_row.upcast_ref())
+        || typed(&widgets.oauth_auth_url_row)
+        || typed(&widgets.oauth_token_url_row)
+        || typed(&widgets.oauth_scope_row)
+        || widgets.host_row.text().trim() != preset_host
+        || (widgets.smtp_row.is_visible() && widgets.smtp_row.text().trim() != preset_smtp)
 }
 
 fn rebuild_goa_rows(

@@ -4378,10 +4378,22 @@ msgstr ""
 msgid "Get Started"
 msgstr ""
 
-msgid "Add your email account"
+msgid "Import your online accounts"
 msgstr ""
 
-msgid "Found in GNOME Online Accounts"
+msgid ""
+"Mail accounts signed in under GNOME Settings → Online Accounts can be added "
+"here in one click. Google and Microsoft accounts are only supported through "
+"Online Accounts."
+msgstr ""
+
+msgid "No mail accounts were found in Online Accounts."
+msgstr ""
+
+msgid "Scan Again"
+msgstr ""
+
+msgid "Add your email account"
 msgstr ""
 
 msgid "Your name"
@@ -4402,14 +4414,6 @@ msgid "IMAP port"
 msgstr ""
 
 msgid "Test & Add"
-msgstr ""
-
-msgid ""
-"Accounts added in GNOME Settings → Online Accounts appear above, IMAP and "
-"SMTP ones included. Google and Microsoft sign in only that way."
-msgstr ""
-
-msgid "Scan Again"
 msgstr ""
 
 msgid "Privacy, your way"
@@ -4475,27 +4479,16 @@ msgid ""
 "please open an issue on our <a href=\"{url}\">Github</a>."
 msgstr ""
 
-msgid "Start Reading"
+msgid "Finish"
 msgstr ""
 
-#. Fixed footer: Continue lives with the dots so it never scrolls
-#. away with a tall page. Hidden on the hero and final pages, which
-#. carry their own calls to action.
 msgid "Continue"
 msgstr ""
 
-msgid "Set Up in Settings"
-msgstr ""
-
-msgid ""
-"An OAuth account needs your provider's sign-in details. Settings opens on it "
-"when you finish here."
+msgid "Sign In & Add"
 msgstr ""
 
 msgid "Port"
-msgstr ""
-
-msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."
@@ -4507,6 +4500,9 @@ msgstr ""
 msgid "✓ {email} — added"
 msgstr ""
 
+msgid "Add another email account"
+msgstr ""
+
 msgid "✓ {email} — connected and added"
 msgstr ""
 
@@ -4514,6 +4510,15 @@ msgid "{email} — mail server: {e}"
 msgstr ""
 
 msgid "{email} — sending (SMTP): {e}"
+msgstr ""
+
+msgid "✓ {email} — signed in and added"
+msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+msgid "Enter your email address, the client ID and both OAuth URLs first."
 msgstr ""
 
 msgid "Your mail provider confirmed this really came from {from}."

@@ -1601,9 +1601,20 @@ window.welcome-window,
   color: #ffffff;
 }
 
-.welcome-link {
+/* Secondary wizard buttons: the language picker's white wash, so they read
+   as buttons on the blue without competing with the amber ones. */
+.welcome-window button.welcome-secondary {
+  padding: 8px 20px;
+  min-height: 0;
   font-weight: 600;
+  background-color: alpha(#ffffff, 0.16);
   color: #ffffff;
+}
+.welcome-window button.welcome-secondary:hover {
+  background-color: alpha(#ffffff, 0.24);
+}
+.welcome-window button.welcome-secondary:active {
+  background-color: alpha(#ffffff, 0.32);
 }
 
 .welcome-window carouselindicatordots {
