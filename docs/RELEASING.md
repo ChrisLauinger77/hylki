@@ -40,6 +40,17 @@ Part 2 is asked of GitHub, so the tag has to be pushed first, which is the order
 ship steps already run in. Without `gh`, or before the tag is up, the script
 still emits parts 1 and 3 and says on stderr what it left out.
 
+## Credit
+
+An @ link on a release page is for the people whose work is in the release:
+code, artwork or a translation, the handles listed in `data/CONTRIBUTORS` and
+`data/TRANSLATORS`. Somebody who reported a bug or asked for a feature is named
+without one ("asked for by rsx-xp"), since an @ both notifies them and reads as
+authorship ([#277](https://github.com/hyprlab/hylki/issues/277)). Write the
+notes that way; `tools/release-notes.sh` also strips an @ from any other handle
+when it builds the page. It joins wrapped lines too, as GitHub keeps every line
+break in a release body.
+
 ## Before the tag
 
 `python3 tools/check-docs.py` has to pass: a release page, the About window and

@@ -50,6 +50,29 @@ unwrap() {
   '
 }
 
+# An @ on a release page is for the people whose work is in it (#277): the
+# handles in data/CONTRIBUTORS and data/TRANSLATORS. Anyone else the notes
+# name, such as whoever reported a bug or asked for a feature, is named
+# without one, so the page neither links them as an author nor notifies them.
+credit() {
+  python3 -c '
+import re, sys
+authors = set()
+for path in ("data/CONTRIBUTORS", "data/TRANSLATORS"):
+    for line in open(path, encoding="utf-8"):
+        m = re.search(r"<([^>]+)>", line)
+        if m and not line.lstrip().startswith("#"):
+            authors.add(m.group(1).lower())
+def plain(m):
+    handle = m.group(1) or m.group(2)
+    return m.group(0) if handle.lower() in authors else handle
+link = r"\[@([A-Za-z0-9-]+)\]\(https://github\.com/[A-Za-z0-9-]+/?\)"
+bare = r"(?<![\w.@/])@([A-Za-z0-9-]+)\b"
+for line in sys.stdin:
+    sys.stdout.write(re.sub(link + "|" + bare, plain, line))
+'
+}
+
 # "## What's new in X.Y.Z" (newest) or "## In X.Y.Z" (older), with optional
 # suffixes like " — security release".
 notes=$(section docs/RELEASE_NOTES.md \
@@ -64,7 +87,7 @@ if [ -z "${notes//[[:space:]]/}" ]; then
   exit 1
 fi
 
-printf '%s\n' "$notes" | trim | unwrap
+printf '%s\n' "$notes" | trim | unwrap | credit
 
 # The release before this one, in version order, and of the same kind: a beta
 # is measured against the previous beta, a stable against the previous stable.

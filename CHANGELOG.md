@@ -9,7 +9,8 @@
   other retired choice becomes the default.
 - **Changed: GitHub release pages show each paragraph as one line** (#277).
   The notes are wrapped in the repository, and GitHub kept every one of
-  those line breaks.
+  those line breaks. An @ on a release page now links only people whose work
+  is in the release; anyone else the notes mention is named without one.
 - **New: Settings > Privacy > Warn when the addressing doesn't match.**
   Turned off, a message marked "Check this sender" (its replies go to
   another domain, or its sender's name claims a domain the address is not
