@@ -1441,6 +1441,18 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Alias hozzáadása…"
 
+msgid "Signature"
+msgstr "Aláírás"
+
+msgid "Appended to new messages sent from this account."
+msgstr "Az ebből a fiókból küldött új üzenetekhez fűzve."
+
+msgid "Edit HTML…"
+msgstr "HTML szerkesztése…"
+
+msgid "Import File…"
+msgstr "Fájl importálása…"
+
 msgid "Syncing"
 msgstr "Szinkronizálás"
 
@@ -1541,18 +1553,6 @@ msgstr "Önálló üzenetek kártyaként"
 
 msgid "New messages, replies and forwards start with signing on."
 msgstr ""
-
-msgid "Signature"
-msgstr "Aláírás"
-
-msgid "Appended to new messages sent from this account."
-msgstr "Az ebből a fiókból küldött új üzenetekhez fűzve."
-
-msgid "Edit HTML…"
-msgstr "HTML szerkesztése…"
-
-msgid "Import File…"
-msgstr "Fájl importálása…"
 
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
@@ -4269,6 +4269,15 @@ msgstr ""
 "Megjeleníti a betöltést felajánló sávot. Kikapcsolva csak az értesítés "
 "rejtőzik el — a távoli tartalom ugyanúgy blokkolva marad."
 
+msgid "Warn when the addressing doesn't match"
+msgstr ""
+
+msgid ""
+"Shows the red banner over a message marked \"Check this sender\", such as "
+"one whose replies go to another domain. The badge beside the sender still "
+"marks it, and a possible forgery always shows the banner."
+msgstr ""
+
 msgid "Use Gravatar when a contact has no photo"
 msgstr "Gravatar használata, ha a névjegyhez nincs fénykép"
 
@@ -5003,6 +5012,10 @@ msgstr "A visszapattanó levelek ide mennének: {rp}"
 
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "A feladó neve „{claimed}”, de a cím: {from}"
+
+msgid ""
+"{from} checks out, but the addressing doesn't match the name on the message."
+msgstr ""
 
 #, fuzzy
 msgid "Could not reach the JMAP server: {e}"

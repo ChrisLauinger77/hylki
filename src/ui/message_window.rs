@@ -75,6 +75,8 @@ pub enum MessageWindowInput {
     SetBody { account_id: u32, id: u32, body: String },
     /// The sender-authentication verdict for this message.
     SetSenderCheck(Box<crate::models::SenderCheck>),
+    /// The Settings switch for the "Check this sender" banner changed.
+    SetSpoofBannerShown(bool),
     /// Reflect a star toggle that happened elsewhere (or came back from the app).
     SetStarred(bool),
     /// The message's keywords changed (#71).
@@ -475,6 +477,9 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::FacesChanged => {
                 self.view.emit(MessageViewInput::FacesChanged);
+            }
+            MessageWindowInput::SetSpoofBannerShown(show) => {
+                self.view.emit(MessageViewInput::SetSpoofBannerShown(show));
             }
             MessageWindowInput::SetSenderCheck(check) => {
                 // Light the popout's header seal too (#88).

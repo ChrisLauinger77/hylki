@@ -345,7 +345,10 @@ fn judge(ev: &Evidence) -> SenderCheck {
     // Only relabel when the *addressing* is what pulled a clean pass down; a
     // "couldn't confirm" verdict already carries the right sentence.
     let summary = if trust == SenderTrust::Suspicious && downgraded_by_addressing {
-        format!("{from} checks out, but the addressing doesn't match the name on the message.")
+        i18n_f(
+            "{from} checks out, but the addressing doesn't match the name on the message.",
+            &[("from", &from.to_string())],
+        )
     } else {
         summary
     };

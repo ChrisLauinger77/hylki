@@ -1188,6 +1188,11 @@ struct PrivacyFile {
     /// the banner; it never changes what is blocked, only whether you're told.
     #[serde(default = "default_show_remote_banner")]
     show_remote_banner: bool,
+    /// Whether a "Check this sender" verdict (the addressing points somewhere
+    /// the From: line doesn't) puts the red banner over the message. The badge
+    /// still shows the verdict, and a failed check always gets the banner.
+    #[serde(default = "default_show_spoof_banner")]
+    show_spoof_banner: bool,
     /// Whether the sidebar offers the unified "All Inboxes" section at all
     /// (it only ever appears with more than one enabled account).
     #[serde(default = "default_show_unified")]
@@ -1326,6 +1331,10 @@ fn default_show_remote_banner() -> bool {
     true
 }
 
+fn default_show_spoof_banner() -> bool {
+    true
+}
+
 fn default_palette_collapse() -> u64 {
     5
 }
@@ -1390,6 +1399,7 @@ impl Default for PrivacyFile {
             allowed_senders: Vec::new(),
             auto_remote_content: false,
             show_remote_banner: default_show_remote_banner(),
+            show_spoof_banner: default_show_spoof_banner(),
             show_unified: default_show_unified(),
             unified_chip: default_unified_chip(),
             unified_chips: UnifiedChips::default(),
@@ -1531,6 +1541,10 @@ pub fn load_auto_remote_content() -> bool {
 
 pub fn load_show_remote_banner() -> bool {
     load_privacy().show_remote_banner
+}
+
+pub fn load_show_spoof_banner() -> bool {
+    load_privacy().show_spoof_banner
 }
 
 /// Whether Gravatar avatar loading is enabled.
@@ -3044,6 +3058,7 @@ pub fn save_privacy(
     tray_mail: bool,
     launcher_count: bool,
     show_remote_banner: bool,
+    show_spoof_banner: bool,
     sidebar_hover_expand: bool,
     remember_sidebar: bool,
     remember_rail: bool,
@@ -3143,6 +3158,7 @@ pub fn save_privacy(
         tray_mail,
         launcher_count,
         show_remote_banner,
+        show_spoof_banner,
         sidebar_hover_expand,
         remember_sidebar,
         remember_rail,

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **New: Settings > Privacy > Warn when the addressing doesn't match.**
+  Turned off, a message marked "Check this sender" (its replies go to
+  another domain, or its sender's name claims a domain the address is not
+  on) no longer gets the red banner across the top. The badge beside the
+  sender still shows the verdict, and a possible forgery keeps the banner
+  whatever the switch says. On by default; stored as `show_spoof_banner`
+  in `privacy.toml`. The banner's sentence for an addressing mismatch was
+  also never sent for translation, and now is.
 - **Fixed: the tray icon was published three times at every startup**
   (#275, reported by mfreeman72). Settings is built hidden a moment after
   startup so that it opens at once, and setting its rows to the saved

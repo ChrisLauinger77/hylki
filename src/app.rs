@@ -673,6 +673,9 @@ pub struct AppModel {
     /// Whether the blocked-remote-content banner is shown at all. Hiding it changes nothing about what
     /// is blocked — only whether the reader says so.
     show_remote_banner: bool,
+    /// Whether a "Check this sender" verdict gets the red banner over the
+    /// message. A failed check gets it regardless.
+    show_spoof_banner: bool,
     /// Addresses/domains whose incoming inbox mail is auto-deleted (lowercased).
     blacklist: Vec<String>,
     /// Seconds the message-list actions palette stays open after the cursor leaves.
@@ -1243,6 +1246,7 @@ pub enum AppMsg {
     MarkSpam,
     SetAutoRemoteContent(bool),
     SetShowRemoteBanner(bool),
+    SetShowSpoofBanner(bool),
     /// The reader pane crossed the actions breakpoint (true = collapse the
     /// header's buttons into the overflow menu).
     SetReaderActionsCollapsed(bool),
@@ -3140,6 +3144,7 @@ impl SimpleComponent for AppModel {
             invite_answers: config::load_invite_answers(),
             auto_remote_content: config::load_auto_remote_content(),
             show_remote_banner: config::load_show_remote_banner(),
+            show_spoof_banner: config::load_show_spoof_banner(),
             blacklist: config::load_blacklist(),
             palette_collapse_secs: config::load_palette_collapse(),
             card_palette_collapse_secs: config::load_card_palette_collapse(),
@@ -6825,6 +6830,17 @@ impl SimpleComponent for AppModel {
                     self.show_remote_banner = on;
                     self.save_settings();
                     self.message_view.emit(MessageViewInput::SetBannerShown(on));
+                }
+            }
+
+            AppMsg::SetShowSpoofBanner(on) => {
+                if self.show_spoof_banner != on {
+                    self.show_spoof_banner = on;
+                    self.save_settings();
+                    self.message_view.emit(MessageViewInput::SetSpoofBannerShown(on));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetSpoofBannerShown(on));
+                    }
                 }
             }
 
@@ -10556,6 +10572,7 @@ impl AppModel {
             self.tray_mail,
             self.launcher_count,
             self.show_remote_banner,
+            self.show_spoof_banner,
             self.sidebar_hover_expand,
             self.remember_sidebar,
             self.remember_rail,
@@ -16798,6 +16815,7 @@ impl AppModel {
         let init = PrefInit {
             auto_remote_content: self.auto_remote_content,
             show_remote_banner: self.show_remote_banner,
+            show_spoof_banner: self.show_spoof_banner,
             gravatar: self.gravatar,
             avatars: self.avatars,
             own_mailbox_face: self.own_mailbox_face,
@@ -16911,6 +16929,7 @@ impl AppModel {
             .forward(sender.input_sender(), |out| match out {
                 PrefOutput::SetAutoRemoteContent(on) => AppMsg::SetAutoRemoteContent(on),
                 PrefOutput::SetShowRemoteBanner(on) => AppMsg::SetShowRemoteBanner(on),
+                PrefOutput::SetShowSpoofBanner(on) => AppMsg::SetShowSpoofBanner(on),
                 PrefOutput::SetGravatar(on) => AppMsg::SetGravatar(on),
                 PrefOutput::SetAvatars(on) => AppMsg::SetAvatars(on),
                 PrefOutput::SetOwnMailboxFace(on) => AppMsg::SetOwnMailboxFace(on),

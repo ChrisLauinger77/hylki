@@ -1467,6 +1467,18 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Добавить псевдоним…"
 
+msgid "Signature"
+msgstr "Подпись"
+
+msgid "Appended to new messages sent from this account."
+msgstr "Добавляется к новым сообщениям, отправляемым с этой учётной записи."
+
+msgid "Edit HTML…"
+msgstr "Редактировать HTML…"
+
+msgid "Import File…"
+msgstr "Импортировать файл…"
+
 msgid "Syncing"
 msgstr "Синхронизация"
 
@@ -1566,18 +1578,6 @@ msgstr "Одиночные сообщения в виде карточек"
 
 msgid "New messages, replies and forwards start with signing on."
 msgstr ""
-
-msgid "Signature"
-msgstr "Подпись"
-
-msgid "Appended to new messages sent from this account."
-msgstr "Добавляется к новым сообщениям, отправляемым с этой учётной записи."
-
-msgid "Edit HTML…"
-msgstr "Редактировать HTML…"
-
-msgid "Import File…"
-msgstr "Импортировать файл…"
 
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
@@ -4347,6 +4347,15 @@ msgstr ""
 "параметра лишь скрывает уведомление — само удалённое содержимое по-прежнему "
 "блокируется."
 
+msgid "Warn when the addressing doesn't match"
+msgstr ""
+
+msgid ""
+"Shows the red banner over a message marked \"Check this sender\", such as "
+"one whose replies go to another domain. The badge beside the sender still "
+"marks it, and a possible forgery always shows the banner."
+msgstr ""
+
 msgid "Use Gravatar when a contact has no photo"
 msgstr "Использовать Gravatar, если у контакта нет фото"
 
@@ -5089,6 +5098,10 @@ msgstr "Уведомления о недоставке будут отправл
 
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "В имени отправителя указано «{claimed}», но адрес — {from}"
+
+msgid ""
+"{from} checks out, but the addressing doesn't match the name on the message."
+msgstr ""
 
 #, fuzzy
 msgid "Could not reach the JMAP server: {e}"

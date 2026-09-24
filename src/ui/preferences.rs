@@ -15,6 +15,7 @@ use crate::i18n::{i18n, i18n_f, i18n_noop};
 pub struct PrefInit {
     pub auto_remote_content: bool,
     pub show_remote_banner: bool,
+    pub show_spoof_banner: bool,
     pub gravatar: bool,
     pub avatars: bool,
     /// Your own mail wears its mailbox's face, not a sender's circle (#189).
@@ -783,6 +784,7 @@ fn side_page(id: &str) -> Option<&'static SidePage> {
 #[derive(Debug)]
 pub enum PrefInput {
     ToggleShowRemoteBanner(bool),
+    ToggleShowSpoofBanner(bool),
     ToggleAutoRemoteContent(bool),
     ToggleGravatar(bool),
     ToggleAvatars(bool),
@@ -952,6 +954,7 @@ pub enum PrefOutput {
     PageShown(String),
     SetAutoRemoteContent(bool),
     SetShowRemoteBanner(bool),
+    SetShowSpoofBanner(bool),
     SetGravatar(bool),
     SetAvatars(bool),
     SetOwnMailboxFace(bool),
@@ -2847,6 +2850,19 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "show_spoof_banner_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Warn when the addressing doesn't match"),
+                                        set_subtitle: &i18n("Shows the red banner over a message marked \
+                                                       \"Check this sender\", such as one whose replies go \
+                                                       to another domain. The badge beside the sender still \
+                                                       marks it, and a possible forgery always shows the \
+                                                       banner."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleShowSpoofBanner(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "gravatar_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Use Gravatar when a contact has no photo"),
@@ -3296,6 +3312,7 @@ impl Component for Preferences {
 
         widgets.auto_remote_content_row.set_active(init.auto_remote_content);
         widgets.show_remote_banner_row.set_active(init.show_remote_banner);
+        widgets.show_spoof_banner_row.set_active(init.show_spoof_banner);
         widgets.gravatar_row.set_active(init.gravatar);
         widgets.avatars_row.set_active(init.avatars);
         widgets.own_mailbox_face_row.set_active(init.own_mailbox_face);
@@ -4545,6 +4562,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleShowRemoteBanner(on) => {
                 let _ = sender.output(PrefOutput::SetShowRemoteBanner(on));
+            }
+            PrefInput::ToggleShowSpoofBanner(on) => {
+                let _ = sender.output(PrefOutput::SetShowSpoofBanner(on));
             }
             PrefInput::ToggleOverrideFonts(on) => {
                 let _ = sender.output(PrefOutput::SetOverrideFonts(on));

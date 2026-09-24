@@ -1331,6 +1331,18 @@ msgstr ""
 msgid "Add Alias…"
 msgstr ""
 
+msgid "Signature"
+msgstr ""
+
+msgid "Appended to new messages sent from this account."
+msgstr ""
+
+msgid "Edit HTML…"
+msgstr ""
+
+msgid "Import File…"
+msgstr ""
+
 msgid "Syncing"
 msgstr ""
 
@@ -1416,18 +1428,6 @@ msgid "Sign messages by default"
 msgstr ""
 
 msgid "New messages, replies and forwards start with signing on."
-msgstr ""
-
-msgid "Signature"
-msgstr ""
-
-msgid "Appended to new messages sent from this account."
-msgstr ""
-
-msgid "Edit HTML…"
-msgstr ""
-
-msgid "Import File…"
 msgstr ""
 
 msgid ""
@@ -3876,6 +3876,15 @@ msgid ""
 "— remote content is still blocked just the same."
 msgstr ""
 
+msgid "Warn when the addressing doesn't match"
+msgstr ""
+
+msgid ""
+"Shows the red banner over a message marked \"Check this sender\", such as "
+"one whose replies go to another domain. The badge beside the sender still "
+"marks it, and a possible forgery always shows the banner."
+msgstr ""
+
 msgid "Use Gravatar when a contact has no photo"
 msgstr ""
 
@@ -4540,6 +4549,10 @@ msgid "Bounces would go to {rp}"
 msgstr ""
 
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
+msgstr ""
+
+msgid ""
+"{from} checks out, but the addressing doesn't match the name on the message."
 msgstr ""
 
 msgid "Could not reach the JMAP server: {e}"

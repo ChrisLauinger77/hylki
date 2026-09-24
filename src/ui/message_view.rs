@@ -78,6 +78,9 @@ pub struct MessageView {
     /// Whether the blocked-content banner is shown at all. It gates only the notice: `blocked`
     /// still governs what is withheld, so hiding it never loads anything.
     show_banner: bool,
+    /// Whether a "Check this sender" verdict gets the red banner. A failed
+    /// check gets it regardless: that one says the From: line is forged.
+    show_spoof_banner: bool,
     /// Whether the user has actually permitted remote content for what is on
     /// screen (settings, "Load once", or "Always allow sender").
     ///
@@ -646,6 +649,18 @@ impl MessageView {
             .map(|c| c.trust)
             .unwrap_or(crate::models::SenderTrust::Unverified)
     }
+
+    /// Whether the red banner is over the message. Settings can quiet it for
+    /// "Check this sender", which a newsletter replying from its mailing
+    /// service earns routinely; a failed check keeps it, since that verdict
+    /// says the From: line is forged.
+    fn spoof_alert_shown(&self) -> bool {
+        match self.trust() {
+            crate::models::SenderTrust::Fail => true,
+            crate::models::SenderTrust::Suspicious => self.show_spoof_banner,
+            _ => false,
+        }
+    }
 }
 
 /// One attachment as a card lists it (#213): the name and size only. The
@@ -661,6 +676,7 @@ pub enum MessageViewInput {
     /// Whether the blocked-remote-content banner is shown. It doesn't change
     /// what is blocked — only what the reader says about it.
     SetBannerShown(bool),
+    SetSpoofBannerShown(bool),
     /// The split reply opened above the reader (true) or went away (false).
     SetUnderSplit(bool),
     /// The "always show recipients" preference changed (re-render follows).
@@ -1165,7 +1181,7 @@ impl Component for MessageView {
                 gtk::Revealer {
                     set_transition_type: gtk::RevealerTransitionType::SlideDown,
                     #[watch]
-                    set_reveal_child: model.trust().is_alarming(),
+                    set_reveal_child: model.spoof_alert_shown(),
 
                     gtk::Box {
                         add_css_class: "spoof-alert",
@@ -1302,7 +1318,7 @@ impl Component for MessageView {
                     #[watch]
                     set_class_active: (
                         "under-bar",
-                        model.trust().is_alarming()
+                        model.spoof_alert_shown()
                             || (model.blocked && model.show_banner)
                             || model.find_open,
                     ),
@@ -1527,6 +1543,7 @@ impl Component for MessageView {
             reader_default: crate::config::ReaderDefault::Remember,
             read_mark: crate::config::ReadMark::default(),
             show_banner: crate::config::load_show_remote_banner(),
+            show_spoof_banner: crate::config::load_show_spoof_banner(),
             card_actions_hover: crate::config::load_card_actions_hover(),
             card_actions_auto: crate::config::load_card_actions_auto(),
             palette_collapse_secs: crate::config::load_card_palette_collapse(),
@@ -2119,6 +2136,9 @@ impl Component for MessageView {
             }
             MessageViewInput::SetBannerShown(show) => {
                 self.show_banner = show;
+            }
+            MessageViewInput::SetSpoofBannerShown(show) => {
+                self.show_spoof_banner = show;
             }
             MessageViewInput::SetUnderSplit(under) => {
                 self.under_split = under;

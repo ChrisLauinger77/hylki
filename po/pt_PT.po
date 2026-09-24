@@ -1467,6 +1467,18 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Adicionar endereço alternativo…"
 
+msgid "Signature"
+msgstr "Assinatura"
+
+msgid "Appended to new messages sent from this account."
+msgstr "Adicionada às novas mensagens enviadas a partir desta conta."
+
+msgid "Edit HTML…"
+msgstr "Editar HTML…"
+
+msgid "Import File…"
+msgstr "Importar ficheiro…"
+
 msgid "Syncing"
 msgstr "Sincronização"
 
@@ -1570,18 +1582,6 @@ msgstr "Mensagens individuais como cartões"
 
 msgid "New messages, replies and forwards start with signing on."
 msgstr ""
-
-msgid "Signature"
-msgstr "Assinatura"
-
-msgid "Appended to new messages sent from this account."
-msgstr "Adicionada às novas mensagens enviadas a partir desta conta."
-
-msgid "Edit HTML…"
-msgstr "Editar HTML…"
-
-msgid "Import File…"
-msgstr "Importar ficheiro…"
 
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
@@ -4381,6 +4381,15 @@ msgstr ""
 "Mostra a faixa que permite carregá-lo. Desativar esta opção apenas oculta o "
 "aviso — o conteúdo remoto continua igualmente bloqueado."
 
+msgid "Warn when the addressing doesn't match"
+msgstr ""
+
+msgid ""
+"Shows the red banner over a message marked \"Check this sender\", such as "
+"one whose replies go to another domain. The badge beside the sender still "
+"marks it, and a possible forgery always shows the banner."
+msgstr ""
+
 msgid "Use Gravatar when a contact has no photo"
 msgstr "Utilizar o Gravatar quando um contacto não tem fotografia"
 
@@ -5123,6 +5132,10 @@ msgstr "As mensagens devolvidas seriam enviadas para {rp}"
 
 msgid "The sender's name says \"{claimed}\" but the address is {from}"
 msgstr "O nome do remetente indica «{claimed}», mas o endereço é {from}"
+
+msgid ""
+"{from} checks out, but the addressing doesn't match the name on the message."
+msgstr ""
 
 #, fuzzy
 msgid "Could not reach the JMAP server: {e}"
