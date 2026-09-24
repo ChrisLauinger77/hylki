@@ -40,15 +40,24 @@ Everyone whose work is in the app is named in
 
 ## Commits
 
-Commit messages are plain: an imperative subject, then why the change exists,
-in factual language with no marketing, no emoji and no em dashes.
+Subjects follow [Conventional Commits](https://www.conventionalcommits.org):
+`type(area): summary`, such as `fix(reader): keep the caret in a reply's body`
+or `feat(i18n): add the German translation`. The type is one of `feat`, `fix`,
+`perf`, `refactor`, `docs`, `build`, `ci`, `test`, `style`, `chore` or
+`revert`; the area is the part of the app the change is in. Keep the subject
+to 72 characters, lower case after the colon, with no full stop
+([#277](https://github.com/hyprlab/hylki/issues/277)).
+
+The body is optional. When there is one, it says in a few lines why the change
+exists, in factual language with no marketing, no emoji and no em dashes, and
+stays under 100 words.
 Trailers are for people: a `Co-Authored-By:` line credits somebody whose work
 is in the commit, using the `users.noreply.github.com` address that resolves to
 their profile, and not for the tools anyone wrote it with. The README's
 [AI notice](../README.md#ai-notice) covers that for the repository as a whole,
 so the history reads as the maintainer's own
 ([#230](https://github.com/hyprlab/hylki/issues/230)).
-`tools/git-hooks/commit-msg` checks it; point a clone at the hooks with
+`tools/git-hooks/commit-msg` checks all of this; point a clone at the hooks with
 `git config core.hooksPath tools/git-hooks`.
 
 ## Documentation

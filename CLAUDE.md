@@ -47,14 +47,36 @@ declares how the app is built, once, for the whole repository. A
 `Co-Authored-By:` trailer is still how an outside contributor is credited, with
 the GitHub noreply address that resolves to their profile.
 
-Write what a person would write: an imperative subject of about 72 characters
-or fewer, then a body wrapped at 76 saying why the change exists. The prose
-rules below apply to a commit message too, and one more on top of them: no em
-dashes, which a colon, a comma or a full stop replaces. Factual, no marketing,
-no emoji, no restating the diff.
+Subjects follow [Conventional Commits](https://www.conventionalcommits.org):
+`type(area): summary`, lower case after the colon, imperative, no full stop,
+72 characters at most and ideally nearer 50 (#277).
 
-`tools/git-hooks/commit-msg` refuses the attribution lines. A clone is pointed
-at it with `git config core.hooksPath tools/git-hooks`.
+- Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `build`, `ci`, `test`,
+  `style`, `chore`, `revert`.
+- The area is where the change lives: `reader`, `composer`, `list`,
+  `sidebar`, `settings`, `imap`, `jmap`, `graph`, `smtp`, `tray`, `i18n`,
+  `flatpak`, `rpm`, `release` and so on. Leave it out only when there is no
+  single place.
+- An issue number goes at the end: `fix(imap): keep deleted mail deleted (#260)`.
+- Releases: `chore(release): 1.42.0`, `build(flatpak): pin the manifest to
+  v1.42.0`, `build(rpm): sync the package version to 1.42.0`.
+
+The body is optional and short: why the change exists, in a few lines wrapped
+at 72, and nothing the diff already says. Past 100 words the detail belongs in
+`docs/` or `CHANGELOG.md`, or the commit wants splitting. The prose rules
+above apply too, plus one more: no em dashes, which a colon, a comma or a full
+stop replaces.
+
+`tools/git-hooks/commit-msg` refuses the attribution lines, em dashes, a
+subject without a type, and an overlong subject or body. A clone is pointed at
+it with `git config core.hooksPath tools/git-hooks`.
+
+## Issue replies
+
+A reply that says a request is done is one or two sentences: what changed,
+from the user's side, and which version carries it. How it was built is in the
+commit and the changelog for anyone who wants it. Only a reply that asks for
+something (a log, a test) or explains a decline runs longer.
 
 ## Code
 
