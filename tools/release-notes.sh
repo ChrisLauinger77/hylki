@@ -33,6 +33,23 @@ trim() { # drop leading and trailing blank lines
   awk 'NF{f=1} f' | tac | awk 'NF{f=1} f' | tac
 }
 
+# The Markdown files are wrapped at 76 columns, but GitHub keeps every line
+# break in a release body, so wrapped paragraphs showed up there as ragged
+# short lines (#277). Rejoin each paragraph and list item onto one line;
+# headings, new list items, quotes, tables and code blocks stay as they are.
+unwrap() {
+  awk '
+    function flush() { if (buf != "") print buf; buf = "" }
+    /^[ \t]*```/ { flush(); print; fence = !fence; next }
+    fence { print; next }
+    /^[ \t]*$/ { flush(); print; next }
+    /^(#+ |> |\||---)/ || /^[ \t]*([-*+]|[0-9]+\.) / { flush(); buf = $0; next }
+    buf != "" { line = $0; sub(/^[ \t]+/, "", line); buf = buf " " line; next }
+    { buf = $0 }
+    END { flush() }
+  '
+}
+
 # "## What's new in X.Y.Z" (newest) or "## In X.Y.Z" (older), with optional
 # suffixes like " — security release".
 notes=$(section docs/RELEASE_NOTES.md \
@@ -47,7 +64,7 @@ if [ -z "${notes//[[:space:]]/}" ]; then
   exit 1
 fi
 
-printf '%s\n' "$notes" | trim
+printf '%s\n' "$notes" | trim | unwrap
 
 # The release before this one, in version order, and of the same kind: a beta
 # is measured against the previous beta, a stable against the previous stable.

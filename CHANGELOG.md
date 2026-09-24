@@ -7,6 +7,9 @@
   classic icon. The squircles, the envelopes and the birds are gone. A
   squircle that was chosen becomes the square of the same color, and any
   other retired choice becomes the default.
+- **Changed: GitHub release pages show each paragraph as one line** (#277).
+  The notes are wrapped in the repository, and GitHub kept every one of
+  those line breaks.
 - **New: Settings > Privacy > Warn when the addressing doesn't match.**
   Turned off, a message marked "Check this sender" (its replies go to
   another domain, or its sender's name claims a domain the address is not
