@@ -16,6 +16,7 @@ mod datefmt;
 mod desktop;
 mod goa;
 mod i18n;
+mod icon_fallback;
 mod invite;
 mod launcher_badge;
 mod legacy;

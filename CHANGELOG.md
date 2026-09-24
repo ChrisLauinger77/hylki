@@ -39,6 +39,14 @@
   down and published again for each, with the settings file written each
   time. Cinnamon's status applet crashed on the churn. A row now reports
   only a change made after the window is built.
+- **Fixed: some icons showed as a broken image on KDE and other desktops**
+  (#278). Since 1.41.0 the icon theme draws Hylki's icons, and inside the
+  Flatpak a theme can list a file the sandbox cannot open, typically a
+  symlink into the host's `/usr/share/icons`. GTK drew its placeholder for
+  those and never fell back to the bundled copy. Hylki now looks up each
+  icon it carries in the theme once the window is up, and again when the
+  theme changes, and swaps in its own copy for every file that cannot be
+  read, leaving the rest of the theme in place.
 
 ## 1.41.1 — 2026-09-23
 

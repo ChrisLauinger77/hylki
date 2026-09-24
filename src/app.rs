@@ -20325,6 +20325,9 @@ fn register_icons() {
     {
         settings.set_gtk_icon_theme_name(Some(&name));
     }
+    if let Some(display) = gtk::gdk::Display::default() {
+        crate::icon_fallback::install(&display);
+    }
     gtk::Window::set_default_icon_name(crate::APP_ID);
 }
 
