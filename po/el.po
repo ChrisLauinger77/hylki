@@ -1145,6 +1145,10 @@ msgstr ""
 msgid "Enter your server details manually."
 msgstr "Εισαγάγετε χειροκίνητα τα στοιχεία του διακομιστή σας."
 
+msgid "Enter your provider's OAuth endpoints, then sign in."
+msgstr ""
+"Εισαγάγετε τα τελικά σημεία OAuth του παρόχου σας και έπειτα συνδεθείτε."
+
 msgid "Sign in with your browser — no password needed."
 msgstr ""
 "Συνδεθείτε με το πρόγραμμα περιήγησης — δεν απαιτείται κωδικός πρόσβασης."
@@ -1162,10 +1166,6 @@ msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Ενεργοποιήστε πρώτα την πρόσβαση POP/IMAP στις ρυθμίσεις GMX."
-
-msgid "Enter your provider's OAuth endpoints, then sign in."
-msgstr ""
-"Εισαγάγετε τα τελικά σημεία OAuth του παρόχου σας και έπειτα συνδεθείτε."
 
 msgid "Mail Accounts"
 msgstr "Λογαριασμοί αλληλογραφίας"
@@ -5089,7 +5089,19 @@ msgstr "Έναρξη ανάγνωσης"
 msgid "Continue"
 msgstr "Συνέχεια"
 
+#, fuzzy
+msgid "Set Up in Settings"
+msgstr "Ρυθμίσεις"
+
+msgid ""
+"An OAuth account needs your provider's sign-in details. Settings opens on it "
+"when you finish here."
+msgstr ""
+
 msgid "Port"
+msgstr ""
+
+msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."

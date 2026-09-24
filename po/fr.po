@@ -1133,6 +1133,11 @@ msgstr ""
 msgid "Enter your server details manually."
 msgstr "Saisissez manuellement les détails de votre serveur."
 
+msgid "Enter your provider's OAuth endpoints, then sign in."
+msgstr ""
+"Saisissez les points de terminaison OAuth de votre fournisseur, puis "
+"connectez-vous."
+
 msgid "Sign in with your browser — no password needed."
 msgstr "Connectez-vous via votre navigateur — aucun mot de passe requis."
 
@@ -1151,11 +1156,6 @@ msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Activez d'abord l'accès POP/IMAP dans les paramètres GMX."
-
-msgid "Enter your provider's OAuth endpoints, then sign in."
-msgstr ""
-"Saisissez les points de terminaison OAuth de votre fournisseur, puis "
-"connectez-vous."
 
 msgid "Mail Accounts"
 msgstr "Comptes e-mail"
@@ -5076,8 +5076,20 @@ msgstr "Commencer la lecture"
 msgid "Continue"
 msgstr "Continuer"
 
+#, fuzzy
+msgid "Set Up in Settings"
+msgstr "Paramètres"
+
+msgid ""
+"An OAuth account needs your provider's sign-in details. Settings opens on it "
+"when you finish here."
+msgstr ""
+
 msgid "Port"
 msgstr "Port"
+
+msgid "✓ Settings opens on your OAuth account at the end"
+msgstr ""
 
 msgid "Enter your email address and password first."
 msgstr "Saisissez d'abord votre adresse e-mail et votre mot de passe."

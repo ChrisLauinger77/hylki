@@ -57,6 +57,11 @@ impl Provider {
     pub(crate) fn wizard_password_provider(&self) -> bool {
         self.is_password()
     }
+    /// Custom OAuth, which the wizard lists but hands to Settings: its
+    /// client and endpoint fields live in the account editor only.
+    pub(crate) fn wizard_opens_settings(&self) -> bool {
+        self.kind == ProviderKind::CustomOAuth
+    }
     pub(crate) fn wizard_label(&self) -> &'static str {
         self.label
     }
@@ -269,6 +274,9 @@ pub enum AccountsInput {
     /// The app's live folder lists per account email (for Special Folders).
     SetFolderChoices(std::collections::HashMap<String, Vec<(String, String)>>),
     AddAccount,
+    /// A new account with Custom (OAuth) already picked: the welcome
+    /// wizard's hand-off for the one provider it does not set up itself.
+    AddCustomOAuthAccount,
     EditAccount(usize),
     /// Open the editor for the account with this address (the sidebar's
     /// "Account Settings…"), leaving another account's editor if one is up.
@@ -1832,7 +1840,7 @@ impl Component for AccountsWindow {
                 self.senders.widget().invalidate_filter();
                 self.blacklist.widget().invalidate_filter();
             }
-            AccountsInput::AddAccount => {
+            m @ (AccountsInput::AddAccount | AccountsInput::AddCustomOAuthAccount) => {
                 self.editing = None;
                 self.emoji = None;
                 self.avatar = None;
@@ -1849,6 +1857,9 @@ impl Component for AccountsWindow {
                 set_connection_editable(widgets, true);
                 widgets.goa_banner.set_visible(false);
                 widgets.keyring_note.set_visible(true);
+                if matches!(m, AccountsInput::AddCustomOAuthAccount) {
+                    widgets.provider_row.set_selected(kind_index(ProviderKind::CustomOAuth));
+                }
                 self.apply_provider(widgets);
                 self.sig_editor(widgets).set_html("");
                 widgets.color_btn.set_rgba(&parse_color(DEFAULT_COLOR));

@@ -6,7 +6,10 @@
   The Incoming Protocol row of an IMAP/POP3 account offers IMAP and POP3,
   and is hidden for Stalwart, whose protocol is always JMAP. Accounts
   already on JMAP open under Stalwart as before. Custom (OAuth) moves up
-  the Provider list to sit under IMAP/POP3 Account.
+  the Provider list to sit under IMAP/POP3 Account, and the welcome
+  wizard lists it too: choosing it there opens Settings on a new OAuth
+  account when the wizard finishes, since its sign-in details are only
+  in the account editor.
 - **Changed: Mail Accounts marks an account with no provider logo by how it
   connects** (#277): a blue IMAP, red POP3 or yellow OAuth tile in place
   of the blue and yellow envelopes, in the account list, the Provider

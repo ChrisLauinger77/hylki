@@ -1151,6 +1151,9 @@ msgstr "Требуется пароль приложения (не ваш обы
 msgid "Enter your server details manually."
 msgstr "Введите параметры сервера вручную."
 
+msgid "Enter your provider's OAuth endpoints, then sign in."
+msgstr "Укажите конечные точки OAuth вашего провайдера и войдите."
+
 msgid "Sign in with your browser — no password needed."
 msgstr "Войдите через браузер — пароль не требуется."
 
@@ -1167,9 +1170,6 @@ msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Сначала включите доступ по POP/IMAP в настройках GMX."
-
-msgid "Enter your provider's OAuth endpoints, then sign in."
-msgstr "Укажите конечные точки OAuth вашего провайдера и войдите."
 
 msgid "Mail Accounts"
 msgstr "Почтовые учётные записи"
@@ -5026,7 +5026,19 @@ msgstr "Начать работу"
 msgid "Continue"
 msgstr "Продолжить"
 
+#, fuzzy
+msgid "Set Up in Settings"
+msgstr "Настройки"
+
+msgid ""
+"An OAuth account needs your provider's sign-in details. Settings opens on it "
+"when you finish here."
+msgstr ""
+
 msgid "Port"
+msgstr ""
+
+msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."

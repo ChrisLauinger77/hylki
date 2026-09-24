@@ -67,6 +67,9 @@ pub enum WelcomeOutput {
     /// A language was picked on the first page: its locale code, "" for
     /// the system's. The app saves it and comes back in that language.
     Language(String),
+    /// Custom (OAuth) was chosen: open Settings on a new account with it
+    /// picked, once the wizard is done (sent after `Done`).
+    SetUpCustomOAuth,
 }
 
 #[derive(Debug)]
@@ -83,6 +86,9 @@ pub struct Welcome {
     /// supersedes the running test (its late result is ignored), so the
     /// button never has to lock while a slow/wrong server times out.
     test_seq: u32,
+    /// Custom (OAuth) was chosen and handed to Settings, which opens on it
+    /// when the wizard finishes.
+    oauth_in_settings: bool,
 }
 
 pub struct WelcomeWidgets {
@@ -119,10 +125,15 @@ pub struct WelcomeWidgets {
     finish_btn: gtk::Button,
 }
 
-/// The password-capable subset of the shared provider table (OAuth providers
-/// go through GNOME Online Accounts, which the page covers separately).
+/// The shared provider table less Google and Microsoft, which sign in
+/// through GNOME Online Accounts (the page lists those separately). Custom
+/// OAuth is listed but set up in Settings, whose account editor has the
+/// client and endpoint fields it needs.
 fn wizard_providers() -> Vec<&'static Provider> {
-    PROVIDERS.iter().filter(|p| p.wizard_password_provider()).collect()
+    PROVIDERS
+        .iter()
+        .filter(|p| p.wizard_password_provider() || p.wizard_opens_settings())
+        .collect()
 }
 
 /// The wordmark with the app icon beside it, for the About window and the
@@ -362,6 +373,7 @@ impl Component for Welcome {
             goa,
             added: Vec::new(),
             test_seq: 0,
+            oauth_in_settings: false,
         };
 
         let carousel = adw::Carousel::new();
@@ -825,6 +837,29 @@ impl Component for Welcome {
             }
             WelcomeInput::ProviderChanged => {
                 let sel = widgets.provider_row.selected() as usize;
+                let settings = wizard_providers().get(sel).is_some_and(|p| p.wizard_opens_settings());
+                // Picking another provider takes back a hand-off already made.
+                self.oauth_in_settings = false;
+                widgets.status_lbl.set_text("");
+                for row in [
+                    widgets.name_row.upcast_ref::<gtk::Widget>(),
+                    widgets.email_row.upcast_ref(),
+                    widgets.pass_row.upcast_ref(),
+                    widgets.server_exp.upcast_ref(),
+                ] {
+                    row.set_visible(!settings);
+                }
+                widgets
+                    .add_btn
+                    .set_label(&if settings { i18n("Set Up in Settings") } else { i18n("Test & Add") });
+                if settings {
+                    widgets.hint_lbl.set_visible(true);
+                    widgets.hint_lbl.set_text(&i18n(
+                        "An OAuth account needs your provider's sign-in details. \
+                         Settings opens on it when you finish here.",
+                    ));
+                    return;
+                }
                 if let Some(p) = wizard_providers().get(sel) {
                     let (ih, ip, sh, sp) = p.wizard_servers();
                     let jmap = p.wizard_protocol() == Protocol::Jmap;
@@ -848,10 +883,18 @@ impl Component for Welcome {
                     widgets.smtp_port_row.set_visible(!jmap);
                     let hint = p.wizard_hint();
                     widgets.hint_lbl.set_visible(!hint.is_empty());
-                    widgets.hint_lbl.set_text(hint);
+                    widgets.hint_lbl.set_text(&i18n(hint));
                 }
             }
             WelcomeInput::TestAndAdd => {
+                let sel = widgets.provider_row.selected() as usize;
+                if wizard_providers().get(sel).is_some_and(|p| p.wizard_opens_settings()) {
+                    self.oauth_in_settings = true;
+                    widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
+                    widgets.status_lbl.set_text(&i18n("✓ Settings opens on your OAuth account at the end"));
+                    sender.input(WelcomeInput::Next);
+                    return;
+                }
                 let email = widgets.email_row.text().trim().to_string();
                 let password = widgets.pass_row.text().to_string();
                 // Derive missing servers from the address's domain — the common
@@ -950,6 +993,9 @@ impl Component for Welcome {
                 };
                 let _ = sender.output(WelcomeOutput::Prefs(prefs));
                 let _ = sender.output(WelcomeOutput::Done);
+                if self.oauth_in_settings {
+                    let _ = sender.output(WelcomeOutput::SetUpCustomOAuth);
+                }
                 root.close();
             }
         }

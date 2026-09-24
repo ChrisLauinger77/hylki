@@ -1136,6 +1136,9 @@ msgstr "Alkalmazásjelszó szükséges (nem a szokásos bejelentkezési jelszava
 msgid "Enter your server details manually."
 msgstr "Adja meg kézzel a kiszolgáló adatait."
 
+msgid "Enter your provider's OAuth endpoints, then sign in."
+msgstr "Adja meg a szolgáltató OAuth-végpontjait, majd jelentkezzen be."
+
 msgid "Sign in with your browser — no password needed."
 msgstr "Jelentkezzen be a böngészőben — nincs szükség jelszóra."
 
@@ -1152,9 +1155,6 @@ msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Először engedélyezze a POP/IMAP-hozzáférést a GMX beállításaiban."
-
-msgid "Enter your provider's OAuth endpoints, then sign in."
-msgstr "Adja meg a szolgáltató OAuth-végpontjait, majd jelentkezzen be."
 
 msgid "Mail Accounts"
 msgstr "Levelezési fiókok"
@@ -4937,7 +4937,19 @@ msgstr "Olvasás megkezdése"
 msgid "Continue"
 msgstr "Folytatás"
 
+#, fuzzy
+msgid "Set Up in Settings"
+msgstr "Beállítások"
+
+msgid ""
+"An OAuth account needs your provider's sign-in details. Settings opens on it "
+"when you finish here."
+msgstr ""
+
 msgid "Port"
+msgstr ""
+
+msgid "✓ Settings opens on your OAuth account at the end"
 msgstr ""
 
 msgid "Enter your email address and password first."

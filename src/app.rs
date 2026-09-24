@@ -1573,6 +1573,9 @@ pub enum AppMsg {
     OpenAccounts,
     /// Open the accounts window straight to the "add account" form (empty state).
     AddFirstAccount,
+    /// The welcome wizard handed Custom (OAuth) over: a new account in
+    /// Settings with that provider picked.
+    AddCustomOAuthAccount,
     AccountSaved { original_email: Option<String>, account: Box<AccountConfig> },
     /// Show the keyring / Secret Service setup help. `problem: true` when a save
     /// actually failed to persist; `false` for the proactive one-time tip.
@@ -8320,6 +8323,12 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenAccounts => self.open_settings_window(&sender, true, false),
 
             AppMsg::AddFirstAccount => self.open_settings_window(&sender, true, true),
+            AppMsg::AddCustomOAuthAccount => {
+                self.open_settings_window(&sender, true, false);
+                if let Some(a) = &self.accounts_win {
+                    a.emit(crate::ui::accounts::AccountsInput::AddCustomOAuthAccount);
+                }
+            }
 
             AppMsg::AccountSaved { original_email, account } => {
                 // Whether the account joined or left the unified section
@@ -11883,6 +11892,7 @@ impl AppModel {
                 WelcomeOutput::Prefs(p) => AppMsg::ApplyWelcomePrefs(p),
                 WelcomeOutput::Done => AppMsg::PresentWindow,
                 WelcomeOutput::Language(code) => AppMsg::WizardLanguage(code),
+                WelcomeOutput::SetUpCustomOAuth => AppMsg::AddCustomOAuthAccount,
             });
         welcome.widget().set_transient_for(Some(&self.window));
         welcome.widget().set_modal(true);
