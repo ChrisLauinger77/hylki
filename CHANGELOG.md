@@ -572,8 +572,8 @@ and the repository itself rebuilt around #230.
   180-line budget, a `docs/*.md` missing from the index or linked from nowhere,
   artwork under `docs/`, unexpected top-level Markdown, a "Vireo" outside the
   changelog, and a CONTRIBUTORS or TRANSLATORS line About would silently drop.
-  Where each kind of writing goes is a placement table in the new `CLAUDE.md`
-  and in `docs/CONTRIBUTING.md`, and the check is a step before a tag.
+  Where each kind of writing goes is a placement table in
+  `docs/CONTRIBUTING.md`, and the check is a step before a tag.
 - `HYLKI_SHOWCASE_SCROLL` now scrolls the About window too, and
   `HYLKI_SHOWCASE_PEEK` takes a list of seconds (`=7,10`), working the sidebar
   toggle at each — how the borrowed-layout paths were checked without input

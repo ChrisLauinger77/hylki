@@ -16,7 +16,7 @@ the rules that keep it, and docs/, from drifting back:
 Run it after touching any .md, and before a release. It prints what is wrong
 and exits non-zero, or says everything is in order.
 """
-import pathlib, re, sys
+import pathlib, re, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -24,15 +24,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # not a formality: what pushed it over probably belongs in docs/.
 README_MAX_LINES = 180
 
-# The Markdown allowed at the top level: the front page, the history GitHub
-# and the About page both read from here, and CLAUDE.md, which is read by
-# whoever works on the repository rather than by anyone reading it. Everything
-# else is documentation and lives in docs/ (SECURITY.md included: GitHub finds
-# a security policy in docs/ as readily as at the top).
+# The Markdown allowed at the top level: the front page, and the history
+# GitHub and the About page both read from here. Everything else is
+# documentation and lives in docs/ (SECURITY.md included: GitHub finds a
+# security policy in docs/ as readily as at the top).
 TOP_LEVEL_MD = {
     "README.md",
     "CHANGELOG.md",
-    "CLAUDE.md",
 }
 
 # The files whose Vireo/Veem mentions are history rather than staleness.
@@ -40,9 +38,8 @@ OLD_NAME_OK = {"CHANGELOG.md", "RELEASE_NOTES.md"}
 
 # An em dash is a colon, a comma or a full stop that has not decided which it
 # is, and the documentation reads better without one (#230). The changelog and
-# the release notes are a record of what was published and keep theirs;
-# CLAUDE.md is a working agreement rather than documentation.
-EM_DASH_OK = {"CHANGELOG.md", "RELEASE_NOTES.md", "CLAUDE.md"}
+# the release notes are a record of what was published and keep theirs.
+EM_DASH_OK = {"CHANGELOG.md", "RELEASE_NOTES.md"}
 
 problems: list[str] = []
 
@@ -51,12 +48,30 @@ def problem(where: str, what: str) -> None:
     problems.append(f"{where}: {what}")
 
 
+def ignored(files: list[pathlib.Path]) -> set[pathlib.Path]:
+    # A file git ignores is somebody's local notes, not part of the repository,
+    # so it is neither checked nor counted as unexpected. Outside a checkout
+    # nothing is ignored.
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(ROOT), "check-ignore", "--stdin"],
+            input="\n".join(str(f) for f in files),
+            capture_output=True,
+            text=True,
+        ).stdout
+    except OSError:
+        return set()
+    return {pathlib.Path(line) for line in out.splitlines()}
+
+
 def markdown_files() -> list[pathlib.Path]:
-    return sorted(ROOT.glob("*.md")) + sorted(ROOT.glob("docs/*.md")) + [
+    files = sorted(ROOT.glob("*.md")) + sorted(ROOT.glob("docs/*.md")) + [
         ROOT / "po/README.md",
         ROOT / "data/brands/README.md",
         ROOT / "data/logos/README.md",
     ]
+    skip = ignored(files)
+    return [f for f in files if f not in skip]
 
 
 def anchors(path: pathlib.Path) -> set[str]:
@@ -140,8 +155,10 @@ def check_docs_holds_only_docs() -> None:
             f"docs/{f.relative_to(ROOT / 'docs')}",
             "not documentation — artwork goes in data/repo/",
         )
-    for f in sorted(ROOT.glob("*.md")):
-        if f.name not in TOP_LEVEL_MD:
+    top = sorted(ROOT.glob("*.md"))
+    skip = ignored(top)
+    for f in top:
+        if f.name not in TOP_LEVEL_MD and f not in skip:
             problem(f.name, "top-level Markdown belongs in docs/")
 
 
