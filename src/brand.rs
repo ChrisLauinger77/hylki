@@ -25,7 +25,6 @@ brands!(
     "nextcloud", "owncloud", "opencloud", "onedrive", "dropbox", "seafile",
     "gmail", "outlook", "icloud", "yahoo", "proton", "fastmail", "aol", "zoho", "gmx", "yandex", "mailcom",
     "stalwart",
-    "mail", "mail-oauth",
 );
 
 thread_local! {
@@ -73,12 +72,33 @@ pub fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
     image
 }
 
-/// Point an existing image at a mark (or the fallback icon), for a header
-/// mark that follows a picker.
-pub fn set_image(image: &gtk::Image, id: &str, px: i32, fallback: &str) {
-    match texture(id, px * 2) {
-        Some(t) => image.set_paintable(Some(&t)),
-        None => image.set_icon_name(Some(fallback)),
+/// The accounts that belong to no provider are marked by how they connect,
+/// in a colored tile with the protocol's name: "mail" (IMAP on a server the
+/// app does not recognise), "mail-pop3" (the same over POP3) and "mail-oauth" (custom OAuth).
+/// Words rather than the envelopes these once were, which said nothing a
+/// glance could tell apart and had little contrast in either scheme (#277).
+fn protocol_pill(id: &str, px: i32) -> Option<gtk::Label> {
+    let (text, class) = match id {
+        "mail" => ("IMAP", "imap"),
+        "mail-pop3" => ("POP3", "pop3"),
+        "mail-oauth" => ("OAuth", "oauth"),
+        _ => return None,
+    };
+    let pill = gtk::Label::new(Some(text));
+    pill.add_css_class("protocol-pill");
+    pill.add_css_class(class);
+    if px >= 40 {
+        pill.add_css_class("large");
     }
-    image.set_pixel_size(px);
+    pill.set_valign(gtk::Align::Center);
+    pill.set_halign(gtk::Align::Center);
+    Some(pill)
+}
+
+/// [`image_or`], or the protocol tile for an account with no provider mark.
+pub fn mark(id: &str, px: i32, fallback: &str) -> gtk::Widget {
+    match protocol_pill(id, px) {
+        Some(pill) => pill.upcast(),
+        None => image_or(id, px, fallback).upcast(),
+    }
 }

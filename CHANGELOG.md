@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Changed: Mail Accounts marks an account with no provider logo by how it
+  connects** (#277): a blue IMAP, red POP3 or yellow OAuth tile in place
+  of the blue and yellow envelopes, in the account list, the Provider
+  picker and over the account editor.
 - **Changed: the app icon gallery offers five icons** (#277, suggested by
   yioannides): the default, the blue, navy and yellow squares, and the
   classic icon. The squircles, the envelopes and the birds are gone. A

@@ -1014,7 +1014,7 @@ fn rebuild_goa_rows(
         let row = adw::ActionRow::new();
         row.set_title(&g.email);
         row.set_subtitle(&g.provider);
-        row.add_prefix(&crate::brand::image_or(
+        row.add_prefix(&crate::brand::mark(
             crate::ui::accounts::brand_for_goa(&g.provider),
             24,
             crate::brand::GENERIC_MAIL,
