@@ -2802,6 +2802,14 @@ msgstr "Não foi possível cancelar a inscrição: {why}"
 msgid "Try Again"
 msgstr "Tentar novamente"
 
+#. Mail sent well after the request means the list did not
+#. act on it, or that the List-Id covers more than the one
+#. list that was left (#284); the banner must not say
+#. "unsubscribed" over the proof that it was not.
+#, fuzzy
+msgid "You unsubscribed on {date}, but this list is still sending mail."
+msgstr "Você cancelou a inscrição nesta lista em {date}."
+
 msgid "You unsubscribed from this list on {date}."
 msgstr "Você cancelou a inscrição nesta lista em {date}."
 
@@ -5045,9 +5053,6 @@ msgstr ""
 "funcionalidade,\n"
 "abra um pedido no nosso <a href=\"{url}\">Github</a>."
 
-msgid "Finish"
-msgstr ""
-
 msgid "Continue"
 msgstr "Continuar"
 
@@ -5082,6 +5087,9 @@ msgstr "{email} — envio (SMTP): {e}"
 #, fuzzy
 msgid "✓ {email} — signed in and added"
 msgstr "✓ {email} — conectado e adicionado"
+
+msgid "Finish"
+msgstr ""
 
 msgid "Skip"
 msgstr ""

@@ -2795,6 +2795,14 @@ msgstr "No se pudo cancelar la suscripción: {why}"
 msgid "Try Again"
 msgstr "Intentar de nuevo"
 
+#. Mail sent well after the request means the list did not
+#. act on it, or that the List-Id covers more than the one
+#. list that was left (#284); the banner must not say
+#. "unsubscribed" over the proof that it was not.
+#, fuzzy
+msgid "You unsubscribed on {date}, but this list is still sending mail."
+msgstr "Cancelaste la suscripción a esta lista el {date}."
+
 msgid "You unsubscribed from this list on {date}."
 msgstr "Cancelaste la suscripción a esta lista el {date}."
 
@@ -5035,9 +5043,6 @@ msgstr ""
 "¡Disfruta! Si encuentras algún problema o quieres solicitar una función, "
 "abre una incidencia en nuestro <a href=\"{url}\">GitHub</a>."
 
-msgid "Finish"
-msgstr ""
-
 msgid "Continue"
 msgstr "Continuar"
 
@@ -5072,6 +5077,9 @@ msgstr "{email} — envío (SMTP): {e}"
 #, fuzzy
 msgid "✓ {email} — signed in and added"
 msgstr "✓ {email} — conectada y añadida"
+
+msgid "Finish"
+msgstr ""
 
 msgid "Skip"
 msgstr ""

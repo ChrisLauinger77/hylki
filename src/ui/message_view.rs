@@ -259,6 +259,14 @@ impl MessageView {
             ),
             None => {
                 let text = match self.unsubscribed.get(&info.key(&m.from_addr)) {
+                    // Mail sent well after the request means the list did not
+                    // act on it, or that the List-Id covers more than the one
+                    // list that was left (#284); the banner must not say
+                    // "unsubscribed" over the proof that it was not.
+                    Some(at) if m.timestamp > at + UNSUB_GRACE_SECS => i18n_f(
+                        "You unsubscribed on {date}, but this list is still sending mail.",
+                        &[("date", &crate::datefmt::day_month_year(*at))],
+                    ),
                     Some(at) => i18n_f(
                         "You unsubscribed from this list on {date}.",
                         &[("date", &crate::datefmt::day_month_year(*at))],
@@ -957,6 +965,11 @@ pub enum MessageViewOutput {
         action: InviteAction,
     },
 }
+
+/// How long a list has to act on an unsubscribe request before its mail
+/// stops counting as already on its way: the two days Gmail and Yahoo
+/// require of bulk senders.
+const UNSUB_GRACE_SECS: i64 = 2 * 24 * 60 * 60;
 
 /// Where a card's unsubscribe request stands while it is not at rest.
 #[derive(Debug, Clone, PartialEq, Eq)]

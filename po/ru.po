@@ -2807,6 +2807,13 @@ msgstr ""
 msgid "Try Again"
 msgstr "Повторить поиск"
 
+#. Mail sent well after the request means the list did not
+#. act on it, or that the List-Id covers more than the one
+#. list that was left (#284); the banner must not say
+#. "unsubscribed" over the proof that it was not.
+msgid "You unsubscribed on {date}, but this list is still sending mail."
+msgstr ""
+
 msgid "You unsubscribed from this list on {date}."
 msgstr ""
 
@@ -5025,9 +5032,6 @@ msgstr ""
 "предложить новую функцию,\n"
 "пожалуйста, создайте обращение на нашем <a href=\"{url}\">GitHub</a>."
 
-msgid "Finish"
-msgstr ""
-
 msgid "Continue"
 msgstr "Продолжить"
 
@@ -5062,6 +5066,9 @@ msgstr "{email} — отправка (SMTP): {e}"
 #, fuzzy
 msgid "✓ {email} — signed in and added"
 msgstr "✓ {email} — подключено и добавлено"
+
+msgid "Finish"
+msgstr ""
 
 msgid "Skip"
 msgstr ""

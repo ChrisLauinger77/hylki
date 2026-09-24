@@ -2826,6 +2826,14 @@ msgstr "Le désabonnement a échoué : {why}"
 msgid "Try Again"
 msgstr "Réessayer"
 
+#. Mail sent well after the request means the list did not
+#. act on it, or that the List-Id covers more than the one
+#. list that was left (#284); the banner must not say
+#. "unsubscribed" over the proof that it was not.
+#, fuzzy
+msgid "You unsubscribed on {date}, but this list is still sending mail."
+msgstr "Vous vous êtes désabonné(e) de cette liste le {date}."
+
 msgid "You unsubscribed from this list on {date}."
 msgstr "Vous vous êtes désabonné(e) de cette liste le {date}."
 
@@ -5073,9 +5081,6 @@ msgstr ""
 "fonctionnalité,\n"
 "veuillez ouvrir un ticket sur notre <a href=\"{url}\">GitHub</a>."
 
-msgid "Finish"
-msgstr ""
-
 msgid "Continue"
 msgstr "Continuer"
 
@@ -5110,6 +5115,9 @@ msgstr "{email} — envoi (SMTP) : {e}"
 #, fuzzy
 msgid "✓ {email} — signed in and added"
 msgstr "✓ {email} — connecté et ajouté"
+
+msgid "Finish"
+msgstr ""
 
 msgid "Skip"
 msgstr ""

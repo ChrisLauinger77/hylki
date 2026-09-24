@@ -2845,6 +2845,13 @@ msgstr ""
 msgid "Try Again"
 msgstr "Νέα σάρωση"
 
+#. Mail sent well after the request means the list did not
+#. act on it, or that the List-Id covers more than the one
+#. list that was left (#284); the banner must not say
+#. "unsubscribed" over the proof that it was not.
+msgid "You unsubscribed on {date}, but this list is still sending mail."
+msgstr ""
+
 msgid "You unsubscribed from this list on {date}."
 msgstr ""
 
@@ -5088,9 +5095,6 @@ msgstr ""
 "Καλή χρήση! Αν αντιμετωπίσετε κάποιο πρόβλημα ή έχετε πρόταση λειτουργίας,\n"
 "ανοίξτε ένα ζήτημα στο <a href=\"{url}\">Github</a> μας."
 
-msgid "Finish"
-msgstr ""
-
 msgid "Continue"
 msgstr "Συνέχεια"
 
@@ -5125,6 +5129,9 @@ msgstr "{email} — αποστολή (SMTP): {e}"
 #, fuzzy
 msgid "✓ {email} — signed in and added"
 msgstr "✓ {email} — συνδέθηκε και προστέθηκε"
+
+msgid "Finish"
+msgstr ""
 
 msgid "Skip"
 msgstr ""
