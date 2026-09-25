@@ -123,7 +123,7 @@ pub fn new_mail(
         }
     }
     send(&mail_id(account_id), &n);
-    if let Some(sound) = crate::config::notification_sound() {
+    if let Some(sound) = crate::config::new_mail_sound() {
         if crate::desktop::quiet() {
             tracing::debug!("new-mail sound: the desktop asks for quiet");
         } else {
@@ -144,13 +144,16 @@ thread_local! {
 /// notifications; a sound still playing is left to finish rather than
 /// stacked with copies of itself. `restart` is Settings' Play button, which
 /// starts over.
-pub fn play_sound(path: &std::path::Path, restart: bool) {
+pub fn play_sound(sound: &crate::config::SoundSource, restart: bool) {
     SOUND.with(|slot| {
         let mut slot = slot.borrow_mut();
         if !restart && slot.as_ref().is_some_and(|m| m.is_playing()) {
             return;
         }
-        let media = gtk::MediaFile::for_filename(path);
+        let media = match sound {
+            crate::config::SoundSource::Resource(path) => gtk::MediaFile::for_resource(path),
+            crate::config::SoundSource::File(path) => gtk::MediaFile::for_filename(path),
+        };
         media.connect_error_notify(|m| {
             if let Some(e) = m.error() {
                 tracing::warn!("new-mail sound: {e}");

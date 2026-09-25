@@ -20,4 +20,12 @@ fn main() {
         "resources/logos.gresource.xml",
         "logos.gresource",
     );
+    // The built-in new-mail sounds (data/sounds/).
+    println!("cargo:rerun-if-changed=resources/sounds.gresource.xml");
+    println!("cargo:rerun-if-changed=data/sounds");
+    glib_build_tools::compile_resources(
+        &["resources"],
+        "resources/sounds.gresource.xml",
+        "sounds.gresource",
+    );
 }

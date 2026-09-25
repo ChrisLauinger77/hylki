@@ -326,4 +326,10 @@ fn register_resources() {
         Ok(resource) => gio::resources_register(&resource),
         Err(e) => tracing::error!("failed to register bundled logo resources: {e}"),
     }
+    // The built-in new-mail sounds, under /co/hyprlab/Hylki/sounds/<name>.ogg.
+    let sounds = glib::Bytes::from_static(include_bytes!(concat!(env!("OUT_DIR"), "/sounds.gresource")));
+    match gio::Resource::from_data(&sounds) {
+        Ok(resource) => gio::resources_register(&resource),
+        Err(e) => tracing::error!("failed to register bundled sound resources: {e}"),
+    }
 }

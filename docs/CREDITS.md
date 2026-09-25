@@ -150,5 +150,6 @@ Adding or updating one is the easiest way in: see [po/README.md](../po/README.md
 
 ## Third-party work
 
-The brand marks, sender logos and appearance themes Hylki bundles are listed
-with their sources and licences in [LICENSE.md](LICENSE.md).
+The brand marks, sender logos, new-mail sounds and appearance themes Hylki
+bundles are listed with their sources and licences in
+[LICENSE.md](LICENSE.md).

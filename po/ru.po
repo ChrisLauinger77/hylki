@@ -3685,12 +3685,15 @@ msgstr "Показывать отправителя и тему"
 msgid "Sound for new mail"
 msgstr "Проверка новой почты"
 
+msgid "Sound"
+msgstr ""
+
 msgid "Play"
 msgstr ""
 
 #, fuzzy
-msgid "Remove Sound"
-msgstr "Удалить аккаунт?"
+msgid "Sound file"
+msgstr "Проверка новой почты"
 
 #, fuzzy
 msgid "Notification Buttons"
@@ -4886,6 +4889,26 @@ msgstr ""
 msgid "Forget this word"
 msgstr "Удалить это слово"
 
+#. GNOME Settings' own names for its alert sounds.
+msgid "Click"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Hum"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "String"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Swing"
+msgstr ""
+
+#, fuzzy
+msgid "Custom File"
+msgstr "Другой цвет…"
+
 msgid "Print Message"
 msgstr "Печать сообщения"
 
@@ -5607,6 +5630,10 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Remove Sound"
+#~ msgstr "Удалить аккаунт?"
 
 #, fuzzy
 #~ msgid "Send it with the message"

@@ -3712,12 +3712,15 @@ msgstr "Εμφάνιση αποστολέα και θέματος"
 msgid "Sound for new mail"
 msgstr "Έλεγχος για νέα μηνύματα"
 
+msgid "Sound"
+msgstr ""
+
 msgid "Play"
 msgstr ""
 
 #, fuzzy
-msgid "Remove Sound"
-msgstr "Αφαίρεση λογαριασμού;"
+msgid "Sound file"
+msgstr "Έλεγχος για νέα μηνύματα"
 
 msgid "Notification Buttons"
 msgstr "Κουμπιά ειδοποιήσεων"
@@ -4958,6 +4961,26 @@ msgstr ""
 msgid "Forget this word"
 msgstr "Να ξεχαστεί αυτή η λέξη"
 
+#. GNOME Settings' own names for its alert sounds.
+msgid "Click"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Hum"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "String"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Swing"
+msgstr ""
+
+#, fuzzy
+msgid "Custom File"
+msgstr "Προσαρμοσμένο χρώμα…"
+
 msgid "Print Message"
 msgstr "Εκτύπωση μηνύματος"
 
@@ -5712,6 +5735,10 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Remove Sound"
+#~ msgstr "Αφαίρεση λογαριασμού;"
 
 #, fuzzy
 #~ msgid "Send it with the message"

@@ -19,6 +19,13 @@ can fill a sender's avatar: they come from
 [Simple Icons](https://simpleicons.org) (CC0), remain their owners' marks, and
 are listed with their sources in [data/logos/README.md](../data/logos/README.md).
 
+## New-mail sounds
+
+The built-in new-mail sounds (Click, Hum, String and Swing) are GNOME's alert
+sounds from [GNOME Settings](https://gitlab.gnome.org/GNOME/gnome-control-center)
+(GPL-2.0-or-later), unmodified; see
+[data/sounds/README.md](../data/sounds/README.md).
+
 ## Appearance themes
 
 The appearance themes (Rose, Forest, Tidal, Earth and Midnight) are the theme

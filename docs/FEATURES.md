@@ -136,7 +136,7 @@ The full list. The [README](../README.md) carries a shorter one.
   you choose.
 - **Notifications** that open the message they are about, with up to three
   buttons of your choice: Mark as Read, Archive, Delete, Reply, Forward or
-  Mark as Spam, and a sound file of your own if you want one.
+  Mark as Spam, and a sound if you want one: built in, or a file of your own.
 - **GNOME Contacts:** names and photos from your address book, optional.
 - **Your language:** the desktop's, or one you pick; a 12- or 24-hour clock
   following the desktop setting.

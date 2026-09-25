@@ -3654,12 +3654,15 @@ msgstr "Feladó és tárgy megjelenítése"
 msgid "Sound for new mail"
 msgstr "Új levelek keresése"
 
+msgid "Sound"
+msgstr ""
+
 msgid "Play"
 msgstr ""
 
 #, fuzzy
-msgid "Remove Sound"
-msgstr "Eltávolítja a fiókot?"
+msgid "Sound file"
+msgstr "Új levelek keresése"
 
 #, fuzzy
 msgid "Notification Buttons"
@@ -4788,6 +4791,26 @@ msgstr ""
 msgid "Forget this word"
 msgstr "Szó elfelejtése"
 
+#. GNOME Settings' own names for its alert sounds.
+msgid "Click"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Hum"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "String"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Swing"
+msgstr ""
+
+#, fuzzy
+msgid "Custom File"
+msgstr "Egyéni szín…"
+
 msgid "Print Message"
 msgstr "Üzenet nyomtatása"
 
@@ -5507,6 +5530,10 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Remove Sound"
+#~ msgstr "Eltávolítja a fiókot?"
 
 #, fuzzy
 #~ msgid "Send it with the message"

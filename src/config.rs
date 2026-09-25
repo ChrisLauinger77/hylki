@@ -154,27 +154,26 @@ fn prune_avatars(accounts: &[AccountConfig]) {
     }
 }
 
-/// Where the new-mail sound is kept (#292). It is a copy, so the original
-/// can be moved or deleted, and inside the Flatpak it stays readable after
-/// the file chooser's grant lapses. The file keeps its own name, which is
-/// what Settings shows; there is never more than one.
-fn notification_sound_dir() -> Option<PathBuf> {
+/// Where the custom new-mail sound is kept (#292). It is a copy, so the
+/// original can be moved or deleted, and inside the Flatpak it stays readable
+/// after the file chooser's grant lapses. The file keeps its own name, which
+/// is what Settings shows; there is never more than one.
+fn custom_sound_dir() -> Option<PathBuf> {
     data_base().map(|d| d.join("hylki").join("notification-sound"))
 }
 
-/// The chosen new-mail sound, if there is one. None means the desktop's
-/// own behaviour: Hylki plays nothing.
-pub fn notification_sound() -> Option<PathBuf> {
-    std::fs::read_dir(notification_sound_dir()?)
+/// The custom new-mail sound file, if one has been chosen.
+pub fn custom_sound() -> Option<PathBuf> {
+    std::fs::read_dir(custom_sound_dir()?)
         .ok()?
         .flatten()
         .map(|e| e.path())
         .find(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
 }
 
-/// Make a copy of `src` the new-mail sound, in place of any earlier one.
-pub fn set_notification_sound(src: &Path) -> std::io::Result<PathBuf> {
-    let dir = notification_sound_dir()
+/// Make a copy of `src` the custom new-mail sound, in place of any earlier one.
+pub fn set_custom_sound(src: &Path) -> std::io::Result<PathBuf> {
+    let dir = custom_sound_dir()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no data directory"))?;
     let name = src
         .file_name()
@@ -184,21 +183,88 @@ pub fn set_notification_sound(src: &Path) -> std::io::Result<PathBuf> {
     std::fs::create_dir_all(&dir)?;
     let part = dir.join(".incoming");
     std::fs::copy(src, &part)?;
-    clear_notification_sound();
+    for entry in std::fs::read_dir(&dir)?.flatten() {
+        if entry.file_name() != ".incoming" {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
     let dest = dir.join(name);
     std::fs::rename(&part, &dest)?;
     Ok(dest)
 }
 
-/// Go back to the desktop's own behaviour for new mail.
-pub fn clear_notification_sound() {
-    let Some(dir) = notification_sound_dir() else { return };
-    let Ok(entries) = std::fs::read_dir(&dir) else { return };
-    for entry in entries.flatten() {
-        if entry.file_name() != ".incoming" {
-            let _ = std::fs::remove_file(entry.path());
+/// The built-in new-mail sounds: GNOME's four alert sounds (data/sounds/),
+/// so there is something to hear without hunting for a file. The desktop's
+/// own sound theme is out of reach: the GNOME runtime ships none, and the
+/// Flatpak cannot see the host's /usr/share/sounds.
+pub const BUILTIN_SOUNDS: [&str; 4] = ["click", "hum", "string", "swing"];
+
+/// The `sound` value naming the custom file.
+pub const CUSTOM_SOUND: &str = "custom";
+
+/// Something to play: a built-in sound's resource path, or the custom file.
+pub enum SoundSource {
+    Resource(String),
+    File(PathBuf),
+}
+
+/// The new-mail sound settings (#292). Stored in sound.toml, like focus.toml,
+/// so privacy.toml's long save call stays as it is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NewMailSound {
+    pub enabled: bool,
+    /// One of `BUILTIN_SOUNDS`, or `CUSTOM_SOUND`.
+    pub sound: String,
+}
+
+impl NewMailSound {
+    /// What `sound` names. An unknown name is the first built-in; a custom
+    /// sound whose file has gone is nothing.
+    pub fn source(&self) -> Option<SoundSource> {
+        if self.sound == CUSTOM_SOUND {
+            return custom_sound().map(SoundSource::File);
         }
+        let name = BUILTIN_SOUNDS.iter().find(|n| **n == self.sound).unwrap_or(&BUILTIN_SOUNDS[0]);
+        Some(SoundSource::Resource(format!("/co/hyprlab/Hylki/sounds/{name}.ogg")))
     }
+}
+
+fn sound_path() -> Option<PathBuf> {
+    Some(config_base()?.join("hylki").join("sound.toml"))
+}
+
+/// The saved new-mail sound settings. Without sound.toml the sound is off,
+/// unless a custom file was chosen before the switch existed: that stays on.
+pub fn load_new_mail_sound() -> NewMailSound {
+    if let Some(saved) = sound_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| toml::from_str::<NewMailSound>(&t).ok())
+    {
+        return saved;
+    }
+    let custom = custom_sound().is_some();
+    NewMailSound {
+        enabled: custom,
+        sound: if custom { CUSTOM_SOUND } else { BUILTIN_SOUNDS[0] }.to_string(),
+    }
+}
+
+pub fn save_new_mail_sound(sound: &NewMailSound) {
+    let Some(path) = sound_path() else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(toml) = toml::to_string_pretty(sound) {
+        let _ = std::fs::write(&path, toml);
+    }
+}
+
+/// What to play for new mail, if anything.
+pub fn new_mail_sound() -> Option<SoundSource> {
+    let sound = load_new_mail_sound();
+    if sound.enabled { sound.source() } else { None }
 }
 
 /// Service name used for keyring entries; password items are keyed by email.
@@ -4034,6 +4100,18 @@ mod tests {
         // An older privacy.toml with no `notifications` key opts in by default.
         let p: PrivacyFile = toml::from_str("").unwrap();
         assert!(p.notifications);
+    }
+
+    #[test]
+    fn new_mail_sound_names_a_builtin_or_falls_back() {
+        let resource = |sound: &str| match (super::NewMailSound { enabled: true, sound: sound.into() }).source() {
+            Some(super::SoundSource::Resource(p)) => p,
+            _ => panic!("a built-in plays from the bundle"),
+        };
+        assert_eq!(resource("hum"), "/co/hyprlab/Hylki/sounds/hum.ogg");
+        assert_eq!(resource("bogus"), "/co/hyprlab/Hylki/sounds/click.ogg");
+        let saved: super::NewMailSound = toml::from_str("enabled = true\nsound = \"swing\"").unwrap();
+        assert_eq!(saved, super::NewMailSound { enabled: true, sound: "swing".into() });
     }
 
     #[test]

@@ -3338,10 +3338,13 @@ msgstr ""
 msgid "Sound for new mail"
 msgstr ""
 
+msgid "Sound"
+msgstr ""
+
 msgid "Play"
 msgstr ""
 
-msgid "Remove Sound"
+msgid "Sound file"
 msgstr ""
 
 msgid "Notification Buttons"
@@ -4325,6 +4328,25 @@ msgid "Sounds"
 msgstr ""
 
 msgid "Forget this word"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Click"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Hum"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "String"
+msgstr ""
+
+#. GNOME Settings' own names for its alert sounds.
+msgid "Swing"
+msgstr ""
+
+msgid "Custom File"
 msgstr ""
 
 msgid "Print Message"

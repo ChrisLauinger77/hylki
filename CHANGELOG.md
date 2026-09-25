@@ -10,14 +10,15 @@
   paragraph in its plain-text copy, and Shift+Return made a line. Lists and
   the two-Return exit from a quote are unchanged. See
   [Return and Shift+Return](docs/DOCUMENTATION.md#return-and-shiftreturn).
-- **New: a sound file of your own for new mail** (#292, suggested by
-  yioannides). **Settings → General → Sound for new mail** picks a file
-  (WAV, MP3, OGG, FLAC or anything else GStreamer plays), previews it and
-  removes it again. Hylki keeps a copy in its data directory and plays it
-  with each new-mail notification, once for a burst from several accounts.
-  It stays quiet when GNOME's event sounds are off, and during Do Not Disturb
-  in a native install; the Flatpak cannot read Do Not Disturb. The Flatpak
-  gains `--socket=pulseaudio` to play it. See
+- **New: a sound for new mail** (#292, suggested by yioannides).
+  **Settings → General → Sound for new mail** switches it on, and **Sound**
+  picks one of GNOME's four alert sounds (Click, Hum, String, Swing), which
+  Hylki now carries, or a file of your own (WAV, MP3, OGG, FLAC or anything
+  else GStreamer plays), of which Hylki keeps a copy. Picking a sound plays
+  it. It is off by default, and plays once for a burst of mail from several
+  accounts. It stays quiet when GNOME's event sounds are off, and during Do
+  Not Disturb in a native install; the Flatpak cannot read Do Not Disturb.
+  The Flatpak gains `--socket=pulseaudio` to play it. See
   [Notifications](docs/DOCUMENTATION.md#notifications).
 - **New: files dragged onto the window go into a message** (#293). Dragged
   over a composer, the files bring up a card for each place they can go:
