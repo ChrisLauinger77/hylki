@@ -54,6 +54,16 @@
   button now ask whether to save the message to Drafts, discard it or keep
   editing, once anything has been written or attached. An untouched reply
   still closes at once. Escape in the question answers Keep Editing.
+- **Fixed: Unsubscribe said "Unsubscribed" when the list had done nothing**
+  (#284, reported by Nonchalantcz). A one-click request the list answered
+  with a redirect was followed as a GET, whose landing page answered 200.
+  Only a direct 2xx answer to the POST now counts; anything else falls back
+  to the mail route or, failing that, opens the list's page in the browser.
+  Mail from a list dated more than two days after you unsubscribed now says
+  the list is still sending, instead of labelling it as from a list you left.
+- **Translations:** French (PR #281 by frenchy82), Spanish (PR #287 by
+  Daniel Miguel), Portuguese and Brazilian Portuguese (PR #280 by Paulo
+  Fino) and Greek (PR #291 by Yiannis Ioannides) brought up to date.
 - **Changed: JMAP is set up through the Stalwart (JMAP) provider only.**
   The Incoming Protocol row of an IMAP/POP3 account offers IMAP and POP3,
   and is hidden for Stalwart, whose protocol is always JMAP. Accounts
