@@ -2804,12 +2804,12 @@ msgstr[0] "Επεξεργασία αυτού του μηνύματος"
 msgstr[1] "Επεξεργασία αυτού του μηνύματος"
 
 #, fuzzy
-msgid "Place the picture in the message"
-msgid_plural "Place the pictures in the message"
+msgid "Place the picture where the cursor is"
+msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
 msgstr[1] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
 
-msgid "Pictures in the message, other files attached"
+msgid "Pictures where the cursor is, other files attached"
 msgstr ""
 
 msgid "Share a download link from {name}"

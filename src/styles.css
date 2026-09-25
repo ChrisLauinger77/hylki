@@ -340,6 +340,9 @@ button.star-active {
   opacity: 0.65;
   min-height: 4.2em;
 }
+.drop-layer.rows .drop-subtitle {
+  min-height: 0;
+}
 .drop-zone:drop(active) {
   border-style: solid;
   border-color: alpha(@accent_bg_color, 0.9);

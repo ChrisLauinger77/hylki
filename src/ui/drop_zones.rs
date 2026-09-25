@@ -21,6 +21,12 @@ pub enum DropChoice {
 }
 
 const FADE_MS: u32 = 160;
+/// The veil's padding (`.drop-layer` in styles.css) and the gap between
+/// its summary line and the cards.
+const LAYER_PADDING: i32 = 18;
+const LAYER_SPACING: i32 = 14;
+/// A card's side padding (`.drop-zone`) plus its border.
+const CARD_PADDING: i32 = 18;
 
 pub struct DropZones {
     layer: gtk::Box,
@@ -46,6 +52,9 @@ pub struct DropZones {
 
 struct Zone {
     widget: gtk::Box,
+    /// The icon beside the words (a row) or above them (a column).
+    inner: gtk::Box,
+    title: gtk::Label,
     subtitle: gtk::Label,
 }
 
@@ -60,7 +69,7 @@ impl DropZones {
     ) -> Rc<Self> {
         let on_drop: Rc<dyn Fn(DropChoice, Vec<PathBuf>)> = Rc::new(on_drop);
 
-        let layer = gtk::Box::new(gtk::Orientation::Vertical, 14);
+        let layer = gtk::Box::new(gtk::Orientation::Vertical, LAYER_SPACING);
         layer.add_css_class("drop-layer");
         layer.set_visible(false);
 
@@ -218,9 +227,9 @@ impl DropZones {
         let inline = self.allow_inline.get() && pictures > 0;
         self.inline.widget.set_visible(inline);
         self.inline.subtitle.set_label(&if pictures == n {
-            ni18n("Place the picture in the message", "Place the pictures in the message", n)
+            ni18n("Place the picture where the cursor is", "Place the pictures where the cursor is", n)
         } else {
-            i18n("Pictures in the message, other files attached")
+            i18n("Pictures where the cursor is, other files attached")
         });
 
         self.cloud.widget.set_visible(!names.is_empty());
@@ -229,24 +238,58 @@ impl DropZones {
             _ => i18n("Share a download link"),
         });
 
-        // Side by side, unless the composer is too narrow for them and has
-        // the height to stack them instead.
-        let count = 1 + i32::from(inline) + i32::from(!names.is_empty());
-        let side_by_side = width >= height || width >= 190 * count;
-        self.zones.set_orientation(if side_by_side {
-            gtk::Orientation::Horizontal
-        } else {
-            gtk::Orientation::Vertical
-        });
-
-        if self.shown.replace(true) {
-            return;
-        }
+        // Up (still transparent) before anything is measured: a hidden
+        // widget's style is not worked out, and it measures as nothing.
         if !self.layer.is_visible() {
             self.layer.set_opacity(0.0);
             self.layer.set_visible(true);
         }
-        self.fade_to(1.0);
+
+        // Stacked as rows, which the tall reading pane has room for; side
+        // by side only where the composer is too short to stack them (a
+        // split reply dragged small). Measured, since the words wrap to the
+        // width there is.
+        self.lay_out(true);
+        let (need, _, _, _) = self.layer.measure(gtk::Orientation::Vertical, width);
+        if need > height {
+            self.lay_out(false);
+        } else {
+            self.align_rows(width - 2 * LAYER_PADDING);
+        }
+
+        if !self.shown.replace(true) {
+            self.fade_to(1.0);
+        }
+    }
+
+    /// Give the rows' contents one width, the widest one's, so the icons
+    /// line up down the stack however long each card's words are. (A size
+    /// group would be the tool, but it does not hold with wrapping labels.)
+    fn align_rows(&self, room: i32) {
+        let visible: Vec<&Zone> =
+            [&self.attach, &self.inline, &self.cloud].into_iter().filter(|z| z.widget.is_visible()).collect();
+        let widest = visible
+            .iter()
+            .map(|z| z.inner.measure(gtk::Orientation::Horizontal, -1).1)
+            .max()
+            .unwrap_or(0)
+            .min(room - 2 * CARD_PADDING);
+        for zone in visible {
+            zone.inner.set_size_request(widest, -1);
+        }
+    }
+
+    fn lay_out(&self, rows: bool) {
+        self.zones.set_orientation(if rows { gtk::Orientation::Vertical } else { gtk::Orientation::Horizontal });
+        if rows {
+            self.layer.add_css_class("rows");
+        } else {
+            self.layer.remove_css_class("rows");
+        }
+        for zone in [&self.attach, &self.inline, &self.cloud] {
+            zone.inner.set_size_request(-1, -1);
+            zone.lay_out(rows);
+        }
     }
 
     fn hide(&self) {
@@ -289,35 +332,53 @@ impl Zone {
 
         let inner = gtk::Box::new(gtk::Orientation::Vertical, 6);
         inner.set_valign(gtk::Align::Center);
+        inner.set_halign(gtk::Align::Center);
         inner.set_vexpand(true);
 
         let badge = gtk::Image::from_icon_name(icon);
         badge.add_css_class("drop-badge");
         badge.set_pixel_size(30);
+        badge.set_valign(gtk::Align::Center);
         badge.set_halign(gtk::Align::Center);
-        badge.set_margin_bottom(6);
         inner.append(&badge);
 
+        let words = gtk::Box::new(gtk::Orientation::Vertical, 4);
+        words.set_valign(gtk::Align::Center);
         let title = gtk::Label::new(Some(title));
         title.add_css_class("drop-title");
         title.set_wrap(true);
-        title.set_justify(gtk::Justification::Center);
-        inner.append(&title);
+        words.append(&title);
 
         let subtitle = gtk::Label::new(None);
         subtitle.add_css_class("drop-subtitle");
         subtitle.set_wrap(true);
-        subtitle.set_justify(gtk::Justification::Center);
         subtitle.set_max_width_chars(30);
-        // Room for three lines whatever the text, so the icons and titles
-        // of cards side by side stay level.
         subtitle.set_lines(3);
         subtitle.set_ellipsize(gtk::pango::EllipsizeMode::End);
         subtitle.set_valign(gtk::Align::Start);
-        inner.append(&subtitle);
+        words.append(&subtitle);
+        inner.append(&words);
 
         widget.append(&inner);
-        Self { widget, subtitle }
+        let zone = Self { widget, inner, title, subtitle };
+        zone.lay_out(true);
+        zone
+    }
+
+    /// A row: the icon to the left of the words, the pair centred in the
+    /// card and as wide as the other cards' pairs, so the icons line up
+    /// ([`DropZones::align_rows`]). A column: the icon over the words, all
+    /// centred, the line under the title kept three lines tall (the
+    /// stylesheet's `.rows` lifts that) so side by side the icons stay level.
+    fn lay_out(&self, row: bool) {
+        self.inner.set_orientation(if row { gtk::Orientation::Horizontal } else { gtk::Orientation::Vertical });
+        self.inner.set_spacing(if row { 20 } else { 12 });
+        let (xalign, justify) =
+            if row { (0.0, gtk::Justification::Left) } else { (0.5, gtk::Justification::Center) };
+        for label in [&self.title, &self.subtitle] {
+            label.set_xalign(xalign);
+            label.set_justify(justify);
+        }
     }
 }
 

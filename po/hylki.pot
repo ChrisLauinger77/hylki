@@ -2507,12 +2507,12 @@ msgid_plural "Send them with the message"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Place the picture in the message"
-msgid_plural "Place the pictures in the message"
+msgid "Place the picture where the cursor is"
+msgid_plural "Place the pictures where the cursor is"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Pictures in the message, other files attached"
+msgid "Pictures where the cursor is, other files attached"
 msgstr ""
 
 msgid "Share a download link from {name}"

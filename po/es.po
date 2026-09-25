@@ -2764,12 +2764,12 @@ msgstr[0] "Encima de los mensajes"
 msgstr[1] "Encima de los mensajes"
 
 #, fuzzy
-msgid "Place the picture in the message"
-msgid_plural "Place the pictures in the message"
+msgid "Place the picture where the cursor is"
+msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Paleta de acciones en la lista de mensajes"
 msgstr[1] "Paleta de acciones en la lista de mensajes"
 
-msgid "Pictures in the message, other files attached"
+msgid "Pictures where the cursor is, other files attached"
 msgstr ""
 
 msgid "Share a download link from {name}"
