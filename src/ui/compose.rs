@@ -282,6 +282,9 @@ pub struct Compose {
     /// A recipient/subject field was edited since open (body edits are tracked
     /// separately by the editor itself). Used for save-if-dirty.
     fields_dirty: bool,
+    /// The save-or-discard question is on screen (or about to be), so a
+    /// second Escape in the moment before it appears asks nothing twice.
+    asking_discard: bool,
     /// OpenPGP (#133): sign the message; encrypt it to every recipient.
     sign: bool,
     encrypt: bool,
@@ -409,7 +412,15 @@ pub enum ComposeInput {
     SaveDraft,
     /// The editor content came back — finish saving the draft.
     SaveDraftBody { html: String, text: String, to: String, cc: String, bcc: String, reply_to: String, subject: String, from_account_id: u32, from_alias: Option<String> },
+    /// Cancel, Escape or the window's close button: closes at once when
+    /// nothing was written, else asks first (#290).
     Cancel,
+    /// Ask whether to save the edited message to Drafts or discard it.
+    ConfirmDiscard,
+    /// The question was answered with Keep Editing.
+    KeepEditing,
+    /// Close without saving.
+    Discard,
     /// The user clicked the inline/window toggle button.
     ToggleWindowed,
     /// The app moved this pane between inline and window; sync the button icon.
@@ -967,6 +978,7 @@ impl Component for Compose {
             fields_shown: crate::config::load_reply_fields(),
             narrow: false,
             fields_dirty: false,
+            asking_discard: false,
             sign: false,
             sign_touched: false,
             sign_expected: None,
@@ -1257,10 +1269,10 @@ impl Component for Compose {
                 return Propagation::Stop;
             }
             if !open.get() {
-                // Escape backs out of the whole composer — the same as Cancel,
-                // so an accidental reply is one key away from being undone. Only
-                // once the suggestion list is closed, which Escape dismisses
-                // first (below), so one press never does both.
+                // Escape backs out of the whole composer, the same as Cancel:
+                // an untouched reply goes at once, an edited one asks first
+                // (#290). Only once the suggestion list is closed, which
+                // Escape dismisses first (below), so one press never does both.
                 if keyval == gtk::gdk::Key::Escape {
                     s.input(ComposeInput::Cancel);
                     return Propagation::Stop;
@@ -1299,6 +1311,31 @@ impl Component for Compose {
         'handle: {
         match message {
             ComposeInput::Cancel => {
+                if self.asking_discard {
+                    break 'handle;
+                }
+                if self.fields_dirty {
+                    sender.input(ComposeInput::ConfirmDiscard);
+                } else {
+                    let s = sender.clone();
+                    self.editor.is_dirty(move |body_dirty| {
+                        s.input(if body_dirty { ComposeInput::ConfirmDiscard } else { ComposeInput::Discard });
+                    });
+                }
+            }
+
+            ComposeInput::ConfirmDiscard => {
+                if self.asking_discard {
+                    break 'handle;
+                }
+                self.asking_discard = true;
+                let parent = root.root().and_downcast::<gtk::Window>();
+                confirm_discard_dialog(parent.as_ref(), sender.input_sender().clone());
+            }
+
+            ComposeInput::KeepEditing => self.asking_discard = false,
+
+            ComposeInput::Discard => {
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
             }
 
@@ -1663,6 +1700,7 @@ impl Component for Compose {
                 if paths.is_empty() {
                     break 'handle;
                 }
+                self.fields_dirty = true;
                 let at = self.attachments.len();
                 let what = attachment_label(i18n_noop("Attach {name}"), &paths[0], paths.len());
                 self.attachments.extend(paths.iter().cloned());
@@ -1673,6 +1711,7 @@ impl Component for Compose {
 
             ComposeInput::RemoveAttachment(i) => {
                 if i < self.attachments.len() {
+                    self.fields_dirty = true;
                     let path = self.attachments.remove(i);
                     let what = attachment_label(i18n_noop("Remove {name}"), &path, 1);
                     self.push_history(what, ComposeStep::Insert { at: i, paths: vec![path] });
@@ -2628,6 +2667,32 @@ impl Compose {
         }
         flow.set_visible(!self.attachments.is_empty() || !self.cloud_links.is_empty() || self.cloud_busy > 0);
     }
+}
+
+/// Save the edited message, discard it, or go back to it. Escape answers
+/// Keep Editing, so a second press never discards what the first one asked
+/// about (#290).
+fn confirm_discard_dialog(parent: Option<&gtk::Window>, sender: relm4::Sender<ComposeInput>) {
+    let dialog = adw::MessageDialog::new(
+        parent,
+        Some(i18n("Save the message?").as_str()),
+        Some(i18n("It has not been sent. Save it to Drafts to finish later, or discard it.").as_str()),
+    );
+    dialog.add_response("keep", &i18n("Keep Editing"));
+    dialog.add_response("discard", &i18n("Discard"));
+    dialog.add_response("save", &i18n("Save Draft"));
+    dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+    dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("save"));
+    dialog.set_close_response("keep");
+    dialog.connect_response(None, move |_, resp| {
+        let _ = sender.send(match resp {
+            "save" => ComposeInput::SaveDraft,
+            "discard" => ComposeInput::Discard,
+            _ => ComposeInput::KeepEditing,
+        });
+    });
+    dialog.present();
 }
 
 fn html_escape(s: &str) -> String {

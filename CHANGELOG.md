@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fixed: Escape discarded a message being written without asking** (#290,
+  reported by EmmanuelP). Escape, Cancel and the composer window's close
+  button now ask whether to save the message to Drafts, discard it or keep
+  editing, once anything has been written or attached. An untouched reply
+  still closes at once. Escape in the question answers Keep Editing.
 - **Changed: JMAP is set up through the Stalwart (JMAP) provider only.**
   The Incoming Protocol row of an IMAP/POP3 account offers IMAP and POP3,
   and is hidden for Stalwart, whose protocol is always JMAP. Accounts

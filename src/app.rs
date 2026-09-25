@@ -1567,6 +1567,9 @@ pub enum AppMsg {
     DraftSaved,
     /// A composer (id) finished — tear down its host (window or inline revealer).
     ComposeClosed(u32),
+    /// A composer window's close button: the composer decides, as for
+    /// Cancel, whether to ask first (#290).
+    ComposeCloseRequested(u32),
     /// Promote/demote the reader's inline composer (id) between inline and window.
     ComposeToggleWindow(u32),
     Refresh,
@@ -8291,6 +8294,19 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::ReclaimFocus);
             }
 
+            AppMsg::ComposeCloseRequested(id) => {
+                let controller = self
+                    .composers
+                    .iter()
+                    .find(|h| h.id == id)
+                    .map(|h| &h.controller)
+                    .or(self.reader_compose.as_ref().filter(|r| r.id == id).map(|r| &r.controller));
+                match controller {
+                    Some(c) => c.emit(ComposeInput::Cancel),
+                    None => self.close_compose(id),
+                }
+            }
+
             AppMsg::ComposeToggleWindow(id) => self.toggle_compose_window(id, &sender),
 
             AppMsg::Sent { account_id } => {
@@ -14323,8 +14339,8 @@ impl AppModel {
         win.set_content(Some(content));
         let s = sender.input_sender().clone();
         win.connect_close_request(move |_| {
-            let _ = s.send(AppMsg::ComposeClosed(id));
-            gtk::glib::Propagation::Proceed
+            let _ = s.send(AppMsg::ComposeCloseRequested(id));
+            gtk::glib::Propagation::Stop
         });
         win.connect_is_active_notify(|w| {
             if w.is_active() {
