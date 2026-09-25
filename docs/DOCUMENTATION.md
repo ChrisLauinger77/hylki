@@ -145,6 +145,31 @@ IMAP and JMAP accounts can receive mail this way. A Microsoft account and a
 POP3 account can be moved from but not into: Microsoft files a message added
 to a folder as a draft, and POP3 has only an inbox.
 
+### Deleting an attachment from the server
+
+**Delete from Server…** in the right-click menu of a file in the attachment
+drawer, or in the attachment gallery, takes that one file out of the message
+on the server, to save space there. The rest of the message stays: its text,
+its other files, where it is filed, its read, starred and tag state, and its
+date. Hylki asks first, as the change reaches every device that reads the
+account and cannot be undone. Save the file first if you want to keep a copy.
+
+An IMAP or JMAP server cannot edit a message, so Hylki stores a copy without
+the file and then deletes the original; the copy stands where the original
+was. In place of the file the copy carries a short note in the format
+Thunderbird uses, so Thunderbird shows it as a deleted attachment and Hylki
+leaves it out of the list. A Microsoft account deletes the file from the
+message itself.
+
+It is refused where it would not save space or would break the message:
+
+- **Gmail**, which keeps every message in All Mail as well, so the original
+  would stay there, file and all.
+- **POP3**, which has no way to change a message on the server.
+- **A signed or encrypted message**, where removing a file breaks the
+  signature or cannot be done at all.
+- **A message that is nothing but the file**, which is better deleted whole.
+
 ### OAuth (Google / Microsoft)
 
 **Microsoft** works out of the box: pick *Microsoft* in the account editor and

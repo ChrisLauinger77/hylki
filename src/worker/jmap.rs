@@ -1328,21 +1328,20 @@ fn jmap_import(
     mailbox: &str,
     keywords: serde_json::Value,
 ) -> Result<String, String> {
-    let blob = jmap_upload(s, raw, "message/rfc822")?;
+    jmap_import_email(s, raw, serde_json::json!({ "mailboxIds": { mailbox: true }, "keywords": keywords }))
+}
+
+/// Upload a message's bytes and import them with the Email properties in
+/// `email` (`mailboxIds`, `keywords`, `receivedAt`). Returns the new id.
+fn jmap_import_email(s: &JmapSession, raw: &[u8], mut email: serde_json::Value) -> Result<String, String> {
+    email["blobId"] = jmap_upload(s, raw, "message/rfc822")?.into();
     let responses = jmap_call(
         s,
         &[CAP_CORE, CAP_MAIL],
         vec![call(
             0,
             "Email/import",
-            serde_json::json!({
-                "accountId": s.account,
-                "emails": { "d": {
-                    "blobId": blob,
-                    "mailboxIds": { mailbox: true },
-                    "keywords": keywords,
-                }},
-            }),
+            serde_json::json!({ "accountId": s.account, "emails": { "d": email } }),
         )],
     )?;
     let r = args(&responses, 0);
@@ -1350,6 +1349,56 @@ fn jmap_import(
         let why = &r["notCreated"]["d"];
         why["description"].as_str().or(why["type"].as_str()).unwrap_or("the server would not take the message").to_string()
     })
+}
+
+/// Replace a message with a copy that lacks one attachment (#289): a JMAP
+/// message cannot be edited, so the copy is imported with the original's
+/// folders, keywords and arrival time, then the original is destroyed.
+/// Returns the copy's id and bytes.
+async fn jmap_strip_attachment(
+    s: &JmapSession,
+    state: &mut JmapState,
+    path: &str,
+    uid: u32,
+    name: &str,
+    size: u64,
+) -> Result<(String, Vec<u8>), String> {
+    let (id, _) = jmap_resolve(s, state, path, uid).await.ok_or_else(|| "message not found".to_string())?;
+    let raw = jmap_fetch_raw(s, state, path, uid).await?;
+    let stripped = super::strip::without_attachment(&raw, name, size, &super::strip::note_date())
+        .map_err(|e| e.text())?;
+    let sess = s.clone();
+    blocking(move || {
+        let responses = jmap_call(
+            &sess,
+            &[CAP_CORE, CAP_MAIL],
+            vec![call(
+                0,
+                "Email/get",
+                serde_json::json!({
+                    "accountId": sess.account,
+                    "ids": [id],
+                    "properties": ["mailboxIds", "keywords", "receivedAt"],
+                }),
+            )],
+        )?;
+        let original = args(&responses, 0)["list"][0].clone();
+        if original.is_null() {
+            return Err(i18n("The attachment is no longer in the message on the server"));
+        }
+        let new_id = jmap_import_email(
+            &sess,
+            &stripped,
+            serde_json::json!({
+                "mailboxIds": original["mailboxIds"],
+                "keywords": original["keywords"],
+                "receivedAt": original["receivedAt"],
+            }),
+        )?;
+        jmap_destroy_all(&sess, &[id])?;
+        Ok((new_id, stripped))
+    })
+    .await
 }
 
 /// Drop the draft a message was opened from, server-side and in the cache.
@@ -2232,6 +2281,41 @@ pub(super) async fn run_jmap(
                 emit(WorkerEvent::RawExported { token, raw });
             }
 
+            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
+                let Some(s) = jmap_session(&account, &mut state, &emit).await else {
+                    emit(WorkerEvent::Error { text: i18n("Could not reach the server"), connectivity: true });
+                    continue;
+                };
+                emit(WorkerEvent::Status(i18n("Removing the attachment…")));
+                let result = jmap_strip_attachment(&s, &mut state, &path, uid, &name, size).await;
+                emit(WorkerEvent::Status(String::new()));
+                match result {
+                    Ok((new_id, raw)) => {
+                        let new_uid = hash_uid(&new_id);
+                        state.uids.remove(&uid);
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_message(account_id, &path, uid);
+                        }
+                        if let Some((folder_id, _)) = state.folders.get(&path).cloned() {
+                            if let Ok(messages) =
+                                jmap_load_folder(&s, account_id, folder_id, &path, cache.as_ref(), &mut state).await
+                            {
+                                emit(WorkerEvent::Messages { folder_id, messages });
+                            }
+                        }
+                        if let Some(c) = cache.as_ref() {
+                            c.save_attachment_meta(account_id, &path, uid, &[]);
+                            cache_rewritten(c, account_id, &path, new_uid, &raw);
+                        }
+                        emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(new_uid), name, size });
+                    }
+                    Err(e) => emit(WorkerEvent::Error {
+                        text: i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
+                        connectivity: false,
+                    }),
+                }
+            }
+
             MailRequest::ImportRaw { token, path, raw, seen, flagged } => {
                 let mailbox = state.folders.get(&path).map(|(_, id)| id.clone());
                 let result = match (jmap_session(&account, &mut state, &emit).await, mailbox) {
@@ -2372,6 +2456,83 @@ mod tests {
         let sid = jmap_submit(&s, msg.as_bytes(), &me, &[me.clone()], &sent.mailbox_id).expect("submit");
         assert!(jmap_list_messages(&s, &sent.mailbox_id, 1, 0).expect("sent").iter().any(|(_, i, _)| i == &sid));
         println!("submitted {sid}");
+    }
+
+    /// Removing an attachment over JMAP (#289), with `JMAP_LIVE` as for
+    /// [`live`]: the copy keeps the other file, the keywords and the arrival
+    /// time, and the original is destroyed. Leaves the inbox as it was.
+    #[test]
+    #[ignore]
+    fn live_strip_attachment() {
+        let Ok(spec) = std::env::var("JMAP_LIVE") else { return };
+        let mut parts = spec.splitn(3, ',');
+        let acc = AccountConfig {
+            imap_host: parts.next().unwrap_or_default().into(),
+            imap_port: 443,
+            username: parts.next().unwrap_or_default().into(),
+            password: parts.next().unwrap_or_default().into(),
+            ..sample_account()
+        };
+        let s = jmap_connect(&acc).expect("session");
+        let folders = jmap_list_folders(&s, 1, &BTreeMap::new()).expect("folders");
+        let inbox = folders.iter().find(|f| f.folder.kind == FolderKind::Inbox).expect("inbox");
+        let raw = super::super::strip::MIXED.replace("r1@example.org", &format!("strip-{}@hylki.test", crate::datefmt::now()));
+        let id = jmap_import_email(
+            &s,
+            raw.as_bytes(),
+            serde_json::json!({
+                "mailboxIds": { inbox.mailbox_id.clone(): true },
+                "keywords": { "$seen": true, "$flagged": true },
+                "receivedAt": "2020-01-01T10:00:00Z",
+            }),
+        )
+        .expect("import");
+        let blob = jmap_list_messages(&s, &inbox.mailbox_id, 1, inbox.folder.id)
+            .expect("list")
+            .into_iter()
+            .find(|(_, i, _)| i == &id)
+            .map(|(_, _, b)| b)
+            .expect("listed");
+        let mut state = JmapState {
+            session: None,
+            folders: HashMap::new(),
+            uids: HashMap::from([(hash_uid(&id), (id.clone(), blob))]),
+            drafts: None,
+            inbox: None,
+            sent: None,
+            roles: BTreeMap::new(),
+            hidden: Vec::new(),
+        };
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (new_id, _) = rt
+            .block_on(jmap_strip_attachment(&s, &mut state, &inbox.folder.path, hash_uid(&id), "report.pdf", 18))
+            .expect("strip");
+        assert_ne!(new_id, id);
+        let responses = jmap_call(
+            &s,
+            &[CAP_CORE, CAP_MAIL],
+            vec![call(
+                0,
+                "Email/get",
+                serde_json::json!({
+                    "accountId": s.account,
+                    "ids": [id, new_id],
+                    "properties": ["keywords", "receivedAt", "mailboxIds", "blobId"],
+                }),
+            )],
+        )
+        .expect("get");
+        let got = args(&responses, 0);
+        println!("{got}");
+        assert_eq!(got["notFound"], serde_json::json!([id]), "the original is gone");
+        let copy = &got["list"][0];
+        assert_eq!(copy["keywords"], serde_json::json!({ "$seen": true, "$flagged": true }));
+        assert_eq!(copy["receivedAt"], "2020-01-01T10:00:00Z");
+        assert_eq!(copy["mailboxIds"], serde_json::json!({ inbox.mailbox_id.clone(): true }));
+        let bytes = jmap_download(&s, copy["blobId"].as_str().unwrap()).expect("download");
+        let names: Vec<String> = extract_attachments(&bytes).into_iter().map(|a| a.name).collect();
+        assert_eq!(names, vec!["data.csv"]);
+        jmap_destroy_all(&s, &[new_id]).expect("clean up");
     }
 
     #[test]

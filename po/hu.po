@@ -451,6 +451,15 @@ msgstr "Törli ezt a beszélgetést?"
 msgid "Delete Conversation"
 msgstr "Beszélgetés törlése"
 
+#, fuzzy
+msgid "Delete the attachment from the server?"
+msgstr "Mellékletek betöltése a kiszolgálóról"
+
+msgid ""
+"“{name}” will be removed from the message on the server. The rest of the "
+"message stays. This can’t be undone."
+msgstr ""
+
 msgid "Delete this message permanently?"
 msgid_plural "Delete {n} messages permanently?"
 msgstr[0] "Véglegesen törli ezt az üzenetet?"
@@ -1979,6 +1988,10 @@ msgstr "A kulcs nem importálható"
 msgid "Show in Message"
 msgstr "Ugrás az üzenethez"
 
+#, fuzzy
+msgid "Delete from Server…"
+msgstr "Mappa törlése…"
+
 msgid "Import OpenPGP key"
 msgstr "OpenPGP-kulcs importálása"
 
@@ -2590,6 +2603,20 @@ msgstr "{name} (hivatkozás)"
 
 msgid "Uploading…"
 msgstr "Feltöltés…"
+
+#, fuzzy
+msgid "Save the message?"
+msgstr "Üzenet archiválása"
+
+msgid "It has not been sent. Save it to Drafts to finish later, or discard it."
+msgstr ""
+
+#, fuzzy
+msgid "Keep Editing"
+msgstr "Beállítások"
+
+msgid "Discard"
+msgstr "Elvetés"
 
 msgid "Upload {n} file and put its share link in the message."
 msgid_plural "Upload {n} files and put their share links in the message."
@@ -3514,9 +3541,6 @@ msgid ""
 msgstr ""
 "A fiókszerkesztő meg van nyitva. Mentse a módosításokat, vagy vesse el őket, "
 "mielőtt továbblép."
-
-msgid "Discard"
-msgstr "Elvetés"
 
 msgid "Check for new mail"
 msgstr "Új levelek keresése"
@@ -5072,6 +5096,9 @@ msgstr "Küldés…"
 msgid "Still could not send “{subject}”: {e}"
 msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
 
+msgid "The attachment is no longer in the message on the server"
+msgstr ""
+
 msgid "Could not load message: {e}"
 msgstr "Az üzenet nem tölthető be: {e}"
 
@@ -5147,7 +5174,26 @@ msgstr "A küldés sikertelen: {e}"
 msgid "Could not reach the server"
 msgstr "A mappa nem hozható létre: {e}"
 
+#, fuzzy
+msgid "Removing the attachment…"
+msgstr "Mellékletek betöltése…"
+
+#, fuzzy
+msgid "Could not remove the attachment: {e}"
+msgstr "A mellékletek nem tölthetők be: {e}"
+
 msgid "That folder is not on the server"
+msgstr ""
+
+msgid "The message is signed or encrypted, and removing a file would break it"
+msgstr ""
+
+msgid "The attachment is the whole message; delete the message instead"
+msgstr ""
+
+msgid ""
+"You deleted an attachment from this message. The original MIME headers for "
+"the attachment were:"
 msgstr ""
 
 msgid "the server's reply could not be read (it began: {reply})"
@@ -5179,6 +5225,11 @@ msgstr "Az üzenet nem címkézhető: {e}"
 
 msgid "Could not mark folder read: {e}"
 msgstr "A mappa nem jelölhető olvasottként: {e}"
+
+msgid ""
+"Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an "
+"attachment there"
+msgstr ""
 
 msgid "Could not move {len} messages: {e}"
 msgstr "{len} üzenet nem helyezhető át: {e}"
@@ -5225,6 +5276,10 @@ msgid "POP3 accounts don't support folders"
 msgstr "A POP3-fiókok nem támogatják a mappákat"
 
 msgid "A POP3 account can't receive mail from another account"
+msgstr ""
+
+msgid ""
+"POP3 cannot change a message on the server, so the attachment was not removed"
 msgstr ""
 
 msgid "Inbox"

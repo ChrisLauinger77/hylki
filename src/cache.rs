@@ -1327,6 +1327,15 @@ impl Cache {
         })
     }
 
+    /// Forget a message's rendered body, so the next open renders it
+    /// afresh from the server's copy.
+    pub fn delete_body(&self, account_id: u32, folder_path: &str, uid: u32) {
+        let _ = self.conn.execute(
+            "DELETE FROM bodies WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+            params![account_id, folder_path, uid],
+        );
+    }
+
     pub fn save_body(&self, account_id: u32, folder_path: &str, uid: u32, body: &str) {
         if let Err(e) = self.conn.execute(
             "INSERT OR REPLACE INTO bodies (account_id, folder_path, uid, body) VALUES (?1, ?2, ?3, ?4)",

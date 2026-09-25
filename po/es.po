@@ -447,6 +447,15 @@ msgstr "¿Eliminar esta conversación?"
 msgid "Delete Conversation"
 msgstr "Eliminar conversación"
 
+#, fuzzy
+msgid "Delete the attachment from the server?"
+msgstr "Cargar archivos adjuntos desde el servidor"
+
+msgid ""
+"“{name}” will be removed from the message on the server. The rest of the "
+"message stays. This can’t be undone."
+msgstr ""
+
 msgid "Delete this message permanently?"
 msgid_plural "Delete {n} messages permanently?"
 msgstr[0] "¿Eliminar este mensaje permanentemente?"
@@ -1991,6 +2000,10 @@ msgstr "No se pudo importar la clave"
 msgid "Show in Message"
 msgstr "Mostrar en el mensaje"
 
+#, fuzzy
+msgid "Delete from Server…"
+msgstr "Eliminar carpeta…"
+
 msgid "Import OpenPGP key"
 msgstr "Importar clave OpenPGP"
 
@@ -2601,6 +2614,20 @@ msgstr "{name} (enlace)"
 
 msgid "Uploading…"
 msgstr "Subiendo…"
+
+#, fuzzy
+msgid "Save the message?"
+msgstr "Encima de los mensajes"
+
+msgid "It has not been sent. Save it to Drafts to finish later, or discard it."
+msgstr ""
+
+#, fuzzy
+msgid "Keep Editing"
+msgstr "Reunión"
+
+msgid "Discard"
+msgstr "Descartar"
 
 msgid "Upload {n} file and put its share link in the message."
 msgid_plural "Upload {n} files and put their share links in the message."
@@ -3522,9 +3549,6 @@ msgid ""
 msgstr ""
 "El editor de cuentas está abierto. Guarda los cambios o descártalos antes de "
 "continuar."
-
-msgid "Discard"
-msgstr "Descartar"
 
 msgid "Check for new mail"
 msgstr "Comprobar correo nuevo"
@@ -5177,6 +5201,10 @@ msgstr "Enviando…"
 msgid "Still could not send “{subject}”: {e}"
 msgstr "Todavía no se pudo enviar «{subject}»: {e}"
 
+#, fuzzy
+msgid "The attachment is no longer in the message on the server"
+msgstr "Esa carpeta no está en el servidor"
+
 msgid "Could not load message: {e}"
 msgstr "No se pudo cargar el mensaje: {e}"
 
@@ -5250,8 +5278,30 @@ msgstr "El envío ha fallado: {e}"
 msgid "Could not reach the server"
 msgstr "No se pudo contactar con el servidor"
 
+#, fuzzy
+msgid "Removing the attachment…"
+msgstr "Cargando archivos adjuntos…"
+
+#, fuzzy
+msgid "Could not remove the attachment: {e}"
+msgstr "No se pudieron cargar los archivos adjuntos: {e}"
+
 msgid "That folder is not on the server"
 msgstr "Esa carpeta no está en el servidor"
+
+msgid "The message is signed or encrypted, and removing a file would break it"
+msgstr ""
+
+#, fuzzy
+msgid "The attachment is the whole message; delete the message instead"
+msgstr ""
+"Reunir todos los archivos adjuntos de la conversación abierta en un panel "
+"situado debajo de los mensajes."
+
+msgid ""
+"You deleted an attachment from this message. The original MIME headers for "
+"the attachment were:"
+msgstr ""
 
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "no se pudo leer la respuesta del servidor (comenzaba por: {reply})"
@@ -5282,6 +5332,11 @@ msgstr "No se pudo etiquetar el mensaje: {e}"
 
 msgid "Could not mark folder read: {e}"
 msgstr "No se pudo marcar la carpeta como leída: {e}"
+
+msgid ""
+"Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an "
+"attachment there"
+msgstr ""
 
 msgid "Could not move {len} messages: {e}"
 msgstr "No se pudieron mover {len} mensajes: {e}"
@@ -5331,6 +5386,10 @@ msgstr "Las cuentas POP3 no admiten carpetas"
 
 msgid "A POP3 account can't receive mail from another account"
 msgstr "Una cuenta POP3 no puede recibir correo de otra cuenta"
+
+msgid ""
+"POP3 cannot change a message on the server, so the attachment was not removed"
+msgstr ""
 
 msgid "Inbox"
 msgstr "Bandeja de entrada"

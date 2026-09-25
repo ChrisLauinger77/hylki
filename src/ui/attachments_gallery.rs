@@ -240,6 +240,11 @@ pub enum GalleryInput {
     DownloadItem(usize),
     /// Jump to item `index`'s source message.
     GoToItem(usize),
+    /// Remove item `index` from its message on the server (#289).
+    DeleteItem(usize),
+    /// An attachment was removed from a message on the server: its item
+    /// leaves the view (the next load reads the cache as it is now).
+    Removed { account_id: u32, folder_path: String, uid: u32, name: String },
     /// A cell was double-clicked: open it externally, closing any preview.
     OpenExternal(usize),
     /// Right-click on cell `index` at `(x, y)` (cell-relative) — show its menu there.
@@ -266,6 +271,9 @@ pub enum GalleryOutput {
     /// Fetch an attachment whose bytes were never downloaded, so it can be
     /// opened or previewed.
     Fetch { account_id: u32, folder_path: String, uid: u32 },
+    /// Take an attachment out of its message on the server (#289); the app
+    /// asks first.
+    DeleteFromServer { account_id: u32, folder_path: String, uid: u32, name: String, size: u64 },
 }
 
 #[relm4::component(pub)]
@@ -932,6 +940,23 @@ impl Component for AttachmentsGallery {
                     }
                 }
             }
+            GalleryInput::Removed { account_id, folder_path, uid, name } => {
+                // In place, rather than a reload that would lose the user's
+                // place in a long list.
+                let Some(at) = self.all_items.iter().position(|i| {
+                    i.account_id == account_id && i.folder_path == folder_path && i.uid == uid && i.name == name
+                }) else {
+                    return;
+                };
+                self.all_items.remove(at);
+                self.total = self.total.saturating_sub(1);
+                self.preview = match self.preview {
+                    Some(p) if p == at => None,
+                    Some(p) if p > at => Some(p - 1),
+                    p => p,
+                };
+                self.rebuild_view(&sender);
+            }
             GalleryInput::SetQuery(q) => {
                 if self.query != q {
                     self.query = q;
@@ -1100,6 +1125,17 @@ impl Component for AttachmentsGallery {
             GalleryInput::OpenItem(i) => self.open_item(i, &sender),
             GalleryInput::DownloadItem(i) => self.download_item(i, &sender),
             GalleryInput::GoToItem(i) => self.goto_item(i, &sender),
+            GalleryInput::DeleteItem(i) => {
+                if let Some(item) = self.item_at(i) {
+                    let _ = sender.output(GalleryOutput::DeleteFromServer {
+                        account_id: item.account_id,
+                        folder_path: item.folder_path.clone(),
+                        uid: item.uid,
+                        name: item.name.clone(),
+                        size: item.size,
+                    });
+                }
+            }
             GalleryInput::OpenExternal(i) => {
                 // Double-click: skip/close the preview and open the file directly.
                 self.preview = None;
@@ -1576,7 +1612,10 @@ impl AttachmentsGallery {
         let s = sender.clone();
         let goto = MenuEntry::new(i18n("Go to Message"), move || s.input(GalleryInput::GoToItem(index)))
             .icon("mail-unread-symbolic");
-        let sections = vec![vec![open, download, goto]];
+        let s = sender.clone();
+        let delete = MenuEntry::new(i18n("Delete from Server…"), move || s.input(GalleryInput::DeleteItem(index)))
+            .icon("user-trash-symbolic");
+        let sections = vec![vec![open, download, goto], vec![delete]];
 
         // Anchor on the clicked cell/row itself so the click point (already
         // relative to it) needs no coordinate translation.

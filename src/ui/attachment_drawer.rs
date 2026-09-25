@@ -137,6 +137,9 @@ pub enum DrawerOutput {
     ShowLightbox { items: Vec<Attachment>, start: usize },
     /// Scroll the reader to the message this attachment came with (#213).
     ShowInMessage(Attachment),
+    /// Take this attachment out of its message on the server (#289); the
+    /// app asks first.
+    DeleteFromServer(Attachment),
 }
 
 #[derive(Debug)]
@@ -163,6 +166,8 @@ pub enum AttachmentDrawerInput {
     Download(usize),
     /// Scroll the reader to the message the attachment belongs to (#213).
     ShowInMessage(usize),
+    /// Remove the attachment from its message on the server (#289).
+    DeleteFromServer(usize),
     /// Save every attachment into a chosen folder ("Save All" header button).
     SaveAll,
     /// Right-click at (x, y) within the cell.
@@ -652,6 +657,11 @@ impl SimpleComponent for AttachmentDrawer {
                     let _ = sender.output(DrawerOutput::ShowInMessage(att));
                 }
             }
+            AttachmentDrawerInput::DeleteFromServer(i) => {
+                if let Some(att) = self.item_at(i).cloned() {
+                    let _ = sender.output(DrawerOutput::DeleteFromServer(att));
+                }
+            }
             AttachmentDrawerInput::Activate(i) => {
                 // Single clicks do nothing at all (a first click must never
                 // steal the second — a modal lightbox on click one made the
@@ -1009,7 +1019,8 @@ impl AttachmentDrawer {
         });
     }
 
-    /// Right-click menu: Open / Download, matching the gallery's actions.
+    /// Right-click menu: Open / Download, Show in Message, and Delete from
+    /// Server, matching the gallery's actions.
     fn show_context_menu(&self, index: usize, x: f64, y: f64, sender: &ComponentSender<Self>) {
         let s = sender.clone();
         let open = MenuEntry::new(i18n("Open"), move || s.input(AttachmentDrawerInput::Open(index)))
@@ -1025,6 +1036,11 @@ impl AttachmentDrawer {
             s.input(AttachmentDrawerInput::ShowInMessage(index))
         })
         .icon("mail-unread-symbolic");
+        let s = sender.clone();
+        let delete = MenuEntry::new(i18n("Delete from Server…"), move || {
+            s.input(AttachmentDrawerInput::DeleteFromServer(index))
+        })
+        .icon("user-trash-symbolic");
 
         // Anchor on the clicked cell itself so the click point (already
         // relative to it) needs no coordinate translation.
@@ -1033,7 +1049,7 @@ impl AttachmentDrawer {
             .child_at_index(index as i32)
             .map(|c| c.upcast())
             .unwrap_or_else(|| self.flow.clone().upcast());
-        show_context_menu(&parent, x, y, vec![vec![open, download], vec![show]]);
+        show_context_menu(&parent, x, y, vec![vec![open, download], vec![show], vec![delete]]);
     }
 
     /// Ask the app to show its full-window lightbox over the message's

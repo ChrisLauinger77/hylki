@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **New: Delete from Server… removes one attachment from a message** (#289,
+  suggested by yioannides). It is in the right-click menu of a file in the
+  attachment drawer and in the attachment gallery, and asks first. On IMAP
+  and JMAP the message is stored again without the file, keeping its folder,
+  flags, keywords and date, and the original is deleted; the file's place
+  holds a note in Thunderbird's `text/x-moz-deleted` format, which Hylki does
+  not list as an attachment. Microsoft 365 deletes the attachment in place.
+  Refused on Gmail (All Mail would keep the original), POP3, signed or
+  encrypted messages, and a message that is only the file. See
+  [Deleting an attachment from the server](docs/DOCUMENTATION.md#deleting-an-attachment-from-the-server).
 - **Fixed: Escape discarded a message being written without asking** (#290,
   reported by EmmanuelP). Escape, Cancel and the composer window's close
   button now ask whether to save the message to Drafts, discard it or keep

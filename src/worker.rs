@@ -30,6 +30,7 @@ use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The JMAP path (#245), a child module so it shares this file's helpers.
 mod jmap;
+mod strip;
 
 /// Number of most-recent messages to fetch attachment info (BODYSTRUCTURE) for;
 /// older messages get an envelope-only index row and resolve attachments on open.
@@ -473,6 +474,13 @@ pub enum MailRequest {
     /// Step two, on the receiving account: add `raw` to `path` with its
     /// read and starred state, answered with [`WorkerEvent::RawImported`].
     ImportRaw { token: u64, path: String, raw: Vec<u8>, seen: bool, flagged: bool },
+    /// Take one attachment out of a message on the server (#289), found by
+    /// its name and, among files sharing the name, its decoded size.
+    /// IMAP and JMAP store a copy without it and delete the original, so
+    /// the message comes back under a new UID; Microsoft 365 deletes the
+    /// attachment in place. Answered with [`WorkerEvent::AttachmentDeleted`]
+    /// or an error.
+    DeleteAttachment { message_id: u32, path: String, uid: u32, name: String, size: u64 },
     /// The tag finder (Settings → Tags → Find Tags…): report every keyword
     /// in use across the account's folders as one
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
@@ -617,6 +625,10 @@ pub enum WorkerEvent {
     RawExported { token: u64, raw: Result<Vec<u8>, String> },
     /// The answer to [`MailRequest::ImportRaw`].
     RawImported { token: u64, result: Result<(), String> },
+    /// The answer to [`MailRequest::DeleteAttachment`]: the message that was
+    /// `uid` in `path` is now `new_uid` there, `None` when the copy could not
+    /// be found again. The folder's list has been sent again first.
+    AttachmentDeleted { message_id: u32, path: String, uid: u32, new_uid: Option<u32>, name: String, size: u64 },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
@@ -1964,6 +1976,57 @@ async fn run_imap(
                 emit(WorkerEvent::RawImported { token, result });
             }
 
+            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
+                let folders = cache.as_ref().map(|c| c.load_folders(account_id)).unwrap_or_default();
+                // Gmail keeps every message in All Mail as well as under the
+                // label it is shown in: the original would stay there, file
+                // and all, beside the copy.
+                if has_gmail_labels(&account, &folders) {
+                    emit(WorkerEvent::Error {
+                        text: i18n("Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an attachment there"),
+                        connectivity: false,
+                    });
+                    continue;
+                }
+                emit(WorkerEvent::Status(i18n("Removing the attachment…")));
+                let result = strip_imap_attachment(&mut session, &account, &path, uid, &name, size).await;
+                emit(WorkerEvent::Status(String::new()));
+                match result {
+                    Ok((new_uid, raw)) => {
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_message(account_id, &path, uid);
+                        }
+                        if let Some(folder_id) = folders.iter().find(|f| f.path == path).map(|f| f.id) {
+                            if let Ok(messages) = load_messages_retry(
+                                account_id, &mut session, &account, folder_id, &path,
+                                &mut use_envelope, cache.as_ref(),
+                            )
+                            .await
+                            {
+                                if let Some(c) = cache.as_ref() {
+                                    c.upsert_messages(account_id, &path, &messages);
+                                }
+                                emit(WorkerEvent::Messages { folder_id, messages });
+                            }
+                        }
+                        if let Some(c) = cache.as_ref() {
+                            c.save_attachment_meta(account_id, &path, uid, &[]);
+                            if let Some(new_uid) = new_uid {
+                                cache_rewritten(c, account_id, &path, new_uid, &raw);
+                            }
+                        }
+                        emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size });
+                    }
+                    Err(e) => {
+                        emit(WorkerEvent::Error {
+                            text: i18n_f("Could not remove the attachment: {e}", &[("e", &e.text)]),
+                            connectivity: false,
+                        });
+                        lost |= e.connection;
+                    }
+                }
+            }
+
             MailRequest::MoveMessage { path, uid, dest } => {
                 let sess = session.as_mut().unwrap();
                 match move_message(sess, &path, uid, &dest).await {
@@ -2810,6 +2873,17 @@ async fn load_bodies_retry(
     res
 }
 
+/// Whether the account is Gmail, where a folder is a label and one message
+/// sits in several of them at once.
+fn has_gmail_labels(account: &AccountConfig, folders: &[Folder]) -> bool {
+    let host = account.imap_host.to_ascii_lowercase();
+    host.ends_with("gmail.com")
+        || host.ends_with("googlemail.com")
+        || folders
+            .iter()
+            .any(|f| f.path.starts_with("[Gmail]/") || f.path.starts_with("[Google Mail]/"))
+}
+
 /// After a move into Trash or Spam on Gmail, drop the moved mail's copies
 /// under its other labels from the cache: Gmail removed them with the move
 /// (see [`Cache::drop_label_copies`]). Any other server keeps a copy in
@@ -2823,12 +2897,7 @@ fn drop_gmail_label_copies(
     dest: &str,
 ) {
     let folders = cache.load_folders(account_id);
-    let host = account.imap_host.to_ascii_lowercase();
-    let labels = host.ends_with("gmail.com")
-        || host.ends_with("googlemail.com")
-        || folders
-            .iter()
-            .any(|f| f.path.starts_with("[Gmail]/") || f.path.starts_with("[Google Mail]/"));
+    let labels = has_gmail_labels(account, &folders);
     let binned = folders
         .iter()
         .any(|f| f.path == dest && matches!(f.kind, FolderKind::Trash | FolderKind::Junk));
@@ -3629,12 +3698,27 @@ fn attachments_of(raw: &[u8]) -> (Vec<crate::models::Attachment>, bool) {
 
 /// Parse attachment parts (name, mime, decoded bytes) out of a raw message.
 fn extract_attachments(raw: &[u8]) -> Vec<crate::models::Attachment> {
-    use mail_parser::{MessageParser, MimeHeaders};
-    let Some(parsed) = MessageParser::default().parse(raw) else {
+    let Some(parsed) = mail_parser::MessageParser::default().parse(raw) else {
         return Vec::new();
     };
+    attachment_parts(&parsed, raw).into_iter().map(|(_, a)| a).collect()
+}
+
+/// The attachments of a parsed message, each with the index of the MIME
+/// part it came from, so the part can be found again to remove it (#289).
+fn attachment_parts(
+    parsed: &mail_parser::Message<'_>,
+    raw: &[u8],
+) -> Vec<(usize, crate::models::Attachment)> {
+    use mail_parser::MimeHeaders;
     let mut out = Vec::new();
-    for (i, part) in parsed.attachments().enumerate() {
+    for (i, &id) in parsed.attachments.iter().enumerate() {
+        let Some(part) = parsed.parts.get(id) else { continue };
+        // What is left where an attachment was removed, here or by
+        // Thunderbird (#289): a note, not a file.
+        if strip::is_placeholder(part) {
+            continue;
+        }
         // Decoration referenced from the body (a `cid:` logo) is rendered in
         // place, not listed — unless it's big enough to be real content.
         //
@@ -3665,10 +3749,13 @@ fn extract_attachments(raw: &[u8]) -> Vec<crate::models::Attachment> {
                 .unwrap_or_default();
             format!("attachment-{}{ext}", i + 1)
         });
-        out.push(crate::models::Attachment {
-            name,
-            data: part.contents().to_vec(),
-        });
+        out.push((
+            id,
+            crate::models::Attachment {
+                name,
+                data: part.contents().to_vec(),
+            },
+        ));
     }
     out
 }
@@ -5187,6 +5274,132 @@ async fn append_msg(
     let cmd = format!("APPEND {} {} ({} bytes)", quote_mailbox(path), flags.unwrap_or(""), raw.len());
     wire(&cmd);
     let r = session.append(path, flags, None, raw).await;
+    wired(&cmd, &r);
+    r
+}
+
+/// Put what a message holds after an attachment was removed (#289) into
+/// the cache: the files, the paperclip, and the gallery's index of them.
+fn cache_rewritten(c: &Cache, account_id: u32, path: &str, uid: u32, raw: &[u8]) {
+    let items = extract_attachments(raw);
+    c.save_attachments(account_id, path, uid, &items);
+    c.mark_attachments_checked(account_id, path, uid);
+    c.set_has_attachment(account_id, path, uid, !items.is_empty());
+    let metas: Vec<crate::models::AttachmentMeta> = items
+        .iter()
+        .enumerate()
+        .map(|(i, a)| crate::models::AttachmentMeta {
+            idx: i as u32,
+            name: a.name.clone(),
+            mime: guess_mime(&a.name).to_string(),
+            size: a.data.len() as u64,
+            section: String::new(),
+        })
+        .collect();
+    c.save_attachment_meta(account_id, path, uid, &metas);
+}
+
+/// Why [`strip_imap_attachment`] failed, and whether the connection went
+/// with it.
+struct StripFailure {
+    text: String,
+    connection: bool,
+}
+
+impl From<async_imap::error::Error> for StripFailure {
+    fn from(e: async_imap::error::Error) -> Self {
+        StripFailure { text: e.to_string(), connection: true }
+    }
+}
+
+/// Replace message `uid` in `path` with a copy that lacks the attachment
+/// (#289): the copy keeps the original's flags and arrival date, and is
+/// stored before the original is deleted, so a failure part way leaves the
+/// message as it was, or at worst twice. Returns the copy's UID, when it
+/// can be found again, and its bytes.
+async fn strip_imap_attachment(
+    session: &mut Option<ImapSession>,
+    account: &AccountConfig,
+    path: &str,
+    uid: u32,
+    name: &str,
+    size: u64,
+) -> Result<(Option<u32>, Vec<u8>), StripFailure> {
+    let raw = load_raw_retry(session, account, path, uid).await?;
+    let stripped = strip::without_attachment(&raw, name, size, &strip::note_date())
+        .map_err(|e| StripFailure { text: e.text(), connection: false })?;
+    let sess = session.as_mut().expect("session ensured before call");
+    let uid_next = sel(sess, path).await?.uid_next;
+    let fetches: Vec<Fetch> =
+        fetch_uids(sess, uid.to_string(), "(UID FLAGS INTERNALDATE BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+            .await?
+            .try_collect()
+            .await?;
+    let meta = fetches.iter().find(|f| f.uid == Some(uid));
+    let flags = meta.map(|f| kept_flags(f.flags())).filter(|f| !f.is_empty()).map(|f| format!("({})", f.join(" ")));
+    let date = meta
+        .and_then(|f| f.internal_date())
+        .map(|d| format!("\"{}\"", d.format("%d-%b-%Y %H:%M:%S %z")));
+    let msgid = meta.map(message_id_of).unwrap_or_default();
+    append_dated(sess, path, flags.as_deref(), date.as_deref(), &stripped).await?;
+    let new_uid = find_appended(sess, uid, uid_next, &msgid).await;
+    purge_messages(sess, path, &[uid]).await?;
+    Ok((new_uid, stripped))
+}
+
+/// The UID an APPEND just gave a message: among those at or above the
+/// folder's UIDNEXT from before it, the one with its Message-ID (or, with
+/// none, the lowest). Read from the headers rather than searched for, as
+/// Stalwart's full-text index answers `SEARCH HEADER Message-ID` with nothing.
+async fn find_appended(sess: &mut ImapSession, old_uid: u32, uid_next: Option<u32>, msgid: &str) -> Option<u32> {
+    let from = uid_next.unwrap_or(0).max(old_uid + 1);
+    let fetches: Vec<Fetch> = fetch_uids(sess, format!("{from}:*"), "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        .await
+        .ok()?
+        .try_collect()
+        .await
+        .ok()?;
+    // `n:*` always takes in the highest UID, even one below `n`.
+    let mut found: Vec<(u32, String)> =
+        fetches.iter().filter_map(|f| f.uid.filter(|&u| u >= from).map(|u| (u, message_id_of(f)))).collect();
+    found.sort();
+    match msgid {
+        "" => found.first().map(|(u, _)| *u),
+        id => found.iter().find(|(_, m)| m == id).map(|(u, _)| *u),
+    }
+}
+
+/// The flags a rewritten message carries over: all but the ones the server
+/// sets itself or that would delete it.
+fn kept_flags<'a>(flags: impl Iterator<Item = Flag<'a>>) -> Vec<String> {
+    flags
+        .filter_map(|f| match f {
+            Flag::Seen => Some("\\Seen".to_string()),
+            Flag::Answered => Some("\\Answered".to_string()),
+            Flag::Flagged => Some("\\Flagged".to_string()),
+            Flag::Draft => Some("\\Draft".to_string()),
+            Flag::Custom(k) if !k.starts_with('\\') => Some(k.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+async fn append_dated(
+    session: &mut ImapSession,
+    path: &str,
+    flags: Option<&str>,
+    date: Option<&str>,
+    raw: &[u8],
+) -> Result<(), async_imap::error::Error> {
+    let cmd = format!(
+        "APPEND {} {} {} ({} bytes)",
+        quote_mailbox(path),
+        flags.unwrap_or(""),
+        date.unwrap_or(""),
+        raw.len()
+    );
+    wire(&cmd);
+    let r = session.append(path, flags, date, raw).await;
     wired(&cmd, &r);
     r
 }
@@ -8763,6 +8976,10 @@ async fn run_pop3(
                 token,
                 result: Err(i18n("A POP3 account can't receive mail from another account")),
             }),
+            MailRequest::DeleteAttachment { .. } => emit(WorkerEvent::Error {
+                text: i18n("POP3 cannot change a message on the server, so the attachment was not removed"),
+                connectivity: false,
+            }),
         }
     }
 }
@@ -9087,6 +9304,9 @@ async fn run_mock(
                     .ok_or_else(|| "no such demo message".to_string()),
             }),
             MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported { token, result: Ok(()) }),
+            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
+                emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size })
+            }
             // Pretend the send succeeded so the compose flow is demoable offline.
             MailRequest::Send { .. } => emit(WorkerEvent::Sent),
         }
@@ -10902,6 +11122,34 @@ async fn run_graph(
                 token,
                 result: Err(i18n("A Microsoft account can't receive mail from another account")),
             }),
+
+            // Microsoft 365 deletes an attachment in place: the message
+            // keeps its id, and only what the cache holds of it changes.
+            MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
+                emit(WorkerEvent::Status(i18n("Removing the attachment…")));
+                let result = graph_delete_attachment(&account, &mut state, &path, uid, &name, size, &emit).await;
+                emit(WorkerEvent::Status(String::new()));
+                match result {
+                    Ok(()) => {
+                        if let Some(c) = cache.as_ref() {
+                            c.delete_body(account_id, &path, uid);
+                            match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
+                                Ok(raw) => cache_rewritten(c, account_id, &path, uid, &raw),
+                                // Fetched again at the next open.
+                                Err(_) => {
+                                    c.save_attachments(account_id, &path, uid, &[]);
+                                    c.save_attachment_meta(account_id, &path, uid, &[]);
+                                }
+                            }
+                        }
+                        emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size });
+                    }
+                    Err(e) => emit(WorkerEvent::Error {
+                        text: i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
+                        connectivity: false,
+                    }),
+                }
+            }
         }
     }
 }
@@ -11119,6 +11367,38 @@ async fn graph_resolve(
     // account/folder ids only label the discarded summaries, so zeros are fine.
     let _ = graph_load_folder(&token, 0, 0, path, None, state).await;
     state.uids.get(&uid).map(|gid| (token, gid.clone()))
+}
+
+/// Delete the attachment called `name` (nearest `size` among namesakes)
+/// from a message (#289).
+async fn graph_delete_attachment(
+    account: &AccountConfig,
+    state: &mut GraphState,
+    path: &str,
+    uid: u32,
+    name: &str,
+    size: u64,
+    emit: &impl Fn(WorkerEvent),
+) -> Result<(), String> {
+    let (token, gid) = graph_resolve(account, state, path, uid, emit)
+        .await
+        .ok_or_else(|| "message not found".to_string())?;
+    let name = name.to_string();
+    tokio::task::spawn_blocking(move || {
+        let url = format!("{GRAPH_BASE}/me/messages/{gid}/attachments?$select=id,name,size");
+        let listed = graph_get_json(&token, &url)?;
+        let aid = listed["value"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|a| a["name"].as_str() == Some(name.as_str()))
+            .min_by_key(|a| a["size"].as_u64().unwrap_or(0).abs_diff(size))
+            .and_then(|a| a["id"].as_str().map(str::to_string))
+            .ok_or_else(|| i18n("The attachment is no longer in the message on the server"))?;
+        graph_delete_req(&token, &format!("{GRAPH_BASE}/me/messages/{gid}/attachments/{aid}"))
+    })
+    .await
+    .unwrap_or_else(|_| Err("task failed".into()))
 }
 
 /// Fetch a message's raw RFC 822 bytes.
@@ -11397,6 +11677,68 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+
+    /// Removing an attachment on a real server (#289), with
+    /// `IMAP_LIVE=host,port,user,password` (implicit TLS, any certificate).
+    /// Stores a message with two files, removes one, and checks the copy
+    /// kept the other, the flags and the arrival date; the mailbox is left
+    /// as it was found.
+    #[test]
+    #[ignore]
+    fn live_strip_attachment() {
+        let Ok(spec) = std::env::var("IMAP_LIVE") else { return };
+        let p: Vec<&str> = spec.splitn(4, ',').collect();
+        let account = AccountConfig {
+            imap_host: p[0].into(),
+            imap_port: p[1].parse().expect("port"),
+            username: p[2].into(),
+            password: p[3].into(),
+            security: Some(crate::config::ServerSecurity {
+                imap_starttls: false,
+                imap_accept_invalid_certs: true,
+                ..Default::default()
+            }),
+            ..sample_account()
+        };
+        let msgid = format!("strip-{}@hylki.test", crate::datefmt::now());
+        let raw = strip::MIXED.replace("r1@example.org", &msgid);
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(async {
+            let mut sess = connect(&account).await.expect("connect");
+            let uid_next = sel(&mut sess, "INBOX").await.expect("select").uid_next;
+            append_dated(&mut sess, "INBOX", Some("(\\Seen \\Flagged $label1)"), Some("\"01-Jan-2020 10:00:00 +0000\""), raw.as_bytes())
+                .await
+                .expect("append");
+            let wanted = normalize_msgid(format!("<{msgid}>").as_bytes());
+            let uid = find_appended(&mut sess, 0, uid_next, &wanted).await.expect("stored");
+            let mut session = Some(sess);
+            let (new_uid, _) = match strip_imap_attachment(&mut session, &account, "INBOX", uid, "report.pdf", 18).await {
+                Ok(done) => done,
+                Err(e) => panic!("strip: {}", e.text),
+            };
+            let new_uid = new_uid.expect("the copy is found again");
+            assert_ne!(new_uid, uid);
+            let sess = session.as_mut().unwrap();
+            sel(sess, "INBOX").await.expect("select");
+            let left: Vec<Fetch> = fetch_uids(sess, uid.to_string(), "(UID FLAGS)").await.expect("fetch").try_collect().await.expect("fetch");
+            assert!(left.iter().all(|f| f.uid != Some(uid)), "the original is gone");
+            let fetches: Vec<Fetch> = fetch_uids(sess, new_uid.to_string(), "(UID FLAGS INTERNALDATE BODY.PEEK[])")
+                .await
+                .expect("fetch")
+                .try_collect()
+                .await
+                .expect("fetch");
+            let f = fetches.iter().find(|f| f.uid == Some(new_uid)).expect("the copy");
+            let flags = kept_flags(f.flags());
+            println!("copy {new_uid}: flags {flags:?} date {:?}", f.internal_date());
+            assert!(flags.contains(&"\\Seen".to_string()) && flags.contains(&"\\Flagged".to_string()));
+            assert!(flags.contains(&"$label1".to_string()));
+            assert_eq!(f.internal_date().map(|d| d.timestamp()), Some(1_577_872_800));
+            let names: Vec<String> = extract_attachments(f.body().expect("body")).into_iter().map(|a| a.name).collect();
+            assert_eq!(names, vec!["data.csv"]);
+            purge_messages(sess, "INBOX", &[new_uid]).await.expect("clean up");
+        });
+    }
 
     /// A message moved in from another account keeps its read and starred
     /// state as IMAP flags, and asks for none when it had neither (#265).

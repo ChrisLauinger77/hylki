@@ -1068,6 +1068,17 @@ pub enum UnifiedView {
     Filtered,
 }
 
+/// One attachment of one message on the server, to be removed (#289).
+#[derive(Debug, Clone)]
+pub struct AttachmentTarget {
+    account_id: u32,
+    message_id: u32,
+    path: String,
+    uid: u32,
+    name: String,
+    size: u64,
+}
+
 #[derive(Debug)]
 pub enum AppMsg {
     // User actions
@@ -1493,6 +1504,20 @@ pub enum AppMsg {
     /// The drawer's "Show in Message": scroll the reader to the message this
     /// attachment came with (#213).
     ShowAttachmentInMessage(Attachment),
+    /// The drawer's "Delete from Server…" (#289): find the message the file
+    /// came with, then ask.
+    DeleteDrawerAttachment(Attachment),
+    /// Ask before an attachment is taken out of its message on the server.
+    AskDeleteAttachment(AttachmentTarget),
+    /// The user said yes: have the account's worker do it.
+    DeleteAttachment(AttachmentTarget),
+    /// Showcase only (HYLKI_SHOWCASE_DELETE_ATTACHMENT): the drawer's
+    /// Delete from Server for the file called `name`, asking first unless
+    /// `confirmed`.
+    ShowcaseDeleteAttachment { name: String, confirmed: bool },
+    /// The worker did it: the message is `new_uid` now (the same UID on
+    /// Microsoft 365, a new one elsewhere, `None` if it was not found again).
+    AttachmentDeleted { account_id: u32, message_id: u32, path: String, uid: u32, new_uid: Option<u32>, name: String, size: u64 },
     /// Showcase only: turn the inline composer's preview on.
     ShowcaseComposePreview,
     /// Pick entry `n` of the inline composer's From row (#237 capture).
@@ -2821,6 +2846,9 @@ impl SimpleComponent for AppModel {
                 crate::ui::attachment_drawer::DrawerOutput::ShowInMessage(att) => {
                     AppMsg::ShowAttachmentInMessage(att)
                 }
+                crate::ui::attachment_drawer::DrawerOutput::DeleteFromServer(att) => {
+                    AppMsg::DeleteDrawerAttachment(att)
+                }
             });
 
         let gallery =
@@ -2833,6 +2861,16 @@ impl SimpleComponent for AppModel {
                     GalleryOutput::Load(req) => AppMsg::GalleryLoad(Box::new(req)),
                     GalleryOutput::Fetch { account_id, folder_path, uid } => {
                         AppMsg::GalleryFetch { account_id, folder_path, uid }
+                    }
+                    GalleryOutput::DeleteFromServer { account_id, folder_path, uid, name, size } => {
+                        AppMsg::AskDeleteAttachment(AttachmentTarget {
+                            account_id,
+                            message_id: uid,
+                            path: folder_path,
+                            uid,
+                            name,
+                            size,
+                        })
                     }
                 });
 
@@ -4268,6 +4306,21 @@ impl SimpleComponent for AppModel {
                 for _ in 0..n.unsigned_abs() {
                     s.input(AppMsg::ZoomMessage(n.signum()));
                 }
+            });
+        }
+        // HYLKI_SHOWCASE_DELETE_ATTACHMENT=<name>[:yes] chooses Delete from
+        // Server for that file of the message on screen at 10 s
+        // (HYLKI_SHOWCASE_DELETE_AT overrides the seconds); `:yes` answers
+        // the question as well (#289).
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_DELETE_ATTACHMENT") {
+            let (name, confirmed) = match v.strip_suffix(":yes") {
+                Some(name) => (name.to_string(), true),
+                None => (v, false),
+            };
+            let at: u32 = std::env::var("HYLKI_SHOWCASE_DELETE_AT").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(at, move || {
+                s.input(AppMsg::ShowcaseDeleteAttachment { name, confirmed });
             });
         }
         if let Some((a, id)) = std::env::var("HYLKI_SHOWCASE_SELECT").ok().and_then(|v| {
@@ -7523,6 +7576,79 @@ impl SimpleComponent for AppModel {
                 if let Some((account_id, id)) = owner {
                     self.message_view
                         .emit(MessageViewInput::ScrollToAttachments { account_id, id });
+                }
+            }
+            AppMsg::DeleteDrawerAttachment(att) => {
+                if let Some(target) = self.attachment_target(&att.name, Some(att.data.len())) {
+                    sender.input(AppMsg::AskDeleteAttachment(target));
+                }
+            }
+            AppMsg::ShowcaseDeleteAttachment { name, confirmed } => {
+                match self.attachment_target(&name, None) {
+                    Some(target) if confirmed => sender.input(AppMsg::DeleteAttachment(target)),
+                    Some(target) => sender.input(AppMsg::AskDeleteAttachment(target)),
+                    None => tracing::warn!("showcase: no attachment called {name:?} on screen"),
+                }
+            }
+            AppMsg::AskDeleteAttachment(target) => self.confirm_delete_attachment(target, &sender),
+            AppMsg::DeleteAttachment(t) => {
+                self.send_to(t.account_id, MailRequest::DeleteAttachment {
+                    message_id: t.message_id,
+                    path: t.path,
+                    uid: t.uid,
+                    name: t.name,
+                    size: t.size,
+                });
+            }
+            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size } => {
+                if self.showing_gallery {
+                    self.gallery.emit(GalleryInput::Removed {
+                        account_id,
+                        folder_path: path.clone(),
+                        uid,
+                        name: name.clone(),
+                    });
+                }
+                let key = (account_id, message_id);
+                let members = self.conversation_members();
+                self.thread_cache.retain(|_, members| {
+                    !members.iter().any(|m| (m.account_id, m.id) == key)
+                });
+                self.body_cache.remove(&key);
+                if new_uid == Some(uid) {
+                    // The same message, one file fewer (Microsoft 365): the
+                    // reader drops the file where it stands.
+                    if let Some(mut items) = self.attachment_cache.remove(&key) {
+                        if let Some(at) = items
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, a)| a.name == name)
+                            .min_by_key(|(_, a)| (a.data.len() as u64).abs_diff(size))
+                            .map(|(i, _)| i)
+                        {
+                            items.remove(at);
+                        }
+                        sender.input(AppMsg::Attachments { account_id, message_id, items });
+                    }
+                    return;
+                }
+                // A copy took the message's place under a new UID. The list,
+                // loaded again first, may already have carried the selection
+                // over to it by Message-ID, the files it held with it; if not,
+                // the copy is opened here.
+                self.attachment_cache.remove(&key);
+                let Some(new_uid) = new_uid else { return };
+                let now = (account_id, new_uid);
+                self.attachment_cache.remove(&now);
+                if members.contains(&now) {
+                    self.send_to(account_id, MailRequest::LoadAttachments {
+                        message_id: new_uid,
+                        path,
+                        uid: new_uid,
+                        download: true,
+                    });
+                } else if members.contains(&key) {
+                    self.message_list.emit(MessageListInput::SelectAndLoad(now));
                 }
             }
             AppMsg::ZoomMessage(step) => {
@@ -15360,6 +15486,50 @@ impl AppModel {
         dialog.present();
     }
 
+    /// The message on screen that carries the attachment `name` (of `len`
+    /// bytes, when known), as the drawer's Show in Message finds it.
+    fn attachment_target(&self, name: &str, len: Option<usize>) -> Option<AttachmentTarget> {
+        let (m, size) = self.current_thread.iter().chain(self.current.iter()).find_map(|m| {
+            let items = self.attachment_cache.get(&(m.account_id, m.id))?;
+            let a = items.iter().find(|a| a.name == name && len.is_none_or(|l| a.data.len() == l))?;
+            Some((m, a.data.len() as u64))
+        })?;
+        Some(AttachmentTarget {
+            account_id: m.account_id,
+            message_id: m.id,
+            path: self.resolve_folder_path(m)?,
+            uid: m.uid,
+            name: name.to_string(),
+            size,
+        })
+    }
+
+    /// Removing an attachment cannot be undone, and reaches every device
+    /// that reads the account: ask (#289).
+    fn confirm_delete_attachment(&self, target: AttachmentTarget, sender: &ComponentSender<Self>) {
+        let heading = i18n("Delete the attachment from the server?");
+        let body = i18n_f(
+            "“{name}” will be removed from the message on the server. The rest of the message stays. This can’t be undone.",
+            &[("name", &target.name)],
+        );
+        let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("delete", &i18n("Delete"));
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        let s = sender.clone();
+        let target = std::cell::RefCell::new(Some(target));
+        dialog.connect_response(None, move |_, resp| {
+            if resp == "delete" {
+                if let Some(t) = target.borrow_mut().take() {
+                    s.input(AppMsg::DeleteAttachment(t));
+                }
+            }
+        });
+        dialog.present();
+    }
+
     fn confirm_purge(&self, messages: Vec<Message>, sender: &ComponentSender<Self>) {
         let n = messages.len();
         let heading = ni18n_f("Delete this message permanently?", "Delete {n} messages permanently?", n as u32, &[("n", &n.to_string())]);
@@ -20491,6 +20661,9 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
         WorkerEvent::RawExported { token, raw } => AppMsg::RawExported { token, raw },
         WorkerEvent::RawImported { token, result } => AppMsg::RawImported { token, result },
+        WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size } => {
+            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size }
+        }
         WorkerEvent::Gone { message_id, path, uid } => {
             AppMsg::MessageGone { account_id, message_id, path, uid }
         }

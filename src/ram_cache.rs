@@ -88,6 +88,13 @@ impl<V: Weigh> RamCache<V> {
         }
     }
 
+    pub fn remove(&mut self, key: &(u32, u32)) -> Option<V> {
+        let v = self.map.remove(key)?;
+        self.bytes -= v.weight();
+        self.order.retain(|k| k != key);
+        Some(v)
+    }
+
     pub fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
