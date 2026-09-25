@@ -2780,6 +2780,44 @@ msgstr "Προσθήκη τηλεφώνου"
 msgid "Add website"
 msgstr "Προσθήκη ιστοτόπου"
 
+#, fuzzy
+msgid "Attach"
+msgstr "Συνημμένα"
+
+#, fuzzy
+msgid "Insert in Text"
+msgstr "Εισαγωγή συνδέσμου"
+
+#, fuzzy
+msgid "Upload to Cloud"
+msgstr "Μεταφόρτωση σε αποθήκευση cloud"
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] "Επεξεργασία αυτού του μηνύματος"
+msgstr[1] "Επεξεργασία αυτού του μηνύματος"
+
+#, fuzzy
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
+msgstr[1] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
 msgid "Whole conversation"
 msgstr "Ολόκληρη συζήτηση"
 

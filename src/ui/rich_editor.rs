@@ -678,6 +678,13 @@ impl RichEditor {
     /// Paste the clipboard into the editor, keeping (`rich`) or stripping the
     /// clipboard's formatting for this one paste, whatever the standing
     /// preference says.
+    /// Put the pictures among `paths` in the text at the caret, and hand
+    /// the rest to the attachment list, as a drop on the text does.
+    pub fn insert_files(&self, paths: &[std::path::PathBuf]) {
+        let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
+        deliver_files(&self.webview, &files, None, &self.attach_cb);
+    }
+
     pub fn paste(&self, rich: bool) {
         paste_into(&self.webview, rich, &self.attach_cb);
     }
@@ -1003,6 +1010,13 @@ fn read_image_for_insert(
     file: &gtk::gio::File,
     path: &std::path::Path,
 ) -> Option<(String, String)> {
+    let mime = inline_mime(file)?;
+    let data = std::fs::read(path).ok()?;
+    Some((crate::oauth::base64_encode(&data), mime))
+}
+
+/// The MIME type of a picture that can go in the text, or `None`.
+fn inline_mime(file: &gtk::gio::File) -> Option<String> {
     const MAX_INLINE_BYTES: u64 = 32 * 1024 * 1024;
     let info = file
         .query_info(
@@ -1026,11 +1040,13 @@ fn read_image_for_insert(
         "image/svg+xml",
         "image/avif",
     ];
-    if !INLINE_MIMES.contains(&mime.as_str()) || info.size() as u64 > MAX_INLINE_BYTES {
-        return None;
-    }
-    let data = std::fs::read(path).ok()?;
-    Some((crate::oauth::base64_encode(&data), mime))
+    (INLINE_MIMES.contains(&mime.as_str()) && info.size() as u64 <= MAX_INLINE_BYTES).then_some(mime)
+}
+
+/// Whether the file is a picture the editor would place in the text rather
+/// than attach: what the composer's drop surfaces offer "Insert in Text" for.
+pub fn is_inline_image(path: &std::path::Path) -> bool {
+    inline_mime(&gtk::gio::File::for_path(path)).is_some()
 }
 
 /// The format bar, plus the block-kind toggles keyed the way `fmtState` in
@@ -1264,6 +1280,16 @@ const PASTE_SCRIPT: &str = r#"<script>
         if(x !== null && document.caretRangeFromPoint){
           var r = document.caretRangeFromPoint(x, y);
           if(r){ var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+        }
+        /* No drop point and no caret in the text (the composer's drop
+           surfaces, with the focus in the To row): the line written on
+           first, at the top, rather than nowhere. */
+        var cur = getSelection();
+        if(!cur.rangeCount || !document.body.contains(cur.anchorNode)){
+          var top = document.createRange();
+          top.setStart(document.body.firstChild || document.body, 0);
+          top.collapse(true);
+          cur.removeAllRanges(); cur.addRange(top);
         }
         scaleUrl(url, type, function(u){
           /* The file's own name rides along as alt, which is the only place

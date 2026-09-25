@@ -2758,6 +2758,44 @@ msgstr "Telefonnummer hinzufügen"
 msgid "Add website"
 msgstr "Website hinzufügen"
 
+#, fuzzy
+msgid "Attach"
+msgstr "Anhänge"
+
+#, fuzzy
+msgid "Insert in Text"
+msgstr "Link einfügen"
+
+#, fuzzy
+msgid "Upload to Cloud"
+msgstr "In Cloud-Speicher hochladen"
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] "Vor den Meldungen"
+msgstr[1] "Vor den Meldungen"
+
+#, fuzzy
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] "Aktionspalette in der Nachrichtenliste"
+msgstr[1] "Aktionspalette in der Nachrichtenliste"
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
 msgid "Whole conversation"
 msgstr "Gesamte Unterhaltung"
 

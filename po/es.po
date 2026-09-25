@@ -2740,6 +2740,44 @@ msgstr "Añadir teléfono"
 msgid "Add website"
 msgstr "Añadir sitio web"
 
+#, fuzzy
+msgid "Attach"
+msgstr "Archivos adjuntos"
+
+#, fuzzy
+msgid "Insert in Text"
+msgstr "Insertar enlace"
+
+#, fuzzy
+msgid "Upload to Cloud"
+msgstr "Subir al almacenamiento en la nube"
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] "Encima de los mensajes"
+msgstr[1] "Encima de los mensajes"
+
+#, fuzzy
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] "Paleta de acciones en la lista de mensajes"
+msgstr[1] "Paleta de acciones en la lista de mensajes"
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
 msgid "Whole conversation"
 msgstr "Conversación completa"
 

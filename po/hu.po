@@ -2734,6 +2734,44 @@ msgid "Add website"
 msgstr "Webhely hozzáadása"
 
 #, fuzzy
+msgid "Attach"
+msgstr "Mellékletek"
+
+#, fuzzy
+msgid "Insert in Text"
+msgstr "Hivatkozás beszúrása"
+
+#, fuzzy
+msgid "Upload to Cloud"
+msgstr "Feltöltés felhőtárhelyre"
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] "Üzenet archiválása"
+msgstr[1] "Üzenet archiválása"
+
+#, fuzzy
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] "Műveletpaletta az üzenetlistában"
+msgstr[1] "Műveletpaletta az üzenetlistában"
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
+#, fuzzy
 msgid "Whole conversation"
 msgstr "Beszélgetés megjelenítése"
 

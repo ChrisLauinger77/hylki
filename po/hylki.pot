@@ -2488,6 +2488,39 @@ msgstr ""
 msgid "Add website"
 msgstr ""
 
+msgid "Attach"
+msgstr ""
+
+msgid "Insert in Text"
+msgstr ""
+
+msgid "Upload to Cloud"
+msgstr ""
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
 msgid "Whole conversation"
 msgstr ""
 

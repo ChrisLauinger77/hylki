@@ -11,12 +11,15 @@
   in a native install; the Flatpak cannot read Do Not Disturb. The Flatpak
   gains `--socket=pulseaudio` to play it. See
   [Notifications](docs/DOCUMENTATION.md#notifications).
-- **New: files dragged onto the window go into a message** (#293). Dropped
-  on the composer, anywhere on it, they are attached (a picture let go in the
-  text is still placed inline). Dropped elsewhere in the main window, they go
-  into the message being written there or start a new one, with the same
-  large-file question as *Send with Hylki*. Before, only the text area of the
-  composer took files. See
+- **New: files dragged onto the window go into a message** (#293). Dragged
+  over a composer, the files bring up a card for each place they can go:
+  **Attach**, **Insert in Text** (when a picture is among them and the
+  message is rich text; other files are attached) and **Upload to Cloud**
+  (when a cloud storage account is set up, opening the upload dialog). The
+  card under the pointer fills with the accent color. Dropped elsewhere in the main
+  window, the files go into the message being written there or start a new
+  one, with the same large-file question as *Send with Hylki*. Before, only
+  the text area of the composer took files. See
   [Dragging files into a message](docs/DOCUMENTATION.md#dragging-files-into-a-message).
 - **New: Delete from Server… removes one attachment from a message** (#289,
   suggested by yioannides). It is in the right-click menu of a file in the

@@ -2752,6 +2752,47 @@ msgstr "Добавить телефон"
 msgid "Add website"
 msgstr "Добавить веб-сайт"
 
+#, fuzzy
+msgid "Attach"
+msgstr "Вложения"
+
+#, fuzzy
+msgid "Insert in Text"
+msgstr "Вставить ссылку"
+
+#, fuzzy
+msgid "Upload to Cloud"
+msgstr "Загрузить в облачное хранилище"
+
+msgid "{n} file · {size}"
+msgid_plural "{n} files · {size}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "Send it with the message"
+msgid_plural "Send them with the message"
+msgstr[0] "Архивировать это сообщение"
+msgstr[1] "Архивировать это сообщение"
+msgstr[2] "Архивировать это сообщение"
+
+#, fuzzy
+msgid "Place the picture in the message"
+msgid_plural "Place the pictures in the message"
+msgstr[0] "Палитра действий в списке сообщений"
+msgstr[1] "Палитра действий в списке сообщений"
+msgstr[2] "Палитра действий в списке сообщений"
+
+msgid "Pictures in the message, other files attached"
+msgstr ""
+
+msgid "Share a download link from {name}"
+msgstr ""
+
+msgid "Share a download link"
+msgstr ""
+
 msgid "Whole conversation"
 msgstr "Всё обсуждение"
 

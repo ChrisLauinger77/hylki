@@ -440,13 +440,26 @@ be decrypted. Click the icon for the details.
 
 ### Dragging files into a message
 
-Files dragged from a file manager onto the composer are attached to the
-message, wherever on the composer they are let go. A picture dropped into the
-text itself is placed there as an inline image instead, and in HTML or
-Markdown source it is attached. Files dropped anywhere else in the main window
-go into the message being written there, or start a new message when there is
-none; a message in a window of its own takes files dropped on that window.
-Folders are skipped. A new message started this way asks about files over the
+Files dragged from a file manager over a composer bring up a card for each
+place they can go, and the files go where they are let go:
+
+- **Attach** sends them with the message.
+- **Insert in Text** places the pictures in the message where the cursor is
+  (at the top when the cursor is not in the text), and attaches any other
+  file. It is offered when the files include a PNG, JPEG, GIF, WebP, BMP,
+  SVG or AVIF picture of 32 MB or less, and only while the message is being
+  written as rich text: plain text has nowhere to put a picture, and in
+  Markdown or HTML the reference is yours to write.
+- **Upload to Cloud** opens the upload dialog for the files, as the
+  composer's cloud button does. It is offered when a cloud storage account
+  is set up (see [Cloud attachments](#cloud-attachments-nextcloud-onedrive-dropbox-seafile)).
+
+Letting go between the cards attaches the files. A composer in a window of
+its own shows the cards too.
+
+Files dropped anywhere else in the main window go into the message being
+written there, or start a new message when there is none. Folders are
+skipped. A new message started this way asks about files over the
 size limit the way *Send with Hylki* does (below).
 
 ### Send with Hylki from GNOME Files

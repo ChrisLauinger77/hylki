@@ -296,6 +296,62 @@ button.star-active {
   background: alpha(currentColor, 0.08);
 }
 
+/* The composer's drop surfaces (ui/drop_zones.rs): a veil over the composer
+   while files are dragged across it, holding one card per place the files
+   can go. The card under the pointer is the one GTK marks :drop(active); it
+   fills with the accent and lifts, so the choice reads before the drop. */
+.drop-layer {
+  background-color: alpha(@window_bg_color, 0.95);
+  padding: 18px;
+}
+/* The veil takes a drop let go between the cards; the accent outline GTK
+   gives a widget accepting a drop belongs to the card under the pointer. */
+.drop-layer:drop(active) {
+  box-shadow: none;
+}
+.drop-summary {
+  font-weight: 700;
+  opacity: 0.65;
+}
+.drop-zone {
+  padding: 20px 16px;
+  border-radius: 20px;
+  border: 2px dashed alpha(@accent_color, 0.35);
+  /* Opaque, unlike the veil around it: the message beneath shows through
+     only at the margins, never behind a card's words. */
+  background-color: mix(@window_bg_color, @accent_bg_color, 0.05);
+  transition: background-color 180ms ease-out, border-color 180ms ease-out,
+              box-shadow 180ms ease-out;
+}
+.drop-zone .drop-badge {
+  min-width: 68px;
+  min-height: 68px;
+  border-radius: 34px;
+  color: @accent_color;
+  background-color: alpha(@accent_bg_color, 0.12);
+  transition: background-color 180ms ease-out, color 180ms ease-out,
+              -gtk-icon-transform 180ms ease-out;
+}
+.drop-zone .drop-title {
+  font-size: 1.2em;
+  font-weight: 800;
+}
+.drop-zone .drop-subtitle {
+  opacity: 0.65;
+  min-height: 4.2em;
+}
+.drop-zone:drop(active) {
+  border-style: solid;
+  border-color: alpha(@accent_bg_color, 0.9);
+  background-color: mix(@window_bg_color, @accent_bg_color, 0.14);
+  box-shadow: 0 10px 28px -8px alpha(@accent_bg_color, 0.45);
+}
+.drop-zone:drop(active) .drop-badge {
+  color: @accent_fg_color;
+  background-color: @accent_bg_color;
+  -gtk-icon-transform: scale(1.12);
+}
+
 /* Right-click context menus (see ui/context_menu.rs): a flat icon + label
    button per row, padded and rounded like GNOME's native popover menu items.
    Real menu rows (GtkModelButton/PopoverMenu items) are regular weight and a

@@ -10,6 +10,7 @@ use crate::ui::rich_editor::{self, RichEditor, SourceKind, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
+use crate::ui::drop_zones::{DropChoice, DropZones};
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -244,6 +245,9 @@ pub struct Compose {
     signature_position: SignaturePosition,
     /// Files to attach.
     attachments: Vec<std::path::PathBuf>,
+    /// The surfaces shown while files are dragged over the composer, set up
+    /// once the view exists.
+    drop_zones: Option<std::rc::Rc<DropZones>>,
     /// When editing a queued Outbox message, the row this replaces once sent.
     outbox_origin: Option<u32>,
     /// Recipient suggestions, filtered as the user types.
@@ -380,6 +384,8 @@ pub enum ComposeInput {
     CloudAttach,
     /// Files picked; ask which account and how, then upload.
     CloudPicked(Vec<std::path::PathBuf>),
+    /// Files let go on one of the drop surfaces.
+    DroppedFiles(DropChoice, Vec<std::path::PathBuf>),
     /// Upload these files to `account`, whose `expire_days` and `password`
     /// carry the user's choices for this upload; `link_password` is a
     /// password of their own for every link, else one is generated per
@@ -503,320 +509,326 @@ impl Component for Compose {
             // breakpoint set in `init` folds the actions into the ⋯ menu.
             set_size_request: (COMPOSE_MIN_WIDTH, 200),
 
+            // The overlay carries the drop surfaces shown while files are
+            // dragged over the composer (drop_zones.rs).
             #[wrap(Some)]
-            #[name = "toolbar_root"]
-            set_child = &adw::ToolbarView {
-                #[name = "header"]
-                add_top_bar = &adw::HeaderBar {
-                    add_css_class: "compose-toolbar",
-                    set_show_start_title_buttons: false,
-                    set_show_end_title_buttons: false,
-                    // No "Hylki" branding on the compose bar.
-                    #[wrap(Some)]
-                    set_title_widget = &gtk::Label {
-                        set_label: "",
-                    },
+            #[name = "drop_overlay"]
+            set_child = &gtk::Overlay {
+                #[wrap(Some)]
+                #[name = "toolbar_root"]
+                set_child = &adw::ToolbarView {
+                    #[name = "header"]
+                    add_top_bar = &adw::HeaderBar {
+                        add_css_class: "compose-toolbar",
+                        set_show_start_title_buttons: false,
+                        set_show_end_title_buttons: false,
+                        // No "Hylki" branding on the compose bar.
+                        #[wrap(Some)]
+                        set_title_widget = &gtk::Label {
+                            set_label: "",
+                        },
 
-                    pack_start = &gtk::Button {
-                        set_label: &i18n("Cancel"),
-                        connect_clicked => ComposeInput::Cancel,
-                    },
-                    // Save Draft stays, label and all, however narrow the
-                    // pane: it is the one action worth a click in a hurry.
-                    pack_start = &gtk::Button {
-                        set_label: &i18n("Save Draft"),
-                        set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
-                        connect_clicked => ComposeInput::SaveDraft,
-                    },
-                    // Only while editing an existing draft: the message is
-                    // moved to Trash, not saved, and the editor closes.
-                    pack_start = &gtk::Button {
-                        set_label: &i18n("Delete Draft"),
-                        set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
-                        #[watch]
-                        set_visible: model.draft_origin.is_some() && !model.narrow,
-                        connect_clicked => ComposeInput::DeleteDraft,
-                    },
-                    // Send, with Send Later beside it (#145): presets, or a
-                    // date and time of your own.
-                    pack_end = &gtk::Box {
-                        add_css_class: "linked",
-                        add_css_class: "send-split",
-                        gtk::Button {
+                        pack_start = &gtk::Button {
+                            set_label: &i18n("Cancel"),
+                            connect_clicked => ComposeInput::Cancel,
+                        },
+                        // Save Draft stays, label and all, however narrow the
+                        // pane: it is the one action worth a click in a hurry.
+                        pack_start = &gtk::Button {
+                            set_label: &i18n("Save Draft"),
+                            set_tooltip_text: Some(i18n("Save to Drafts").as_str()),
+                            connect_clicked => ComposeInput::SaveDraft,
+                        },
+                        // Only while editing an existing draft: the message is
+                        // moved to Trash, not saved, and the editor closes.
+                        pack_start = &gtk::Button {
+                            set_label: &i18n("Delete Draft"),
+                            set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
                             #[watch]
-                            set_label: &if model.send_at.is_some() { i18n("Schedule") } else { i18n("Send") },
-                            add_css_class: "suggested-action",
-                            connect_clicked => ComposeInput::Send,
+                            set_visible: model.draft_origin.is_some() && !model.narrow,
+                            connect_clicked => ComposeInput::DeleteDraft,
                         },
-                        // A floating divider, not a seam: the box paints the
-                        // accent behind it so the two read as one control.
-                        gtk::Separator {
-                            set_orientation: gtk::Orientation::Vertical,
-                        },
-                        gtk::MenuButton {
-                            set_icon_name: "pan-down-symbolic",
-                            add_css_class: "suggested-action",
-                            set_tooltip_text: Some(i18n("Send later").as_str()),
-                            set_can_focus: false,
-                            #[wrap(Some)]
-                            set_popover = &gtk::Popover {
-                                gtk::Box {
-                                    set_orientation: gtk::Orientation::Vertical,
-                                    set_spacing: 2,
-                                    // Menu rows, not buttons: regular weight
-                                    // like every other popover menu (#167).
-                                    add_css_class: "context-menu-list",
-                                    gtk::Button {
-                                        add_css_class: "flat",
-                                        add_css_class: "context-menu-item",
-                                        set_halign: gtk::Align::Fill,
-                                        #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
-                                        connect_clicked[sender] => move |b| {
-                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                            sender.input(ComposeInput::ClearSendAt);
-                                            sender.input(ComposeInput::Send);
+                        // Send, with Send Later beside it (#145): presets, or a
+                        // date and time of your own.
+                        pack_end = &gtk::Box {
+                            add_css_class: "linked",
+                            add_css_class: "send-split",
+                            gtk::Button {
+                                #[watch]
+                                set_label: &if model.send_at.is_some() { i18n("Schedule") } else { i18n("Send") },
+                                add_css_class: "suggested-action",
+                                connect_clicked => ComposeInput::Send,
+                            },
+                            // A floating divider, not a seam: the box paints the
+                            // accent behind it so the two read as one control.
+                            gtk::Separator {
+                                set_orientation: gtk::Orientation::Vertical,
+                            },
+                            gtk::MenuButton {
+                                set_icon_name: "pan-down-symbolic",
+                                add_css_class: "suggested-action",
+                                set_tooltip_text: Some(i18n("Send later").as_str()),
+                                set_can_focus: false,
+                                #[wrap(Some)]
+                                set_popover = &gtk::Popover {
+                                    gtk::Box {
+                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_spacing: 2,
+                                        // Menu rows, not buttons: regular weight
+                                        // like every other popover menu (#167).
+                                        add_css_class: "context-menu-list",
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            set_halign: gtk::Align::Fill,
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::ClearSendAt);
+                                                sender.input(ComposeInput::Send);
+                                            },
                                         },
-                                    },
-                                    gtk::Separator {},
-                                    gtk::Button {
-                                        add_css_class: "flat",
-                                        add_css_class: "context-menu-item",
-                                        #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n_f("Tomorrow morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
-                                        connect_clicked[sender] => move |b| {
-                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                            sender.input(ComposeInput::SendAt(preset_time(1, 8)));
+                                        gtk::Separator {},
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n_f("Tomorrow morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::SendAt(preset_time(1, 8)));
+                                            },
                                         },
-                                    },
-                                    gtk::Button {
-                                        add_css_class: "flat",
-                                        add_css_class: "context-menu-item",
-                                        #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n_f("Tomorrow afternoon ({time})", &[("time", &crate::datefmt::clock_label(13))]), set_halign: gtk::Align::Start },
-                                        connect_clicked[sender] => move |b| {
-                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                            sender.input(ComposeInput::SendAt(preset_time(1, 13)));
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n_f("Tomorrow afternoon ({time})", &[("time", &crate::datefmt::clock_label(13))]), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::SendAt(preset_time(1, 13)));
+                                            },
                                         },
-                                    },
-                                    gtk::Button {
-                                        add_css_class: "flat",
-                                        add_css_class: "context-menu-item",
-                                        #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n_f("Monday morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
-                                        connect_clicked[sender] => move |b| {
-                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                            sender.input(ComposeInput::SendAt(next_monday(8)));
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n_f("Monday morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::SendAt(next_monday(8)));
+                                            },
                                         },
-                                    },
-                                    gtk::Separator {},
-                                    gtk::Button {
-                                        add_css_class: "flat",
-                                        add_css_class: "context-menu-item",
-                                        #[wrap(Some)]
-                                        set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
-                                        connect_clicked[sender] => move |b| {
-                                            b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                            sender.input(ComposeInput::PickSendTime);
+                                        gtk::Separator {},
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::PickSendTime);
+                                            },
                                         },
                                     },
                                 },
                             },
                         },
-                    },
-                    // The folded toolbar (narrow pane): every action that is
-                    // not Cancel or Send lives in this menu.
-                    #[name = "overflow_btn"]
-                    pack_end = &gtk::Button {
-                        set_icon_name: "view-more-horizontal-symbolic",
-                        set_tooltip_text: Some(i18n("Actions").as_str()),
-                        #[watch]
-                        set_visible: model.narrow,
-                        connect_clicked => ComposeInput::OverflowMenu,
-                    },
-                    // OpenPGP (#133): only offered where a gpg exists.
-                    #[name = "encrypt_btn"]
-                    pack_end = &gtk::ToggleButton {
-                        set_icon_name: "channel-secure-symbolic",
-                        set_tooltip_text: Some(i18n("Encrypt with OpenPGP to every recipient's key").as_str()),
-                        #[watch]
-                        set_visible: crate::pgp::available() && !model.narrow,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
+                        // The folded toolbar (narrow pane): every action that is
+                        // not Cancel or Send lives in this menu.
+                        #[name = "overflow_btn"]
+                        pack_end = &gtk::Button {
+                            set_icon_name: "view-more-horizontal-symbolic",
+                            set_tooltip_text: Some(i18n("Actions").as_str()),
+                            #[watch]
+                            set_visible: model.narrow,
+                            connect_clicked => ComposeInput::OverflowMenu,
+                        },
+                        // OpenPGP (#133): only offered where a gpg exists.
+                        #[name = "encrypt_btn"]
+                        pack_end = &gtk::ToggleButton {
+                            set_icon_name: "channel-secure-symbolic",
+                            set_tooltip_text: Some(i18n("Encrypt with OpenPGP to every recipient's key").as_str()),
+                            #[watch]
+                            set_visible: crate::pgp::available() && !model.narrow,
+                            connect_toggled[sender] => move |b| {
+                                sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
+                            },
+                        },
+                        #[name = "sign_btn"]
+                        pack_end = &gtk::ToggleButton {
+                            set_icon_name: "security-high-symbolic",
+                            set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
+                            #[watch]
+                            set_visible: crate::pgp::available() && !model.narrow,
+                            connect_toggled[sender] => move |b| {
+                                sender.input(ComposeInput::ToggleSign(b.is_active()));
+                            },
+                        },
+                        pack_end = &gtk::Button {
+                            set_icon_name: "mail-attachment-symbolic",
+                            set_tooltip_text: Some(i18n("Attach files").as_str()),
+                            #[watch]
+                            set_visible: !model.narrow,
+                            connect_clicked => ComposeInput::AttachFiles,
+                        },
+                        // Cloud attachments (#144): only with an account set up.
+                        pack_end = &gtk::Button {
+                            set_icon_name: "cloud-symbolic",
+                            set_tooltip_text: Some(i18n("Upload to cloud storage and share a link").as_str()),
+                            #[watch]
+                            set_visible: !model.cloud_accounts.is_empty() && !model.narrow,
+                            #[watch]
+                            set_sensitive: model.cloud_busy == 0,
+                            connect_clicked => ComposeInput::CloudAttach,
+                        },
+                        pack_end = &gtk::Button {
+                            set_icon_name: "x-office-address-book-symbolic",
+                            set_tooltip_text: Some(i18n("Open Contacts").as_str()),
+                            #[watch]
+                            set_visible: !model.narrow,
+                            connect_clicked => ComposeInput::OpenContacts,
+                        },
+                        // Promote inline reply → window, or collapse window → inline.
+                        // Icon set in `init` and on SetWindowed.
+                        #[name = "toggle_btn"]
+                        pack_end = &gtk::Button {
+                            set_tooltip_text: Some(i18n("Open in window").as_str()),
+                            #[watch]
+                            set_visible: model.can_toggle && !model.narrow,
+                            connect_clicked => ComposeInput::ToggleWindowed,
+                        },
+                        // The compact reply's From/To/Subject rows (#154): folded
+                        // away by default, one press brings them back.
+                        #[name = "fields_btn"]
+                        pack_end = &gtk::ToggleButton {
+                            set_icon_name: "pan-down-symbolic",
+                            add_css_class: "fields-chevron",
+                            set_tooltip_text: Some(i18n("Show From, To and Subject").as_str()),
+                            set_can_focus: false,
+                            #[watch]
+                            set_visible: model.compact && !model.windowed,
+                            connect_toggled[sender] => move |b| {
+                                sender.input(ComposeInput::ShowFields(b.is_active()));
+                            },
                         },
                     },
-                    #[name = "sign_btn"]
-                    pack_end = &gtk::ToggleButton {
-                        set_icon_name: "security-high-symbolic",
-                        set_tooltip_text: Some(i18n("Sign with your OpenPGP key").as_str()),
+                    // Send Later (#145): says when a scheduled message goes, with a
+                    // way back to sending at once.
+                    add_top_bar = &gtk::Box {
+                        add_css_class: "schedule-bar",
+                        set_spacing: 8,
+                        set_margin_start: 12,
+                        set_margin_end: 12,
+                        set_margin_top: 4,
+                        set_margin_bottom: 4,
                         #[watch]
-                        set_visible: crate::pgp::available() && !model.narrow,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::ToggleSign(b.is_active()));
+                        set_visible: model.send_at.is_some(),
+                        gtk::Image { set_icon_name: Some("alarm-symbolic") },
+                        gtk::Label {
+                            set_hexpand: true,
+                            set_halign: gtk::Align::Start,
+                            set_ellipsize: gtk::pango::EllipsizeMode::End,
+                            #[watch]
+                            set_label: &model.send_at.map(|t| i18n_f("Scheduled for {when}", &[("when", &crate::datefmt::date_time(t))])).unwrap_or_default(),
+                        },
+                        gtk::Button {
+                            add_css_class: "flat",
+                            set_label: &i18n("Send now instead"),
+                            connect_clicked => ComposeInput::ClearSendAt,
                         },
                     },
-                    pack_end = &gtk::Button {
-                        set_icon_name: "mail-attachment-symbolic",
-                        set_tooltip_text: Some(i18n("Attach files").as_str()),
+                    // Cloud attachments (#144): the download passwords, which
+                    // stay out of the message and go to the recipient some other way.
+                    add_top_bar = &gtk::Box {
+                        set_spacing: 8,
+                        set_margin_start: 12,
+                        set_margin_end: 12,
+                        set_margin_top: 4,
+                        set_margin_bottom: 4,
                         #[watch]
-                        set_visible: !model.narrow,
-                        connect_clicked => ComposeInput::AttachFiles,
-                    },
-                    // Cloud attachments (#144): only with an account set up.
-                    pack_end = &gtk::Button {
-                        set_icon_name: "cloud-symbolic",
-                        set_tooltip_text: Some(i18n("Upload to cloud storage and share a link").as_str()),
-                        #[watch]
-                        set_visible: !model.cloud_accounts.is_empty() && !model.narrow,
-                        #[watch]
-                        set_sensitive: model.cloud_busy == 0,
-                        connect_clicked => ComposeInput::CloudAttach,
-                    },
-                    pack_end = &gtk::Button {
-                        set_icon_name: "x-office-address-book-symbolic",
-                        set_tooltip_text: Some(i18n("Open Contacts").as_str()),
-                        #[watch]
-                        set_visible: !model.narrow,
-                        connect_clicked => ComposeInput::OpenContacts,
-                    },
-                    // Promote inline reply → window, or collapse window → inline.
-                    // Icon set in `init` and on SetWindowed.
-                    #[name = "toggle_btn"]
-                    pack_end = &gtk::Button {
-                        set_tooltip_text: Some(i18n("Open in window").as_str()),
-                        #[watch]
-                        set_visible: model.can_toggle && !model.narrow,
-                        connect_clicked => ComposeInput::ToggleWindowed,
-                    },
-                    // The compact reply's From/To/Subject rows (#154): folded
-                    // away by default, one press brings them back.
-                    #[name = "fields_btn"]
-                    pack_end = &gtk::ToggleButton {
-                        set_icon_name: "pan-down-symbolic",
-                        add_css_class: "fields-chevron",
-                        set_tooltip_text: Some(i18n("Show From, To and Subject").as_str()),
-                        set_can_focus: false,
-                        #[watch]
-                        set_visible: model.compact && !model.windowed,
-                        connect_toggled[sender] => move |b| {
-                            sender.input(ComposeInput::ShowFields(b.is_active()));
+                        set_visible: !model.cloud_passwords.is_empty(),
+                        gtk::Image { set_icon_name: Some("dialog-password-symbolic") },
+                        gtk::Label {
+                            set_hexpand: true,
+                            set_halign: gtk::Align::Start,
+                            set_wrap: true,
+                            set_selectable: true,
+                            #[watch]
+                            set_label: &model.cloud_passwords.iter().map(|(n, p)| i18n_f("Download password for {name}: {password}", &[("name", n), ("password", p)])).collect::<Vec<_>>().join("\n"),
                         },
-                    },
-                },
-                // Send Later (#145): says when a scheduled message goes, with a
-                // way back to sending at once.
-                add_top_bar = &gtk::Box {
-                    add_css_class: "schedule-bar",
-                    set_spacing: 8,
-                    set_margin_start: 12,
-                    set_margin_end: 12,
-                    set_margin_top: 4,
-                    set_margin_bottom: 4,
-                    #[watch]
-                    set_visible: model.send_at.is_some(),
-                    gtk::Image { set_icon_name: Some("alarm-symbolic") },
-                    gtk::Label {
-                        set_hexpand: true,
-                        set_halign: gtk::Align::Start,
-                        set_ellipsize: gtk::pango::EllipsizeMode::End,
-                        #[watch]
-                        set_label: &model.send_at.map(|t| i18n_f("Scheduled for {when}", &[("when", &crate::datefmt::date_time(t))])).unwrap_or_default(),
-                    },
-                    gtk::Button {
-                        add_css_class: "flat",
-                        set_label: &i18n("Send now instead"),
-                        connect_clicked => ComposeInput::ClearSendAt,
-                    },
-                },
-                // Cloud attachments (#144): the download passwords, which
-                // stay out of the message and go to the recipient some other way.
-                add_top_bar = &gtk::Box {
-                    set_spacing: 8,
-                    set_margin_start: 12,
-                    set_margin_end: 12,
-                    set_margin_top: 4,
-                    set_margin_bottom: 4,
-                    #[watch]
-                    set_visible: !model.cloud_passwords.is_empty(),
-                    gtk::Image { set_icon_name: Some("dialog-password-symbolic") },
-                    gtk::Label {
-                        set_hexpand: true,
-                        set_halign: gtk::Align::Start,
-                        set_wrap: true,
-                        set_selectable: true,
-                        #[watch]
-                        set_label: &model.cloud_passwords.iter().map(|(n, p)| i18n_f("Download password for {name}: {password}", &[("name", n), ("password", p)])).collect::<Vec<_>>().join("\n"),
-                    },
-                    gtk::Button {
-                        add_css_class: "flat",
-                        set_label: &i18n("Copy"),
-                        connect_clicked => ComposeInput::CopyCloudPasswords,
-                    },
-                },
-
-                #[wrap(Some)]
-                set_content = &gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-                    set_spacing: 12,
-                    add_css_class: "compose-pane",
-
-                    // From and To are always offered, inline included — a
-                    // forward is unaddressable without To (#25, #52). Cc, Bcc,
-                    // and (for replies/forwards) the prefilled Subject wait
-                    // behind the To row's "More" button; per-row visibility is
-                    // set in `init`.
-                    #[name = "fields_list"]
-                    gtk::ListBox {
-                        add_css_class: "boxed-list",
-                        add_css_class: "compose-fields",
-                        set_selection_mode: gtk::SelectionMode::None,
-
-                        #[name = "from_row"]
-                        adw::ComboRow {
-                            set_title: &i18n("From"),
-                            connect_selected_notify => ComposeInput::AccountChanged,
-                        },
-                        #[name = "to_row"]
-                        adw::EntryRow {
-                            set_title: &i18n("To"),
-                            set_input_purpose: gtk::InputPurpose::Email,
-                        },
-                        #[name = "cc_row"]
-                        adw::EntryRow {
-                            set_title: &i18n("Cc"),
-                            set_input_purpose: gtk::InputPurpose::Email,
-                        },
-                        #[name = "bcc_row"]
-                        adw::EntryRow {
-                            set_title: &i18n("Bcc"),
-                            set_input_purpose: gtk::InputPurpose::Email,
-                        },
-                        #[name = "reply_to_row"]
-                        adw::EntryRow {
-                            set_title: &i18n("Reply-To"),
-                            set_input_purpose: gtk::InputPurpose::Email,
-                        },
-                        #[name = "subject_row"]
-                        adw::EntryRow {
-                            set_title: &i18n("Subject"),
+                        gtk::Button {
+                            add_css_class: "flat",
+                            set_label: &i18n("Copy"),
+                            connect_clicked => ComposeInput::CopyCloudPasswords,
                         },
                     },
 
-                    #[name = "attach_box"]
-                    gtk::FlowBox {
-                        set_selection_mode: gtk::SelectionMode::None,
-                        set_column_spacing: 6,
-                        set_row_spacing: 6,
-                        set_max_children_per_line: 4,
-                        set_visible: false,
-                    },
-
-                    // Holder for the shared rich-text editor (toolbar + body),
-                    // appended in `init`.
-                    #[name = "editor_holder"]
-                    gtk::Box {
+                    #[wrap(Some)]
+                    set_content = &gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
-                        set_vexpand: true,
+                        set_spacing: 12,
+                        add_css_class: "compose-pane",
+
+                        // From and To are always offered, inline included — a
+                        // forward is unaddressable without To (#25, #52). Cc, Bcc,
+                        // and (for replies/forwards) the prefilled Subject wait
+                        // behind the To row's "More" button; per-row visibility is
+                        // set in `init`.
+                        #[name = "fields_list"]
+                        gtk::ListBox {
+                            add_css_class: "boxed-list",
+                            add_css_class: "compose-fields",
+                            set_selection_mode: gtk::SelectionMode::None,
+
+                            #[name = "from_row"]
+                            adw::ComboRow {
+                                set_title: &i18n("From"),
+                                connect_selected_notify => ComposeInput::AccountChanged,
+                            },
+                            #[name = "to_row"]
+                            adw::EntryRow {
+                                set_title: &i18n("To"),
+                                set_input_purpose: gtk::InputPurpose::Email,
+                            },
+                            #[name = "cc_row"]
+                            adw::EntryRow {
+                                set_title: &i18n("Cc"),
+                                set_input_purpose: gtk::InputPurpose::Email,
+                            },
+                            #[name = "bcc_row"]
+                            adw::EntryRow {
+                                set_title: &i18n("Bcc"),
+                                set_input_purpose: gtk::InputPurpose::Email,
+                            },
+                            #[name = "reply_to_row"]
+                            adw::EntryRow {
+                                set_title: &i18n("Reply-To"),
+                                set_input_purpose: gtk::InputPurpose::Email,
+                            },
+                            #[name = "subject_row"]
+                            adw::EntryRow {
+                                set_title: &i18n("Subject"),
+                            },
+                        },
+
+                        #[name = "attach_box"]
+                        gtk::FlowBox {
+                            set_selection_mode: gtk::SelectionMode::None,
+                            set_column_spacing: 6,
+                            set_row_spacing: 6,
+                            set_max_children_per_line: 4,
+                            set_visible: false,
+                        },
+
+                        // Holder for the shared rich-text editor (toolbar + body),
+                        // appended in `init`.
+                        #[name = "editor_holder"]
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_vexpand: true,
+                        },
                     },
                 },
             },
@@ -989,6 +1001,7 @@ impl Component for Compose {
             encrypt: false,
             send_at,
             cloud_accounts: crate::cloud::load_enabled_accounts(),
+            drop_zones: None,
             cloud_links: Vec::new(),
             cloud_busy: 0,
             cloud_passwords: Vec::new(),
@@ -1138,6 +1151,31 @@ impl Component for Compose {
         widgets
             .fields_list
             .add_controller(file_drop_target(&sender, gtk::PropagationPhase::Capture));
+        // While files are dragged over it, the composer offers where they
+        // go instead: attached, in the text, or uploaded to the cloud. The
+        // targets above take a drop only when the surfaces could not come up.
+        let s = sender.input_sender().clone();
+        let zones = DropZones::install(&root, &widgets.drop_overlay, move |choice, paths| {
+            s.emit(ComposeInput::DroppedFiles(choice, paths));
+        });
+        zones.set_allow_inline(model.format == ComposeFormat::Rich);
+        zones.set_cloud_names(model.cloud_accounts.iter().map(|a| a.name.clone()).collect());
+        // HYLKI_SHOWCASE_DROP_ZONES=<attach|inline|cloud|none>:<file>[:<file>…]
+        // raises the surfaces two seconds after the composer opens.
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_DROP_ZONES") {
+            let mut parts = std::env::split_paths(&v);
+            let hover = match parts.next().as_deref().and_then(|p| p.to_str()) {
+                Some("attach") => Some(DropChoice::Attach),
+                Some("inline") => Some(DropChoice::Inline),
+                Some("cloud") => Some(DropChoice::Cloud),
+                _ => None,
+            };
+            let paths: Vec<_> = parts.collect();
+            let zones = zones.clone();
+            let host = root.clone().upcast::<gtk::Widget>();
+            gtk::glib::timeout_add_seconds_local_once(2, move || zones.showcase(&paths, &host, hover));
+        }
+        model.drop_zones = Some(zones);
 
         // Files handed in over the size limit (Settings → System → GNOME
         // Files): straight into the upload dialog, once the composer has a
@@ -1435,6 +1473,12 @@ impl Component for Compose {
                     }
                 });
             }
+
+            ComposeInput::DroppedFiles(choice, paths) => match choice {
+                DropChoice::Attach => sender.input(ComposeInput::AddAttachments(paths)),
+                DropChoice::Inline => self.editor.insert_files(&paths),
+                DropChoice::Cloud => sender.input(ComposeInput::CloudPicked(paths)),
+            },
 
             ComposeInput::CloudPicked(paths) => {
                 let parent = root.root().and_downcast::<gtk::Window>();
@@ -1920,6 +1964,9 @@ impl Component for Compose {
                 }
                 self.format = to;
                 self.editor.set_formatting_visible(to == ComposeFormat::Rich);
+                if let Some(zones) = &self.drop_zones {
+                    zones.set_allow_inline(to == ComposeFormat::Rich);
+                }
                 self.dress_format_buttons();
                 self.preview_btn.set_visible(to.is_source());
                 // A preview of the old format's render would be a lie about
