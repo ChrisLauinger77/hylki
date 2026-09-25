@@ -1400,28 +1400,56 @@ const PASTE_SCRIPT: &str = r#"<script>
     }
     fmtState();
   };
-  /* Enter twice inside a quote leaves it (#137), the way a list ends: the
+  /* Return breaks the line, or with `__hylkiReturnParagraph` set starts a
+     new paragraph, a <p> the recipient's client spaces as one; Shift+Return
+     does the other. WebKit's own pair is the reverse of the default, and
+     its paragraph is a copy of the block the caret is in, usually a
+     spaceless <div>. Inside a list Return keeps making the next item.
+
+     Enter twice inside a quote leaves it (#137), the way a list ends: the
      first Enter opens an empty line in the quote, the second takes that
      line out below it (WebKit's outdent drops one quote level for the
      caret's paragraph). Any other key in between makes the next Enter an
      ordinary one again. */
   var enterInQuote = false;
+  if(window.__hylkiReturnParagraph){
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+  }
   document.addEventListener('keydown', function(e){
-    if(e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || composing){
+    if(e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || composing){
       enterInQuote = false;
       return;
     }
     var sel = getSelection();
     var n = sel.rangeCount ? sel.anchorNode : null;
     var el = n && n.nodeType === 3 ? n.parentNode : n;
-    var inQuote = !!(el && el.closest && el.closest('blockquote'));
-    if(inQuote && enterInQuote && sel.isCollapsed){
+    if(!el || !el.closest || !document.body.isContentEditable || el.closest('li')){
+      enterInQuote = false;
+      return;
+    }
+    var inQuote = !!el.closest('blockquote');
+    if(!e.shiftKey && inQuote && enterInQuote && sel.isCollapsed){
       e.preventDefault();
       document.execCommand('outdent');
       enterInQuote = false;
       return;
     }
-    enterInQuote = inQuote;
+    enterInQuote = inQuote && !e.shiftKey;
+    e.preventDefault();
+    if(!window.__hylkiReturnParagraph === !e.shiftKey){
+      document.execCommand('insertLineBreak');
+      return;
+    }
+    document.execCommand('insertParagraph');
+    /* A paragraph split from a <div> is another <div>; it becomes a <p>
+       so it carries a paragraph's space. Only a bare div: one with a
+       class (the signature) or a style is somebody's markup. */
+    var m = getSelection().anchorNode;
+    var b = m && (m.nodeType === 3 ? m.parentNode : m);
+    b = b && b.closest && b.closest('p,div,li,blockquote,h1,h2,h3,h4,h5,h6,pre');
+    if(b && b.tagName === 'DIV' && !b.attributes.length){
+      document.execCommand('formatBlock', false, 'p');
+    }
   }, true);
   document.addEventListener('compositionstart', function(){ composing = true; });
   document.addEventListener('compositionend', function(){ composing = false; });
@@ -1752,8 +1780,10 @@ fn document(content: &str, webview: &webkit6::WebView) -> String {
     let scheme = if dark { "dark" } else { "light" };
     let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
     let paste_rich = !crate::config::load_paste_plain();
+    let return_paragraph = crate::config::load_return_paragraph();
     let script = format!(
-        "<script>window.__hylkiPasteRich={paste_rich};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}"
+        "<script>window.__hylkiPasteRich={paste_rich};\
+         window.__hylkiReturnParagraph={return_paragraph};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}"
     );
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\">\
@@ -1777,6 +1807,9 @@ fn document(content: &str, webview: &webkit6::WebView) -> String {
              background-color:rgba(224,27,36,0.10);}}\
            blockquote{{margin:0 0 0 8px;padding-left:10px;\
              border-left:3px solid rgba(128,128,128,0.4);}}\
+           /* A paragraph's space goes below it, so the first line of the\
+              message sits where it would in a <div>. */\
+           body>p:first-child{{margin-top:0;}}\
            .vireo-quote-attr{{opacity:0.7;margin:10px 0 4px;}}\
            .vireo-sig{{opacity:0.85;}}\
            a{{color:#3584e4;}}\

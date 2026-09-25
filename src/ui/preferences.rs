@@ -86,6 +86,7 @@ pub struct PrefInit {
     /// folder's account. One of `identities`' addresses.
     pub compose_default_from: String,
     pub paste_plain: bool,
+    pub return_paragraph: bool,
     pub spellcheck: bool,
     pub spellcheck_langs: String,
     pub message_theme: MessageTheme,
@@ -838,6 +839,7 @@ pub enum PrefInput {
     /// then `identities` in order.
     ChangeComposeDefaultFrom(u32),
     TogglePastePlain(bool),
+    ToggleReturnParagraph(bool),
     ToggleSpellcheck(bool),
     SpellLangsEdited(String),
     ChangeFetchInterval(u32),
@@ -998,6 +1000,7 @@ pub enum PrefOutput {
     SetLinkBrowser(String),
     SetComposeDefaultFrom(String),
     SetPastePlain(bool),
+    SetReturnParagraph(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
     SetFetchInterval(u64),
@@ -2803,6 +2806,19 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "return_paragraph_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Return starts a new paragraph"),
+                                        set_subtitle: &i18n("Return ends the paragraph with a hard \
+                                                       return and leaves space before the next. \
+                                                       Off, Return starts a new line in the same \
+                                                       paragraph. Shift+Return always does the \
+                                                       other."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleReturnParagraph(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "compose_format_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Write messages in"),
@@ -3679,6 +3695,7 @@ impl Component for Preferences {
             middle_ellipsize(&widgets.default_from_row);
         }
         widgets.paste_plain_row.set_active(init.paste_plain);
+        widgets.return_paragraph_row.set_active(init.return_paragraph);
         widgets.compose_format_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Rich text"),
             &i18n("Markdown"),
@@ -4248,6 +4265,9 @@ impl Component for Preferences {
             }
             PrefInput::TogglePastePlain(on) => {
                 let _ = sender.output(PrefOutput::SetPastePlain(on));
+            }
+            PrefInput::ToggleReturnParagraph(on) => {
+                let _ = sender.output(PrefOutput::SetReturnParagraph(on));
             }
             PrefInput::ToggleSpellcheck(on) => {
                 let _ = sender.output(PrefOutput::SetSpellcheck(on));

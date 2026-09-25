@@ -287,6 +287,16 @@ message, so it closes what you wrote rather than what the other person did.
 message instead, the placement Hylki had before 1.38. The setting applies
 when a composer opens; a draft keeps its signature wherever it was saved.
 
+### Return and Shift+Return
+
+In the rich text editor <kbd>Return</kbd> starts a new line in the same
+paragraph, and <kbd>Shift+Return</kbd> ends the paragraph with a hard
+return, which leaves a space before the next one. **Settings → Composing →
+Return starts a new paragraph** swaps the two. In a list <kbd>Return</kbd>
+still starts the next item, and pressed twice in a quote it still leaves the
+quote. The setting applies when a composer opens. Markdown, HTML and plain
+text are written as source, where <kbd>Return</kbd> is always a new line.
+
 ### Writing in Markdown or HTML
 
 A message can be written in any of four formats, chosen in **Settings →

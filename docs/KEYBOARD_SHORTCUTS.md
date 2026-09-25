@@ -33,6 +33,10 @@ in the menus, and in a search field it still clears the search.
 any of its address rows. It does what the Send button does, so a message with
 no recipient is not sent, and one scheduled for later is queued.
 
+In the body, <kbd>Return</kbd> starts a new line and <kbd>Shift+Return</kbd>
+a new paragraph; **Settings → Composing → Return starts a new paragraph**
+swaps them. See [Return and Shift+Return](DOCUMENTATION.md#return-and-shiftreturn).
+
 <kbd>Ctrl+Shift+F</kbd> turns [Focus Mode](FEATURES.md#the-app) on and off,
 with or without single-key shortcuts.
 

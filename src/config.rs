@@ -1146,6 +1146,11 @@ struct PrivacyFile {
     /// menu always offers both, whichever way this is set.
     #[serde(default = "default_paste_plain")]
     paste_plain: bool,
+    /// Whether Return in the composer starts a new paragraph (a hard
+    /// return) rather than breaking the line (the default). Shift+Return
+    /// does whichever this does not.
+    #[serde(default)]
+    return_paragraph: bool,
     /// New messages start as plain text, without formatting (#180). Kept
     /// written so a version that predates `compose_format` still opens its
     /// composer the way this one was left.
@@ -1514,6 +1519,7 @@ impl Default for PrivacyFile {
             compose_default_from: String::new(),
             single_card_default_applied: false,
             paste_plain: default_paste_plain(),
+            return_paragraph: false,
             compose_plain: false,
             compose_format: None,
             reply_position: ReplyPosition::default(),
@@ -2849,6 +2855,11 @@ pub fn load_paste_plain() -> bool {
     load_privacy().paste_plain
 }
 
+/// Whether Return in the composer starts a new paragraph rather than a line.
+pub fn load_return_paragraph() -> bool {
+    load_privacy().return_paragraph
+}
+
 /// Whether the composer checks spelling as you type.
 pub fn load_spellcheck() -> bool {
     load_privacy().spellcheck
@@ -3091,6 +3102,7 @@ pub fn save_privacy(
     reply_fields: bool,
     compose_default_from: &str,
     paste_plain: bool,
+    return_paragraph: bool,
     compose_format: ComposeFormat,
     reply_position: ReplyPosition,
     signature_position: SignaturePosition,
@@ -3187,6 +3199,7 @@ pub fn save_privacy(
         reply_fields,
         compose_default_from: compose_default_from.to_string(),
         paste_plain,
+        return_paragraph,
         // Both are written: the boolean is what an older version reads.
         compose_plain: compose_format == ComposeFormat::Plain,
         compose_format: Some(compose_format),

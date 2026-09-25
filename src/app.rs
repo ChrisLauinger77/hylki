@@ -917,6 +917,8 @@ pub struct AppModel {
     /// folder's account.
     compose_default_from: String,
     paste_plain: bool,
+    /// Return starts a new paragraph in the composer; off, a new line.
+    return_paragraph: bool,
     /// New messages start as plain text (#180).
     compose_format: crate::config::ComposeFormat,
     /// Where the split reply opens in the reading pane (#212).
@@ -1383,6 +1385,7 @@ pub enum AppMsg {
     /// The Settings window showed a category; remembered for reopening.
     SettingsPageShown(String),
     SetPastePlain(bool),
+    SetReturnParagraph(bool),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
     /// Show or block remote content for one message, whatever the standing
@@ -3331,6 +3334,7 @@ impl SimpleComponent for AppModel {
             reply_fields: config::load_reply_fields(),
             compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
+            return_paragraph: config::load_return_paragraph(),
             compose_format: config::load_compose_format(),
             reply_position: config::load_reply_position(),
             signature_position: config::load_signature_position(),
@@ -7995,6 +7999,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SetReturnParagraph(on) => {
+                if self.return_paragraph != on {
+                    self.return_paragraph = on;
+                    self.save_settings();
+                }
+            }
+
             AppMsg::SetSpellcheck(on) => {
                 if self.spellcheck != on {
                     self.spellcheck = on;
@@ -10799,6 +10810,7 @@ impl AppModel {
             self.reply_fields,
             &self.compose_default_from,
             self.paste_plain,
+            self.return_paragraph,
             self.compose_format,
             self.reply_position,
             self.signature_position,
@@ -17182,6 +17194,7 @@ impl AppModel {
             link_browser: self.link_browser.clone(),
             compose_default_from: self.compose_default_from.clone(),
             paste_plain: self.paste_plain,
+            return_paragraph: self.return_paragraph,
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),
             app_theme: self.app_theme,
@@ -17261,6 +17274,7 @@ impl AppModel {
                 PrefOutput::SetLinkBrowser(id) => AppMsg::SetLinkBrowser(id),
                 PrefOutput::SetComposeDefaultFrom(addr) => AppMsg::SetComposeDefaultFrom(addr),
                 PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
+                PrefOutput::SetReturnParagraph(on) => AppMsg::SetReturnParagraph(on),
                 PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
                 PrefOutput::SetSpellcheckLangs(l) => AppMsg::SetSpellcheckLangs(l),
                 PrefOutput::SetFetchInterval(secs) => AppMsg::SetFetchInterval(secs),

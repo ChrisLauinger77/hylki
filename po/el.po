@@ -4435,6 +4435,15 @@ msgstr ""
 "ανενεργό, η επικόλληση διατηρεί τη μορφοποίηση. Το δεξί κλικ στο πρόγραμμα "
 "επεξεργασίας προσφέρει πάντα και τις δύο επιλογές."
 
+msgid "Return starts a new paragraph"
+msgstr ""
+
+msgid ""
+"Return ends the paragraph with a hard return and leaves space before the "
+"next. Off, Return starts a new line in the same paragraph. Shift+Return "
+"always does the other."
+msgstr ""
+
 msgid "Write messages in"
 msgstr "Σύνταξη μηνυμάτων σε"
 

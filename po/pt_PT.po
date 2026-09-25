@@ -4405,6 +4405,15 @@ msgstr ""
 "desativada, a formatação é mantida. O menu de contexto do editor "
 "disponibiliza sempre ambas as opções."
 
+msgid "Return starts a new paragraph"
+msgstr ""
+
+msgid ""
+"Return ends the paragraph with a hard return and leaves space before the "
+"next. Off, Return starts a new line in the same paragraph. Shift+Return "
+"always does the other."
+msgstr ""
+
 msgid "Write messages in"
 msgstr "Escrever mensagens em"
 

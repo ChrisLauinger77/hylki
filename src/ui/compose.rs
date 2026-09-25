@@ -872,8 +872,13 @@ impl Component for Compose {
         // Initial editor content: a blank line to type on, then the
         // signature and the quoted reply/forward (if any), in the order
         // the setting says (#237). A draft already contains its signature;
-        // don't add another.
-        let mut content = String::from("<div><br></div>");
+        // don't add another. With Return set to start paragraphs the line
+        // is a paragraph too, so the first Return splits it into two.
+        let mut content = String::from(if crate::config::load_return_paragraph() {
+            "<p><br></p>"
+        } else {
+            "<div><br></div>"
+        });
         let sig = if draft_origin.is_none() && !current_sig.is_empty() {
             sig_html(&current_sig)
         } else {

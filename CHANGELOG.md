@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **New: a choice of what Return does in the composer.** In rich text,
+  Return starts a new line in the same paragraph and Shift+Return starts a
+  new paragraph, sent as a `<p>` with space before the next one. **Settings
+  → Composing → Return starts a new paragraph** swaps them. Before, Return
+  made a new block that looked like a line in the message but became a
+  paragraph in its plain-text copy, and Shift+Return made a line. Lists and
+  the two-Return exit from a quote are unchanged. See
+  [Return and Shift+Return](docs/DOCUMENTATION.md#return-and-shiftreturn).
 - **New: a sound file of your own for new mail** (#292, suggested by
   yioannides). **Settings → General → Sound for new mail** picks a file
   (WAV, MP3, OGG, FLAC or anything else GStreamer plays), previews it and
