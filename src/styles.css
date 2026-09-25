@@ -304,10 +304,12 @@ button.star-active {
   background-color: alpha(@window_bg_color, 0.95);
   padding: 18px;
 }
-/* The veil takes a drop let go between the cards; the accent outline GTK
-   gives a widget accepting a drop belongs to the card under the pointer. */
-.drop-layer:drop(active) {
+/* The composer takes every file drop itself and lights the card under the
+   pointer by hand; the outline GTK gives a widget taking a drop would ring
+   the whole composer. */
+.drop-host:drop(active) {
   box-shadow: none;
+  outline: none;
 }
 .drop-summary {
   font-weight: 700;

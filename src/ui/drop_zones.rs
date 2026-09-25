@@ -41,9 +41,6 @@ pub struct DropZones {
     /// The cloud accounts' names, for the upload surface's line; empty
     /// means there is nowhere to upload to.
     cloud_names: RefCell<Vec<String>>,
-    /// Bumped on every enter and leave, so a file list read for a drag that
-    /// has since left does not bring the surfaces up after it.
-    epoch: Cell<u32>,
     /// Up, or on its way up; the layer stays visible a moment longer while
     /// it fades out.
     shown: Cell<bool>,
@@ -99,66 +96,103 @@ impl DropZones {
             cloud,
             allow_inline: Cell::new(true),
             cloud_names: RefCell::new(Vec::new()),
-            epoch: Cell::new(0),
             shown: Cell::new(false),
             fade: RefCell::new(None),
         });
 
-        for (zone, choice) in [
-            (&this.attach.widget, DropChoice::Attach),
-            (&this.inline.widget, DropChoice::Inline),
-            (&this.cloud.widget, DropChoice::Cloud),
-        ] {
-            zone.add_controller(this.target(choice, &on_drop));
-        }
-        // Let go between the surfaces: attached, which is what a drop on
-        // the composer did before there were surfaces to choose from.
-        layer.add_controller(this.target(DropChoice::Attach, &on_drop));
+        // The veil only shows; the target below does all the taking.
+        layer.set_can_target(false);
         overlay.add_overlay(&layer);
 
-        // A motion controller rather than a drop target: it sees a drag
-        // come and go without taking the drop from whatever is under it.
-        let motion = gtk::DropControllerMotion::new();
-        let weak = Rc::downgrade(&this);
+        // One target over the whole composer, ahead of everything in it
+        // (capture phase), rather than one per card: the files are read
+        // once, as the drag comes in, and that one reading both decides
+        // the cards and is what the drop delivers. With a target per card,
+        // each read the files again when let go, and on some desktops that
+        // second read never came back, so the drop never happened. Which
+        // card was chosen is worked out from where the files were let go.
+        let target = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+        target.set_propagation_phase(gtk::PropagationPhase::Capture);
+        target.set_preload(true);
         let host_widget = host.as_ref().clone();
-        motion.connect_enter(move |ctrl, _, _| {
-            let Some(this) = weak.upgrade() else { return };
-            let Some(drop) = ctrl.drop() else { return };
-            if !drop.formats().contains_type(gtk::gdk::FileList::static_type()) {
-                return;
-            }
-            let epoch = this.epoch.get().wrapping_add(1);
-            this.epoch.set(epoch);
-            let weak = Rc::downgrade(&this);
-            let host = host_widget.clone();
-            drop.read_value_async(
-                gtk::gdk::FileList::static_type(),
-                gtk::glib::Priority::DEFAULT,
-                gtk::gio::Cancellable::NONE,
-                move |res| {
-                    let Some(this) = weak.upgrade() else { return };
-                    if this.epoch.get() != epoch {
-                        return;
-                    }
-                    let Some(paths) = res.ok().and_then(|v| v.get::<gtk::gdk::FileList>().ok()).map(|l| file_paths(&l))
-                    else {
-                        return;
-                    };
-                    if !paths.is_empty() {
-                        this.show(&paths, host.width(), host.height());
-                    }
-                },
-            );
-        });
+        host_widget.add_css_class("drop-host");
+
         let weak = Rc::downgrade(&this);
-        motion.connect_leave(move |_| {
+        let h = host_widget.clone();
+        target.connect_value_notify(move |t| {
+            let Some(this) = weak.upgrade() else { return };
+            let Some(value) = t.value() else { return };
+            let paths = value.get::<gtk::gdk::FileList>().map(|l| file_paths(&l)).unwrap_or_default();
+            tracing::debug!("drop cards: {} file(s) dragged over the composer", paths.len());
+            if !paths.is_empty() {
+                this.show(&paths, h.width(), h.height());
+            }
+        });
+
+        let weak = Rc::downgrade(&this);
+        let h = host_widget.clone();
+        target.connect_motion(move |_, x, y| {
             if let Some(this) = weak.upgrade() {
-                this.epoch.set(this.epoch.get().wrapping_add(1));
+                this.hover(this.card_at(&h, x, y));
+            }
+            gtk::gdk::DragAction::COPY
+        });
+
+        let weak = Rc::downgrade(&this);
+        target.connect_leave(move |_| {
+            if let Some(this) = weak.upgrade() {
                 this.hide();
             }
         });
-        host.add_controller(motion);
+
+        let weak = Rc::downgrade(&this);
+        let h = host_widget.clone();
+        target.connect_drop(move |_, value, x, y| {
+            let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+            let paths = file_paths(&list);
+            // Let go before the cards were up, or between them: attached,
+            // which is what a drop on the composer always did.
+            let choice = weak
+                .upgrade()
+                .and_then(|this| {
+                    let choice = this.shown.get().then(|| this.card_at(&h, x, y)).flatten();
+                    this.hide();
+                    choice
+                })
+                .unwrap_or(DropChoice::Attach);
+            tracing::info!("drop cards: {} file(s) let go on {choice:?}", paths.len());
+            if paths.is_empty() {
+                return false;
+            }
+            on_drop(choice, paths);
+            true
+        });
+        host.add_controller(target);
         this
+    }
+
+    /// The card under `(x, y)` in `host`'s coordinates, if one is up there.
+    fn card_at(&self, host: &gtk::Widget, x: f64, y: f64) -> Option<DropChoice> {
+        [(&self.attach, DropChoice::Attach), (&self.inline, DropChoice::Inline), (&self.cloud, DropChoice::Cloud)]
+            .into_iter()
+            .filter(|(zone, _)| zone.widget.is_visible())
+            .find(|(zone, _)| {
+                host.compute_point(&zone.widget, &gtk::graphene::Point::new(x as f32, y as f32))
+                    .is_some_and(|p| zone.widget.contains(p.x() as f64, p.y() as f64))
+            })
+            .map(|(_, choice)| choice)
+    }
+
+    /// Light the card under the pointer the way GTK lights a drop target
+    /// that would take the drop (`:drop(active)` in the stylesheet).
+    fn hover(&self, choice: Option<DropChoice>) {
+        for (zone, c) in [(&self.attach, DropChoice::Attach), (&self.inline, DropChoice::Inline), (&self.cloud, DropChoice::Cloud)] {
+            if choice == Some(c) {
+                zone.widget.set_state_flags(gtk::StateFlags::DROP_ACTIVE, false);
+            } else {
+                zone.widget.unset_state_flags(gtk::StateFlags::DROP_ACTIVE);
+            }
+        }
     }
 
     pub fn set_allow_inline(&self, on: bool) {
@@ -179,33 +213,7 @@ impl DropZones {
         if let Some(fade) = self.fade.borrow().as_ref() {
             fade.skip();
         }
-        let zone = match hover {
-            Some(DropChoice::Attach) => &self.attach.widget,
-            Some(DropChoice::Inline) => &self.inline.widget,
-            Some(DropChoice::Cloud) => &self.cloud.widget,
-            None => return,
-        };
-        zone.set_state_flags(gtk::StateFlags::DROP_ACTIVE, false);
-    }
-
-    fn target(self: &Rc<Self>, choice: DropChoice, on_drop: &Rc<dyn Fn(DropChoice, Vec<PathBuf>)>) -> gtk::DropTarget {
-        let target = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
-        let weak = Rc::downgrade(self);
-        let on_drop = on_drop.clone();
-        target.connect_drop(move |_, value, _, _| {
-            let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
-            let paths = file_paths(&list);
-            if let Some(this) = weak.upgrade() {
-                this.epoch.set(this.epoch.get().wrapping_add(1));
-                this.hide();
-            }
-            if paths.is_empty() {
-                return false;
-            }
-            on_drop(choice, paths);
-            true
-        });
-        target
+        self.hover(hover);
     }
 
     fn show(&self, paths: &[PathBuf], width: i32, height: i32) {
@@ -293,6 +301,7 @@ impl DropZones {
     }
 
     fn hide(&self) {
+        self.hover(None);
         if self.shown.replace(false) {
             self.fade_to(0.0);
         }
@@ -305,9 +314,6 @@ impl DropZones {
             running.pause();
         }
         let from = self.layer.opacity();
-        // Fading out, it is still over the composer for a moment: a second
-        // drag arriving then goes to the composer, not to the ghost.
-        self.layer.set_can_target(to > 0.0);
         let layer = self.layer.clone();
         let target = adw::CallbackAnimationTarget::new(move |v| layer.set_opacity(v));
         let anim = adw::TimedAnimation::new(&self.layer, from, to, FADE_MS, target);

@@ -1143,17 +1143,8 @@ impl Component for Compose {
             model.rebuild_attachments(&widgets.attach_box, &sender);
         }
 
-        // Files dropped anywhere on the composer are attached (#293). The
-        // body has a target of its own, which puts a picture in the text
-        // (rich_editor.rs). The address and subject rows take theirs before
-        // the rows do: a text entry accepts a file drag as its path, typed in.
-        root.add_controller(file_drop_target(&sender, gtk::PropagationPhase::Bubble));
-        widgets
-            .fields_list
-            .add_controller(file_drop_target(&sender, gtk::PropagationPhase::Capture));
-        // While files are dragged over it, the composer offers where they
-        // go instead: attached, in the text, or uploaded to the cloud. The
-        // targets above take a drop only when the surfaces could not come up.
+        // Files dragged over the composer bring up cards for where they go:
+        // attached, in the text, or uploaded to the cloud (#293).
         let s = sender.input_sender().clone();
         let zones = DropZones::install(&root, &widgets.drop_overlay, move |choice, paths| {
             s.emit(ComposeInput::DroppedFiles(choice, paths));
@@ -2728,23 +2719,6 @@ impl Compose {
 /// Save the edited message, discard it, or go back to it. Escape answers
 /// Keep Editing, so a second press never discards what the first one asked
 /// about (#290).
-/// Attach whatever files are dropped on the widget it is added to.
-fn file_drop_target(sender: &ComponentSender<Compose>, phase: gtk::PropagationPhase) -> gtk::DropTarget {
-    let drop = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
-    drop.set_propagation_phase(phase);
-    let s = sender.input_sender().clone();
-    drop.connect_drop(move |_, value, _, _| {
-        let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
-        let paths: Vec<_> = list.files().iter().filter_map(|f| f.path()).filter(|p| p.is_file()).collect();
-        if paths.is_empty() {
-            return false;
-        }
-        s.emit(ComposeInput::AddAttachments(paths));
-        true
-    });
-    drop
-}
-
 fn confirm_discard_dialog(parent: Option<&gtk::Window>, sender: relm4::Sender<ComposeInput>) {
     let dialog = adw::MessageDialog::new(
         parent,
