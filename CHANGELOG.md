@@ -30,6 +30,10 @@
   Refused on Gmail (All Mail would keep the original), POP3, signed or
   encrypted messages, and a message that is only the file. See
   [Deleting an attachment from the server](docs/DOCUMENTATION.md#deleting-an-attachment-from-the-server).
+- **Fixed: the menu offered to reveal a status bar already showing** (#294,
+  reported by frenchy82). The menu item reads *Hide Status Bar* while the
+  bar is down, an error message passing through it included, and hides it.
+  Before, choosing it with only a passing message showing held the bar open.
 - **Fixed: Escape discarded a message being written without asking** (#290,
   reported by EmmanuelP). Escape, Cancel and the composer window's close
   button now ask whether to save the message to Drafts, discard it or keep

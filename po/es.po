@@ -256,6 +256,10 @@ msgstr "No hay ninguna libreta de direcciones disponible"
 msgid "Could not update contact: {e}"
 msgstr "No se pudo actualizar el contacto: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Mostrar barra de estado"
+
 msgid "Reveal Status Bar"
 msgstr "Mostrar barra de estado"
 

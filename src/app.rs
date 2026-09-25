@@ -475,6 +475,8 @@ pub struct AppModel {
     menu: gtk::gio::Menu,
     /// The burger menu's help section, rebuilt when Console mode toggles.
     help_menu: gtk::gio::Menu,
+    /// Whether the status bar is down, so the menu offers to hide it (#294).
+    status_bar_shown: bool,
     /// All known accounts, ordered by id.
     accounts: Vec<Account>,
     /// account_id → that account's folders.
@@ -1768,6 +1770,7 @@ pub enum AppMsg {
     Status { account_id: u32, text: String },
     Error { account_id: u32, text: String, connectivity: bool },
     NotifyCount(usize),
+    StatusBarShown(bool),
     ToggleNotifications,
     OpenContacts,
     /// The background EDS read for the contacts view finished.
@@ -2934,6 +2937,7 @@ impl SimpleComponent for AppModel {
             |out| match out {
                 NotifyOutput::CountChanged(n) => AppMsg::NotifyCount(n),
                 NotifyOutput::ExportLog => AppMsg::ExportLog,
+                NotifyOutput::Shown(shown) => AppMsg::StatusBarShown(shown),
             },
         );
 
@@ -3065,6 +3069,7 @@ impl SimpleComponent for AppModel {
             next_compose_id: 1,
             menu,
             help_menu,
+            status_bar_shown: false,
             undo_menu: model_undo_menu.clone(),
             accounts: Vec::new(),
             folders: HashMap::new(),
@@ -10410,7 +10415,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::NotifyCount(n) => self.notify_count = n,
-            AppMsg::ToggleNotifications => self.notifications.emit(NotifyInput::TogglePanel),
+            AppMsg::ToggleNotifications => self.notifications.emit(NotifyInput::ToggleBar),
+            AppMsg::StatusBarShown(shown) => {
+                self.status_bar_shown = shown;
+                self.rebuild_help_menu();
+            }
 
             AppMsg::OpenContacts => {
                 self.close_sidebar_peek();
@@ -10697,7 +10706,8 @@ impl AppModel {
     /// only while Console mode is enabled in Settings.
     fn rebuild_help_menu(&self) {
         self.help_menu.remove_all();
-        self.help_menu.append(Some(i18n("Reveal Status Bar").as_str()), Some("win.status-bar"));
+        let status_bar = if self.status_bar_shown { i18n("Hide Status Bar") } else { i18n("Reveal Status Bar") };
+        self.help_menu.append(Some(status_bar.as_str()), Some("win.status-bar"));
         if self.console_mode {
             self.help_menu.append(Some(i18n("Console").as_str()), Some("win.console"));
         }

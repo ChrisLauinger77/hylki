@@ -256,6 +256,10 @@ msgstr "Kein Adressbuch verfügbar"
 msgid "Could not update contact: {e}"
 msgstr "Kontakt konnte nicht aktualisiert werden: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Statusleiste anzeigen"
+
 msgid "Reveal Status Bar"
 msgstr "Statusleiste anzeigen"
 

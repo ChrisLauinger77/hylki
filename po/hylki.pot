@@ -243,6 +243,9 @@ msgstr ""
 msgid "Could not update contact: {e}"
 msgstr ""
 
+msgid "Hide Status Bar"
+msgstr ""
+
 msgid "Reveal Status Bar"
 msgstr ""
 

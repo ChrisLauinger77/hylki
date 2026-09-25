@@ -254,6 +254,10 @@ msgstr "Адресная книга недоступна"
 msgid "Could not update contact: {e}"
 msgstr "Не удалось обновить контакт: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Показать строку состояния"
+
 msgid "Reveal Status Bar"
 msgstr "Показать строку состояния"
 

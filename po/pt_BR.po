@@ -257,6 +257,10 @@ msgstr "Não está disponível nenhum catálogo de endereços"
 msgid "Could not update contact: {e}"
 msgstr "Não foi possível atualizar o contato: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Mostrar a barra de status"
+
 msgid "Reveal Status Bar"
 msgstr "Mostrar a barra de status"
 

@@ -126,6 +126,9 @@ pub enum NotifyInput {
     /// Connectivity restored: drop any connection/sync error cards.
     ClearConnectivity,
     TogglePanel,
+    /// The menu item, Ctrl+Shift+S and a long-press on Refresh: hide the bar
+    /// if it shows at all, a passing message included, or open it (#294).
+    ToggleBar,
     /// Open the panel straight into console mode.
     ShowConsole,
     /// The console's Export button (#132).
@@ -147,6 +150,9 @@ pub enum NotifyOutput {
     CountChanged(usize),
     /// The console's Export button: save the log to a file (#132).
     ExportLog,
+    /// The bar came down or went up, for the menu item that names what it
+    /// will do (#294).
+    Shown(bool),
 }
 
 #[relm4::component(pub)]
@@ -406,6 +412,16 @@ impl SimpleComponent for NotificationCenter {
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
+        let was_shown = self.shown();
+        self.handle(msg, &sender);
+        if self.shown() != was_shown {
+            let _ = sender.output(NotifyOutput::Shown(self.shown()));
+        }
+    }
+}
+
+impl NotificationCenter {
+    fn handle(&mut self, msg: NotifyInput, sender: &ComponentSender<Self>) {
         match msg {
             NotifyInput::Push {
                 text,
@@ -469,6 +485,17 @@ impl SimpleComponent for NotificationCenter {
                     // The bar's X is also console mode's exit.
                     self.console_open = false;
                     self.console_theme = false;
+                }
+            }
+
+            NotifyInput::ToggleBar => {
+                if self.shown() {
+                    self.panel_open = false;
+                    self.transient_visible = false;
+                    self.console_open = false;
+                    self.console_theme = false;
+                } else {
+                    self.panel_open = true;
                 }
             }
 
@@ -586,9 +613,12 @@ impl SimpleComponent for NotificationCenter {
             }
         }
     }
-}
 
-impl NotificationCenter {
+    /// Whether the bar is down: a passing message, or the panel.
+    fn shown(&self) -> bool {
+        self.transient_visible || self.panel_open
+    }
+
     /// Remove every connectivity-flagged error card (newest-first indices).
     fn remove_connectivity_cards(&mut self) {
         let to_remove: Vec<usize> = (0..self.ids.len())

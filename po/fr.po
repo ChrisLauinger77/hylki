@@ -257,6 +257,10 @@ msgstr "Aucun carnet d'adresses disponible"
 msgid "Could not update contact: {e}"
 msgstr "Impossible de mettre à jour le contact : {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Afficher la barre d'état"
+
 msgid "Reveal Status Bar"
 msgstr "Afficher la barre d'état"
 

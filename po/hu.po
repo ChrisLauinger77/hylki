@@ -251,6 +251,10 @@ msgstr "Nem érhető el címjegyzék"
 msgid "Could not update contact: {e}"
 msgstr "A névjegy nem frissíthető: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Állapotsáv megjelenítése"
+
 msgid "Reveal Status Bar"
 msgstr "Állapotsáv megjelenítése"
 

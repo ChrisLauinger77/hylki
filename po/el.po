@@ -259,6 +259,10 @@ msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσε
 msgid "Could not update contact: {e}"
 msgstr "Αδυναμία ενημέρωσης επαφής: {e}"
 
+#, fuzzy
+msgid "Hide Status Bar"
+msgstr "Εμφάνιση γραμμής κατάστασης"
+
 msgid "Reveal Status Bar"
 msgstr "Εμφάνιση γραμμής κατάστασης"
 
