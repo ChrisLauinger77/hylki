@@ -299,6 +299,8 @@ pub struct Preferences {
     /// The notification buttons, kept whole so each switch can hand the
     /// app the full set (#244).
     notification_buttons: crate::config::NotificationButtons,
+    /// The new-mail sound (#292), a copy in the data directory.
+    notification_sound: Option<std::path::PathBuf>,
     show_unified: bool,
     /// The unified Starred / Sent / Drafts switches, kept whole so each
     /// toggle can hand the app the full set.
@@ -843,6 +845,11 @@ pub enum PrefInput {
     ToggleNotifications(bool),
     ToggleNotificationContent(bool),
     ToggleNotificationButton(crate::config::NotificationButton, bool),
+    /// The new-mail sound (#292): pick a file, it was picked, hear it, drop it.
+    ChooseSound,
+    SoundChosen(std::path::PathBuf),
+    PlaySound,
+    ClearSound,
     ToggleAttachmentsRow(bool),
     ToggleContactsRow(bool),
     ToggleShowUnified(bool),
@@ -1658,6 +1665,49 @@ impl Component for Preferences {
                                         set_title: &i18n("Show sender and subject"),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleNotificationContent(row.is_active()));
+                                        },
+                                    },
+
+                                    // A sound file of the user's own (#292),
+                                    // played with each new-mail notification.
+                                    adw::ActionRow {
+                                        #[watch]
+                                        set_sensitive: model.notifications,
+                                        set_title: &i18n("Sound for new mail"),
+                                        #[watch]
+                                        set_subtitle: &model
+                                            .notification_sound
+                                            .as_ref()
+                                            .and_then(|p| p.file_name())
+                                            .map_or_else(|| i18n("None"), |n| n.to_string_lossy().into_owned()),
+                                        add_suffix = &gtk::Button {
+                                            set_icon_name: "media-playback-start-symbolic",
+                                            set_tooltip_text: Some(i18n("Play").as_str()),
+                                            set_valign: gtk::Align::Center,
+                                            add_css_class: "flat",
+                                            #[watch]
+                                            set_visible: model.notification_sound.is_some(),
+                                            connect_clicked[sender] => move |_| {
+                                                sender.input(PrefInput::PlaySound);
+                                            },
+                                        },
+                                        add_suffix = &gtk::Button {
+                                            set_icon_name: "user-trash-symbolic",
+                                            set_tooltip_text: Some(i18n("Remove Sound").as_str()),
+                                            set_valign: gtk::Align::Center,
+                                            add_css_class: "flat",
+                                            #[watch]
+                                            set_visible: model.notification_sound.is_some(),
+                                            connect_clicked[sender] => move |_| {
+                                                sender.input(PrefInput::ClearSound);
+                                            },
+                                        },
+                                        add_suffix = &gtk::Button {
+                                            set_label: &i18n("Choose…"),
+                                            set_valign: gtk::Align::Center,
+                                            connect_clicked[sender] => move |_| {
+                                                sender.input(PrefInput::ChooseSound);
+                                            },
                                         },
                                     },
 
@@ -3212,6 +3262,7 @@ impl Component for Preferences {
             browsers: crate::ui::launch::browsers(),
             notifications: init.notifications,
             notification_buttons: init.notification_buttons,
+            notification_sound: crate::config::notification_sound(),
             toolbar: init.reader_toolbar.clone(),
             focus: init.focus,
             toolbar_editor: None,
@@ -4229,6 +4280,38 @@ impl Component for Preferences {
                 }
                 self.notification_buttons.set(button, on);
                 let _ = sender.output(PrefOutput::SetNotificationButtons(self.notification_buttons));
+            }
+            PrefInput::ChooseSound => {
+                let dialog = gtk::FileDialog::builder().title(&i18n("Choose a Sound")).build();
+                let filter = gtk::FileFilter::new();
+                filter.set_name(Some(&i18n("Sounds")));
+                filter.add_mime_type("audio/*");
+                let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+                filters.append(&filter);
+                dialog.set_filters(Some(&filters));
+                dialog.set_default_filter(Some(&filter));
+                let s = sender.clone();
+                dialog.open(Some(root), gtk::gio::Cancellable::NONE, move |res| {
+                    let Ok(file) = res else { return };
+                    let Some(path) = file.path() else { return };
+                    s.input(PrefInput::SoundChosen(path));
+                });
+            }
+            PrefInput::SoundChosen(path) => match crate::config::set_notification_sound(&path) {
+                Ok(copy) => {
+                    crate::notify::play_sound(&copy, true);
+                    self.notification_sound = Some(copy);
+                }
+                Err(e) => tracing::warn!("could not keep {} as the new-mail sound: {e}", path.display()),
+            },
+            PrefInput::PlaySound => {
+                if let Some(path) = &self.notification_sound {
+                    crate::notify::play_sound(path, true);
+                }
+            }
+            PrefInput::ClearSound => {
+                crate::config::clear_notification_sound();
+                self.notification_sound = None;
             }
             PrefInput::ToggleAttachmentsRow(on) => {
                 let _ = sender.output(PrefOutput::SetAttachmentsRow(on));

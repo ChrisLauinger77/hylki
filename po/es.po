@@ -3576,6 +3576,17 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Mostrar remitente y asunto"
 
+#, fuzzy
+msgid "Sound for new mail"
+msgstr "Comprobar correo nuevo"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "¿Eliminar cuenta?"
+
 msgid "Notification Buttons"
 msgstr "Botones de notificación"
 
@@ -4780,6 +4791,13 @@ msgstr "No se pudo eliminar la extensión"
 
 msgid "Could not restart Files"
 msgstr "No se pudo reiniciar Archivos"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Elegir una imagen"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Olvidar esta palabra"

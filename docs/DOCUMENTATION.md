@@ -541,6 +541,18 @@ General → Notification Buttons picks any three of the six (Mark as Read,
 Archive and Delete to begin with); a notification that sums up several new
 messages carries none. Stored as `notification_buttons` in `privacy.toml`.
 
+**Settings → General → Sound for new mail** plays a sound file of your
+choosing with each new-mail notification: **Choose…** picks it (any format
+GStreamer can play, such as WAV, MP3, OGG or FLAC), the play button previews
+it and the bin button goes back to no sound of Hylki's own. The file is copied
+to `~/.local/share/hylki/notification-sound/`, so the original can be moved or
+deleted. Several accounts receiving mail at once play it once. It is not
+played when event sounds are switched off in GNOME, or, in a native install,
+while Do Not Disturb is on. The Flatpak cannot see Do Not Disturb: the desktop
+does not share that setting with sandboxed apps. The desktop may play a sound
+of its own for the notification as well; GNOME Settings → Notifications →
+Hylki → Sound Alerts turns that one off.
+
 ## Privacy
 
 Hylki collects no telemetry and sends no analytics. Remote content in messages is

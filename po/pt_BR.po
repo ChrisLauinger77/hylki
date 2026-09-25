@@ -3583,6 +3583,17 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Mostrar remetente e assunto"
 
+#, fuzzy
+msgid "Sound for new mail"
+msgstr "Procurar novas mensagens"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "Remover conta?"
+
 msgid "Notification Buttons"
 msgstr "Botões das notificações"
 
@@ -4783,6 +4794,13 @@ msgstr "Não foi possível remover a extensão"
 
 msgid "Could not restart Files"
 msgstr "Não foi possível reiniciar o aplicativo Arquivos"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Escolher uma imagem"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Esquecer esta palavra"

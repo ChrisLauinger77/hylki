@@ -3264,6 +3264,15 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr ""
 
+msgid "Sound for new mail"
+msgstr ""
+
+msgid "Play"
+msgstr ""
+
+msgid "Remove Sound"
+msgstr ""
+
 msgid "Notification Buttons"
 msgstr ""
 
@@ -4227,6 +4236,12 @@ msgid "Could not remove the extension"
 msgstr ""
 
 msgid "Could not restart Files"
+msgstr ""
+
+msgid "Choose a Sound"
+msgstr ""
+
+msgid "Sounds"
 msgstr ""
 
 msgid "Forget this word"

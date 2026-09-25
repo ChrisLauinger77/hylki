@@ -3626,6 +3626,17 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Εμφάνιση αποστολέα και θέματος"
 
+#, fuzzy
+msgid "Sound for new mail"
+msgstr "Έλεγχος για νέα μηνύματα"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "Αφαίρεση λογαριασμού;"
+
 msgid "Notification Buttons"
 msgstr "Κουμπιά ειδοποιήσεων"
 
@@ -4845,6 +4856,13 @@ msgstr "Δεν ήταν δυνατή η αφαίρεση της επέκταση
 
 msgid "Could not restart Files"
 msgstr "Δεν ήταν δυνατή η επανεκκίνηση των Αρχείων"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Επιλογή εικόνας"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Να ξεχαστεί αυτή η λέξη"

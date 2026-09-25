@@ -3600,6 +3600,17 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Absender und Betreff anzeigen"
 
+#, fuzzy
+msgid "Sound for new mail"
+msgstr "Auf neue Nachrichten prüfen"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "Konto entfernen?"
+
 msgid "Notification Buttons"
 msgstr "Schaltflächen in Benachrichtigungen"
 
@@ -4789,6 +4800,13 @@ msgstr "Erweiterung konnte nicht entfernt werden"
 
 msgid "Could not restart Files"
 msgstr "Es konnten keine Dateien neu gestartet werden"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Wählen Sie ein Bild"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Dieses Wort vergessen"

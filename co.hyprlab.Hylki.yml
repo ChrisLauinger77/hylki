@@ -29,6 +29,7 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri                                 # WebKit rendering
+  - --socket=pulseaudio                          # the new-mail sound (#292)
   - --talk-name=org.freedesktop.secrets          # keyring: passwords + OAuth tokens
   - --talk-name=org.gnome.OnlineAccounts          # import GNOME Online Accounts
   - --talk-name=org.gnome.Settings                 # "Open Online Accounts" button

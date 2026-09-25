@@ -6,7 +6,7 @@
 //! field is read from the TOML if present (older configs / manual setup) and
 //! migrated into the keyring on first use, then stripped from the file.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -149,6 +149,53 @@ fn prune_avatars(accounts: &[AccountConfig]) {
             .and_then(|t| t.elapsed().ok())
             .is_some_and(|age| age < std::time::Duration::from_secs(600));
         if !fresh {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
+/// Where the new-mail sound is kept (#292). It is a copy, so the original
+/// can be moved or deleted, and inside the Flatpak it stays readable after
+/// the file chooser's grant lapses. The file keeps its own name, which is
+/// what Settings shows; there is never more than one.
+fn notification_sound_dir() -> Option<PathBuf> {
+    data_base().map(|d| d.join("hylki").join("notification-sound"))
+}
+
+/// The chosen new-mail sound, if there is one. None means the desktop's
+/// own behaviour: Hylki plays nothing.
+pub fn notification_sound() -> Option<PathBuf> {
+    std::fs::read_dir(notification_sound_dir()?)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.is_file() && !p.file_name().is_some_and(|n| n.to_string_lossy().starts_with('.')))
+}
+
+/// Make a copy of `src` the new-mail sound, in place of any earlier one.
+pub fn set_notification_sound(src: &Path) -> std::io::Result<PathBuf> {
+    let dir = notification_sound_dir()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no data directory"))?;
+    let name = src
+        .file_name()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "not a file"))?;
+    // Copied beside the old one first, so a failed copy leaves the old
+    // sound playing rather than none.
+    std::fs::create_dir_all(&dir)?;
+    let part = dir.join(".incoming");
+    std::fs::copy(src, &part)?;
+    clear_notification_sound();
+    let dest = dir.join(name);
+    std::fs::rename(&part, &dest)?;
+    Ok(dest)
+}
+
+/// Go back to the desktop's own behaviour for new mail.
+pub fn clear_notification_sound() {
+    let Some(dir) = notification_sound_dir() else { return };
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    for entry in entries.flatten() {
+        if entry.file_name() != ".incoming" {
             let _ = std::fs::remove_file(entry.path());
         }
     }

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **New: a sound file of your own for new mail** (#292, suggested by
+  yioannides). **Settings → General → Sound for new mail** picks a file
+  (WAV, MP3, OGG, FLAC or anything else GStreamer plays), previews it and
+  removes it again. Hylki keeps a copy in its data directory and plays it
+  with each new-mail notification, once for a burst from several accounts.
+  It stays quiet when GNOME's event sounds are off, and during Do Not Disturb
+  in a native install; the Flatpak cannot read Do Not Disturb. The Flatpak
+  gains `--socket=pulseaudio` to play it. See
+  [Notifications](docs/DOCUMENTATION.md#notifications).
 - **New: files dragged onto the window go into a message** (#293). Dropped
   on the composer, anywhere on it, they are attached (a picture let go in the
   text is still placed inline). Dropped elsewhere in the main window, they go

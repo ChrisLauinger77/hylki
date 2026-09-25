@@ -3592,6 +3592,17 @@ msgid "Show sender and subject"
 msgstr "Показывать отправителя и тему"
 
 #, fuzzy
+msgid "Sound for new mail"
+msgstr "Проверка новой почты"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "Удалить аккаунт?"
+
+#, fuzzy
 msgid "Notification Buttons"
 msgstr "Уведомления"
 
@@ -4765,6 +4776,13 @@ msgstr "Не удалось удалить расширение"
 
 msgid "Could not restart Files"
 msgstr "Не удалось перезапустить «Файлы»"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Выбрать картинку"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Удалить это слово"

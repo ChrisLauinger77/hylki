@@ -123,6 +123,58 @@ pub fn new_mail(
         }
     }
     send(&mail_id(account_id), &n);
+    if let Some(sound) = crate::config::notification_sound() {
+        if crate::desktop::quiet() {
+            tracing::debug!("new-mail sound: the desktop asks for quiet");
+        } else {
+            play_sound(&sound, false);
+        }
+    }
+}
+
+thread_local! {
+    /// The sound playing, held until it ends: a dropped `MediaFile` stops
+    /// mid-play.
+    static SOUND: std::cell::RefCell<Option<gtk::MediaFile>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Play the new-mail sound (#292). The notification itself goes through the
+/// portal, which has no way to carry a sound of the app's choosing, so the
+/// app plays it. Several accounts syncing at once post several
+/// notifications; a sound still playing is left to finish rather than
+/// stacked with copies of itself. `restart` is Settings' Play button, which
+/// starts over.
+pub fn play_sound(path: &std::path::Path, restart: bool) {
+    SOUND.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if !restart && slot.as_ref().is_some_and(|m| m.is_playing()) {
+            return;
+        }
+        let media = gtk::MediaFile::for_filename(path);
+        media.connect_error_notify(|m| {
+            if let Some(e) = m.error() {
+                tracing::warn!("new-mail sound: {e}");
+            }
+        });
+        // Let go of it once it has played, or its audio stream stays open
+        // for as long as the app runs.
+        media.connect_ended_notify(|m| {
+            if !m.is_ended() {
+                return;
+            }
+            let m = m.clone();
+            gtk::glib::idle_add_local_once(move || {
+                SOUND.with(|slot| {
+                    let mut slot = slot.borrow_mut();
+                    if slot.as_ref() == Some(&m) {
+                        *slot = None;
+                    }
+                });
+            });
+        });
+        media.play();
+        *slot = Some(media);
+    });
 }
 
 /// Withdraw an account's new-mail notification (once its mail has been read).

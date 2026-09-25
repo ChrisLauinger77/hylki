@@ -3570,6 +3570,17 @@ msgid "Show sender and subject"
 msgstr "Feladó és tárgy megjelenítése"
 
 #, fuzzy
+msgid "Sound for new mail"
+msgstr "Új levelek keresése"
+
+msgid "Play"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Sound"
+msgstr "Eltávolítja a fiókot?"
+
+#, fuzzy
 msgid "Notification Buttons"
 msgstr "Értesítések"
 
@@ -4676,6 +4687,13 @@ msgstr "A kulcs nem importálható"
 #, fuzzy
 msgid "Could not restart Files"
 msgstr "A fájl nem olvasható"
+
+#, fuzzy
+msgid "Choose a Sound"
+msgstr "Navigáció"
+
+msgid "Sounds"
+msgstr ""
 
 msgid "Forget this word"
 msgstr "Szó elfelejtése"
