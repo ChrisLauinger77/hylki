@@ -153,6 +153,8 @@ on the server, to save space there. The rest of the message stays: its text,
 its other files, where it is filed, its read, starred and tag state, and its
 date. Hylki asks first, as the change reaches every device that reads the
 account and cannot be undone. Save the file first if you want to keep a copy.
+While the server works, the file shows pale red with "Deleting…" in place of
+its buttons, then fades out; if the server refuses, it comes back as it was.
 
 An IMAP or JMAP server cannot edit a message, so Hylki stores a copy without
 the file and then deletes the original; the copy stands where the original

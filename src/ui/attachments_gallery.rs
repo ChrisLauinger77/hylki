@@ -171,6 +171,16 @@ pub struct AttachmentsGallery {
     account_names: gtk::StringList,
     /// The component's root widget, used to anchor the right-click context menu.
     root: gtk::Widget,
+    /// Files being deleted from the server (#289), drawn pale red with
+    /// "Deleting…" until the server answers.
+    deleting: Vec<FileKey>,
+}
+
+/// One attachment in the gallery: account, folder, message UID, file name.
+pub type FileKey = (u32, String, u32, String);
+
+fn key_of(item: &GalleryItem) -> FileKey {
+    (item.account_id, item.folder_path.clone(), item.uid, item.name.clone())
 }
 
 #[derive(Debug)]
@@ -242,9 +252,18 @@ pub enum GalleryInput {
     GoToItem(usize),
     /// Remove item `index` from its message on the server (#289).
     DeleteItem(usize),
+    /// A file is being deleted from the server (`true`), or the server
+    /// refused (`false`).
+    SetDeleting(FileKey, bool),
     /// An attachment was removed from a message on the server: its item
-    /// leaves the view (the next load reads the cache as it is now).
-    Removed { account_id: u32, folder_path: String, uid: u32, name: String },
+    /// fades out and leaves the view (the next load reads the cache as it
+    /// is now).
+    Removed(FileKey),
+    /// The fade is over: take the item away.
+    RemoveNow(FileKey),
+    /// Showcase only (HYLKI_SHOWCASE_DELETE_ATTACHMENT=gallery:<name>):
+    /// Delete from Server… on the first file of that name.
+    ShowcaseDelete(String),
     /// A cell was double-clicked: open it externally, closing any preview.
     OpenExternal(usize),
     /// Right-click on cell `index` at `(x, y)` (cell-relative) — show its menu there.
@@ -846,6 +865,7 @@ impl Component for AttachmentsGallery {
             folder_list: gtk::ListBox::new(),
             account_names: gtk::StringList::new(&[i18n("All accounts").as_str()]),
             root: root.clone().upcast(),
+            deleting: Vec::new(),
         };
         let flow = &model.flow;
         let table = &model.table;
@@ -940,12 +960,35 @@ impl Component for AttachmentsGallery {
                     }
                 }
             }
-            GalleryInput::Removed { account_id, folder_path, uid, name } => {
+            GalleryInput::SetDeleting(key, on) => {
+                self.deleting.retain(|k| *k != key);
+                if on {
+                    self.deleting.push(key);
+                }
+                self.rebuild_view(&sender);
+            }
+            GalleryInput::Removed(key) => {
+                let at = self.all_items.iter().position(|i| key_of(i) == key);
+                let shown: Option<gtk::Widget> = at.and_then(|at| {
+                    if self.view_table {
+                        self.table.row_at_index(at as i32).map(|r| r.upcast())
+                    } else {
+                        self.flow.child_at_index(at as i32).map(|c| c.upcast())
+                    }
+                });
+                let s = sender.clone();
+                let done = move || s.input(GalleryInput::RemoveNow(key.clone()));
+                match shown {
+                    Some(w) => fade_out(&w, done),
+                    None => done(),
+                }
+            }
+            GalleryInput::RemoveNow(key) => {
+                self.deleting.retain(|k| *k != key);
                 // In place, rather than a reload that would lose the user's
                 // place in a long list.
-                let Some(at) = self.all_items.iter().position(|i| {
-                    i.account_id == account_id && i.folder_path == folder_path && i.uid == uid && i.name == name
-                }) else {
+                let Some(at) = self.all_items.iter().position(|i| key_of(i) == key) else {
+                    self.rebuild_view(&sender);
                     return;
                 };
                 self.all_items.remove(at);
@@ -1125,6 +1168,12 @@ impl Component for AttachmentsGallery {
             GalleryInput::OpenItem(i) => self.open_item(i, &sender),
             GalleryInput::DownloadItem(i) => self.download_item(i, &sender),
             GalleryInput::GoToItem(i) => self.goto_item(i, &sender),
+            GalleryInput::ShowcaseDelete(name) => {
+                match self.all_items.iter().position(|i| i.name == name) {
+                    Some(i) => sender.input(GalleryInput::DeleteItem(i)),
+                    None => tracing::warn!("showcase: no {name:?} in the gallery"),
+                }
+            }
             GalleryInput::DeleteItem(i) => {
                 if let Some(item) = self.item_at(i) {
                     let _ = sender.output(GalleryOutput::DeleteFromServer {
@@ -1515,8 +1564,9 @@ impl AttachmentsGallery {
         }
         for display in 0..self.all_items.len() {
             if let Some(item) = self.item_at(display) {
+                let deleting = self.deleting.contains(&key_of(item));
                 self.flow
-                    .append(&build_cell(display, item, self.thumb_width, sender));
+                    .append(&build_cell(display, item, self.thumb_width, deleting, sender));
             }
         }
     }
@@ -1527,7 +1577,8 @@ impl AttachmentsGallery {
         }
         for display in 0..self.all_items.len() {
             if let Some(item) = self.item_at(display) {
-                self.table.append(&build_row(display, item, sender));
+                let deleting = self.deleting.contains(&key_of(item));
+                self.table.append(&build_row(display, item, deleting, sender));
             }
         }
     }
@@ -1634,6 +1685,7 @@ fn build_cell(
     index: usize,
     item: &GalleryItem,
     width: i32,
+    deleting: bool,
     sender: &ComponentSender<AttachmentsGallery>,
 ) -> gtk::Widget {
     let cell = gtk::Box::new(gtk::Orientation::Vertical, 6);
@@ -1716,7 +1768,12 @@ fn build_cell(
     let s = sender.clone();
     goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
     actions.append(&goto);
-    thumb_overlay.add_overlay(&actions);
+    if deleting {
+        cell.add_css_class("attachment-deleting");
+        thumb_overlay.add_overlay(&deleting_veil(true));
+    } else {
+        thumb_overlay.add_overlay(&actions);
+    }
 
     cell.append(&thumb_overlay);
 
@@ -1760,6 +1817,11 @@ fn build_cell(
 
     let child = gtk::FlowBoxChild::new();
     child.set_child(Some(&cell));
+    // Nothing more to do with a file on its way off the server.
+    if deleting {
+        child.set_can_target(false);
+        return child.upcast();
+    }
 
     // Right-click → context menu at the click point.
     let right = gtk::GestureClick::new();
@@ -1783,6 +1845,53 @@ fn build_cell(
     child.add_controller(dbl);
 
     child.upcast()
+}
+
+/// How long a file deleted from the server takes to fade out (#289).
+const DELETE_FADE_MS: u32 = 420;
+
+/// "Deleting…", in place of a file's actions while it is removed from the
+/// server (#289).
+pub(crate) fn deleting_label() -> gtk::Label {
+    let l = gtk::Label::new(Some(&i18n("Deleting…")));
+    l.add_css_class("attachment-deleting-label");
+    l.add_css_class("caption");
+    l.set_valign(gtk::Align::Center);
+    l
+}
+
+/// A thumbnail's cover while its file is removed from the server: a pale
+/// red veil, with "Deleting…" across the middle when `labelled` (a
+/// thumbnail too small for it says so beneath instead).
+pub(crate) fn deleting_veil(labelled: bool) -> gtk::Widget {
+    let veil = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    veil.add_css_class("attachment-deleting-veil");
+    veil.set_hexpand(true);
+    veil.set_vexpand(true);
+    veil.set_overflow(gtk::Overflow::Hidden);
+    if labelled {
+        let label = deleting_label();
+        label.set_halign(gtk::Align::Center);
+        label.set_vexpand(true);
+        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        veil.append(&label);
+    }
+    veil.upcast()
+}
+
+/// Fade a deleted file's cell or row out, then call `done` to take it away.
+/// Libadwaita skips the fade when animations are off or the widget is not
+/// on screen, and `done` comes at once.
+pub(crate) fn fade_out(widget: &impl IsA<gtk::Widget>, done: impl Fn() + 'static) {
+    let w = widget.clone().upcast::<gtk::Widget>();
+    let target = adw::CallbackAnimationTarget::new({
+        let w = w.clone();
+        move |v| w.set_opacity(v)
+    });
+    let anim = adw::TimedAnimation::new(&w, 1.0, 0.0, DELETE_FADE_MS, target);
+    anim.set_easing(adw::Easing::EaseOutCubic);
+    anim.connect_done(move |_| done());
+    anim.play();
 }
 
 fn caption(item: &GalleryItem) -> String {
@@ -1818,6 +1927,7 @@ fn folder_label(path: &str) -> String {
 fn build_row(
     index: usize,
     item: &GalleryItem,
+    deleting: bool,
     sender: &ComponentSender<AttachmentsGallery>,
 ) -> gtk::ListBoxRow {
     let line = gtk::Box::new(gtk::Orientation::Horizontal, 10);
@@ -1910,10 +2020,22 @@ fn build_row(
     let s = sender.clone();
     goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
     actions.append(&goto);
-    line.append(&actions);
+    if deleting {
+        line.add_css_class("attachment-deleting");
+        let label = deleting_label();
+        label.set_width_request(TABLE_ACTIONS_WIDTH);
+        label.set_xalign(1.0);
+        line.append(&label);
+    } else {
+        line.append(&actions);
+    }
 
     let row = gtk::ListBoxRow::new();
     row.set_child(Some(&line));
+    if deleting {
+        row.set_can_target(false);
+        return row;
+    }
 
     // The same gestures the grid cells carry: right-click for the context
     // menu, double-click to open externally (single click previews).

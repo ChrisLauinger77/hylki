@@ -4,7 +4,9 @@
 
 - **New: Delete from Server… removes one attachment from a message** (#289,
   suggested by yioannides). It is in the right-click menu of a file in the
-  attachment drawer and in the attachment gallery, and asks first. On IMAP
+  attachment drawer and in the attachment gallery, and asks first. The file
+  shows pale red with "Deleting…" until the server answers, then fades out,
+  in the grid and list views of both. On IMAP
   and JMAP the message is stored again without the file, keeping its folder,
   flags, keywords and date, and the original is deleted; the file's place
   holds a note in Thunderbird's `text/x-moz-deleted` format, which Hylki does

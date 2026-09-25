@@ -629,6 +629,9 @@ pub enum WorkerEvent {
     /// `uid` in `path` is now `new_uid` there, `None` when the copy could not
     /// be found again. The folder's list has been sent again first.
     AttachmentDeleted { message_id: u32, path: String, uid: u32, new_uid: Option<u32>, name: String, size: u64 },
+    /// [`MailRequest::DeleteAttachment`] did not happen; an `Error` saying
+    /// why goes with it. The file stays where it was.
+    AttachmentNotDeleted { message_id: u32, name: String, size: u64 },
     /// `path` is the folder the body was read from. A UID is unique only within
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
@@ -1982,10 +1985,8 @@ async fn run_imap(
                 // label it is shown in: the original would stay there, file
                 // and all, beside the copy.
                 if has_gmail_labels(&account, &folders) {
-                    emit(WorkerEvent::Error {
-                        text: i18n("Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an attachment there"),
-                        connectivity: false,
-                    });
+                    let why = i18n("Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an attachment there");
+                    strip_refused(&emit, why, message_id, name, size);
                     continue;
                 }
                 emit(WorkerEvent::Status(i18n("Removing the attachment…")));
@@ -2018,10 +2019,8 @@ async fn run_imap(
                         emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size });
                     }
                     Err(e) => {
-                        emit(WorkerEvent::Error {
-                            text: i18n_f("Could not remove the attachment: {e}", &[("e", &e.text)]),
-                            connectivity: false,
-                        });
+                        let why = i18n_f("Could not remove the attachment: {e}", &[("e", &e.text)]);
+                        strip_refused(&emit, why, message_id, name, size);
                         lost |= e.connection;
                     }
                 }
@@ -5297,6 +5296,13 @@ fn cache_rewritten(c: &Cache, account_id: u32, path: &str, uid: u32, raw: &[u8])
         })
         .collect();
     c.save_attachment_meta(account_id, path, uid, &metas);
+}
+
+/// An attachment removal that did not happen (#289): the error, and word
+/// to the views showing the file as being deleted that it is not.
+fn strip_refused(emit: &impl Fn(WorkerEvent), text: String, message_id: u32, name: String, size: u64) {
+    emit(WorkerEvent::Error { text, connectivity: false });
+    emit(WorkerEvent::AttachmentNotDeleted { message_id, name, size });
 }
 
 /// Why [`strip_imap_attachment`] failed, and whether the connection went
@@ -8976,10 +8982,13 @@ async fn run_pop3(
                 token,
                 result: Err(i18n("A POP3 account can't receive mail from another account")),
             }),
-            MailRequest::DeleteAttachment { .. } => emit(WorkerEvent::Error {
-                text: i18n("POP3 cannot change a message on the server, so the attachment was not removed"),
-                connectivity: false,
-            }),
+            MailRequest::DeleteAttachment { message_id, name, size, .. } => strip_refused(
+                &emit,
+                i18n("POP3 cannot change a message on the server, so the attachment was not removed"),
+                message_id,
+                name,
+                size,
+            ),
         }
     }
 }
@@ -11144,10 +11153,13 @@ async fn run_graph(
                         }
                         emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size });
                     }
-                    Err(e) => emit(WorkerEvent::Error {
-                        text: i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
-                        connectivity: false,
-                    }),
+                    Err(e) => strip_refused(
+                        &emit,
+                        i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
+                        message_id,
+                        name,
+                        size,
+                    ),
                 }
             }
         }

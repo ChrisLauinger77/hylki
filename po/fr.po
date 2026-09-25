@@ -2129,6 +2129,10 @@ msgstr "Aller au message"
 msgid "All accounts"
 msgstr "Tous les comptes"
 
+#, fuzzy
+msgid "Deleting…"
+msgstr "Supprimer…"
+
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
 msgid "Indexing {n} messages…"

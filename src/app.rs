@@ -770,6 +770,11 @@ pub struct AppModel {
     /// first open, not to every one. Bounded — a conversation holds its
     /// messages' bodies, which are not small.
     thread_cache: HashMap<(u32, u32), Vec<Message>>,
+    /// Attachments being deleted from the server (#289), shown as such in
+    /// the drawer and the gallery until the worker answers.
+    deleting_attachments: Vec<AttachmentTarget>,
+    /// Showcase only: answer the next delete question with Delete.
+    showcase_confirm_delete: bool,
     /// Insertion order for `thread_cache`, oldest first.
     thread_cache_order: Vec<(u32, u32)>,
     /// Which conversation `current_thread` is, for storing it back.
@@ -1077,6 +1082,12 @@ pub struct AttachmentTarget {
     uid: u32,
     name: String,
     size: u64,
+}
+
+impl AttachmentTarget {
+    fn gallery_key(&self) -> crate::ui::attachments_gallery::FileKey {
+        (self.account_id, self.path.clone(), self.uid, self.name.clone())
+    }
 }
 
 #[derive(Debug)]
@@ -1511,6 +1522,11 @@ pub enum AppMsg {
     AskDeleteAttachment(AttachmentTarget),
     /// The user said yes: have the account's worker do it.
     DeleteAttachment(AttachmentTarget),
+    /// Send the request (held back by HYLKI_SHOWCASE_DELETE_HOLD, otherwise
+    /// straight after [`AppMsg::DeleteAttachment`]).
+    SendDeleteAttachment(AttachmentTarget),
+    /// The worker could not delete it: show the file as it was.
+    AttachmentNotDeleted { account_id: u32, message_id: u32, name: String, size: u64 },
     /// Showcase only (HYLKI_SHOWCASE_DELETE_ATTACHMENT): the drawer's
     /// Delete from Server for the file called `name`, asking first unless
     /// `confirmed`.
@@ -3228,6 +3244,8 @@ impl SimpleComponent for AppModel {
             thread_related_pending: false,
             thread_painted: false,
             thread_cache: HashMap::new(),
+            deleting_attachments: Vec::new(),
+            showcase_confirm_delete: false,
             thread_cache_order: Vec::new(),
             thread_key: None,
             threads_expanded: config::load_threads_expanded(),
@@ -4312,12 +4330,20 @@ impl SimpleComponent for AppModel {
         // Server for that file of the message on screen at 10 s
         // (HYLKI_SHOWCASE_DELETE_AT overrides the seconds); `:yes` answers
         // the question as well (#289).
+        // `gallery:<name>` opens the attachments gallery 4 s before and
+        // deletes the file from there.
         if let Ok(v) = std::env::var("HYLKI_SHOWCASE_DELETE_ATTACHMENT") {
             let (name, confirmed) = match v.strip_suffix(":yes") {
                 Some(name) => (name.to_string(), true),
                 None => (v, false),
             };
             let at: u32 = std::env::var("HYLKI_SHOWCASE_DELETE_AT").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
+            if name.starts_with("gallery:") {
+                let s = sender.clone();
+                gtk::glib::timeout_add_seconds_local_once(at.saturating_sub(4), move || {
+                    s.input(AppMsg::ShowAttachments)
+                });
+            }
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(at, move || {
                 s.input(AppMsg::ShowcaseDeleteAttachment { name, confirmed });
@@ -7584,14 +7610,38 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::ShowcaseDeleteAttachment { name, confirmed } => {
+                if let Some(name) = name.strip_prefix("gallery:") {
+                    self.showcase_confirm_delete = confirmed;
+                    self.gallery.emit(GalleryInput::ShowcaseDelete(name.to_string()));
+                    return;
+                }
                 match self.attachment_target(&name, None) {
                     Some(target) if confirmed => sender.input(AppMsg::DeleteAttachment(target)),
                     Some(target) => sender.input(AppMsg::AskDeleteAttachment(target)),
                     None => tracing::warn!("showcase: no attachment called {name:?} on screen"),
                 }
             }
+            AppMsg::AskDeleteAttachment(target) if std::mem::take(&mut self.showcase_confirm_delete) => {
+                sender.input(AppMsg::DeleteAttachment(target));
+            }
             AppMsg::AskDeleteAttachment(target) => self.confirm_delete_attachment(target, &sender),
             AppMsg::DeleteAttachment(t) => {
+                self.attachment_drawer
+                    .emit(AttachmentDrawerInput::MarkDeleting(t.name.clone(), t.size as usize));
+                self.gallery.emit(GalleryInput::SetDeleting(t.gallery_key(), true));
+                self.deleting_attachments.push(t.clone());
+                // HYLKI_SHOWCASE_DELETE_HOLD=<seconds> holds the request back,
+                // so the file can be captured while it is being deleted.
+                if let Some(secs) = std::env::var("HYLKI_SHOWCASE_DELETE_HOLD").ok().and_then(|v| v.parse().ok()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(secs, move || {
+                        s.input(AppMsg::SendDeleteAttachment(t));
+                    });
+                    return;
+                }
+                sender.input(AppMsg::SendDeleteAttachment(t));
+            }
+            AppMsg::SendDeleteAttachment(t) => {
                 self.send_to(t.account_id, MailRequest::DeleteAttachment {
                     message_id: t.message_id,
                     path: t.path,
@@ -7600,15 +7650,21 @@ impl SimpleComponent for AppModel {
                     size: t.size,
                 });
             }
-            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size } => {
-                if self.showing_gallery {
-                    self.gallery.emit(GalleryInput::Removed {
-                        account_id,
-                        folder_path: path.clone(),
-                        uid,
-                        name: name.clone(),
-                    });
+            AppMsg::AttachmentNotDeleted { account_id, message_id, name, size } => {
+                if let Some(t) = self.take_deleting(account_id, message_id, &name) {
+                    self.gallery.emit(GalleryInput::SetDeleting(t.gallery_key(), false));
                 }
+                self.attachment_drawer.emit(AttachmentDrawerInput::NotDeleted(name, size as usize));
+            }
+            AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size } => {
+                // The file fades out where it is shown; the lists that
+                // follow wait for it.
+                let t = self.take_deleting(account_id, message_id, &name);
+                self.gallery.emit(GalleryInput::Removed((account_id, path.clone(), uid, name.clone())));
+                self.attachment_drawer.emit(AttachmentDrawerInput::Deleted(
+                    name.clone(),
+                    t.map_or(size, |t| t.size) as usize,
+                ));
                 let key = (account_id, message_id);
                 let members = self.conversation_members();
                 self.thread_cache.retain(|_, members| {
@@ -15504,6 +15560,15 @@ impl AppModel {
         })
     }
 
+    /// Forget a deletion the worker has answered, handing back what it was.
+    fn take_deleting(&mut self, account_id: u32, message_id: u32, name: &str) -> Option<AttachmentTarget> {
+        let at = self
+            .deleting_attachments
+            .iter()
+            .position(|t| t.account_id == account_id && t.message_id == message_id && t.name == name)?;
+        Some(self.deleting_attachments.remove(at))
+    }
+
     /// Removing an attachment cannot be undone, and reaches every device
     /// that reads the account: ask (#289).
     fn confirm_delete_attachment(&self, target: AttachmentTarget, sender: &ComponentSender<Self>) {
@@ -20663,6 +20728,9 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::RawImported { token, result } => AppMsg::RawImported { token, result },
         WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid, name, size } => {
             AppMsg::AttachmentDeleted { account_id, message_id, path, uid, new_uid, name, size }
+        }
+        WorkerEvent::AttachmentNotDeleted { message_id, name, size } => {
+            AppMsg::AttachmentNotDeleted { account_id, message_id, name, size }
         }
         WorkerEvent::Gone { message_id, path, uid } => {
             AppMsg::MessageGone { account_id, message_id, path, uid }

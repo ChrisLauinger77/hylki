@@ -1941,6 +1941,9 @@ msgstr ""
 msgid "All accounts"
 msgstr ""
 
+msgid "Deleting…"
+msgstr ""
+
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
 msgid "Indexing {n} messages…"

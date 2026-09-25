@@ -2138,6 +2138,10 @@ msgstr "Μετάβαση στο μήνυμα"
 msgid "All accounts"
 msgstr "Όλοι οι λογαριασμοί"
 
+#, fuzzy
+msgid "Deleting…"
+msgstr "Διαγραφή…"
+
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
 msgid "Indexing {n} messages…"

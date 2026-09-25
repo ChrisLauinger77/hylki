@@ -2100,6 +2100,10 @@ msgstr "Ugrás az üzenethez"
 msgid "All accounts"
 msgstr ""
 
+#, fuzzy
+msgid "Deleting…"
+msgstr "Törlés…"
+
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
 #, fuzzy

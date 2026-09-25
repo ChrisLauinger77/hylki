@@ -2122,6 +2122,10 @@ msgstr "Перейти к сообщению"
 msgid "All accounts"
 msgstr "Все учётные записи"
 
+#, fuzzy
+msgid "Deleting…"
+msgstr "Удалить…"
+
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
 msgid "Indexing {n} messages…"

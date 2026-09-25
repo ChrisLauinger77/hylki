@@ -1468,6 +1468,31 @@ headerbar.compose-toolbar button.image-button {
   padding: 2px 6px;
 }
 
+/* A file being deleted from the server (#289): pale red, "Deleting…" in
+   place of its actions, until it fades out. */
+.attachment-drawer-flow > flowboxchild .drawer-cell.attachment-deleting,
+.gallery-flow > flowboxchild .gallery-cell.attachment-deleting,
+.drawer-list-row.attachment-deleting,
+.gallery-table-row.attachment-deleting {
+  background: alpha(@error_color, 0.12);
+}
+.drawer-list-row.attachment-deleting,
+.gallery-table-row.attachment-deleting {
+  border-radius: 8px;
+}
+.attachment-deleting-label {
+  color: @error_color;
+  font-weight: 600;
+}
+.attachment-deleting-veil {
+  background: alpha(@error_color, 0.22);
+}
+.attachment-deleting-veil .attachment-deleting-label {
+  background: alpha(@window_bg_color, 0.9);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
 /* Folder-tree expander (#51): a chevron sized to exactly the leaf spacer's
    width, so names at one depth align whether or not a folder has children. */
 .tree-expander {

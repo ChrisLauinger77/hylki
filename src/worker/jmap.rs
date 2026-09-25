@@ -2283,7 +2283,7 @@ pub(super) async fn run_jmap(
 
             MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
                 let Some(s) = jmap_session(&account, &mut state, &emit).await else {
-                    emit(WorkerEvent::Error { text: i18n("Could not reach the server"), connectivity: true });
+                    strip_refused(&emit, i18n("Could not reach the server"), message_id, name, size);
                     continue;
                 };
                 emit(WorkerEvent::Status(i18n("Removing the attachment…")));
@@ -2309,10 +2309,13 @@ pub(super) async fn run_jmap(
                         }
                         emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(new_uid), name, size });
                     }
-                    Err(e) => emit(WorkerEvent::Error {
-                        text: i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
-                        connectivity: false,
-                    }),
+                    Err(e) => strip_refused(
+                        &emit,
+                        i18n_f("Could not remove the attachment: {e}", &[("e", &e)]),
+                        message_id,
+                        name,
+                        size,
+                    ),
                 }
             }
 
