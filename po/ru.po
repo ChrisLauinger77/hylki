@@ -2764,6 +2764,21 @@ msgstr "Вставить ссылку"
 msgid "Upload to Cloud"
 msgstr "Загрузить в облачное хранилище"
 
+#, fuzzy
+msgid "Attach to New Message"
+msgstr "Действовать по сообщению"
+
+#, fuzzy
+msgid "Insert in New Message"
+msgstr "Новое сообщение"
+
+#, fuzzy
+msgid "Share Link in New Message"
+msgid_plural "Share Links in New Message"
+msgstr[0] "Поиск в сообщении"
+msgstr[1] "Поиск в сообщении"
+msgstr[2] "Поиск в сообщении"
+
 msgid "{n} file · {size}"
 msgid_plural "{n} files · {size}"
 msgstr[0] ""
@@ -2792,6 +2807,36 @@ msgstr ""
 
 msgid "Share a download link"
 msgstr ""
+
+#, fuzzy
+msgid "Start a message with the file attached"
+msgid_plural "Start a message with the files attached"
+msgstr[0] "Новое письмо с {n} прикрёпленным файлом открыто в Hylki."
+msgstr[1] "Новое письмо с {n} прикрёпленными файлами открыто в Hylki."
+msgstr[2] "Новое письмо с {n} прикрёпленными файлами открыто в Hylki."
+
+#, fuzzy
+msgid "Start a message with the picture in the text"
+msgid_plural "Start a message with the pictures in the text"
+msgstr[0] "Сначала откройте сообщение, затем распечатайте его."
+msgstr[1] "Сначала откройте сообщение, затем распечатайте его."
+msgstr[2] "Сначала откройте сообщение, затем распечатайте его."
+
+msgid ""
+"Start a message with the pictures in the text and the other files attached"
+msgstr ""
+
+msgid "Start a message with a download link from {name}"
+msgid_plural "Start a message with download links from {name}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "Start a message with a download link"
+msgid_plural "Start a message with download links"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid "Whole conversation"
 msgstr "Всё обсуждение"

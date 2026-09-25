@@ -467,10 +467,15 @@ place they can go, and the files go where they are let go:
 Letting go between the cards attaches the files. A composer in a window of
 its own shows the cards too.
 
-Files dropped anywhere else in the main window go into the message being
-written there, or start a new message when there is none. Folders are
-skipped. A new message started this way asks about files over the
-size limit the way *Send with Hylki* does (below).
+Dragged over the main window with no message being written in it, files
+bring up the same cards side by side, each starting a new message: **Attach
+to New Message**, **Insert in New Message** and **Share Link in New
+Message**, offered on the same terms (Insert in New Message when new
+messages start as rich text, in **Settings → Composing → Write messages
+in**). Attach to New
+Message asks about files over the size limit the way *Send with Hylki* does
+(below). While a message is being written in the main window, files dropped
+anywhere else in it go into that message. Folders are skipped.
 
 ### Send with Hylki from GNOME Files
 

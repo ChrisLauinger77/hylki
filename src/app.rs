@@ -440,6 +440,9 @@ pub struct AppModel {
     draining_composers: Vec<(u32, Controller<Compose>)>,
     /// SlideDown revealer under the reader toolbar that hosts the inline pane.
     reader_compose_revealer: gtk::Revealer,
+    /// The cards files dragged onto the window bring up when no composer is
+    /// open in it, each starting a new message (#293).
+    window_drop_zones: Option<std::rc::Rc<crate::ui::drop_zones::DropZones>>,
     /// Split-reply slot (#86): a reply slides down from the pane's top and
     /// the message(s) stay below it, visible and interactive.
     reader_split_top: gtk::Revealer,
@@ -1600,6 +1603,9 @@ pub enum AppMsg {
     OpenWithFiles(Vec<std::path::PathBuf>),
     /// Files dragged onto the main window from a file manager (#293).
     DropFiles(Vec<std::path::PathBuf>),
+    /// Files let go on one of the main window's cards: a new message with
+    /// them attached, in its text, or uploaded to the cloud.
+    DropFilesAs(crate::ui::drop_zones::DropChoice, Vec<std::path::PathBuf>),
     /// The click on a "message ready" desktop alert: raise the window and
     /// the composer it announced.
     PresentComposers,
@@ -3061,6 +3067,7 @@ impl SimpleComponent for AppModel {
                 p.add_css_class("reader-split");
                 p
             },
+            window_drop_zones: None,
             reader_compose_revealer: {
                 let r = gtk::Revealer::new();
                 r.set_transition_type(gtk::RevealerTransitionType::SlideDown);
@@ -5187,11 +5194,50 @@ impl SimpleComponent for AppModel {
             sender.input(AppMsg::OpenWithFiles(paths));
         }
 
-        // Files dragged onto the window go into a message (#293). A composer
-        // in the window has targets of its own and takes the files dropped
-        // on it; this one is for everywhere else. The reader's web views
-        // would take a file themselves and never pass it up, so the reader
-        // gets a target that goes before them.
+        // Files dragged onto the window with no composer open in it bring
+        // up the cards for starting a new message with them (#293).
+        {
+            use crate::ui::drop_zones::{DropContext, DropZones};
+            let overlay = root.content().and_downcast::<gtk::Overlay>().expect("the window's content is an overlay");
+            let s = sender.input_sender().clone();
+            let zones = DropZones::install(DropContext::NewMessage, &root, &overlay, move |choice, paths| {
+                s.emit(AppMsg::DropFilesAs(choice, paths));
+            });
+            let slots = [
+                model.reader_compose_revealer.clone(),
+                model.contacts_compose_revealer.clone(),
+                model.reader_split_top.clone(),
+                model.reader_split_bottom.clone(),
+            ];
+            zones.set_gate(move || !slots.iter().any(|slot| slot.reveals_child() && slot.is_visible()));
+            zones.set_refresh(|zones| {
+                zones.set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
+                zones.set_cloud_names(crate::cloud::load_enabled_accounts().into_iter().map(|a| a.name).collect());
+            });
+            // HYLKI_SHOWCASE_WINDOW_DROP=<attach|inline|cloud|none>:<file>[:<file>…]
+            // raises the window's cards at 3 s, for a capture.
+            if let Ok(v) = std::env::var("HYLKI_SHOWCASE_WINDOW_DROP") {
+                let mut parts = std::env::split_paths(&v);
+                let hover = match parts.next().as_deref().and_then(|p| p.to_str()) {
+                    Some("attach") => Some(crate::ui::drop_zones::DropChoice::Attach),
+                    Some("inline") => Some(crate::ui::drop_zones::DropChoice::Inline),
+                    Some("cloud") => Some(crate::ui::drop_zones::DropChoice::Cloud),
+                    _ => None,
+                };
+                let paths: Vec<std::path::PathBuf> = parts.collect();
+                let (zones, host) = (zones.clone(), root.clone().upcast::<gtk::Widget>());
+                gtk::glib::timeout_add_seconds_local_once(3, move || {
+                    zones.set_allow_inline(config::load_compose_format() == config::ComposeFormat::Rich);
+                    zones.set_cloud_names(crate::cloud::load_enabled_accounts().into_iter().map(|a| a.name).collect());
+                    zones.showcase(&paths, &host, hover);
+                });
+            }
+            model.window_drop_zones = Some(zones);
+        }
+        // With a composer open in the window, files dropped anywhere else in
+        // it go into that composer. The reader's web views would take a file
+        // themselves and never pass it up, so the reader gets a target that
+        // goes before them.
         root.add_controller(window_drop_target(&sender, gtk::PropagationPhase::Bubble));
         model
             .message_view
@@ -8240,6 +8286,29 @@ impl SimpleComponent for AppModel {
                     FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
                     &sender,
                 );
+            }
+
+            AppMsg::DropFilesAs(choice, paths) => {
+                use crate::ui::drop_zones::DropChoice;
+                tracing::info!("file drop: {} file(s) for a new message ({choice:?})", paths.len());
+                let mut prefill = ComposePrefill::default();
+                match choice {
+                    // The route a drop always took: the size check first.
+                    DropChoice::Attach => {
+                        sender.input(AppMsg::DropFiles(paths));
+                        return;
+                    }
+                    DropChoice::Inline => prefill.inline_files = paths,
+                    DropChoice::Cloud => prefill.cloud_uploads = paths,
+                }
+                self.leave_gallery();
+                let account = self.current.as_ref().map(|m| m.account_id).unwrap_or_else(|| self.active_account());
+                let (account, prefill) = self.new_message_from(account, prefill);
+                if self.compose_inline {
+                    self.open_inline_reply(account, prefill, None, &sender);
+                } else {
+                    self.open_compose(account, prefill, &sender);
+                }
             }
 
             AppMsg::DropFiles(paths) => {
@@ -14239,6 +14308,7 @@ impl AppModel {
             from_address: String::new(),
             send_at: item.send_at,
             cloud_uploads: Vec::new(),
+            inline_files: Vec::new(),
         };
         // The Outbox stays the folder on screen: its list is still what's listed,
         // so its toolbar has to stay too. Leaving it would strand the user in a

@@ -2,7 +2,9 @@
 //! attach them, one to place pictures in the text, one to upload them to
 //! cloud storage and share a link. Each appears only when it can take the
 //! files being dragged: the text only takes pictures, and only in a rich
-//! message; the cloud only when an account is set up.
+//! message; the cloud only when an account is set up. The main window shows
+//! the same three when no composer is open in it, each starting a new
+//! message ([`DropContext::NewMessage`]).
 
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
@@ -20,6 +22,17 @@ pub enum DropChoice {
     Cloud,
 }
 
+/// What the files are dropped into, which is what the cards say and how
+/// they are laid out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropContext {
+    /// A composer: the cards stack as rows, the reading pane being tall.
+    Composer,
+    /// The main window with no composer open: each card starts a new
+    /// message, and the cards stand side by side across the wide window.
+    NewMessage,
+}
+
 const FADE_MS: u32 = 160;
 /// The veil's padding (`.drop-layer` in styles.css) and the gap between
 /// its summary line and the cards.
@@ -29,6 +42,7 @@ const LAYER_SPACING: i32 = 14;
 const CARD_PADDING: i32 = 18;
 
 pub struct DropZones {
+    context: DropContext,
     layer: gtk::Box,
     zones: gtk::Box,
     summary: gtk::Label,
@@ -45,6 +59,12 @@ pub struct DropZones {
     /// it fades out.
     shown: Cell<bool>,
     fade: RefCell<Option<adw::TimedAnimation>>,
+    /// Whether a drag may bring the cards up at all (the main window's
+    /// stand down while a composer is open in it).
+    gate: RefCell<Option<Box<dyn Fn() -> bool>>>,
+    /// Run before the cards come up, to bring what they depend on (the
+    /// format a new message starts in, the cloud accounts) up to date.
+    refresh: RefCell<Option<Box<dyn Fn(&DropZones)>>>,
 }
 
 struct Zone {
@@ -60,6 +80,7 @@ impl DropZones {
     /// overlay) and watch `host` for file drags. `on_drop` gets the files
     /// and the surface they landed on.
     pub fn install(
+        context: DropContext,
         host: &impl IsA<gtk::Widget>,
         overlay: &gtk::Overlay,
         on_drop: impl Fn(DropChoice, Vec<PathBuf>) + 'static,
@@ -80,14 +101,21 @@ impl DropZones {
         zones.set_vexpand(true);
         layer.append(&zones);
 
-        let attach = Zone::new("mail-attachment-symbolic", &i18n("Attach"));
-        let inline = Zone::new("image-x-generic-symbolic", &i18n("Insert in Text"));
-        let cloud = Zone::new("cloud-symbolic", &i18n("Upload to Cloud"));
+        let (attach, inline, cloud) = match context {
+            DropContext::Composer => (i18n("Attach"), i18n("Insert in Text"), i18n("Upload to Cloud")),
+            DropContext::NewMessage => {
+                (i18n("Attach to New Message"), i18n("Insert in New Message"), i18n("Share Link in New Message"))
+            }
+        };
+        let attach = Zone::new("mail-attachment-symbolic", &attach);
+        let inline = Zone::new("image-x-generic-symbolic", &inline);
+        let cloud = Zone::new("cloud-symbolic", &cloud);
         for z in [&attach, &inline, &cloud] {
             zones.append(&z.widget);
         }
 
         let this = Rc::new(Self {
+            context,
             layer: layer.clone(),
             zones,
             summary,
@@ -98,6 +126,8 @@ impl DropZones {
             cloud_names: RefCell::new(Vec::new()),
             shown: Cell::new(false),
             fade: RefCell::new(None),
+            gate: RefCell::new(None),
+            refresh: RefCell::new(None),
         });
 
         // The veil only shows; the target below does all the taking.
@@ -118,12 +148,22 @@ impl DropZones {
         host_widget.add_css_class("drop-host");
 
         let weak = Rc::downgrade(&this);
+        target.connect_accept(move |_, drop| {
+            let open = weak.upgrade().is_some_and(|this| this.gate.borrow().as_ref().is_none_or(|gate| gate()));
+            open && drop.formats().contains_type(gtk::gdk::FileList::static_type())
+                && drop.actions().contains(gtk::gdk::DragAction::COPY)
+        });
+
+        let weak = Rc::downgrade(&this);
         let h = host_widget.clone();
         target.connect_value_notify(move |t| {
             let Some(this) = weak.upgrade() else { return };
             let Some(value) = t.value() else { return };
             let paths = value.get::<gtk::gdk::FileList>().map(|l| file_paths(&l)).unwrap_or_default();
-            tracing::debug!("drop cards: {} file(s) dragged over the composer", paths.len());
+            tracing::debug!("drop cards: {} file(s) dragged over the {:?}", paths.len(), this.context);
+            if let Some(refresh) = this.refresh.borrow().as_ref() {
+                refresh(&this);
+            }
             if !paths.is_empty() {
                 this.show(&paths, h.width(), h.height());
             }
@@ -203,6 +243,16 @@ impl DropZones {
         *self.cloud_names.borrow_mut() = names;
     }
 
+    /// Bring the cards up only while `gate` says so.
+    pub fn set_gate(&self, gate: impl Fn() -> bool + 'static) {
+        *self.gate.borrow_mut() = Some(Box::new(gate));
+    }
+
+    /// Run `refresh` each time the cards are about to come up.
+    pub fn set_refresh(&self, refresh: impl Fn(&DropZones) + 'static) {
+        *self.refresh.borrow_mut() = Some(Box::new(refresh));
+    }
+
     /// HYLKI_SHOWCASE_DROP_ZONES: bring the surfaces up for `paths` as a
     /// drag would, with `hover`'s card marked as under the pointer, since
     /// no drag can be made from a script.
@@ -230,21 +280,53 @@ impl DropZones {
             ni18n_f("{n} file · {size}", "{n} files · {size}", n, &[("n", &n.to_string()), ("size", &size)])
         });
 
-        self.attach.subtitle.set_label(&ni18n("Send as a normal attachment", "Send as normal attachments", n));
-
         let inline = self.allow_inline.get() && pictures > 0;
         self.inline.widget.set_visible(inline);
-        self.inline.subtitle.set_label(&if pictures == n {
-            ni18n("Place the picture where the cursor is", "Place the pictures where the cursor is", n)
-        } else {
-            i18n("Pictures insert where the cursor is placed, other files attach normally")
-        });
-
         self.cloud.widget.set_visible(!names.is_empty());
-        self.cloud.subtitle.set_label(&match names.as_slice() {
-            [one] => i18n_f("Share a download link from {name}", &[("name", one)]),
-            _ => i18n("Share a download link"),
-        });
+        match self.context {
+            DropContext::Composer => {
+                self.attach.subtitle.set_label(&ni18n("Send as a normal attachment", "Send as normal attachments", n));
+                self.inline.subtitle.set_label(&if pictures == n {
+                    ni18n("Place the picture where the cursor is", "Place the pictures where the cursor is", n)
+                } else {
+                    i18n("Pictures insert where the cursor is placed, other files attach normally")
+                });
+                self.cloud.subtitle.set_label(&match names.as_slice() {
+                    [one] => i18n_f("Share a download link from {name}", &[("name", one)]),
+                    _ => i18n("Share a download link"),
+                });
+            }
+            DropContext::NewMessage => {
+                self.cloud.title.set_label(&ni18n("Share Link in New Message", "Share Links in New Message", n));
+                self.attach.subtitle.set_label(&ni18n(
+                    "Start a message with the file attached",
+                    "Start a message with the files attached",
+                    n,
+                ));
+                self.inline.subtitle.set_label(&if pictures == n {
+                    ni18n(
+                        "Start a message with the picture in the text",
+                        "Start a message with the pictures in the text",
+                        n,
+                    )
+                } else {
+                    i18n("Start a message with the pictures in the text and the other files attached")
+                });
+                self.cloud.subtitle.set_label(&match names.as_slice() {
+                    [one] => ni18n_f(
+                        "Start a message with a download link from {name}",
+                        "Start a message with download links from {name}",
+                        n,
+                        &[("name", one)],
+                    ),
+                    _ => ni18n(
+                        "Start a message with a download link",
+                        "Start a message with download links",
+                        n,
+                    ),
+                });
+            }
+        }
 
         // Up (still transparent) before anything is measured: a hidden
         // widget's style is not worked out, and it measures as nothing.
@@ -253,15 +335,25 @@ impl DropZones {
             self.layer.set_visible(true);
         }
 
-        // Stacked as rows, which the tall reading pane has room for; side
-        // by side only where the composer is too short to stack them (a
-        // split reply dragged small). Measured, since the words wrap to the
-        // width there is.
-        self.lay_out(true);
-        let (need, _, _, _) = self.layer.measure(gtk::Orientation::Vertical, width);
-        if need > height {
-            self.lay_out(false);
-        } else {
+        // A composer stacks them as rows, which the tall reading pane has
+        // room for, and puts them side by side only where it is too short
+        // to stack them (a split reply dragged small). The main window puts
+        // them side by side, stacking them only in a window too narrow for
+        // that. Measured, since the words wrap to the room there is.
+        let rows = match self.context {
+            DropContext::Composer => {
+                self.lay_out(true);
+                let (need, _, _, _) = self.layer.measure(gtk::Orientation::Vertical, width);
+                need <= height
+            }
+            DropContext::NewMessage => {
+                self.lay_out(false);
+                let (need, _, _, _) = self.layer.measure(gtk::Orientation::Horizontal, height);
+                need > width
+            }
+        };
+        self.lay_out(rows);
+        if rows {
             self.align_rows(width - 2 * LAYER_PADDING);
         }
 

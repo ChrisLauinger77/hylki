@@ -33,6 +33,10 @@ pub struct RichEditor {
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
     attach_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    /// Whether the document is there to take files, and the ones waiting
+    /// for it ([`RichEditor::insert_files`]).
+    loaded: std::rc::Rc<std::cell::Cell<bool>>,
+    pending_files: std::rc::Rc<std::cell::RefCell<Vec<std::path::PathBuf>>>,
     /// What the document's own text history can do right now, mirrored from
     /// WebKit's editor state so a host can read it without a round trip
     /// (#200 in the composer). `(undo, redo)`.
@@ -321,6 +325,27 @@ impl RichEditor {
         // the exact node the right-click landed on (`__hylkiCtxImg`).
         let attach_cb: std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>> =
             std::rc::Rc::new(std::cell::RefCell::new(None));
+        // Files to put in the text that arrived before the document did (a
+        // message started from files dropped on the main window): they go
+        // in once it has loaded, and not into the document being replaced.
+        let loaded = std::rc::Rc::new(std::cell::Cell::new(false));
+        let pending_files: std::rc::Rc<std::cell::RefCell<Vec<std::path::PathBuf>>> =
+            std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        {
+            let (loaded, pending, cb) = (loaded.clone(), pending_files.clone(), attach_cb.clone());
+            webview.connect_load_changed(move |v, ev| match ev {
+                webkit6::LoadEvent::Started => loaded.set(false),
+                webkit6::LoadEvent::Finished => {
+                    loaded.set(true);
+                    let paths = std::mem::take(&mut *pending.borrow_mut());
+                    if !paths.is_empty() {
+                        let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
+                        deliver_files(v, &files, None, &cb);
+                    }
+                }
+                _ => {}
+            });
+        }
         // Rich to begin with; [`RichEditor::set_source`] moves it.
         let source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>> =
             std::rc::Rc::new(std::cell::Cell::new(None));
@@ -532,6 +557,8 @@ impl RichEditor {
             preview: std::rc::Rc::new(std::cell::RefCell::new(None)),
             source: source.clone(),
             attach_cb,
+            loaded,
+            pending_files,
             text_history,
             history_cb,
             _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
@@ -679,8 +706,13 @@ impl RichEditor {
     /// clipboard's formatting for this one paste, whatever the standing
     /// preference says.
     /// Put the pictures among `paths` in the text at the caret, and hand
-    /// the rest to the attachment list, as a drop on the text does.
+    /// the rest to the attachment list, as a drop on the text does. Before
+    /// the document has loaded they wait for it.
     pub fn insert_files(&self, paths: &[std::path::PathBuf]) {
+        if !self.loaded.get() {
+            self.pending_files.borrow_mut().extend(paths.iter().cloned());
+            return;
+        }
         let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
         deliver_files(&self.webview, &files, None, &self.attach_cb);
     }

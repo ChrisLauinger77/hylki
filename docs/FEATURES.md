@@ -81,8 +81,8 @@ The full list. The [README](../README.md) carries a shorter one.
   share link in the message, with an optional expiry and download password.
   See [Cloud attachments](DOCUMENTATION.md#cloud-attachments-nextcloud-onedrive-dropbox-seafile).
 - **Drag files in:** dragged over the composer, files can be attached, put
-  in the text or uploaded to cloud storage; dropped anywhere else in the
-  window, they start a new message.
+  in the text or uploaded to cloud storage; dragged over the window, they
+  start a new message in any of those three ways.
 - **Send from Files:** a *Send with Hylki* entry in the GNOME Files
   right-click menu sends the selected files into a new message, a draft or a
   reply of your choosing, with an offer to upload big ones to cloud storage

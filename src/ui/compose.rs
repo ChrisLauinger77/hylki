@@ -10,7 +10,7 @@ use crate::ui::rich_editor::{self, RichEditor, SourceKind, js_escape};
 use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
-use crate::ui::drop_zones::{DropChoice, DropZones};
+use crate::ui::drop_zones::{DropChoice, DropContext, DropZones};
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,6 +203,9 @@ pub struct ComposePrefill {
     /// composer opens its cloud upload dialog on them as soon as it is up,
     /// so the links land in the body instead.
     pub cloud_uploads: Vec<std::path::PathBuf>,
+    /// Files dropped on the main window's Insert in New Message card: the
+    /// pictures go in the text once the editor is up, the rest attached.
+    pub inline_files: Vec<std::path::PathBuf>,
 }
 
 /// Everything the compose pane needs to open.
@@ -1151,7 +1154,7 @@ impl Component for Compose {
         // Files dragged over the composer bring up cards for where they go:
         // attached, in the text, or uploaded to the cloud (#293).
         let s = sender.input_sender().clone();
-        let zones = DropZones::install(&root, &widgets.drop_overlay, move |choice, paths| {
+        let zones = DropZones::install(DropContext::Composer, &root, &widgets.drop_overlay, move |choice, paths| {
             s.emit(ComposeInput::DroppedFiles(choice, paths));
         });
         zones.set_allow_inline(model.format == ComposeFormat::Rich);
@@ -1176,6 +1179,9 @@ impl Component for Compose {
         // Files handed in over the size limit (Settings → System → GNOME
         // Files): straight into the upload dialog, once the composer has a
         // window for it to be transient for.
+        if !prefill.inline_files.is_empty() {
+            model.editor.insert_files(&prefill.inline_files);
+        }
         if !prefill.cloud_uploads.is_empty() {
             let s = sender.clone();
             let paths = prefill.cloud_uploads.clone();

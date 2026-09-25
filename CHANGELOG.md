@@ -24,10 +24,13 @@
   **Attach**, **Insert in Text** (when a picture is among them and the
   message is rich text; other files are attached) and **Upload to Cloud**
   (when a cloud storage account is set up, opening the upload dialog). The
-  card under the pointer fills with the accent color. Dropped elsewhere in the main
-  window, the files go into the message being written there or start a new
-  one, with the same large-file question as *Send with Hylki*. Before, only
-  the text area of the composer took files. See
+  card under the pointer fills with the accent color. Dragged over the main
+  window with no composer open, they bring up the same cards side by side,
+  each starting a new message: **Attach to New Message** (with the same
+  large-file question as *Send with Hylki*), **Insert in New Message** and
+  **Share Link in New Message**. With a composer open, files dropped
+  elsewhere in the window go into it. Before, only the text area of the
+  composer took files. See
   [Dragging files into a message](docs/DOCUMENTATION.md#dragging-files-into-a-message).
 - **New: Delete from Server… removes one attachment from a message** (#289,
   suggested by yioannides). It is in the right-click menu of a file in the

@@ -2752,6 +2752,20 @@ msgstr "Insertar enlace"
 msgid "Upload to Cloud"
 msgstr "Subir al almacenamiento en la nube"
 
+#, fuzzy
+msgid "Attach to New Message"
+msgstr "Archivos adjuntos en cada mensaje"
+
+#, fuzzy
+msgid "Insert in New Message"
+msgstr "Editar como mensaje nuevo"
+
+#, fuzzy
+msgid "Share Link in New Message"
+msgid_plural "Share Links in New Message"
+msgstr[0] "Buscar en el mensaje"
+msgstr[1] "Buscar en el mensaje"
+
 msgid "{n} file · {size}"
 msgid_plural "{n} files · {size}"
 msgstr[0] ""
@@ -2777,6 +2791,32 @@ msgstr ""
 
 msgid "Share a download link"
 msgstr ""
+
+#, fuzzy
+msgid "Start a message with the file attached"
+msgid_plural "Start a message with the files attached"
+msgstr[0] "Hay un mensaje nuevo con {n} archivo adjunto abierto en Hylki."
+msgstr[1] "Hay un mensaje nuevo con {n} archivos adjuntos abierto en Hylki."
+
+#, fuzzy
+msgid "Start a message with the picture in the text"
+msgid_plural "Start a message with the pictures in the text"
+msgstr[0] "Abre primero un mensaje y después imprímelo."
+msgstr[1] "Abre primero un mensaje y después imprímelo."
+
+msgid ""
+"Start a message with the pictures in the text and the other files attached"
+msgstr ""
+
+msgid "Start a message with a download link from {name}"
+msgid_plural "Start a message with download links from {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Start a message with a download link"
+msgid_plural "Start a message with download links"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Whole conversation"
 msgstr "Conversación completa"

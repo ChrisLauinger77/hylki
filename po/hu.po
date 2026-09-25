@@ -2745,6 +2745,20 @@ msgstr "Hivatkozás beszúrása"
 msgid "Upload to Cloud"
 msgstr "Feltöltés felhőtárhelyre"
 
+#, fuzzy
+msgid "Attach to New Message"
+msgstr "Művelet az üzeneten"
+
+#, fuzzy
+msgid "Insert in New Message"
+msgstr "Új üzenet"
+
+#, fuzzy
+msgid "Share Link in New Message"
+msgid_plural "Share Links in New Message"
+msgstr[0] "Ugrás az üzenethez"
+msgstr[1] "Ugrás az üzenethez"
+
 msgid "{n} file · {size}"
 msgid_plural "{n} files · {size}"
 msgstr[0] ""
@@ -2770,6 +2784,31 @@ msgstr ""
 
 msgid "Share a download link"
 msgstr ""
+
+msgid "Start a message with the file attached"
+msgid_plural "Start a message with the files attached"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Start a message with the picture in the text"
+msgid_plural "Start a message with the pictures in the text"
+msgstr[0] "Előbb nyisson meg egy üzenetet, majd nyomtassa ki."
+msgstr[1] "Előbb nyisson meg egy üzenetet, majd nyomtassa ki."
+
+msgid ""
+"Start a message with the pictures in the text and the other files attached"
+msgstr ""
+
+msgid "Start a message with a download link from {name}"
+msgid_plural "Start a message with download links from {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Start a message with a download link"
+msgid_plural "Start a message with download links"
+msgstr[0] ""
+msgstr[1] ""
 
 #, fuzzy
 msgid "Whole conversation"
