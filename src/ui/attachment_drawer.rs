@@ -36,7 +36,7 @@ use crate::config::{self, DrawerState};
 use crate::models::{is_image_name, Attachment};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::attachments_gallery::{
-    deleting_label, deleting_veil, fade_out, icon_color_class, icon_for, is_pdf_name, open_bytes,
+    deleting_label, deleting_over, deleting_veil, fade_out, icon_color_class, icon_for, is_pdf_name, open_bytes,
     spawn_thumbnail_render, texture_from, thumbnail_texture, Thumbnail,
 };
 use crate::i18n::{i18n, ni18n_f};
@@ -1330,19 +1330,6 @@ fn build_list_row(
     size.set_valign(gtk::Align::Center);
     row.append(&size);
 
-    if deleting {
-        row.add_css_class("attachment-deleting");
-        let label = deleting_label();
-        label.set_margin_start(6);
-        label.set_margin_end(6);
-        row.append(&label);
-        let child = gtk::FlowBoxChild::new();
-        child.set_child(Some(&row));
-        child.set_tooltip_text(Some(&att.name));
-        child.set_can_target(false);
-        return child;
-    }
-
     let action_btn = |icon: &str, tip: &str| {
         let b = gtk::Button::from_icon_name(icon);
         b.add_css_class("flat");
@@ -1350,18 +1337,32 @@ fn build_list_row(
         b.set_tooltip_text(Some(tip));
         b
     };
+    // Spaced as the row spaces its other parts.
+    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let download = action_btn("folder-download-symbolic", "Download");
     let s = sender.clone();
     download.connect_clicked(move |_| s.input(AttachmentDrawerInput::Download(index)));
-    row.append(&download);
+    actions.append(&download);
     let open = action_btn("document-open-symbolic", "Open");
     let s = sender.clone();
     open.connect_clicked(move |_| s.input(AttachmentDrawerInput::Open(index)));
-    row.append(&open);
+    actions.append(&open);
+    if deleting {
+        row.append(&deleting_over(&actions));
+    } else {
+        row.append(&actions);
+    }
 
     let child = gtk::FlowBoxChild::new();
     child.set_child(Some(&row));
     child.set_tooltip_text(Some(&att.name));
+    if deleting {
+        // The ground on the cell itself, where the hover and selection
+        // highlights are drawn, so it has their shape.
+        child.add_css_class("attachment-deleting");
+        child.set_can_target(false);
+        return child;
+    }
 
     let right = gtk::GestureClick::new();
     right.set_button(gtk::gdk::BUTTON_SECONDARY);

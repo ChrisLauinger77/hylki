@@ -1860,6 +1860,20 @@ pub(crate) fn deleting_label() -> gtk::Label {
     l
 }
 
+/// A row's actions while its file is removed from the server: still there,
+/// unseen and out of reach, so the row keeps its size, with "Deleting…"
+/// over them.
+pub(crate) fn deleting_over(actions: &impl IsA<gtk::Widget>) -> gtk::Overlay {
+    actions.set_opacity(0.0);
+    actions.set_can_target(false);
+    let overlay = gtk::Overlay::new();
+    overlay.set_child(Some(actions));
+    let label = deleting_label();
+    label.set_halign(gtk::Align::End);
+    overlay.add_overlay(&label);
+    overlay
+}
+
 /// A thumbnail's cover while its file is removed from the server: a pale
 /// red veil, with "Deleting…" across the middle when `labelled` (a
 /// thumbnail too small for it says so beneath instead).
@@ -2021,11 +2035,7 @@ fn build_row(
     goto.connect_clicked(move |_| s.input(GalleryInput::GoToItem(index)));
     actions.append(&goto);
     if deleting {
-        line.add_css_class("attachment-deleting");
-        let label = deleting_label();
-        label.set_width_request(TABLE_ACTIONS_WIDTH);
-        label.set_xalign(1.0);
-        line.append(&label);
+        line.append(&deleting_over(&actions));
     } else {
         line.append(&actions);
     }
@@ -2033,6 +2043,9 @@ fn build_row(
     let row = gtk::ListBoxRow::new();
     row.set_child(Some(&line));
     if deleting {
+        // The ground on the row itself, where the hover and selection
+        // highlights are drawn, so it has their shape.
+        row.add_css_class("attachment-deleting");
         row.set_can_target(false);
         return row;
     }

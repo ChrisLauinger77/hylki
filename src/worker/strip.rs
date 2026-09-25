@@ -182,7 +182,6 @@ a,b\r\n\
 mod tests {
     use super::*;
 
-
     fn names(raw: &[u8]) -> Vec<String> {
         super::super::extract_attachments(raw).into_iter().map(|a| a.name).collect()
     }

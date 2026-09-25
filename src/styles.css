@@ -1472,13 +1472,9 @@ headerbar.compose-toolbar button.image-button {
    place of its actions, until it fades out. */
 .attachment-drawer-flow > flowboxchild .drawer-cell.attachment-deleting,
 .gallery-flow > flowboxchild .gallery-cell.attachment-deleting,
-.drawer-list-row.attachment-deleting,
-.gallery-table-row.attachment-deleting {
+.attachment-drawer-flow > flowboxchild.attachment-deleting,
+.gallery-table row.attachment-deleting {
   background: alpha(@error_color, 0.12);
-}
-.drawer-list-row.attachment-deleting,
-.gallery-table-row.attachment-deleting {
-  border-radius: 8px;
 }
 .attachment-deleting-label {
   color: @error_color;
