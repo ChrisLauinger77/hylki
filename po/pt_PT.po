@@ -2782,10 +2782,10 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Acima das mensagens"
-msgstr[1] "Acima das mensagens"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Enviar como anexo em alternativa"
+msgstr[1] "Enviar como anexo em alternativa"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2793,7 +2793,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Paleta de ações na lista de mensagens"
 msgstr[1] "Paleta de ações na lista de mensagens"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5631,6 +5631,12 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Acima das mensagens"
+#~ msgstr[1] "Acima das mensagens"
 
 #, fuzzy
 #~ msgid ""

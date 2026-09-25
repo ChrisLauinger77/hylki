@@ -230,14 +230,14 @@ impl DropZones {
             ni18n_f("{n} file · {size}", "{n} files · {size}", n, &[("n", &n.to_string()), ("size", &size)])
         });
 
-        self.attach.subtitle.set_label(&ni18n("Send it with the message", "Send them with the message", n));
+        self.attach.subtitle.set_label(&ni18n("Send as a normal attachment", "Send as normal attachments", n));
 
         let inline = self.allow_inline.get() && pictures > 0;
         self.inline.widget.set_visible(inline);
         self.inline.subtitle.set_label(&if pictures == n {
             ni18n("Place the picture where the cursor is", "Place the pictures where the cursor is", n)
         } else {
-            i18n("Pictures where the cursor is, other files attached")
+            i18n("Pictures insert where the cursor is placed, other files attach normally")
         });
 
         self.cloud.widget.set_visible(!names.is_empty());

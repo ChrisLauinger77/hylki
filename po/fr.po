@@ -2792,10 +2792,10 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Au-dessus des messages"
-msgstr[1] "Au-dessus des messages"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Envoyer plutôt en pièce jointe"
+msgstr[1] "Envoyer plutôt en pièce jointe"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2803,7 +2803,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Palette d'actions dans la liste des messages"
 msgstr[1] "Palette d'actions dans la liste des messages"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5648,6 +5648,12 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Au-dessus des messages"
+#~ msgstr[1] "Au-dessus des messages"
 
 #~ msgid "Found in GNOME Online Accounts"
 #~ msgstr "Trouvé dans GNOME Comptes en ligne"

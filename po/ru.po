@@ -2771,11 +2771,11 @@ msgstr[1] ""
 msgstr[2] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Архивировать это сообщение"
-msgstr[1] "Архивировать это сообщение"
-msgstr[2] "Архивировать это сообщение"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Отправить вложением"
+msgstr[1] "Отправить вложением"
+msgstr[2] "Отправить вложением"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2784,7 +2784,7 @@ msgstr[0] "Палитра действий в списке сообщений"
 msgstr[1] "Палитра действий в списке сообщений"
 msgstr[2] "Палитра действий в списке сообщений"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5562,6 +5562,13 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Архивировать это сообщение"
+#~ msgstr[1] "Архивировать это сообщение"
+#~ msgstr[2] "Архивировать это сообщение"
 
 #~ msgid "Found in GNOME Online Accounts"
 #~ msgstr "Найдено в «Сетевых учётных записях GNOME»"

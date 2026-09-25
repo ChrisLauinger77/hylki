@@ -2751,10 +2751,10 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Üzenet archiválása"
-msgstr[1] "Üzenet archiválása"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Küldés inkább mellékletként"
+msgstr[1] "Küldés inkább mellékletként"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2762,7 +2762,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Műveletpaletta az üzenetlistában"
 msgstr[1] "Műveletpaletta az üzenetlistában"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5468,6 +5468,12 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Üzenet archiválása"
+#~ msgstr[1] "Üzenet archiválása"
 
 #~ msgid "Found in GNOME Online Accounts"
 #~ msgstr "Megtalálható a GNOME Online-fiókok között"

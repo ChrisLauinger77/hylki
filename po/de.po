@@ -2776,10 +2776,10 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Vor den Meldungen"
-msgstr[1] "Vor den Meldungen"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Stattdessen als Anhang senden"
+msgstr[1] "Stattdessen als Anhang senden"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2787,7 +2787,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Aktionspalette in der Nachrichtenliste"
 msgstr[1] "Aktionspalette in der Nachrichtenliste"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5614,6 +5614,12 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Vor den Meldungen"
+#~ msgstr[1] "Vor den Meldungen"
 
 #~ msgid "Found in GNOME Online Accounts"
 #~ msgstr "Gefunden in GNOME Online Accounts"

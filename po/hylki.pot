@@ -2502,8 +2502,8 @@ msgid_plural "{n} files · {size}"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -2512,7 +2512,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"

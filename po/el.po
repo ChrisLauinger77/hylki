@@ -2798,10 +2798,10 @@ msgstr[0] ""
 msgstr[1] ""
 
 #, fuzzy
-msgid "Send it with the message"
-msgid_plural "Send them with the message"
-msgstr[0] "Επεξεργασία αυτού του μηνύματος"
-msgstr[1] "Επεξεργασία αυτού του μηνύματος"
+msgid "Send as a normal attachment"
+msgid_plural "Send as normal attachments"
+msgstr[0] "Αποστολή ως συνημμένο αντί για σύνδεσμο"
+msgstr[1] "Αποστολή ως συνημμένο αντί για σύνδεσμο"
 
 #, fuzzy
 msgid "Place the picture where the cursor is"
@@ -2809,7 +2809,7 @@ msgid_plural "Place the pictures where the cursor is"
 msgstr[0] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
 msgstr[1] "Παλέτα ενεργειών στη λίστα μηνυμάτων"
 
-msgid "Pictures where the cursor is, other files attached"
+msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
 
 msgid "Share a download link from {name}"
@@ -5672,6 +5672,12 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Send it with the message"
+#~ msgid_plural "Send them with the message"
+#~ msgstr[0] "Επεξεργασία αυτού του μηνύματος"
+#~ msgstr[1] "Επεξεργασία αυτού του μηνύματος"
 
 #~ msgid "Found in GNOME Online Accounts"
 #~ msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
