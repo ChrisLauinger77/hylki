@@ -1593,6 +1593,8 @@ pub enum AppMsg {
     /// Hylki", or the command line): open a fresh composer with them attached
     /// (Isaac's PR #96).
     OpenWithFiles(Vec<std::path::PathBuf>),
+    /// Files dragged onto the main window from a file manager (#293).
+    DropFiles(Vec<std::path::PathBuf>),
     /// The click on a "message ready" desktop alert: raise the window and
     /// the composer it announced.
     PresentComposers,
@@ -5176,6 +5178,22 @@ impl SimpleComponent for AppModel {
             sender.input(AppMsg::OpenWithFiles(paths));
         }
 
+        // Files dragged onto the window go into a message (#293). A composer
+        // in the window has targets of its own and takes the files dropped
+        // on it; this one is for everywhere else. The reader's web views
+        // would take a file themselves and never pass it up, so the reader
+        // gets a target that goes before them.
+        root.add_controller(window_drop_target(&sender, gtk::PropagationPhase::Bubble));
+        model
+            .message_view
+            .widget()
+            .add_controller(window_drop_target(&sender, gtk::PropagationPhase::Capture));
+        if let Ok(list) = std::env::var("HYLKI_SHOWCASE_DROP") {
+            let paths: Vec<std::path::PathBuf> = std::env::split_paths(&list).collect();
+            let s = sender.clone();
+            gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::DropFiles(paths)));
+        }
+
         // Send Later (#145): the app's clock. Every half minute, any queued
         // message whose time has come is flushed by id, which sends it even
         // though the ordinary flush leaves scheduled mail alone. One try per
@@ -8204,6 +8222,22 @@ impl SimpleComponent for AppModel {
                 }
                 self.begin_hand_off(
                     FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
+                    &sender,
+                );
+            }
+
+            AppMsg::DropFiles(paths) => {
+                tracing::info!("file drop: {} file(s)", paths.len());
+                // A composer open in the window is what the files are for,
+                // wherever in the window they were let go.
+                if let Some(r) = self.reader_compose.as_ref().filter(|r| r.window.is_none()) {
+                    r.controller.emit(ComposeInput::AddAttachments(paths));
+                    return;
+                }
+                self.leave_gallery();
+                self.hand_off_size_check(
+                    FileHandOff { base: ComposePrefill::default(), files: paths, dropped: Vec::new() },
+                    HandOffTarget::New,
                     &sender,
                 );
             }
@@ -21003,6 +21037,24 @@ fn show_message_picker(
         }
     });
     dialog.present();
+}
+
+/// Files dropped on the main window, for [`AppMsg::DropFiles`]. Folders
+/// are passed over: there is nothing to attach.
+fn window_drop_target(sender: &ComponentSender<AppModel>, phase: gtk::PropagationPhase) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+    drop.set_propagation_phase(phase);
+    let s = sender.input_sender().clone();
+    drop.connect_drop(move |_, value, _, _| {
+        let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+        let paths: Vec<_> = list.files().iter().filter_map(|f| f.path()).filter(|p| p.is_file()).collect();
+        if paths.is_empty() {
+            return false;
+        }
+        s.emit(AppMsg::DropFiles(paths));
+        true
+    });
+    drop
 }
 
 fn reply_prefill(m: &Message) -> ComposePrefill {

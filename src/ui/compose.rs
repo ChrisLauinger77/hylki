@@ -1130,6 +1130,15 @@ impl Component for Compose {
             model.rebuild_attachments(&widgets.attach_box, &sender);
         }
 
+        // Files dropped anywhere on the composer are attached (#293). The
+        // body has a target of its own, which puts a picture in the text
+        // (rich_editor.rs). The address and subject rows take theirs before
+        // the rows do: a text entry accepts a file drag as its path, typed in.
+        root.add_controller(file_drop_target(&sender, gtk::PropagationPhase::Bubble));
+        widgets
+            .fields_list
+            .add_controller(file_drop_target(&sender, gtk::PropagationPhase::Capture));
+
         // Files handed in over the size limit (Settings → System → GNOME
         // Files): straight into the upload dialog, once the composer has a
         // window for it to be transient for.
@@ -2672,6 +2681,23 @@ impl Compose {
 /// Save the edited message, discard it, or go back to it. Escape answers
 /// Keep Editing, so a second press never discards what the first one asked
 /// about (#290).
+/// Attach whatever files are dropped on the widget it is added to.
+fn file_drop_target(sender: &ComponentSender<Compose>, phase: gtk::PropagationPhase) -> gtk::DropTarget {
+    let drop = gtk::DropTarget::new(gtk::gdk::FileList::static_type(), gtk::gdk::DragAction::COPY);
+    drop.set_propagation_phase(phase);
+    let s = sender.input_sender().clone();
+    drop.connect_drop(move |_, value, _, _| {
+        let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
+        let paths: Vec<_> = list.files().iter().filter_map(|f| f.path()).filter(|p| p.is_file()).collect();
+        if paths.is_empty() {
+            return false;
+        }
+        s.emit(ComposeInput::AddAttachments(paths));
+        true
+    });
+    drop
+}
+
 fn confirm_discard_dialog(parent: Option<&gtk::Window>, sender: relm4::Sender<ComposeInput>) {
     let dialog = adw::MessageDialog::new(
         parent,

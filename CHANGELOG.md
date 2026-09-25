@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **New: files dragged onto the window go into a message** (#293). Dropped
+  on the composer, anywhere on it, they are attached (a picture let go in the
+  text is still placed inline). Dropped elsewhere in the main window, they go
+  into the message being written there or start a new one, with the same
+  large-file question as *Send with Hylki*. Before, only the text area of the
+  composer took files. See
+  [Dragging files into a message](docs/DOCUMENTATION.md#dragging-files-into-a-message).
 - **New: Delete from Server… removes one attachment from a message** (#289,
   suggested by yioannides). It is in the right-click menu of a file in the
   attachment drawer and in the attachment gallery, and asks first. The file

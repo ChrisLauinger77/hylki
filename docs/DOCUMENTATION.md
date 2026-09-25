@@ -438,6 +438,17 @@ be decrypted. Click the icon for the details.
 - *Nothing to encrypt with for an address*: that person's key is missing;
   see step 3.
 
+### Dragging files into a message
+
+Files dragged from a file manager onto the composer are attached to the
+message, wherever on the composer they are let go. A picture dropped into the
+text itself is placed there as an inline image instead, and in HTML or
+Markdown source it is attached. Files dropped anywhere else in the main window
+go into the message being written there, or start a new message when there is
+none; a message in a window of its own takes files dropped on that window.
+Folders are skipped. A new message started this way asks about files over the
+size limit the way *Send with Hylki* does (below).
+
 ### Send with Hylki from GNOME Files
 
 Select files in GNOME Files (Nautilus), right-click, *Send with Hylki*: a new
