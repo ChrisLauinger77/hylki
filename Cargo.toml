@@ -76,6 +76,7 @@ gettext-rs = { version = "0.8.0", features = ["gettext-system"] }
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 markup5ever_rcdom = "0.39.0"
 html5ever = "0.39"
+css-inline = { version = "0.21.2", default-features = false }
 
 [build-dependencies]
 # Compiles resources/veem.gresource.xml (the bundled symbolic icons) into a

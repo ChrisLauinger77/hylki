@@ -2934,7 +2934,7 @@ impl AccountsWindow {
     /// build, for a field most visits never reach.
     fn sig_editor(&mut self, widgets: &AccountsWindowWidgets) -> &RichEditor {
         if self.sig_editor.is_none() {
-            let editor = RichEditor::new("");
+            let editor = RichEditor::new("", None);
             widgets.sig_holder.append(&editor.widget);
             self.sig_editor = Some(editor);
         }

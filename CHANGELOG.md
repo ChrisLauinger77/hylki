@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Changed: a reply or a forward quotes the message as it looks** (#295,
+  reported by urkos101). The quote keeps the original's colors,
+  backgrounds, fonts and spacing, including those set in a `<style>` block,
+  which are written onto the elements they apply to, and the pictures the
+  message carries inside itself. Before, every style was dropped, so a
+  designed message (an order confirmation, a newsletter) lost its layout,
+  and its embedded pictures showed as empty boxes. Pictures on the sender's
+  server now load in the composer only when the reader loads them for that
+  message; before, the composer loaded them whatever the remote content
+  setting said. Nothing in a quote can fetch a resource through CSS or
+  cover the composer. In dark mode a quote that sets its own colors sits on
+  a light ground. See [Replies and forwards](docs/DOCUMENTATION.md#replies-and-forwards).
 - **New: a choice of what Return does in the composer.** In rich text,
   Return starts a new line in the same paragraph and Shift+Return starts a
   new paragraph, sent as a `<p>` with space before the next one. **Settings

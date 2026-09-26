@@ -344,6 +344,16 @@ message, so it closes what you wrote rather than what the other person did.
 message instead, the placement Hylki had before 1.38. The setting applies
 when a composer opens; a draft keeps its signature wherever it was saved.
 
+### Replies and forwards
+
+The quoted message in a reply or a forward keeps its layout: its colors,
+fonts, tables and the pictures it carries inside itself look as they do in
+the reader, and go to the recipient that way. Pictures on the sender's server show only when the
+reader shows them for that message, so answering a message does not load
+anything reading it did not. The recipient still gets them. In dark mode a
+quoted message that sets its own colors keeps the light ground it was
+designed for.
+
 ### Return and Shift+Return
 
 In the rich text editor <kbd>Return</kbd> starts a new line in the same
