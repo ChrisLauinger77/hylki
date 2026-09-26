@@ -144,9 +144,11 @@
   message dissolves the one before into it over 80 ms instead of cutting,
   and the attachment drawer fades in, fades out, or dissolves from one
   message's files to the next's on the same beat.
-- **Translations:** French (PR #281 by frenchy82), Spanish (PR #287 by
-  Daniel Miguel), Portuguese and Brazilian Portuguese (PR #280 by Paulo
-  Fino) and Greek (PR #291 by Yiannis Ioannides) brought up to date.
+- **Polish translation** (PR #306 by Tomasz Bojanowski), complete.
+- **Translations:** French (PRs #281 and #303 by frenchy82), German (PR #302
+  by Christian Lauinger), Spanish (PR #287 by Daniel Miguel), Portuguese and
+  Brazilian Portuguese (PR #280 by Paulo Fino) and Greek (PR #291 by Yiannis
+  Ioannides) brought up to date.
 - **Changed: JMAP is set up through the Stalwart (JMAP) provider only.**
   The Incoming Protocol row of an IMAP/POP3 account offers IMAP and POP3,
   and is hidden for Stalwart, whose protocol is always JMAP. Accounts
