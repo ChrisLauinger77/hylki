@@ -4499,6 +4499,15 @@ msgstr ""
 "Dónde se coloca la firma en una respuesta o reenvío. Sobre el mensaje citado "
 "cierra lo que escribiste; debajo aparece tras toda la conversación."
 
+msgid "Separator line above the signature"
+msgstr ""
+
+msgid ""
+"Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
+"Mutt use it to dim the signature and to leave it out when they quote your "
+"message."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ortografía"
 

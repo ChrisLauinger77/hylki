@@ -344,6 +344,12 @@ message, so it closes what you wrote rather than what the other person did.
 message instead, the placement Hylki had before 1.38. The setting applies
 when a composer opens; a draft keeps its signature wherever it was saved.
 
+The signature follows a blank line and nothing else. **Settings → Composing →
+Separator line above the signature** puts the traditional `-- ` line (two
+dashes and a space) between them, as Hylki did before 1.42. Thunderbird,
+Evolution and Mutt use that line to show the signature dimmed and to leave it
+out when they quote your message; Gmail, Apple Mail and Outlook ignore it.
+
 ### Replies and forwards
 
 A reply or a forward opens in the reading pane, beside the message it

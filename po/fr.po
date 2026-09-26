@@ -4538,6 +4538,15 @@ msgstr ""
 "message cité, elle clôt ce que vous avez écrit ; en dessous, elle suit "
 "l'ensemble de la conversation."
 
+msgid "Separator line above the signature"
+msgstr ""
+
+msgid ""
+"Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
+"Mutt use it to dim the signature and to leave it out when they quote your "
+"message."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Orthographe"
 

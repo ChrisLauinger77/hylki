@@ -20,23 +20,26 @@ pub enum Field {
     Bcc,
 }
 
-/// A signature block as HTML (`-- ` delimiter). The stored signature is HTML
-/// (legacy plain-text signatures are converted).
-fn sig_html(sig: &str) -> String {
+/// A signature block as HTML, under a `-- ` line when `dashes` is set. The
+/// stored signature is HTML (legacy plain-text signatures are converted).
+fn sig_html(sig: &str, dashes: bool) -> String {
     let body = rich_editor::signature_to_html(sig);
-    format!("<div class=\"vireo-sig\"><br>-- <br>{body}</div>")
+    let dashes = if dashes { "-- <br>" } else { "" };
+    format!("<div class=\"vireo-sig\"><br>{dashes}{body}</div>")
 }
 
-/// The signature as it reads in a source-mode body: Markdown under
-/// its `-- ` line, or the same HTML block the rich editor holds.
-fn sig_source(kind: SourceKind, sig: &str) -> String {
+/// The signature as it reads in a source-mode body: Markdown (under its
+/// `-- ` line when `dashes` is set), or the same HTML block the rich
+/// editor holds.
+fn sig_source(kind: SourceKind, sig: &str, dashes: bool) -> String {
     if sig.is_empty() {
         return String::new();
     }
     match kind {
-        SourceKind::Html => format!("\n{}\n", sig_html(sig)),
+        SourceKind::Html => format!("\n{}\n", sig_html(sig, dashes)),
         SourceKind::Markdown => format!(
-            "\n\n-- \n{}\n",
+            "\n\n{}{}\n",
+            if dashes { "-- \n" } else { "" },
             crate::markdown::from_html(&rich_editor::signature_to_html(sig))
         ),
     }
@@ -246,6 +249,9 @@ pub struct Compose {
     editor: RichEditor,
     /// Signature currently appended to the body (so it can be swapped out).
     current_sig: String,
+    /// Whether signatures go in under a `-- ` line (Settings, read when the
+    /// composer opens).
+    sig_dashes: bool,
     /// Where that signature sits against a quoted original (#237), so a
     /// signature added on an account switch lands in the same place.
     signature_position: SignaturePosition,
@@ -885,8 +891,9 @@ impl Component for Compose {
         } else {
             "<div><br></div>"
         });
+        let sig_dashes = crate::config::load_signature_dashes();
         let sig = if draft_origin.is_none() && !current_sig.is_empty() {
-            sig_html(&current_sig)
+            sig_html(&current_sig, sig_dashes)
         } else {
             String::new()
         };
@@ -986,6 +993,7 @@ impl Component for Compose {
             accounts,
             editor,
             current_sig,
+            sig_dashes,
             signature_position,
             attachments: prefill_attachments,
             suggestions,
@@ -1821,8 +1829,12 @@ impl Component for Compose {
                 // Source mode holds the signature as text, so the swap is a
                 // text replacement in the field rather than a DOM one.
                 if let Some(kind) = self.editor.source_kind() {
-                    let old = sig_source(kind, &self.current_sig);
-                    let new = sig_source(kind, &new_sig);
+                    // The old block is looked for with and without its
+                    // `-- ` line: a draft keeps the form it was written in,
+                    // whatever the setting says now.
+                    let old = sig_source(kind, &self.current_sig, self.sig_dashes);
+                    let old_other = sig_source(kind, &self.current_sig, !self.sig_dashes);
+                    let new = sig_source(kind, &new_sig, self.sig_dashes);
                     // With no old block to replace (the previous account had
                     // none), the new one goes where the setting puts it: at
                     // the end, or above the quoted original (#237), which
@@ -1845,11 +1857,13 @@ impl Component for Compose {
                     };
                     self.editor.run_js(&format!(
                         "(function(){{var t=document.getElementById('src');if(!t)return;\
-                         var o='{}',n='{}';var v=t.value;\
+                         var o='{}',p='{}',n='{}';var v=t.value;\
                          var i=o?v.lastIndexOf(o):-1;\
+                         if(i<0&&p){{i=v.lastIndexOf(p);if(i>=0)o=p;}}\
                          if(i>=0){{v=v.slice(0,i)+n+v.slice(i+o.length);}}else{{{place}}}\
                          t.value=v;window.__hylkiDirty=true;}})()",
                         js_escape(&old),
+                        js_escape(&old_other),
                         js_escape(&new)
                     ));
                     self.current_sig = new_sig;
@@ -1859,7 +1873,7 @@ impl Component for Compose {
                     let replacement = if new_sig.is_empty() {
                         String::new()
                     } else {
-                        sig_html(&new_sig)
+                        sig_html(&new_sig, self.sig_dashes)
                     };
                     // No signature block to replace (the previous account
                     // had none): a new one goes where the setting puts it,
@@ -3042,4 +3056,19 @@ fn attachment_label(template: &str, path: &std::path::Path, count: usize) -> Str
         path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
     };
     i18n_f(template, &[("name", &name)])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{sig_html, sig_source};
+    use crate::ui::rich_editor::SourceKind;
+
+    #[test]
+    fn the_separator_line_follows_the_setting() {
+        assert_eq!(sig_html("Ann", false), "<div class=\"vireo-sig\"><br>Ann</div>");
+        assert_eq!(sig_html("Ann", true), "<div class=\"vireo-sig\"><br>-- <br>Ann</div>");
+        assert!(!sig_source(SourceKind::Markdown, "Ann", false).contains("-- "));
+        assert!(sig_source(SourceKind::Markdown, "Ann", true).starts_with("\n\n-- \n"));
+        assert_eq!(sig_source(SourceKind::Markdown, "", true), "");
+    }
 }

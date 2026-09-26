@@ -1242,6 +1242,11 @@ struct PrivacyFile {
     /// quoted original, or below it.
     #[serde(default)]
     signature_position: SignaturePosition,
+    /// Whether the signature follows a `-- ` line, the delimiter some mail
+    /// programs use to dim a signature and leave it out of their quotes.
+    /// Off by default, as in most mail programs today.
+    #[serde(default)]
+    signature_dashes: bool,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_spellcheck")]
     spellcheck: bool,
@@ -1603,6 +1608,7 @@ impl Default for PrivacyFile {
             compose_format: None,
             reply_position: ReplyPosition::default(),
             signature_position: SignaturePosition::default(),
+            signature_dashes: false,
             spellcheck: default_spellcheck(),
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -2741,6 +2747,11 @@ pub fn load_signature_position() -> SignaturePosition {
     load_privacy().signature_position
 }
 
+/// Whether the composer puts a `-- ` line above the signature.
+pub fn load_signature_dashes() -> bool {
+    load_privacy().signature_dashes
+}
+
 /// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
 pub fn load_compose_format() -> ComposeFormat {
@@ -3232,6 +3243,7 @@ pub fn save_privacy(
     compose_format: ComposeFormat,
     reply_position: ReplyPosition,
     signature_position: SignaturePosition,
+    signature_dashes: bool,
     spellcheck: bool,
     spellcheck_langs: String,
     preview_lines: u32,
@@ -3333,6 +3345,7 @@ pub fn save_privacy(
         compose_format: Some(compose_format),
         reply_position,
         signature_position,
+        signature_dashes,
         spellcheck,
         // Every save is after the first load, which applied it.
         single_card_default_applied: true,

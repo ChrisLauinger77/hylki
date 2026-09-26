@@ -4558,6 +4558,15 @@ msgstr ""
 "παρατιθέμενο μήνυμα κλείνει το κείμενο που γράψατε· κάτω από αυτό ακολουθεί "
 "ολόκληρη τη συνομιλία."
 
+msgid "Separator line above the signature"
+msgstr ""
+
+msgid ""
+"Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
+"Mutt use it to dim the signature and to leave it out when they quote your "
+"message."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ορθογραφία"
 

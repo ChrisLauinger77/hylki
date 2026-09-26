@@ -108,6 +108,7 @@ pub struct PrefInit {
     pub reply_position: crate::config::ReplyPosition,
     /// Where the signature sits in a reply or forward (#237).
     pub signature_position: crate::config::SignaturePosition,
+    pub signature_dashes: bool,
     pub app_theme: AppTheme,
     pub text_scale: u32,
     /// The appearance theme's id ("system" for the stock GNOME colors).
@@ -931,6 +932,7 @@ pub enum PrefInput {
     ChangeComposeFormat(u32),
     ChangeReplyPosition(u32),
     ChangeSignaturePosition(u32),
+    ToggleSignatureDashes(bool),
     ChangeAppTheme(u32),
     ChangeTextScale(u32),
     ChangeTheme(String),
@@ -1069,6 +1071,7 @@ pub enum PrefOutput {
     SetComposeFormat(crate::config::ComposeFormat),
     SetReplyPosition(crate::config::ReplyPosition),
     SetSignaturePosition(crate::config::SignaturePosition),
+    SetSignatureDashes(bool),
     Closed,
 }
 
@@ -2887,6 +2890,18 @@ impl Component for Preferences {
                                             sender.input(PrefInput::ChangeSignaturePosition(row.selected()));
                                         },
                                     },
+
+                                    #[name = "signature_dashes_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Separator line above the signature"),
+                                        set_subtitle: &i18n("Puts the standard \u{201c}-- \u{201d} line \
+                                                       above the signature. Thunderbird, Evolution \
+                                                       and Mutt use it to dim the signature and to \
+                                                       leave it out when they quote your message."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleSignatureDashes(row.is_active()));
+                                        },
+                                    },
                                 },
 
                                 #[name = "spelling_group"]
@@ -3776,6 +3791,7 @@ impl Component for Preferences {
             crate::config::SignaturePosition::AboveQuote => 0,
             crate::config::SignaturePosition::BelowQuote => 1,
         });
+        widgets.signature_dashes_row.set_active(init.signature_dashes);
         widgets.reply_position_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Above the messages"),
             &i18n("Below the messages"),
@@ -4791,6 +4807,9 @@ impl Component for Preferences {
                     _ => crate::config::SignaturePosition::AboveQuote,
                 };
                 let _ = sender.output(PrefOutput::SetSignaturePosition(position));
+            }
+            PrefInput::ToggleSignatureDashes(on) => {
+                let _ = sender.output(PrefOutput::SetSignatureDashes(on));
             }
         }
     }

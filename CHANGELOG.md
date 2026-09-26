@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Changed: no `-- ` line above the signature.** New messages, replies and
+  forwards put the signature after a blank line only. **Settings → Composing
+  → Separator line above the signature** brings the line back for anyone who
+  writes to mailing lists or to people on Thunderbird, Evolution or Mutt,
+  which use it to dim the signature and leave it out of their quotes. A draft
+  keeps the form it was saved in, and changing the From account replaces
+  either form. See
+  [Where the signature goes](docs/DOCUMENTATION.md#where-the-signature-goes).
 - **Fixed: messages stuck on "Loading…" and a composer that takes no
   typing on some systems** (#296, reported by Christian Lauinger). On some
   hosts the fonts the Flatpak lends WebKit send its web process into a loop

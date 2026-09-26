@@ -936,6 +936,8 @@ pub struct AppModel {
     reply_position: config::ReplyPosition,
     /// Where the signature sits in a reply or forward (#237).
     signature_position: config::SignaturePosition,
+    /// A `-- ` line goes above the signature in new messages.
+    signature_dashes: bool,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -1532,6 +1534,7 @@ pub enum AppMsg {
     /// Settings: where the split reply opens in the reading pane (#212).
     SetReplyPosition(config::ReplyPosition),
     SetSignaturePosition(config::SignaturePosition),
+    SetSignatureDashes(bool),
     /// Settings: each conversation message lists its own attachments (#213).
     SetCardAttachments(bool),
     /// Settings: the attachment drawer beneath the reader is shown (#213).
@@ -3375,6 +3378,7 @@ impl SimpleComponent for AppModel {
             compose_format: config::load_compose_format(),
             reply_position: config::load_reply_position(),
             signature_position: config::load_signature_position(),
+            signature_dashes: config::load_signature_dashes(),
             spellcheck: config::load_spellcheck(),
             spellcheck_langs: config::load_spellcheck_langs(),
             message_theme: config::load_message_theme(),
@@ -8321,6 +8325,12 @@ impl SimpleComponent for AppModel {
                     self.save_settings();
                 }
             }
+            AppMsg::SetSignatureDashes(on) => {
+                if self.signature_dashes != on {
+                    self.signature_dashes = on;
+                    self.save_settings();
+                }
+            }
             AppMsg::SetOverrideColors(on) => {
                 if self.override_colors != on {
                     self.override_colors = on;
@@ -11006,6 +11016,7 @@ impl AppModel {
             self.compose_format,
             self.reply_position,
             self.signature_position,
+            self.signature_dashes,
             self.spellcheck,
             self.spellcheck_langs.clone(),
             self.preview_lines,
@@ -17496,6 +17507,7 @@ impl AppModel {
             compose_format: self.compose_format,
             reply_position: self.reply_position,
             signature_position: self.signature_position,
+            signature_dashes: self.signature_dashes,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             notification_buttons: self.notification_buttons,
@@ -17682,6 +17694,7 @@ impl AppModel {
                 PrefOutput::SetComposeFormat(f) => AppMsg::SetComposeFormat(f),
                 PrefOutput::SetReplyPosition(p) => AppMsg::SetReplyPosition(p),
                 PrefOutput::SetSignaturePosition(p) => AppMsg::SetSignaturePosition(p),
+                PrefOutput::SetSignatureDashes(on) => AppMsg::SetSignatureDashes(on),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
