@@ -3849,6 +3849,9 @@ impl SimpleComponent for AppModel {
                 let act = gtk::gio::SimpleAction::new(name, Some(ty));
                 let asender = sender.clone();
                 act.connect_activate(move |_, param| {
+                    // No window will spend the shell's launch token, so
+                    // end the launch here, or the busy pointer stays up.
+                    crate::startup::complete();
                     if let Some((account_id, folder_id, message_id)) =
                         param.and_then(|v| v.get::<(u32, u32, u32)>())
                     {

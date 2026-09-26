@@ -118,6 +118,12 @@
   to the mail route or, failing that, opens the list's page in the browser.
   Mail from a list dated more than two days after you unsubscribed now says
   the list is still sending, instead of labelling it as from a list you left.
+- **Fixed: a notification button left the busy pointer up for 15 seconds**
+  on GNOME Wayland. GNOME Shell runs a button as a launch of the app and
+  shows the busy pointer until a window of the app appears. Mark as Read,
+  Archive, Delete and Spam show none, and GTK has no way to end a launch on
+  Wayland without one, so the pointer stayed until the shell gave up. Hylki
+  now tells the shell the launch is over as the button is handled.
 - **Translations:** French (PR #281 by frenchy82), Spanish (PR #287 by
   Daniel Miguel), Portuguese and Brazilian Portuguese (PR #280 by Paulo
   Fino) and Greek (PR #291 by Yiannis Ioannides) brought up to date.
