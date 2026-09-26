@@ -125,6 +125,7 @@ pub struct PrefInit {
     pub tags_placement: crate::config::SectionPlacement,
     pub chevrons_left: bool,
     pub start_view: crate::config::StartView,
+    pub folder_sort: crate::config::FolderSort,
     pub console_mode: bool,
     pub read_mark: crate::config::ReadMark,
     pub sidebar_hover_expand: bool,
@@ -879,6 +880,7 @@ pub enum PrefInput {
     SetShowAccounts(bool),
     ChangeChevronSide(u32),
     ChangeStartView(u32),
+    ChangeFolderSort(u32),
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
     ToggleSidebarHoverExpand(bool),
@@ -1022,6 +1024,7 @@ pub enum PrefOutput {
     SetShowAccounts(bool),
     SetChevronsLeft(bool),
     SetStartView(crate::config::StartView),
+    SetFolderSort(crate::config::FolderSort),
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
     SetConsoleMode(bool),
@@ -2054,6 +2057,18 @@ impl Component for Preferences {
                                                        Ctrl+Shift+A."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleShowAccounts(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "folder_sort_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Folder order"),
+                                        set_subtitle: &i18n("How each account's folders are sorted. Dragging a folder \
+                                                       puts that account in Custom Order. An account can choose \
+                                                       its own in its settings, or from the right-click menu of \
+                                                       its Folders heading."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFolderSort(row.selected()));
                                         },
                                     },
 
@@ -3376,6 +3391,7 @@ impl Component for Preferences {
             &widgets.language_row,
             &widgets.chevron_side_row,
             &widgets.start_view_row,
+            &widgets.folder_sort_row,
         ] {
             no_truncate(row);
         }
@@ -3460,6 +3476,10 @@ impl Component for Preferences {
             crate::config::StartView::AccountInbox => 1,
             crate::config::StartView::LastFolder => 2,
         });
+        let sort_labels: Vec<String> = crate::config::FolderSort::ALL.iter().map(|s| s.label()).collect();
+        let sort_labels: Vec<&str> = sort_labels.iter().map(String::as_str).collect();
+        widgets.folder_sort_row.set_model(Some(&gtk::StringList::new(&sort_labels)));
+        widgets.folder_sort_row.set_selected(init.folder_sort.index());
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
@@ -4488,6 +4508,10 @@ impl Component for Preferences {
                     _ => StartView::AllInboxes,
                 };
                 let _ = sender.output(PrefOutput::SetStartView(view));
+            }
+            PrefInput::ChangeFolderSort(idx) => {
+                let sort = crate::config::FolderSort::ALL.get(idx as usize).copied().unwrap_or_default();
+                let _ = sender.output(PrefOutput::SetFolderSort(sort));
             }
             PrefInput::ChangeChevronSide(idx) => {
                 let _ = sender.output(PrefOutput::SetChevronsLeft(idx == 0));

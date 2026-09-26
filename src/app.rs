@@ -493,6 +493,9 @@ pub struct AppModel {
     /// Collapsed folder-tree nodes ("email\tpath") — the sidebar's custom
     /// folders render as a collapsible hierarchy (#51).
     tree_collapsed: Vec<String>,
+    /// The folders the user has put in order in the sidebar ("email\tpath"):
+    /// each sorts among its siblings by its place in this list.
+    folder_order: Vec<String>,
     selected: Option<SelectedFolder>,
     /// Attachments of the currently-open message (shown in the drawer).
     attachments: Vec<Attachment>,
@@ -823,6 +826,9 @@ pub struct AppModel {
     chevrons_left: bool,
     /// What the window shows at launch (#256).
     start_view: config::StartView,
+    /// How accounts' folders are sorted, unless an account chooses
+    /// (Settings → Sidebar).
+    folder_sort: config::FolderSort,
     /// Console mode offered in the status bar (Settings → System & Appearance).
     console_mode: bool,
     /// Read-marking policy (#100).
@@ -1132,6 +1138,15 @@ pub enum AppMsg {
     ToggleCollapse(u32),
     /// A sidebar folder-tree node was collapsed/expanded (#51) — persist it.
     FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
+    /// A run of sibling folders was put in a new order in the sidebar.
+    ReorderFolders { account_id: u32, paths: Vec<String> },
+    /// A folder was dropped beside one at another level: move it there on
+    /// the server, then put it just before or after `target`.
+    PlaceFolder { account_id: u32, path: String, dest: String, target: String, after: bool },
+    /// An account's own folder order, chosen from its Folders heading.
+    SetAccountFolderSort { account_id: u32, sort: Option<config::FolderSort> },
+    /// Settings → Sidebar → Folder order: every account without its own.
+    SetFolderSort(config::FolderSort),
     ToggleCustomFolders(u32),
     SidebarCollapsed(bool),
     /// The message-pane header's sidebar button: flip the sidebar between the
@@ -2670,7 +2685,12 @@ impl SimpleComponent for AppModel {
         }
         let rail_now = icon_only || focus.active(config::FocusPart::RailSidebar);
         if !remember_sidebar {
-            sidebar_state = config::SidebarState { order: sidebar_state.order, ..Default::default() };
+            // The layout starts fresh; the order things were put in stays.
+            sidebar_state = config::SidebarState {
+                order: sidebar_state.order,
+                folder_order: sidebar_state.folder_order,
+                ..Default::default()
+            };
         }
         let unified_expanded = sidebar_state.unified_expanded;
         let filtered_expanded = sidebar_state.filtered_expanded;
@@ -2717,6 +2737,7 @@ impl SimpleComponent for AppModel {
         let filtered_expanded_accounts = sidebar_state.filtered_expanded_accounts;
         let tags_expanded_accounts = sidebar_state.tags_expanded_accounts;
         let tree_collapsed = sidebar_state.tree_collapsed;
+        let folder_order = sidebar_state.folder_order;
 
         // Whether this run serves the built-in sample data (see spawn_workers):
         // decided after the GOA reconcile, which can add accounts.
@@ -3087,6 +3108,7 @@ impl SimpleComponent for AppModel {
             collapsed,
             folders_expanded,
             tree_collapsed,
+            folder_order,
             selected: None,
             attachments: Vec::new(),
             lightbox_items: Vec::new(),
@@ -3282,6 +3304,7 @@ impl SimpleComponent for AppModel {
             list_header_widgets: std::cell::OnceCell::new(),
             chevrons_left: config::load_chevrons_left(),
             start_view,
+            folder_sort: config::load_folder_sort(),
             console_mode: config::load_console_mode(),
             read_mark: config::load_read_mark(),
             // The demo (no accounts of its own) ships with tags and filter
@@ -5612,6 +5635,47 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::ReorderFolders { account_id, paths } => {
+                let custom = self.folders.get(&account_id).is_some_and(|fs| {
+                    fs.iter().any(|f| f.kind == FolderKind::Custom && paths.contains(&f.path))
+                });
+                if custom {
+                    self.adopt_custom_order(account_id);
+                }
+                self.keep_folder_order(account_id, &paths);
+            }
+
+            AppMsg::PlaceFolder { account_id, path, dest, target, after } => {
+                self.adopt_custom_order(account_id);
+                // Moved on the server first (the same move as a drop on a
+                // folder, with its checks and its undo); only once that has
+                // gone ahead does it take its place beside `target`.
+                let Some(new_path) = self.move_folder(account_id, path, dest) else { return };
+                let shown = self.shown_folders(account_id);
+                let hierarchy = crate::ui::sidebar::Hierarchy {
+                    delimiter: self.folder_delimiter(account_id),
+                    namespace: self.folder_namespace(account_id),
+                };
+                if let Some(paths) =
+                    crate::ui::sidebar::placed_run(&shown, &hierarchy, &new_path, &target, after)
+                {
+                    self.keep_folder_order(account_id, &paths);
+                }
+            }
+
+            AppMsg::SetAccountFolderSort { account_id, sort } => {
+                self.set_account_folder_sort(account_id, sort);
+                self.rebuild_sidebar();
+            }
+
+            AppMsg::SetFolderSort(sort) => {
+                if self.folder_sort != sort {
+                    self.folder_sort = sort;
+                    self.save_settings();
+                    self.rebuild_sidebar();
+                }
+            }
+
             AppMsg::FolderNodeCollapsed { account_id, path, collapsed } => {
                 // The sidebar already reshaped its rows; just remember it.
                 if let Some(email) =
@@ -5962,6 +6026,14 @@ impl SimpleComponent for AppModel {
                 CtxAction::HideFolder { account_id, path } => {
                     self.hide_folders(account_id, vec![path]);
                 }
+                CtxAction::ResetFolderOrder(account_id) => {
+                    if let Some(email) = self.email_of(account_id) {
+                        let prefix = format!("{email}\t");
+                        self.folder_order.retain(|k| !k.starts_with(&prefix));
+                        self.save_sidebar_state();
+                        self.rebuild_sidebar();
+                    }
+                }
             },
 
             AppMsg::DropMoveMessages { dest_account, dest, items } => {
@@ -5989,7 +6061,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::MoveFolder { account_id, path, dest } => {
-                self.move_folder(account_id, path, dest);
+                let _ = self.move_folder(account_id, path, dest);
             }
 
             AppMsg::RenameFolderTo { account_id, path, new_name } => {
@@ -10950,6 +11022,7 @@ impl AppModel {
             self.files_prefs,
             self.link_browser.clone(),
             self.start_view,
+            self.folder_sort,
         );
     }
 
@@ -12346,6 +12419,7 @@ impl AppModel {
             folders_expanded: self.folders_expanded.clone(),
             icon_only: self.sidebar_collapsed,
             tree_collapsed: self.tree_collapsed.clone(),
+            folder_order: self.folder_order.clone(),
             unified_expanded: self.unified_expanded,
             filtered_expanded: self.filtered_expanded,
             tags_expanded: self.tags_expanded,
@@ -12356,6 +12430,94 @@ impl AppModel {
             filtered_expanded_accounts: self.filtered_expanded_accounts.clone(),
             tags_expanded_accounts: self.tags_expanded_accounts.clone(),
         });
+    }
+
+    /// Keep a run of sibling folders in its new order. The run goes to the
+    /// end of the list; only the order within a run counts, so the others
+    /// stand as they were.
+    fn keep_folder_order(&mut self, account_id: u32, paths: &[String]) {
+        self.store_folder_order(account_id, paths);
+        self.save_sidebar_state();
+        self.rebuild_sidebar();
+    }
+
+    fn store_folder_order(&mut self, account_id: u32, paths: &[String]) {
+        let Some(email) = self.email_of(account_id) else { return };
+        let keys: Vec<String> = paths.iter().map(|p| format!("{email}\t{p}")).collect();
+        self.folder_order.retain(|k| !keys.contains(k));
+        self.folder_order.extend(keys);
+    }
+
+    /// The folder order an account chose for itself, if any.
+    fn own_folder_sort(&self, account_id: u32) -> Option<config::FolderSort> {
+        self.effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+            .and_then(|c| c.folder_sort)
+    }
+
+    /// How an account's custom folders are sorted: its own choice, or
+    /// Settings'.
+    fn folder_sort_of(&self, account_id: u32) -> config::FolderSort {
+        self.own_folder_sort(account_id).unwrap_or(self.folder_sort)
+    }
+
+    /// An account's folders in the order the sidebar shows them.
+    fn shown_folders(&self, account_id: u32) -> Vec<Folder> {
+        let prefix = self.email_of(account_id).map(|e| format!("{e}\t")).unwrap_or_default();
+        let order: Vec<String> =
+            self.folder_order.iter().filter_map(|k| k.strip_prefix(&prefix).map(String::from)).collect();
+        crate::ui::sidebar::order_folders(
+            self.folders.get(&account_id).cloned().unwrap_or_default(),
+            &order,
+            self.folder_sort_of(account_id),
+        )
+    }
+
+    /// Give an account its own folder order (`None` follows Settings), in
+    /// the file and in the Settings window's copy of the account, which
+    /// would otherwise put the old one back when its editor is saved.
+    fn set_account_folder_sort(&mut self, account_id: u32, sort: Option<config::FolderSort>) {
+        let demo = self.config.is_empty() && demo_mode();
+        let accounts = if demo { &mut self.demo_config } else { &mut self.config };
+        let Some(cfg) = accounts.get_mut(account_id.saturating_sub(1) as usize) else { return };
+        if cfg.folder_sort == sort {
+            return;
+        }
+        cfg.folder_sort = sort;
+        let email = cfg.email.clone();
+        let saved = if demo {
+            config::save_demo_accounts(&self.demo_config).map_err(|e| e.to_string())
+        } else {
+            config::save(&self.config).map_err(|e| e.to_string())
+        };
+        if let Err(e) = saved {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n_f("Could not save account: {e}", &[("e", &e)]),
+                error: true,
+                connectivity: false,
+            });
+        }
+        if let Some(acc) = &self.accounts_win {
+            acc.emit(crate::ui::accounts::AccountsInput::SetFolderSort { email, sort });
+        }
+    }
+
+    /// Dragging a custom folder is arranging them by hand, so an account
+    /// sorted another way switches to Custom Order, every custom folder kept
+    /// first where the old sort showed it: only the dragged one moves.
+    fn adopt_custom_order(&mut self, account_id: u32) {
+        if self.folder_sort_of(account_id) == config::FolderSort::Custom {
+            return;
+        }
+        let shown: Vec<String> = self
+            .shown_folders(account_id)
+            .into_iter()
+            .filter(|f| f.kind == FolderKind::Custom)
+            .map(|f| f.path)
+            .collect();
+        self.store_folder_order(account_id, &shown);
+        let sort = (self.folder_sort != config::FolderSort::Custom).then_some(config::FolderSort::Custom);
+        self.set_account_folder_sort(account_id, sort);
     }
 
     /// Account emails in display order: those listed in `account_order` first
@@ -12734,6 +12896,17 @@ impl AppModel {
                     .iter()
                     .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
                     .collect();
+                let folder_order = self
+                    .folder_order
+                    .iter()
+                    .filter_map(|k| k.strip_prefix(&prefix).map(String::from))
+                    .collect();
+                let folder_sort = self.folder_sort_of(account.id);
+                let own_folder_sort = self.own_folder_sort(account.id);
+                let hierarchy = crate::ui::sidebar::Hierarchy {
+                    delimiter: self.folder_delimiter(account.id),
+                    namespace: self.folder_namespace(account.id),
+                };
                 let filtered = self.account_filtered_folders(account.id);
                 let has_filters = self
                     .filters
@@ -12753,6 +12926,11 @@ impl AppModel {
                     folders,
                     filtered,
                     tree_collapsed,
+                    folder_order,
+                    hierarchy,
+                    folder_sort,
+                    own_folder_sort,
+                    default_folder_sort: self.folder_sort,
                 })
             })
             .collect();
@@ -16224,7 +16402,9 @@ impl AppModel {
         self.send_to(account_id, MailRequest::DeleteFolder { path, trash });
     }
 
-    fn move_folder(&mut self, account_id: u32, path: String, dest: String) {
+    /// Move a folder under `dest` ("" for the top level). Returns its new
+    /// path when the move went ahead, `None` when it was refused.
+    fn move_folder(&mut self, account_id: u32, path: String, dest: String) -> Option<String> {
         let complain = |me: &Self, text: &str| {
             me.notifications.emit(NotifyInput::Push {
                 text: text.to_string(),
@@ -16236,7 +16416,7 @@ impl AppModel {
         // Into itself or its own subtree: there is no such place.
         if dest == path || dest.starts_with(&format!("{path}{delim}")) {
             complain(self, "A folder can't be moved into itself.");
-            return;
+            return None;
         }
         let folders = self.folders.get(&account_id).cloned().unwrap_or_default();
         // Only your own folders (or the top level) can hold other folders —
@@ -16244,7 +16424,7 @@ impl AppModel {
         if !dest.is_empty()
             && !folders.iter().any(|f| f.path == dest && f.kind == FolderKind::Custom)
         {
-            return;
+            return None;
         }
         let leaf = path.rsplit(delim).next().unwrap_or(&path).to_string();
         let new_path = if dest.is_empty() {
@@ -16253,13 +16433,14 @@ impl AppModel {
             format!("{dest}{delim}{leaf}")
         };
         if new_path == path {
-            return;
+            return None;
         }
         if folders.iter().any(|f| f.path == new_path) {
             complain(self, &format!("A folder named {leaf:?} is already there."));
-            return;
+            return None;
         }
-        self.apply_folder_rename(account_id, path, new_path, Some(i18n("Move Folder")));
+        self.apply_folder_rename(account_id, path, new_path.clone(), Some(i18n("Move Folder")));
+        Some(new_path)
     }
 
     /// Bring an account's local folder list back to exactly the shape the
@@ -16353,6 +16534,24 @@ impl AppModel {
         {
             let key_prefix = format!("{email}\t");
             for k in self.tree_collapsed.iter_mut() {
+                if let Some(rest) = k.strip_prefix(&key_prefix) {
+                    if rest == path {
+                        *k = format!("{key_prefix}{new_path}");
+                    } else if let Some(r) = rest.strip_prefix(&old_prefix) {
+                        *k = format!("{key_prefix}{new_prefix}{r}");
+                    }
+                }
+            }
+            // So does the folder order. A renamed folder keeps its place; one
+            // moved under another parent has left the siblings it was placed
+            // among, and joins its new ones at the end.
+            let parent = |p: &str| p.rsplit_once(delim).map(|(head, _)| head.to_string());
+            let moved = parent(&path) != parent(&new_path);
+            let own_key = format!("{key_prefix}{path}");
+            if moved {
+                self.folder_order.retain(|k| *k != own_key);
+            }
+            for k in self.folder_order.iter_mut() {
                 if let Some(rest) = k.strip_prefix(&key_prefix) {
                     if rest == path {
                         *k = format!("{key_prefix}{new_path}");
@@ -17273,6 +17472,7 @@ impl AppModel {
             tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
             start_view: self.start_view,
+            folder_sort: self.folder_sort,
             console_mode: self.console_mode,
             read_mark: self.read_mark,
             settings_open_accounts: self.settings_open_accounts,
@@ -17399,6 +17599,7 @@ impl AppModel {
                 PrefOutput::SetTagsPlacement(p) => AppMsg::SetTagsPlacement(p),
                 PrefOutput::SetChevronsLeft(left) => AppMsg::SetChevronsLeft(left),
                 PrefOutput::SetStartView(view) => AppMsg::SetStartView(view),
+                PrefOutput::SetFolderSort(sort) => AppMsg::SetFolderSort(sort),
                 PrefOutput::SetConsoleMode(on) => AppMsg::SetConsoleMode(on),
                 PrefOutput::SetReadMark(policy) => AppMsg::SetReadMark(policy),
                 PrefOutput::ExportSettings => AppMsg::ExportSettings,
@@ -20155,6 +20356,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         empty_trash_days: 0,
         pgp_key: None,
         in_unified: true,
+        folder_sort: None,
         sign_by_default: false,
     };
     vec![
@@ -20649,6 +20851,15 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         }
         SidebarOutput::MoveFolder { account_id, path, dest } => {
             AppMsg::MoveFolder { account_id, path, dest }
+        }
+        SidebarOutput::ReorderFolders { account_id, paths } => {
+            AppMsg::ReorderFolders { account_id, paths }
+        }
+        SidebarOutput::PlaceFolder { account_id, path, dest, target, after } => {
+            AppMsg::PlaceFolder { account_id, path, dest, target, after }
+        }
+        SidebarOutput::SetFolderSort { account_id, sort } => {
+            AppMsg::SetAccountFolderSort { account_id, sort }
         }
     }
 }

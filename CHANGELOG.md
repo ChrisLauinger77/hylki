@@ -45,6 +45,39 @@
   Refused on Gmail (All Mail would keep the original), POP3, signed or
   encrypted messages, and a message that is only the file. See
   [Deleting an attachment from the server](docs/DOCUMENTATION.md#deleting-an-attachment-from-the-server).
+- **New: folders can be put in your own order in the sidebar** by dragging
+  them. While a folder is dragged, a line in the accent color shows the gap
+  between folders where it will land, indented to the level it lands at.
+  Dropped in a gap at its own level, the folder only changes places. In a
+  gap at another level, it is moved there on the server first, as dropping
+  it on a folder does, and then takes that place. Over the middle third of
+  a folder, the folder is outlined and the dragged one moves inside it.
+  Inbox, Sent, Drafts and the other main folders reorder among themselves.
+  A folder never dragged, such as one created later, goes just after the
+  sibling before it by name. The order is kept on this computer only.
+  **Reset Folder Order**, in the right-click menu of the account's header
+  or its Folders heading, forgets it. See
+  [Folder order](docs/DOCUMENTATION.md#folder-order).
+- **New: a choice of folder order.** **Settings → Sidebar → Folder order**
+  sorts every account's custom folders by Custom Order (the default: by
+  name, with dragged folders where they were put), Name (A to Z), Name (Z
+  to A) or Full Path (the whole path on the server, as Gmail on the web
+  lists labels). An account can choose its own under **Folder Order** in
+  its settings, or from the right-click menu of its Folders heading in the
+  sidebar. Dragging a custom folder puts its account in Custom Order.
+- **Changed: only the chevrons open and close sidebar items.** Clicking a
+  folder that has sub-folders opens the folder and leaves its sub-folders
+  as they were; the arrow beside it shows or hides them. The Folders,
+  Filters and Tags headings open and close from their chevron alone, not
+  their name. Double-clicking or long-pressing Inboxes, Starred, Sent,
+  Drafts, Archive, Filters or Tags no longer opens or closes the list under
+  it; its chevron does. In the icon rail, which has no chevrons, a click on
+  a heading's icon and a long press on a unified row still do.
+- **Changed: custom folders sort by the name shown in the sidebar**, not
+  by their path on the server, as Thunderbird sorts them. Gmail's
+  `[Gmail]/Important` and `[Gmail]/Test` sorted by the bracket, ahead of
+  every folder named with a letter, and now sort as "Important" and
+  "Test". Full Path keeps the old order.
 - **Fixed: a folder another client added, renamed or moved stayed as it
   was until Hylki was restarted.** Refresh, and each automatic check for
   mail, now reads the folder list again as well as the unread counts.
