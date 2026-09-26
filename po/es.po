@@ -4428,6 +4428,15 @@ msgstr ""
 "puedes separarlo en una ventana desde su cabecera. Desactivado = abrir "
 "directamente una ventana independiente."
 
+#, fuzzy
+msgid "Reply and forward in the main window"
+msgstr "Redactar en la ventana principal"
+
+msgid ""
+"A reply or a forward opens in the reading pane, beside the message it "
+"answers. Off = open a separate window."
+msgstr ""
+
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Mostrar De, Para y Asunto en el panel de respuesta"
 

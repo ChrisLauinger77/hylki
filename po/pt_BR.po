@@ -4431,6 +4431,15 @@ msgstr ""
 "resposta — pode destacá-la para uma janela através do cabeçalho. Desativado "
 "= abrir diretamente uma janela separada."
 
+#, fuzzy
+msgid "Reply and forward in the main window"
+msgstr "Compor na janela principal"
+
+msgid ""
+"A reply or a forward opens in the reading pane, beside the message it "
+"answers. Off = open a separate window."
+msgstr ""
+
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Mostrar De, Para e Assunto no painel de resposta"
 

@@ -4423,6 +4423,15 @@ msgstr ""
 "отдельное окно через заголовок). Если отключено — сразу открывается "
 "отдельное окно."
 
+#, fuzzy
+msgid "Reply and forward in the main window"
+msgstr "Создание писем в основном окне"
+
+msgid ""
+"A reply or a forward opens in the reading pane, beside the message it "
+"answers. Off = open a separate window."
+msgstr ""
+
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Показывать поля «От», «Кому» и «Тема» в панели ответа"
 

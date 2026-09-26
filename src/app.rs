@@ -921,6 +921,8 @@ pub struct AppModel {
     swipe_sensitivity: f64,
     /// "New message" composes inline over the reading pane (vs a window).
     compose_inline: bool,
+    /// Reply, Reply All and Forward open in the reading pane (vs a window, #295).
+    reply_inline: bool,
     reply_fields: bool,
     /// The identity new messages are sent from (#157); empty = the open
     /// folder's account.
@@ -1378,6 +1380,7 @@ pub enum AppMsg {
     SetSwipeReversed(bool),
     SetSwipeSensitivity(f64),
     SetComposeInline(bool),
+    SetReplyInline(bool),
     /// Reply panel shows its From/To/Subject rows from the start (#154).
     SetReplyFields(bool),
     /// Settings → System → GNOME Files changed.
@@ -3361,6 +3364,7 @@ impl SimpleComponent for AppModel {
             swipe_reversed: config::load_swipe_reversed(),
             swipe_sensitivity: config::load_swipe_sensitivity(),
             compose_inline: config::load_compose_inline(),
+            reply_inline: config::load_reply_inline(),
             reply_fields: config::load_reply_fields(),
             compose_default_from: config::load_compose_default_from(),
             paste_plain: config::load_paste_plain(),
@@ -5591,10 +5595,10 @@ impl SimpleComponent for AppModel {
                     if m.body.is_empty() {
                         self.pending_notified_reply = Some(m);
                     } else {
-                        self.open_inline_reply(
+                        self.open_reply(
                             m.account_id,
                             self.reply_context(&m, reply_prefill(&m)),
-                            Some((m.account_id, m.id)),
+                            (m.account_id, m.id),
                             &sender,
                         );
                     }
@@ -6601,14 +6605,14 @@ impl SimpleComponent for AppModel {
                 );
                 match action {
                     RowAction::Reply => {
-                        self.open_inline_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), Some((m.account_id, m.id)), &sender);
+                        self.open_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), (m.account_id, m.id), &sender);
                     }
                     RowAction::ReplyAll => {
                         let self_email = self.email_of(m.account_id).unwrap_or_default();
-                        self.open_inline_reply(
+                        self.open_reply(
                             m.account_id,
                             self.reply_context(&m, reply_all_prefill(&m, &self_email)),
-                            Some((m.account_id, m.id)),
+                            (m.account_id, m.id),
                             &sender,
                         );
                     }
@@ -6832,17 +6836,17 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Reply => {
                 if let Some(m) = self.compose_target() {
-                    self.open_inline_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), Some((m.account_id, m.id)), &sender);
+                    self.open_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), (m.account_id, m.id), &sender);
                 }
             }
 
             AppMsg::ReplyAll => {
                 if let Some(m) = self.compose_target() {
                     let self_email = self.email_of(m.account_id).unwrap_or_default();
-                    self.open_inline_reply(
+                    self.open_reply(
                         m.account_id,
                         self.reply_context(&m, reply_all_prefill(&m, &self_email)),
-                        Some((m.account_id, m.id)),
+                        (m.account_id, m.id),
                         &sender,
                     );
                 }
@@ -8028,6 +8032,13 @@ impl SimpleComponent for AppModel {
             AppMsg::SetComposeInline(on) => {
                 if self.compose_inline != on {
                     self.compose_inline = on;
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::SetReplyInline(on) => {
+                if self.reply_inline != on {
+                    self.reply_inline = on;
                     self.save_settings();
                 }
             }
@@ -10170,10 +10181,10 @@ impl SimpleComponent for AppModel {
                 if let Some(mut m) = self.pending_notified_reply.take() {
                     if m.account_id == account_id && m.id == message_id {
                         m.body = body.clone();
-                        self.open_inline_reply(
+                        self.open_reply(
                             m.account_id,
                             self.reply_context(&m, reply_prefill(&m)),
-                            Some((m.account_id, m.id)),
+                            (m.account_id, m.id),
                             &sender,
                         );
                     } else {
@@ -10981,6 +10992,7 @@ impl AppModel {
             self.swipe_reversed,
             self.swipe_sensitivity,
             self.compose_inline,
+            self.reply_inline,
             self.reply_fields,
             &self.compose_default_from,
             self.paste_plain,
@@ -14579,7 +14591,7 @@ impl AppModel {
     /// Built like `edit_as_new`: the body and the attachments may still be
     /// on the server, so each is fetched at most once with the message held
     /// in `pending_forward`, and the reply re-enters here. `inline` says
-    /// where the composer opens, over the reading pane or in a window.
+    /// the composer opens where a reply does; otherwise in a window.
     fn forward(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
         let m = self.with_cached_body(m);
         let key = (m.account_id, m.id);
@@ -14619,7 +14631,7 @@ impl AppModel {
         let mut prefill = self.quoting(&m, forward_prefill(&m));
         prefill.attachments = attachments;
         if inline {
-            self.open_inline_reply(m.account_id, prefill, Some((m.account_id, m.id)), sender);
+            self.open_reply(m.account_id, prefill, (m.account_id, m.id), sender);
         } else {
             self.open_compose(m.account_id, prefill, sender);
         }
@@ -15154,7 +15166,7 @@ impl AppModel {
             .is_some_and(|c| c.account_id == m.account_id && c.id == m.id)
             || self.current_thread.iter().any(|t| t.account_id == m.account_id && t.id == m.id);
         if on_screen {
-            self.open_inline_reply(m.account_id, prefill, Some((m.account_id, m.id)), sender);
+            self.open_reply(m.account_id, prefill, (m.account_id, m.id), sender);
         } else {
             self.open_compose(m.account_id, prefill, sender);
         }
@@ -15488,6 +15500,23 @@ impl AppModel {
             config::ReplyPosition::Top => false,
             config::ReplyPosition::Bottom => true,
             config::ReplyPosition::Follow => !self.thread_newest_first,
+        }
+    }
+
+    /// Where a reply or a forward opens: the reading pane, beside the
+    /// message it answers, or a window of its own when Settings says so
+    /// (#295).
+    fn open_reply(
+        &mut self,
+        account_id: u32,
+        prefill: ComposePrefill,
+        answering: (u32, u32),
+        sender: &ComponentSender<Self>,
+    ) {
+        if self.reply_inline {
+            self.open_inline_reply(account_id, prefill, Some(answering), sender);
+        } else {
+            self.open_compose(account_id, prefill, sender);
         }
     }
 
@@ -17496,6 +17525,7 @@ impl AppModel {
             swipe_reversed: self.swipe_reversed,
             swipe_sensitivity: self.swipe_sensitivity,
             compose_inline: self.compose_inline,
+            reply_inline: self.reply_inline,
             reply_fields: self.reply_fields,
             files: self.files_prefs,
             link_browser: self.link_browser.clone(),
@@ -17576,6 +17606,7 @@ impl AppModel {
                 PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
                 PrefOutput::SetSwipeSensitivity(v) => AppMsg::SetSwipeSensitivity(v),
                 PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
+                PrefOutput::SetReplyInline(on) => AppMsg::SetReplyInline(on),
                 PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
                 PrefOutput::SetFilesPrefs(p) => AppMsg::SetFilesPrefs(p),
                 PrefOutput::SetLinkBrowser(id) => AppMsg::SetLinkBrowser(id),

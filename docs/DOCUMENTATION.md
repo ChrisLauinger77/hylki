@@ -346,9 +346,14 @@ when a composer opens; a draft keeps its signature wherever it was saved.
 
 ### Replies and forwards
 
-The quoted message in a reply or a forward keeps its layout: its colors,
-fonts, tables and the pictures it carries inside itself look as they do in
-the reader, and go to the recipient that way. Pictures on the sender's server show only when the
+A reply or a forward opens in the reading pane, beside the message it
+answers. **Settings → Composing → Reply and forward in the main window**,
+switched off, opens them in a window of their own instead, as **Compose in
+the main window** does for a new message.
+
+The quoted message keeps its layout: its colors, fonts, tables and the
+pictures it carries inside itself look as they do in the reader, and go to
+the recipient that way. Pictures on the sender's server show only when the
 reader shows them for that message, so answering a message does not load
 anything reading it did not. The recipient still gets them. In dark mode a
 quoted message that sets its own colors keeps the light ground it was

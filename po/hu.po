@@ -4342,6 +4342,15 @@ msgstr ""
 "Az új üzenet válaszhoz hasonlóan lecsúszik az olvasópanelre — a fejlécéből "
 "külön ablakba emelhető. Kikapcsolva közvetlenül külön ablakban nyílik meg."
 
+#, fuzzy
+msgid "Reply and forward in the main window"
+msgstr "Levélírás a főablakban"
+
+msgid ""
+"A reply or a forward opens in the reading pane, beside the message it "
+"answers. Off = open a separate window."
+msgstr ""
+
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Feladó, címzett és tárgy megjelenítése a válaszpanelen"
 

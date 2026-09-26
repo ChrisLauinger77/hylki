@@ -75,6 +75,8 @@ pub struct PrefInit {
     pub swipe_sensitivity: f64,
     /// "New message" composes inline over the reading pane (vs a window).
     pub compose_inline: bool,
+    /// Reply, Reply All and Forward open in the reading pane (vs a window).
+    pub reply_inline: bool,
     pub reply_fields: bool,
     /// Settings → System → GNOME Files: what handed-in files open into.
     pub files: crate::config::FilesPrefs,
@@ -837,6 +839,7 @@ pub enum PrefInput {
     ToggleSwipeReversed(bool),
     ChangeSwipeSensitivity(f64),
     ToggleComposeInline(bool),
+    ToggleReplyInline(bool),
     ToggleReplyFields(bool),
     /// The "Send new messages from" combo: 0 = the open folder's account,
     /// then `identities` in order.
@@ -999,6 +1002,7 @@ pub enum PrefOutput {
     SetSwipeReversed(bool),
     SetSwipeSensitivity(f64),
     SetComposeInline(bool),
+    SetReplyInline(bool),
     SetReplyFields(bool),
     SetFilesPrefs(crate::config::FilesPrefs),
     /// The browser links open in (#232): "" = the desktop's default,
@@ -2802,6 +2806,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "reply_inline_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Reply and forward in the main window"),
+                                        set_subtitle: &i18n("A reply or a forward opens in the reading pane, \
+                                                       beside the message it answers. Off = open a \
+                                                       separate window."),
+                                        connect_active_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ToggleReplyInline(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "reply_fields_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Show From, To and Subject in the reply panel"),
@@ -3671,6 +3686,7 @@ impl Component for Preferences {
         widgets.swipe_enabled_row.set_active(init.swipe_enabled);
         widgets.swipe_reversed_row.set_active(init.swipe_reversed);
         widgets.compose_inline_row.set_active(init.compose_inline);
+        widgets.reply_inline_row.set_active(init.reply_inline);
         widgets.reply_fields_row.set_active(init.reply_fields);
         widgets.files_action_row.set_model(Some(&gtk::StringList::new(&[
             i18n("Ask each time").as_str(),
@@ -4304,6 +4320,9 @@ impl Component for Preferences {
             }
             PrefInput::ToggleComposeInline(on) => {
                 let _ = sender.output(PrefOutput::SetComposeInline(on));
+            }
+            PrefInput::ToggleReplyInline(on) => {
+                let _ = sender.output(PrefOutput::SetReplyInline(on));
             }
             PrefInput::TogglePastePlain(on) => {
                 let _ = sender.output(PrefOutput::SetPastePlain(on));

@@ -4444,6 +4444,15 @@ msgstr ""
 "— knallen Sie sie aus der Kopfzeile in ein Fenster. Aus = öffnen Sie direkt "
 "ein separates Fenster."
 
+#, fuzzy
+msgid "Reply and forward in the main window"
+msgstr "Im Hauptfenster verfassen"
+
+msgid ""
+"A reply or a forward opens in the reading pane, beside the message it "
+"answers. Off = open a separate window."
+msgstr ""
+
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Von, An und Betreff im Antwortbereich anzeigen"
 

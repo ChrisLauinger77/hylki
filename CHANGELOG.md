@@ -14,6 +14,10 @@
   setting said. Nothing in a quote can fetch a resource through CSS or
   cover the composer. In dark mode a quote that sets its own colors sits on
   a light ground. See [Replies and forwards](docs/DOCUMENTATION.md#replies-and-forwards).
+- **New: replies and forwards can open in a window** (#295). **Settings →
+  Composing → Reply and forward in the main window**, switched off, opens
+  Reply, Reply All and Forward in a window of their own. It is on by
+  default, which keeps them in the reading pane as before.
 - **New: a choice of what Return does in the composer.** In rich text,
   Return starts a new line in the same paragraph and Shift+Return starts a
   new paragraph, sent as a `<p>` with space before the next one. **Settings

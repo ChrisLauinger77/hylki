@@ -1197,6 +1197,10 @@ struct PrivacyFile {
     /// reply) rather than in its own window.
     #[serde(default = "default_compose_inline")]
     compose_inline: bool,
+    /// Whether Reply, Reply All and Forward open in the reading pane (#86)
+    /// rather than in a window of their own (#295).
+    #[serde(default = "default_compose_inline")]
+    reply_inline: bool,
     /// Whether the inline reply panel shows its From, To and Subject rows
     /// from the start (#154); off, a button in its header reveals them.
     #[serde(default)]
@@ -1589,6 +1593,7 @@ impl Default for PrivacyFile {
             swipe_reversed: false,
             swipe_sensitivity: default_swipe_sensitivity(),
             compose_inline: default_compose_inline(),
+            reply_inline: default_compose_inline(),
             reply_fields: false,
             compose_default_from: String::new(),
             single_card_default_applied: false,
@@ -2965,6 +2970,11 @@ pub fn load_compose_inline() -> bool {
     load_privacy().compose_inline
 }
 
+/// Whether a reply or a forward opens in the reading pane.
+pub fn load_reply_inline() -> bool {
+    load_privacy().reply_inline
+}
+
 /// Whether pasting into the composer strips the clipboard's formatting.
 pub fn load_paste_plain() -> bool {
     load_privacy().paste_plain
@@ -3214,6 +3224,7 @@ pub fn save_privacy(
     swipe_reversed: bool,
     swipe_sensitivity: f64,
     compose_inline: bool,
+    reply_inline: bool,
     reply_fields: bool,
     compose_default_from: &str,
     paste_plain: bool,
@@ -3312,6 +3323,7 @@ pub fn save_privacy(
         swipe_reversed,
         swipe_sensitivity,
         compose_inline,
+        reply_inline,
         reply_fields,
         compose_default_from: compose_default_from.to_string(),
         paste_plain,
