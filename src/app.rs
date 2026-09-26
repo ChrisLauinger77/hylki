@@ -9562,6 +9562,39 @@ impl SimpleComponent for AppModel {
                                 && a.name == b.name
                         })
                 });
+                // Ids are list positions, so a folder another client added,
+                // renamed or removed shifts them (a refresh re-lists the
+                // folders). The open folder and the cached lists follow their
+                // folder by path; a list whose folder is gone is dropped.
+                // The first listing has nothing to follow from.
+                if !unchanged && self.folders.get(&account_id).is_some_and(|old| !old.is_empty()) {
+                    let old_paths: HashMap<u32, String> = self
+                        .folders
+                        .get(&account_id)
+                        .map(|old| old.iter().map(|f| (f.id, f.path.clone())).collect())
+                        .unwrap_or_default();
+                    let new_ids: HashMap<&str, u32> =
+                        folders.iter().map(|f| (f.path.as_str(), f.id)).collect();
+                    let cached = std::mem::take(&mut self.message_cache);
+                    for ((a, fid), mut list) in cached {
+                        if a != account_id {
+                            self.message_cache.insert((a, fid), list);
+                            continue;
+                        }
+                        let Some(&id) = old_paths.get(&fid).and_then(|p| new_ids.get(p.as_str())) else {
+                            continue;
+                        };
+                        for m in &mut list {
+                            m.folder_id = id;
+                        }
+                        self.message_cache.insert((a, id), list);
+                    }
+                    if let Some(sel) = self.selected.as_mut().filter(|s| s.account_id == account_id) {
+                        if let Some(&id) = new_ids.get(sel.path.as_str()) {
+                            sel.folder_id = id;
+                        }
+                    }
+                }
                 self.folders.insert(account_id, folders);
                 if unchanged {
                     self.push_unread_counts();

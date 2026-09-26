@@ -45,6 +45,14 @@
   Refused on Gmail (All Mail would keep the original), POP3, signed or
   encrypted messages, and a message that is only the file. See
   [Deleting an attachment from the server](docs/DOCUMENTATION.md#deleting-an-attachment-from-the-server).
+- **Fixed: a folder another client added, renamed or moved stayed as it
+  was until Hylki was restarted.** Refresh, and each automatic check for
+  mail, now reads the folder list again as well as the unread counts.
+- **Fixed: moving a folder left its sub-folders unsubscribed on some
+  servers.** The server moves the sub-folders with it, but Dovecot keeps
+  their subscriptions at the old names, so a client showing subscribed
+  folders only (Thunderbird's default) lost sight of them. Hylki now moves
+  each sub-folder's subscription too.
 - **Fixed: the menu offered to reveal a status bar already showing** (#294,
   reported by frenchy82). The menu item reads *Hide Status Bar* while the
   bar is down, an error message passing through it included, and hides it.
