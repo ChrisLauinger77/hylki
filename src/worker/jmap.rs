@@ -2150,35 +2150,18 @@ pub(super) async fn run_jmap(
                                 }
                             }
                         }
-                        if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
-                            c.delete_outbox(queued);
-                            emit_outbox(cache.as_ref(), account_id, &emit);
-                        }
+                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
                     }
                     Err(e) => {
-                        let queued = queue_failed_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e);
-                        if let (true, Some(old), Some(c)) = (queued, message.outbox_origin, cache.as_ref()) {
-                            c.delete_outbox(old);
-                        }
-                        emit(WorkerEvent::error(if queued {
-                                i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e)])
-                            } else {
-                                i18n_f("Send failed: {e}", &[("e", &e)])
-                            }));
-                        emit_outbox(cache.as_ref(), account_id, &emit);
+                        send_failed(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e, &emit);
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => {
-                if let Some(c) = cache.as_ref() {
-                    c.delete_outbox(id);
-                }
-                emit_outbox(cache.as_ref(), account_id, &emit);
-            }
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
 
             MailRequest::FlushOutbox { id } => {
                 if let Some(s) = jmap_session(&account, &mut state, &emit).await {

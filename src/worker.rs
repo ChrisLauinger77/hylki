@@ -2503,53 +2503,19 @@ async fn run_imap(
                             }
                         }
                         // This version replaces the queued one it was edited from.
-                        if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
-                            c.delete_outbox(queued);
-                            emit_outbox(cache.as_ref(), account_id, &emit);
-                        }
+                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
                     }
                     Err(e) => {
                         emit(WorkerEvent::Status(String::new()));
-                        // Hold the message rather than losing it: the composer is
-                        // already closed by the time this arrives, so anything not
-                        // queued here is gone (issue #15). Being offline is the
-                        // usual reason a send fails, which is exactly when saving
-                        // to the server's Drafts folder would fail too.
-                        let queued = queue_failed_send(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            sent_path.as_deref(),
-                            &e.to_string(),
-                        );
-                        // Queue first, drop the superseded row second: a crash in
-                        // between leaves the message queued twice, which is
-                        // recoverable, rather than not at all.
-                        if let (true, Some(old), Some(c)) =
-                            (queued, message.outbox_origin, cache.as_ref())
-                        {
-                            c.delete_outbox(old);
-                        }
-                        emit(WorkerEvent::error(if queued {
-                                i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e.to_string())])
-                            } else {
-                                i18n_f("Send failed: {e}", &[("e", &e.to_string())])
-                            }));
-                        emit_outbox(cache.as_ref(), account_id, &emit);
+                        send_failed(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e.to_string(), &emit);
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => {
-                if let Some(c) = cache.as_ref() {
-                    c.delete_outbox(id);
-                }
-                emit_outbox(cache.as_ref(), account_id, &emit);
-            }
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
 
             MailRequest::FlushOutbox { id } => {
                 flush_outbox(
@@ -2614,12 +2580,7 @@ async fn run_imap(
                                 }
                                 // Saved as a draft instead of sent: the queued
                                 // copy it was edited from is now superseded.
-                                if let (Some(queued), Some(c)) =
-                                    (message.outbox_origin, cache.as_ref())
-                                {
-                                    c.delete_outbox(queued);
-                                    emit_outbox(cache.as_ref(), account_id, &emit);
-                                }
+                                drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                                 emit(WorkerEvent::Status(String::new()));
                                 emit(WorkerEvent::DraftSaved);
                             }
@@ -3813,17 +3774,57 @@ fn emit_outbox(cache: Option<&Cache>, account_id: u32, emit: &impl Fn(WorkerEven
     emit(WorkerEvent::Outbox { items });
 }
 
-/// Store a message that could not be sent. Returns whether it was kept — with no
-/// cache there is nowhere to put it, and the caller must not claim otherwise.
-fn queue_failed_send(
+/// The user deleted a queued message from the Outbox.
+fn delete_queued(cache: Option<&Cache>, account_id: u32, id: u32, emit: &impl Fn(WorkerEvent)) {
+    if let Some(c) = cache {
+        c.delete_outbox(id);
+    }
+    emit_outbox(cache, account_id, emit);
+}
+
+/// The message went out, or was saved as a draft instead: the queued copy it
+/// was edited from is superseded.
+fn drop_superseded_outbox(
+    cache: Option<&Cache>,
+    account_id: u32,
+    msg: &OutgoingMessage,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if let (Some(queued), Some(c)) = (msg.outbox_origin, cache) {
+        c.delete_outbox(queued);
+        emit_outbox(cache, account_id, emit);
+    }
+}
+
+/// A send failed. Hold the message in the Outbox rather than losing it: the
+/// composer is already closed by the time this runs, so anything not queued
+/// here is gone (issue #15). Being offline is the usual reason, which is
+/// exactly when saving to the server's Drafts folder would fail too. With no
+/// cache there is nowhere to keep it, and the error must not claim otherwise.
+fn send_failed(
     cache: Option<&Cache>,
     account_id: u32,
     account: &AccountConfig,
     msg: &OutgoingMessage,
     sent_path: Option<&str>,
     error: &str,
-) -> bool {
-    queue_outbox_message(cache, account_id, account, msg, sent_path, error, None)
+    emit: &impl Fn(WorkerEvent),
+) {
+    let queued = queue_outbox_message(cache, account_id, account, msg, sent_path, error, None);
+    // Queue first, drop the superseded row second: a crash in between leaves
+    // the message queued twice, which is recoverable, rather than not at all.
+    if let (true, Some(old), Some(c)) = (queued, msg.outbox_origin, cache) {
+        c.delete_outbox(old);
+    }
+    emit(WorkerEvent::error(if queued {
+        i18n_f(
+            "Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.",
+            &[("e", error)],
+        )
+    } else {
+        i18n_f("Send failed: {e}", &[("e", error)])
+    }));
+    emit_outbox(cache, account_id, emit);
 }
 
 /// Send Later (#145): park the message in the Outbox until `at`. The bytes are
@@ -8775,46 +8776,20 @@ async fn run_pop3(
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(_) => {
-                        if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
-                            c.delete_outbox(queued);
-                            emit_outbox(cache.as_ref(), account_id, &emit);
-                        }
+                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
                     }
                     Err(e) => {
                         // POP3 has no Sent folder to copy to, but the message is held
                         // exactly as it is for IMAP accounts.
-                        let queued = queue_failed_send(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            None,
-                            &e.to_string(),
-                        );
-                        if let (true, Some(old), Some(c)) =
-                            (queued, message.outbox_origin, cache.as_ref())
-                        {
-                            c.delete_outbox(old);
-                        }
-                        emit(WorkerEvent::error(if queued {
-                                i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e.to_string())])
-                            } else {
-                                i18n_f("Send failed: {e}", &[("e", &e.to_string())])
-                            }));
-                        emit_outbox(cache.as_ref(), account_id, &emit);
+                        send_failed(cache.as_ref(), account_id, &account, &message, None, &e.to_string(), &emit);
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => {
-                if let Some(c) = cache.as_ref() {
-                    c.delete_outbox(id);
-                }
-                emit_outbox(cache.as_ref(), account_id, &emit);
-            }
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
 
             MailRequest::FlushOutbox { id } => {
                 let mut no_session = None;
@@ -10801,10 +10776,7 @@ async fn run_graph(
                                 }
                             }
                         }
-                        if let (Some(queued), Some(c)) = (message.outbox_origin, cache.as_ref()) {
-                            c.delete_outbox(queued);
-                            emit_outbox(cache.as_ref(), account_id, &emit);
-                        }
+                        drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         // The server files the copy in Sent Items itself; list
                         // that folder now so the copy is in the cache and can
                         // join the conversation it answers (#199).
@@ -10827,37 +10799,14 @@ async fn run_graph(
                     }
                     Err(e) => {
                         emit(WorkerEvent::Status(String::new()));
-                        let queued = queue_failed_send(
-                            cache.as_ref(),
-                            account_id,
-                            &account,
-                            &message,
-                            None,
-                            &e,
-                        );
-                        if let (true, Some(old), Some(c)) =
-                            (queued, message.outbox_origin, cache.as_ref())
-                        {
-                            c.delete_outbox(old);
-                        }
-                        emit(WorkerEvent::error(if queued {
-                                i18n_f("Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.", &[("e", &e.to_string())])
-                            } else {
-                                i18n_f("Send failed: {e}", &[("e", &e.to_string())])
-                            }));
-                        emit_outbox(cache.as_ref(), account_id, &emit);
+                        send_failed(cache.as_ref(), account_id, &account, &message, None, &e, &emit);
                     }
                 }
             }
 
             MailRequest::LoadOutbox => emit_outbox(cache.as_ref(), account_id, &emit),
 
-            MailRequest::DeleteOutbox { id } => {
-                if let Some(c) = cache.as_ref() {
-                    c.delete_outbox(id);
-                }
-                emit_outbox(cache.as_ref(), account_id, &emit);
-            }
+            MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
 
             MailRequest::FlushOutbox { id } => {
                 graph_flush_outbox(cache.as_ref(), account_id, &account, id, &emit).await;
