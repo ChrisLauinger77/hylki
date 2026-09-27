@@ -32,17 +32,17 @@ impl Weigh for Vec<crate::models::Attachment> {
     }
 }
 
-/// A `(account_id, message_id)`-keyed map that stays under a byte budget by
-/// dropping its oldest entries.
-pub struct RamCache<V: Weigh> {
-    map: HashMap<(u32, u32), V>,
+/// A map that stays under a byte budget by dropping its oldest entries. The
+/// key says which message an entry belongs to; see its users for the shape.
+pub struct RamCache<K, V: Weigh> {
+    map: HashMap<K, V>,
     /// Insertion order, oldest first — the eviction queue.
-    order: VecDeque<(u32, u32)>,
+    order: VecDeque<K>,
     bytes: usize,
     budget: usize,
 }
 
-impl<V: Weigh> RamCache<V> {
+impl<K: std::hash::Hash + Eq + Clone, V: Weigh> RamCache<K, V> {
     pub fn new(budget: usize) -> Self {
         RamCache { map: HashMap::new(), order: VecDeque::new(), bytes: 0, budget }
     }
@@ -62,17 +62,17 @@ impl<V: Weigh> RamCache<V> {
         self.budget
     }
 
-    pub fn get(&self, key: &(u32, u32)) -> Option<&V> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         self.map.get(key)
     }
 
-    pub fn contains_key(&self, key: &(u32, u32)) -> bool {
+    pub fn contains_key(&self, key: &K) -> bool {
         self.map.contains_key(key)
     }
 
-    pub fn insert(&mut self, key: (u32, u32), value: V) {
+    pub fn insert(&mut self, key: K, value: V) {
         self.bytes += value.weight();
-        if let Some(old) = self.map.insert(key, value) {
+        if let Some(old) = self.map.insert(key.clone(), value) {
             self.bytes -= old.weight();
             self.order.retain(|k| k != &key);
         }
@@ -88,7 +88,7 @@ impl<V: Weigh> RamCache<V> {
         }
     }
 
-    pub fn remove(&mut self, key: &(u32, u32)) -> Option<V> {
+    pub fn remove(&mut self, key: &K) -> Option<V> {
         let v = self.map.remove(key)?;
         self.bytes -= v.weight();
         self.order.retain(|k| k != key);

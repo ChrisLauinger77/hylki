@@ -535,7 +535,7 @@ pub struct AppModel {
     /// revisiting a message doesn't re-download them. Byte-bounded — raw
     /// attachment bytes for every message ever opened added up to hundreds of
     /// megabytes over a long session (issue #106).
-    attachment_cache: crate::ram_cache::RamCache<Vec<Attachment>>,
+    attachment_cache: crate::ram_cache::RamCache<(u32, u32), Vec<Attachment>>,
     /// The app-wide attachment lightbox (drawer previews): the
     /// previewable items on show, the current index, and its texture. The
     /// overlay fills the whole window — a separate window meant double chrome.
@@ -572,12 +572,16 @@ pub struct AppModel {
     /// (account_id, folder_id) whose background backfill has fully finished, so the
     /// message list knows no more rows will stream in for them.
     indexed_folders: HashSet<(u32, u32)>,
-    /// (account_id, message_id) → fetched body, so reopening a message renders
-    /// instantly with no loading spinner. Byte-bounded: the background prefetch
+    /// Fetched bodies by (account, folder, UID) (see [`body_key`]), so
+    /// reopening a message renders instantly with no loading spinner. The
+    /// folder is part of the key because a UID is unique only within its
+    /// folder: keyed by account and UID alone, a Sent message's body filed by
+    /// the prefetch replaced an Inbox message's with the same UID, and the
+    /// Inbox message then opened showing the other one's text. Byte-bounded: the background prefetch
     /// feeds this on every folder sync, and unbounded it grew past a gigabyte
     /// on a long-running session (issue #106) — evicted bodies re-read from the
     /// SQLite cache in a blink.
-    body_cache: crate::ram_cache::RamCache<String>,
+    body_cache: crate::ram_cache::RamCache<BodyKey, String>,
     /// Sender-authentication verdicts, keyed like `body_cache`. Prefetch delivers
     /// these well before a message is opened, and opening one renders from the
     /// in-memory body cache without a worker round-trip — so the verdict has to
@@ -1027,7 +1031,7 @@ pub struct AppModel {
     carried_threads: HashMap<(u32, String), Vec<Message>>,
     /// Bodies belonging to messages a move is bringing back (#200), by
     /// Message-ID. A move gives a message a new UID, which orphans its body in
-    /// [`body_cache`] — that is keyed by the id the UID becomes. These are
+    /// [`body_cache`] — that is keyed by the folder and UID it had. These are
     /// re-keyed onto the new ids as the folder's reload arrives, so the
     /// restored message renders from what is already here instead of blanking
     /// to a spinner while the server sends it over again. Drained on use.
@@ -5441,13 +5445,13 @@ impl SimpleComponent for AppModel {
                     // Sent first, it comes back into the body cache, which
                     // the selection reads before fetching. A body already
                     // there (prefetched on arrival) needs nothing.
-                    if !self.body_cache.contains_key(&(account_id, message_id)) {
-                        let uid = self
-                            .message_cache
-                            .get(&(account_id, folder_id))
-                            .and_then(|msgs| msgs.iter().find(|m| m.id == message_id))
-                            .map(|m| m.uid);
-                        if let Some(uid) = uid {
+                    let uid = self
+                        .message_cache
+                        .get(&(account_id, folder_id))
+                        .and_then(|msgs| msgs.iter().find(|m| m.id == message_id))
+                        .map(|m| m.uid);
+                    if let Some(uid) = uid {
+                        if !self.body_cache.contains_key(&(account_id, folder_id, uid)) {
                             self.send_to(account_id, MailRequest::LoadBody {
                                 message_id,
                                 path: path.clone(),
@@ -6086,7 +6090,7 @@ impl SimpleComponent for AppModel {
                 let cached_body = if !m.body.is_empty() {
                     Some(m.body.clone())
                 } else {
-                    self.body_cache.get(&(account_id, m.id)).cloned()
+                    self.body_cache.get(&body_key(&m)).cloned()
                 };
                 let needs_body = cached_body.is_none();
 
@@ -6179,7 +6183,7 @@ impl SimpleComponent for AppModel {
                                 tm.unread = false;
                                 tm.body = current.body.clone();
                             } else if tm.body.is_empty() {
-                                if let Some(b) = self.body_cache.get(&(tm.account_id, tm.id)) {
+                                if let Some(b) = self.body_cache.get(&body_key(&tm)) {
                                     tm.body = b.clone();
                                 }
                             }
@@ -6301,7 +6305,7 @@ impl SimpleComponent for AppModel {
                             tm.body = c.body.clone();
                         }
                     } else if tm.body.is_empty() {
-                        if let Some(b) = self.body_cache.get(&k) {
+                        if let Some(b) = self.body_cache.get(&body_key(&tm)) {
                             tm.body = b.clone();
                         }
                     }
@@ -7645,7 +7649,14 @@ impl SimpleComponent for AppModel {
                 self.thread_cache.retain(|_, members| {
                     !members.iter().any(|m| (m.account_id, m.id) == key)
                 });
-                self.body_cache.remove(&key);
+                let folder = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == path))
+                    .map(|f| f.id);
+                if let Some(fid) = folder {
+                    self.body_cache.remove(&(account_id, fid, uid));
+                }
                 if new_uid == Some(uid) {
                     // The same message, one file fewer (Microsoft 365): the
                     // reader drops the file where it stands.
@@ -9598,7 +9609,7 @@ impl SimpleComponent for AppModel {
                         if let Some(body) =
                             self.carried_bodies.remove(&(account_id, m.message_id.clone()))
                         {
-                            self.body_cache.insert((account_id, m.id), body);
+                            self.body_cache.insert(body_key(m), body);
                         }
                     }
                 }
@@ -9923,8 +9934,27 @@ impl SimpleComponent for AppModel {
                 // WebView document alike); decoded mail bodies can carry them.
                 let body =
                     if body.contains('\0') { body.replace('\0', " ") } else { body };
-                self.body_cache
-                    .insert((account_id, message_id), body.clone());
+                // A UID is unique only within its folder, and the background
+                // prefetch pushes bodies from every folder it syncs. Matching on
+                // the number alone would let one folder's body overwrite a
+                // different message that happens to share it.
+                let folder = self
+                    .folders
+                    .get(&account_id)
+                    .and_then(|fs| fs.iter().find(|f| f.path == path))
+                    .map(|f| f.id);
+                // A folder the app does not know yet has no key; the body is
+                // still on disk for when it does. A member opened out from
+                // another folder was asked for under the id it goes by here,
+                // so its body comes back under that id: file it by its UID.
+                if let Some(fid) = folder {
+                    let uid = self
+                        .related_ids
+                        .iter()
+                        .find(|((a, f, _), id)| *a == account_id && *f == fid && **id == message_id)
+                        .map_or(message_id, |((_, _, uid), _)| *uid);
+                    self.body_cache.insert((account_id, fid, uid), body.clone());
+                }
                 // If this body was fetched to open a draft, open the editor now.
                 if let Some((pd, inline, extra)) = self.pending_draft.take() {
                     if pd.account_id == account_id && pd.id == message_id {
@@ -9975,15 +10005,6 @@ impl SimpleComponent for AppModel {
                     }
                     self.pending_reply = Some((m, extra));
                 }
-                // A UID is unique only within its folder, and the background
-                // prefetch pushes bodies from every folder it syncs. Matching on
-                // the number alone would let one folder's body overwrite a
-                // different message that happens to share it.
-                let folder = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
                 let is_target = |m: &Message| {
                     m.account_id == account_id
                         && m.id == message_id
@@ -11542,7 +11563,7 @@ impl AppModel {
             .into_iter()
             .map(|mut m| {
                 if m.body.is_empty() {
-                    if let Some(body) = self.body_cache.get(&(account_id, m.id)) {
+                    if let Some(body) = self.body_cache.get(&body_key(&m)) {
                         m.body = body.clone();
                     }
                 }
@@ -13995,7 +14016,7 @@ impl AppModel {
         {
             self.current.as_ref().map(|c| c.body.clone())
         } else {
-            self.body_cache.get(&key).cloned()
+            self.body_cache.get(&body_key(&m)).cloned()
         };
         let needs_body = cached_body.is_none();
 
@@ -14057,7 +14078,7 @@ impl AppModel {
                 continue;
             }
             if member.body.is_empty() {
-                if let Some(body) = self.body_cache.get(&mkey) {
+                if let Some(body) = self.body_cache.get(&body_key(member)) {
                     member.body = body.clone();
                 } else if let Some(path) = self.resolve_folder_path(member) {
                     self.send_to(member.account_id, MailRequest::LoadBody {
@@ -14290,7 +14311,7 @@ impl AppModel {
         let body = if !m.body.is_empty() {
             Some(m.body.clone())
         } else {
-            self.body_cache.get(&(m.account_id, m.id)).cloned()
+            self.body_cache.get(&body_key(&m)).cloned()
         };
         match body {
             Some(html) => self.compose_from_draft(m, html, inline, extra, sender),
@@ -14961,7 +14982,7 @@ impl AppModel {
                 let body = if !m.body.is_empty() {
                     Some(m.body.clone())
                 } else {
-                    self.body_cache.get(&(m.account_id, m.id)).cloned()
+                    self.body_cache.get(&body_key(&m)).cloned()
                 };
                 match body {
                     Some(html) => {
@@ -15655,7 +15676,7 @@ impl AppModel {
             }
             r.id = self.related_id(&r);
             r.unread = false;
-            if let Some(b) = self.body_cache.get(&(r.account_id, r.id)) {
+            if let Some(b) = self.body_cache.get(&body_key(&r)) {
                 r.body = b.clone();
             }
             added.push(r);
@@ -18063,7 +18084,7 @@ impl AppModel {
     /// reply/forward from the context menu can quote it when available.
     fn with_cached_body(&self, mut m: Message) -> Message {
         if m.body.is_empty() {
-            if let Some(b) = self.body_cache.get(&(m.account_id, m.id)) {
+            if let Some(b) = self.body_cache.get(&body_key(&m)) {
                 m.body = b.clone();
             }
         }
@@ -20908,6 +20929,16 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::Error { account_id, text, connectivity }
         }
     }
+}
+
+/// Where a body is kept in the app's RAM cache: (account, folder, UID).
+type BodyKey = (u32, u32, u32);
+
+/// A message's [`BodyKey`]. The folder and UID are the message's real ones
+/// even where its id is not (a member opened out from another folder), so
+/// every copy of a message is found where its own body was filed.
+fn body_key(m: &Message) -> BodyKey {
+    (m.account_id, m.folder_id, m.uid)
 }
 
 thread_local! {

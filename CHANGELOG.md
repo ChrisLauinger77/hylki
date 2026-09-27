@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixed: a message sometimes opened showing another message's text.** The
+  bodies kept in memory were filed by message number, and the number is only
+  unique within a folder, so a message in Sent could replace the text of the
+  Inbox message with the same number. The Inbox message then opened with the
+  Sent message's text, often just a signature, under its own header. Bodies
+  are now kept per folder.
 - **Added: how much storage a mail account uses** (#298, requested by
   rsx-xp). An account's page in Settings → Mail Accounts shows the space in
   use, the limit and what is free, with a bar that turns amber past 90% and
