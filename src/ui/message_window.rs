@@ -45,6 +45,8 @@ pub struct MessageWindowInit {
     pub reader_default: crate::config::ReaderDefault,
     /// The tags (#71), for the cards' chips.
     pub tags: Vec<crate::config::Tag>,
+    /// The OpenPGP chip says its verdict in words (#300).
+    pub pgp_labels: bool,
 }
 
 pub struct MessageWindow {
@@ -75,6 +77,8 @@ pub enum MessageWindowInput {
     SetBody { account_id: u32, id: u32, body: String },
     /// The sender-authentication verdict for this message.
     SetSenderCheck(Box<crate::models::SenderCheck>),
+    /// The OpenPGP chip's words on or off (#300).
+    SetPgpLabels(bool),
     /// The Settings switch for the "Check this sender" banner changed.
     SetSpoofBannerShown(bool),
     /// Reflect a star toggle that happened elsewhere (or came back from the app).
@@ -379,6 +383,7 @@ impl Component for MessageWindow {
         view.emit(MessageViewInput::SetZoomDefault(init.zoom_default));
         view.emit(MessageViewInput::SetZoom(init.zoom));
         view.emit(MessageViewInput::SetReaderSwitchShown(init.reader_switch));
+        view.emit(MessageViewInput::SetPgpLabels(init.pgp_labels));
         view.emit(MessageViewInput::SetReaderDefault(init.reader_default));
         view.emit(MessageViewInput::SetTags(init.tags.clone()));
 
@@ -486,6 +491,7 @@ impl Component for MessageWindow {
             MessageWindowInput::SetSpoofBannerShown(show) => {
                 self.view.emit(MessageViewInput::SetSpoofBannerShown(show));
             }
+            MessageWindowInput::SetPgpLabels(on) => self.view.emit(MessageViewInput::SetPgpLabels(on)),
             MessageWindowInput::SetSenderCheck(check) => {
                 // Light the popout's header seal too (#88).
                 self.view.emit(MessageViewInput::SenderCheckFor {

@@ -17,6 +17,9 @@ pub struct MessageView {
     /// Render a lone message as an inset card, same as a conversation's
     /// messages (#57, preference; off keeps the full-bleed view).
     single_message_card: bool,
+    /// The OpenPGP chip says its verdict in words (#300); off keeps the
+    /// icons alone.
+    pgp_labels: bool,
     /// What each message on screen has attached (#213): names and sizes,
     /// handed over by the app as the files arrive. Listed beneath the card.
     card_atts: std::collections::HashMap<(u32, u32), Vec<CardAttachment>>,
@@ -697,6 +700,9 @@ pub enum MessageViewInput {
     SetAlwaysShowRecipients(bool),
     /// The "single messages as cards" preference changed (re-render follows).
     SetSingleMessageCard(bool),
+    /// The OpenPGP chip's words on or off (#300), applied to the open
+    /// document at once.
+    SetPgpLabels(bool),
     /// What each message on screen has attached (#213), patched into the
     /// cards live when the document is up.
     SetCardAttachments(std::collections::HashMap<(u32, u32), Vec<CardAttachment>>),
@@ -1715,6 +1721,7 @@ impl Component for MessageView {
         let mut model = MessageView {
             always_show_recipients: false,
             single_message_card: false,
+            pgp_labels: true,
             card_atts: std::collections::HashMap::new(),
             card_atts_shown: true,
             drawer_on: true,
@@ -2294,6 +2301,14 @@ impl Component for MessageView {
             }
             MessageViewInput::SetSingleMessageCard(on) => {
                 self.single_message_card = on;
+            }
+            MessageViewInput::SetPgpLabels(on) => {
+                self.pgp_labels = on;
+                let js = format!(
+                    "document.body&&document.body.toggleAttribute('data-vireo-pgpicons',{})",
+                    !on
+                );
+                self.webview.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
             }
             MessageViewInput::SetCardAttachments(map) => {
                 self.card_atts = map;
@@ -3198,6 +3213,8 @@ impl MessageView {
         } else {
             ""
         };
+        // The OpenPGP chip as its icons alone, without the words (#300).
+        let pgp_icons = if self.pgp_labels { "" } else { " data-vireo-pgpicons" };
         // The newest member, for the open-scroll fallback (#101): with no
         // unread mail the reader lands on the newest message rather than
         // wherever the document happens to start.
@@ -3218,7 +3235,7 @@ impl MessageView {
         let copied = format!(" data-vireo-copied=\"{}\"", i18n("Copied").replace('"', "&quot;"));
         let html = html.replacen(
             "<body",
-            &format!("<body{noscroll}{hover}{delay}{acts_menu}{newest}{readmark}{copied}"),
+            &format!("<body{noscroll}{hover}{delay}{acts_menu}{pgp_icons}{newest}{readmark}{copied}"),
             1,
         );
         self.did_autoscroll = true;
@@ -4052,6 +4069,13 @@ impl MessageView {
                .vireo-pgp.pgp-warn{{color:#cd9309;background:rgba(205,147,9,0.16);}}\
                .vireo-pgp.pgp-bad{{color:#c01c28;background:rgba(192,28,40,0.14);}}\
                .vireo-pgp:hover{{filter:brightness(1.1);}}\
+               /* The icons alone (Settings, #300): the chip as it was before\
+                  it had words, sitting on the name's line like the seal. */\
+               body[data-vireo-pgpicons] .vireo-pgp{{background:none;padding:0 2px;\
+                 margin-left:2px;gap:1px;font-size:inherit;line-height:0;\
+                 transform:translateY(0.18em);}}\
+               body[data-vireo-pgpicons] .vireo-pgp svg{{width:0.95em;height:0.95em;}}\
+               body[data-vireo-pgpicons] .vireo-pgp-text{{display:none;}}\
                .vireo-mail{{cursor:pointer;}}\
                .vireo-mail:hover{{text-decoration:underline;}}\
                /* Styled after the app's own context menus (context_menu.rs +\

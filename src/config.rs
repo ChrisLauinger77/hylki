@@ -1079,6 +1079,10 @@ pub(crate) struct PrivacyFile {
     /// Whether the reader always shows the recipients line under the sender.
     #[serde(default)]
     pub(crate) always_show_recipients: bool,
+    /// Whether the OpenPGP chip beside a sender's name says its verdict in
+    /// words (#300); off shows the lock and shield icons alone.
+    #[serde(default = "default_on")]
+    pub(crate) pgp_labels: bool,
     /// Whether a lone message renders as an inset card like a conversation's
     /// messages (#57); off keeps the full-bleed view.
     #[serde(default = "default_single_message_card")]
@@ -1500,6 +1504,7 @@ impl Default for PrivacyFile {
             thread_row_newest: false,
             thread_newest_first: false,
             always_show_recipients: false,
+            pgp_labels: true,
             single_message_card: default_single_message_card(),
             reader_mode: false,
             reader_switch: true,

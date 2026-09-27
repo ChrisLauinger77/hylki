@@ -37,6 +37,8 @@ pub struct PrefInit {
     pub thread_newest_first: bool,
     /// Reader always shows the recipients line under the sender.
     pub always_show_recipients: bool,
+    /// The OpenPGP chip says its verdict in words (#300).
+    pub pgp_labels: bool,
     /// Lone messages render as inset cards, like conversation messages.
     pub single_message_card: bool,
     /// The Reader View switch is shown in the reader header.
@@ -934,6 +936,7 @@ pub enum PrefOutput {
     SetThreadsExpanded(bool),
     SetThreadNewestFirst(bool),
     SetAlwaysShowRecipients(bool),
+    SetPgpLabels(bool),
     SetSingleMessageCard(bool),
     SetReaderSwitch(bool),
     SetReaderDefault(crate::config::ReaderDefault),
@@ -2715,6 +2718,17 @@ impl Component for Preferences {
                                             let _ = sender.output(PrefOutput::SetAlwaysShowRecipients(row.is_active()));
                                         },
                                     },
+
+                                    #[name = "pgp_labels_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Name the OpenPGP result"),
+                                        set_subtitle: &i18n("Beside the sender, say in words whether a message \
+                                                       is signed or encrypted and whether it checks out. \
+                                                       Off shows the lock and shield icons alone."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetPgpLabels(row.is_active()));
+                                        },
+                                    },
                                 },
 
                                 add = &adw::PreferencesGroup {
@@ -3604,6 +3618,7 @@ impl Component for Preferences {
         widgets.threads_expanded_row.set_active(init.threads_expanded);
         widgets.thread_newest_first_row.set_active(init.thread_newest_first);
         widgets.always_show_recipients_row.set_active(init.always_show_recipients);
+        widgets.pgp_labels_row.set_active(init.pgp_labels);
         widgets.single_message_card_row.set_active(init.single_message_card);
         widgets.reader_switch_row.set_active(init.reader_switch);
         widgets.reader_default_row.set_model(Some(&gtk::StringList::new(&[

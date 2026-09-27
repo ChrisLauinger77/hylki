@@ -515,7 +515,9 @@ Beside a sender's name, a label says what OpenPGP made of the message:
 was encrypted and a shield means it was signed. Green: everything checks out
 against a trusted key. Amber: a doubt, such as an unknown or untrusted key, or
 an expired one. Red: a failure, such as a signature that does not match or a
-message that could not be decrypted. Click the label for the details.
+message that could not be decrypted. Click the label for the details. To see
+the icons without the words, switch off *Settings → Reading → Name the OpenPGP
+result*.
 
 **If something goes wrong**
 

@@ -13,7 +13,8 @@
   by rsx-xp). The small colored shield beside the sender's name is now a
   label on a wash of the same color: Signed, Encrypted, Encrypted and signed,
   or what is wrong, such as Bad signature, Signed, unknown key or Signed, key
-  not trusted. Clicking it still opens the details.
+  not trusted. Clicking it still opens the details. **Settings → Reading →
+  Name the OpenPGP result**, switched off, brings back the icons alone.
 - **Changed: attachment chips in the composer show more** (#299, requested
   by rsx-xp). Each attached file shows its size under its name, and pictures
   and PDFs show a thumbnail in place of the paper clip; other files show

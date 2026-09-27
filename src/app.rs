@@ -807,6 +807,8 @@ pub struct AppModel {
     thread_newest_first: bool,
     /// Reader always shows the recipients line under the sender.
     always_show_recipients: bool,
+    /// The OpenPGP chip says its verdict in words (#300).
+    pgp_labels: bool,
     /// Whether the sidebar offers the unified "All Inboxes" section at all.
     show_unified_pref: bool,
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
@@ -3201,6 +3203,7 @@ impl SimpleComponent for AppModel {
             threads_expanded: prefs.threads_expanded,
             thread_newest_first: prefs.thread_newest_first,
             always_show_recipients: prefs.always_show_recipients,
+            pgp_labels: prefs.pgp_labels,
             show_unified_pref: prefs.show_unified,
             unified_chips: config::load_unified_chips(),
             unified_filtered: prefs.unified_filtered,
@@ -3429,6 +3432,7 @@ impl SimpleComponent for AppModel {
         model
             .message_view
             .emit(MessageViewInput::SetAlwaysShowRecipients(model.always_show_recipients));
+        model.message_view.emit(MessageViewInput::SetPgpLabels(model.pgp_labels));
         model
             .message_view
             .emit(MessageViewInput::SetSingleMessageCard(model.single_message_card));
@@ -7723,6 +7727,14 @@ impl SimpleComponent for AppModel {
                     }
                 }
             }
+            AppMsg::Pref(PrefOutput::SetPgpLabels(on)) => {
+                if pref!(self.pgp_labels = on) {
+                    self.message_view.emit(MessageViewInput::SetPgpLabels(on));
+                    for p in self.popouts.values() {
+                        p.controller.emit(MessageWindowInput::SetPgpLabels(on));
+                    }
+                }
+            }
             AppMsg::Pref(PrefOutput::SetSingleMessageCard(on)) => {
                 if pref!(self.single_message_card = on) {
                     self.message_view.emit(MessageViewInput::SetSingleMessageCard(on));
@@ -10719,6 +10731,7 @@ impl AppModel {
             thread_row_newest: self.thread_row_newest,
             thread_newest_first: self.thread_newest_first,
             always_show_recipients: self.always_show_recipients,
+            pgp_labels: self.pgp_labels,
             single_message_card: self.single_message_card,
             reader_mode: self.reader_mode,
             reader_switch: self.reader_switch,
@@ -14064,6 +14077,7 @@ impl AppModel {
             reader_switch: self.reader_switch,
             reader_default: self.effective_reader_default(),
             tags: self.tags.clone(),
+            pgp_labels: self.pgp_labels,
         };
 
         let controller = MessageWindow::builder()
@@ -17269,6 +17283,7 @@ impl AppModel {
             threads_expanded: self.threads_expanded,
             thread_newest_first: self.thread_newest_first,
             always_show_recipients: self.always_show_recipients,
+            pgp_labels: self.pgp_labels,
             single_message_card: self.single_message_card,
             reader_switch: self.reader_switch,
             reader_default: self.reader_default,
