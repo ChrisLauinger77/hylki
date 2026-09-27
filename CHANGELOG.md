@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Fixed: plain-text messages arrived empty** (#297, reported by
+  Amadeus Paulussen). With **Write messages in** set to Plain text, the message was
+  sent, and saved to Sent, without its body; a plain-text draft lost its
+  body the same way. Rich-text mail was sent with an empty plain-text part,
+  which mail clients that show plain text displayed as a blank message.
+- **Fixed: Reload in the print preview** (#301, reported by rsx-xp).
+  Right-clicking the preview offered Reload, which replaced the preview with
+  "Could not connect to hylki.localhost". The message view, the print
+  preview and the composer no longer offer Back, Forward, Stop or Reload.
+- **Fixed: exported settings were named `vireo-settings.toml`** (#304,
+  reported by Amadeus Paulussen). The file is now `hylki-settings.toml`.
 - **Fixed: empty message previews.** A message whose HTML has a `<header>`
   element showed an empty or cut-short preview in the message list,
   because everything after that element was dropped. Previews also no
