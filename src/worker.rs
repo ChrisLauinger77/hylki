@@ -690,6 +690,14 @@ impl WorkerEvent {
 
 type ImapSession = Session<TlsStream<TcpStream>>;
 
+/// Run blocking work (an HTTP request, a cache query) off the async
+/// threads; a task that panicked reads as an error.
+async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(f).await.unwrap_or_else(|_| Err("task failed".into()))
+}
+
 /// A distinct accent color per account (cycles through a small palette).
 pub(crate) fn accent_for(account_id: u32) -> &'static str {
     const PALETTE: [&str; 6] = [
@@ -6231,9 +6239,7 @@ async fn auto_empty_graph(
             graph_before_date(days)
         );
         let t = token.to_string();
-        let items = tokio::task::spawn_blocking(move || graph_paged(&t, &url, GRAPH_INDEX_CAP))
-            .await
-            .unwrap_or_else(|_| Err("task failed".into()));
+        let items = blocking(move || graph_paged(&t, &url, GRAPH_INDEX_CAP)).await;
         let ids: Vec<String> = match items {
             Ok(items) => items.iter().filter_map(|v| v["id"].as_str().map(str::to_string)).collect(),
             Err(e) => {
@@ -6248,9 +6254,7 @@ async fn auto_empty_graph(
         for gid in ids {
             let t = token.to_string();
             let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-            let ok = tokio::task::spawn_blocking(move || graph_delete_req(&t, &url))
-                .await
-                .unwrap_or_else(|_| Err("task failed".into()))
+            let ok = blocking(move || graph_delete_req(&t, &url)).await
                 .is_ok();
             if ok {
                 deleted += 1;
@@ -6543,9 +6547,7 @@ async fn emit_graph_body_hits(
             crate::percent::encode(&term)
         );
         let t = token.to_string();
-        let found = tokio::task::spawn_blocking(move || graph_paged(&t, &url, 250))
-            .await
-            .unwrap_or_else(|_| Err("task failed".into()));
+        let found = blocking(move || graph_paged(&t, &url, 250)).await;
         match found {
             Ok(items) => {
                 for uid in items
@@ -10199,11 +10201,9 @@ async fn run_graph(
                 let mut found: Vec<KeywordFinding> = Vec::new();
                 if let Some(token) = graph_token(&account, &emit).await {
                     let t = token.clone();
-                    let cats = tokio::task::spawn_blocking(move || {
+                    let cats = blocking(move || {
                         graph_get_json(&t, &format!("{GRAPH_BASE}/me/outlook/masterCategories"))
-                    })
-                    .await
-                    .unwrap_or_else(|_| Err("task failed".into()));
+                    }).await;
                     match cats {
                         Ok(v) => {
                             for c in v["value"].as_array().into_iter().flatten() {
@@ -10609,9 +10609,7 @@ async fn run_graph(
                 };
                 let t = token.clone();
                 let body = serde_json::json!({ "displayName": name });
-                let r = tokio::task::spawn_blocking(move || graph_send_json(&t, "POST", &url, &body))
-                    .await
-                    .unwrap_or_else(|_| Err("task failed".into()));
+                let r = blocking(move || graph_send_json(&t, "POST", &url, &body)).await;
                 match r {
                     Ok(_) => {
                         refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit)
@@ -10634,9 +10632,7 @@ async fn run_graph(
                 let url = format!("{GRAPH_BASE}/me/mailFolders/{gid}");
                 let body = serde_json::json!({ "displayName": leaf });
                 let r =
-                    tokio::task::spawn_blocking(move || graph_send_json(&t, "PATCH", &url, &body))
-                        .await
-                        .unwrap_or_else(|_| Err("task failed".into()));
+                    blocking(move || graph_send_json(&t, "PATCH", &url, &body)).await;
                 match r {
                     Ok(_) => {
                         refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit)
@@ -10662,9 +10658,7 @@ async fn run_graph(
                 };
                 let t = token.clone();
                 let url = format!("{GRAPH_BASE}/me/mailFolders/{gid}");
-                let r = tokio::task::spawn_blocking(move || graph_delete_req(&t, &url))
-                    .await
-                    .unwrap_or_else(|_| Err("task failed".into()));
+                let r = blocking(move || graph_delete_req(&t, &url)).await;
                 match r {
                     Ok(()) => {
                         refresh_graph_folders(&token, account_id, cache.as_ref(), &mut state, &emit)
@@ -10685,11 +10679,9 @@ async fn run_graph(
                             Some(token) => {
                                 let t = token.clone();
                                 let url = format!("{GRAPH_BASE}/me/messages");
-                                let r = tokio::task::spawn_blocking(move || {
+                                let r = blocking(move || {
                                     graph_post_mime(&t, &url, &raw)
-                                })
-                                .await
-                                .unwrap_or_else(|_| Err("task failed".into()));
+                                }).await;
                                 match r {
                                     Ok(_) => {
                                         // Replace the previous version of this draft.
@@ -10987,9 +10979,7 @@ async fn graph_refresh_unread(
 ) {
     let t = token.to_string();
     let roles = state.roles.clone();
-    let Ok(list) = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
-        .await
-        .unwrap_or_else(|_| Err("task failed".into()))
+    let Ok(list) = blocking(move || graph_list_folders(&t, account_id, &roles)).await
     else {
         return;
     };
@@ -11023,9 +11013,7 @@ async fn graph_purge_uids(
         let deleted = match graph_resolve(account, state, path, uid, emit).await {
             Some((token, gid)) => {
                 let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-                tokio::task::spawn_blocking(move || graph_delete_req(&token, &url))
-                    .await
-                    .unwrap_or_else(|_| Err("task failed".into()))
+                blocking(move || graph_delete_req(&token, &url)).await
                     .is_ok()
             }
             None => false,
@@ -11064,9 +11052,7 @@ async fn refresh_graph_folders(
 ) {
     let t = token.to_string();
     let roles = state.roles.clone();
-    let r = tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
-        .await
-        .unwrap_or_else(|_| Err("task failed".into()));
+    let r = blocking(move || graph_list_folders(&t, account_id, &roles)).await;
     match r {
         Ok(mut list) => {
             // Hidden folders (#239) leave here, before the ids settle.
@@ -11097,9 +11083,7 @@ async fn graph_load_folder(
         let t = token.to_string();
         let roles = state.roles.clone();
         if let Ok(list) =
-            tokio::task::spawn_blocking(move || graph_list_folders(&t, account_id, &roles))
-                .await
-                .unwrap_or_else(|_| Err("task failed".into()))
+            blocking(move || graph_list_folders(&t, account_id, &roles)).await
         {
             state.adopt_folders(&list);
         }
@@ -11111,11 +11095,9 @@ async fn graph_load_folder(
         .ok_or_else(|| format!("unknown folder {path}"))?;
 
     let t = token.to_string();
-    let listed = tokio::task::spawn_blocking(move || {
+    let listed = blocking(move || {
         graph_list_messages(&t, &gid, account_id, folder_id)
-    })
-    .await
-    .unwrap_or_else(|_| Err("task failed".into()))?;
+    }).await?;
 
     let mut messages = Vec::with_capacity(listed.len());
     for (m, gid) in listed {
@@ -11162,7 +11144,7 @@ async fn graph_delete_attachment(
         .await
         .ok_or_else(|| "message not found".to_string())?;
     let name = name.to_string();
-    tokio::task::spawn_blocking(move || {
+    blocking(move || {
         let url = format!("{GRAPH_BASE}/me/messages/{gid}/attachments?$select=id,name,size");
         let listed = graph_get_json(&token, &url)?;
         let aid = listed["value"]
@@ -11174,9 +11156,7 @@ async fn graph_delete_attachment(
             .and_then(|a| a["id"].as_str().map(str::to_string))
             .ok_or_else(|| i18n("The attachment is no longer in the message on the server"))?;
         graph_delete_req(&token, &format!("{GRAPH_BASE}/me/messages/{gid}/attachments/{aid}"))
-    })
-    .await
-    .unwrap_or_else(|_| Err("task failed".into()))
+    }).await
 }
 
 /// Fetch a message's raw RFC 822 bytes.
@@ -11191,9 +11171,7 @@ async fn graph_fetch_raw(
         .await
         .ok_or_else(|| "message not found".to_string())?;
     let url = format!("{GRAPH_BASE}/me/messages/{gid}/$value");
-    tokio::task::spawn_blocking(move || graph_get_bytes(&token, &url))
-        .await
-        .unwrap_or_else(|_| Err("task failed".into()))
+    blocking(move || graph_get_bytes(&token, &url)).await
 }
 
 /// PATCH one message (read state, flag). Errors are logged, not surfaced — the
@@ -11210,9 +11188,7 @@ async fn graph_patch_message(
         return;
     };
     let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-    let r = tokio::task::spawn_blocking(move || graph_send_json(&token, "PATCH", &url, &body))
-        .await
-        .unwrap_or_else(|_| Err("task failed".into()));
+    let r = blocking(move || graph_send_json(&token, "PATCH", &url, &body)).await;
     if let Err(e) = r {
         tracing::warn!("graph: could not update message flags: {e}");
     }
@@ -11242,9 +11218,7 @@ async fn graph_move_uids(
         let t = token.clone();
         let url = format!("{GRAPH_BASE}/me/messages/{gid}/move");
         let body = serde_json::json!({ "destinationId": dest_gid });
-        tokio::task::spawn_blocking(move || graph_send_json(&t, "POST", &url, &body))
-            .await
-            .unwrap_or_else(|_| Err("task failed".into()))?;
+        blocking(move || graph_send_json(&t, "POST", &url, &body)).await?;
         state.uids.remove(&uid);
         if let Some(c) = cache {
             c.delete_message(account_id, path, uid);
@@ -11277,11 +11251,9 @@ async fn graph_undo_move(
         message_ids.iter().map(|s| s.as_str()).collect();
 
     let t = token.clone();
-    let listed = tokio::task::spawn_blocking(move || {
+    let listed = blocking(move || {
         graph_list_messages(&t, &gid, account_id, folder_id)
-    })
-    .await
-    .unwrap_or_else(|_| Err("task failed".into()))?;
+    }).await?;
 
     let mut uids = Vec::new();
     for (m, mgid) in listed {
@@ -11311,9 +11283,7 @@ async fn graph_send_message(
         .await
         .ok_or_else(|| "no sign-in token from GNOME Online Accounts".to_string())?;
     let url = format!("{GRAPH_BASE}/me/sendMail");
-    tokio::task::spawn_blocking(move || graph_post_mime(&token, &url, &raw))
-        .await
-        .unwrap_or_else(|_| Err("task failed".into()))?;
+    blocking(move || graph_post_mime(&token, &url, &raw)).await?;
     Ok(())
 }
 
@@ -11349,9 +11319,7 @@ async fn graph_flush_outbox(
         let t = token.clone();
         let raw = item.raw.clone();
         let url = format!("{GRAPH_BASE}/me/sendMail");
-        let r = tokio::task::spawn_blocking(move || graph_post_mime(&t, &url, &raw))
-            .await
-            .unwrap_or_else(|_| Err("task failed".into()));
+        let r = blocking(move || graph_post_mime(&t, &url, &raw)).await;
         match r {
             Ok(_) => {
                 sent_any = true;

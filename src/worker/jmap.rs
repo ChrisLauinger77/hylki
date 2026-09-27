@@ -684,12 +684,6 @@ fn jmap_destroy_all(s: &JmapSession, ids: &[String]) -> Result<(), String> {
 // Async glue
 // ---------------------------------------------------------------------------
 
-async fn blocking<T: Send + 'static>(
-    f: impl FnOnce() -> Result<T, String> + Send + 'static,
-) -> Result<T, String> {
-    tokio::task::spawn_blocking(f).await.unwrap_or_else(|_| Err("task failed".into()))
-}
-
 /// The session, connecting on first use (and after a reconnect dropped it).
 /// A failure is reported through `emit` and leaves the state untouched, so
 /// the next request tries again.
