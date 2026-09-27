@@ -8913,7 +8913,7 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::ExportSettings) => {
                 let dialog = gtk::FileDialog::builder()
                     .title(&i18n("Export Settings"))
-                    .initial_name("vireo-settings.toml")
+                    .initial_name("hylki-settings.toml")
                     .build();
                 let win = self.window.clone();
                 let notif = self.notifications.sender().clone();
