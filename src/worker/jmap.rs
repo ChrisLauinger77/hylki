@@ -27,6 +27,8 @@ const JMAP_INDEX_CAP: usize = 300;
 const CAP_CORE: &str = "urn:ietf:params:jmap:core";
 const CAP_MAIL: &str = "urn:ietf:params:jmap:mail";
 const CAP_SUBMISSION: &str = "urn:ietf:params:jmap:submission";
+/// RFC 9425: how much room the account has (#298).
+const CAP_QUOTA: &str = "urn:ietf:params:jmap:quota";
 
 /// The summary properties one listing asks `Email/get` for.
 const EMAIL_PROPS: &[&str] = &[
@@ -49,6 +51,8 @@ pub(super) struct JmapSession {
     account: String,
     /// The `Authorization` header value.
     auth: String,
+    /// Whether the server answers `Quota/get` (RFC 9425).
+    quota: bool,
 }
 
 /// One mailbox, flattened out of the tree.
@@ -274,7 +278,8 @@ pub(super) fn jmap_connect(account: &AccountConfig) -> Result<JmapSession, Strin
     if !v["capabilities"][CAP_MAIL].is_object() {
         return Err("the server does not offer JMAP for mail".into());
     }
-    Ok(JmapSession { api_url, download_url, upload_url, event_source_url, account: account_id, auth })
+    let quota = v["capabilities"][CAP_QUOTA].is_object();
+    Ok(JmapSession { api_url, download_url, upload_url, event_source_url, account: account_id, auth, quota })
 }
 
 /// One API request: the method calls, in order, with their responses back
@@ -319,6 +324,31 @@ fn jmap_call(
         }
     }
     Ok(responses)
+}
+
+/// The mailbox size out of a `Quota/get` list (RFC 9425): the account's own
+/// quota on octets that covers mail (the `Email` data type; Stalwart lists
+/// it beside calendars and files), preferred over a domain's or the
+/// server's; the hard limit, else the soft one.
+fn jmap_storage_quota(list: &serde_json::Value) -> Option<MailboxQuota> {
+    let quotas = list.as_array()?;
+    let covers_mail = |q: &serde_json::Value| {
+        q["types"].as_array().is_none_or(|t| t.is_empty() || t.iter().any(|x| x.as_str() == Some("Email")))
+    };
+    let rank = |q: &serde_json::Value| match q["scope"].as_str() {
+        Some("account") => 0,
+        Some("domain") => 1,
+        _ => 2,
+    };
+    quotas
+        .iter()
+        .filter(|q| q["resourceType"].as_str() == Some("octets") && covers_mail(q))
+        .filter_map(|q| {
+            let limit = q["hardLimit"].as_u64().filter(|n| *n > 0).or_else(|| q["softLimit"].as_u64().filter(|n| *n > 0))?;
+            Some((rank(q), MailboxQuota { used: q["used"].as_u64().unwrap_or(0), limit }))
+        })
+        .min_by_key(|(r, _)| *r)
+        .map(|(_, q)| q)
 }
 
 /// A method call tagged by its position, so an error can be traced back.
@@ -1688,6 +1718,27 @@ pub(super) async fn run_jmap(
                 }
                 emit(WorkerEvent::Located { message_id, hit });
             }
+            MailRequest::Quota => {
+                let mut quota = None;
+                if let Some(s) = jmap_session(&account, &mut state, &emit).await {
+                    if s.quota {
+                        let sess = s.clone();
+                        let r = blocking(move || {
+                            jmap_call(
+                                &sess,
+                                &[CAP_CORE, CAP_QUOTA],
+                                vec![call(0, "Quota/get", serde_json::json!({ "accountId": sess.account, "ids": null }))],
+                            )
+                        })
+                        .await;
+                        match r {
+                            Ok(responses) => quota = jmap_storage_quota(&args(&responses, 0)["list"]),
+                            Err(e) => tracing::warn!("[account {account_id}] quota: {e}"),
+                        }
+                    }
+                }
+                emit(WorkerEvent::Quota(quota));
+            }
             MailRequest::FindKeywords => {
                 // JMAP has no keyword listing; the cached rows are the
                 // survey, as they are for the count on every path.
@@ -2260,6 +2311,22 @@ pub(super) async fn run_jmap(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_accounts_own_mail_quota_wins() {
+        let list = serde_json::json!([
+            { "resourceType": "count", "scope": "account", "used": 5, "hardLimit": 100, "types": ["Email"] },
+            { "resourceType": "octets", "scope": "domain", "used": 9, "hardLimit": 1000, "types": ["Email"] },
+            { "resourceType": "octets", "scope": "account", "used": 2048, "hardLimit": 4096, "types": ["Email", "CalendarEvent"] },
+            { "resourceType": "octets", "scope": "account", "used": 1, "hardLimit": 2, "types": ["ContactCard"] },
+        ]);
+        assert_eq!(jmap_storage_quota(&list), Some(MailboxQuota { used: 2048, limit: 4096 }));
+        // A soft limit stands in for a missing hard one; no limit, no quota.
+        let soft = serde_json::json!([{ "resourceType": "octets", "scope": "account", "used": 10, "softLimit": 50 }]);
+        assert_eq!(jmap_storage_quota(&soft), Some(MailboxQuota { used: 10, limit: 50 }));
+        let none = serde_json::json!([{ "resourceType": "octets", "scope": "account", "used": 10 }]);
+        assert_eq!(jmap_storage_quota(&none), None);
+    }
 
     fn account(host: &str, port: u16) -> AccountConfig {
         AccountConfig { imap_host: host.into(), imap_port: port, ..sample_account() }

@@ -289,6 +289,18 @@ button.star-active {
   color: #e5a50a;
 }
 
+/* The account page's storage bar (#298): the accent until the mailbox is
+   nearly full, then the warning and error colors. */
+levelbar block.quota-ok {
+  background-color: @accent_bg_color;
+}
+levelbar block.quota-warn {
+  background-color: @warning_bg_color;
+}
+levelbar block.quota-full {
+  background-color: @error_bg_color;
+}
+
 /* Compose attachment chips. */
 .attach-chip {
   padding: 3px 4px 3px 6px;

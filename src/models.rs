@@ -59,6 +59,40 @@ pub struct KeywordFinding {
     pub folders: Vec<String>,
 }
 
+/// How much of an account's mail storage the server says is in use (#298),
+/// in bytes. Only servers that report a limit give one: IMAP's QUOTA
+/// extension and JMAP's quotas; Microsoft 365 and POP3 do not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MailboxQuota {
+    pub used: u64,
+    pub limit: u64,
+}
+
+impl MailboxQuota {
+    /// The share in use, 0 to 1.
+    pub fn fraction(&self) -> f64 {
+        if self.limit == 0 {
+            return 0.0;
+        }
+        (self.used as f64 / self.limit as f64).clamp(0.0, 1.0)
+    }
+
+    /// "2.1 GB of 15 GB used".
+    pub fn used_line(&self) -> String {
+        i18n_f(
+            "{used} of {limit} used",
+            &[("used", &human_size(self.used)), ("limit", &human_size(self.limit))],
+        )
+    }
+
+    /// "12.9 GB free (86%)".
+    pub fn free_line(&self) -> String {
+        let free = self.limit.saturating_sub(self.used);
+        let pct = ((1.0 - self.fraction()) * 100.0).round() as u32;
+        i18n_f("{free} free ({pct}%)", &[("free", &human_size(free)), ("pct", &pct.to_string())])
+    }
+}
+
 /// A mail folder within an account.
 #[derive(Debug, Clone)]
 pub struct Folder {
@@ -1189,6 +1223,16 @@ pub fn thread_ids(msgs: &[Message]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_quota_says_what_is_used_and_free() {
+        let q = MailboxQuota { used: 250, limit: 1000 };
+        assert_eq!(q.fraction(), 0.25);
+        assert!(q.free_line().ends_with("(75%)"));
+        let over = MailboxQuota { used: 1200, limit: 1000 };
+        assert_eq!(over.fraction(), 1.0);
+        assert!(over.free_line().ends_with("(0%)"));
+    }
 
     #[test]
     fn the_pgp_chip_names_its_verdict() {

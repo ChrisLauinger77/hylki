@@ -383,6 +383,9 @@ pub enum AccountsInput {
     TagFindings(Vec<TagProposal>),
     /// The tags the user chose from the report.
     ImportTags(Vec<crate::config::Tag>),
+    /// How much storage an account's server says is in use (#298); shown
+    /// when that account's page is the one open.
+    Quota { email: String, quota: Option<crate::models::MailboxQuota> },
 }
 
 /// One keyword the tag finder proposes as a tag: the tag as it would be
@@ -425,6 +428,8 @@ pub enum AccountsOutput {
     SetTags(Vec<crate::config::Tag>),
     /// The tag finder wants every account scanned for keywords in use.
     FindTags,
+    /// An account's page opened: ask its server for the storage in use.
+    WantQuota(String),
     /// The editor was left with nothing changed in it: it is already closed,
     /// and the settings window can show `page` without asking anything.
     LeftEditor(String),
@@ -1007,6 +1012,28 @@ impl Component for AccountsWindow {
                                         set_label: &i18n("Open Online Accounts\u{2026}"),
                                         set_halign: gtk::Align::Start,
                                         connect_clicked => AccountsInput::OpenOnlineAccounts,
+                                    },
+                                },
+                            },
+
+                            // The mailbox's storage (#298): shown once the
+                            // server has said how much is in use, never for
+                            // one that keeps no limit or cannot say.
+                            #[name = "quota_group"]
+                            add = &adw::PreferencesGroup {
+                                set_visible: false,
+
+                                #[name = "quota_row"]
+                                adw::ActionRow {
+                                    set_title: &i18n("Storage"),
+                                    add_css_class: "property",
+
+                                    #[name = "quota_bar"]
+                                    add_suffix = &gtk::LevelBar {
+                                        set_valign: gtk::Align::Center,
+                                        set_width_request: 160,
+                                        set_min_value: 0.0,
+                                        set_max_value: 1.0,
                                     },
                                 },
                             },
@@ -1926,6 +1953,10 @@ impl Component for AccountsWindow {
                 self.hidden_edits = acc.hidden_folders.clone();
                 self.rebuild_hidden_list(widgets, &sender);
                 fill_editor(widgets, &acc);
+                // Hidden until this account's server answers; a page opened
+                // before it must not show the last account's figure.
+                show_quota(widgets, None);
+                let _ = sender.output(AccountsOutput::WantQuota(acc.email.clone()));
                 // The secrets come from the keyring now, off the main thread,
                 // and land in the fields when they arrive (Save reads the
                 // keyring itself should it come first).
@@ -2781,6 +2812,12 @@ impl Component for AccountsWindow {
                 if !self.tag_scanning {
                     self.set_tag_scanning(true);
                     let _ = sender.output(AccountsOutput::FindTags);
+                }
+            }
+            AccountsInput::Quota { email, quota } => {
+                let open = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.email.eq_ignore_ascii_case(&email));
+                if open {
+                    show_quota(widgets, quota);
                 }
             }
             AccountsInput::TagScanning(on) => self.set_tag_scanning(on),
@@ -4107,6 +4144,26 @@ fn mount_editor(widgets: &AccountsWindowWidgets) {
     if widgets.editor_page.parent().is_none() {
         widgets.nav.add(&widgets.editor_page);
     }
+}
+
+/// Show the storage row with the server's figures (#298), or hide it.
+fn show_quota(widgets: &AccountsWindowWidgets, quota: Option<crate::models::MailboxQuota>) {
+    let Some(q) = quota else {
+        widgets.quota_group.set_visible(false);
+        return;
+    };
+    widgets.quota_row.set_subtitle(&format!("{} \u{b7} {}", q.used_line(), q.free_line()));
+    // GTK's own offsets mark a *low* value as the warning, which is a fuel
+    // gauge's sense, not a mailbox's: here the warning is a full one.
+    let bar = &widgets.quota_bar;
+    for name in ["low", "high", "full", "quota-ok", "quota-warn", "quota-full"] {
+        bar.remove_offset_value(Some(name));
+    }
+    bar.add_offset_value("quota-ok", 0.9);
+    bar.add_offset_value("quota-warn", 0.98);
+    bar.add_offset_value("quota-full", 1.0);
+    bar.set_value(q.fraction());
+    widgets.quota_group.set_visible(true);
 }
 
 fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {

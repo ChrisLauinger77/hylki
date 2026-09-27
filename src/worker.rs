@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 use crate::backend::{MailBackend, MockBackend};
 use crate::cache::Cache;
 use crate::config::AccountConfig;
-use crate::models::{Account, Folder, FolderKind, KeywordFinding, Message, ThreadSummary};
+use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message, ThreadSummary};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The JMAP path (#245), a child module so it shares this file's helpers.
@@ -488,6 +488,10 @@ pub enum MailRequest {
     /// [`WorkerEvent::KeywordsFound`] — always answered, even when empty, so
     /// the app can tell when every account has reported.
     FindKeywords,
+    /// How much of the mailbox's storage is in use (#298), for the account's
+    /// Settings page. Always answered with [`WorkerEvent::Quota`], `None` when
+    /// the server gives no figure.
+    Quota,
     /// Bring every folder's cached keywords in line with the server (#166):
     /// a tag set or cleared on another device reaches the tag views here
     /// without the folder it sits in being opened. `keywords` are the
@@ -596,6 +600,8 @@ pub enum WorkerEvent {
     /// The answer to [`MailRequest::FindKeywords`]: the keywords in use on
     /// this account, system flags left out.
     KeywordsFound(Vec<KeywordFinding>),
+    /// The answer to [`MailRequest::Quota`].
+    Quota(Option<MailboxQuota>),
     /// The answer to [`MailRequest::RefreshKeywords`]: the folders whose
     /// cached keywords changed (empty when nothing did).
     KeywordsSynced { paths: Vec<String> },
@@ -2279,6 +2285,25 @@ async fn run_imap(
                 emit(WorkerEvent::KeywordsFound(found));
             }
 
+            MailRequest::Quota => {
+                // RFC 2087/9208: the quota root the inbox belongs to is the
+                // account's own, and its STORAGE resource is the mailbox size.
+                let sess = session.as_mut().unwrap();
+                let offered = sess.capabilities().await.is_ok_and(|caps| caps.has_str("QUOTA"));
+                let quota = if offered {
+                    match sess.get_quota_root("INBOX").await {
+                        Ok((_, quotas)) => imap_storage_quota(&quotas),
+                        Err(e) => {
+                            tracing::warn!("[account {account_id}] quota: GETQUOTAROOT failed: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+                tracing::debug!(target: "hylki::imap", "quota: {quota:?} (server {} QUOTA)", if offered { "offers" } else { "lacks" });
+                emit(WorkerEvent::Quota(quota));
+            }
             MailRequest::RefreshKeywords { keywords } => {
                 let sess = session.as_mut().unwrap();
                 let paths = refresh_keywords(account_id, sess, cache.as_ref(), &keywords).await;
@@ -5435,6 +5460,17 @@ async fn uid_move(
     flag_deleted_and_expunge(session, set).await
 }
 
+/// The mailbox size out of a GETQUOTAROOT answer: the first quota with a
+/// STORAGE resource and a limit, whose figures are in units of 1024 octets.
+fn imap_storage_quota(quotas: &[async_imap::types::Quota]) -> Option<MailboxQuota> {
+    use async_imap::types::QuotaResourceName;
+    quotas
+        .iter()
+        .flat_map(|q| &q.resources)
+        .find(|r| r.name == QuotaResourceName::Storage && r.limit > 0)
+        .map(|r| MailboxQuota { used: r.usage.saturating_mul(1024), limit: r.limit.saturating_mul(1024) })
+}
+
 /// A mailbox name as an IMAP quoted string: backslashes and quotes escaped,
 /// the whole wrapped in quotes (RFC 3501 §4.3).
 fn quote_mailbox(name: &str) -> String {
@@ -8461,6 +8497,8 @@ async fn run_pop3(
             }
             // POP3 has no server-side keywords: nothing to find.
             MailRequest::FindKeywords => emit(WorkerEvent::KeywordsFound(Vec::new())),
+            // POP3 has no way to say how much room is left.
+            MailRequest::Quota => emit(WorkerEvent::Quota(None)),
             MailRequest::RefreshKeywords { .. } => emit(WorkerEvent::KeywordsSynced { paths: Vec::new() }),
             // POP3 keeps everything in the inbox, so a conversation never spans
             // folders and the reader already has all of it.
@@ -8904,6 +8942,10 @@ async fn run_mock(
             MailRequest::ScanAttachments { folder_path } => {
                 emit(WorkerEvent::AttachmentsScanned { folder_path, added: 0, remaining: 0 });
             }
+            MailRequest::Quota => emit(WorkerEvent::Quota(Some(MailboxQuota {
+                used: 2_310_000_000,
+                limit: 15_000_000_000,
+            }))),
             // What a scan of a lived-in mailbox turns up: Thunderbird's
             // built-ins and a few of the user's own, plus one the demo's tags
             // already know (dropped by the app before the report).
@@ -9777,6 +9819,24 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn imap_storage_quota_reads_kibibytes() {
+        use async_imap::types::{Quota, QuotaResource, QuotaResourceName};
+        let quotas = vec![Quota {
+            root_name: String::new(),
+            resources: vec![
+                QuotaResource { name: QuotaResourceName::Message, usage: 12, limit: 1000 },
+                QuotaResource { name: QuotaResourceName::Storage, usage: 1024, limit: 4096 },
+            ],
+        }];
+        assert_eq!(imap_storage_quota(&quotas), Some(MailboxQuota { used: 1024 * 1024, limit: 4096 * 1024 }));
+        let unlimited = vec![Quota {
+            root_name: String::new(),
+            resources: vec![QuotaResource { name: QuotaResourceName::Storage, usage: 5, limit: 0 }],
+        }];
+        assert_eq!(imap_storage_quota(&unlimited), None);
+    }
 
     /// Removing an attachment on a real server (#289), with
     /// `IMAP_LIVE=host,port,user,password` (implicit TLS, any certificate).

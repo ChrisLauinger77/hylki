@@ -444,6 +444,8 @@ pub(super) async fn run_graph(
                 // held: answer "not found" so the app can report the miss.
                 emit(WorkerEvent::Located { message_id: message_id.clone(), hit: None });
             }
+            // Graph reports no mailbox size or limit to the user it signs in.
+            MailRequest::Quota => emit(WorkerEvent::Quota(None)),
             MailRequest::FindKeywords => {
                 // Categories are defined once per mailbox, with a name and a
                 // color: the master list is the whole answer. Counts come

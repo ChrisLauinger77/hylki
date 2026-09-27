@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: how much storage a mail account uses** (#298, requested by
+  rsx-xp). An account's page in Settings → Mail Accounts shows the space in
+  use, the limit and what is free, with a bar that turns amber past 90% and
+  red when the mailbox is full. The figures come from the server: IMAP
+  servers that offer the QUOTA extension and JMAP servers that report quotas
+  (Stalwart, Fastmail). Microsoft 365 and POP3 give no figure, so the row is
+  not shown for them.
 - **Changed: an OpenPGP message says what it is in words** (#300, requested
   by rsx-xp). The small colored shield beside the sender's name is now a
   label on a wash of the same color: Signed, Encrypted, Encrypted and signed,

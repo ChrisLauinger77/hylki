@@ -1519,6 +1519,11 @@ pub enum AppMsg {
     FindTags,
     /// One account's answer to the scan.
     KeywordsFound { account_id: u32, findings: Vec<KeywordFinding> },
+    /// Settings opened this account's page: ask its server how much
+    /// storage is in use (#298).
+    WantQuota(String),
+    /// The server's answer, for the account's Settings page.
+    QuotaFound { account_id: u32, quota: Option<crate::models::MailboxQuota> },
     /// A keyword re-sync (#166) changed the cached keywords of these folders.
     KeywordsSynced { account_id: u32, paths: Vec<String> },
     /// The scan's safety net: report what has come in, if the scan `gen` is
@@ -8239,6 +8244,23 @@ impl SimpleComponent for AppModel {
                 gtk::glib::timeout_add_seconds_local_once(120, move || {
                     s.input(AppMsg::TagScanTimeout(gen));
                 });
+            }
+
+            AppMsg::WantQuota(email) => {
+                let worker = self
+                    .accounts
+                    .iter()
+                    .find(|a| a.email.eq_ignore_ascii_case(&email))
+                    .and_then(|a| self.workers.get(&a.id));
+                if let Some(w) = worker {
+                    let _ = w.send(MailRequest::Quota);
+                }
+            }
+
+            AppMsg::QuotaFound { account_id, quota } => {
+                if let (Some(email), Some(a)) = (self.email_of(account_id), &self.accounts_win) {
+                    a.emit(crate::ui::accounts::AccountsInput::Quota { email, quota });
+                }
             }
 
             AppMsg::KeywordsFound { account_id, findings } => {
@@ -17458,6 +17480,7 @@ impl AppModel {
                 AccountsOutput::ApplyFilters => AppMsg::ApplyFilters(Vec::new()),
                 AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
                 AccountsOutput::FindTags => AppMsg::FindTags,
+                AccountsOutput::WantQuota(email) => AppMsg::WantQuota(email),
                 AccountsOutput::LeftEditor(page) => AppMsg::SettingsLeaveEditor { page, ask: false },
                 AccountsOutput::LeaveNeedsPrompt(page) => {
                     AppMsg::SettingsLeaveEditor { page, ask: true }
@@ -20791,6 +20814,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         }
         WorkerEvent::Located { message_id, hit } => AppMsg::MidLocated { account_id, message_id, hit },
         WorkerEvent::KeywordsFound(findings) => AppMsg::KeywordsFound { account_id, findings },
+        WorkerEvent::Quota(quota) => AppMsg::QuotaFound { account_id, quota },
         WorkerEvent::KeywordsSynced { paths } => AppMsg::KeywordsSynced { account_id, paths },
         WorkerEvent::Restored { folder_id, message_ids } => {
             AppMsg::UndoRestored { account_id, folder_id, message_ids }
