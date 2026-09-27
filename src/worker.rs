@@ -3852,25 +3852,17 @@ fn prefetch_status(remaining: usize) -> String {
     }
 }
 
-/// Guess a MIME type from a filename extension (best-effort).
-fn guess_mime(name: &str) -> &'static str {
-    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-    match ext.as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "svg" => "image/svg+xml",
-        "pdf" => "application/pdf",
-        "txt" | "log" => "text/plain",
-        "html" | "htm" => "text/html",
-        "csv" => "text/csv",
-        "ics" => "text/calendar",
-        "zip" => "application/zip",
-        "doc" | "docx" => "application/msword",
-        "xls" | "xlsx" => "application/vnd.ms-excel",
-        _ => "application/octet-stream",
-    }
+/// Guess a MIME type from a filename, from shared-mime-info's table of
+/// suffixes: the one the desktop opens files by, current Office formats
+/// included. Only the name is looked at, and GIO calls a name it has no
+/// suffix for `application/x-zerosize` (it reads the missing data as empty),
+/// so that becomes the generic type.
+fn guess_mime(name: &str) -> String {
+    let (content_type, _uncertain) = gtk::gio::content_type_guess(Some(name), &[]);
+    gtk::gio::content_type_get_mime_type(&content_type)
+        .map(|m| m.to_string())
+        .filter(|m| m != "application/x-zerosize")
+        .unwrap_or_else(|| "application/octet-stream".to_string())
 }
 
 type SmtpError = Box<dyn std::error::Error + Send + Sync>;
@@ -4460,7 +4452,7 @@ fn attachments_multipart(
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "attachment".to_string());
-        let ct = ContentType::parse(guess_mime(&name))
+        let ct = ContentType::parse(&guess_mime(&name))
             .unwrap_or(ContentType::TEXT_PLAIN);
         multipart = multipart.singlepart(Attachment::new(name).body(bytes, ct));
     }
@@ -5294,7 +5286,7 @@ fn cache_rewritten(c: &Cache, account_id: u32, path: &str, uid: u32, raw: &[u8])
         .map(|(i, a)| crate::models::AttachmentMeta {
             idx: i as u32,
             name: a.name.clone(),
-            mime: guess_mime(&a.name).to_string(),
+            mime: guess_mime(&a.name),
             size: a.data.len() as u64,
             section: String::new(),
         })
@@ -11665,6 +11657,26 @@ mod hostname_mismatch_tests {
         assert!(is_hostname_mismatch("The certificate's CN name does not match the passed value"));
         assert!(!is_hostname_mismatch("certificate verify failed: self-signed certificate"));
         assert!(!is_hostname_mismatch("connecting to imap.example.org timed out after 30 seconds"));
+    }
+}
+
+#[cfg(test)]
+mod guess_mime_tests {
+    use super::guess_mime;
+
+    #[test]
+    fn types_attachments_by_suffix() {
+        assert_eq!(guess_mime("scan.PDF"), "application/pdf");
+        assert_eq!(guess_mime("photo.jpeg"), "image/jpeg");
+        assert_eq!(
+            guess_mime("report.docx"),
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        assert_eq!(
+            guess_mime("budget.xlsx"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
     }
 }
 
