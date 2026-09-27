@@ -139,51 +139,31 @@ fn success_page() -> String {
     SUCCESS_TEMPLATE.replace("__ICON__", &base64_encode(ICON_PNG))
 }
 
-/// Standard base64 encoding (no dependency), for inline `data:` URIs.
+/// Standard base64, for inline `data:` URIs.
 pub fn base64_encode(data: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
-    for chunk in data.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
-        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
-        let n = (b0 << 16) | (b1 << 8) | b2;
-        out.push(T[((n >> 18) & 63) as usize] as char);
-        out.push(T[((n >> 12) & 63) as usize] as char);
-        out.push(if chunk.len() > 1 { T[((n >> 6) & 63) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
-    }
-    out
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(data)
 }
 
-/// Decode standard base64, ignoring whitespace. `None` if the input isn't valid
-/// (which for a truncated fetch is a real possibility, not a bug).
+/// Decode standard base64, skipping whitespace and `=` wherever they fall (a
+/// MIME body wraps its lines) and a lone last character that cannot make a
+/// byte. `None` if the input isn't valid (which for a truncated fetch is a
+/// real possibility, not a bug).
 pub fn base64_decode(text: &str) -> Option<Vec<u8>> {
-    let value = |b: u8| -> Option<u8> {
-        match b {
-            b'A'..=b'Z' => Some(b - b'A'),
-            b'a'..=b'z' => Some(b - b'a' + 26),
-            b'0'..=b'9' => Some(b - b'0' + 52),
-            b'+' => Some(62),
-            b'/' => Some(63),
-            _ => None,
-        }
-    };
-    let mut out = Vec::with_capacity(text.len() / 4 * 3);
-    let mut bits: u32 = 0;
-    let mut nbits = 0;
-    for b in text.bytes() {
-        if b.is_ascii_whitespace() || b == b'=' {
-            continue;
-        }
-        bits = (bits << 6) | u32::from(value(b)?);
-        nbits += 6;
-        if nbits >= 8 {
-            nbits -= 8;
-            out.push((bits >> nbits) as u8);
-        }
+    use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
+    use base64::Engine;
+    const LENIENT: GeneralPurpose = GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        GeneralPurposeConfig::new()
+            .with_decode_padding_mode(DecodePaddingMode::RequireNone)
+            .with_decode_allow_trailing_bits(true),
+    );
+    let mut clean: Vec<u8> =
+        text.bytes().filter(|b| !b.is_ascii_whitespace() && *b != b'=').collect();
+    if clean.len() % 4 == 1 {
+        clean.pop();
     }
-    Some(out)
+    LENIENT.decode(clean).ok()
 }
 
 /// Server presets for a known provider (endpoints + IMAP/SMTP hosts). Client
@@ -609,6 +589,17 @@ fn pct_decode(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn base64_is_as_forgiving_as_a_mail_body_needs() {
+        let bytes: Vec<u8> = (0..=255).collect();
+        assert_eq!(base64_decode(&base64_encode(&bytes)).unwrap(), bytes);
+        assert_eq!(base64_encode(b"hi!?"), "aGkhPw==");
+        assert_eq!(base64_decode("aGkh\r\nPw==").unwrap(), b"hi!?");
+        assert_eq!(base64_decode("aGkhPw").unwrap(), b"hi!?", "padding is optional");
+        assert_eq!(base64_decode("aGkhP").unwrap(), b"hi!", "a lone last character is dropped");
+        assert_eq!(base64_decode("aG*h"), None);
+    }
 
     #[test]
     fn a_stale_waiter_gives_up_the_fixed_port() {
