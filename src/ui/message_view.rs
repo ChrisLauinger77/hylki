@@ -4329,6 +4329,7 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
     // URI whose bytes are already in the document, so swap in our own item that
     // decodes them and opens a real save dialog.
     webview.connect_context_menu(|view, menu, hit| {
+        strip_navigation_items(menu);
         if !hit.context_is_image() {
             return false; // not an image — leave the default menu alone
         }
@@ -4383,6 +4384,13 @@ fn build_webview(role: &'static str) -> webkit6::WebView {
         if is_nav || is_new_window {
             if let Some(nav) = decision.downcast_ref::<webkit6::NavigationPolicyDecision>() {
                 if let Some(mut action) = nav.navigation_action() {
+                    // The documents are loaded from strings under a made-up
+                    // `hylki.localhost` base, so a reload has nothing to fetch
+                    // and shows "Connection refused" (#301).
+                    if action.navigation_type() == webkit6::NavigationType::Reload {
+                        decision.ignore();
+                        return true;
+                    }
                     let clicked = is_new_window
                         || action.navigation_type() == webkit6::NavigationType::LinkClicked;
                     if clicked {
@@ -4905,6 +4913,18 @@ fn push_css(b: &[u8], start: usize, end: usize, spans: &mut Vec<(usize, usize)>)
             }
         }
         at = p + 7;
+    }
+}
+
+/// Take WebKit's Back, Forward, Stop and Reload out of a context menu. Every
+/// view here shows a document loaded from a string, so there is no page to go
+/// back to or fetch again, and Reload ended on "Connection refused" (#301).
+pub(crate) fn strip_navigation_items(menu: &webkit6::ContextMenu) {
+    use webkit6::ContextMenuAction as A;
+    for item in menu.items() {
+        if matches!(item.stock_action(), A::GoBack | A::GoForward | A::Stop | A::Reload) {
+            menu.remove(&item);
+        }
     }
 }
 

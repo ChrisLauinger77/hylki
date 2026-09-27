@@ -366,6 +366,7 @@ impl RichEditor {
         let menu_attach_cb = attach_cb.clone();
         let menu_history = text_history.clone();
         webview.connect_context_menu(move |view, menu, hit| {
+            crate::ui::message_view::strip_navigation_items(menu);
             if hit.context_is_image() {
                 // Stock image entries (copy/save/open variants) are replaced
                 // by ours, which also know about the editable document.
