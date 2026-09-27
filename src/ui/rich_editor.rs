@@ -797,21 +797,26 @@ impl RichEditor {
     }
 
     fn read_body(&self, reader: &str, cb: impl FnOnce(String, String) + 'static) {
+        // JSON, not a separator: the value comes back as a C string, so a NUL
+        // between the halves cut the text off and plain-text mail went out
+        // empty (#297).
         self.webview.evaluate_javascript(
-            &format!("{reader} + '\\u0000' + window.__hylkiBodyText()"),
+            &format!("JSON.stringify([{reader}, window.__hylkiBodyText()])"),
             None,
             None,
             gtk::gio::Cancellable::NONE,
             move |res| {
-                let combined = res.map(|v| v.to_str().to_string()).unwrap_or_default();
-                let (html, text) = combined
-                    .split_once('\u{0}')
-                    .map(|(h, t)| (h.to_string(), t.to_string()))
-                    .unwrap_or_else(|| (combined.clone(), String::new()));
+                let json = res.map(|v| v.to_str().to_string()).unwrap_or_default();
+                let (html, text) = split_body(&json);
                 cb(html, text);
             },
         );
     }
+}
+
+/// The HTML and the text of the body from `read_body`'s JSON pair.
+fn split_body(json: &str) -> (String, String) {
+    serde_json::from_str::<(String, String)>(json).unwrap_or_default()
 }
 
 /// Whether a keystroke is an undo (`Some(false)`) or a redo (`Some(true)`).
@@ -2264,5 +2269,22 @@ impl Drop for RichEditor {
                 crate::memory_report::release_web_view(v);
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod body_tests {
+    use super::*;
+
+    /// The text half survives the trip out of WebKit: a plain-text message
+    /// went out empty when the halves were joined with a NUL (#297).
+    #[test]
+    fn both_halves_of_the_body_arrive() {
+        let json = r#"["<p>Hi</p>","Hi\nthere \u0000 \"quoted\""]"#;
+        assert_eq!(
+            split_body(json),
+            ("<p>Hi</p>".to_string(), "Hi\nthere \u{0} \"quoted\"".to_string())
+        );
+        assert_eq!(split_body("null"), (String::new(), String::new()));
     }
 }
