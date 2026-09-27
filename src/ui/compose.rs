@@ -1541,7 +1541,7 @@ impl Component for Compose {
                 match result {
                     Ok(share) => {
                         let id = format!("vireo-cloud-{}", crate::rng::token(8).unwrap_or_else(|_| share.size.to_string()));
-                        let mut caption = crate::cloud::human_size(share.size);
+                        let mut caption = crate::models::human_size(share.size);
                         if let Some(d) = &share.expires {
                             caption.push_str(&format!(", {}", i18n_f("link expires {date}", &[("date", d)])));
                         }

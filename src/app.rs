@@ -14966,7 +14966,7 @@ impl AppModel {
     fn ask_hand_off_action(&self, hand_off: FileHandOff, sender: &ComponentSender<Self>) {
         let n = hand_off.files.len() as u32;
         let names = hand_off_names(&hand_off.files);
-        let size = crate::cloud::human_size(hand_off_size(&hand_off.files));
+        let size = crate::models::human_size(hand_off_size(&hand_off.files));
         let dialog = adw::MessageDialog::new(
             Some(&self.window),
             Some(ni18n_f("Send {n} file with Hylki", "Send {n} files with Hylki", n, &[("n", &n.to_string())]).as_str()),
@@ -15071,8 +15071,8 @@ impl AppModel {
                             n,
                             &[
                                 ("names", &names),
-                                ("size", &crate::cloud::human_size(total)),
-                                ("limit", &crate::cloud::human_size(limit)),
+                                ("size", &crate::models::human_size(total)),
+                                ("limit", &crate::models::human_size(limit)),
                             ],
                         )
                         .as_str(),

@@ -6689,7 +6689,7 @@ mod tests {
         assert!(row.contains("class=\"vireo-attc ftype-pdf\" data-key=\"1:7\" data-idx=\"0\""), "{row}");
         assert!(row.contains("class=\"vireo-attc ftype-image\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
         assert!(row.contains("class=\"vireo-attsave\" data-key=\"1:7\" data-idx=\"1\""), "{row}");
-        assert!(row.contains("2.0 KB"), "{row}");
+        assert!(row.contains(&crate::models::human_size(2048)), "{row}");
         assert!(!row.contains("<b>x</b>"), "filename is escaped: {row}");
         assert!(row.contains("&lt;b&gt;x&lt;/b&gt;.png"), "{row}");
         // Nothing attached: the row is there, and empty.

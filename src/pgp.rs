@@ -578,7 +578,7 @@ impl KeyInfo {
     pub fn usable(&self) -> bool {
         !self.disabled
             && !matches!(self.validity, KeyValidity::Revoked | KeyValidity::Expired)
-            && self.expires.is_none_or(|e| e > now_secs())
+            && self.expires.is_none_or(|e| e > crate::datefmt::now())
     }
 
     /// The fingerprint in readable groups of four.
@@ -590,13 +590,6 @@ impl KeyInfo {
             .collect::<Vec<_>>()
             .join(" ")
     }
-}
-
-fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 /// The keys in the keyring: the user's own (`secret`) or everyone's.
