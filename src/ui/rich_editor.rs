@@ -84,7 +84,7 @@ impl Drop for ThemeHandlerGuard {
 /// nothing.
 pub fn apply_spellcheck() {
     let ctx = super::message_view::shared_web_context();
-    let on = crate::config::load_spellcheck();
+    let on = crate::config::load_privacy().spellcheck;
     ctx.set_spell_checking_enabled(on);
     if !on {
         return;
@@ -96,7 +96,7 @@ pub fn apply_spellcheck() {
 /// The language checking actually runs with: the configured one, else the
 /// session locale, either mapped onto an installed dictionary.
 pub fn resolved_spell_language() -> String {
-    let configured = crate::config::load_spellcheck_langs();
+    let configured = crate::config::load_privacy().spellcheck_langs;
     let want = configured
         .split([',', ';', ' '])
         .map(str::trim)
@@ -1834,8 +1834,8 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str) -> St
     let dark = adw::StyleManager::default().is_dark();
     let scheme = if dark { "dark" } else { "light" };
     let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
-    let paste_rich = !crate::config::load_paste_plain();
-    let return_paragraph = crate::config::load_return_paragraph();
+    let paste_rich = !crate::config::load_privacy().paste_plain;
+    let return_paragraph = crate::config::load_privacy().return_paragraph;
     let script = format!(
         "<script>window.__hylkiPasteRich={paste_rich};\
          window.__hylkiReturnParagraph={return_paragraph};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}"

@@ -1583,7 +1583,7 @@ pub(super) async fn run_jmap(
     };
 
     let (push_tx, mut push_rx) = mpsc::unbounded_channel::<()>();
-    let push_enabled = account.push.unwrap_or_else(crate::config::load_push);
+    let push_enabled = account.push.unwrap_or_else(|| crate::config::load_privacy().push);
     let mut push_started = false;
 
     if let Some(s) = jmap_session(&account, &mut state, &emit).await {
@@ -1596,7 +1596,7 @@ pub(super) async fn run_jmap(
 
     // The poll is the fallback for a server without push (or with it off):
     // the auto-fetch cadence when set, otherwise a quiet couple of minutes.
-    let poll_secs = match crate::config::load_fetch_interval() {
+    let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
         0 => 120,
         s => s.max(60),
     };

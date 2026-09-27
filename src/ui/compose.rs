@@ -886,12 +886,12 @@ impl Component for Compose {
         // the setting says (#237). A draft already contains its signature;
         // don't add another. With Return set to start paragraphs the line
         // is a paragraph too, so the first Return splits it into two.
-        let mut content = String::from(if crate::config::load_return_paragraph() {
+        let mut content = String::from(if crate::config::load_privacy().return_paragraph {
             "<p><br></p>"
         } else {
             "<div><br></div>"
         });
-        let sig_dashes = crate::config::load_signature_dashes();
+        let sig_dashes = crate::config::load_privacy().signature_dashes;
         let sig = if draft_origin.is_none() && !current_sig.is_empty() {
             sig_html(&current_sig, sig_dashes)
         } else {
@@ -1014,7 +1014,7 @@ impl Component for Compose {
             // addressed: replies arrive with To filled, forwards do not.
             compact: compact && !prefill.to.trim().is_empty(),
             decorations,
-            fields_shown: crate::config::load_reply_fields(),
+            fields_shown: crate::config::load_privacy().reply_fields,
             narrow: false,
             fields_dirty: false,
             asking_discard: false,
@@ -1322,7 +1322,7 @@ impl Component for Compose {
                 && keyval == gtk::gdk::Key::v
                 && editor.has_focus()
             {
-                editor.paste(!crate::config::load_paste_plain());
+                editor.paste(!crate::config::load_privacy().paste_plain);
                 return Propagation::Stop;
             }
             // Ctrl+Enter sends (#238), as it does in Gmail, Apple Mail and

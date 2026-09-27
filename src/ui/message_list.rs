@@ -3247,13 +3247,13 @@ impl SimpleComponent for MessageList {
             tags: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             palette_collapse_secs: std::rc::Rc::new(std::cell::Cell::new(5)),
             palette_hover: std::rc::Rc::new(std::cell::Cell::new(
-                crate::config::load_list_palette_hover(),
+                crate::config::load_privacy().list_palette_hover,
             )),
             swipe_reversed: std::rc::Rc::new(std::cell::Cell::new(
-                crate::config::load_swipe_reversed(),
+                crate::config::load_privacy().swipe_reversed,
             )),
             swipe_enabled: std::rc::Rc::new(std::cell::Cell::new(
-                crate::config::load_swipe_enabled(),
+                crate::config::load_privacy().swipe_enabled,
             )),
             swipe_sensitivity: std::rc::Rc::new(std::cell::Cell::new(
                 crate::config::load_swipe_sensitivity(),

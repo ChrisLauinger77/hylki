@@ -1096,7 +1096,7 @@ async fn run_imap(
     let mut backlog: std::collections::VecDeque<MailRequest> = std::collections::VecDeque::new();
     // IMAP IDLE push: watch the most recently loaded folder for new mail.
     // The account's own setting wins over the global switch (#91).
-    let push_enabled = account.push.unwrap_or_else(crate::config::load_push);
+    let push_enabled = account.push.unwrap_or_else(|| crate::config::load_privacy().push);
     let mut idle_folder: Option<(u32, String)> = None;
     // When the other folders' unread chips were last re-checked (None = not
     // yet this session; connect_and_list's full listing covers startup itself).
@@ -10144,7 +10144,7 @@ async fn run_graph(
     // Graph has no push channel (nothing like IMAP IDLE is available to this
     // token), so new mail arrives on a poll. The auto-fetch preference sets the
     // cadence when it's on; otherwise a quiet couple of minutes.
-    let poll_secs = match crate::config::load_fetch_interval() {
+    let poll_secs = match crate::config::load_privacy().fetch_interval_secs {
         0 => 120,
         s => s.max(60),
     };

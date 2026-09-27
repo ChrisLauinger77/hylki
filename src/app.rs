@@ -2658,6 +2658,8 @@ impl SimpleComponent for AppModel {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        // Every setting in privacy.toml, read once.
+        let prefs = config::load_privacy();
         relm4::set_global_css(include_str!("styles.css"));
         register_icons();
         // Before install_scheme_css and before the reader exists: both read
@@ -2676,8 +2678,8 @@ impl SimpleComponent for AppModel {
         // starts with every section folded up — and every account, folded as
         // it arrives (SetAccount) — keeping only the account order. The two
         // are independent.
-        let remember_sidebar = config::load_remember_sidebar();
-        let remember_rail = config::load_remember_rail();
+        let remember_sidebar = prefs.remember_sidebar;
+        let remember_rail = prefs.remember_rail;
         let icon_only = remember_rail && sidebar_state.icon_only;
         // Read here, ahead of the sidebar itself: Focus Mode's rail part
         // decides what the sidebar is built as. `icon_only` stays the user's
@@ -2750,9 +2752,9 @@ impl SimpleComponent for AppModel {
         // Whether this run serves the built-in sample data (see spawn_workers):
         // decided after the GOA reconcile, which can add accounts.
         let demo_data = demo_mode() && config.is_empty();
-        let show_attachments = config::load_show_attachments();
-        let show_contacts = config::load_show_contacts();
-        let start_view = config::load_start_view();
+        let show_attachments = prefs.show_attachments;
+        let show_contacts = prefs.show_contacts;
+        let start_view = prefs.start_view;
         let start = {
             use crate::ui::sidebar::StartTarget;
             let (last, last_account) = config::load_last_view();
@@ -3015,7 +3017,7 @@ impl SimpleComponent for AppModel {
             menu.append_section(None, &quit);
         }
 
-        let show_accounts = config::load_show_accounts();
+        let show_accounts = prefs.show_accounts;
         let show_accounts_action = gtk::gio::SimpleAction::new_stateful(
             "show-accounts",
             None,
@@ -3171,7 +3173,7 @@ impl SimpleComponent for AppModel {
             link_browser: {
                 // The launcher reads its choice from here, not from disk, so
                 // it is handed over before the first link can be clicked.
-                let choice = config::load_link_browser();
+                let choice = config::load_privacy().link_browser;
                 crate::ui::launch::set_browser(&choice);
                 choice
             },
@@ -3225,7 +3227,7 @@ impl SimpleComponent for AppModel {
                 s
             },
             peek_refresh_spinner: gtk::Spinner::new(),
-            sidebar_hover_expand: config::load_sidebar_hover_expand(),
+            sidebar_hover_expand: prefs.sidebar_hover_expand,
             remember_sidebar,
             remember_rail,
             unified_expanded,
@@ -3237,55 +3239,55 @@ impl SimpleComponent for AppModel {
             archive_expanded,
             filtered_expanded_accounts,
             tags_expanded_accounts,
-            rail_dots: config::load_rail_dots(),
-            rail_fold: config::load_rail_fold(),
-            app_theme: config::load_app_theme(),
+            rail_dots: prefs.rail_dots,
+            rail_fold: prefs.rail_fold,
+            app_theme: prefs.app_theme,
             text_scale: config::load_text_scale(),
             theme: config::load_theme(),
             current: None,
-            allowed_senders: config::load_allowed_senders(),
+            allowed_senders: prefs.allowed_senders,
             unsubscribed: config::load_unsubscribed(),
             invite_answers: config::load_invite_answers(),
-            auto_remote_content: config::load_auto_remote_content(),
-            show_remote_banner: config::load_show_remote_banner(),
-            show_spoof_banner: config::load_show_spoof_banner(),
-            blacklist: config::load_blacklist(),
-            palette_collapse_secs: config::load_palette_collapse(),
-            card_palette_collapse_secs: config::load_card_palette_collapse(),
-            gravatar: config::load_gravatar(),
-            avatars: config::load_avatars(),
-            own_mailbox_face: config::load_own_mailbox_face(),
-            sender_logos: config::load_sender_logos(),
+            auto_remote_content: prefs.auto_remote_content,
+            show_remote_banner: prefs.show_remote_banner,
+            show_spoof_banner: prefs.show_spoof_banner,
+            blacklist: prefs.blacklist,
+            palette_collapse_secs: prefs.palette_collapse_secs,
+            card_palette_collapse_secs: prefs.card_palette_collapse_secs,
+            gravatar: prefs.gravatar,
+            avatars: prefs.avatars,
+            own_mailbox_face: prefs.own_mailbox_face,
+            sender_logos: prefs.sender_logos,
             date_style: config::load_date_format().0,
             clock_style: config::load_date_format().1,
-            fetch_interval_secs: config::load_fetch_interval(),
-            push: config::load_push(),
-            notifications_enabled: config::load_notifications(),
-            notification_content: config::load_notification_content(),
+            fetch_interval_secs: prefs.fetch_interval_secs,
+            push: prefs.push,
+            notifications_enabled: prefs.notifications,
+            notification_content: prefs.notification_content,
             notification_buttons: config::load_notification_buttons(),
             show_attachments,
             show_contacts,
-            settings_open_accounts: config::load_settings_open_accounts(),
+            settings_open_accounts: prefs.settings_open_accounts,
             last_settings_page: None,
             list_count: String::new(),
             preview_lines: config::load_preview_lines(),
             shortcuts_win: None,
             run_in_background: std::rc::Rc::new(std::cell::Cell::new(
-                config::load_run_in_background(),
+                config::load_privacy().run_in_background,
             )),
             autostart: config::load_autostart(),
-            tray_enabled: config::load_tray(),
-            tray_icon: config::load_tray_icon(),
-            tray_mail: config::load_tray_mail(),
-            launcher_count: config::load_launcher_count(),
+            tray_enabled: prefs.tray,
+            tray_icon: prefs.tray_icon,
+            tray_mail: prefs.tray_mail,
+            launcher_count: prefs.launcher_count,
             app_icon: crate::app_icon::init_on_startup(),
             restart_pending: false,
             tray: None,
             tray_mail_key: std::cell::RefCell::new(None),
             single_key: std::rc::Rc::new(std::cell::Cell::new(
-                config::load_single_key_shortcuts(),
+                config::load_privacy().single_key_shortcuts,
             )),
-            threading: config::load_threading(),
+            threading: prefs.threading,
             thread_render_queued: false,
             thread_opened_at: None,
             thread_related_pending: false,
@@ -3295,26 +3297,26 @@ impl SimpleComponent for AppModel {
             showcase_confirm_delete: false,
             thread_cache_order: Vec::new(),
             thread_key: None,
-            threads_expanded: config::load_threads_expanded(),
-            thread_newest_first: config::load_thread_newest_first(),
-            always_show_recipients: config::load_always_show_recipients(),
-            show_unified_pref: config::load_show_unified(),
+            threads_expanded: prefs.threads_expanded,
+            thread_newest_first: prefs.thread_newest_first,
+            always_show_recipients: prefs.always_show_recipients,
+            show_unified_pref: prefs.show_unified,
             unified_chips: config::load_unified_chips(),
-            unified_filtered: config::load_unified_filtered(),
-            filtered_placement: config::load_filtered_placement(),
-            tags_placement: config::load_tags_placement(),
-            unified_kinds: config::load_unified_kinds(),
-            unified_tags: config::load_unified_tags(),
+            unified_filtered: prefs.unified_filtered,
+            filtered_placement: prefs.filtered_placement,
+            tags_placement: prefs.tags_placement,
+            unified_kinds: prefs.unified_kinds,
+            unified_tags: prefs.unified_tags,
             show_accounts,
             show_accounts_action,
             focus,
             focus_action,
             list_header_widgets: std::cell::OnceCell::new(),
-            chevrons_left: config::load_chevrons_left(),
+            chevrons_left: prefs.chevrons_left,
             start_view,
-            folder_sort: config::load_folder_sort(),
-            console_mode: config::load_console_mode(),
-            read_mark: config::load_read_mark(),
+            folder_sort: prefs.folder_sort,
+            console_mode: prefs.console_mode,
+            read_mark: prefs.read_mark,
             // The demo (no accounts of its own) ships with tags and filter
             // rules, so its sidebar shows the Tags and Filtered Folders
             // sections; a staged tags.toml / filters.toml still wins.
@@ -3348,39 +3350,39 @@ impl SimpleComponent for AppModel {
             filter_run: None,
             filter_moved: Default::default(),
             body_hits: Default::default(),
-            single_message_card: config::load_single_message_card(),
-            reader_mode: config::load_reader_mode(),
+            single_message_card: prefs.single_message_card,
+            reader_mode: prefs.reader_mode,
             zoom: config::load_reader_zoom(),
             zoom_default: config::load_reader_zoom(),
-            reader_switch: config::load_reader_switch(),
-            reader_default: config::load_reader_default(),
-            card_attachments: config::load_card_attachments(),
-            drawer_enabled: config::load_attachment_drawer(),
-            thread_expansion: config::load_thread_expansion(),
-            thread_row_newest: config::load_thread_row_newest(),
-            confirm_thread_delete: config::load_confirm_thread_delete(),
+            reader_switch: prefs.reader_switch,
+            reader_default: prefs.reader_default,
+            card_attachments: prefs.card_attachments,
+            drawer_enabled: prefs.attachment_drawer,
+            thread_expansion: prefs.thread_expansion,
+            thread_row_newest: prefs.thread_row_newest,
+            confirm_thread_delete: prefs.confirm_thread_delete,
             selection_from_cards: false,
-            card_actions_hover: config::load_card_actions_hover(),
-            card_actions_auto: config::load_card_actions_auto(),
-            list_palette: config::load_list_palette(),
-            list_palette_hover: config::load_list_palette_hover(),
-            card_palette_menu: config::load_card_palette_menu(),
-            swipe_enabled: config::load_swipe_enabled(),
-            swipe_reversed: config::load_swipe_reversed(),
+            card_actions_hover: prefs.card_actions_hover,
+            card_actions_auto: prefs.card_actions_auto,
+            list_palette: prefs.list_palette,
+            list_palette_hover: prefs.list_palette_hover,
+            card_palette_menu: prefs.card_palette_menu,
+            swipe_enabled: prefs.swipe_enabled,
+            swipe_reversed: prefs.swipe_reversed,
             swipe_sensitivity: config::load_swipe_sensitivity(),
-            compose_inline: config::load_compose_inline(),
-            reply_inline: config::load_reply_inline(),
-            reply_fields: config::load_reply_fields(),
-            compose_default_from: config::load_compose_default_from(),
-            paste_plain: config::load_paste_plain(),
-            return_paragraph: config::load_return_paragraph(),
+            compose_inline: prefs.compose_inline,
+            reply_inline: prefs.reply_inline,
+            reply_fields: prefs.reply_fields,
+            compose_default_from: prefs.compose_default_from,
+            paste_plain: prefs.paste_plain,
+            return_paragraph: prefs.return_paragraph,
             compose_format: config::load_compose_format(),
-            reply_position: config::load_reply_position(),
-            signature_position: config::load_signature_position(),
-            signature_dashes: config::load_signature_dashes(),
-            spellcheck: config::load_spellcheck(),
-            spellcheck_langs: config::load_spellcheck_langs(),
-            message_theme: config::load_message_theme(),
+            reply_position: prefs.reply_position,
+            signature_position: prefs.signature_position,
+            signature_dashes: prefs.signature_dashes,
+            spellcheck: prefs.spellcheck,
+            spellcheck_langs: prefs.spellcheck_langs,
+            message_theme: prefs.message_theme,
             override_fonts: reader_override.0,
             reader_font: reader_override.1,
             override_colors: reader_override.2,
@@ -12342,7 +12344,7 @@ impl AppModel {
         apply_app_theme(self.app_theme);
         welcome.widget().connect_unmap(|_| {
             WIZARD_HOLDS_LIGHT.store(false, std::sync::atomic::Ordering::Relaxed);
-            apply_app_theme(config::load_app_theme());
+            apply_app_theme(config::load_privacy().app_theme);
         });
         // On a true first run the main window stays hidden (see main.rs)
         // until the wizard finishes — or is dismissed.
