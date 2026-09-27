@@ -3542,14 +3542,17 @@ impl SimpleComponent for MessageList {
                     self.thread_expansion = on;
                     // Turning expansion off folds every open thread (the
                     // `expanded` computation ignores the stored toggles while
-                    // off); turning it on restores them.
-                    self.rebuild();
+                    // off); turning it on restores them. Every row is built
+                    // again: a folded row reads as unchanged to the rebuild,
+                    // and kept the caret it was built with.
+                    self.rebuild_rows_preserving_scroll();
                 }
             }
             MessageListInput::SetListPalette(on) => {
                 if self.list_palette != on {
                     self.list_palette = on;
-                    self.rebuild();
+                    // A row reads the setting when it is built, as above.
+                    self.rebuild_rows_preserving_scroll();
                 }
             }
             MessageListInput::ResolveDelete => {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed: turning off Expandable conversations left the carets on the
+  count chips** until the next sync rebuilt the list. The rows are now
+  built again at once, and switching the message list's action palette on
+  or off applies at once too.
 - **Fixed: right-clicking a message sometimes opened no menu.** A
   right-click between two messages of a conversation or at the reader's
   edge found no message and did nothing, and in a message opened in its own
