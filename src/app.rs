@@ -197,6 +197,20 @@ relm4::new_stateless_action!(AboutAction, WindowActionGroup, "about");
 relm4::new_stateless_action!(ShortcutsAction, WindowActionGroup, "shortcuts");
 relm4::new_stateless_action!(PrintAction, WindowActionGroup, "print");
 relm4::new_stateless_action!(PrintPreviewAction, WindowActionGroup, "print-preview");
+/// Store a setting the user changed and save the settings, if it really
+/// changed; says whether it did, so the caller can apply it.
+macro_rules! pref {
+    ($self:ident . $($field:ident).+ = $value:expr) => {{
+        let value = $value;
+        let changed = $self.$($field).+ != value;
+        if changed {
+            $self.$($field).+ = value;
+            $self.save_settings();
+        }
+        changed
+    }};
+}
+
 relm4::new_stateless_action!(StatusBarAction, WindowActionGroup, "status-bar");
 relm4::new_stateless_action!(ConsoleAction, WindowActionGroup, "console");
 relm4::new_stateless_action!(FindAction, WindowActionGroup, "find");
@@ -5684,9 +5698,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetFolderSort(sort) => {
-                if self.folder_sort != sort {
-                    self.folder_sort = sort;
-                    self.save_settings();
+                if pref!(self.folder_sort = sort) {
                     self.rebuild_sidebar();
                 }
             }
@@ -5842,24 +5854,15 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetSidebarHoverExpand(on) => {
-                if self.sidebar_hover_expand != on {
-                    self.sidebar_hover_expand = on;
-                    self.save_settings();
-                }
+                pref!(self.sidebar_hover_expand = on);
             }
 
             AppMsg::SetRememberSidebar(on) => {
-                if self.remember_sidebar != on {
-                    self.remember_sidebar = on;
-                    self.save_settings();
-                }
+                pref!(self.remember_sidebar = on);
             }
 
             AppMsg::SetRememberRail(on) => {
-                if self.remember_rail != on {
-                    self.remember_rail = on;
-                    self.save_settings();
-                }
+                pref!(self.remember_rail = on);
             }
 
             AppMsg::SidebarSectionsOpen {
@@ -5894,17 +5897,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetRailDots(on) => {
-                if self.rail_dots != on {
-                    self.rail_dots = on;
-                    self.save_settings();
+                if pref!(self.rail_dots = on) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetRailFold(fold) => {
-                if self.rail_fold != fold {
-                    self.rail_fold = fold;
-                    self.save_settings();
+                if pref!(self.rail_fold = fold) {
                     // The sidebar folds (or reopens) the sections concerned
                     // itself if the rail is up.
                     self.rebuild_sidebar();
@@ -6993,9 +6992,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAvatars(on) => {
-                if self.avatars != on {
-                    self.avatars = on;
-                    self.save_settings();
+                if pref!(self.avatars = on) {
                     self.push_list_look(false);
                 }
             }
@@ -7005,9 +7002,7 @@ impl SimpleComponent for AppModel {
             AppMsg::ListOverflowMenu => self.show_list_overflow_menu(&sender),
 
             AppMsg::SetOwnMailboxFace(on) => {
-                if self.own_mailbox_face != on {
-                    self.own_mailbox_face = on;
-                    self.save_settings();
+                if pref!(self.own_mailbox_face = on) {
                     self.refresh_own_faces();
                     // Switched on, the accounts that want a Gravatar may never
                     // have been asked about (the switch was off at startup).
@@ -7027,9 +7022,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetSenderLogos(on) => {
-                if self.sender_logos != on {
-                    self.sender_logos = on;
-                    self.save_settings();
+                if pref!(self.sender_logos = on) {
                     self.message_list.emit(MessageListInput::SetSenderLogos(on));
                 }
             }
@@ -7062,17 +7055,13 @@ impl SimpleComponent for AppModel {
             AppMsg::ReaderOverflowMenu => self.show_reader_overflow_menu(&sender),
 
             AppMsg::SetShowRemoteBanner(on) => {
-                if self.show_remote_banner != on {
-                    self.show_remote_banner = on;
-                    self.save_settings();
+                if pref!(self.show_remote_banner = on) {
                     self.message_view.emit(MessageViewInput::SetBannerShown(on));
                 }
             }
 
             AppMsg::SetShowSpoofBanner(on) => {
-                if self.show_spoof_banner != on {
-                    self.show_spoof_banner = on;
-                    self.save_settings();
+                if pref!(self.show_spoof_banner = on) {
                     self.message_view.emit(MessageViewInput::SetSpoofBannerShown(on));
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetSpoofBannerShown(on));
@@ -7081,9 +7070,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAutoRemoteContent(on) => {
-                if self.auto_remote_content != on {
-                    self.auto_remote_content = on;
-                    self.save_settings();
+                if pref!(self.auto_remote_content = on) {
                     // Re-render what is open so the change takes effect there too:
                     // on, the blocked content loads; off, it is stripped again.
                     if self.current_thread.len() > 1 {
@@ -7096,9 +7083,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetDateStyle(style) => {
-                if self.date_style != style {
-                    self.date_style = style;
-                    self.save_settings();
+                if pref!(self.date_style = style) {
                     self.apply_date_style();
                 }
             }
@@ -7155,17 +7140,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetClockStyle(style) => {
-                if self.clock_style != style {
-                    self.clock_style = style;
-                    self.save_settings();
+                if pref!(self.clock_style = style) {
                     self.apply_date_style();
                 }
             }
 
             AppMsg::SetGravatar(on) => {
-                if self.gravatar != on {
-                    self.gravatar = on;
-                    self.save_settings();
+                if pref!(self.gravatar = on) {
                     self.message_list.emit(MessageListInput::SetGravatar(on));
                     // Refresh the reader's avatar for the open message.
                     let current = self.current.clone();
@@ -7246,41 +7227,28 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetFetchInterval(secs) => {
-                if self.fetch_interval_secs != secs {
-                    self.fetch_interval_secs = secs;
-                    self.save_settings();
+                if pref!(self.fetch_interval_secs = secs) {
                     self.arm_auto_fetch(&sender);
                 }
             }
 
             AppMsg::SetPush(on) => {
-                if self.push != on {
-                    self.push = on;
-                    self.save_settings();
+                if pref!(self.push = on) {
                     // Workers read the push setting at startup; restart to apply.
                     self.reconnect_all(&sender);
                 }
             }
 
             AppMsg::SetNotifications(on) => {
-                if self.notifications_enabled != on {
-                    self.notifications_enabled = on;
-                    self.save_settings();
-                }
+                pref!(self.notifications_enabled = on);
             }
 
             AppMsg::SetNotificationContent(on) => {
-                if self.notification_content != on {
-                    self.notification_content = on;
-                    self.save_settings();
-                }
+                pref!(self.notification_content = on);
             }
 
             AppMsg::SetNotificationButtons(buttons) => {
-                if self.notification_buttons != buttons {
-                    self.notification_buttons = buttons;
-                    self.save_settings();
-                }
+                pref!(self.notification_buttons = buttons);
             }
 
             AppMsg::SetRunInBackground(on) => {
@@ -7298,17 +7266,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAutostart(on) => {
-                if self.autostart != on {
-                    self.autostart = on;
-                    self.save_settings();
+                if pref!(self.autostart = on) {
                     crate::background::request(self.run_in_background.get() && on);
                 }
             }
 
             AppMsg::SetTray(on) => {
-                if self.tray_enabled != on {
-                    self.tray_enabled = on;
-                    self.save_settings();
+                if pref!(self.tray_enabled = on) {
                     if on {
                         self.start_tray(&sender);
                     } else if let Some(tray) = self.tray.take() {
@@ -7318,9 +7282,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetTrayIcon(icon) => {
-                if self.tray_icon != icon {
-                    self.tray_icon = icon;
-                    self.save_settings();
+                if pref!(self.tray_icon = icon) {
                     // A fresh item rather than a new icon on the old one: the
                     // AppIndicator extension, taken from a picture back to a
                     // symbolic icon's file, kept drawing the picture (#258).
@@ -7380,9 +7342,7 @@ impl SimpleComponent for AppModel {
             },
 
             AppMsg::SetTrayMail(on) => {
-                if self.tray_mail != on {
-                    self.tray_mail = on;
-                    self.save_settings();
+                if pref!(self.tray_mail = on) {
                     // A sentinel no real list equals, so the change is sent
                     // whichever way the switch went.
                     *self.tray_mail_key.borrow_mut() =
@@ -7392,9 +7352,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetLauncherCount(on) => {
-                if self.launcher_count != on {
-                    self.launcher_count = on;
-                    self.save_settings();
+                if pref!(self.launcher_count = on) {
                     self.push_launcher_count();
                 }
             }
@@ -7478,9 +7436,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAttachmentsRow(show) => {
-                if self.show_attachments != show {
-                    self.show_attachments = show;
-                    self.save_settings();
+                if pref!(self.show_attachments = show) {
                     self.sidebars_emit(SidebarInput::SetAttachmentsRow(show));
                 }
             }
@@ -7488,59 +7444,45 @@ impl SimpleComponent for AppModel {
             AppMsg::ListCount(text) => self.list_count = text,
 
             AppMsg::SetContactsRow(show) => {
-                if self.show_contacts != show {
-                    self.show_contacts = show;
-                    self.save_settings();
+                if pref!(self.show_contacts = show) {
                     self.sidebars_emit(SidebarInput::SetContactsRow(show));
                 }
             }
 
             AppMsg::SetShowUnified(show) => {
-                if self.show_unified_pref != show {
-                    self.show_unified_pref = show;
-                    self.save_settings();
+                if pref!(self.show_unified_pref = show) {
                     // Rebuilds the sidebar with or without the unified section.
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetUnifiedChips(chips) => {
-                if self.unified_chips != chips {
-                    self.unified_chips = chips;
-                    self.save_settings();
+                if pref!(self.unified_chips = chips) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetUnifiedFiltered(show) => {
-                if self.unified_filtered != show {
-                    self.unified_filtered = show;
-                    self.save_settings();
+                if pref!(self.unified_filtered = show) {
                     // Adds or removes the Filtered Folders section.
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetUnifiedKinds(kinds) => {
-                if self.unified_kinds != kinds {
-                    self.unified_kinds = kinds;
-                    self.save_settings();
+                if pref!(self.unified_kinds = kinds) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetUnifiedTags(show) => {
-                if self.unified_tags != show {
-                    self.unified_tags = show;
-                    self.save_settings();
+                if pref!(self.unified_tags = show) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetShowAccounts(show) => {
-                if self.show_accounts != show {
-                    self.show_accounts = show;
-                    self.save_settings();
+                if pref!(self.show_accounts = show) {
                     self.rebuild_sidebar();
                 }
                 // Both places that offer the switch stay in step.
@@ -7576,65 +7518,47 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetFilteredPlacement(p) => {
-                if self.filtered_placement != p {
-                    self.filtered_placement = p;
-                    self.save_settings();
+                if pref!(self.filtered_placement = p) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetTagsPlacement(p) => {
-                if self.tags_placement != p {
-                    self.tags_placement = p;
-                    self.save_settings();
+                if pref!(self.tags_placement = p) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetStartView(view) => {
-                if self.start_view != view {
-                    self.start_view = view;
-                    self.save_settings();
-                }
+                pref!(self.start_view = view);
             }
 
             AppMsg::SetChevronsLeft(left) => {
-                if self.chevrons_left != left {
-                    self.chevrons_left = left;
-                    self.save_settings();
+                if pref!(self.chevrons_left = left) {
                     self.rebuild_sidebar();
                 }
             }
 
             AppMsg::SetThreading(on) => {
-                if self.threading != on {
-                    self.threading = on;
-                    self.save_settings();
+                if pref!(self.threading = on) {
                     self.message_list.emit(MessageListInput::SetThreading(on));
                 }
             }
 
             AppMsg::SetThreadExpansion(on) => {
-                if self.thread_expansion != on {
-                    self.thread_expansion = on;
-                    self.save_settings();
+                if pref!(self.thread_expansion = on) {
                     self.message_list.emit(MessageListInput::SetThreadExpansion(on));
                 }
             }
 
             AppMsg::SetThreadRowNewest(on) => {
-                if self.thread_row_newest != on {
-                    self.thread_row_newest = on;
-                    self.save_settings();
+                if pref!(self.thread_row_newest = on) {
                     self.message_list.emit(MessageListInput::SetThreadRowNewest(on));
                 }
             }
 
             AppMsg::SetConfirmThreadDelete(on) => {
-                if self.confirm_thread_delete != on {
-                    self.confirm_thread_delete = on;
-                    self.save_settings();
-                }
+                pref!(self.confirm_thread_delete = on);
             }
 
             AppMsg::DeleteThread(messages) => {
@@ -7664,17 +7588,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetThreadsExpanded(on) => {
-                if self.threads_expanded != on {
-                    self.threads_expanded = on;
-                    self.save_settings();
+                if pref!(self.threads_expanded = on) {
                     self.message_list.emit(MessageListInput::SetThreadsExpanded(on));
                 }
             }
 
             AppMsg::SetThreadNewestFirst(on) => {
-                if self.thread_newest_first != on {
-                    self.thread_newest_first = on;
-                    self.save_settings();
+                if pref!(self.thread_newest_first = on) {
                     // Re-render an open conversation in the new order.
                     if self.current_thread.len() > 1 {
                         self.show_thread();
@@ -7683,9 +7603,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetAlwaysShowRecipients(on) => {
-                if self.always_show_recipients != on {
-                    self.always_show_recipients = on;
-                    self.save_settings();
+                if pref!(self.always_show_recipients = on) {
                     self.message_view.emit(MessageViewInput::SetAlwaysShowRecipients(on));
                     // Re-render whatever is open so the header reflects it.
                     if self.current_thread.len() > 1 {
@@ -7698,16 +7616,12 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetCardAttachments(on) => {
-                if self.card_attachments != on {
-                    self.card_attachments = on;
-                    self.save_settings();
+                if pref!(self.card_attachments = on) {
                     self.message_view.emit(MessageViewInput::SetCardAttachmentsShown(on));
                 }
             }
             AppMsg::SetAttachmentDrawer(on) => {
-                if self.drawer_enabled != on {
-                    self.drawer_enabled = on;
-                    self.save_settings();
+                if pref!(self.drawer_enabled = on) {
                     self.sync_attachment_drawer();
                     self.message_view.emit(MessageViewInput::SetAttachmentDrawer(on));
                 }
@@ -7871,9 +7785,7 @@ impl SimpleComponent for AppModel {
                 self.set_zoom(zoom);
             }
             AppMsg::SetZoomDefault(zoom) => {
-                if self.zoom_default != zoom {
-                    self.zoom_default = zoom;
-                    self.save_settings();
+                if pref!(self.zoom_default = zoom) {
                     self.message_view.emit(MessageViewInput::SetZoomDefault(zoom));
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetZoomDefault(zoom));
@@ -7902,9 +7814,7 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::SetReaderSwitchShown(on) => {
-                if self.reader_switch != on {
-                    self.reader_switch = on;
-                    self.save_settings();
+                if pref!(self.reader_switch = on) {
                     self.message_view.emit(MessageViewInput::SetReaderSwitchShown(on));
                     for p in self.popouts.values() {
                         p.controller.emit(MessageWindowInput::SetReaderSwitchShown(on));
@@ -7912,9 +7822,7 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::SetReaderDefault(policy) => {
-                if self.reader_default != policy {
-                    self.reader_default = policy;
-                    self.save_settings();
+                if pref!(self.reader_default = policy) {
                     // Focus Mode's Reader View outranks it while on.
                     let policy = self.effective_reader_default();
                     self.message_view.emit(MessageViewInput::SetReaderDefault(policy));
@@ -7924,9 +7832,7 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::SetSingleMessageCard(on) => {
-                if self.single_message_card != on {
-                    self.single_message_card = on;
-                    self.save_settings();
+                if pref!(self.single_message_card = on) {
                     self.message_view.emit(MessageViewInput::SetSingleMessageCard(on));
                     // Only lone messages change; re-render one if it's open.
                     if self.current_thread.len() <= 1 {
@@ -7939,57 +7845,43 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetPaletteCollapse(secs) => {
-                if self.palette_collapse_secs != secs {
-                    self.palette_collapse_secs = secs;
-                    self.save_settings();
+                if pref!(self.palette_collapse_secs = secs) {
                     self.message_list.emit(MessageListInput::SetPaletteCollapse(secs));
                 }
             }
 
             AppMsg::SetCardPaletteCollapse(secs) => {
-                if self.card_palette_collapse_secs != secs {
-                    self.card_palette_collapse_secs = secs;
-                    self.save_settings();
+                if pref!(self.card_palette_collapse_secs = secs) {
                     self.message_view.emit(MessageViewInput::SetPaletteCollapse(secs));
                 }
             }
 
             AppMsg::SetListPalette(on) => {
-                if self.list_palette != on {
-                    self.list_palette = on;
-                    self.save_settings();
+                if pref!(self.list_palette = on) {
                     self.message_list.emit(MessageListInput::SetListPalette(on));
                 }
             }
 
             AppMsg::SetListPaletteHover(on) => {
-                if self.list_palette_hover != on {
-                    self.list_palette_hover = on;
-                    self.save_settings();
+                if pref!(self.list_palette_hover = on) {
                     self.message_list.emit(MessageListInput::SetPaletteHover(on));
                 }
             }
 
             AppMsg::SetCardPaletteMenu(on) => {
-                if self.card_palette_menu != on {
-                    self.card_palette_menu = on;
-                    self.save_settings();
+                if pref!(self.card_palette_menu = on) {
                     self.message_view.emit(MessageViewInput::SetCardPaletteMenu(on));
                 }
             }
 
             AppMsg::SetSwipeEnabled(on) => {
-                if self.swipe_enabled != on {
-                    self.swipe_enabled = on;
-                    self.save_settings();
+                if pref!(self.swipe_enabled = on) {
                     self.message_list.emit(MessageListInput::SetSwipeEnabled(on));
                 }
             }
 
             AppMsg::SetSwipeReversed(on) => {
-                if self.swipe_reversed != on {
-                    self.swipe_reversed = on;
-                    self.save_settings();
+                if pref!(self.swipe_reversed = on) {
                     self.message_list.emit(MessageListInput::SetSwipeReversed(on));
                 }
             }
@@ -7999,9 +7891,7 @@ impl SimpleComponent for AppModel {
                     config::SWIPE_SENSITIVITY_MIN,
                     config::SWIPE_SENSITIVITY_MAX,
                 );
-                if self.swipe_sensitivity != factor {
-                    self.swipe_sensitivity = factor;
-                    self.save_settings();
+                if pref!(self.swipe_sensitivity = factor) {
                     self.message_list
                         .emit(MessageListInput::SetSwipeSensitivity(factor));
                 }
@@ -8035,31 +7925,19 @@ impl SimpleComponent for AppModel {
 
 
             AppMsg::SetComposeInline(on) => {
-                if self.compose_inline != on {
-                    self.compose_inline = on;
-                    self.save_settings();
-                }
+                pref!(self.compose_inline = on);
             }
 
             AppMsg::SetReplyInline(on) => {
-                if self.reply_inline != on {
-                    self.reply_inline = on;
-                    self.save_settings();
-                }
+                pref!(self.reply_inline = on);
             }
 
             AppMsg::SetReplyFields(on) => {
-                if self.reply_fields != on {
-                    self.reply_fields = on;
-                    self.save_settings();
-                }
+                pref!(self.reply_fields = on);
             }
 
             AppMsg::SetFilesPrefs(prefs) => {
-                if self.files_prefs != prefs {
-                    self.files_prefs = prefs;
-                    self.save_settings();
-                }
+                pref!(self.files_prefs = prefs);
             }
 
             AppMsg::EditAsNewCurrent => {
@@ -8110,9 +7988,7 @@ impl SimpleComponent for AppModel {
             AppMsg::HandOffOpen { hand_off, target, cloud, remember } => {
                 if remember {
                     let large = if cloud { config::FilesLarge::Cloud } else { config::FilesLarge::Attach };
-                    if self.files_prefs.large != large {
-                        self.files_prefs.large = large;
-                        self.save_settings();
+                    if pref!(self.files_prefs.large = large) {
                         self.push_files_prefs();
                     }
                 }
@@ -8120,30 +7996,19 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetComposeDefaultFrom(addr) => {
-                if self.compose_default_from != addr {
-                    self.compose_default_from = addr;
-                    self.save_settings();
-                }
+                pref!(self.compose_default_from = addr);
             }
 
             AppMsg::SetPastePlain(on) => {
-                if self.paste_plain != on {
-                    self.paste_plain = on;
-                    self.save_settings();
-                }
+                pref!(self.paste_plain = on);
             }
 
             AppMsg::SetReturnParagraph(on) => {
-                if self.return_paragraph != on {
-                    self.return_paragraph = on;
-                    self.save_settings();
-                }
+                pref!(self.return_paragraph = on);
             }
 
             AppMsg::SetSpellcheck(on) => {
-                if self.spellcheck != on {
-                    self.spellcheck = on;
-                    self.save_settings();
+                if pref!(self.spellcheck = on) {
                     // Takes effect in already-open composers too: the shared
                     // web context is live.
                     crate::ui::rich_editor::apply_spellcheck();
@@ -8151,17 +8016,13 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetSpellcheckLangs(langs) => {
-                if self.spellcheck_langs != langs {
-                    self.spellcheck_langs = langs;
-                    self.save_settings();
+                if pref!(self.spellcheck_langs = langs) {
                     crate::ui::rich_editor::apply_spellcheck();
                 }
             }
 
             AppMsg::SetMessageTheme(theme) => {
-                if self.message_theme != theme {
-                    self.message_theme = theme;
-                    self.save_settings();
+                if pref!(self.message_theme = theme) {
                     let dark = theme.dark_override();
                     // Message content only — the reader and any popped-out windows.
                     self.message_view.emit(MessageViewInput::SetContentTheme(dark));
@@ -8204,30 +8065,22 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::SetOverrideFonts(on) => {
-                if self.override_fonts != on {
-                    self.override_fonts = on;
-                    self.save_settings();
+                if pref!(self.override_fonts = on) {
                     self.push_reader_style();
                 }
             }
             AppMsg::SetReaderFont(font) => {
-                if self.reader_font != font {
-                    self.reader_font = font;
-                    self.save_settings();
+                if pref!(self.reader_font = font) {
                     self.push_reader_style();
                 }
             }
             AppMsg::SetPlainMonospace(on) => {
-                if self.plain_monospace != on {
-                    self.plain_monospace = on;
-                    self.save_settings();
+                if pref!(self.plain_monospace = on) {
                     self.push_reader_style();
                 }
             }
             AppMsg::SetPlainFont(font) => {
-                if self.plain_font != font {
-                    self.plain_font = font;
-                    self.save_settings();
+                if pref!(self.plain_font = font) {
                     self.push_reader_style();
                 }
             }
@@ -8299,37 +8152,23 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::SetComposeFormat(format) => {
-                if self.compose_format != format {
-                    self.compose_format = format;
-                    self.save_settings();
-                }
+                pref!(self.compose_format = format);
             }
             AppMsg::SetReplyPosition(position) => {
                 // A split reply already open stays where it is; the next
                 // one opens in the new place.
-                if self.reply_position != position {
-                    self.reply_position = position;
-                    self.save_settings();
-                }
+                pref!(self.reply_position = position);
             }
             AppMsg::SetSignaturePosition(position) => {
                 // Composers already open keep their signature where it is;
                 // the next reply or forward opens with the new placement.
-                if self.signature_position != position {
-                    self.signature_position = position;
-                    self.save_settings();
-                }
+                pref!(self.signature_position = position);
             }
             AppMsg::SetSignatureDashes(on) => {
-                if self.signature_dashes != on {
-                    self.signature_dashes = on;
-                    self.save_settings();
-                }
+                pref!(self.signature_dashes = on);
             }
             AppMsg::SetOverrideColors(on) => {
-                if self.override_colors != on {
-                    self.override_colors = on;
-                    self.save_settings();
+                if pref!(self.override_colors = on) {
                     self.push_reader_style();
                 }
             }
@@ -9188,9 +9027,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetReadMark(policy) => {
-                if self.read_mark != policy {
-                    self.read_mark = policy;
-                    self.save_settings();
+                if pref!(self.read_mark = policy) {
                     self.message_view.emit(MessageViewInput::SetReadMark(policy));
                 }
             }
@@ -9338,9 +9175,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SetConsoleMode(on) => {
-                if self.console_mode != on {
-                    self.console_mode = on;
-                    self.save_settings();
+                if pref!(self.console_mode = on) {
                     self.notifications.emit(NotifyInput::SetConsoleEnabled(on));
                     self.rebuild_help_menu();
                 }
@@ -9481,10 +9316,7 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenPreferences => self.open_settings_window(&sender, false, false),
 
             AppMsg::SetSettingsOpenAccounts(on) => {
-                if self.settings_open_accounts != on {
-                    self.settings_open_accounts = on;
-                    self.save_settings();
-                }
+                pref!(self.settings_open_accounts = on);
             }
 
             // Closing the combined Settings window hides it (the window's
