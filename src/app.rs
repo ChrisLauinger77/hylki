@@ -16148,12 +16148,7 @@ impl AppModel {
     }
 
     fn delete_folder(&mut self, account_id: u32, path: String) {
-        let trash = self
-            .folders
-            .get(&account_id)
-            .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Trash))
-            .map(|f| f.path.clone())
-            .or_else(|| self.default_folder_path(account_id, FolderKind::Trash));
+        let trash = self.folder_path_for(account_id, FolderKind::Trash);
         // If the deleted folder is currently open, clear the view.
         if self.selected.as_ref().is_some_and(|s| s.account_id == account_id && s.path == path) {
             self.current = None;
@@ -16685,13 +16680,7 @@ impl AppModel {
         let Some(src) = self.resolve_folder_path(&m) else {
             return;
         };
-        let dest = self
-            .folders
-            .get(&m.account_id)
-            .and_then(|fs| fs.iter().find(|f| f.kind == FolderKind::Junk))
-            .map(|f| f.path.clone())
-            .or_else(|| self.default_folder_path(m.account_id, FolderKind::Junk));
-        let Some(dest) = dest else {
+        let Some(dest) = self.folder_path_for(m.account_id, FolderKind::Junk) else {
             self.notifications.emit(NotifyInput::Push {
                 text: i18n("No Junk folder available for this account"),
                 error: true,
