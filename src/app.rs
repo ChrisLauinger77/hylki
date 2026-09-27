@@ -21851,76 +21851,7 @@ pub fn message_text(body: &str) -> String {
     if !body.contains('<') {
         return body.trim().to_string();
     }
-    let mut s = strip_block(body, "script");
-    s = strip_block(&s, "style");
-    s = strip_block(&s, "head");
-    // Turn common block/line elements into newlines.
-    for (tag, nl) in [
-        ("<br>", "\n"), ("<br/>", "\n"), ("<br />", "\n"),
-        ("</p>", "\n\n"), ("</div>", "\n"), ("</li>", "\n"),
-        ("</tr>", "\n"), ("</h1>", "\n"), ("</h2>", "\n"), ("</h3>", "\n"),
-    ] {
-        s = s.replace(tag, nl);
-        s = s.replace(&tag.to_uppercase(), nl);
-    }
-    // Strip remaining tags.
-    let mut out = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for c in s.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => out.push(c),
-            _ => {}
-        }
-    }
-    // Decode the handful of entities that matter for plain text.
-    let out = out
-        .replace("&nbsp;", " ")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
-        .replace("&amp;", "&");
-    // Collapse runs of blank lines.
-    let mut result = String::new();
-    let mut blanks = 0;
-    for line in out.lines() {
-        if line.trim().is_empty() {
-            blanks += 1;
-            if blanks <= 1 {
-                result.push('\n');
-            }
-        } else {
-            blanks = 0;
-            result.push_str(line.trim_end());
-            result.push('\n');
-        }
-    }
-    result.trim().to_string()
-}
-
-/// Remove `<tag>…</tag>` blocks (case-insensitive) from HTML.
-fn strip_block(html: &str, tag: &str) -> String {
-    let lower = html.to_ascii_lowercase();
-    let open = format!("<{tag}");
-    let close = format!("</{tag}>");
-    let mut out = String::new();
-    let mut i = 0;
-    while i < html.len() {
-        if lower[i..].starts_with(&open) {
-            if let Some(rel) = lower[i..].find(&close) {
-                i += rel + close.len();
-                continue;
-            } else {
-                break; // unterminated — drop the rest
-            }
-        }
-        let ch = html[i..].chars().next().unwrap();
-        out.push(ch);
-        i += ch.len_utf8();
-    }
-    out
+    crate::markdown::plain_text(body)
 }
 
 fn kind_label(kind: FolderKind) -> String {
@@ -22738,4 +22669,3 @@ mod tests {
         assert!(credits(TRANSLATORS).iter().all(|(_, _, note)| !note.is_empty()));
     }
 }
-

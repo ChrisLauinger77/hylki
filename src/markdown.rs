@@ -644,6 +644,57 @@ pub fn html_to_text(html: &str) -> String {
     from_html(html)
 }
 
+/// An HTML body as plain text, for list previews: its words, a line break
+/// for each block and `<br>`, whitespace collapsed as a browser does
+/// outside `<pre>`, each line trimmed, and at most one blank line in a row.
+pub fn plain_text(html: &str) -> String {
+    fn walk(nodes: &[Node], pre: bool, out: &mut String) {
+        for node in nodes {
+            match node {
+                Node::Text(t) if pre => out.push_str(t),
+                Node::Text(t) => {
+                    let mut last_space = out.ends_with([' ', '\n']);
+                    for c in t.chars() {
+                        let space = c.is_whitespace();
+                        if !(space && last_space) {
+                            out.push(if space { ' ' } else { c });
+                        }
+                        last_space = space;
+                    }
+                }
+                Node::Elem(e) if e.name == "br" => out.push('\n'),
+                Node::Elem(e) => {
+                    let block = is_block(&e.name);
+                    if block && !out.is_empty() && !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    walk(&e.children, pre || e.name == "pre", out);
+                    if block {
+                        out.push_str(if e.name == "p" { "\n\n" } else { "\n" });
+                    }
+                }
+            }
+        }
+    }
+    let mut text = String::new();
+    walk(&parse(html), false, &mut text);
+    let mut out = String::new();
+    let mut blank = false;
+    for line in text.lines().map(|l| l.trim_matches(|c: char| c == ' ' || c == '\u{a0}')) {
+        if line.is_empty() {
+            if !blank && !out.is_empty() {
+                out.push('\n');
+            }
+            blank = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+            blank = false;
+        }
+    }
+    out.trim().to_string()
+}
+
 /// Is this element a block, as far as the Markdown writer is concerned?
 fn is_block(name: &str) -> bool {
     matches!(
@@ -1138,6 +1189,16 @@ pub fn pretty_html(html: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A preview is the body's words: no head, no styles, and a `<header>`
+    /// element is content like any other.
+    #[test]
+    fn plain_text_keeps_the_words_and_the_breaks() {
+        let html = "<html><head><title>T</title><style>p{}</style></head><body>\
+                    <header>Hello   <b>there</b></header><p>One<br>two &amp; three</p>\
+                    <p></p><p></p><div>After</div><pre>a  b\n c</pre></body></html>";
+        assert_eq!(plain_text(html), "Hello there\nOne\ntwo & three\n\nAfter\na  b\nc");
+    }
 
     /// Outlook nests a link in a link; a browser closes the first, leaving
     /// it empty. Only the one with text is written.
