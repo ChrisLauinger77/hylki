@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Fixed: right-clicking a message sometimes opened no menu.** A
+  right-click between two messages of a conversation or at the reader's
+  edge found no message and did nothing, and in a message opened in its own
+  window a right-click on the text never opened a menu at all. Over a link
+  or a picture it opened a short menu of the link's or picture's own
+  instead of the message's. The reader now opens the message's menu wherever
+  it is clicked (the nearest message's, between two), in the main window and
+  in a message's own window. A link adds Open Link and Copy Link Address
+  (Copy Email Address for a mail link) at the top, a picture adds Save
+  Image As… and Copy Image, and selected text adds Copy. Escape now closes
+  the small menu an address opens.
 - **Fixed: a blank conversation count on a grey selected row.** When the
   message list does not have the keyboard focus, the selected row turns grey,
   and its conversation chip showed a white pill with no number in it. The

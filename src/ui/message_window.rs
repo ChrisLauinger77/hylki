@@ -132,6 +132,8 @@ pub enum MessageWindowInput {
     ComposeTo(String),
     /// "Add to Contacts" from an address's right-click menu.
     AddContactAddr(String),
+    /// A right-click in the message: its menu, at this window's point (x, y).
+    CardMenu { message: Box<Message>, x: f64, y: f64, hit: crate::ui::message_view::MenuHit },
     /// A card's Unsubscribe button — handed to the app, which owns the
     /// request.
     Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
@@ -189,6 +191,8 @@ pub enum MessageWindowOutput {
     AllowSender(String),
     /// An email address in a card header was clicked — compose to it.
     ComposeTo(String),
+    /// A right-click in the message: the app shows its menu over this window.
+    CardMenu { message: Box<Message>, x: f64, y: f64, hit: crate::ui::message_view::MenuHit },
     /// The window was closed.
     Closed,
 }
@@ -342,10 +346,11 @@ impl Component for MessageWindow {
                 }
                 MessageViewOutput::ContactSender(m) => MessageWindowInput::ContactFor(m),
                 MessageViewOutput::MarkSeen { .. } => MessageWindowInput::Ignore,
-                // The standalone window has no list menu, nor a folder picker.
-                MessageViewOutput::CardMenu { .. } | MessageViewOutput::CardMoveTo { .. } => {
-                    MessageWindowInput::Ignore
+                MessageViewOutput::CardMenu { message, x, y, hit } => {
+                    MessageWindowInput::CardMenu { message, x, y, hit }
                 }
+                // The standalone window has no folder picker.
+                MessageViewOutput::CardMoveTo { .. } => MessageWindowInput::Ignore,
                 MessageViewOutput::SelectCards(_) => MessageWindowInput::Ignore,
                 // A window's cards are never given attachment rows (#213).
                 MessageViewOutput::AttachmentAction { .. } => MessageWindowInput::Ignore,
@@ -604,6 +609,9 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::ComposeTo(addr) => {
                 let _ = sender.output(MessageWindowOutput::ComposeTo(addr));
+            }
+            MessageWindowInput::CardMenu { message, x, y, hit } => {
+                let _ = sender.output(MessageWindowOutput::CardMenu { message, x, y, hit });
             }
         }
     }

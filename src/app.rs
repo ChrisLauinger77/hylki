@@ -1272,7 +1272,15 @@ pub enum AppMsg {
     CardContact(Box<Message>),
     /// A right-click on a reader card: that message's full menu (the list
     /// row's) at window point (x, y).
-    CardMenu { message: Box<Message>, x: f64, y: f64 },
+    /// A reader's right-click: the message's menu at (x, y) in the main
+    /// window, or in the pop-out opened for `popout`.
+    CardMenu {
+        message: Box<Message>,
+        x: f64,
+        y: f64,
+        hit: crate::ui::message_view::MenuHit,
+        popout: Option<(u32, u32)>,
+    },
     /// The reader toolbar's Mark as Read/Unread toggle for the open message.
     ToggleReadCurrent,
     /// A bulk action applied to every selected message.
@@ -2754,8 +2762,8 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::AttachmentAction { account_id, id, index, save } => {
                         AppMsg::CardAttachment { account_id, id, index, save }
                     }
-                    MessageViewOutput::CardMenu { message, x, y } => {
-                        AppMsg::CardMenu { message, x, y }
+                    MessageViewOutput::CardMenu { message, x, y, hit } => {
+                        AppMsg::CardMenu { message, x, y, hit, popout: None }
                     }
                     MessageViewOutput::CardMoveTo { message, x, y } => AppMsg::ListMoveTo {
                         messages: vec![*message],
@@ -8799,8 +8807,8 @@ impl SimpleComponent for AppModel {
                 );
             }
 
-            AppMsg::CardMenu { message, x, y } => {
-                self.show_card_menu(*message, x, y, &sender);
+            AppMsg::CardMenu { message, x, y, hit, popout } => {
+                self.show_card_menu(*message, x, y, hit, popout, &sender);
             }
 
             AppMsg::ListMoveTo { messages, offer_whole, x, y } => {
@@ -13558,24 +13566,53 @@ impl AppModel {
 
     /// The menu a right-click on a reader card opens (the message list
     /// row's menu, for that one message), anchored on the window at (x, y).
-    fn show_card_menu(&self, m: Message, x: f64, y: f64, sender: &ComponentSender<Self>) {
+    fn show_card_menu(
+        &self,
+        m: Message,
+        x: f64,
+        y: f64,
+        hit: crate::ui::message_view::MenuHit,
+        popout: Option<(u32, u32)>,
+        sender: &ComponentSender<Self>,
+    ) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
+        // A pop-out's menu opens over the pop-out, and acts as its own
+        // buttons do; with the window gone there is nothing to anchor to.
+        let parent: gtk::Widget = match popout {
+            Some(key) => match self.popouts.get(&key) {
+                Some(p) => p.window.clone().upcast(),
+                None => return,
+            },
+            None => self.window.clone().upcast(),
+        };
+        let window = parent.clone().downcast::<gtk::Window>().ok();
         // Through the card path: a reply started from a card belongs in the
         // pane's inline composer, like the card's own buttons — the row path
         // would open a compose window. Every other action falls through to
-        // the row behaviour there.
+        // the row behaviour there. A pop-out has no pane, so it takes the row
+        // path, as its toolbar does.
         let item = |action: RowAction, label: String, icon: &str| -> MenuEntry {
             let s = sender.input_sender().clone();
             let message = m.clone();
             MenuEntry::new(label, move || {
-                let _ = s.send(AppMsg::CardAction { action, message: Box::new(message.clone()) });
+                let message = Box::new(message.clone());
+                let _ = s.send(if popout.is_some() {
+                    AppMsg::RowAction { action, message, conversation: Vec::new() }
+                } else {
+                    AppMsg::CardAction { action, message }
+                });
             })
             .icon(format!("{icon}-symbolic"))
         };
         let kind = self.folder_kind(m.account_id, m.folder_id);
         let in_junk = kind == Some(FolderKind::Junk);
         let restorable = matches!(kind, Some(FolderKind::Trash | FolderKind::Junk));
-        let mut sections = vec![
+        let mut sections = Vec::new();
+        let here = crate::ui::message_view::hit_menu_entries(&hit, window);
+        if !here.is_empty() {
+            sections.push(here);
+        }
+        sections.extend([
             vec![
                 item(RowAction::Reply, i18n("Reply"), "mail-reply-sender"),
                 item(RowAction::ReplyAll, i18n("Reply All"), "mail-reply-all"),
@@ -13594,7 +13631,7 @@ impl AppModel {
                     item(RowAction::ToggleRead, i18n("Mark as Unread"), "mail-unread")
                 },
             ],
-        ];
+        ]);
         if !self.tags.is_empty() {
             let s = sender.input_sender().clone();
             let message = m.clone();
@@ -13619,7 +13656,8 @@ impl AppModel {
             }
             acts.push(item(RowAction::Spam, i18n("Mark as Spam"), "mail-mark-junk"));
         }
-        {
+        // The folder picker opens over the main window, so not from a pop-out.
+        if popout.is_none() {
             let s = sender.input_sender().clone();
             let message = m.clone();
             acts.push(
@@ -13658,7 +13696,7 @@ impl AppModel {
             .icon(format!("{icon}-symbolic"))]);
         }
         sections.push(vec![item(RowAction::ViewSource, i18n("View Source"), "code")]);
-        show_context_menu(&self.window, x, y, sections);
+        show_context_menu(&parent, x, y, sections);
     }
 
     /// Whether a read/unread change for a message in `path` is still on its
@@ -14031,6 +14069,9 @@ impl AppModel {
                     AppMsg::InviteAction { message, invite, action }
                 }
                 MessageWindowOutput::ComposeTo(addr) => AppMsg::ComposeTo(addr),
+                MessageWindowOutput::CardMenu { message, x, y, hit } => {
+                    AppMsg::CardMenu { message, x, y, hit, popout: Some(key) }
+                }
                 MessageWindowOutput::Closed => AppMsg::PopoutClosed(key),
             });
 
