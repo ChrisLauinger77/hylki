@@ -4310,26 +4310,36 @@ impl SimpleComponent for AppModel {
                 s.input(AppMsg::ShowcaseDeleteAttachment { name, confirmed });
             });
         }
-        if let Some((a, id)) = std::env::var("HYLKI_SHOWCASE_SELECT").ok().and_then(|v| {
-            let (a, id) = v.split_once(':')?;
-            Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?))
-        }) {
-            let at: u32 = std::env::var("HYLKI_SHOWCASE_SELECT_AT")
+        // Several may be given, comma-separated, each with its own
+        // @<seconds>, to open one message and then another.
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_SELECT") {
+            let default_at: u32 = std::env::var("HYLKI_SHOWCASE_SELECT_AT")
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(5);
-            let list = model.message_list.sender().clone();
-            gtk::glib::timeout_add_seconds_local_once(at, move || {
-                let _ = list.send(MessageListInput::SelectAndLoad((a, id)));
-            });
+            for item in v.split(',') {
+                let (item, at) = showcase_at(item, default_at);
+                let Some((a, id)) = item
+                    .split_once(':')
+                    .and_then(|(a, id)| Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?)))
+                else {
+                    continue;
+                };
+                let list = model.message_list.sender().clone();
+                gtk::glib::timeout_add_seconds_local_once(at, move || {
+                    let _ = list.send(MessageListInput::SelectAndLoad((a, id)));
+                });
+            }
         }
-        // HYLKI_SHOWCASE_INBOX=<account> switches to that account's Inbox
-        // at 3 s (the first account's when it is not a number), real
-        // accounts included, for the same probe from a folder view.
+        // HYLKI_SHOWCASE_INBOX=<account>[@<seconds>] switches to that
+        // account's Inbox at 3 s or the time given (the first account's when
+        // it is not a number), real accounts included, for the same probe
+        // from a folder view.
         if let Ok(v) = std::env::var("HYLKI_SHOWCASE_INBOX") {
+            let (v, at) = showcase_at(&v, 3);
             let account = v.parse::<u32>().ok().filter(|a| *a > 0);
             let s = sender.clone();
-            gtk::glib::timeout_add_seconds_local_once(3, move || {
+            gtk::glib::timeout_add_seconds_local_once(at, move || {
                 s.input(AppMsg::ShowcaseFolder { kind: FolderKind::Inbox, account });
             });
         }
@@ -4723,9 +4733,9 @@ impl SimpleComponent for AppModel {
                 // selected message, to check the composer's grounds (#148).
                 // HYLKI_SHOWCASE_FLIP=dark|light then switches the app theme
                 // at 6 s, to check a live flip re-resolves those grounds.
-                // HYLKI_SHOWCASE_FOLDER=drafts|sent|archive|junk|trash switches
-                // to that folder at 2 s, before the staging's 3 s selection
-                // moves onto its first row.
+                // HYLKI_SHOWCASE_FOLDER=drafts|sent|archive|junk|trash[@<s>]
+                // switches to that folder at 2 s, before the staging's 3 s
+                // selection moves onto its first row, or at the time given.
                 // HYLKI_SHOWCASE_FOCUS=<seconds> switches Focus Mode on at
                 // that moment (its parts as saved in focus.toml), so a
                 // capture a little later catches the slide, and one later
@@ -4741,8 +4751,9 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
-                if let Ok(kind) = std::env::var("HYLKI_SHOWCASE_FOLDER") {
-                    let kind = match kind.as_str() {
+                if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FOLDER") {
+                    let (kind, at) = showcase_at(&v, 2);
+                    let kind = match kind {
                         "drafts" => Some(FolderKind::Drafts),
                         "sent" => Some(FolderKind::Sent),
                         "archive" => Some(FolderKind::Archive),
@@ -4752,7 +4763,7 @@ impl SimpleComponent for AppModel {
                     };
                     if let Some(kind) = kind {
                         let s = sender.clone();
-                        gtk::glib::timeout_add_seconds_local_once(2, move || {
+                        gtk::glib::timeout_add_seconds_local_once(at, move || {
                             s.input(AppMsg::ShowcaseFolder { kind, account: None });
                         });
                     }
@@ -20392,6 +20403,15 @@ fn scroll_all_to(w: &gtk::Widget, frac: f64) {
     while let Some(c) = child {
         scroll_all_to(&c, frac);
         child = c.next_sibling();
+    }
+}
+
+/// A showcase value with an optional `@<seconds>` after it: the value, and
+/// the seconds or `default`.
+fn showcase_at(v: &str, default: u32) -> (&str, u32) {
+    match v.rsplit_once('@') {
+        Some((value, at)) => (value, at.parse().unwrap_or(default)),
+        None => (v, default),
     }
 }
 
