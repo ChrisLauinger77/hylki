@@ -3182,6 +3182,13 @@ fn load_state() -> StateFile {
         .unwrap_or_default()
 }
 
+/// Change one thing in state.toml.
+fn update_state(change: impl FnOnce(&mut StateFile)) {
+    let mut s = load_state();
+    change(&mut s);
+    save_state(&s);
+}
+
 fn save_state(state: &StateFile) {
     let Some(path) = state_path() else {
         return;
@@ -3261,15 +3268,11 @@ pub fn load_app_icon_generation() -> u32 {
 }
 
 pub fn save_app_icon_generation(generation: u32) {
-    let mut s = load_state();
-    s.app_icon_generation = generation;
-    save_state(&s);
+    update_state(|s| s.app_icon_generation = generation);
 }
 
 pub fn save_app_icon(id: &str) {
-    let mut s = load_state();
-    s.app_icon = Some(id.to_string());
-    save_state(&s);
+    update_state(|s| s.app_icon = Some(id.to_string()));
 }
 
 /// Whether the one-time Mint keyring setup tip has already been dismissed.
@@ -3358,30 +3361,22 @@ pub fn save_fetch_mode(email: &str, use_envelope: bool, previews_rejected: bool)
 }
 
 pub fn save_drawer_collapsed(collapsed: bool) {
-    let mut s = load_state();
-    s.drawer_collapsed = collapsed;
-    save_state(&s);
+    update_state(|s| s.drawer_collapsed = collapsed);
 }
 
 /// Persist the attachment drawer's expanded (dragged) height.
 pub fn save_drawer_height(height: i32) {
-    let mut s = load_state();
-    s.drawer_height = height.clamp(96, 4000);
-    save_state(&s);
+    update_state(|s| s.drawer_height = height.clamp(96, 4000));
 }
 
 /// Persist the attachment drawer's view mode (list vs. thumbnail grid).
 pub fn save_drawer_list_view(list_view: bool) {
-    let mut s = load_state();
-    s.drawer_list_view = list_view;
-    save_state(&s);
+    update_state(|s| s.drawer_list_view = list_view);
 }
 
 /// Persist the attachment drawer's list sort direction.
 pub fn save_drawer_sort_desc(desc: bool) {
-    let mut s = load_state();
-    s.drawer_sort_desc = desc;
-    save_state(&s);
+    update_state(|s| s.drawer_sort_desc = desc);
 }
 
 /// The attachments gallery's remembered view settings:
@@ -3397,23 +3392,17 @@ pub fn load_gallery_view() -> (bool, i32, u32) {
 
 /// Persist whether the attachments gallery shows the table view.
 pub fn save_gallery_table_view(table: bool) {
-    let mut s = load_state();
-    s.gallery_table_view = table;
-    save_state(&s);
+    update_state(|s| s.gallery_table_view = table);
 }
 
 /// Persist the attachments gallery's thumbnail width.
 pub fn save_gallery_thumb_width(width: i32) {
-    let mut s = load_state();
-    s.gallery_thumb_width = width;
-    save_state(&s);
+    update_state(|s| s.gallery_thumb_width = width);
 }
 
 /// Persist the attachments gallery's sort criterion (dropdown row index).
 pub fn save_gallery_sort(sort: u32) {
-    let mut s = load_state();
-    s.gallery_sort = sort;
-    save_state(&s);
+    update_state(|s| s.gallery_sort = sort);
 }
 
 /// One per-folder gallery override as it is stored: "<account id>\t<path>\t<0|1>".
@@ -3469,9 +3458,7 @@ pub fn load_split_reply_height() -> i32 {
 }
 
 pub fn save_split_reply_height(height: i32) {
-    let mut s = load_state();
-    s.split_reply_height = height.clamp(220, 4000);
-    save_state(&s);
+    update_state(|s| s.split_reply_height = height.clamp(220, 4000));
 }
 
 pub fn load_about_height() -> i32 {
@@ -3479,9 +3466,7 @@ pub fn load_about_height() -> i32 {
 }
 
 pub fn save_about_height(height: i32) {
-    let mut s = load_state();
-    s.about_height = height.clamp(400, 4000);
-    save_state(&s);
+    update_state(|s| s.about_height = height.clamp(400, 4000));
 }
 
 /// The message-list pane's remembered width (clamped to something sane).
@@ -3491,9 +3476,7 @@ pub fn load_list_pane_width() -> i32 {
 
 /// Persist the message-list pane's width (#28).
 pub fn save_list_pane_width(width: i32) {
-    let mut s = load_state();
-    s.list_pane_width = width.clamp(324, 4000);
-    save_state(&s);
+    update_state(|s| s.list_pane_width = width.clamp(324, 4000));
 }
 
 /// The contacts view's remembered list-pane width (280 is also its floor).
@@ -3502,9 +3485,7 @@ pub fn load_contacts_pane_width() -> i32 {
 }
 
 pub fn save_contacts_pane_width(width: i32) {
-    let mut s = load_state();
-    s.contacts_pane_width = width.clamp(280, 4000);
-    save_state(&s);
+    update_state(|s| s.contacts_pane_width = width.clamp(280, 4000));
 }
 
 
