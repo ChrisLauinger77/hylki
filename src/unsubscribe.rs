@@ -773,7 +773,7 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
     };
     let mut to: Vec<String> = addr_part
         .split(',')
-        .map(|a| percent_decode(a, false))
+        .map(|a| crate::percent::decode(a, false))
         .map(|a| a.trim().to_string())
         .filter(|a| a.contains('@'))
         .collect();
@@ -784,7 +784,7 @@ pub fn parse_mailto(uri: &str) -> Option<MailtoTarget> {
         let key = k.to_ascii_lowercase();
         // An address keeps its `+` (plus-addressing, `list+token@…`); only
         // the text fields read it as a space, as form-encoded links write it.
-        let v = percent_decode(v, !matches!(key.as_str(), "to" | "cc"));
+        let v = crate::percent::decode(v, !matches!(key.as_str(), "to" | "cc"));
         match key.as_str() {
             "subject" => subject = v,
             "body" => body = v,
@@ -812,28 +812,6 @@ fn strip_scheme<'a>(uri: &'a str, scheme: &str) -> Option<&'a str> {
     let uri = uri.trim();
     (uri.len() >= scheme.len() && uri[..scheme.len()].eq_ignore_ascii_case(scheme))
         .then(|| &uri[scheme.len()..])
-}
-
-/// `%20` back to a character, for a mailto component; `+` too, when
-/// `plus_is_space`, which only a text field (subject, body) wants.
-fn percent_decode(s: &str, plus_is_space: bool) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(h) =
-                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("zz"), 16)
-            {
-                out.push(h);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(if plus_is_space && bytes[i] == b'+' { b' ' } else { bytes[i] });
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Send the RFC 8058 one-click request: a POST of `List-Unsubscribe=One-Click`

@@ -372,11 +372,11 @@ pub fn run_flow(settings: &OAuthSettings) -> Result<FlowResult, String> {
         "{base}?response_type=code&client_id={cid}&redirect_uri={redir}&scope={scope}\
          &code_challenge={chal}&code_challenge_method=S256&state={state}{offline}",
         base = settings.auth_url,
-        cid = pct(&settings.client_id),
-        redir = pct(&redirect),
-        scope = pct(&settings.scopes),
-        chal = pct(&challenge),
-        state = pct(&state),
+        cid = crate::percent::encode(&settings.client_id),
+        redir = crate::percent::encode(&redirect),
+        scope = crate::percent::encode(&settings.scopes),
+        chal = crate::percent::encode(&challenge),
+        state = crate::percent::encode(&state),
     );
 
     // Open the system browser (via the OpenURI portal, so it works in a Flatpak).
@@ -515,7 +515,7 @@ fn parse_redirect(request_line: &str) -> (Option<String>, Option<String>) {
     let mut state = None;
     for pair in query.split('&') {
         if let Some((k, v)) = pair.split_once('=') {
-            let value = pct_decode(v);
+            let value = crate::percent::decode(v, true);
             match k {
                 "code" => code = Some(value),
                 "state" => state = Some(value),
@@ -526,8 +526,6 @@ fn parse_redirect(request_line: &str) -> (Option<String>, Option<String>) {
     (code, state)
 }
 
-const UNRESERVED: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-
 /// The PKCE S256 code challenge for a verifier: base64url(SHA-256(verifier)),
 /// without padding (RFC 7636 §4.2).
 fn pkce_challenge(verifier: &str) -> String {
@@ -537,54 +535,6 @@ fn pkce_challenge(verifier: &str) -> String {
         sha2::Sha256::digest(verifier.as_bytes()),
     )
 }
-
-/// Percent-encode a query value (encode everything but the unreserved set).
-fn pct(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        if UNRESERVED.contains(&b) {
-            out.push(b as char);
-        } else {
-            out.push_str(&format!("%{b:02X}"));
-        }
-    }
-    out
-}
-
-/// Minimal percent-decode for redirect query values.
-fn pct_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'%' if i + 2 < bytes.len() => {
-                let hi = (bytes[i + 1] as char).to_digit(16);
-                let lo = (bytes[i + 2] as char).to_digit(16);
-                if let (Some(h), Some(l)) = (hi, lo) {
-                    out.push((h * 16 + l) as u8);
-                    i += 3;
-                    continue;
-                }
-                out.push(b'%');
-                i += 1;
-            }
-            b'+' => {
-                out.push(b' ');
-                i += 1;
-            }
-            c => {
-                out.push(c);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-
-
-
 
 #[cfg(test)]
 mod tests {

@@ -20562,7 +20562,7 @@ fn parse_mid(uri: &str) -> Option<String> {
     // GLib normalizes a scheme it does not know to `mid:///…` on the way
     // through GFile (and decodes some of the escapes), so leading slashes
     // are not part of the id.
-    let decoded = crate::ui::rich_editor::percent_decode(rest.trim_start_matches('/'));
+    let decoded = crate::percent::decode(rest.trim_start_matches('/'), false);
     // An optional `/content-id` follows the message-id. Slashes are legal
     // inside a message-id's left part (GitHub's have several), so only a
     // slash after the `@`, in the domain part, ends the id.
@@ -20615,28 +20615,6 @@ fn notified_message(
         .find(|m| m.id == message_id)
 }
 
-/// Percent-decode for mailto components (RFC 6068): `%XX` only — `+` stays
-/// literal, because plus-addressing (`user+tag@example.com`) is a real thing.
-fn pct_decode_mailto(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let hi = (bytes[i + 1] as char).to_digit(16);
-            let lo = (bytes[i + 2] as char).to_digit(16);
-            if let (Some(h), Some(l)) = (hi, lo) {
-                out.push((h * 16 + l) as u8);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 /// Turn a `mailto:` URI into a composer prefill (RFC 6068: address part plus
 /// to/cc/bcc/subject/body query keys, all percent-encoded).
 fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefill> {
@@ -20646,13 +20624,14 @@ fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefill> {
     // opens `mailto:///?attach=…` (#90), and sloppy generators write
     // `mailto://user@host` URL-style.
     let addr = addr.trim_start_matches('/');
-    let mut to = pct_decode_mailto(addr);
+    // `+` stays literal: plus-addressing (`user+tag@example.com`) is real.
+    let mut to = crate::percent::decode(addr, false);
     let (mut cc, mut bcc, mut subject, mut body) =
         (String::new(), String::new(), String::new(), String::new());
     let mut attachments: Vec<std::path::PathBuf> = Vec::new();
     for pair in query.split('&').filter(|p| !p.is_empty()) {
         let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        let v = pct_decode_mailto(v);
+        let v = crate::percent::decode(v, false);
         match k.to_ascii_lowercase().as_str() {
             // A second `to` joins the address part, comma-separated.
             "to" if !v.is_empty() => {

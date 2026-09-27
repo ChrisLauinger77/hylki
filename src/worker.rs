@@ -6618,7 +6618,7 @@ async fn emit_graph_body_hits(
         let term = format!("\"body:{}\"", needle.replace('"', " "));
         let url = format!(
             "{GRAPH_BASE}/me/mailFolders/{gid}/messages?$search={}&$select=id&$top=250",
-            url_query_encode(&term)
+            crate::percent::encode(&term)
         );
         let t = token.to_string();
         let found = tokio::task::spawn_blocking(move || graph_paged(&t, &url, 250))
@@ -6640,18 +6640,6 @@ async fn emit_graph_body_hits(
     }
     tracing::info!("filter: Graph body search over {} messages hit {}", listed.len(), hits.len());
     emit(WorkerEvent::BodyHits { folder_id, hits });
-}
-
-/// Percent-encode a URL query value (everything but the unreserved set).
-fn url_query_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() * 3);
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
 }
 
 fn cached_folder_kind(cache: Option<&Cache>, account_id: u32, path: &str) -> Option<FolderKind> {
@@ -9676,7 +9664,9 @@ fn inline_cid_images(
             .iter()
             .position(|b| matches!(b, b'"' | b'\'' | b'>' | b')' | b' ' | b'\t' | b'\r' | b'\n'))
             .map_or(html.len(), |n| start + n);
-        let key = normalize(&percent_decode(&html[start..end]));
+        // `cid:` values are percent-encoded when they contain URI-reserved
+        // characters (Gmail's ids embed an `@`, which some senders write as `%40`).
+        let key = normalize(&crate::percent::decode(&html[start..end], false));
         if key.is_empty() {
             i = end.max(i + 1);
             continue;
@@ -9722,36 +9712,6 @@ fn is_href(bytes: &[u8], at: usize) -> bool {
         j -= 1;
     }
     j >= 4 && bytes[j - 4..j].eq_ignore_ascii_case(b"href")
-}
-
-/// Decode `%XX` escapes in a URI reference, leaving anything else untouched.
-/// `cid:` values are percent-encoded when they contain URI-reserved characters
-/// (Gmail's ids embed an `@`, which some senders write as `%40`).
-fn percent_decode(s: &str) -> String {
-    if !s.contains('%') {
-        return s.to_string();
-    }
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        let hex = (i + 2 < bytes.len())
-            .then(|| std::str::from_utf8(&bytes[i + 1..i + 3]).ok())
-            .flatten()
-            .filter(|_| bytes[i] == b'%')
-            .and_then(|h| u8::from_str_radix(h, 16).ok());
-        match hex {
-            Some(byte) => {
-                out.push(byte);
-                i += 3;
-            }
-            None => {
-                out.push(bytes[i]);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// The `image/<subtype>` MIME type of a part, if it is an image we can inline.
@@ -13589,13 +13549,6 @@ mod tests {
         assert_eq!(body_search_query("1", r#"say "hi" \now"#), r#"UID 1 BODY "say \"hi\" \\now""#);
         assert_eq!(body_search_query("1", "café"), r#"CHARSET UTF-8 UID 1 BODY "café""#);
         assert_eq!(body_search_query("1", "a\r\nb"), r#"UID 1 BODY "ab""#);
-    }
-
-    #[test]
-    fn url_query_values_are_percent_encoded() {
-        assert_eq!(url_query_encode("\"body:opt out\""), "%22body%3Aopt%20out%22");
-        assert_eq!(url_query_encode("a-b_c.d~e"), "a-b_c.d~e");
-        assert_eq!(url_query_encode("é"), "%C3%A9");
     }
 
     #[test]

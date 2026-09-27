@@ -2129,12 +2129,12 @@ fn local_image_data_uri(value: &str, base: Option<&std::path::Path>, max: u64) -
     let v = value.trim();
     let lower = v.to_ascii_lowercase();
     let path = if let Some(rest) = lower.strip_prefix("file://") {
-        std::path::PathBuf::from(percent_decode(&v[v.len() - rest.len()..]))
+        std::path::PathBuf::from(crate::percent::decode(&v[v.len() - rest.len()..], false))
     } else if lower.contains(':') && !lower.starts_with('/') && !lower.starts_with('.') {
         // Some other scheme (http, https, data, cid, mailto…): not ours.
         return None;
     } else {
-        let p = std::path::PathBuf::from(percent_decode(v));
+        let p = std::path::PathBuf::from(crate::percent::decode(v, false));
         if p.is_absolute() {
             p
         } else {
@@ -2157,25 +2157,6 @@ fn local_image_data_uri(value: &str, base: Option<&std::path::Path>, max: u64) -
     }
     let data = std::fs::read(&path).ok()?;
     Some(format!("data:{mime};base64,{}", crate::oauth::base64_encode(&data)))
-}
-
-/// `%20` and friends back to characters, for a path or id that came as a URL.
-pub(crate) fn percent_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(h) = u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("zz"), 16) {
-                out.push(h);
-                i += 3;
-                continue;
-            }
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Re-ground an open editor document (#148): the color scheme and the page

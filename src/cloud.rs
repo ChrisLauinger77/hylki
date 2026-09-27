@@ -416,23 +416,6 @@ fn expiry(account: &CloudAccount) -> Option<String> {
     })
 }
 
-/// Percent-encode one path segment for a URL.
-fn seg(s: &str) -> String {
-    let mut out = String::new();
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
-
-/// Percent-encode a whole path, keeping its slashes.
-fn pct_path(p: &str) -> String {
-    p.split('/').map(seg).collect::<Vec<_>>().join("/")
-}
-
 fn http_err(what: &str, e: ureq::Error) -> String {
     match e {
         ureq::Error::Status(401, _) | ureq::Error::Status(403, _) => {
@@ -621,7 +604,7 @@ fn auth(account: &CloudAccount, password: &str) -> String {
 }
 
 fn dav_root(account: &CloudAccount) -> String {
-    format!("{}/remote.php/dav/files/{}", account.base(), seg(account.user.trim()))
+    format!("{}/remote.php/dav/files/{}", account.base(), crate::percent::encode(account.user.trim()))
 }
 
 /// The OCS user endpoint answers with the display name.
@@ -664,7 +647,7 @@ fn nextcloud_upload_and_share(
     let mut dir = String::new();
     for part in folder.split('/').filter(|p| !p.is_empty()) {
         dir.push('/');
-        dir.push_str(&seg(part));
+        dir.push_str(&crate::percent::encode(part));
         let r = ureq::request("MKCOL", &format!("{root}{dir}"))
             .set("Authorization", &authz)
             .call();
@@ -677,7 +660,7 @@ fn nextcloud_upload_and_share(
     // A name that is free.
     let mut remote = name.clone();
     let exists = |n: &str| {
-        ureq::head(&format!("{root}{dir}/{}", seg(n)))
+        ureq::head(&format!("{root}{dir}/{}", crate::percent::encode(n)))
             .set("Authorization", &authz)
             .call()
             .is_ok()
@@ -686,7 +669,7 @@ fn nextcloud_upload_and_share(
         remote = stamped_name(&name);
     }
 
-    let target = format!("{root}{dir}/{}", seg(&remote));
+    let target = format!("{root}{dir}/{}", crate::percent::encode(&remote));
     if account.cloudflare && size > CLOUDFLARE_CHUNK {
         // Chunked upload (the "uploads" DAV endpoint): the pieces go into a
         // one-off folder, numbered so they sort in order, and a MOVE of its
@@ -696,7 +679,7 @@ fn nextcloud_upload_and_share(
         let upload = format!(
             "{}/remote.php/dav/uploads/{}/hylki-{}",
             account.base(),
-            seg(account.user.trim()),
+            crate::percent::encode(account.user.trim()),
             crate::rng::token(12).map_err(|e| e.to_string())?
         );
         ureq::request("MKCOL", &upload)
@@ -1208,7 +1191,7 @@ fn seafile_upload_and_share(
     for part in folder.split('/').filter(|p| !p.is_empty()) {
         dir.push('/');
         dir.push_str(part);
-        let url = format!("{base}/api2/repos/{repo}/dir/?p={}", pct_path(&dir));
+        let url = format!("{base}/api2/repos/{repo}/dir/?p={}", crate::percent::encode_path(&dir));
         let there = ureq::get(&url).set("Authorization", &authz).timeout(Duration::from_secs(60)).call();
         match there {
             Ok(_) => {}
@@ -1225,7 +1208,7 @@ fn seafile_upload_and_share(
     let parent = if dir.is_empty() { "/".to_string() } else { dir.clone() };
 
     // The upload goes to a one-off link from the file server.
-    let link: serde_json::Value = ureq::get(&format!("{base}/api2/repos/{repo}/upload-link/?p={}", pct_path(&parent)))
+    let link: serde_json::Value = ureq::get(&format!("{base}/api2/repos/{repo}/upload-link/?p={}", crate::percent::encode_path(&parent)))
         .set("Authorization", &authz)
         .timeout(Duration::from_secs(60))
         .call()
@@ -1394,7 +1377,7 @@ fn onedrive_item(path: &str) -> String {
     if path.is_empty() {
         format!("{GRAPH}/me/drive/root")
     } else {
-        format!("{GRAPH}/me/drive/root:/{}", pct_path(path))
+        format!("{GRAPH}/me/drive/root:/{}", crate::percent::encode_path(path))
     }
 }
 
@@ -1582,13 +1565,6 @@ mod tests {
         assert_eq!(a.base(), "https://cloud.example.com");
         a.url = "http://localhost:8080/nextcloud/".into();
         assert_eq!(a.base(), "http://localhost:8080/nextcloud");
-    }
-
-    #[test]
-    fn dav_segments_are_encoded() {
-        assert_eq!(seg("Q3 report.pdf"), "Q3%20report.pdf");
-        assert_eq!(seg("caf\u{e9}"), "caf%C3%A9");
-        assert_eq!(pct_path("/Hylki/Q3 report.pdf"), "/Hylki/Q3%20report.pdf");
     }
 
     #[test]
