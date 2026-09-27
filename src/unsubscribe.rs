@@ -38,7 +38,8 @@ use crate::models::{ReplyRoute, Unsubscribe};
 const ONE_CLICK: &str = "list-unsubscribe=one-click";
 
 /// Read everything a raw message offers, headers and body.
-pub fn detect_raw(raw: &[u8]) -> Option<Unsubscribe> {
+#[cfg(test)]
+fn detect_raw(raw: &[u8]) -> Option<Unsubscribe> {
     let parsed = mail_parser::MessageParser::default().parse(raw)?;
     detect(&parsed)
 }

@@ -3818,15 +3818,6 @@ pub fn save_app_icon(id: &str) {
     save_state(&s);
 }
 
-/// Whether this install has any settings on disk at all — how a build that
-/// changes a default tells an existing install from a fresh one.
-pub fn settings_on_disk() -> bool {
-    let Some(dir) = config_base().map(|b| b.join("hylki")) else { return false };
-    ["accounts.toml", "privacy.toml", "state.toml", "sidebar.toml", "window.toml"]
-        .iter()
-        .any(|f| dir.join(f).exists())
-}
-
 /// Whether the one-time Mint keyring setup tip has already been dismissed.
 pub fn mint_keyring_help_dismissed() -> bool {
     load_state().mint_keyring_help_dismissed

@@ -533,7 +533,8 @@ fn bundled_entry(email: &str) -> Option<&'static LogoEntry> {
 }
 
 /// Whether a sender has a bundled mark (shown with no request made).
-pub fn has_bundled(email: &str) -> bool {
+#[cfg(test)]
+fn has_bundled(email: &str) -> bool {
     !is_mailbox_host(email) && bundled_entry(email).is_some()
 }
 

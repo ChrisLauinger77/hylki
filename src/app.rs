@@ -1599,7 +1599,6 @@ pub enum AppMsg {
     Reply,
     ReplyAll,
     Forward,
-    AddToContacts,
     AddContactAddr(String),
     OpenMailto(String),
     /// Ctrl+C while the reader's view does not hold the keyboard.
@@ -6868,12 +6867,6 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::AddToContacts => {
-                if let Some(m) = self.reply_target() {
-                    self.show_add_contact_dialog(&m.from_name, &m.from_addr, &sender);
-                }
-            }
-
             AppMsg::AddContactAddr(addr) => {
                 // From an address's right-click menu: only the address is
                 // known; the dialog's name field starts blank for the user.
@@ -9852,7 +9845,7 @@ impl SimpleComponent for AppModel {
                     .filter(|m| !m.message_id.is_empty())
                     .map(|m| (m.message_id.as_str(), (m.uid, m.id)))
                     .collect();
-                let mut renumber = |m: &mut Message| {
+                let renumber = |m: &mut Message| {
                     if m.account_id != account_id || m.folder_id != folder_id {
                         return;
                     }
@@ -20033,7 +20026,7 @@ fn md_column(md: &str) -> gtk::Box {
 
     let mut blocks: Vec<Block> = Vec::new();
     let mut cur: Option<Block> = None;
-    let mut flush = |cur: &mut Option<Block>, blocks: &mut Vec<Block>| {
+    let flush = |cur: &mut Option<Block>, blocks: &mut Vec<Block>| {
         if let Some(b) = cur.take() {
             blocks.push(b);
         }

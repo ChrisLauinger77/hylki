@@ -40,8 +40,6 @@ pub enum CloudKind {
 }
 
 impl CloudKind {
-    pub const ALL: [CloudKind; 4] = [CloudKind::Nextcloud, CloudKind::OneDrive, CloudKind::Dropbox, CloudKind::Seafile];
-
     /// Signed in through GNOME Online Accounts: no secret of ours.
     pub fn via_goa(self) -> bool {
         self == CloudKind::OneDrive

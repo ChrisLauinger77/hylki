@@ -3,7 +3,6 @@ use crate::i18n::{i18n, i18n_f};
 
 /// A configured mail account (one IMAP/SMTP identity).
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // `id` and `accent` are used once multi-account lands.
 pub struct Account {
     pub id: u32,
     pub name: String,
@@ -316,12 +315,6 @@ impl SenderTrust {
             SenderTrust::Suspicious => "trust-suspicious",
             SenderTrust::Fail => "trust-fail",
         }
-    }
-
-    /// Whether this verdict deserves a banner across the top of the message
-    /// rather than just a badge beside the sender.
-    pub fn is_alarming(self) -> bool {
-        matches!(self, SenderTrust::Suspicious | SenderTrust::Fail)
     }
 }
 
