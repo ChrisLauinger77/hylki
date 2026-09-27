@@ -479,92 +479,31 @@ const EMOJI: &[(&str, &str)] = &[
     ("arrow_down", "\u{2B07}\u{FE0F}"), ("link", "\u{1F517}"), ("bookmark", "\u{1F516}"),
 ];
 
-/// Every presentational rule the finished HTML needs, as `style`
-/// attributes. A `<style>` block would be stripped by most webmail clients
-/// before the recipient ever saw it, so the styling has to ride on the tags
-/// themselves.
-///
-/// An attribute the writer already produced (a table cell's alignment) is
-/// kept and wins, since it is appended after ours.
-fn inline_styles(html: &str) -> String {
-    // The code inside a fence needs none of the inline-code treatment; hide
-    // those pairs while `code` is styled, then put them back styled as a
-    // block.
-    const FENCE: &str = "\u{0}FENCE\u{0}";
-    let mut out = html.replace("<pre><code", FENCE);
-    for (tag, css) in [
-        ("code", "background:rgba(128,128,128,0.12);padding:1px 4px;border-radius:4px;\
-                  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.95em"),
-        ("table", "border-collapse:collapse;margin:8px 0"),
-        ("th", "border:1px solid rgba(128,128,128,0.45);padding:6px 10px;\
-                background:rgba(128,128,128,0.12);text-align:left"),
-        ("td", "border:1px solid rgba(128,128,128,0.45);padding:6px 10px"),
-        ("blockquote", "margin:0 0 0 8px;padding-left:10px;\
-                        border-left:3px solid rgba(128,128,128,0.4)"),
-        ("hr", "border:none;border-top:1px solid rgba(128,128,128,0.4);margin:14px 0"),
-        ("img", "max-width:100%;height:auto"),
-        ("dt", "font-weight:600;margin-top:6px"),
-        ("dd", "margin:0 0 4px 20px"),
-        ("kbd", "border:1px solid rgba(128,128,128,0.5);border-radius:4px;padding:0 4px;\
-                 font-family:ui-monospace,monospace;font-size:0.9em"),
-    ] {
-        out = add_style(&out, tag, css);
-    }
-    out = out.replace(
-        FENCE,
-        "<pre style=\"background:rgba(128,128,128,0.12);padding:10px 12px;border-radius:6px;\
-         overflow:auto;white-space:pre-wrap;word-wrap:break-word\"><code \
-         style=\"font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.95em\"",
-    );
-    out = out.replace("<input disabled=\"\" type=\"checkbox\"", "<input disabled=\"\" type=\"checkbox\" style=\"margin-right:6px\"");
-    out = out.replace(
-        "<div class=\"footnote-definition\"",
-        "<div class=\"footnote-definition\" style=\"font-size:0.92em;opacity:0.85\"",
-    );
-    out
-}
+/// The look of what Markdown produces, written onto each element with
+/// css-inline, since mail clients drop `<style>` blocks. Fenced code is a
+/// block: `pre code` takes back the inline-code treatment.
+const SHEET: &str = "\
+    code{background:rgba(128,128,128,0.12);padding:1px 4px;border-radius:4px;\
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.95em}\
+    pre{background:rgba(128,128,128,0.12);padding:10px 12px;border-radius:6px;\
+      overflow:auto;white-space:pre-wrap;word-wrap:break-word}\
+    pre code{background:none;padding:0;border-radius:0}\
+    table{border-collapse:collapse;margin:8px 0}\
+    th{border:1px solid rgba(128,128,128,0.45);padding:6px 10px;\
+      background:rgba(128,128,128,0.12);text-align:left}\
+    td{border:1px solid rgba(128,128,128,0.45);padding:6px 10px}\
+    blockquote{margin:0 0 0 8px;padding-left:10px;border-left:3px solid rgba(128,128,128,0.4)}\
+    hr{border:none;border-top:1px solid rgba(128,128,128,0.4);margin:14px 0}\
+    img{max-width:100%;height:auto}\
+    dt{font-weight:600;margin-top:6px}\
+    dd{margin:0 0 4px 20px}\
+    kbd{border:1px solid rgba(128,128,128,0.5);border-radius:4px;padding:0 4px;\
+      font-family:ui-monospace,monospace;font-size:0.9em}\
+    input[type=checkbox]{margin-right:6px}\
+    div.footnote-definition{font-size:0.92em;opacity:0.85}";
 
-/// Give every `<tag>` and `<tag …>` in `html` a `style`, merged with one the
-/// tag already carries.
-fn add_style(html: &str, tag: &str, css: &str) -> String {
-    let open = format!("<{tag}");
-    let mut out = String::with_capacity(html.len() + 64);
-    let mut rest = html;
-    while let Some(at) = rest.find(&open) {
-        out.push_str(&rest[..at]);
-        let after = &rest[at + open.len()..];
-        out.push_str(&open);
-        // `<code` must not match `<codepoint`, and a tag with no `>` is not
-        // a tag at all.
-        let boundary = after.starts_with('>') || after.starts_with(' ') || after.starts_with('/');
-        let close = after.find('>');
-        let (Some(close), true) = (close, boundary) else {
-            rest = after;
-            continue;
-        };
-        let attrs = &after[..close];
-        match attrs.find("style=\"") {
-            // Merged, not appended: HTML keeps the *first* of two attributes
-            // with the same name, so a second `style` would be dropped
-            // whole. Ours goes at the front of the existing value, where the
-            // tag's own rules still override it.
-            Some(p) => {
-                let head = p + "style=\"".len();
-                out.push_str(&attrs[..head]);
-                out.push_str(css);
-                out.push(';');
-                out.push_str(&attrs[head..]);
-            }
-            None => {
-                out.push_str(&format!(" style=\"{css}\""));
-                out.push_str(attrs);
-            }
-        }
-        out.push('>');
-        rest = &after[close + 1..];
-    }
-    out.push_str(rest);
-    out
+fn inline_styles(html: &str) -> String {
+    css_inline::inline_fragment(html, SHEET).unwrap_or_else(|_| html.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,7 +1196,7 @@ mod tests {
 
     #[test]
     fn hard_break_and_escapes() {
-        has(&to_html("one  \ntwo"), "<br />");
+        has(&to_html("one  \ntwo"), "<br>");
         has(&to_html(r"\*not emphasis\*"), "*not emphasis*");
     }
 
@@ -1339,13 +1278,26 @@ mod tests {
         // The writer's own alignment survives the merge into one attribute
         // — two `style`s on a tag and the second is thrown away.
         let aligned = to_html("| a |\n| ---: |\n| 1 |");
-        has(&aligned, "text-align: right");
-        has(&aligned, "padding:6px 10px;text-align: right");
+        has(&aligned, "padding: 6px 10px;text-align: right");
+        assert!(!aligned.contains("text-align: left"), "the sheet's left gave way: {aligned}");
         for tag in ["<th ", "<td "] {
             let at = aligned.find(tag).unwrap();
             let open = &aligned[at..at + aligned[at..].find('>').unwrap()];
             assert_eq!(open.matches("style=").count(), 1, "{open}");
         }
+    }
+
+    /// A fence is a block: the `pre` carries the ground, and the `code`
+    /// inside does not get inline code's own ground and padding as well.
+    #[test]
+    fn fenced_code_is_not_inline_code() {
+        let html = to_html("```\nlet a = 1;\n```\n\nand `b`");
+        let pre = &html[html.find("<pre").unwrap()..html.find("</pre>").unwrap()];
+        let inner = &pre[pre.find("<code").unwrap()..];
+        assert!(pre.starts_with("<pre style=\"background: rgba(128,128,128,0.12)"), "{html}");
+        assert!(inner.contains("background: none") && inner.contains("padding: 0"), "{html}");
+        let inline = &html[html.rfind("<code").unwrap()..];
+        assert!(inline.contains("padding: 1px 4px"), "{html}");
     }
 
     #[test]
