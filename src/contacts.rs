@@ -742,11 +742,7 @@ pub fn writable_books() -> Vec<Book> {
 /// Best-effort display name from the EDS source file for a book UID.
 fn source_display_name(uid: &str) -> Option<String> {
     let path = config_dir()?.join(format!("sources/{uid}.source"));
-    let text = std::fs::read_to_string(path).ok()?;
-    text.lines()
-        .find_map(|l| l.strip_prefix("DisplayName="))
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    crate::platform::keyfile_value(&std::fs::read_to_string(path).ok()?, "Data Source", "DisplayName")
 }
 
 // ---------------------------------------------------------------------------
@@ -760,10 +756,9 @@ fn factory_dest() -> Option<String> {
         let name = entry.file_name().to_string_lossy().to_string();
         if name.contains("AddressBook") && name.ends_with(".service") {
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
-                if let Some(n) = text.lines().find_map(|l| l.strip_prefix("Name=")) {
-                    let n = n.trim();
+                if let Some(n) = crate::platform::keyfile_value(&text, "D-BUS Service", "Name") {
                     if n.contains("AddressBook") {
-                        return Some(n.to_string());
+                        return Some(n);
                     }
                 }
             }
@@ -1009,43 +1004,24 @@ fn registry_books() -> Option<HashMap<String, String>> {
     Some(books)
 }
 
-/// A `Key=value` lookup inside one `[Section]` of a source keyfile.
-fn keyfile_get(data: &str, section: &str, key: &str) -> Option<String> {
-    let mut in_section = false;
-    for line in data.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_section = line.eq_ignore_ascii_case(section);
-            continue;
-        }
-        if in_section {
-            if let Some(v) = line.strip_prefix(key).and_then(|r| r.strip_prefix('=')) {
-                let v = v.trim();
-                return (!v.is_empty()).then(|| v.to_string());
-            }
-        }
-    }
-    None
-}
-
 /// A book's friendly name: which account it belongs to and over what — walked
 /// up the source's parent chain to the account collection, whose backend
 /// (google / microsoft365 / webdav) and identity say it best.
 fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
-    let mut backend = keyfile_get(book_data, "[Address Book]", "BackendName");
+    let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
     let mut identity: Option<String> = None;
-    let mut top_display = keyfile_get(book_data, "[Data Source]", "DisplayName");
+    let mut top_display = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
     let mut current = book_data.to_string();
     for _ in 0..4 {
-        let Some(parent) = keyfile_get(&current, "[Data Source]", "Parent") else { break };
+        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else { break };
         let Some(parent_data) = sources.get(&parent) else { break };
-        if let Some(b) = keyfile_get(parent_data, "[Collection]", "BackendName") {
+        if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
             backend = Some(b);
         }
         if identity.is_none() {
-            identity = keyfile_get(parent_data, "[Collection]", "Identity");
+            identity = crate::platform::keyfile_value(parent_data, "Collection", "Identity");
         }
-        if let Some(d) = keyfile_get(parent_data, "[Data Source]", "DisplayName") {
+        if let Some(d) = crate::platform::keyfile_value(parent_data, "Data Source", "DisplayName") {
             top_display = Some(d);
         }
         current = parent_data.clone();
@@ -1062,22 +1038,9 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
     }
 }
 
-/// Whether a source keyfile's `[Data Source]` section says `Enabled=false`.
+/// Whether a source keyfile's `[Data Source]` group says `Enabled=false`.
 fn data_source_disabled(data: &str) -> bool {
-    let mut in_data_source = false;
-    for line in data.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_data_source = line.eq_ignore_ascii_case("[Data Source]");
-            continue;
-        }
-        if in_data_source {
-            if let Some(v) = line.strip_prefix("Enabled=") {
-                return v.trim().eq_ignore_ascii_case("false");
-            }
-        }
-    }
-    false
+    crate::platform::keyfile(data).and_then(|kf| kf.boolean("Data Source", "Enabled").ok()) == Some(false)
 }
 
 /// Discover the versioned Sources registry bus name (e.g. `…Sources5`).
@@ -1087,8 +1050,8 @@ fn sources_dest() -> Option<String> {
         let name = entry.file_name().to_string_lossy().to_string();
         if name.contains("evolution.dataserver.Sources") && name.ends_with(".service") {
             if let Ok(text) = std::fs::read_to_string(entry.path()) {
-                if let Some(n) = text.lines().find_map(|l| l.strip_prefix("Name=")) {
-                    return Some(n.trim().to_string());
+                if let Some(n) = crate::platform::keyfile_value(&text, "D-BUS Service", "Name") {
+                    return Some(n);
                 }
             }
         }
@@ -1715,5 +1678,21 @@ mod tests {
         assert!(leap.contains("29") && !leap.contains("2000"), "{leap}");
         assert_eq!(super::pretty_birthday("1985-02-30"), "1985-02-30");
         assert_eq!(super::pretty_birthday("sometime"), "sometime");
+    }
+
+    /// EDS `.source` files are key files: a book's name comes from its
+    /// account collection, and only `[Data Source]`'s Enabled switches it off.
+    #[test]
+    fn eds_sources_are_read_as_key_files() {
+        let book = "[Data Source]\nDisplayName=Contacts\nEnabled=true\nParent=acct\n\n\
+                    [Address Book]\nBackendName=carddav\n\n[Refresh]\nEnabled=false\n";
+        let acct = "[Data Source]\nDisplayName=Google\n\n[Collection]\nBackendName=google\n\
+                    Identity=someone@gmail.com\n";
+        let sources: std::collections::HashMap<String, String> =
+            [("acct".to_string(), acct.to_string())].into();
+        assert_eq!(super::book_display_name(book, &sources), "Google — someone@gmail.com");
+        assert!(!super::data_source_disabled(book), "[Refresh] Enabled=false is not the switch");
+        assert!(super::data_source_disabled(&book.replace("Enabled=true", "Enabled=false")));
+        assert_eq!(crate::platform::keyfile_value(book, "Address Book", "Missing"), None);
     }
 }

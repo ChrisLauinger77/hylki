@@ -864,51 +864,14 @@ fn manifest_icons(json: &str, base: &str) -> Vec<(u32, String)> {
         .collect()
 }
 
-/// `href` as seen from `base` (an absolute URL): absolute, scheme-relative,
-/// root-relative or relative to the base's directory. Only `http(s)`.
+/// `href` as seen from `base` (an absolute URL), by RFC 3986's rules; only
+/// an `http(s)` result counts. Parsed relaxed, since sites write links by
+/// hand.
 fn resolve_url(base: &str, href: &str) -> Option<String> {
-    let href = href.trim();
-    let lower = href.to_ascii_lowercase();
-    if lower.starts_with("https://") || lower.starts_with("http://") {
-        return Some(href.to_string());
-    }
-    if lower.starts_with("//") {
-        return Some(format!("https:{href}"));
-    }
-    if href.contains(':') && !href.starts_with('/') && !href.starts_with('.') {
-        // data:, mailto: and the like.
-        return None;
-    }
-    let scheme_end = base.find("://")? + 3;
-    let host_end = base[scheme_end..].find('/').map(|i| scheme_end + i).unwrap_or(base.len());
-    let origin = &base[..host_end];
-    if let Some(rest) = href.strip_prefix('/') {
-        return Some(format!("{origin}/{rest}"));
-    }
-    let path = &base[host_end..];
-    let dir = match path.rfind('/') {
-        Some(i) => &path[..=i],
-        None => "/",
-    };
-    let mut segments: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
-    let mut tail = href;
-    loop {
-        if let Some(r) = tail.strip_prefix("../") {
-            segments.pop();
-            tail = r;
-        } else if let Some(r) = tail.strip_prefix("./") {
-            tail = r;
-        } else {
-            break;
-        }
-    }
-    let mut url = format!("{origin}/");
-    for seg in segments {
-        url.push_str(seg);
-        url.push('/');
-    }
-    url.push_str(tail);
-    Some(url)
+    use gtk::glib::{Uri, UriFlags};
+    let url = Uri::resolve_relative(Some(base), href.trim(), UriFlags::PARSE_RELAXED).ok()?;
+    let lower = url.to_ascii_lowercase();
+    (lower.starts_with("https://") || lower.starts_with("http://")).then(|| url.to_string())
 }
 
 fn get(url: &str) -> Option<Vec<u8>> {
@@ -1131,6 +1094,12 @@ mod tests {
         assert_eq!(largest_size(Some("16x16 48x48 32x32")), Some(48));
         assert_eq!(resolve_url("https://example.com", "favicon.ico").as_deref(), Some("https://example.com/favicon.ico"));
         assert_eq!(resolve_url("https://example.com/", "data:image/png;base64,AAAA"), None);
+        let base = "https://www.example.com/a/b/page.html";
+        assert_eq!(resolve_url(base, "../i.png").as_deref(), Some("https://www.example.com/a/i.png"));
+        assert_eq!(resolve_url(base, "./i.png").as_deref(), Some("https://www.example.com/a/b/i.png"));
+        assert_eq!(resolve_url(base, "/i.png").as_deref(), Some("https://www.example.com/i.png"));
+        assert_eq!(resolve_url(base, "//cdn.example.net/i.png").as_deref(), Some("https://cdn.example.net/i.png"));
+        assert_eq!(resolve_url(base, "mailto:x@example.com"), None);
     }
 
     #[test]
