@@ -20838,6 +20838,9 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
         // turns grey, as a sidebar's does, so it is plain that the list's
         // keys will not reach it (#274). An inactive window keeps the
         // accent: focus is not lost, the window is just behind another.
+        // The conversation chip goes back to its grey pill there, and a tag
+        // keeps the text color picked for its fill: the white chip and the
+        // window's text color left the count white on white.
         let shield = if dark { "#ffca28" } else { "#ff7800" };
         // The compose surface sits on the reader's deeper page ground — the
         // same shade the threaded cards float on, as the theme defines it.
@@ -20851,10 +20854,14 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
              .message-listbox:not(:focus-within):not(:backdrop) > row.activatable:selected:hover .message-row, \
              .message-listbox:not(:focus-within):not(:backdrop) > row.activatable:selected:active .message-row {{ \
                background-color: alpha(@window_fg_color, 0.14); color: @window_fg_color; }}\
-             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row label {{ \
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row label:not(.tag-chip) {{ \
                color: @window_fg_color; }}\
              .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row .unread-dot {{ \
                background: @accent_bg_color; }}\
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row .thread-chip {{ \
+               background: alpha(@window_fg_color, 0.1); }}\
+             .message-listbox:not(:focus-within):not(:backdrop) > row:selected .message-row .thread-chip image {{ \
+               color: @window_fg_color; }}\
              .remote-alert image {{ color: {shield}; }}\
              .inline-compose-surface, .compose-pane {{ background-color: {page}; }}\
              .reader-split > separator {{ background-color: {page}; }}"

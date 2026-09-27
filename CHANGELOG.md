@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fixed: a blank conversation count on a grey selected row.** When the
+  message list does not have the keyboard focus, the selected row turns grey,
+  and its conversation chip showed a white pill with no number in it. The
+  chip now keeps its grey pill and count there, and a tag on that row keeps
+  its own text color.
 - **Changed: conversations open out across folders** (#309, reported by
   Amadeus Paulussen). An expanded conversation in a folder or in Inboxes now
   lists its messages from other folders too, such as your replies in Sent
