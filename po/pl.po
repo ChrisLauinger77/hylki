@@ -4501,6 +4501,14 @@ msgstr ""
 "Wyświetla odbiorców każdej wiadomości pod nadawcą bez klikania przycisku "
 "odbiorców. Przy jednym odbiorcy przycisk nie jest w ogóle wyświetlany."
 
+msgid "Name the OpenPGP result"
+msgstr ""
+
+msgid ""
+"Beside the sender, say in words whether a message is signed or encrypted and "
+"whether it checks out. Off shows the lock and shield icons alone."
+msgstr ""
+
 msgid "Reader View switch"
 msgstr "Przełącznik widoku czytania"
 
