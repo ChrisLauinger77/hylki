@@ -733,51 +733,26 @@ fn get_text(url: &str) -> Option<(String, String)> {
     Some((final_url, String::from_utf8_lossy(&buf).into_owned()))
 }
 
-/// The `<link>` tags of a page, each as its attributes (names lowercased,
-/// entity `&amp;` unescaped in values). A tolerant scan, not a parser: enough
-/// for the `rel`/`href`/`sizes`/`type` of icon links.
+/// The `<link>` tags of a page, each as its attributes, as html5ever reads
+/// them (names lowercased, every entity decoded). The page may be cut short
+/// at 512 KiB; the parser takes what is there.
 fn link_tags(html: &str) -> Vec<Vec<(String, String)>> {
-    let lower = html.to_ascii_lowercase();
-    let mut tags = Vec::new();
-    let mut at = 0;
-    while let Some(i) = lower[at..].find("<link") {
-        let start = at + i + 5;
-        let Some(len) = html[start..].find('>') else { break };
-        let tag = &html[start..start + len];
-        at = start + len;
-        if !tag.starts_with(|c: char| c.is_whitespace()) {
-            continue;
-        }
-        let mut attrs = Vec::new();
-        let mut rest = tag.trim();
-        while !rest.is_empty() {
-            let name_len = rest
-                .find(|c: char| c == '=' || c.is_whitespace() || c == '/')
-                .unwrap_or(rest.len());
-            let name = rest[..name_len].to_ascii_lowercase();
-            rest = rest[name_len..].trim_start();
-            let mut value = String::new();
-            if let Some(r) = rest.strip_prefix('=') {
-                let r = r.trim_start();
-                if let Some(q) = r.chars().next().filter(|c| *c == '"' || *c == '\'') {
-                    let inner = &r[1..];
-                    let end = inner.find(q).unwrap_or(inner.len());
-                    value = inner[..end].to_string();
-                    rest = inner[end..].strip_prefix(q).unwrap_or("").trim_start();
-                } else {
-                    let end = r.find(|c: char| c.is_whitespace()).unwrap_or(r.len());
-                    value = r[..end].to_string();
-                    rest = r[end..].trim_start();
-                }
-            } else {
-                rest = rest.trim_start_matches('/').trim_start();
-            }
-            if !name.is_empty() {
-                attrs.push((name, value.replace("&amp;", "&")));
+    use html5ever::tendril::TendrilSink;
+    use markup5ever_rcdom::{Handle, NodeData, RcDom};
+
+    fn walk(node: &Handle, tags: &mut Vec<Vec<(String, String)>>) {
+        if let NodeData::Element { name, attrs, .. } = &node.data {
+            if name.local.as_ref() == "link" {
+                tags.push(attrs.borrow().iter().map(|a| (a.name.local.to_string(), a.value.to_string())).collect());
             }
         }
-        tags.push(attrs);
+        for child in node.children.borrow().iter() {
+            walk(child, tags);
+        }
     }
+    let dom = html5ever::parse_document(RcDom::default(), Default::default()).one(html);
+    let mut tags = Vec::new();
+    walk(&dom.document, &mut tags);
     tags
 }
 
