@@ -128,8 +128,20 @@ pub fn show_context_menu_with_header(
     // Submenu pages were added while the main page was built; start on it.
     stack.set_visible_child_name("main");
 
-    popover.set_child(Some(&stack));
+    // Never taller than the window, scrolling past that (see below).
+    let root_height = parent.as_ref().root().map(|r| r.upcast_ref::<gtk::Widget>().height());
+    let scroller = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .propagate_natural_height(true)
+        .propagate_natural_width(true)
+        .child(&stack)
+        .build();
+    if let Some(h) = root_height.filter(|h| *h > 0) {
+        scroller.set_max_content_height((h - MENU_MARGIN).max(1));
+    }
+    popover.set_child(Some(&scroller));
     popover.set_parent(parent);
+    let y = fitted_anchor(parent.as_ref(), &popover, x, y);
     popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
     popover.connect_closed(|p| p.unparent());
     popover.popup();
@@ -150,6 +162,38 @@ pub fn show_context_menu_with_header(
             });
         }
     }
+}
+
+/// Room left between a menu and the window's edges.
+const MENU_MARGIN: i32 = 12;
+
+/// Where to anchor a menu opened at `(x, y)` in `parent` so that it shows.
+///
+/// A popover opens below its point or, flipped, above it, but never slides
+/// up or down to fit: when it fits neither way it is not shown at all. The
+/// reader's message menu is taller than half a window, so a right-click
+/// halfway down a message opened nothing. Here the anchor moves up just far
+/// enough for the menu to fit below it, which is how a menu near the
+/// bottom of a screen behaves in any GTK app.
+fn fitted_anchor(parent: &gtk::Widget, popover: &gtk::Popover, x: f64, y: f64) -> f64 {
+    let Some(root) = parent.root() else { return y };
+    let root: &gtk::Widget = root.upcast_ref();
+    let Some(at) = parent.compute_point(root, &gtk::graphene::Point::new(x as f32, y as f32)) else {
+        return y;
+    };
+    // The popover itself measures nothing before it is mapped; its content
+    // does, and the menu's padding and shadow add a little to that.
+    let Some(content) = popover.child() else { return y };
+    let (_, natural, _, _) = content.measure(gtk::Orientation::Vertical, -1);
+    let height = natural + 2 * MENU_MARGIN;
+    let (top, bottom) = (at.y() as f64, root.height() as f64);
+    let fits_below = top + height as f64 <= bottom;
+    let fits_above = top - (height as f64) >= 0.0;
+    if fits_below || fits_above {
+        return y;
+    }
+    let wanted = (bottom - height as f64 - MENU_MARGIN as f64).max(0.0);
+    y - (top - wanted)
 }
 
 /// One page of the popover: the caption (a bulk menu's "5 selected", or a

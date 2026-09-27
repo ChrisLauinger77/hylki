@@ -13,6 +13,12 @@
   (Copy Email Address for a mail link) at the top, a picture adds Save
   Image As… and Copy Image, and selected text adds Copy. Escape now closes
   the small menu an address opens.
+- **Fixed: a right-click menu that fits neither below nor above the pointer
+  is shown.** Such a menu was not shown at all, which is why the message
+  menu, taller than half a window, opened near the top and bottom of a
+  message but not halfway down, depending on where the window sat on the
+  screen. A menu now moves up as far as it needs to fit in the window, and
+  one taller than the window scrolls.
 - **Fixed: a blank conversation count on a grey selected row.** When the
   message list does not have the keyboard focus, the selected row turns grey,
   and its conversation chip showed a white pill with no number in it. The
