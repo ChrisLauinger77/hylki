@@ -2398,7 +2398,7 @@ const PREVIEW_RENDER_WIDTH: f64 = 1600.0;
 /// Render a PDF's first page to a texture at `target_width`, by way of an
 /// in-memory PNG — the same route every other thumbnail here already goes
 /// through, so cropping, caching, and format all stay uniform.
-fn pdf_page_texture(data: &[u8], target_width: f64) -> Option<gdk::Texture> {
+pub(crate) fn pdf_page_texture(data: &[u8], target_width: f64) -> Option<gdk::Texture> {
     // One PDF render at a time, process-wide. Poppler's color management
     // (lcms2) shares state across documents: two thumbnail threads rendering
     // concurrently crashed with heap corruption — one thread tearing down its
