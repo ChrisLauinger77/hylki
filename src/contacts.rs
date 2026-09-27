@@ -1225,13 +1225,10 @@ fn vcard_type_label(params: &[&str]) -> String {
     String::new()
 }
 
-/// "1985-04-12" / "19850412" → "April 12, 1985"; "--04-12" → "April 12";
+/// "1985-04-12" / "19850412" → "Apr 12, 1985"; "--04-12" → "Apr 12", in the
+/// locale's words and the user's date order, as mail dates are written;
 /// anything else passes through unchanged.
 fn pretty_birthday(raw: &str) -> String {
-    const MONTHS: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August", "September",
-        "October", "November", "December",
-    ];
     let head = raw.split('T').next().unwrap_or(raw);
     let digits: String = head.chars().filter(|c| c.is_ascii_digit()).collect();
     let (year, month, day) = if head.starts_with("--") && digits.len() == 4 {
@@ -1241,15 +1238,18 @@ fn pretty_birthday(raw: &str) -> String {
     } else {
         return raw.to_string();
     };
-    let (Ok(m), Ok(d)) = (month.parse::<usize>(), day.parse::<u32>()) else {
+    let (Ok(m), Ok(d)) = (month.parse::<i32>(), day.parse::<i32>()) else {
         return raw.to_string();
     };
-    let Some(month_name) = (1..=12).contains(&m).then(|| MONTHS[m - 1]) else {
+    // A birthday with no year is placed in a leap year, so 29 February is a
+    // date too. Noon keeps the day the same in every time zone.
+    let y = year.and_then(|y| y.parse::<i32>().ok()).unwrap_or(2000);
+    let Ok(date) = gtk::glib::DateTime::from_local(y, m, d, 12, 0, 0.0) else {
         return raw.to_string();
     };
     match year {
-        Some(y) => format!("{month_name} {d}, {y}"),
-        None => format!("{month_name} {d}"),
+        Some(_) => crate::datefmt::day_month_year(date.to_unix()),
+        None => crate::datefmt::day_month(date.to_unix()),
     }
 }
 
@@ -1706,5 +1706,18 @@ mod tests {
             super::read_eds_photo_file("file://evil-host/etc/passwd", 1024),
             None
         );
+    }
+
+    /// A birthday is written as mail dates are, so the words and the order
+    /// are the locale's; a vCard value that is no date passes through.
+    #[test]
+    fn birthdays_are_written_as_dates() {
+        let full = super::pretty_birthday("1985-04-12");
+        assert!(full.contains("1985") && full.contains("12"), "{full}");
+        assert_eq!(super::pretty_birthday("19850412"), full);
+        let leap = super::pretty_birthday("--02-29");
+        assert!(leap.contains("29") && !leap.contains("2000"), "{leap}");
+        assert_eq!(super::pretty_birthday("1985-02-30"), "1985-02-30");
+        assert_eq!(super::pretty_birthday("sometime"), "sometime");
     }
 }
