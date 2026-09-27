@@ -9729,15 +9729,9 @@ fn image_mime(part: &mail_parser::MessagePart) -> Option<String> {
     safe.then(|| format!("image/{}", subtype.to_ascii_lowercase()))
 }
 
+/// Escape text for HTML: element content or a quoted attribute alike.
 fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-/// Escape a string for use inside a double-quoted HTML attribute (e.g. `href`).
-fn escape_attr(text: &str) -> String {
-    escape_html(text).replace('"', "&quot;")
+    gtk::glib::markup_escape_text(text).into()
 }
 
 /// HTML-escape plain text and turn bare URLs into clickable links. Runs on raw
@@ -9752,7 +9746,7 @@ fn linkify(text: &str) -> String {
         out.push_str(&escape_html(&text[i..start]));
         out.push_str(&format!(
             "<a href=\"{}\">{}</a>",
-            escape_attr(&href),
+            escape_html(&href),
             escape_html(&text[start..end])
         ));
         i = end;

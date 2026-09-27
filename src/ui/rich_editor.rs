@@ -1923,7 +1923,7 @@ fn source_document(text: &str, webview: &webkit6::WebView) -> String {
            t.focus();t.setSelectionRange(0,0);\
          }})();\
          </script>{HISTORY_SCRIPT}</body></html>",
-        text = html_escape_text(text)
+        text = gtk::glib::markup_escape_text(text)
     )
 }
 
@@ -1988,11 +1988,6 @@ pub fn remote_image_urls(html: &str) -> Vec<String> {
     urls
 }
 
-/// Escape text for a textarea's contents.
-fn html_escape_text(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
-}
-
 /// Every dropped file straight onto the attachment list.
 fn attach_all(
     files: &[gtk::gio::File],
@@ -2035,10 +2030,7 @@ pub fn signature_to_html(sig: &str) -> String {
     if sig.contains('<') {
         sig.to_string()
     } else {
-        sig.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('\n', "<br>")
+        gtk::glib::markup_escape_text(sig).replace('\n', "<br>")
     }
 }
 

@@ -6521,9 +6521,7 @@ fn print_header_html(message: Option<&Message>) -> String {
 /// Escape text for HTML content: a subject or an address that contains `<` must
 /// not become a tag.
 fn escape_text(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    gtk::glib::markup_escape_text(s).into()
 }
 
 /// Escape a string for use inside a double-quoted HTML **attribute** value
@@ -6548,7 +6546,7 @@ fn body_html(body: &str) -> String {
              body{{margin:0;padding:20px;font:14px/1.5 system-ui,sans-serif;\
              white-space:pre-wrap;word-wrap:break-word}}\
              </style></head><body class=\"vireo-plain\">{}</body></html>",
-            body.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+            escape_text(body)
         )
     }
 }

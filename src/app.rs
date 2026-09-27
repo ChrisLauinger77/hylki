@@ -20661,9 +20661,7 @@ fn parse_mailto(uri: &str) -> Option<crate::ui::compose::ComposePrefill> {
     let body_html = if body.is_empty() {
         String::new()
     } else {
-        body.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
+        gtk::glib::markup_escape_text(&body)
             .replace("\r\n", "\n")
             .replace('\n', "<br>")
     };
@@ -21533,10 +21531,7 @@ fn editable_copy_html(body: &str) -> String {
         let text = message_text(body);
         format!(
             "<p>{}</p>",
-            text.replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;")
-                .replace('\n', "<br>")
+            gtk::glib::markup_escape_text(&text).replace('\n', "<br>")
         )
     }
 }
@@ -21829,12 +21824,7 @@ fn trim_empty_blocks(html: &str) -> &str {
 /// lays it on the light ground it was designed for, where a dark composer
 /// would leave its dark text unreadable.
 fn quote_block_html(attribution: &str, inner_html: &str) -> String {
-    let esc = |s: &str| {
-        s.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('\n', "<br>")
-    };
+    let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
     let colored = ["color:", "color=\"", "background:"].iter().any(|c| inner_html.contains(c));
     format!(
         "<p class=\"vireo-quote-attr\">{}</p><blockquote{}>{}</blockquote>",
@@ -21847,12 +21837,7 @@ fn quote_block_html(attribution: &str, inner_html: &str) -> String {
 /// Build the HTML quoted block (attribution line + blockquote) for a reply or
 /// forward, from plain text so no scripts/remote content leak into the editor.
 fn quote_block(attribution: &str, text: &str) -> String {
-    let esc = |s: &str| {
-        s.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-            .replace('\n', "<br>")
-    };
+    let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
     format!(
         "<p class=\"vireo-quote-attr\">{}</p><blockquote>{}</blockquote>",
         esc(attribution),

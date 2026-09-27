@@ -42,17 +42,7 @@ pub fn to_html(src: &str) -> String {
 
 /// Escape text for an HTML attribute or body.
 fn esc(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            _ => out.push(c),
-        }
-    }
-    out
+    gtk::glib::markup_escape_text(s).into()
 }
 
 /// The three extended items pulldown-cmark leaves to the host, applied to

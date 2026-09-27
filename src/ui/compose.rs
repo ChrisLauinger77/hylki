@@ -2774,7 +2774,7 @@ fn confirm_discard_dialog(parent: Option<&gtk::Window>, sender: relm4::Sender<Co
 }
 
 fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    gtk::glib::markup_escape_text(s).into()
 }
 
 /// Which account to upload to, and how the links are made this time:
