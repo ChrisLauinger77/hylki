@@ -27,8 +27,9 @@ The full list. The [README](../README.md) carries a shorter one.
   loads instantly; the rest indexes in the background with infinite scroll.
 - **Two-way sync:** deletions, moves and flag changes from your phone or
   another client sync back automatically (IMAP IDLE plus reconciliation).
-- **Conversation threading**, with the count covering the whole conversation
-  across folders, not just the folder you are looking at.
+- **Conversation threading** across folders: the count covers the whole
+  conversation, and an expanded conversation shows your replies from Sent
+  and its archived messages alongside the folder's own.
 - **Moving mail between accounts:** Move To lists every account's folders,
   and mail dragged onto another account's folder goes there too.
 - **Full folder management:** create, rename, move, reorder and delete

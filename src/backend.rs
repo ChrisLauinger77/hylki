@@ -167,6 +167,7 @@ impl MockBackend {
                 let want: HashSet<&str> = ids.iter().map(|s| s.as_str()).collect();
                 let mut seen: HashSet<&str> = HashSet::new();
                 let mut newest: Option<&Message> = None;
+                let mut members: Vec<Message> = Vec::new();
                 for m in &self.messages {
                     if m.account_id != account_id || hidden.contains(&m.folder_id) {
                         continue;
@@ -179,11 +180,13 @@ impl MockBackend {
                     if !m.message_id.is_empty() {
                         seen.insert(m.message_id.as_str());
                     }
-                    if !unsent.contains(&m.folder_id)
-                        && newest.is_none_or(|n| m.timestamp > n.timestamp)
-                    {
+                    if unsent.contains(&m.folder_id) {
+                        continue;
+                    }
+                    if newest.is_none_or(|n| m.timestamp > n.timestamp) {
                         newest = Some(m);
                     }
+                    members.push(Message { body: String::new(), ..m.clone() });
                 }
                 (!seen.is_empty()).then(|| {
                     (
@@ -197,6 +200,7 @@ impl MockBackend {
                                 timestamp: m.timestamp,
                                 date: m.date.clone(),
                             }),
+                            members: if seen.len() > 1 { members } else { Vec::new() },
                         },
                     )
                 })

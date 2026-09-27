@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Changed: conversations open out across folders** (#309, reported by
+  Amadeus Paulussen). An expanded conversation in a folder or in Inboxes now
+  lists its messages from other folders too, such as your replies in Sent
+  and the parts in Archive or All Mail, in time order. A conversation with
+  one message in the folder and the rest elsewhere used to show a count but
+  could not be expanded, which in an inbox was most of them. The row itself
+  is still the folder's own message, so archiving, moving or deleting it acts
+  on that folder's mail only; drafts, Trash and Junk are not listed.
 - **Fixed: plain-text messages arrived empty** (#297, reported by
   Amadeus Paulussen). With **Write messages in** set to Plain text, the message was
   sent, and saved to Sent, without its body; a plain-text draft lost its

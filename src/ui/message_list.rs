@@ -2355,6 +2355,32 @@ fn heads_its_row(
 /// nothing newer, or knows of nothing at all yet. Whether it is asked at all
 /// is the "Show your own replies in the message list" setting, off by
 /// default.
+/// Which of a conversation's `found` members, from anywhere in the account,
+/// a row nests under the folder's `own` (#309): not the ones in a folder on
+/// the list, which are rows of their own, nor a copy of mail already there
+/// (Gmail files one message under every label it has), and only those the
+/// list's filters let through. A message with no Message-ID cannot be told
+/// apart from its copies, so it is left out.
+fn nested_members(
+    found: &[Message],
+    own: &[Message],
+    listed_folders: &std::collections::HashSet<(u32, u32)>,
+    passes: &impl Fn(&Message) -> bool,
+) -> Vec<Message> {
+    let mut out: Vec<Message> = Vec::new();
+    for m in found {
+        if m.message_id.is_empty()
+            || listed_folders.contains(&(m.account_id, m.folder_id))
+            || !passes(m)
+            || own.iter().chain(&out).any(|o| o.message_id == m.message_id)
+        {
+            continue;
+        }
+        out.push(m.clone());
+    }
+    out
+}
+
 fn latest_elsewhere(
     summary: Option<&crate::models::ThreadSummary>,
     newest_here: i64,
@@ -2626,6 +2652,12 @@ pub struct MessageList {
     msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
     /// Conversation key → member message keys (multi-message threads only).
     thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
+    /// Members of the conversations on the page that live in other folders
+    /// (your replies in Sent, the archived parts), by message key: rows a
+    /// conversation opens out into without being part of this folder (#309).
+    /// Whole-conversation actions look members up in the folder's own index,
+    /// so they never reach these.
+    nested: std::collections::HashMap<(u32, u32), Message>,
     /// Messages actually rendered (after the render limit), independent of how
     /// many rows are visible once threads are collapsed.
     rendered_count: usize,
@@ -3280,6 +3312,7 @@ impl SimpleComponent for MessageList {
             default_expanded: false,
             msg_thread: std::collections::HashMap::new(),
             thread_members: std::collections::HashMap::new(),
+            nested: std::collections::HashMap::new(),
             rendered_count: 0,
             scroller: None,
             sort: SortOrder::DateNewest,
@@ -4906,7 +4939,13 @@ impl MessageList {
             members
                 .iter()
                 .skip(1)
-                .filter_map(|k| source.iter().find(|m| (m.account_id, m.id) == *k).cloned())
+                .filter_map(|k| {
+                    source
+                        .iter()
+                        .find(|m| (m.account_id, m.id) == *k)
+                        .or_else(|| self.nested.get(k))
+                        .cloned()
+                })
                 .collect()
         };
         if children.is_empty() {
@@ -5038,19 +5077,21 @@ impl MessageList {
         // `render_limit` is a few hundred — cloning the whole match set first put
         // a copy of the entire mailbox through the allocator on every keystroke
         // and on the cache-backed load at startup.
-        let mut matches: Vec<&Message> = self
-            .active_source()
-            .iter()
-            .filter(|m| !self.unread_only || m.unread)
-            .filter(|m| !self.starred_only || m.starred)
-            .filter(|m| {
-                q.is_empty()
+        let (unread_only, starred_only) = (self.unread_only, self.starred_only);
+        let passes = |m: &Message| {
+            (!unread_only || m.unread)
+                && (!starred_only || m.starred)
+                && (q.is_empty()
                     || m.subject.to_lowercase().contains(&q)
                     || m.from_name.to_lowercase().contains(&q)
                     || m.from_addr.to_lowercase().contains(&q)
-                    || m.preview.to_lowercase().contains(&q)
-            })
-            .collect();
+                    || m.preview.to_lowercase().contains(&q))
+        };
+        let mut matches: Vec<&Message> = self.active_source().iter().filter(|m| passes(m)).collect();
+        // The folders on the list: a conversation's members in them are rows
+        // of their own already, so only the rest are nested (#309).
+        let listed_folders: std::collections::HashSet<(u32, u32)> =
+            matches.iter().map(|m| (m.account_id, m.folder_id)).collect();
         let sort = self.sort;
         let t_rebuild = std::time::Instant::now();
         matches.sort_by(|a, b| message_cmp(a, b, sort));
@@ -5112,6 +5153,7 @@ impl MessageList {
         let mut metas: Vec<RowMeta> = Vec::new();
         self.msg_thread.clear();
         self.thread_members.clear();
+        self.nested.clear();
         self.listed_threads.clear();
         for key in &order {
             let mut msgs = groups.remove(key).unwrap();
@@ -5121,14 +5163,23 @@ impl MessageList {
             // list's sort order — recent activity keeps it near the top — but
             // inside the thread, time only runs one way.
             msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
-            let count = msgs.len();
-            // What the badge says. `count` is what this folder holds and goes on
-            // steering the rows — which of them nest, what expands, whose unread
-            // dot shows — but the number on the chip is the size of the
-            // *conversation*, replies filed in Sent included (#222). Never less
-            // than what is on screen: a stale or partial answer from the cache
-            // must not make the badge contradict the rows under it.
             let summary = self.threading.then(|| self.thread_summaries.get(key)).flatten();
+            // The parts of the conversation filed elsewhere, which the row
+            // opens out into along with this folder's own (#309).
+            let extras = match summary {
+                Some(s) if self.thread_expansion => {
+                    nested_members(&s.members, &msgs, &listed_folders, &passes)
+                }
+                _ => Vec::new(),
+            };
+            let own = msgs.len();
+            let count = own + extras.len();
+            // What the badge says. `count` is what the row holds and goes on
+            // steering it (whether it nests and what expands) but the number
+            // on the chip is the size of the *conversation*, drafts included
+            // (#222). Never less than what is on screen: a stale or partial
+            // answer from the cache must not make the badge contradict the
+            // rows under it.
             let total = if self.threading {
                 summary.map(|s| s.count).unwrap_or(0).max(count)
             } else {
@@ -5159,15 +5210,10 @@ impl MessageList {
                 && self.thread_expansion
                 && (self.expanded_threads.contains(key) != self.default_expanded);
             // The head stays marked unread while ANY message in its
-            // conversation is unread — hidden replies included.
+            // conversation is unread, hidden replies included, but only this
+            // folder's own: an archived message still unread is not new mail
+            // here.
             let any_unread = count > 1 && msgs.iter().any(|m| m.unread);
-            if count > 1 {
-                let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
-                for k in &members {
-                    self.msg_thread.insert(*k, key.clone());
-                }
-                self.thread_members.insert(key.clone(), members);
-            }
             // The head is the thread's *oldest* message (see the sort above),
             // but its row speaks for the conversation's NEWEST one: its sender,
             // its preview and the time it landed, rather than the opener
@@ -5196,14 +5242,33 @@ impl MessageList {
                 (None, None, None)
             };
             let any_starred = count > 1 && msgs.iter().any(|m| m.starred);
+            // The row stays this folder's oldest message, whatever the other
+            // folders hold that is older, so what is done to the row is done
+            // to mail in this folder. The rest follow in time order.
+            if !extras.is_empty() {
+                for m in &extras {
+                    self.nested.insert((m.account_id, m.id), m.clone());
+                }
+                let head = msgs.remove(0);
+                msgs.extend(extras);
+                msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
+                msgs.insert(0, head);
+            }
+            if count > 1 {
+                let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
+                for k in &members {
+                    self.msg_thread.insert(*k, key.clone());
+                }
+                self.thread_members.insert(key.clone(), members);
+            }
             let mut it = msgs.into_iter();
             let head = it.next().unwrap();
             shown.push(head);
             metas.push(RowMeta {
                 count: total,
-                // Only this folder's copies can be nested under the head, so a
-                // conversation whose extra members are all elsewhere wears a
-                // bare count and no caret — there is nothing here to open.
+                // The parts filed in other folders open out too (#309); a
+                // conversation with nothing to show beyond its row, all of it
+                // in Trash, say, wears a bare count and no caret.
                 expandable: count > 1,
                 is_child: false,
                 is_last: false,
@@ -5690,6 +5755,11 @@ impl MessageList {
         if !self.threading {
             return (vec![m.clone()], false);
         }
+        // A part of the conversation from another folder, picked out of the
+        // opened-out row: shown by itself, like any reply picked out (#309).
+        if self.nested.contains_key(&(m.account_id, m.id)) {
+            return (vec![m.clone()], true);
+        }
         // Thread within whatever set is on screen (the search pool while searching,
         // otherwise the current folder) so the conversation matches the rows shown.
         let source = self.active_source();
@@ -5846,7 +5916,7 @@ impl MessageList {
 #[cfg(test)]
 mod tests {
     use super::{
-        compute_thread_keys, heads_its_row, latest_elsewhere, reader_conversation,
+        compute_thread_keys, heads_its_row, latest_elsewhere, nested_members, reader_conversation,
         row_for_reader_key, swipe_progress_px, unasked_threads, SWIPE_ARM, SWIPE_MAX,
     };
     use crate::models::Message;
@@ -5886,7 +5956,7 @@ mod tests {
             timestamp: 600,
             date: String::new(),
         };
-        let summary = ThreadSummary { count: 2, latest: Some(reply.clone()) };
+        let summary = ThreadSummary { count: 2, latest: Some(reply.clone()), ..Default::default() };
 
         // The Inbox holds the message that came in at 500; the answer is later.
         assert_eq!(latest_elsewhere(Some(&summary), 500), Some(reply));
@@ -5899,7 +5969,7 @@ mod tests {
         // size, leaves the row alone.
         assert_eq!(latest_elsewhere(None, 500), None);
         assert_eq!(
-            latest_elsewhere(Some(&ThreadSummary { count: 3, latest: None }), 500),
+            latest_elsewhere(Some(&ThreadSummary { count: 3, ..Default::default() }), 500),
             None
         );
     }
@@ -5927,6 +5997,28 @@ mod tests {
             message_id: message_id.into(),
             references: references.into(),
         }
+    }
+
+    /// #309: a conversation opens out into its parts in other folders, but
+    /// not into what the list already shows, a second label's copy of the
+    /// same mail, or what the list's filters leave out.
+    #[test]
+    fn a_row_nests_only_the_conversation_filed_elsewhere() {
+        let in_folder = |id, mid: &str, folder| Message { folder_id: folder, ..msg(id, mid, "") };
+        let own = vec![in_folder(1, "a@x", 1)];
+        let found = vec![
+            in_folder(1, "a@x", 1),          // the inbox message itself
+            in_folder(90, "a@x", 9),         // its copy under All Mail
+            in_folder(91, "b@x", 3),         // your reply in Sent
+            in_folder(92, "b@x", 9),         // the reply's All Mail copy
+            in_folder(93, "c@x", 2),         // in another listed folder
+            Message { unread: true, ..in_folder(94, "d@x", 5) },
+            in_folder(95, "", 5),            // no Message-ID to tell copies by
+        ];
+        let listed = [(1u32, 1u32), (1, 2)].into_iter().collect();
+        let ids = |v: Vec<Message>| v.iter().map(|m| m.id).collect::<Vec<_>>();
+        assert_eq!(ids(nested_members(&found, &own, &listed, &|_| true)), vec![91, 94]);
+        assert_eq!(ids(nested_members(&found, &own, &listed, &|m| m.unread)), vec![94]);
     }
 
     /// Two replies in an Inbox each answer a different message in Sent, and

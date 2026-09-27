@@ -1185,7 +1185,7 @@ impl Cache {
             .filter_map(|(gi, (tag, _))| {
                 let n = named[gi].len() + anonymous[gi];
                 (n > 0).then(|| {
-                    (tag.clone(), ThreadSummary { count: n, latest: latest[gi].cloned() })
+                    (tag.clone(), ThreadSummary { count: n, latest: latest[gi].cloned(), members: Vec::new() })
                 })
             })
             .collect()

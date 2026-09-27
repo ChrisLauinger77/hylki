@@ -6466,7 +6466,12 @@ impl SimpleComponent for AppModel {
             AppMsg::ThreadSummaries { account_id, summaries } => {
                 let summaries: Vec<((u32, String), ThreadSummary)> = summaries
                     .into_iter()
-                    .map(|(root, summary)| ((account_id, root), summary))
+                    .map(|(root, mut summary)| {
+                        for m in &mut summary.members {
+                            m.id = self.related_id(m);
+                        }
+                        ((account_id, root), summary)
+                    })
                     .collect();
                 if !summaries.is_empty() {
                     self.message_list.emit(MessageListInput::SetThreadSummaries(summaries));
@@ -15525,6 +15530,19 @@ impl AppModel {
         self.thread_related_pending = true;
     }
 
+    /// The id a message from another folder goes by here: one per (account,
+    /// folder, UID), so the reader and the list's opened-out conversations
+    /// (#309) name the same message the same way, apart from any folder's own.
+    fn related_id(&mut self, m: &Message) -> u32 {
+        let key = (m.account_id, m.folder_id, m.uid);
+        if let Some(id) = self.related_ids.get(&key) {
+            return *id;
+        }
+        self.related_id_seq = self.related_id_seq.saturating_sub(1);
+        self.related_ids.insert(key, self.related_id_seq);
+        self.related_id_seq
+    }
+
     fn merge_related(&mut self, account_id: u32, message_id: u32, messages: Vec<Message>) {
         let Some(current) = self.current.clone() else { return };
         if current.account_id != account_id || current.id != message_id || !self.threading {
@@ -15541,15 +15559,7 @@ impl AppModel {
             if conv.iter().any(|m| m.folder_id == r.folder_id && m.uid == r.uid) {
                 continue; // already in the conversation, from this folder's own index
             }
-            let key = (r.account_id, r.folder_id, r.uid);
-            r.id = match self.related_ids.get(&key) {
-                Some(id) => *id,
-                None => {
-                    self.related_id_seq = self.related_id_seq.saturating_sub(1);
-                    self.related_ids.insert(key, self.related_id_seq);
-                    self.related_id_seq
-                }
-            };
+            r.id = self.related_id(&r);
             r.unread = false;
             if let Some(b) = self.body_cache.get(&(r.account_id, r.id)) {
                 r.body = b.clone();

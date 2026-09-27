@@ -1731,7 +1731,7 @@ pub(super) async fn run_jmap(
             }
             MailRequest::LoadThreadSummaries { groups } => {
                 let summaries =
-                    cache.as_ref().map(|c| c.thread_summaries(account_id, &groups)).unwrap_or_default();
+                    cache.as_ref().map(|c| thread_summaries_with_members(c, account_id, &groups)).unwrap_or_default();
                 emit(WorkerEvent::ThreadSummaries { summaries });
             }
 

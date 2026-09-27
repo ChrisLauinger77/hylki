@@ -838,7 +838,7 @@ fn cache_lane(
                 if protocol != Some(crate::config::Protocol::Pop3) =>
             {
                 emit(WorkerEvent::ThreadSummaries {
-                    summaries: c.thread_summaries(account_id, &groups),
+                    summaries: thread_summaries_with_members(c, account_id, &groups),
                 });
                 None
             }
@@ -887,19 +887,57 @@ fn serve_cached_body(
 /// so Trash and Junk copies are left out: a conversation shouldn't quietly put
 /// them back on screen.
 fn related_from_cache(cache: &Cache, account_id: u32, ids: &[String]) -> Vec<Message> {
-    let folders = cache.load_folders(account_id);
+    related_in(cache, account_id, &cache.load_folders(account_id), ids, &[FolderKind::Trash, FolderKind::Junk])
+}
+
+/// [`related_from_cache`] over an already loaded folder list, leaving out the
+/// folders of the `skipped` kinds.
+fn related_in(
+    cache: &Cache,
+    account_id: u32,
+    folders: &[crate::models::Folder],
+    ids: &[String],
+    skipped: &[FolderKind],
+) -> Vec<Message> {
     cache
         .messages_by_thread_ids(account_id, ids)
         .into_iter()
         .filter_map(|(path, mut m)| {
             let f = folders.iter().find(|f| f.path == path)?;
-            if matches!(f.kind, FolderKind::Trash | FolderKind::Junk) {
+            if skipped.contains(&f.kind) {
                 return None;
             }
             m.folder_id = f.id;
             Some(m)
         })
         .collect()
+}
+
+/// The list's [`Cache::thread_summaries`], with the members of every
+/// conversation bigger than one message, so a row can open out into the parts
+/// of it filed in other folders (#309). Drafts stay out of the rows as they
+/// stay out of the newest message: a reply still being written is not part of
+/// the conversation yet.
+fn thread_summaries_with_members(
+    cache: &Cache,
+    account_id: u32,
+    groups: &[(String, Vec<String>)],
+) -> Vec<(String, crate::models::ThreadSummary)> {
+    let mut summaries = cache.thread_summaries(account_id, groups);
+    if summaries.iter().all(|(_, s)| s.count < 2) {
+        return summaries;
+    }
+    let folders = cache.load_folders(account_id);
+    let skipped = [FolderKind::Trash, FolderKind::Junk, FolderKind::Drafts];
+    for (tag, summary) in &mut summaries {
+        if summary.count < 2 {
+            continue;
+        }
+        if let Some((_, ids)) = groups.iter().find(|(t, _)| t == tag) {
+            summary.members = related_in(cache, account_id, &folders, ids, &skipped);
+        }
+    }
+    summaries
 }
 
 async fn run(
@@ -1477,7 +1515,7 @@ async fn run_imap(
             MailRequest::LoadThreadSummaries { groups } => {
                 let summaries = cache
                     .as_ref()
-                    .map(|c| c.thread_summaries(account_id, groups))
+                    .map(|c| thread_summaries_with_members(c, account_id, groups))
                     .unwrap_or_default();
                 emit(WorkerEvent::ThreadSummaries { summaries });
                 continue; // cache-only, never hits the network

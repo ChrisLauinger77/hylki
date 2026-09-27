@@ -1138,6 +1138,10 @@ pub struct ThreadLatest {
 pub struct ThreadSummary {
     pub count: usize,
     pub latest: Option<ThreadLatest>,
+    /// The conversation's messages across the account, drafts, Trash and
+    /// Junk left out, for a row that opens out into the parts filed in other
+    /// folders (#309). Empty for a conversation of one.
+    pub members: Vec<Message>,
 }
 
 /// Every Message-ID that identifies a conversation: the messages' own ids plus
