@@ -4129,10 +4129,7 @@ fn addr_list(header: Option<&mail_parser::Address>) -> String {
                     if email.is_empty() {
                         return None;
                     }
-                    Some(match addr.name().map(str::trim).filter(|n| !n.is_empty()) {
-                        Some(name) => format!("{name} <{email}>"),
-                        None => email.to_string(),
-                    })
+                    Some(format_recipient(addr.name().unwrap_or_default(), email))
                 })
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -4228,23 +4225,88 @@ fn outbox_envelope(item: &crate::models::OutboxItem) -> Option<lettre::address::
 }
 
 /// Parse a recipient field ("Name <a@b>, c@d") into (name, email) pairs.
+///
+/// A comma inside a quoted name (`"Martin, Jason" <j@x>`) or inside the
+/// brackets is not a separator. Nor is one in an unquoted name, which is what
+/// a pasted or hand-typed `Martin, Jason <j@x>` has: a piece with no `@` that
+/// runs into a `Name <addr>` is the front of that name.
 pub fn parse_recipients(s: &str) -> Vec<(String, String)> {
+    let mut pieces: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let (mut quoted, mut escaped, mut angle) = (false, false, false);
+    for ch in s.chars() {
+        match ch {
+            _ if escaped => escaped = false,
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '<' if !quoted => angle = true,
+            '>' if !quoted => angle = false,
+            ',' if !quoted && !angle => {
+                pieces.push(std::mem::take(&mut cur));
+                continue;
+            }
+            _ => {}
+        }
+        cur.push(ch);
+    }
+    pieces.push(cur);
+
     let mut out = Vec::new();
-    for part in s.split(',') {
-        let part = part.trim();
+    let mut carry = String::new();
+    for (i, piece) in pieces.iter().enumerate() {
+        let part = if carry.is_empty() {
+            piece.trim().to_string()
+        } else {
+            format!("{carry},{piece}").trim().to_string()
+        };
+        carry.clear();
         if part.is_empty() {
+            continue;
+        }
+        let next_is_named = pieces.get(i + 1).is_some_and(|n| n.contains('<'));
+        if !part.contains('@') && next_is_named {
+            carry = part;
             continue;
         }
         match (part.rfind('<'), part.rfind('>')) {
             (Some(lt), Some(gt)) if lt < gt => {
                 let email = part[lt + 1..gt].trim().to_string();
-                let name = part[..lt].trim().trim_matches('"').trim().to_string();
-                out.push((name, email));
+                out.push((unquote_name(&part[..lt]), email));
             }
-            _ => out.push((String::new(), part.to_string())),
+            _ => out.push((String::new(), part)),
         }
     }
     out
+}
+
+/// A display name as written in a header, without its quotes and escapes.
+fn unquote_name(raw: &str) -> String {
+    let raw = raw.trim();
+    let Some(inner) = raw.strip_prefix('"').and_then(|r| r.strip_suffix('"')) else {
+        return raw.trim_matches('"').trim().to_string();
+    };
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        out.push(if c == '\\' { chars.next().unwrap_or(c) } else { c });
+    }
+    out.trim().to_string()
+}
+
+/// "Name <addr>" for a recipient field (the address alone when there is no
+/// name), quoting a name that has a comma or another character RFC 5322 keeps
+/// out of a bare name, so [`parse_recipients`] reads it back whole.
+pub fn format_recipient(name: &str, email: &str) -> String {
+    let name = name.trim();
+    if name.is_empty() || name == email {
+        return email.to_string();
+    }
+    if name.contains(|c: char| "()<>[]:;@\\,.\"".contains(c)) {
+        let escaped = name.replace('\\', "\\\\").replace('"', "\\\"");
+        format!("\"{escaped}\" <{email}>")
+    } else {
+        format!("{name} <{email}>")
+    }
 }
 
 /// Build a `Name <addr>` mailbox from its parts. Never format the two into one
@@ -11677,6 +11739,51 @@ mod guess_mime_tests {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         );
         assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
+    }
+}
+
+#[cfg(test)]
+mod recipient_tests {
+    use super::{format_recipient, parse_recipients};
+
+    fn pair(name: &str, email: &str) -> (String, String) {
+        (name.to_string(), email.to_string())
+    }
+
+    #[test]
+    fn a_comma_in_a_name_does_not_split_it() {
+        assert_eq!(
+            parse_recipients("\"Martin, Jason\" <j@x.example>, b@x.example"),
+            vec![pair("Martin, Jason", "j@x.example"), pair("", "b@x.example")]
+        );
+        assert_eq!(
+            parse_recipients("Martin, Jason <j@x.example>, Ann <a@x.example>,"),
+            vec![pair("Martin, Jason", "j@x.example"), pair("Ann", "a@x.example")]
+        );
+        assert_eq!(
+            parse_recipients("\"a \\\"b\\\" c\" <q@x.example>"),
+            vec![pair("a \"b\" c", "q@x.example")]
+        );
+        // A stray word stays its own (invalid) entry rather than joining a
+        // bare address, so the send still names it as the bad one.
+        assert_eq!(
+            parse_recipients("bob, a@x.example"),
+            vec![pair("", "bob"), pair("", "a@x.example")]
+        );
+    }
+
+    #[test]
+    fn formatted_recipients_read_back() {
+        for name in ["Jason Martin", "Martin, Jason", "J. \"Jay\" Martin", "a\\b"] {
+            let field = format!("{}, c@x.example", format_recipient(name, "j@x.example"));
+            assert_eq!(
+                parse_recipients(&field),
+                vec![pair(name, "j@x.example"), pair("", "c@x.example")],
+                "{field}"
+            );
+        }
+        assert_eq!(format_recipient("", "j@x.example"), "j@x.example");
+        assert_eq!(format_recipient("Jason Martin", "j@x.example"), "Jason Martin <j@x.example>");
     }
 }
 

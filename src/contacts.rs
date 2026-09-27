@@ -36,11 +36,7 @@ pub struct Suggestion {
 impl Suggestion {
     /// "Name <email>" for inserting into a recipient field (email alone if no name).
     pub fn display(&self) -> String {
-        if self.name.trim().is_empty() || self.name == self.email {
-            self.email.clone()
-        } else {
-            format!("{} <{}>", self.name, self.email)
-        }
+        crate::worker::format_recipient(&self.name, &self.email)
     }
 
     /// Whether the suggestion matches a typed fragment (name or email).

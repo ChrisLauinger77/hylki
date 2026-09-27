@@ -1721,13 +1721,8 @@ impl Component for Compose {
                 };
                 let to_row = widgets.to_row.clone();
                 crate::ui::contacts_browser::present(&win, move |contact| {
-                    let display = if contact.name.trim().is_empty()
-                        || contact.name == contact.email
-                    {
-                        contact.email.clone()
-                    } else {
-                        format!("{} <{}>", contact.name, contact.email)
-                    };
+                    let display =
+                        crate::worker::format_recipient(&contact.name, &contact.email);
                     let cur = to_row.text().to_string();
                     let trimmed = cur.trim_end();
                     let sep = if trimmed.is_empty() {
@@ -2911,9 +2906,8 @@ fn pgp_send_check(from: &str, chosen_key: Option<&str>, fields: &[&str], encrypt
     }
     if encrypt {
         for field in fields {
-            for part in field.split(',') {
-                let (_, addr) = crate::config::split_identity(part.trim());
-                let addr = addr.trim();
+            for (_, addr) in crate::worker::parse_recipients(field) {
+                let addr = addr.as_str();
                 if addr.is_empty() {
                     continue;
                 }
