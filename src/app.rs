@@ -1123,6 +1123,8 @@ impl AttachmentTarget {
 
 #[derive(Debug)]
 pub enum AppMsg {
+    /// A setting changed in Preferences (or its equivalent elsewhere).
+    Pref(PrefOutput),
     // User actions
     /// A unified row was chosen: All Inboxes, the unified section's Starred
     /// / Sent / Drafts row (every account's folder of that kind), or its
@@ -1163,8 +1165,6 @@ pub enum AppMsg {
     PlaceFolder { account_id: u32, path: String, dest: String, target: String, after: bool },
     /// An account's own folder order, chosen from its Folders heading.
     SetAccountFolderSort { account_id: u32, sort: Option<config::FolderSort> },
-    /// Settings → Sidebar → Folder order: every account without its own.
-    SetFolderSort(config::FolderSort),
     ToggleCustomFolders(u32),
     SidebarCollapsed(bool),
     /// The message-pane header's sidebar button: flip the sidebar between the
@@ -1306,14 +1306,9 @@ pub enum AppMsg {
     AddBlacklist(String),
     RemoveBlacklist(String),
     MarkSpam,
-    SetAutoRemoteContent(bool),
-    SetShowRemoteBanner(bool),
-    SetShowSpoofBanner(bool),
     /// The reader pane crossed the actions breakpoint (true = collapse the
     /// header's buttons into the overflow menu).
     SetReaderActionsCollapsed(bool),
-    /// A new reader toolbar layout from Settings: save, re-pack, re-fold.
-    SetReaderToolbar(config::ReaderToolbar),
     /// Showcase only: open a drop gap in the Settings toolbar editor.
     ShowcaseToolbarGap { zone: usize, index: usize },
     /// A right-click on the reader header's empty space: the menu that
@@ -1325,7 +1320,6 @@ pub enum AppMsg {
     ReaderControlsChanged(i32),
     /// The collapsed header's ⋯ button was clicked — pop its menu.
     ReaderOverflowMenu,
-    SetGravatar(bool),
     /// Show the full-window attachment lightbox (from the drawer or the
     /// toolbar popover's Preview) over these previewable items.
     ShowLightbox { items: Vec<Attachment>, start: usize },
@@ -1347,36 +1341,19 @@ pub enum AppMsg {
     /// The GNOME Contacts photo index changed (EDS sync, or the first load
     /// finished) — refresh the avatars that are on screen.
     ContactPhotosChanged,
-    SetAvatars(bool),
-    /// Your own mail wears its mailbox's face, or the circle any other sender
-    /// would get (#189).
-    SetOwnMailboxFace(bool),
     /// A Gravatar one of the accounts asked for came back (#189).
     OwnGravatarFetched {
         email: String,
         outcome: crate::avatar::FetchOutcome,
     },
-    SetSenderLogos(bool),
-    SetDateStyle(crate::config::DateStyle),
-    SetClockStyle(crate::config::ClockStyle),
-    /// Settings: the interface language code, "" for the system's (#179).
-    SetLanguage(String),
     /// The welcome wizard's first page picked a language: save it and
     /// come back in it.
     WizardLanguage(String),
-    SetThreading(bool),
-    SetThreadExpansion(bool),
-    SetThreadRowNewest(bool),
-    SetConfirmThreadDelete(bool),
     /// Delete requested on a whole conversation (a lone selected thread-head
     /// row): confirm (per preference), then delete every member.
     DeleteThread(Vec<Message>),
     /// The thread-delete dialog was confirmed.
     DeleteThreadConfirmed(Vec<Message>),
-    SetThreadsExpanded(bool),
-    SetThreadNewestFirst(bool),
-    SetAlwaysShowRecipients(bool),
-    SetSingleMessageCard(bool),
     /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
     /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
@@ -1386,23 +1363,6 @@ pub enum AppMsg {
     SetZoomDefault(u32),
     /// Settings: show the Reader View switch in the reader header.
     SetReaderSwitchShown(bool),
-    /// Settings: what Reader View does when a message is opened.
-    SetReaderDefault(config::ReaderDefault),
-    SetCardActionsMode { hover_toggle: bool, hover_auto: bool },
-    SetListPalette(bool),
-    SetListPaletteHover(bool),
-    SetCardPaletteMenu(bool),
-    SetSwipeEnabled(bool),
-    SetSwipeReversed(bool),
-    SetSwipeSensitivity(f64),
-    SetComposeInline(bool),
-    SetReplyInline(bool),
-    /// Reply panel shows its From/To/Subject rows from the start (#154).
-    SetReplyFields(bool),
-    /// Settings → System → GNOME Files changed.
-    SetFilesPrefs(config::FilesPrefs),
-    /// Settings → System → Links: the browser links open in (#232).
-    SetLinkBrowser(String),
     /// Copy the message the reader is on into a new one (#232).
     EditAsNewCurrent,
     /// A hand-off's files have a destination (the dialog answered, or the
@@ -1416,15 +1376,8 @@ pub enum AppMsg {
     HandOffReply { hand_off: FileHandOff, message: Option<Message> },
     /// The size check answered: open the composer, attaching or uploading.
     HandOffOpen { hand_off: FileHandOff, target: HandOffTarget, cloud: bool, remember: bool },
-    /// The identity new messages are sent from (#157); empty = the open
-    /// folder's account.
-    SetComposeDefaultFrom(String),
     /// The Settings window showed a category; remembered for reopening.
     SettingsPageShown(String),
-    SetPastePlain(bool),
-    SetReturnParagraph(bool),
-    SetSpellcheck(bool),
-    SetSpellcheckLangs(String),
     /// Show or block remote content for one message, whatever the standing
     /// policy is — the reader menu's entry, and what the banner's Load does.
     SetRemoteContent { account_id: u32, id: u32, show: bool },
@@ -1436,25 +1389,6 @@ pub enum AppMsg {
     /// Redo would take back now, or `None` for a direction with nothing in
     /// it. The window's entries follow it while it holds focus.
     ComposeHistory { id: u32, undo: Option<String>, redo: Option<String> },
-    SetFetchInterval(u64),
-    SetPush(bool),
-    SetNotifications(bool),
-    SetNotificationContent(bool),
-    SetNotificationButtons(config::NotificationButtons),
-    SetAttachmentsRow(bool),
-    SetContactsRow(bool),
-    SetShowUnified(bool),
-    SetUnifiedChips(config::UnifiedChips),
-    SetUnifiedFiltered(bool),
-    /// The unified section's Starred / Sent / Drafts rows.
-    SetUnifiedKinds(config::UnifiedKinds),
-    /// Whether the unified section lists the tags.
-    SetUnifiedTags(bool),
-    /// Whether the account sections are shown at all.
-    SetShowAccounts(bool),
-    /// Focus Mode's settings changed (the master switch or a part): apply
-    /// whatever differs, animated, and save.
-    SetFocusMode(config::FocusMode),
     /// The ⋯ of the message list header (Focus Mode): search, filters and
     /// sort as a menu.
     ListOverflowMenu,
@@ -1462,19 +1396,8 @@ pub enum AppMsg {
     /// folded — record it with the layout.
     ToggleAccountFiltered(u32),
     ToggleAccountTags(u32),
-    SetChevronsLeft(bool),
-    SetStartView(config::StartView),
-    /// Where the Filtered Folders / Tags sections sit (Settings → Sidebar).
-    SetFilteredPlacement(config::SectionPlacement),
-    SetTagsPlacement(config::SectionPlacement),
     /// The message list's visible-count text changed.
     ListCount(String),
-    /// Preference: hovering the narrow-window rail floats the sidebar out.
-    SetSidebarHoverExpand(bool),
-    /// Preference: accounts, folders and sections reopen as they were left.
-    SetRememberSidebar(bool),
-    /// Preference: the sidebar reopens in the icon rail if left there.
-    SetRememberRail(bool),
     /// Build the Settings window ahead of its first open (see the handler).
     PrewarmSettings,
     /// Close the Settings window as the user would (the showcase's reopen
@@ -1491,31 +1414,12 @@ pub enum AppMsg {
         drafts: bool,
         archive: bool,
     },
-    /// Preference: the icon rail shows unread dots rather than counts.
-    SetRailDots(bool),
     /// A tag view's rows, read from the index off the main thread: the
     /// view they answer and, per message, its account and folder path.
     TagViewLoaded { key: (Option<u32>, Option<String>), rows: Vec<(u32, String, Message)> },
-    /// Preference: which sections the icon rail folds up on collapse.
-    SetRailFold(config::RailFold),
-    /// Preference: the app chrome's theme (follow system / light / dark).
-    SetAppTheme(config::AppTheme),
-    SetTextScale(u32),
-    /// Preference: the appearance theme (Settings gallery).
-    SetTheme(String),
     /// The cursor entered the sidebar pane — open the hover peek (rail +
     /// preference permitting).
     SidebarHoverEnter,
-    SetPreviewLines(u32),
-    SetSingleKey(bool),
-    SetRunInBackground(bool),
-    SetAutostart(bool),
-    SetTray(bool),
-    SetTrayIcon(config::TrayIcon),
-    SetTrayMail(bool),
-    SetLauncherCount(bool),
-    /// Preference: the app icon (Settings gallery or the wizard).
-    SetAppIcon(String),
     /// "Restart Now" from the app-icon heads-up: quit into the restart
     /// helper once the desktop has taken the new launcher in.
     RestartApp,
@@ -1534,25 +1438,6 @@ pub enum AppMsg {
     PrintMessage,
     /// Render it to a PDF and open that, to see what will come out.
     PrintPreview,
-    SetPaletteCollapse(u64),
-    SetCardPaletteCollapse(u64),
-    SetMessageTheme(config::MessageTheme),
-    SetOverrideFonts(bool),
-    SetReaderFont(String),
-    SetOverrideColors(bool),
-    /// Settings: plain-text messages in monospace (#181), and the font.
-    SetPlainMonospace(bool),
-    SetPlainFont(String),
-    /// Settings: new messages start as plain text (#180).
-    SetComposeFormat(crate::config::ComposeFormat),
-    /// Settings: where the split reply opens in the reading pane (#212).
-    SetReplyPosition(config::ReplyPosition),
-    SetSignaturePosition(config::SignaturePosition),
-    SetSignatureDashes(bool),
-    /// Settings: each conversation message lists its own attachments (#213).
-    SetCardAttachments(bool),
-    /// Settings: the attachment drawer beneath the reader is shown (#213).
-    SetAttachmentDrawer(bool),
     /// A card's attachment chip (#213): open the file, or save it.
     CardAttachment { account_id: u32, id: u32, index: usize, save: bool },
     /// The drawer's "Show in Message": scroll the reader to the message this
@@ -1680,8 +1565,6 @@ pub enum AppMsg {
     PresentWindow,
     /// Open the status bar straight into console mode (button / burger menu).
     OpenConsole,
-    /// Settings toggle for offering console mode at all.
-    SetConsoleMode(bool),
     /// The list header's unread quick filter (#97).
     SetUnreadFilter(bool),
     /// Reveal (or toggle away) the message list's search bar (#102).
@@ -1691,19 +1574,12 @@ pub enum AppMsg {
     /// Delay-policy read marking (#100): fires a couple of seconds after a
     /// message opened; only applies if it is still the one on screen.
     DeferredMarkRead { message: Box<Message> },
-    /// Settings → Reading → "Mark as read" changed.
-    SetReadMark(config::ReadMark),
     /// The list header's starred quick filter.
     SetStarredFilter(bool),
-    /// Backup (#50): save/load the whole configuration as one file.
-    ExportSettings,
-    /// Save the console's log to a file for a bug report (#132).
-    ExportLog,
     /// Write the exported log straight to `path`, no chooser: the
     /// HYLKI_SHOWCASE_MEMORY hook, for reading the memory section of a
     /// running instance.
     ExportLogTo(std::path::PathBuf),
-    ImportSettings,
     /// The filter rules changed in Settings (#47).
     SetFilters(Vec<config::FilterRule>),
     /// Run the filter rules over mail that is already in these (account,
@@ -1765,8 +1641,6 @@ pub enum AppMsg {
     /// A settings editor was asked whether it can be left: `ask` when it
     /// holds unsaved changes, otherwise it has already closed itself.
     SettingsLeaveEditor { page: String, ask: bool },
-    /// The "settings window opens to" preference changed (true = Accounts).
-    SetSettingsOpenAccounts(bool),
     // Worker events (each carries the account it came from)
     SetAccount(Account),
     SetFolders { account_id: u32, folders: Vec<Folder> },
@@ -2990,7 +2864,7 @@ impl SimpleComponent for AppModel {
             sender.input_sender(),
             |out| match out {
                 NotifyOutput::CountChanged(n) => AppMsg::NotifyCount(n),
-                NotifyOutput::ExportLog => AppMsg::ExportLog,
+                NotifyOutput::ExportLog => AppMsg::Pref(PrefOutput::ExportLog),
                 NotifyOutput::Shown(shown) => AppMsg::StatusBarShown(shown),
             },
         );
@@ -3042,7 +2916,7 @@ impl SimpleComponent for AppModel {
             show_accounts_action.connect_change_state(move |action, value| {
                 if let Some(on) = value.and_then(|v| v.get::<bool>()) {
                     action.set_state(&on.to_variant());
-                    s.input(AppMsg::SetShowAccounts(on));
+                    s.input(AppMsg::Pref(PrefOutput::SetShowAccounts(on)));
                 }
             });
         }
@@ -3059,7 +2933,7 @@ impl SimpleComponent for AppModel {
                     action.set_state(&on.to_variant());
                     let mut focus = config::load_focus_mode();
                     focus.enabled = on;
-                    s.input(AppMsg::SetFocusMode(focus));
+                    s.input(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
                 }
             });
         }
@@ -4846,7 +4720,7 @@ impl SimpleComponent for AppModel {
                         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
                             let mut focus = config::load_focus_mode();
                             focus.enabled = on;
-                            s.input(AppMsg::SetFocusMode(focus));
+                            s.input(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
                         });
                     }
                 }
@@ -4998,11 +4872,11 @@ impl SimpleComponent for AppModel {
                 if let Ok(flip) = std::env::var("HYLKI_SHOWCASE_FLIP") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
-                        s.input(AppMsg::SetAppTheme(if flip == "dark" {
+                        s.input(AppMsg::Pref(PrefOutput::SetAppTheme(if flip == "dark" {
                             config::AppTheme::Dark
                         } else {
                             config::AppTheme::Light
-                        }));
+                        })));
                     });
                 }
                 // HYLKI_SHOWCASE_THEME=<id> picks that appearance theme at
@@ -5011,7 +4885,7 @@ impl SimpleComponent for AppModel {
                 if let Ok(id) = std::env::var("HYLKI_SHOWCASE_THEME") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(6, move || {
-                        s.input(AppMsg::SetTheme(id.clone()));
+                        s.input(AppMsg::Pref(PrefOutput::SetTheme(id.clone())));
                     });
                 }
                 // HYLKI_SHOWCASE_ACCOUNT=N opens account N's editor a beat
@@ -5697,7 +5571,7 @@ impl SimpleComponent for AppModel {
                 self.rebuild_sidebar();
             }
 
-            AppMsg::SetFolderSort(sort) => {
+            AppMsg::Pref(PrefOutput::SetFolderSort(sort)) => {
                 if pref!(self.folder_sort = sort) {
                     self.rebuild_sidebar();
                 }
@@ -5853,15 +5727,15 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetSidebarHoverExpand(on) => {
+            AppMsg::Pref(PrefOutput::SetSidebarHoverExpand(on)) => {
                 pref!(self.sidebar_hover_expand = on);
             }
 
-            AppMsg::SetRememberSidebar(on) => {
+            AppMsg::Pref(PrefOutput::SetRememberSidebar(on)) => {
                 pref!(self.remember_sidebar = on);
             }
 
-            AppMsg::SetRememberRail(on) => {
+            AppMsg::Pref(PrefOutput::SetRememberRail(on)) => {
                 pref!(self.remember_rail = on);
             }
 
@@ -5896,13 +5770,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetRailDots(on) => {
+            AppMsg::Pref(PrefOutput::SetRailDots(on)) => {
                 if pref!(self.rail_dots = on) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetRailFold(fold) => {
+            AppMsg::Pref(PrefOutput::SetRailFold(fold)) => {
                 if pref!(self.rail_fold = fold) {
                     // The sidebar folds (or reopens) the sections concerned
                     // itself if the rail is up.
@@ -5910,7 +5784,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAppTheme(theme) => {
+            AppMsg::Pref(PrefOutput::SetAppTheme(theme)) => {
                 if self.app_theme != theme {
                     self.app_theme = theme;
                     apply_app_theme(theme);
@@ -5918,7 +5792,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetTextScale(percent) => {
+            AppMsg::Pref(PrefOutput::SetTextScale(percent)) => {
                 if self.text_scale != percent {
                     self.text_scale = percent;
                     crate::text_scale::apply(percent);
@@ -5926,7 +5800,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetTheme(id) => {
+            AppMsg::Pref(PrefOutput::SetTheme(id)) => {
                 if self.theme != id {
                     self.theme = id.clone();
                     // Repaints the chrome and tells the reader and any open
@@ -6991,17 +6865,17 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAvatars(on) => {
+            AppMsg::Pref(PrefOutput::SetAvatars(on)) => {
                 if pref!(self.avatars = on) {
                     self.push_list_look(false);
                 }
             }
 
-            AppMsg::SetFocusMode(focus) => self.set_focus_mode(focus),
+            AppMsg::Pref(PrefOutput::SetFocusMode(focus)) => self.set_focus_mode(focus),
 
             AppMsg::ListOverflowMenu => self.show_list_overflow_menu(&sender),
 
-            AppMsg::SetOwnMailboxFace(on) => {
+            AppMsg::Pref(PrefOutput::SetOwnMailboxFace(on)) => {
                 if pref!(self.own_mailbox_face = on) {
                     self.refresh_own_faces();
                     // Switched on, the accounts that want a Gravatar may never
@@ -7021,7 +6895,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetSenderLogos(on) => {
+            AppMsg::Pref(PrefOutput::SetSenderLogos(on)) => {
                 if pref!(self.sender_logos = on) {
                     self.message_list.emit(MessageListInput::SetSenderLogos(on));
                 }
@@ -7032,7 +6906,7 @@ impl SimpleComponent for AppModel {
                 self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
             }
 
-            AppMsg::SetReaderToolbar(layout) => {
+            AppMsg::Pref(PrefOutput::SetReaderToolbar(layout)) => {
                 if self.reader_toolbar != layout {
                     self.reader_toolbar = layout;
                     config::save_reader_toolbar(&self.reader_toolbar);
@@ -7054,13 +6928,13 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ReaderOverflowMenu => self.show_reader_overflow_menu(&sender),
 
-            AppMsg::SetShowRemoteBanner(on) => {
+            AppMsg::Pref(PrefOutput::SetShowRemoteBanner(on)) => {
                 if pref!(self.show_remote_banner = on) {
                     self.message_view.emit(MessageViewInput::SetBannerShown(on));
                 }
             }
 
-            AppMsg::SetShowSpoofBanner(on) => {
+            AppMsg::Pref(PrefOutput::SetShowSpoofBanner(on)) => {
                 if pref!(self.show_spoof_banner = on) {
                     self.message_view.emit(MessageViewInput::SetSpoofBannerShown(on));
                     for p in self.popouts.values() {
@@ -7069,7 +6943,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAutoRemoteContent(on) => {
+            AppMsg::Pref(PrefOutput::SetAutoRemoteContent(on)) => {
                 if pref!(self.auto_remote_content = on) {
                     // Re-render what is open so the change takes effect there too:
                     // on, the blocked content loads; off, it is stripped again.
@@ -7082,13 +6956,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetDateStyle(style) => {
+            AppMsg::Pref(PrefOutput::SetDateStyle(style)) => {
                 if pref!(self.date_style = style) {
                     self.apply_date_style();
                 }
             }
 
-            AppMsg::SetLanguage(code) => {
+            AppMsg::Pref(PrefOutput::SetLanguage(code)) => {
                 // The combo also notifies as its model is set; only a real
                 // change is saved and announced.
                 if config::load_language() != code {
@@ -7139,13 +7013,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetClockStyle(style) => {
+            AppMsg::Pref(PrefOutput::SetClockStyle(style)) => {
                 if pref!(self.clock_style = style) {
                     self.apply_date_style();
                 }
             }
 
-            AppMsg::SetGravatar(on) => {
+            AppMsg::Pref(PrefOutput::SetGravatar(on)) => {
                 if pref!(self.gravatar = on) {
                     self.message_list.emit(MessageListInput::SetGravatar(on));
                     // Refresh the reader's avatar for the open message.
@@ -7226,32 +7100,32 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::ContactPhotosChanged);
             }
 
-            AppMsg::SetFetchInterval(secs) => {
+            AppMsg::Pref(PrefOutput::SetFetchInterval(secs)) => {
                 if pref!(self.fetch_interval_secs = secs) {
                     self.arm_auto_fetch(&sender);
                 }
             }
 
-            AppMsg::SetPush(on) => {
+            AppMsg::Pref(PrefOutput::SetPush(on)) => {
                 if pref!(self.push = on) {
                     // Workers read the push setting at startup; restart to apply.
                     self.reconnect_all(&sender);
                 }
             }
 
-            AppMsg::SetNotifications(on) => {
+            AppMsg::Pref(PrefOutput::SetNotifications(on)) => {
                 pref!(self.notifications_enabled = on);
             }
 
-            AppMsg::SetNotificationContent(on) => {
+            AppMsg::Pref(PrefOutput::SetNotificationContent(on)) => {
                 pref!(self.notification_content = on);
             }
 
-            AppMsg::SetNotificationButtons(buttons) => {
+            AppMsg::Pref(PrefOutput::SetNotificationButtons(buttons)) => {
                 pref!(self.notification_buttons = buttons);
             }
 
-            AppMsg::SetRunInBackground(on) => {
+            AppMsg::Pref(PrefOutput::SetRunInBackground(on)) => {
                 if self.run_in_background.get() != on {
                     self.run_in_background.set(on);
                     self.save_settings();
@@ -7265,13 +7139,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAutostart(on) => {
+            AppMsg::Pref(PrefOutput::SetAutostart(on)) => {
                 if pref!(self.autostart = on) {
                     crate::background::request(self.run_in_background.get() && on);
                 }
             }
 
-            AppMsg::SetTray(on) => {
+            AppMsg::Pref(PrefOutput::SetTray(on)) => {
                 if pref!(self.tray_enabled = on) {
                     if on {
                         self.start_tray(&sender);
@@ -7281,7 +7155,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetTrayIcon(icon) => {
+            AppMsg::Pref(PrefOutput::SetTrayIcon(icon)) => {
                 if pref!(self.tray_icon = icon) {
                     // A fresh item rather than a new icon on the old one: the
                     // AppIndicator extension, taken from a picture back to a
@@ -7294,7 +7168,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAppIcon(id) => {
+            AppMsg::Pref(PrefOutput::SetAppIcon(id)) => {
                 // Picking the stored choice again still changes the desktop
                 // when it replaces an icon set outside Hylki (#252).
                 let replaces_custom = crate::app_icon::custom_icon().is_some();
@@ -7341,7 +7215,7 @@ impl SimpleComponent for AppModel {
                 }
             },
 
-            AppMsg::SetTrayMail(on) => {
+            AppMsg::Pref(PrefOutput::SetTrayMail(on)) => {
                 if pref!(self.tray_mail = on) {
                     // A sentinel no real list equals, so the change is sent
                     // whichever way the switch went.
@@ -7351,7 +7225,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetLauncherCount(on) => {
+            AppMsg::Pref(PrefOutput::SetLauncherCount(on)) => {
                 if pref!(self.launcher_count = on) {
                     self.push_launcher_count();
                 }
@@ -7384,7 +7258,7 @@ impl SimpleComponent for AppModel {
             }
 
 
-            AppMsg::SetSingleKey(on) => {
+            AppMsg::Pref(PrefOutput::SetSingleKey(on)) => {
                 if self.single_key.get() != on {
                     self.single_key.set(on);
                     self.save_settings();
@@ -7417,7 +7291,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Shortcut(action) => self.run_shortcut(action, &sender),
 
-            AppMsg::SetPreviewLines(lines) => {
+            AppMsg::Pref(PrefOutput::SetPreviewLines(lines)) => {
                 if self.preview_lines != lines {
                     let was_off = self.preview_lines == 0;
                     self.preview_lines = lines;
@@ -7435,7 +7309,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAttachmentsRow(show) => {
+            AppMsg::Pref(PrefOutput::SetAttachmentsRow(show)) => {
                 if pref!(self.show_attachments = show) {
                     self.sidebars_emit(SidebarInput::SetAttachmentsRow(show));
                 }
@@ -7443,45 +7317,45 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ListCount(text) => self.list_count = text,
 
-            AppMsg::SetContactsRow(show) => {
+            AppMsg::Pref(PrefOutput::SetContactsRow(show)) => {
                 if pref!(self.show_contacts = show) {
                     self.sidebars_emit(SidebarInput::SetContactsRow(show));
                 }
             }
 
-            AppMsg::SetShowUnified(show) => {
+            AppMsg::Pref(PrefOutput::SetShowUnified(show)) => {
                 if pref!(self.show_unified_pref = show) {
                     // Rebuilds the sidebar with or without the unified section.
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetUnifiedChips(chips) => {
+            AppMsg::Pref(PrefOutput::SetUnifiedChips(chips)) => {
                 if pref!(self.unified_chips = chips) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetUnifiedFiltered(show) => {
+            AppMsg::Pref(PrefOutput::SetUnifiedFiltered(show)) => {
                 if pref!(self.unified_filtered = show) {
                     // Adds or removes the Filtered Folders section.
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetUnifiedKinds(kinds) => {
+            AppMsg::Pref(PrefOutput::SetUnifiedKinds(kinds)) => {
                 if pref!(self.unified_kinds = kinds) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetUnifiedTags(show) => {
+            AppMsg::Pref(PrefOutput::SetUnifiedTags(show)) => {
                 if pref!(self.unified_tags = show) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetShowAccounts(show) => {
+            AppMsg::Pref(PrefOutput::SetShowAccounts(show)) => {
                 if pref!(self.show_accounts = show) {
                     self.rebuild_sidebar();
                 }
@@ -7517,47 +7391,47 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetFilteredPlacement(p) => {
+            AppMsg::Pref(PrefOutput::SetFilteredPlacement(p)) => {
                 if pref!(self.filtered_placement = p) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetTagsPlacement(p) => {
+            AppMsg::Pref(PrefOutput::SetTagsPlacement(p)) => {
                 if pref!(self.tags_placement = p) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetStartView(view) => {
+            AppMsg::Pref(PrefOutput::SetStartView(view)) => {
                 pref!(self.start_view = view);
             }
 
-            AppMsg::SetChevronsLeft(left) => {
+            AppMsg::Pref(PrefOutput::SetChevronsLeft(left)) => {
                 if pref!(self.chevrons_left = left) {
                     self.rebuild_sidebar();
                 }
             }
 
-            AppMsg::SetThreading(on) => {
+            AppMsg::Pref(PrefOutput::SetThreading(on)) => {
                 if pref!(self.threading = on) {
                     self.message_list.emit(MessageListInput::SetThreading(on));
                 }
             }
 
-            AppMsg::SetThreadExpansion(on) => {
+            AppMsg::Pref(PrefOutput::SetThreadExpansion(on)) => {
                 if pref!(self.thread_expansion = on) {
                     self.message_list.emit(MessageListInput::SetThreadExpansion(on));
                 }
             }
 
-            AppMsg::SetThreadRowNewest(on) => {
+            AppMsg::Pref(PrefOutput::SetThreadRowNewest(on)) => {
                 if pref!(self.thread_row_newest = on) {
                     self.message_list.emit(MessageListInput::SetThreadRowNewest(on));
                 }
             }
 
-            AppMsg::SetConfirmThreadDelete(on) => {
+            AppMsg::Pref(PrefOutput::SetConfirmThreadDelete(on)) => {
                 pref!(self.confirm_thread_delete = on);
             }
 
@@ -7576,7 +7450,7 @@ impl SimpleComponent for AppModel {
                 self.delete_messages(messages, &sender);
             }
 
-            AppMsg::SetCardActionsMode { hover_toggle, hover_auto } => {
+            AppMsg::Pref(PrefOutput::SetCardActionsMode { hover_toggle, hover_auto }) => {
                 if self.card_actions_hover != hover_toggle
                     || self.card_actions_auto != hover_auto
                 {
@@ -7587,13 +7461,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetThreadsExpanded(on) => {
+            AppMsg::Pref(PrefOutput::SetThreadsExpanded(on)) => {
                 if pref!(self.threads_expanded = on) {
                     self.message_list.emit(MessageListInput::SetThreadsExpanded(on));
                 }
             }
 
-            AppMsg::SetThreadNewestFirst(on) => {
+            AppMsg::Pref(PrefOutput::SetThreadNewestFirst(on)) => {
                 if pref!(self.thread_newest_first = on) {
                     // Re-render an open conversation in the new order.
                     if self.current_thread.len() > 1 {
@@ -7602,7 +7476,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetAlwaysShowRecipients(on) => {
+            AppMsg::Pref(PrefOutput::SetAlwaysShowRecipients(on)) => {
                 if pref!(self.always_show_recipients = on) {
                     self.message_view.emit(MessageViewInput::SetAlwaysShowRecipients(on));
                     // Re-render whatever is open so the header reflects it.
@@ -7615,12 +7489,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetCardAttachments(on) => {
+            AppMsg::Pref(PrefOutput::SetCardAttachments(on)) => {
                 if pref!(self.card_attachments = on) {
                     self.message_view.emit(MessageViewInput::SetCardAttachmentsShown(on));
                 }
             }
-            AppMsg::SetAttachmentDrawer(on) => {
+            AppMsg::Pref(PrefOutput::SetAttachmentDrawer(on)) => {
                 if pref!(self.drawer_enabled = on) {
                     self.sync_attachment_drawer();
                     self.message_view.emit(MessageViewInput::SetAttachmentDrawer(on));
@@ -7821,7 +7695,7 @@ impl SimpleComponent for AppModel {
                     }
                 }
             }
-            AppMsg::SetReaderDefault(policy) => {
+            AppMsg::Pref(PrefOutput::SetReaderDefault(policy)) => {
                 if pref!(self.reader_default = policy) {
                     // Focus Mode's Reader View outranks it while on.
                     let policy = self.effective_reader_default();
@@ -7831,7 +7705,7 @@ impl SimpleComponent for AppModel {
                     }
                 }
             }
-            AppMsg::SetSingleMessageCard(on) => {
+            AppMsg::Pref(PrefOutput::SetSingleMessageCard(on)) => {
                 if pref!(self.single_message_card = on) {
                     self.message_view.emit(MessageViewInput::SetSingleMessageCard(on));
                     // Only lone messages change; re-render one if it's open.
@@ -7844,49 +7718,49 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetPaletteCollapse(secs) => {
+            AppMsg::Pref(PrefOutput::SetPaletteCollapse(secs)) => {
                 if pref!(self.palette_collapse_secs = secs) {
                     self.message_list.emit(MessageListInput::SetPaletteCollapse(secs));
                 }
             }
 
-            AppMsg::SetCardPaletteCollapse(secs) => {
+            AppMsg::Pref(PrefOutput::SetCardPaletteCollapse(secs)) => {
                 if pref!(self.card_palette_collapse_secs = secs) {
                     self.message_view.emit(MessageViewInput::SetPaletteCollapse(secs));
                 }
             }
 
-            AppMsg::SetListPalette(on) => {
+            AppMsg::Pref(PrefOutput::SetListPalette(on)) => {
                 if pref!(self.list_palette = on) {
                     self.message_list.emit(MessageListInput::SetListPalette(on));
                 }
             }
 
-            AppMsg::SetListPaletteHover(on) => {
+            AppMsg::Pref(PrefOutput::SetListPaletteHover(on)) => {
                 if pref!(self.list_palette_hover = on) {
                     self.message_list.emit(MessageListInput::SetPaletteHover(on));
                 }
             }
 
-            AppMsg::SetCardPaletteMenu(on) => {
+            AppMsg::Pref(PrefOutput::SetCardPaletteMenu(on)) => {
                 if pref!(self.card_palette_menu = on) {
                     self.message_view.emit(MessageViewInput::SetCardPaletteMenu(on));
                 }
             }
 
-            AppMsg::SetSwipeEnabled(on) => {
+            AppMsg::Pref(PrefOutput::SetSwipeEnabled(on)) => {
                 if pref!(self.swipe_enabled = on) {
                     self.message_list.emit(MessageListInput::SetSwipeEnabled(on));
                 }
             }
 
-            AppMsg::SetSwipeReversed(on) => {
+            AppMsg::Pref(PrefOutput::SetSwipeReversed(on)) => {
                 if pref!(self.swipe_reversed = on) {
                     self.message_list.emit(MessageListInput::SetSwipeReversed(on));
                 }
             }
 
-            AppMsg::SetSwipeSensitivity(factor) => {
+            AppMsg::Pref(PrefOutput::SetSwipeSensitivity(factor)) => {
                 let factor = factor.clamp(
                     config::SWIPE_SENSITIVITY_MIN,
                     config::SWIPE_SENSITIVITY_MAX,
@@ -7924,19 +7798,19 @@ impl SimpleComponent for AppModel {
             }
 
 
-            AppMsg::SetComposeInline(on) => {
+            AppMsg::Pref(PrefOutput::SetComposeInline(on)) => {
                 pref!(self.compose_inline = on);
             }
 
-            AppMsg::SetReplyInline(on) => {
+            AppMsg::Pref(PrefOutput::SetReplyInline(on)) => {
                 pref!(self.reply_inline = on);
             }
 
-            AppMsg::SetReplyFields(on) => {
+            AppMsg::Pref(PrefOutput::SetReplyFields(on)) => {
                 pref!(self.reply_fields = on);
             }
 
-            AppMsg::SetFilesPrefs(prefs) => {
+            AppMsg::Pref(PrefOutput::SetFilesPrefs(prefs)) => {
                 pref!(self.files_prefs = prefs);
             }
 
@@ -7946,7 +7820,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetLinkBrowser(choice) => {
+            AppMsg::Pref(PrefOutput::SetLinkBrowser(choice)) => {
                 if self.link_browser != choice {
                     self.link_browser = choice;
                     crate::ui::launch::set_browser(&self.link_browser);
@@ -7995,19 +7869,19 @@ impl SimpleComponent for AppModel {
                 self.hand_off_open(hand_off, target, cloud, &sender);
             }
 
-            AppMsg::SetComposeDefaultFrom(addr) => {
+            AppMsg::Pref(PrefOutput::SetComposeDefaultFrom(addr)) => {
                 pref!(self.compose_default_from = addr);
             }
 
-            AppMsg::SetPastePlain(on) => {
+            AppMsg::Pref(PrefOutput::SetPastePlain(on)) => {
                 pref!(self.paste_plain = on);
             }
 
-            AppMsg::SetReturnParagraph(on) => {
+            AppMsg::Pref(PrefOutput::SetReturnParagraph(on)) => {
                 pref!(self.return_paragraph = on);
             }
 
-            AppMsg::SetSpellcheck(on) => {
+            AppMsg::Pref(PrefOutput::SetSpellcheck(on)) => {
                 if pref!(self.spellcheck = on) {
                     // Takes effect in already-open composers too: the shared
                     // web context is live.
@@ -8015,13 +7889,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetSpellcheckLangs(langs) => {
+            AppMsg::Pref(PrefOutput::SetSpellcheckLangs(langs)) => {
                 if pref!(self.spellcheck_langs = langs) {
                     crate::ui::rich_editor::apply_spellcheck();
                 }
             }
 
-            AppMsg::SetMessageTheme(theme) => {
+            AppMsg::Pref(PrefOutput::SetMessageTheme(theme)) => {
                 if pref!(self.message_theme = theme) {
                     let dark = theme.dark_override();
                     // Message content only — the reader and any popped-out windows.
@@ -8064,22 +7938,22 @@ impl SimpleComponent for AppModel {
                     self.send_to(m.account_id, MailRequest::LoadBody { message_id: m.id, path, uid: m.uid });
                 }
             }
-            AppMsg::SetOverrideFonts(on) => {
+            AppMsg::Pref(PrefOutput::SetOverrideFonts(on)) => {
                 if pref!(self.override_fonts = on) {
                     self.push_reader_style();
                 }
             }
-            AppMsg::SetReaderFont(font) => {
+            AppMsg::Pref(PrefOutput::SetReaderFont(font)) => {
                 if pref!(self.reader_font = font) {
                     self.push_reader_style();
                 }
             }
-            AppMsg::SetPlainMonospace(on) => {
+            AppMsg::Pref(PrefOutput::SetPlainMonospace(on)) => {
                 if pref!(self.plain_monospace = on) {
                     self.push_reader_style();
                 }
             }
-            AppMsg::SetPlainFont(font) => {
+            AppMsg::Pref(PrefOutput::SetPlainFont(font)) => {
                 if pref!(self.plain_font = font) {
                     self.push_reader_style();
                 }
@@ -8151,23 +8025,23 @@ impl SimpleComponent for AppModel {
                     r.controller.emit(ComposeInput::SetFormat(format));
                 }
             }
-            AppMsg::SetComposeFormat(format) => {
+            AppMsg::Pref(PrefOutput::SetComposeFormat(format)) => {
                 pref!(self.compose_format = format);
             }
-            AppMsg::SetReplyPosition(position) => {
+            AppMsg::Pref(PrefOutput::SetReplyPosition(position)) => {
                 // A split reply already open stays where it is; the next
                 // one opens in the new place.
                 pref!(self.reply_position = position);
             }
-            AppMsg::SetSignaturePosition(position) => {
+            AppMsg::Pref(PrefOutput::SetSignaturePosition(position)) => {
                 // Composers already open keep their signature where it is;
                 // the next reply or forward opens with the new placement.
                 pref!(self.signature_position = position);
             }
-            AppMsg::SetSignatureDashes(on) => {
+            AppMsg::Pref(PrefOutput::SetSignatureDashes(on)) => {
                 pref!(self.signature_dashes = on);
             }
-            AppMsg::SetOverrideColors(on) => {
+            AppMsg::Pref(PrefOutput::SetOverrideColors(on)) => {
                 if pref!(self.override_colors = on) {
                     self.push_reader_style();
                 }
@@ -9026,7 +8900,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetReadMark(policy) => {
+            AppMsg::Pref(PrefOutput::SetReadMark(policy)) => {
                 if pref!(self.read_mark = policy) {
                     self.message_view.emit(MessageViewInput::SetReadMark(policy));
                 }
@@ -9036,7 +8910,7 @@ impl SimpleComponent for AppModel {
                 self.message_list.emit(MessageListInput::SetStarredOnly(on));
             }
 
-            AppMsg::ExportSettings => {
+            AppMsg::Pref(PrefOutput::ExportSettings) => {
                 let dialog = gtk::FileDialog::builder()
                     .title(&i18n("Export Settings"))
                     .initial_name("vireo-settings.toml")
@@ -9063,7 +8937,7 @@ impl SimpleComponent for AppModel {
                 });
             }
 
-            AppMsg::ExportLog => {
+            AppMsg::Pref(PrefOutput::ExportLog) => {
                 let dialog = gtk::FileDialog::builder()
                     .title(&i18n("Export Log"))
                     .initial_name(&format!("hylki-log-{}.txt", chrono::Local::now().format("%Y%m%d-%H%M")))
@@ -9101,7 +8975,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::ImportSettings => {
+            AppMsg::Pref(PrefOutput::ImportSettings) => {
                 let dialog = gtk::FileDialog::builder().title(&i18n("Import Settings")).build();
                 let win = self.window.clone();
                 let s = sender.clone();
@@ -9174,7 +9048,7 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SetConsoleMode(on) => {
+            AppMsg::Pref(PrefOutput::SetConsoleMode(on)) => {
                 if pref!(self.console_mode = on) {
                     self.notifications.emit(NotifyInput::SetConsoleEnabled(on));
                     self.rebuild_help_menu();
@@ -9185,15 +9059,15 @@ impl SimpleComponent for AppModel {
                 config::mark_wizard_completed();
                 // Route every choice through its normal handler (each saves and
                 // updates the live UI); drop the wizard controller afterwards.
-                sender.input(AppMsg::SetAutoRemoteContent(!p.block_remote));
-                sender.input(AppMsg::SetGravatar(p.gravatar));
-                sender.input(AppMsg::SetSenderLogos(p.sender_logos));
-                sender.input(AppMsg::SetNotificationContent(p.notification_content));
-                sender.input(AppMsg::SetPreviewLines(p.preview_lines));
-                sender.input(AppMsg::SetAvatars(p.avatars));
-                sender.input(AppMsg::SetThreading(p.threading));
+                sender.input(AppMsg::Pref(PrefOutput::SetAutoRemoteContent(!p.block_remote)));
+                sender.input(AppMsg::Pref(PrefOutput::SetGravatar(p.gravatar)));
+                sender.input(AppMsg::Pref(PrefOutput::SetSenderLogos(p.sender_logos)));
+                sender.input(AppMsg::Pref(PrefOutput::SetNotificationContent(p.notification_content)));
+                sender.input(AppMsg::Pref(PrefOutput::SetPreviewLines(p.preview_lines)));
+                sender.input(AppMsg::Pref(PrefOutput::SetAvatars(p.avatars)));
+                sender.input(AppMsg::Pref(PrefOutput::SetThreading(p.threading)));
                 if !p.app_icon.is_empty() {
-                    sender.input(AppMsg::SetAppIcon(p.app_icon));
+                    sender.input(AppMsg::Pref(PrefOutput::SetAppIcon(p.app_icon)));
                 }
                 self.welcome = None;
             }
@@ -9315,7 +9189,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::OpenPreferences => self.open_settings_window(&sender, false, false),
 
-            AppMsg::SetSettingsOpenAccounts(on) => {
+            AppMsg::Pref(PrefOutput::SetSettingsOpenAccounts(on)) => {
                 pref!(self.settings_open_accounts = on);
             }
 
@@ -10531,6 +10405,10 @@ impl SimpleComponent for AppModel {
                     s.input(AppMsg::ContactsLoaded(contacts));
                 });
             }
+
+            // The rest of Preferences' outputs are mapped to their own
+            // messages before they get here.
+            AppMsg::Pref(_) => {}
         }
     }
 }
@@ -17423,113 +17301,12 @@ impl AppModel {
             .transient_for(&self.window)
             .launch(init)
             .forward(sender.input_sender(), |out| match out {
-                PrefOutput::SetAutoRemoteContent(on) => AppMsg::SetAutoRemoteContent(on),
-                PrefOutput::SetShowRemoteBanner(on) => AppMsg::SetShowRemoteBanner(on),
-                PrefOutput::SetShowSpoofBanner(on) => AppMsg::SetShowSpoofBanner(on),
-                PrefOutput::SetGravatar(on) => AppMsg::SetGravatar(on),
-                PrefOutput::SetAvatars(on) => AppMsg::SetAvatars(on),
-                PrefOutput::SetOwnMailboxFace(on) => AppMsg::SetOwnMailboxFace(on),
-                PrefOutput::SetSenderLogos(on) => AppMsg::SetSenderLogos(on),
-                PrefOutput::SetDateStyle(style) => AppMsg::SetDateStyle(style),
-                PrefOutput::SetClockStyle(style) => AppMsg::SetClockStyle(style),
-                PrefOutput::SetLanguage(code) => AppMsg::SetLanguage(code),
-                PrefOutput::SetThreading(on) => AppMsg::SetThreading(on),
-                PrefOutput::SetThreadExpansion(on) => AppMsg::SetThreadExpansion(on),
-                PrefOutput::SetThreadRowNewest(on) => AppMsg::SetThreadRowNewest(on),
-                PrefOutput::SetConfirmThreadDelete(on) => {
-                    AppMsg::SetConfirmThreadDelete(on)
-                }
-                PrefOutput::SetThreadsExpanded(on) => AppMsg::SetThreadsExpanded(on),
-                PrefOutput::SetThreadNewestFirst(on) => AppMsg::SetThreadNewestFirst(on),
-                PrefOutput::SetAlwaysShowRecipients(on) => AppMsg::SetAlwaysShowRecipients(on),
-                PrefOutput::SetSingleMessageCard(on) => AppMsg::SetSingleMessageCard(on),
                 PrefOutput::SetReaderSwitch(on) => AppMsg::SetReaderSwitchShown(on),
-                PrefOutput::SetReaderDefault(p) => AppMsg::SetReaderDefault(p),
                 PrefOutput::SetReaderZoom(z) => AppMsg::SetZoomDefault(z),
-                PrefOutput::SetCardAttachments(on) => AppMsg::SetCardAttachments(on),
-                PrefOutput::SetAttachmentDrawer(on) => AppMsg::SetAttachmentDrawer(on),
-                PrefOutput::SetCardActionsMode { hover_toggle, hover_auto } => {
-                    AppMsg::SetCardActionsMode { hover_toggle, hover_auto }
-                }
-                PrefOutput::SetListPalette(on) => AppMsg::SetListPalette(on),
-                PrefOutput::SetListPaletteHover(on) => AppMsg::SetListPaletteHover(on),
-                PrefOutput::SetCardPaletteMenu(on) => AppMsg::SetCardPaletteMenu(on),
-                PrefOutput::SetSwipeEnabled(on) => AppMsg::SetSwipeEnabled(on),
-                PrefOutput::SetSwipeReversed(on) => AppMsg::SetSwipeReversed(on),
-                PrefOutput::SetSwipeSensitivity(v) => AppMsg::SetSwipeSensitivity(v),
-                PrefOutput::SetComposeInline(on) => AppMsg::SetComposeInline(on),
-                PrefOutput::SetReplyInline(on) => AppMsg::SetReplyInline(on),
-                PrefOutput::SetReplyFields(on) => AppMsg::SetReplyFields(on),
-                PrefOutput::SetFilesPrefs(p) => AppMsg::SetFilesPrefs(p),
-                PrefOutput::SetLinkBrowser(id) => AppMsg::SetLinkBrowser(id),
-                PrefOutput::SetComposeDefaultFrom(addr) => AppMsg::SetComposeDefaultFrom(addr),
-                PrefOutput::SetPastePlain(on) => AppMsg::SetPastePlain(on),
-                PrefOutput::SetReturnParagraph(on) => AppMsg::SetReturnParagraph(on),
-                PrefOutput::SetSpellcheck(on) => AppMsg::SetSpellcheck(on),
-                PrefOutput::SetSpellcheckLangs(l) => AppMsg::SetSpellcheckLangs(l),
-                PrefOutput::SetFetchInterval(secs) => AppMsg::SetFetchInterval(secs),
-                PrefOutput::SetPush(on) => AppMsg::SetPush(on),
-                PrefOutput::SetNotifications(on) => AppMsg::SetNotifications(on),
-                PrefOutput::SetNotificationContent(on) => {
-                    AppMsg::SetNotificationContent(on)
-                }
-                PrefOutput::SetNotificationButtons(b) => AppMsg::SetNotificationButtons(b),
-                PrefOutput::SetAttachmentsRow(show) => AppMsg::SetAttachmentsRow(show),
-                PrefOutput::SetContactsRow(show) => AppMsg::SetContactsRow(show),
-                PrefOutput::SetShowUnified(show) => AppMsg::SetShowUnified(show),
-                PrefOutput::SetUnifiedChips(chips) => AppMsg::SetUnifiedChips(chips),
-                PrefOutput::SetUnifiedFiltered(show) => AppMsg::SetUnifiedFiltered(show),
-                PrefOutput::SetUnifiedKinds(kinds) => AppMsg::SetUnifiedKinds(kinds),
-                PrefOutput::SetUnifiedTags(show) => AppMsg::SetUnifiedTags(show),
-                PrefOutput::SetShowAccounts(show) => AppMsg::SetShowAccounts(show),
-                PrefOutput::SetFilteredPlacement(p) => AppMsg::SetFilteredPlacement(p),
-                PrefOutput::SetTagsPlacement(p) => AppMsg::SetTagsPlacement(p),
-                PrefOutput::SetChevronsLeft(left) => AppMsg::SetChevronsLeft(left),
-                PrefOutput::SetStartView(view) => AppMsg::SetStartView(view),
-                PrefOutput::SetFolderSort(sort) => AppMsg::SetFolderSort(sort),
-                PrefOutput::SetConsoleMode(on) => AppMsg::SetConsoleMode(on),
-                PrefOutput::SetReadMark(policy) => AppMsg::SetReadMark(policy),
-                PrefOutput::ExportSettings => AppMsg::ExportSettings,
-                PrefOutput::ExportLog => AppMsg::ExportLog,
-                PrefOutput::ImportSettings => AppMsg::ImportSettings,
                 PrefOutput::PageShown(id) => AppMsg::SettingsPageShown(id),
-                PrefOutput::SetSidebarHoverExpand(on) => {
-                    AppMsg::SetSidebarHoverExpand(on)
-                }
-                PrefOutput::SetRememberSidebar(on) => AppMsg::SetRememberSidebar(on),
-                PrefOutput::SetRememberRail(on) => AppMsg::SetRememberRail(on),
-                PrefOutput::SetRailDots(on) => AppMsg::SetRailDots(on),
-                PrefOutput::SetReaderToolbar(layout) => AppMsg::SetReaderToolbar(layout),
-                PrefOutput::SetFocusMode(focus) => AppMsg::SetFocusMode(focus),
-                PrefOutput::SetRailFold(fold) => AppMsg::SetRailFold(fold),
-                PrefOutput::SetAppTheme(theme) => AppMsg::SetAppTheme(theme),
-                PrefOutput::SetTextScale(percent) => AppMsg::SetTextScale(percent),
-                PrefOutput::SetTheme(id) => AppMsg::SetTheme(id),
-                PrefOutput::SetSettingsOpenAccounts(on) => {
-                    AppMsg::SetSettingsOpenAccounts(on)
-                }
-                PrefOutput::SetPreviewLines(n) => AppMsg::SetPreviewLines(n),
-                PrefOutput::SetSingleKey(on) => AppMsg::SetSingleKey(on),
-                PrefOutput::SetRunInBackground(on) => AppMsg::SetRunInBackground(on),
-                PrefOutput::SetAutostart(on) => AppMsg::SetAutostart(on),
-                PrefOutput::SetTray(on) => AppMsg::SetTray(on),
-                PrefOutput::SetTrayIcon(icon) => AppMsg::SetTrayIcon(icon),
-                PrefOutput::SetTrayMail(on) => AppMsg::SetTrayMail(on),
-                PrefOutput::SetLauncherCount(on) => AppMsg::SetLauncherCount(on),
-                PrefOutput::SetAppIcon(id) => AppMsg::SetAppIcon(id),
-                PrefOutput::SetPaletteCollapse(secs) => AppMsg::SetPaletteCollapse(secs),
-                PrefOutput::SetCardPaletteCollapse(secs) => AppMsg::SetCardPaletteCollapse(secs),
-                PrefOutput::SetMessageTheme(t) => AppMsg::SetMessageTheme(t),
-                PrefOutput::SetOverrideFonts(on) => AppMsg::SetOverrideFonts(on),
-                PrefOutput::SetReaderFont(font) => AppMsg::SetReaderFont(font),
-                PrefOutput::SetOverrideColors(on) => AppMsg::SetOverrideColors(on),
-                PrefOutput::SetPlainMonospace(on) => AppMsg::SetPlainMonospace(on),
-                PrefOutput::SetPlainFont(font) => AppMsg::SetPlainFont(font),
-                PrefOutput::SetComposeFormat(f) => AppMsg::SetComposeFormat(f),
-                PrefOutput::SetReplyPosition(p) => AppMsg::SetReplyPosition(p),
-                PrefOutput::SetSignaturePosition(p) => AppMsg::SetSignaturePosition(p),
-                PrefOutput::SetSignatureDashes(on) => AppMsg::SetSignatureDashes(on),
                 PrefOutput::Closed => AppMsg::ClosePreferences,
+                // Every other output is a setting, which AppMsg::Pref applies.
+                other => AppMsg::Pref(other),
             });
         accounts.emit(crate::ui::accounts::AccountsInput::SetFolderChoices(
             self.folder_choice_map(),
@@ -21087,7 +20864,7 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
     let style = adw::StyleManager::default();
     apply(&provider, style.is_dark());
     // A theme change moves the same colors without any scheme flip, so the
-    // provider has to be reloadable on demand as well (AppMsg::SetTheme).
+    // provider has to be reloadable on demand as well (AppMsg::Pref(PrefOutput::SetTheme)).
     SCHEME_REFRESH.with(|slot| {
         let provider = provider.clone();
         let apply = apply.clone();
