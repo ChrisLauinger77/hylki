@@ -11,6 +11,7 @@ use crate::worker::OutgoingMessage;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::drop_zones::{DropChoice, DropContext, DropZones};
+use crate::ui::fade_label::FadeLabel;
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -829,12 +830,16 @@ impl Component for Compose {
                             },
                         },
 
+                        // Attachments in up to three equal columns (#299),
+                        // filling left to right and wrapping.
                         #[name = "attach_box"]
                         gtk::FlowBox {
                             set_selection_mode: gtk::SelectionMode::None,
                             set_column_spacing: 6,
                             set_row_spacing: 6,
-                            set_max_children_per_line: 4,
+                            set_homogeneous: true,
+                            set_max_children_per_line: 3,
+                            add_css_class: "attach-flow",
                             set_visible: false,
                         },
 
@@ -1226,8 +1231,8 @@ impl Component for Compose {
 
         // HYLKI_SHOWCASE_ATTACH=<file>[:<file>…] attaches those files a
         // second after the composer opens (demo only), for a capture of the
-        // chips (#299); HYLKI_SHOWCASE_ATTACH_SHOT=<png> captures the
-        // composer two seconds after that.
+        // chips (#299); HYLKI_SHOWCASE_ATTACH_SHOT=<png>[:<seconds>]
+        // captures the composer that long after it opens.
         if let (Some(v), Some(_)) = (std::env::var_os("HYLKI_SHOWCASE_ATTACH"), std::env::var_os("HYLKI_DEMO")) {
             let paths: Vec<_> = std::env::split_paths(&v).collect();
             // A composer made ahead of time and dropped unused is gone by then.
@@ -1235,9 +1240,14 @@ impl Component for Compose {
             gtk::glib::timeout_add_seconds_local_once(1, move || {
                 let _ = s.send(ComposeInput::AddAttachments(paths));
             });
-            if let Ok(shot) = std::env::var("HYLKI_SHOWCASE_ATTACH_SHOT") {
+            if let Ok(v) = std::env::var("HYLKI_SHOWCASE_ATTACH_SHOT") {
+                // <png>[:<seconds>], three seconds unless given.
+                let (shot, at) = match v.rsplit_once(':') {
+                    Some((p, n)) if n.parse::<u32>().is_ok() => (p.to_string(), n.parse().unwrap()),
+                    _ => (v, 3),
+                };
                 let host = root.clone().upcast::<gtk::Widget>();
-                gtk::glib::timeout_add_seconds_local_once(3, move || {
+                gtk::glib::timeout_add_seconds_local_once(at, move || {
                     if host.is_mapped() {
                         crate::app::showcase_capture(&host, &shot);
                     }
@@ -2691,13 +2701,10 @@ impl Compose {
         for (i, path) in self.attachments.iter().enumerate() {
             let chip = attachment_chip(path, &self.attach_thumbs, sender, i);
             flow.append(&chip);
-            // GtkFlowBox auto-wraps `chip` in a FlowBoxChild that, unlike
-            // `chip` itself, has no halign we can set beforehand — it still
-            // fills (and hover-highlights) the full cell. Shrink it to the
-            // pill's own size and drop its own row interactivity, since the
-            // chip's own click handlers are the only real targets.
+            // GtkFlowBox wraps `chip` in a FlowBoxChild; it fills its column,
+            // but its own row interactivity goes, since the chip's click
+            // handlers are the only real targets.
             if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
-                cell.set_halign(gtk::Align::Start);
                 cell.set_can_focus(false);
                 cell.set_focusable(false);
             }
@@ -2706,16 +2713,15 @@ impl Compose {
         // cloud icon, the name, and a remove that also takes the paragraph
         // out of the body. Uploads in flight show a spinner chip.
         for (i, link) in self.cloud_links.iter().enumerate() {
-            let chip = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+            let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
             chip.add_css_class("attach-chip");
             chip.add_css_class("cloud-chip");
-            chip.set_halign(gtk::Align::Start);
             chip.set_tooltip_text(Some(&link.url));
             chip.append(&gtk::Image::from_icon_name("cloud-symbolic"));
-            let lbl = gtk::Label::new(Some(&i18n_f("{name} (link)", &[("name", &link.name)])));
-            lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-            lbl.set_max_width_chars(26);
+            let lbl = FadeLabel::new(&i18n_f("{name} (link)", &[("name", &link.name)]), CHIP_NAME_NATURAL);
+            lbl.set_hexpand(true);
             chip.append(&lbl);
+            slide_on_hover(&chip, &lbl);
             let rm = gtk::Button::from_icon_name("window-close-symbolic");
             rm.add_css_class("flat");
             rm.set_valign(gtk::Align::Center);
@@ -2726,7 +2732,6 @@ impl Compose {
             chip.append(&rm);
             flow.append(&chip);
             if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
-                cell.set_halign(gtk::Align::Start);
                 cell.set_can_focus(false);
                 cell.set_focusable(false);
             }
@@ -2734,14 +2739,12 @@ impl Compose {
         for _ in 0..self.cloud_busy {
             let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
             chip.add_css_class("attach-chip");
-            chip.set_halign(gtk::Align::Start);
             let spin = gtk::Spinner::new();
             spin.start();
             chip.append(&spin);
             chip.append(&gtk::Label::new(Some(&i18n("Uploading…"))));
             flow.append(&chip);
             if let Some(cell) = chip.parent().and_downcast::<gtk::FlowBoxChild>() {
-                cell.set_halign(gtk::Align::Start);
                 cell.set_can_focus(false);
             }
         }
@@ -3049,8 +3052,12 @@ struct AttachThumb {
 }
 
 /// Edge a chip's thumbnail is drawn at, and the one its hover card uses.
-const CHIP_THUMB: i32 = 24;
+const CHIP_THUMB: i32 = 32;
 const CARD_THUMB: i32 = 220;
+/// The most width a chip's name asks for. The columns are as wide as the
+/// widest chip asks, so this is what lets three fit across a composer of
+/// ordinary width; a wider composer gives the names more.
+const CHIP_NAME_NATURAL: i32 = 110;
 /// Files past this are not read for a thumbnail: the chip keeps its type icon.
 const THUMB_MAX_BYTES: u64 = 64 * 1024 * 1024;
 
@@ -3075,14 +3082,13 @@ fn attachment_chip(
 
     let chip = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     chip.add_css_class("attach-chip");
-    // FlowBoxChild defaults to halign: Fill, which would otherwise stretch
-    // this box the full width of its cell, leaving the pill's background
-    // trailing well past the remove button. Hug the content.
-    chip.set_halign(gtk::Align::Start);
 
     // The leading slot holds the type icon until a thumbnail is ready.
     let slot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     slot.set_valign(gtk::Align::Center);
+    slot.set_size_request(CHIP_THUMB, CHIP_THUMB);
+    slot.set_hexpand(false);
+    slot.set_homogeneous(true);
     let thumbable = is_image_name(&name) || is_pdf_name(&name);
     let cached = thumbs.borrow().get(path).cloned();
     match cached {
@@ -3110,16 +3116,22 @@ fn attachment_chip(
     }
     chip.append(&slot);
 
-    let lbl = gtk::Label::new(Some(&name));
-    lbl.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-    lbl.set_max_width_chars(22);
-    chip.append(&lbl);
+    // The name over the size. The name takes what the chip has left and
+    // fades where it is cut off; hovering the chip slides the rest into view.
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    text.set_hexpand(true);
+    text.set_valign(gtk::Align::Center);
+    let lbl = FadeLabel::new(&name, CHIP_NAME_NATURAL);
+    text.append(&lbl);
     if let Some(n) = size {
         let size_lbl = gtk::Label::new(Some(&crate::models::human_size(n)));
+        size_lbl.set_xalign(0.0);
         size_lbl.add_css_class("dim-label");
         size_lbl.add_css_class("caption");
-        chip.append(&size_lbl);
+        text.append(&size_lbl);
     }
+    chip.append(&text);
+    slide_on_hover(&chip, &lbl);
     let rm = gtk::Button::from_icon_name("window-close-symbolic");
     rm.add_css_class("flat");
     rm.set_valign(gtk::Align::Center);
@@ -3224,6 +3236,17 @@ fn attachment_chip(
     chip
 }
 
+/// Slide a chip's name to show the rest of it while the pointer is over
+/// the chip, and back when it leaves.
+fn slide_on_hover(chip: &gtk::Box, lbl: &FadeLabel) {
+    let hover = gtk::EventControllerMotion::new();
+    let l = lbl.clone();
+    hover.connect_enter(move |_, _, _| l.reveal(true));
+    let l = lbl.clone();
+    hover.connect_leave(move |_| l.reveal(false));
+    chip.add_controller(hover);
+}
+
 /// Put a chip's thumbnail in its leading slot, or the file type's icon when
 /// there is none.
 fn fill_thumb_slot(slot: &gtk::Box, name: &str, tex: Option<&gtk::gdk::Texture>) {
@@ -3241,6 +3264,8 @@ fn fill_thumb_slot(slot: &gtk::Box, name: &str, tex: Option<&gtk::gdk::Texture>)
         }
         None => {
             let img = gtk::Image::from_icon_name(icon_for(name));
+            img.set_pixel_size(CHIP_THUMB * 5 / 8);
+            img.set_halign(gtk::Align::Center);
             img.add_css_class(icon_color_class(name));
             slot.append(&img);
         }

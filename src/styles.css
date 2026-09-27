@@ -307,6 +307,15 @@ levelbar block.quota-full {
   border-radius: 14px;
   background: alpha(currentColor, 0.08);
 }
+.attach-chip:hover {
+  background: alpha(currentColor, 0.12);
+}
+/* The chips' grid cells stay out of sight: the chip is the target, and a
+   cell's own hover square would show around its rounded ends. */
+flowbox.attach-flow > flowboxchild {
+  padding: 0;
+  background: none;
+}
 /* A picture's or a PDF's thumbnail at the head of its chip (#299). */
 .attach-chip-thumb {
   border-radius: 6px;

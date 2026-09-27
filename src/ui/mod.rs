@@ -3,6 +3,7 @@ pub mod attachment_drawer;
 pub mod attachments_gallery;
 pub mod carry_over;
 pub mod chip_flow;
+pub mod fade_label;
 pub mod cloud_accounts;
 pub mod compose;
 pub mod contacts_browser;

@@ -15,10 +15,13 @@
   or what is wrong, such as Bad signature, Signed, unknown key or Signed, key
   not trusted. Clicking it still opens the details.
 - **Changed: attachment chips in the composer show more** (#299, requested
-  by rsx-xp). Each attached file shows its size, and pictures and PDFs show a
-  thumbnail in place of the paper clip; other files show their type's icon.
-  Hovering a chip shows a larger picture, the file's type and its size. A
-  double click opens the file, and a right-click offers Open and Remove.
+  by rsx-xp). Each attached file shows its size under its name, and pictures
+  and PDFs show a thumbnail in place of the paper clip; other files show
+  their type's icon. The chips are all one width, up to three to a row. A
+  name too long for its chip fades out at the edge, and pointing at the chip
+  slides the rest of the name into view. Hovering also shows a larger
+  picture, the file's type and its size. A double click opens the file, and
+  a right-click offers Open and Remove.
 - **Fixed: turning off Expandable conversations left the carets on the
   count chips** until the next sync rebuilt the list. The rows are now
   built again at once, and switching the message list's action palette on
