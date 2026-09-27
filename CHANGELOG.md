@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fixed: empty message previews.** A message whose HTML has a `<header>`
+  element showed an empty or cut-short preview in the message list,
+  because everything after that element was dropped. Previews also no
+  longer run the lines of a signature together, and show characters
+  written as entities (`&bull;`, `&zwnj;`) as the characters themselves.
+- **Changed: attachment sizes use decimal units**, as Files does (2.0 kB
+  rather than 2.0 KB), in your language.
 - **Fixed: a recipient whose name has a comma in it** ("Martin, Jason").
   The name was split at the comma, so the send was refused as having an
   invalid address, and with encryption on Hylki asked for a key for
