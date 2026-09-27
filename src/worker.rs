@@ -10661,23 +10661,7 @@ async fn run_graph(
                                     Ok(_) => {
                                         // Replace the previous version of this draft.
                                         if let Some(o) = &message.draft_origin {
-                                            if o.account_id == account_id {
-                                                if let Some((tok, gid)) = graph_resolve(
-                                                    &account, &mut state, &o.path, o.uid, &emit,
-                                                )
-                                                .await
-                                                {
-                                                    let url =
-                                                        format!("{GRAPH_BASE}/me/messages/{gid}");
-                                                    let _ = tokio::task::spawn_blocking(move || {
-                                                        graph_delete_req(&tok, &url)
-                                                    })
-                                                    .await;
-                                                }
-                                                if let Some(c) = cache.as_ref() {
-                                                    c.delete_message(account_id, &o.path, o.uid);
-                                                }
-                                            }
+                                            graph_drop_draft_origin(&account, &mut state, account_id, o, cache.as_ref(), &emit).await;
                                         }
                                         if let Ok(messages) = graph_load_folder(
                                             &token,
@@ -10721,18 +10705,8 @@ async fn run_graph(
                 let at = message.send_at.unwrap_or_default();
                 restore_msgid_case(cache.as_ref(), &mut message);
                 schedule_send(cache.as_ref(), account_id, &account, &message, None, at, &emit);
-                if let Some(o) = message.draft_origin.clone() {
-                    if o.account_id == account_id {
-                        if let Some((tok, gid)) =
-                            graph_resolve(&account, &mut state, &o.path, o.uid, &emit).await
-                        {
-                            let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-                            let _ = tokio::task::spawn_blocking(move || graph_delete_req(&tok, &url)).await;
-                        }
-                        if let Some(c) = cache.as_ref() {
-                            c.delete_message(account_id, &o.path, o.uid);
-                        }
-                    }
+                if let Some(o) = &message.draft_origin {
+                    graph_drop_draft_origin(&account, &mut state, account_id, o, cache.as_ref(), &emit).await;
                 }
             }
 
@@ -10745,18 +10719,7 @@ async fn run_graph(
                         // If sending an edited draft, remove the obsolete draft.
                         if let Some(o) = message.draft_origin.clone() {
                             if o.account_id == account_id {
-                                if let Some((tok, gid)) =
-                                    graph_resolve(&account, &mut state, &o.path, o.uid, &emit).await
-                                {
-                                    let url = format!("{GRAPH_BASE}/me/messages/{gid}");
-                                    let _ = tokio::task::spawn_blocking(move || {
-                                        graph_delete_req(&tok, &url)
-                                    })
-                                    .await;
-                                }
-                                if let Some(c) = cache.as_ref() {
-                                    c.delete_message(account_id, &o.path, o.uid);
-                                }
+                                graph_drop_draft_origin(&account, &mut state, account_id, &o, cache.as_ref(), &emit).await;
                                 if let Some(token) = graph_token(&account, &emit).await {
                                     if let Ok(messages) = graph_load_folder(
                                         &token,
@@ -11057,6 +11020,28 @@ async fn graph_load_folder(
         c.save_messages(account_id, path, &messages);
     }
     Ok(messages)
+}
+
+/// Delete the draft a message was opened from, on the server and in the
+/// cache, once it has been sent, scheduled or saved as a new version.
+async fn graph_drop_draft_origin(
+    account: &AccountConfig,
+    state: &mut GraphState,
+    account_id: u32,
+    origin: &crate::models::DraftOrigin,
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if origin.account_id != account_id {
+        return;
+    }
+    if let Some((tok, gid)) = graph_resolve(account, state, &origin.path, origin.uid, emit).await {
+        let url = format!("{GRAPH_BASE}/me/messages/{gid}");
+        let _ = blocking(move || graph_delete_req(&tok, &url)).await;
+    }
+    if let Some(c) = cache {
+        c.delete_message(account_id, &origin.path, origin.uid);
+    }
 }
 
 /// Resolve a message uid to (token, Graph id), re-listing the folder once if
