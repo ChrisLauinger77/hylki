@@ -5781,14 +5781,7 @@ pub fn theme_grounds_for(widget: &impl IsA<gtk::Widget>, dark: bool) -> (String,
     let style = widget.style_context();
     if dark == adw::StyleManager::default().is_dark() {
         if let Some(c) = style.lookup_color("view_bg_color") {
-            let hex = |r: f32, g: f32, b: f32| {
-                format!(
-                    "#{:02x}{:02x}{:02x}",
-                    (r * 255.0).round() as u8,
-                    (g * 255.0).round() as u8,
-                    (b * 255.0).round() as u8,
-                )
-            };
+            let hex = |r: f32, g: f32, b: f32| crate::color::to_hex(&gtk::gdk::RGBA::new(r, g, b, 1.0));
             // The stock pairs' own ratios: #1e1e1e→#141414 and #fff→#f1f1f1.
             let f = if dark { 0.667 } else { 0.945 };
             let ground = hex(c.red(), c.green(), c.blue());
