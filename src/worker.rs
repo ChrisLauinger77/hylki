@@ -8593,11 +8593,14 @@ fn strip_crlf(line: &[u8]) -> &[u8] {
     &line[..end]
 }
 
-/// Stable u32 id derived from a POP3 server UID string (which is a string, but
-/// the rest of the app keys messages by u32).
+/// Stable u32 id derived from a server's string id (POP3 UIDL, JMAP and Graph
+/// message ids), since the rest of the app keys messages by u32. The ids are
+/// kept in the cache, so the hash must never change: it is pinned to SipHash-1-3
+/// with zero keys, which is what std's `DefaultHasher` gave when they were
+/// first stored, rather than left to `DefaultHasher`, which may change.
 fn hash_uid(uid: &str) -> u32 {
     use std::hash::{Hash, Hasher};
-    let mut h = std::collections::hash_map::DefaultHasher::new();
+    let mut h = siphasher::sip::SipHasher13::new();
     uid.hash(&mut h);
     (h.finish() & 0x7fff_ffff) as u32
 }
@@ -11739,6 +11742,20 @@ mod guess_mime_tests {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         );
         assert_eq!(guess_mime("blob.zzqx"), "application/octet-stream");
+    }
+}
+
+#[cfg(test)]
+mod hash_uid_tests {
+    use super::hash_uid;
+
+    /// The ids already in users' caches, as std's DefaultHasher derived them.
+    #[test]
+    fn ids_match_the_ones_already_stored() {
+        assert_eq!(hash_uid(""), 600129007);
+        assert_eq!(hash_uid("0000001a4f2c"), 673950292);
+        assert_eq!(hash_uid("M1b2c3d4e5f6@x"), 531181911);
+        assert_eq!(hash_uid("AAMkAGI2TG93AAA="), 581220562);
     }
 }
 
