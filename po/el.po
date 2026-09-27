@@ -987,6 +987,12 @@ msgstr "Βιβλίο διευθύνσεων CardDAV"
 msgid "{date} at {time}"
 msgstr "{date} στις {time}"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Κρυπτογραφημένο μήνυμα"
 
@@ -1038,6 +1044,48 @@ msgstr "Υπογεγραμμένο από {signer} με ανακληθέν κλ�
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Υπογεγραμμένο από {signer}· η υπογραφή έχει λήξει"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Κρυπτογραφημένο μήνυμα"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Υπογραφή στις απαντήσεις"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Κρυπτογραφημένο και υπογεγραμμένο από {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Υπογραφή"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Υπογραφή"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "Υπογεγραμμένο με το κλειδί {id}."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "Υπογεγραμμένο με το κλειδί {id}."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Υπογράφηκε από: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Υπογραφή στις απαντήσεις"
 
 msgid "This message hasn't been checked."
 msgstr "Αυτό το μήνυμα δεν έχει ελεγχθεί."
@@ -1324,6 +1372,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Άνοιγμα Διαδικτυακών λογαριασμών…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Αποθήκευση στο cloud"
 
 msgid "Mail Account"
 msgstr "Λογαριασμός αλληλογραφίας"

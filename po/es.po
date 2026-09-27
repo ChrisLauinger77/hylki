@@ -984,6 +984,12 @@ msgstr "Libreta de direcciones CardDAV"
 msgid "{date} at {time}"
 msgstr "{date} a las {time}"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Mensaje cifrado"
 
@@ -1035,6 +1041,48 @@ msgstr "Firmado por {signer} con una clave revocada"
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Firmado por {signer}; la firma ha caducado"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Mensaje cifrado"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Firma en las respuestas"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Cifrado y firmado por {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Firma"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Firma"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "Firmado con la clave {id}."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "Firmado con la clave {id}."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Firmado por: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Firma en las respuestas"
 
 msgid "This message hasn't been checked."
 msgstr "Este mensaje no se ha comprobado."
@@ -1309,6 +1357,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Abrir Cuentas en línea…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Almacenamiento en la nube"
 
 msgid "Mail Account"
 msgstr "Cuenta de correo"

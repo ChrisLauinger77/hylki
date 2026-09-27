@@ -991,6 +991,12 @@ msgstr "CardDAV-címjegyzék"
 msgid "{date} at {time}"
 msgstr "Hétfő délelőtt (8:00)"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Titkosított üzenet"
 
@@ -1039,6 +1045,48 @@ msgstr "Aláírta: {signer}, visszavont kulccsal"
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Aláírta: {signer}; az aláírás lejárt"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Titkosított üzenet"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Aláírás"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Titkosítva és aláírva: {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Aláírás"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Aláírás"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "A(z) {id} kulccsal aláírva."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "A(z) {id} kulccsal aláírva."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Aláírta: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Aláírás"
 
 msgid "This message hasn't been checked."
 msgstr "Ezt az üzenetet még nem ellenőrizték."
@@ -1310,6 +1358,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Online-fiókok megnyitása…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Felhőtárhely"
 
 msgid "Mail Account"
 msgstr "Levelezési fiók"

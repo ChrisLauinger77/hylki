@@ -986,6 +986,12 @@ msgstr "Livro de endereços CardDAV"
 msgid "{date} at {time}"
 msgstr "{date} às {time}"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Mensagem encriptada"
 
@@ -1036,6 +1042,48 @@ msgstr "Assinada por {signer} com uma chave revogada"
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Assinada por {signer}; a assinatura expirou"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Mensagem encriptada"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Assinatura nas respostas"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Encriptada e assinada por {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Assinatura"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Assinatura"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "Assinada com a chave {id}."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "Assinada com a chave {id}."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Assinada por: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Assinatura nas respostas"
 
 msgid "This message hasn't been checked."
 msgstr "Esta mensagem não foi verificada."
@@ -1318,6 +1366,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Abrir Contas online…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Armazenamento na nuvem"
 
 msgid "Mail Account"
 msgstr "Conta de correio"

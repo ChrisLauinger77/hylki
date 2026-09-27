@@ -998,6 +998,12 @@ msgstr "Książka adresowa CardDAV"
 msgid "{date} at {time}"
 msgstr "{date} o {time}"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Wiadomość zaszyfrowana"
 
@@ -1046,6 +1052,48 @@ msgstr "Podpisana przez {signer} unieważnionym kluczem"
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Podpisana przez {signer}; podpis wygasł"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Wiadomość zaszyfrowana"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Podpis w odpowiedziach"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Zaszyfrowana i podpisana przez {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Podpis"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Podpis"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "Podpisano kluczem {id}."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "Podpisano kluczem {id}."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Podpisane przez: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Podpis w odpowiedziach"
 
 msgid "This message hasn't been checked."
 msgstr "Ta wiadomość nie została sprawdzona."
@@ -1322,6 +1370,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Otwórz konta online…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Przechowywanie w chmurze"
 
 msgid "Mail Account"
 msgstr "Konto pocztowe"

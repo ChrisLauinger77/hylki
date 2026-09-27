@@ -915,6 +915,12 @@ msgstr ""
 msgid "{date} at {time}"
 msgstr ""
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr ""
 
@@ -962,6 +968,39 @@ msgid "Signed by {signer} with a revoked key"
 msgstr ""
 
 msgid "Signed by {signer}; the signature has expired"
+msgstr ""
+
+msgid "Not decrypted"
+msgstr ""
+
+msgid "Encrypted"
+msgstr ""
+
+msgid "Signature not checked"
+msgstr ""
+
+msgid "Encrypted and signed"
+msgstr ""
+
+msgid "Signed"
+msgstr ""
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+msgid "Bad signature"
+msgstr ""
+
+msgid "Signed, unknown key"
+msgstr ""
+
+msgid "Signed, key expired"
+msgstr ""
+
+msgid "Signed, key revoked"
+msgstr ""
+
+msgid "Signature expired"
 msgstr ""
 
 msgid "This message hasn't been checked."
@@ -1206,6 +1245,9 @@ msgid ""
 msgstr ""
 
 msgid "Open Online Accounts…"
+msgstr ""
+
+msgid "Storage"
 msgstr ""
 
 msgid "Mail Account"

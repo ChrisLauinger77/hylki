@@ -1010,6 +1010,12 @@ msgstr "Адресная книга CardDAV"
 msgid "{date} at {time}"
 msgstr "В понедельник утром ({time})"
 
+msgid "{used} of {limit} used"
+msgstr ""
+
+msgid "{free} free ({pct}%)"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Зашифрованное сообщение"
 
@@ -1059,6 +1065,48 @@ msgstr "Подписано {signer} с помощью отозванного к�
 
 msgid "Signed by {signer}; the signature has expired"
 msgstr "Подписано {signer}; срок действия подписи истёк"
+
+msgid "Not decrypted"
+msgstr ""
+
+#, fuzzy
+msgid "Encrypted"
+msgstr "Зашифрованное сообщение"
+
+#, fuzzy
+msgid "Signature not checked"
+msgstr "Подпись"
+
+#, fuzzy
+msgid "Encrypted and signed"
+msgstr "Зашифровано и подписано {signer}"
+
+#, fuzzy
+msgid "Signed"
+msgstr "Подпись"
+
+msgid "Signed, key not trusted"
+msgstr ""
+
+#, fuzzy
+msgid "Bad signature"
+msgstr "Подпись"
+
+#, fuzzy
+msgid "Signed, unknown key"
+msgstr "Подписано ключом {id}."
+
+#, fuzzy
+msgid "Signed, key expired"
+msgstr "Подписано ключом {id}."
+
+#, fuzzy
+msgid "Signed, key revoked"
+msgstr "Подписано: {d}"
+
+#, fuzzy
+msgid "Signature expired"
+msgstr "Подпись"
 
 msgid "This message hasn't been checked."
 msgstr "Это сообщение не проверялось."
@@ -1331,6 +1379,10 @@ msgstr ""
 
 msgid "Open Online Accounts…"
 msgstr "Открыть «Сетевые учётные записи»…"
+
+#, fuzzy
+msgid "Storage"
+msgstr "Облачное хранилище"
 
 msgid "Mail Account"
 msgstr "Почтовая учётная запись"
