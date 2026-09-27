@@ -1721,7 +1721,7 @@ impl Component for MessageView {
         let mut model = MessageView {
             always_show_recipients: false,
             single_message_card: false,
-            pgp_labels: true,
+            pgp_labels: false,
             card_atts: std::collections::HashMap::new(),
             card_atts_shown: true,
             drawer_on: true,

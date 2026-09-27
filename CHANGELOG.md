@@ -9,12 +9,13 @@
   servers that offer the QUOTA extension and JMAP servers that report quotas
   (Stalwart, Fastmail). Microsoft 365 and POP3 give no figure, so the row is
   not shown for them.
-- **Changed: an OpenPGP message says what it is in words** (#300, requested
-  by rsx-xp). The small colored shield beside the sender's name is now a
+- **Added: the OpenPGP chip can say what it found in words** (#300,
+  requested by rsx-xp). With **Settings → Reading → Name the OpenPGP result**
+  switched on, the small colored shield beside the sender's name becomes a
   label on a wash of the same color: Signed, Encrypted, Encrypted and signed,
   or what is wrong, such as Bad signature, Signed, unknown key or Signed, key
-  not trusted. Clicking it still opens the details. **Settings → Reading →
-  Name the OpenPGP result**, switched off, brings back the icons alone.
+  not trusted. Clicking it still opens the details. The setting is off by
+  default, which keeps the icons alone.
 - **Changed: attachment chips in the composer show more** (#299, requested
   by rsx-xp). Each attached file shows its size under its name, and pictures
   and PDFs show a thumbnail in place of the paper clip; other files show
