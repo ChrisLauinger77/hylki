@@ -467,8 +467,8 @@ never leaves your keyring.
 Hylki needs a person's public key to encrypt to them and to check their
 signature. There are four ways to get one, none of which need a terminal:
 
-- A signed message from someone whose key you don't have shows an amber shield
-  beside their name. Click it and choose **Fetch the sender's key**. Hylki
+- A signed message from someone whose key you don't have shows an amber
+  **Signed, unknown key** label beside their name. Click it and choose **Fetch the sender's key**. Hylki
   looks in the message itself first (many clients attach the key in an
   Autocrypt header), then asks the sender's provider (WKD), then the keyservers.
 - A message with a key file attached shows an **Import OpenPGP key** button on
@@ -480,11 +480,11 @@ signature. There are four ways to get one, none of which need a terminal:
 **4. Trust a key**
 
 An imported key checks signatures, but until you have vouched for it the
-shield stays amber and says the key is not trusted yet. Compare the key's
+label stays amber and reads **Signed, key not trusted**. Compare the key's
 fingerprint with the one its owner gives you in person, on their website or
 over another channel, then click **Trust…** on the key's row (or **Trust this
-key…** in the shield's popover). Hylki signs the key locally with your own,
-which is what turns the shield green. Trusting a key you have not checked
+key…** in the label's popover). Hylki signs the key locally with your own,
+which is what turns the label green. Trusting a key you have not checked
 lets an impostor's signature pass as theirs, so do check.
 
 **5. Send signed or encrypted mail**
@@ -509,11 +509,13 @@ account as `sign_by_default = true` in `accounts.toml`.
 
 **Reading the result**
 
-Beside a sender's name, a lock means the message was encrypted and a shield
-means it was signed. Green: everything checks out against a trusted key.
-Amber: a doubt, such as an unknown or untrusted key, or an expired one. Red:
-a failure, such as a signature that does not match or a message that could not
-be decrypted. Click the icon for the details.
+Beside a sender's name, a label says what OpenPGP made of the message:
+**Signed**, **Encrypted**, **Encrypted and signed**, or what is wrong, such as
+**Bad signature** or **Signed, unknown key**. A lock in it means the message
+was encrypted and a shield means it was signed. Green: everything checks out
+against a trusted key. Amber: a doubt, such as an unknown or untrusted key, or
+an expired one. Red: a failure, such as a signature that does not match or a
+message that could not be decrypted. Click the label for the details.
 
 **If something goes wrong**
 

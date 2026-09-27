@@ -14097,8 +14097,14 @@ impl AppModel {
                 keys.push((c.account_id, c.id));
             }
         }
+        // HYLKI_SHOWCASE_PGP=<good|untrusted|bad|nokey|enc> gives every
+        // demo card that OpenPGP verdict, for a capture of the header's
+        // chip (#300); the demo has no sender checks of its own.
+        let showcase = std::env::var_os("HYLKI_DEMO")
+            .and(std::env::var("HYLKI_SHOWCASE_PGP").ok())
+            .map(|v| Box::new(crate::models::SenderCheck { pgp: showcase_pgp(&v), ..Default::default() }));
         for key in keys {
-            if let Some(check) = self.sender_cache.get(&key) {
+            if let Some(check) = showcase.as_ref().or_else(|| self.sender_cache.get(&key)) {
                 self.message_view.emit(MessageViewInput::SenderCheckFor {
                     account_id: key.0,
                     id: key.1,
@@ -20349,6 +20355,21 @@ fn scroll_all_to(w: &gtk::Widget, frac: f64) {
         scroll_all_to(&c, frac);
         child = c.next_sibling();
     }
+}
+
+/// A made-up OpenPGP verdict for HYLKI_SHOWCASE_PGP (demo only).
+fn showcase_pgp(which: &str) -> Option<crate::models::PgpStatus> {
+    use crate::models::{PgpSignature as S, PgpStatus, PgpTrust};
+    let good = |trust| S::Good { signer: "Priya Nair <priya@studio.dev>".into(), key_id: "8F2A6C1D9B3E4F70".into(), trust };
+    let (encrypted, signature) = match which {
+        "good" => (false, good(PgpTrust::Full)),
+        "untrusted" => (false, good(PgpTrust::Unknown)),
+        "bad" => (false, S::Bad { signer: "Priya Nair <priya@studio.dev>".into() }),
+        "nokey" => (false, S::NoKey { key_id: "8F2A6C1D9B3E4F70".into() }),
+        "enc" => (true, good(PgpTrust::Full)),
+        _ => return None,
+    };
+    Some(PgpStatus { encrypted, decrypted: encrypted, signature, ..Default::default() })
 }
 
 pub(crate) fn showcase_capture(win: &gtk::Widget, path: &str) {

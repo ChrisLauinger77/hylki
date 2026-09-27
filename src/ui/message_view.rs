@@ -218,11 +218,13 @@ impl MessageView {
         let pgp = match &check.pgp {
             Some(p) => format!(
                 "var p=document.querySelector('.vireo-pgp[data-key=\"{account_id}:{id}\"]');\
-                 if(p){{p.className='vireo-pgp on{enc}{sig} {cls}';p.title={title:?};}}",
+                 if(p){{p.className='vireo-pgp on{enc}{sig} {cls}';p.title={title:?};\
+                 var t=p.querySelector('.vireo-pgp-text');if(t)t.textContent={label:?};}}",
                 enc = if p.encrypted { " enc" } else { "" },
                 sig = if p.signed() { " sig" } else { "" },
                 cls = p.css_class(),
                 title = p.summary(),
+                label = p.short_label(),
             ),
             None => String::new(),
         };
@@ -3644,13 +3646,14 @@ impl MessageView {
                         "<button type=\"button\" class=\"vireo-verify\" data-key=\"{aid}:{id}\" \
                          title=\"\">{svg}</button>\
                          <button type=\"button\" class=\"vireo-pgp\" data-key=\"{aid}:{id}\" \
-                         title=\"\">{lock}{sig}</button>",
+                         title=\"\">{lock}{sig}<span class=\"vireo-pgp-text\"></span></button>",
                         aid = m.account_id,
                         id = m.id,
                         svg = inline_icon_svg("verified-checkmark-symbolic"),
                         // The OpenPGP chip (#133): a lock for an encrypted
-                        // message, a shield for a signed one, both when both;
-                        // hidden until the verdict is patched in.
+                        // message, a shield for a signed one, then the
+                        // verdict in words (#300); hidden until the verdict
+                        // is patched in.
                         lock = inline_icon_svg("channel-secure-symbolic"),
                         sig = inline_icon_svg("security-high-symbolic"),
                     ),
@@ -4031,17 +4034,24 @@ impl MessageView {
                .vireo-verify.trust-unverified{{color:currentColor;opacity:0.4;}}\
                .vireo-verify.trust-suspicious{{color:#cd9309;}}\
                .vireo-verify.trust-fail{{color:#c01c28;}}\
-               .vireo-pgp{{display:none;background:none;border:none;gap:1px;\
-                 padding:0 2px;margin-left:2px;cursor:pointer;line-height:0;\
-                 align-self:baseline;transform:translateY(0.18em);flex:none;}}\
+               /* The OpenPGP chip (#133), a labelled pill since #300: the\
+                  verdict reads in words on a wash of its color. Text of its\
+                  own, so it sits on the name's baseline without the seal's\
+                  nudge. */\
+               .vireo-pgp{{display:none;font:inherit;font-size:0.78em;font-weight:600;\
+                 border:none;border-radius:999px;padding:0.1em 0.6em 0.1em 0.45em;\
+                 margin-left:4px;cursor:pointer;align-items:center;gap:0.3em;\
+                 align-self:baseline;white-space:nowrap;flex:none;color:inherit;\
+                 background:rgba(128,128,128,0.16);}}\
                .vireo-pgp.on{{display:inline-flex;}}\
-               .vireo-pgp svg{{width:0.95em;height:0.95em;display:none;}}\
+               .vireo-pgp svg{{width:1.1em;height:1.1em;display:none;flex:none;}}\
                .vireo-pgp svg,.vireo-pgp svg *{{fill:currentColor;}}\
                .vireo-pgp.enc svg:first-child{{display:block;}}\
-               .vireo-pgp.sig svg:last-child{{display:block;}}\
-               .vireo-pgp.pgp-good{{color:#26a269;}}\
-               .vireo-pgp.pgp-warn{{color:#cd9309;}}\
-               .vireo-pgp.pgp-bad{{color:#c01c28;}}\
+               .vireo-pgp.sig svg:nth-child(2){{display:block;}}\
+               .vireo-pgp.pgp-good{{color:#26a269;background:rgba(38,162,105,0.16);}}\
+               .vireo-pgp.pgp-warn{{color:#cd9309;background:rgba(205,147,9,0.16);}}\
+               .vireo-pgp.pgp-bad{{color:#c01c28;background:rgba(192,28,40,0.14);}}\
+               .vireo-pgp:hover{{filter:brightness(1.1);}}\
                .vireo-mail{{cursor:pointer;}}\
                .vireo-mail:hover{{text-decoration:underline;}}\
                /* Styled after the app's own context menus (context_menu.rs +\

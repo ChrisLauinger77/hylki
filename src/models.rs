@@ -439,6 +439,28 @@ impl PgpStatus {
         }
     }
 
+    /// The chip's own words (#300): what the message is, or what is wrong
+    /// with it, short enough to sit beside the sender's name. The tooltip
+    /// and the details popover carry the full sentence.
+    pub fn short_label(&self) -> String {
+        use PgpSignature as S;
+        if self.encrypted && !self.decrypted {
+            return i18n("Not decrypted");
+        }
+        match &self.signature {
+            S::None if self.encrypted => i18n("Encrypted"),
+            S::None => i18n("Signature not checked"),
+            S::Good { trust: PgpTrust::Full, .. } if self.encrypted => i18n("Encrypted and signed"),
+            S::Good { trust: PgpTrust::Full, .. } => i18n("Signed"),
+            S::Good { .. } => i18n("Signed, key not trusted"),
+            S::Bad { .. } => i18n("Bad signature"),
+            S::NoKey { .. } => i18n("Signed, unknown key"),
+            S::ExpiredKey { .. } => i18n("Signed, key expired"),
+            S::RevokedKey { .. } => i18n("Signed, key revoked"),
+            S::ExpiredSignature { .. } => i18n("Signature expired"),
+        }
+    }
+
     /// CSS class for the chip's color: green when everything checks out,
     /// amber for a doubt, red for a failure.
     pub fn css_class(&self) -> &'static str {
@@ -1167,6 +1189,19 @@ pub fn thread_ids(msgs: &[Message]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pgp_chip_names_its_verdict() {
+        let good = |trust| PgpSignature::Good { signer: "A".into(), key_id: "1".into(), trust };
+        let status = |encrypted, signature| PgpStatus { encrypted, decrypted: encrypted, signature, ..Default::default() };
+        assert_eq!(status(false, good(PgpTrust::Full)).short_label(), "Signed");
+        assert_eq!(status(true, good(PgpTrust::Full)).short_label(), "Encrypted and signed");
+        assert_eq!(status(false, good(PgpTrust::Unknown)).short_label(), "Signed, key not trusted");
+        assert_eq!(status(false, PgpSignature::Bad { signer: "A".into() }).short_label(), "Bad signature");
+        assert_eq!(status(true, PgpSignature::None).short_label(), "Encrypted");
+        let locked = PgpStatus { encrypted: true, decrypted: false, ..Default::default() };
+        assert_eq!(locked.short_label(), "Not decrypted");
+    }
 
     #[test]
     fn english_folder_names_stay_as_the_server_has_them() {
