@@ -3277,6 +3277,30 @@ msgstr "Ключ отправителя получен и импортирова
 msgid "The sender's key was already in your keyring."
 msgstr "Ключ отправителя уже находился в вашей связке ключей."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Открыть в отдельном окне"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "Адрес электронной почты"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "Адрес электронной почты"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Сохранить изображение"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Изображения"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "Адрес электронной почты"
+
 msgid "Load attachments from server"
 msgstr "Загрузить вложения с сервера"
 
@@ -5393,31 +5417,14 @@ msgid ""
 "{from} checks out, but the addressing doesn't match the name on the message."
 msgstr ""
 
-#, fuzzy
-msgid "Could not reach the JMAP server: {e}"
-msgstr "Не удалось создать папку: {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "Не удалось получить список папок: {e}"
-
-msgid "Sending…"
-msgstr "Отправка…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
-
-#, fuzzy
-msgid "The attachment is no longer in the message on the server"
-msgstr "Папки под строкой «Фильтры»."
-
-msgid "Could not load message: {e}"
-msgstr "Не удалось загрузить сообщение: {e}"
-
 msgid "Syncing…"
 msgstr "Синхронизация…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Не удалось получить почту: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Не удалось загрузить сообщение: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Не удалось загрузить исходный код: {e}"
@@ -5467,23 +5474,11 @@ msgstr "Сохранение черновика…"
 msgid "Could not save draft: {e}"
 msgstr "Не удалось сохранить черновик: {e}"
 
-#, fuzzy
-msgid "Could not save draft: unknown folder"
-msgstr "Не удалось переименовать папку: неизвестная папка"
+msgid "Sending…"
+msgstr "Отправка…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
+msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
-"Не удалось отправить: {e}. Сообщение находится в папке «Исходящие» и будет "
-"отправлено при восстановлении соединения."
-
-msgid "Send failed: {e}"
-msgstr "Не удалось отправить: {e}"
-
-#, fuzzy
-msgid "Could not reach the server"
-msgstr "Не удалось создать папку: {e}"
 
 #, fuzzy
 msgid "Removing the attachment…"
@@ -5492,6 +5487,28 @@ msgstr "Загрузка вложений…"
 #, fuzzy
 msgid "Could not remove the attachment: {e}"
 msgstr "Не удалось загрузить вложения: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Не удалось получить список папок: {e}"
+
+#, fuzzy
+msgid "The attachment is no longer in the message on the server"
+msgstr "Папки под строкой «Фильтры»."
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
+
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Не удалось создать папку: {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "Не удалось переименовать папку: неизвестная папка"
+
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "Не удалось создать папку: {e}"
 
 #, fuzzy
 msgid "That folder is not on the server"
@@ -5568,6 +5585,16 @@ msgstr[0] "Загрузка вложений… осталось {n}"
 msgstr[1] "Загрузка вложений… осталось {n}"
 msgstr[2] "Загрузка вложений… осталось {n}"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Не удалось отправить: {e}. Сообщение находится в папке «Исходящие» и будет "
+"отправлено при восстановлении соединения."
+
+msgid "Send failed: {e}"
+msgstr "Не удалось отправить: {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "Письмо «{subject}» будет отправлено {when}"
 
@@ -5599,9 +5626,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Входящие"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr ""
 
 msgid "Email Client"
 msgstr "Почтовый клиент"

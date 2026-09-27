@@ -3256,6 +3256,30 @@ msgstr "A chave do remetente foi obtida e importada."
 msgid "The sender's key was already in your keyring."
 msgstr "A chave do remetente já se encontrava no seu chaveiro."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Abrir links em"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "Endereço de email"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "Endereço de email"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Salvar imagem"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Imagens"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "Endereço de email"
+
 msgid "Load attachments from server"
 msgstr "Carregar anexos do servidor"
 
@@ -5409,30 +5433,14 @@ msgstr ""
 "A identidade de {from} foi confirmada, mas os endereços não correspondem ao "
 "nome exibido na mensagem."
 
-msgid "Could not reach the JMAP server: {e}"
-msgstr "Não foi possível acessar o servidor JMAP: {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "Não foi possível listar as pastas: {e}"
-
-msgid "Sending…"
-msgstr "Enviando…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Continuou a não ser possível enviar «{subject}»: {e}"
-
-#, fuzzy
-msgid "The attachment is no longer in the message on the server"
-msgstr "Essa pasta não está no servidor"
-
-msgid "Could not load message: {e}"
-msgstr "Não foi possível carregar a mensagem: {e}"
-
 msgid "Syncing…"
 msgstr "Sincronizando…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Não foi possível obter o email: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Não foi possível carregar a mensagem: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Não foi possível carregar o código fonte: {e}"
@@ -5482,21 +5490,11 @@ msgstr "Salvando o rascunho…"
 msgid "Could not save draft: {e}"
 msgstr "Não foi possível salvar o rascunho: {e}"
 
-msgid "Could not save draft: unknown folder"
-msgstr "Não foi possível salvar o rascunho: pasta desconhecida"
+msgid "Sending…"
+msgstr "Enviando…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Falha ao enviar: {e}. A mensagem está na Caixa de saída e será enviada "
-"quando a conexão for restabelecida."
-
-msgid "Send failed: {e}"
-msgstr "Falha ao enviar: {e}"
-
-msgid "Could not reach the server"
-msgstr "Não foi possível acessar o servidor"
+msgid "A Microsoft account can't receive mail from another account"
+msgstr "Uma conta Microsoft não pode receber emails de outra conta"
 
 #, fuzzy
 msgid "Removing the attachment…"
@@ -5505,6 +5503,25 @@ msgstr "Carregando anexos…"
 #, fuzzy
 msgid "Could not remove the attachment: {e}"
 msgstr "Não foi possível carregar os anexos: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Não foi possível listar as pastas: {e}"
+
+#, fuzzy
+msgid "The attachment is no longer in the message on the server"
+msgstr "Essa pasta não está no servidor"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Continuou a não ser possível enviar «{subject}»: {e}"
+
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Não foi possível acessar o servidor JMAP: {e}"
+
+msgid "Could not save draft: unknown folder"
+msgstr "Não foi possível salvar o rascunho: pasta desconhecida"
+
+msgid "Could not reach the server"
+msgstr "Não foi possível acessar o servidor"
 
 msgid "That folder is not on the server"
 msgstr "Essa pasta não está no servidor"
@@ -5581,6 +5598,16 @@ msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Baixando anexos… falta {n}"
 msgstr[1] "Baixando anexos… faltam {n}"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Falha ao enviar: {e}. A mensagem está na Caixa de saída e será enviada "
+"quando a conexão for restabelecida."
+
+msgid "Send failed: {e}"
+msgstr "Falha ao enviar: {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "«{subject}» será enviada {when}"
 
@@ -5612,9 +5639,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Caixa de entrada"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr "Uma conta Microsoft não pode receber emails de outra conta"
 
 msgid "Email Client"
 msgstr "Cliente de email"

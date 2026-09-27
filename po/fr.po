@@ -3281,6 +3281,30 @@ msgstr "La clé de l'expéditeur a été récupérée et importée."
 msgid "The sender's key was already in your keyring."
 msgstr "La clé de l'expéditeur figurait déjà dans votre trousseau de clés."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Ouvrir les liens dans"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "Adresse e-mail"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "Adresse e-mail"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Enregistrer l'image"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Images"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "Adresse e-mail"
+
 msgid "Load attachments from server"
 msgstr "Charger les pièces jointes depuis le serveur"
 
@@ -5443,29 +5467,14 @@ msgstr ""
 "{from} est vérifié, mais l'adressage ne correspond pas au nom indiqué sur le "
 "message."
 
-msgid "Could not reach the JMAP server: {e}"
-msgstr "Impossible de contacter le serveur JMAP : {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "Impossible de lister les dossiers : {e}"
-
-msgid "Sending…"
-msgstr "Envoi en cours…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Impossible d'envoyer « {subject} » : {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "La pièce jointe ne se trouve plus dans le message sur le serveur"
-
-msgid "Could not load message: {e}"
-msgstr "Impossible de charger le message : {e}"
-
 msgid "Syncing…"
 msgstr "Synchronisation…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Impossible de récupérer le courrier : {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Impossible de charger le message : {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Impossible de charger le code source : {e}"
@@ -5515,27 +5524,35 @@ msgstr "Enregistrement du brouillon…"
 msgid "Could not save draft: {e}"
 msgstr "Impossible d'enregistrer le brouillon : {e}"
 
-msgid "Could not save draft: unknown folder"
-msgstr "Impossible d'enregistrer le brouillon : dossier inconnu"
+msgid "Sending…"
+msgstr "Envoi en cours…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Échec de l'envoi : {e}. Le message est dans la Boîte d'envoi et sera envoyé "
-"dès le rétablissement de la connexion."
-
-msgid "Send failed: {e}"
-msgstr "Échec de l'envoi : {e}"
-
-msgid "Could not reach the server"
-msgstr "Impossible de joindre le serveur"
+msgid "A Microsoft account can't receive mail from another account"
+msgstr "Un compte Microsoft ne peut pas recevoir de courrier d'un autre compte"
 
 msgid "Removing the attachment…"
 msgstr "Suppression de la pièce jointe…"
 
 msgid "Could not remove the attachment: {e}"
 msgstr "Impossible de supprimer la pièce jointe : {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Impossible de lister les dossiers : {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "La pièce jointe ne se trouve plus dans le message sur le serveur"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Impossible d'envoyer « {subject} » : {e}"
+
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Impossible de contacter le serveur JMAP : {e}"
+
+msgid "Could not save draft: unknown folder"
+msgstr "Impossible d'enregistrer le brouillon : dossier inconnu"
+
+msgid "Could not reach the server"
+msgstr "Impossible de joindre le serveur"
 
 msgid "That folder is not on the server"
 msgstr "Ce dossier n'existe pas sur le serveur"
@@ -5615,6 +5632,16 @@ msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Téléchargement des pièces jointes… {n} restante"
 msgstr[1] "Téléchargement des pièces jointes… {n} restantes"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Échec de l'envoi : {e}. Le message est dans la Boîte d'envoi et sera envoyé "
+"dès le rétablissement de la connexion."
+
+msgid "Send failed: {e}"
+msgstr "Échec de l'envoi : {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "« {subject} » sera envoyé {when}"
 
@@ -5649,9 +5676,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Boîte de réception"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr "Un compte Microsoft ne peut pas recevoir de courrier d'un autre compte"
 
 msgid "Email Client"
 msgstr "Client e-mail"

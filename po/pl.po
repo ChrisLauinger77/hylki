@@ -3280,6 +3280,30 @@ msgstr "Pobrano i zaimportowano klucz nadawcy."
 msgid "The sender's key was already in your keyring."
 msgstr "Klucz nadawcy był już w bazie kluczy."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Przeglądarka do otwierania odnośników"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "Adres e-mail"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "Adres e-mail"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Zapisz obraz"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Obrazy"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "Adres e-mail"
+
 msgid "Load attachments from server"
 msgstr "Pobierz załączniki z serwera"
 
@@ -5425,29 +5449,14 @@ msgstr ""
 "Domena {from} jest zweryfikowana, ale adresy nie pasują do nazwy w "
 "wiadomości."
 
-msgid "Could not reach the JMAP server: {e}"
-msgstr "Nie udało się połączyć z serwerem JMAP: {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "Nie udało się pobrać listy katalogów: {e}"
-
-msgid "Sending…"
-msgstr "Wysyłanie…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Załącznika nie ma już w wiadomości na serwerze"
-
-msgid "Could not load message: {e}"
-msgstr "Nie udało się wczytać wiadomości: {e}"
-
 msgid "Syncing…"
 msgstr "Synchronizowanie…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Nie udało się pobrać poczty: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Nie udało się wczytać wiadomości: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Nie udało się wczytać źródła: {e}"
@@ -5497,27 +5506,35 @@ msgstr "Zapisywanie szkicu…"
 msgid "Could not save draft: {e}"
 msgstr "Nie udało się zapisać szkicu: {e}"
 
-msgid "Could not save draft: unknown folder"
-msgstr "Nie udało się zapisać szkicu: nieznany katalog"
+msgid "Sending…"
+msgstr "Wysyłanie…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
-msgstr ""
-"Nie udało się wysłać: {e}. Wiadomość jest w skrzynce nadawczej i zostanie "
-"wysłana po przywróceniu połączenia."
-
-msgid "Send failed: {e}"
-msgstr "Nie udało się wysłać: {e}"
-
-msgid "Could not reach the server"
-msgstr "Nie udało się połączyć z serwerem"
+msgid "A Microsoft account can't receive mail from another account"
+msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
 
 msgid "Removing the attachment…"
 msgstr "Usuwanie załącznika…"
 
 msgid "Could not remove the attachment: {e}"
 msgstr "Nie udało się usunąć załącznika: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Nie udało się pobrać listy katalogów: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Załącznika nie ma już w wiadomości na serwerze"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
+
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Nie udało się połączyć z serwerem JMAP: {e}"
+
+msgid "Could not save draft: unknown folder"
+msgstr "Nie udało się zapisać szkicu: nieznany katalog"
+
+msgid "Could not reach the server"
+msgstr "Nie udało się połączyć z serwerem"
 
 msgid "That folder is not on the server"
 msgstr "Tego katalogu nie ma na serwerze"
@@ -5597,6 +5614,16 @@ msgstr[0] "Pobieranie załączników… (pozostał {n})"
 msgstr[1] "Pobieranie załączników… (pozostały {n})"
 msgstr[2] "Pobieranie załączników… (pozostało {n})"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Nie udało się wysłać: {e}. Wiadomość jest w skrzynce nadawczej i zostanie "
+"wysłana po przywróceniu połączenia."
+
+msgid "Send failed: {e}"
+msgstr "Nie udało się wysłać: {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "Wiadomość „{subject}” zostanie wysłana {when}"
 
@@ -5631,9 +5658,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Skrzynka odbiorcza"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
 
 msgid "Email Client"
 msgstr "Klient poczty"

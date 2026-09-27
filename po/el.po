@@ -3294,6 +3294,30 @@ msgstr "Το κλειδί του αποστολέα ανακτήθηκε και 
 msgid "The sender's key was already in your keyring."
 msgstr "Το κλειδί του αποστολέα υπήρχε ήδη στην κλειδοθήκη σας."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Άνοιγμα συνδέσμων σε"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "Διεύθυνση email"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "Διεύθυνση email"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Αποθήκευση εικόνας"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Εικόνες"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "Διεύθυνση email"
+
 msgid "Load attachments from server"
 msgstr "Φόρτωση συνημμένων από τον διακομιστή"
 
@@ -5473,29 +5497,14 @@ msgstr ""
 "Το {from} είναι έγκυρο, αλλά οι διευθύνσεις δεν ταιριάζουν με το όνομα στο "
 "μήνυμα."
 
-msgid "Could not reach the JMAP server: {e}"
-msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή JMAP: {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "Δεν ήταν δυνατή η εμφάνιση των φακέλων: {e}"
-
-msgid "Sending…"
-msgstr "Αποστολή…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr ""
-
-msgid "Could not load message: {e}"
-msgstr "Δεν ήταν δυνατή η φόρτωση του μηνύματος: {e}"
-
 msgid "Syncing…"
 msgstr "Συγχρονισμός…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Δεν ήταν δυνατή η ανάκτηση αλληλογραφίας: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Δεν ήταν δυνατή η φόρτωση του μηνύματος: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Δεν ήταν δυνατή η φόρτωση του πηγαίου κώδικα: {e}"
@@ -5545,27 +5554,37 @@ msgstr "Αποθήκευση προχείρου…"
 msgid "Could not save draft: {e}"
 msgstr "Δεν ήταν δυνατή η αποθήκευση του προχείρου: {e}"
 
-msgid "Could not save draft: unknown folder"
-msgstr "Δεν ήταν δυνατή η αποθήκευση του προχείρου: άγνωστος φάκελος"
+msgid "Sending…"
+msgstr "Αποστολή…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
+msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
-"Η αποστολή απέτυχε: {e}. Το μήνυμα βρίσκεται στα Εξερχόμενα και θα σταλεί "
-"όταν αποκατασταθεί η σύνδεση."
-
-msgid "Send failed: {e}"
-msgstr "Η αποστολή απέτυχε: {e}"
-
-msgid "Could not reach the server"
-msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
+"Ένας λογαριασμός Microsoft δεν μπορεί να λάβει αλληλογραφία από άλλον "
+"λογαριασμό"
 
 msgid "Removing the attachment…"
 msgstr ""
 
 msgid "Could not remove the attachment: {e}"
 msgstr ""
+
+msgid "Could not list folders: {e}"
+msgstr "Δεν ήταν δυνατή η εμφάνιση των φακέλων: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr ""
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
+
+msgid "Could not reach the JMAP server: {e}"
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή JMAP: {e}"
+
+msgid "Could not save draft: unknown folder"
+msgstr "Δεν ήταν δυνατή η αποθήκευση του προχείρου: άγνωστος φάκελος"
+
+msgid "Could not reach the server"
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
 
 msgid "That folder is not on the server"
 msgstr "Αυτός ο φάκελος δεν υπάρχει στον διακομιστή"
@@ -5640,6 +5659,16 @@ msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Λήψη συνημμένων… απομένει {n}"
 msgstr[1] "Λήψη συνημμένων… απομένουν {n}"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"Η αποστολή απέτυχε: {e}. Το μήνυμα βρίσκεται στα Εξερχόμενα και θα σταλεί "
+"όταν αποκατασταθεί η σύνδεση."
+
+msgid "Send failed: {e}"
+msgstr "Η αποστολή απέτυχε: {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "Το «{subject}» θα σταλεί {when}"
 
@@ -5673,11 +5702,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Εισερχόμενα"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr ""
-"Ένας λογαριασμός Microsoft δεν μπορεί να λάβει αλληλογραφία από άλλον "
-"λογαριασμό"
 
 msgid "Email Client"
 msgstr "Πρόγραμμα-πελάτης email"

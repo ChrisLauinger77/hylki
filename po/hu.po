@@ -3254,6 +3254,30 @@ msgstr "A feladó kulcsa lekérve és importálva."
 msgid "The sender's key was already in your keyring."
 msgstr "A feladó kulcsa már a kulcstartóján volt."
 
+#, fuzzy
+msgid "Open Link"
+msgstr "Megnyitás ablakban"
+
+#, fuzzy
+msgid "Copy Email Address"
+msgstr "E-mail-cím"
+
+#, fuzzy
+msgid "Copy Link Address"
+msgstr "E-mail-cím"
+
+#, fuzzy
+msgid "Save Image As…"
+msgstr "Kép mentése"
+
+#, fuzzy
+msgid "Copy Image"
+msgstr "Képek"
+
+#, fuzzy
+msgid "Copy Image Address"
+msgstr "E-mail-cím"
+
 msgid "Load attachments from server"
 msgstr "Mellékletek betöltése a kiszolgálóról"
 
@@ -5298,30 +5322,14 @@ msgid ""
 "{from} checks out, but the addressing doesn't match the name on the message."
 msgstr ""
 
-#, fuzzy
-msgid "Could not reach the JMAP server: {e}"
-msgstr "A mappa nem hozható létre: {e}"
-
-msgid "Could not list folders: {e}"
-msgstr "A mappák nem listázhatók: {e}"
-
-msgid "Sending…"
-msgstr "Küldés…"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr ""
-
-msgid "Could not load message: {e}"
-msgstr "Az üzenet nem tölthető be: {e}"
-
 msgid "Syncing…"
 msgstr "Szinkronizálás…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "A levelek nem kérhetők le: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Az üzenet nem tölthető be: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "A forrás nem tölthető be: {e}"
@@ -5371,23 +5379,11 @@ msgstr "Piszkozat mentése…"
 msgid "Could not save draft: {e}"
 msgstr "A piszkozat nem menthető: {e}"
 
-#, fuzzy
-msgid "Could not save draft: unknown folder"
-msgstr "A mappa nem nevezhető át: ismeretlen mappa"
+msgid "Sending…"
+msgstr "Küldés…"
 
-msgid ""
-"Send failed: {e}. The message is in the Outbox and will be sent when the "
-"connection is back."
+msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
-"A küldés sikertelen: {e}. Az üzenet a Kimenőben van, és a kapcsolat "
-"helyreállásakor elküldésre kerül."
-
-msgid "Send failed: {e}"
-msgstr "A küldés sikertelen: {e}"
-
-#, fuzzy
-msgid "Could not reach the server"
-msgstr "A mappa nem hozható létre: {e}"
 
 #, fuzzy
 msgid "Removing the attachment…"
@@ -5396,6 +5392,27 @@ msgstr "Mellékletek betöltése…"
 #, fuzzy
 msgid "Could not remove the attachment: {e}"
 msgstr "A mellékletek nem tölthetők be: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "A mappák nem listázhatók: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr ""
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
+
+#, fuzzy
+msgid "Could not reach the JMAP server: {e}"
+msgstr "A mappa nem hozható létre: {e}"
+
+#, fuzzy
+msgid "Could not save draft: unknown folder"
+msgstr "A mappa nem nevezhető át: ismeretlen mappa"
+
+#, fuzzy
+msgid "Could not reach the server"
+msgstr "A mappa nem hozható létre: {e}"
 
 msgid "That folder is not on the server"
 msgstr ""
@@ -5469,6 +5486,16 @@ msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Mellékletek letöltése… még {n} van hátra"
 msgstr[1] "Mellékletek letöltése… még {n} van hátra"
 
+msgid ""
+"Send failed: {e}. The message is in the Outbox and will be sent when the "
+"connection is back."
+msgstr ""
+"A küldés sikertelen: {e}. Az üzenet a Kimenőben van, és a kapcsolat "
+"helyreállásakor elküldésre kerül."
+
+msgid "Send failed: {e}"
+msgstr "A küldés sikertelen: {e}"
+
 msgid "“{subject}” will be sent {when}"
 msgstr "A(z) „{subject}” küldése ekkor történik: {when}"
 
@@ -5499,9 +5526,6 @@ msgstr ""
 
 msgid "Inbox"
 msgstr "Beérkezett üzenetek"
-
-msgid "A Microsoft account can't receive mail from another account"
-msgstr ""
 
 msgid "Email Client"
 msgstr "Levelezőkliens"
