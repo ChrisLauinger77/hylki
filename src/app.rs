@@ -535,7 +535,7 @@ pub struct AppModel {
     /// revisiting a message doesn't re-download them. Byte-bounded — raw
     /// attachment bytes for every message ever opened added up to hundreds of
     /// megabytes over a long session (issue #106).
-    attachment_cache: crate::ram_cache::RamCache<(u32, u32), Vec<Attachment>>,
+    attachment_cache: crate::ram_cache::RamCache<BodyKey, Vec<Attachment>>,
     /// The app-wide attachment lightbox (drawer previews): the
     /// previewable items on show, the current index, and its texture. The
     /// overlay fills the whole window — a separate window meant double chrome.
@@ -582,11 +582,12 @@ pub struct AppModel {
     /// on a long-running session (issue #106) — evicted bodies re-read from the
     /// SQLite cache in a blink.
     body_cache: crate::ram_cache::RamCache<BodyKey, String>,
-    /// Sender-authentication verdicts, keyed like `body_cache`. Prefetch delivers
+    /// Sender-authentication verdicts, keyed like `body_cache` (account,
+    /// folder, UID). Prefetch delivers
     /// these well before a message is opened, and opening one renders from the
     /// in-memory body cache without a worker round-trip — so the verdict has to
     /// be held here or it would be lost by the time the reader needs it.
-    sender_cache: HashMap<(u32, u32), Box<crate::models::SenderCheck>>,
+    sender_cache: HashMap<BodyKey, Box<crate::models::SenderCheck>>,
     /// (account_id, folder_id) → server-side unread count, accurate beyond the
     /// loaded window (from IMAP STATUS/SEARCH). Drives the sidebar badges.
     folder_unread: HashMap<(u32, u32), u32>,
@@ -1099,6 +1100,9 @@ pub struct AppModel {
 struct PopOut {
     window: adw::Window,
     controller: Controller<MessageWindow>,
+    /// The popped-out message, where it lives (see [`body_key`]), for the
+    /// events that arrive about it by folder and UID.
+    message: BodyKey,
 }
 
 /// Which folders a unified view merges (see `AppModel::unified_view`).
@@ -1242,6 +1246,7 @@ pub enum AppMsg {
     /// A message's sender-authentication verdict arrived with its body.
     SenderChecked {
         account_id: u32,
+        path: String,
         message_id: u32,
         check: Box<crate::models::SenderCheck>,
     },
@@ -1696,12 +1701,14 @@ pub enum AppMsg {
     /// checking the folder too.
     Body { account_id: u32, message_id: u32, path: String, body: String },
     Source { text: String },
-    Attachments { account_id: u32, message_id: u32, items: Vec<Attachment> },
-    AttachmentsPending { account_id: u32, message_id: u32 },
+    /// These, like `Body`, name the folder: a UID means a message only
+    /// within its folder.
+    Attachments { account_id: u32, path: String, message_id: u32, items: Vec<Attachment> },
+    AttachmentsPending { account_id: u32, path: String, message_id: u32 },
     /// A flagged message turned out to have no real attachments — drop its paperclip.
-    NoAttachments { account_id: u32, message_id: u32 },
+    NoAttachments { account_id: u32, path: String, message_id: u32 },
     /// An unflagged message turned out to carry attachments — give it one.
-    HasAttachments { account_id: u32, message_id: u32 },
+    HasAttachments { account_id: u32, path: String, message_id: u32 },
     Sent { account_id: u32 },
     Status { account_id: u32, text: String },
     Error { account_id: u32, text: String, connectivity: bool },
@@ -6267,7 +6274,7 @@ impl SimpleComponent for AppModel {
                 // message is the request — the paperclip appears when they
                 // land, with no "load attachments" click in between.
                 if m.has_attachment {
-                    if let Some(cached) = self.attachment_cache.get(&(account_id, m.id)).cloned() {
+                    if let Some(cached) = self.attachment_cache.get(&body_key(&m)).cloned() {
                         self.attachments = cached;
                         self.sync_attachment_drawer();
                     } else if let Some(path) = folder_path {
@@ -7538,7 +7545,11 @@ impl SimpleComponent for AppModel {
                 }
             }
             AppMsg::CardAttachment { account_id, id, index, save } => {
-                let Some(items) = self.attachment_cache.get(&(account_id, id)).cloned() else {
+                let Some(items) = self
+                    .member_key((account_id, id))
+                    .and_then(|k| self.attachment_cache.get(&k))
+                    .cloned()
+                else {
                     return;
                 };
                 let Some(att) = items.get(index).cloned() else { return };
@@ -7574,7 +7585,7 @@ impl SimpleComponent for AppModel {
                     .conversation_members()
                     .into_iter()
                     .find(|key| {
-                        self.attachment_cache.get(key).is_some_and(|items| {
+                        self.member_key(*key).and_then(|k| self.attachment_cache.get(&k)).is_some_and(|items| {
                             items.iter().any(|a| a.name == att.name && a.data.len() == att.data.len())
                         })
                     });
@@ -7657,10 +7668,11 @@ impl SimpleComponent for AppModel {
                 if let Some(fid) = folder {
                     self.body_cache.remove(&(account_id, fid, uid));
                 }
+                let held = folder.map(|fid| (account_id, fid, uid));
                 if new_uid == Some(uid) {
                     // The same message, one file fewer (Microsoft 365): the
                     // reader drops the file where it stands.
-                    if let Some(mut items) = self.attachment_cache.remove(&key) {
+                    if let Some(mut items) = held.and_then(|k| self.attachment_cache.remove(&k)) {
                         if let Some(at) = items
                             .iter()
                             .enumerate()
@@ -7670,7 +7682,7 @@ impl SimpleComponent for AppModel {
                         {
                             items.remove(at);
                         }
-                        sender.input(AppMsg::Attachments { account_id, message_id, items });
+                        sender.input(AppMsg::Attachments { account_id, path, message_id, items });
                     }
                     return;
                 }
@@ -7678,10 +7690,14 @@ impl SimpleComponent for AppModel {
                 // loaded again first, may already have carried the selection
                 // over to it by Message-ID, the files it held with it; if not,
                 // the copy is opened here.
-                self.attachment_cache.remove(&key);
+                if let Some(k) = held {
+                    self.attachment_cache.remove(&k);
+                }
                 let Some(new_uid) = new_uid else { return };
                 let now = (account_id, new_uid);
-                self.attachment_cache.remove(&now);
+                if let Some(fid) = folder {
+                    self.attachment_cache.remove(&(account_id, fid, new_uid));
+                }
                 if members.contains(&now) {
                     self.send_to(account_id, MailRequest::LoadAttachments {
                         message_id: new_uid,
@@ -9890,42 +9906,41 @@ impl SimpleComponent for AppModel {
                 self.push_index_complete();
             }
 
-            AppMsg::SenderChecked { account_id, message_id, check } => {
+            AppMsg::SenderChecked { account_id, path, message_id, check } => {
                 // Remember it: prefetch delivers the verdict long before the
                 // message is opened, and opening it renders from the in-memory
                 // body cache without asking the worker for anything.
-                self.sender_cache
-                    .insert((account_id, message_id), check.clone());
+                let key = self.event_key(account_id, &path, message_id);
+                if let Some(k) = key {
+                    self.sender_cache.insert(k, check.clone());
+                }
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
                 // Only the message actually on screen; a verdict that arrives
                 // from a background prefetch must not relabel a different one.
-                if self
-                    .current
-                    .as_ref()
-                    .is_some_and(|c| c.id == message_id && c.account_id == account_id)
-                {
+                if self.current.as_ref().is_some_and(is_target) {
                     self.message_view
                         .emit(MessageViewInput::SetSenderCheck(check.clone()));
                 }
                 // Light the header seal on whichever on-screen card this
                 // verdict belongs to (#88) — the open single message included
-                // (it never fills current_thread).
-                if self
+                // (it never fills current_thread). The card goes by the id
+                // it has here, which for a member from another folder is not
+                // its UID.
+                let card = self
                     .current_thread
                     .iter()
-                    .any(|m| m.account_id == account_id && m.id == message_id)
-                    || self
-                        .current
-                        .as_ref()
-                        .is_some_and(|c| c.id == message_id && c.account_id == account_id)
-                {
+                    .chain(self.current.iter())
+                    .find(|m| is_target(m))
+                    .map(|m| m.id);
+                if let Some(id) = card {
                     self.message_view.emit(MessageViewInput::SenderCheckFor {
                         account_id,
-                        id: message_id,
+                        id,
                         check: check.clone(),
                     });
                 }
-                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
-                    p.controller.emit(MessageWindowInput::SetSenderCheck(check));
+                for p in self.popouts.values().filter(|p| key == Some(p.message)) {
+                    p.controller.emit(MessageWindowInput::SetSenderCheck(check.clone()));
                 }
             }
 
@@ -9935,25 +9950,13 @@ impl SimpleComponent for AppModel {
                 let body =
                     if body.contains('\0') { body.replace('\0', " ") } else { body };
                 // A UID is unique only within its folder, and the background
-                // prefetch pushes bodies from every folder it syncs. Matching on
-                // the number alone would let one folder's body overwrite a
-                // different message that happens to share it.
-                let folder = self
-                    .folders
-                    .get(&account_id)
-                    .and_then(|fs| fs.iter().find(|f| f.path == path))
-                    .map(|f| f.id);
-                // A folder the app does not know yet has no key; the body is
-                // still on disk for when it does. A member opened out from
-                // another folder was asked for under the id it goes by here,
-                // so its body comes back under that id: file it by its UID.
-                if let Some(fid) = folder {
-                    let uid = self
-                        .related_ids
-                        .iter()
-                        .find(|((a, f, _), id)| *a == account_id && *f == fid && **id == message_id)
-                        .map_or(message_id, |((_, _, uid), _)| *uid);
-                    self.body_cache.insert((account_id, fid, uid), body.clone());
+                // prefetch pushes bodies from every folder it syncs, so the
+                // body is filed by folder and UID. A folder the app does not
+                // know yet has no key; the body is still on disk for when it
+                // does.
+                let key = self.event_key(account_id, &path, message_id);
+                if let Some(k) = key {
+                    self.body_cache.insert(k, body.clone());
                 }
                 // If this body was fetched to open a draft, open the editor now.
                 if let Some((pd, inline, extra)) = self.pending_draft.take() {
@@ -10005,17 +10008,10 @@ impl SimpleComponent for AppModel {
                     }
                     self.pending_reply = Some((m, extra));
                 }
-                let is_target = |m: &Message| {
-                    m.account_id == account_id
-                        && m.id == message_id
-                        && folder.is_none_or(|fid| m.folder_id == fid)
-                };
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
                 // Keep the primary's body up to date in either mode.
                 if let Some(current) = self.current.as_mut() {
-                    if current.account_id == account_id
-                        && current.id == message_id
-                        && folder.is_none_or(|fid| current.folder_id == fid)
-                    {
+                    if is_target(current) {
                         current.body = body.clone();
                     }
                 }
@@ -10200,9 +10196,12 @@ impl SimpleComponent for AppModel {
                 self.show_source_window(&text);
             }
 
-            AppMsg::Attachments { account_id, message_id, items } => {
-                self.attachment_cache
-                    .insert((account_id, message_id), items.clone());
+            AppMsg::Attachments { account_id, path, message_id, items } => {
+                let key = self.event_key(account_id, &path, message_id);
+                if let Some(k) = key {
+                    self.attachment_cache.insert(k, items.clone());
+                }
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
                 // A file the gallery asked for: hand the bytes straight over so
                 // the thumbnail and the preview fill in without a reload, which
                 // would throw away the user's place in the list.
@@ -10210,15 +10209,12 @@ impl SimpleComponent for AppModel {
                     self.gallery.emit(GalleryInput::SetFetching(false));
                     self.gallery.emit(GalleryInput::Fetched {
                         account_id,
-                        uid: message_id,
+                        path: path.clone(),
+                        uid: key.map_or(message_id, |k| k.2),
                         items: items.clone(),
                     });
                 }
-                if self
-                    .current
-                    .as_ref()
-                    .is_some_and(|c| c.id == message_id && c.account_id == account_id)
-                {
+                if self.current.as_ref().is_some_and(is_target) {
                     self.attachments_loading = false;
                     self.attachments = items.clone();
                     self.sync_attachment_drawer();
@@ -10226,22 +10222,17 @@ impl SimpleComponent for AppModel {
                 // With a conversation open the drawer spans the whole thread, so
                 // any member's arrival re-merges the union (this supersedes the
                 // single-message assignment above when both apply).
-                if self.current_thread.len() > 1
-                    && self
-                        .current_thread
-                        .iter()
-                        .any(|tm| tm.id == message_id && tm.account_id == account_id)
-                {
+                if self.current_thread.len() > 1 && self.current_thread.iter().any(is_target) {
                     self.attachments_loading = false;
                     self.refresh_thread_attachments();
                 }
-                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
-                    p.controller.emit(MessageWindowInput::SetAttachments(items));
+                for p in self.popouts.values().filter(|p| key == Some(p.message)) {
+                    p.controller.emit(MessageWindowInput::SetAttachments(items.clone()));
                 }
                 // These files were fetched to be carried into a copy of the
                 // message; they are cached now, so the second pass stages them.
                 if let Some(pending) = self.pending_edit_as_new.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
+                    if is_target(&pending) {
                         self.edit_as_new(pending, &sender);
                     } else {
                         self.pending_edit_as_new = Some(pending);
@@ -10249,7 +10240,7 @@ impl SimpleComponent for AppModel {
                 }
                 // The same for a forward that carries them (#240).
                 if let Some((pending, inline)) = self.pending_forward.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
+                    if is_target(&pending) {
                         self.forward(pending, inline, &sender);
                     } else {
                         self.pending_forward = Some((pending, inline));
@@ -10257,23 +10248,20 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::AttachmentsPending { account_id, message_id } => {
+            AppMsg::AttachmentsPending { account_id, path, message_id } => {
                 // Attachments exist but weren't on disk. Opening the message
                 // was the request — fetch them now rather than asking for a
                 // click (the old "load attachments" button). Every reader path
                 // now downloads outright, so this is a safety net for any
                 // cache-only probe that still answers "present, not fetched".
+                let key = self.event_key(account_id, &path, message_id);
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
                 let msg = self
                     .current
                     .as_ref()
-                    .filter(|c| c.id == message_id && c.account_id == account_id)
+                    .filter(|c| is_target(c))
                     .cloned()
-                    .or_else(|| {
-                        self.current_thread
-                            .iter()
-                            .find(|m| m.id == message_id && m.account_id == account_id)
-                            .cloned()
-                    });
+                    .or_else(|| self.current_thread.iter().find(|m| is_target(m)).cloned());
                 if let Some(m) = msg {
                     if let Some(path) = self.resolve_folder_path(&m) {
                         self.attachments_loading = true;
@@ -10285,33 +10273,27 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
-                if let Some(p) = self.popouts.get(&(account_id, message_id)) {
+                for p in self.popouts.values().filter(|p| key == Some(p.message)) {
                     p.controller.emit(MessageWindowInput::AttachmentsPending);
                 }
             }
 
-            AppMsg::NoAttachments { account_id, message_id } => {
-                // Clear a false paperclip live. Update every cached folder for the
-                // account (a UID is per-folder, but the same message copied across
-                // folders shares its attachment status) and the visible row.
-                for ((aid, _), msgs) in self.message_cache.iter_mut() {
-                    if *aid == account_id {
-                        for m in msgs.iter_mut().filter(|m| m.id == message_id) {
-                            m.has_attachment = false;
-                        }
-                    }
-                }
+            AppMsg::NoAttachments { account_id, path, message_id } => {
+                // Clear a false paperclip live: on this message, in its own
+                // folder. A UID names a message only within its folder, so
+                // the same number elsewhere is a different message.
+                let key = self.event_key(account_id, &path, message_id);
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
+                self.set_has_attachment(key, false);
                 if let Some(c) = self.current.as_mut() {
-                    if c.id == message_id && c.account_id == account_id {
+                    if is_target(c) {
                         c.has_attachment = false;
                     }
                 }
-                self.message_list
-                    .emit(MessageListInput::SetHasAttachment { id: message_id, has: false });
                 // A copy waiting on files that do not exist: open it anyway,
                 // rather than leave the menu entry looking dead.
                 if let Some(mut pending) = self.pending_edit_as_new.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
+                    if is_target(&pending) {
                         pending.has_attachment = false;
                         self.edit_as_new(pending, &sender);
                     } else {
@@ -10319,7 +10301,7 @@ impl SimpleComponent for AppModel {
                     }
                 }
                 if let Some((mut pending, inline)) = self.pending_forward.take() {
-                    if pending.account_id == account_id && pending.id == message_id {
+                    if is_target(&pending) {
                         pending.has_attachment = false;
                         self.forward(pending, inline, &sender);
                     } else {
@@ -10328,36 +10310,25 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::HasAttachments { account_id, message_id } => {
+            AppMsg::HasAttachments { account_id, path, message_id } => {
                 // The mirror of NoAttachments: a message whose structure didn't
                 // advertise its attachments (an inline PDF, say — issue #9) is
                 // given its paperclip once the body has proved they are there.
-                for ((aid, _), msgs) in self.message_cache.iter_mut() {
-                    if *aid == account_id {
-                        for m in msgs.iter_mut().filter(|m| m.id == message_id) {
-                            m.has_attachment = true;
-                        }
-                    }
-                }
-                self.message_list
-                    .emit(MessageListInput::SetHasAttachment { id: message_id, has: true });
+                let key = self.event_key(account_id, &path, message_id);
+                let is_target = |m: &Message| is_event_target(m, key, account_id, message_id);
+                self.set_has_attachment(key, true);
                 // If it is the message on screen, fetch the files too: the reader
                 // only asks for them when the flag was already set, which by
                 // definition it wasn't.
                 let already = self
                     .current
                     .as_ref()
-                    .is_some_and(|c| c.id == message_id && c.account_id == account_id && c.has_attachment);
-                let open = self
-                    .current
-                    .as_mut()
-                    .filter(|c| c.id == message_id && c.account_id == account_id);
+                    .is_some_and(|c| is_target(c) && c.has_attachment);
+                let open = self.current.as_mut().filter(|c| is_target(c));
                 if let (false, Some(current)) = (already, open) {
                     current.has_attachment = true;
                     let message = current.clone();
-                    if let Some(cached) =
-                        self.attachment_cache.get(&(account_id, message_id)).cloned()
-                    {
+                    if let Some(cached) = self.attachment_cache.get(&body_key(&message)).cloned() {
                         self.attachments = cached;
                         self.sync_attachment_drawer();
                     } else if let Some(path) = self.resolve_folder_path(&message) {
@@ -13318,6 +13289,44 @@ impl AppModel {
         }
     }
 
+    /// Where the message on screen that goes by `(account, id)` lives, as
+    /// the caches key it (see [`body_key`]).
+    fn member_key(&self, (account_id, id): (u32, u32)) -> Option<BodyKey> {
+        self.current_thread
+            .iter()
+            .chain(self.current.iter())
+            .find(|m| m.account_id == account_id && m.id == id)
+            .map(body_key)
+    }
+
+    /// The message a worker event is about, as the caches key it: `message_id`
+    /// in the folder at `path`. An event names a message by the id it was
+    /// asked for under, which for a member opened out from another folder is
+    /// the id it goes by here, so that is taken back to its UID. `None` for a
+    /// folder the app does not know.
+    fn event_key(&self, account_id: u32, path: &str, message_id: u32) -> Option<BodyKey> {
+        let fid = self.folders.get(&account_id)?.iter().find(|f| f.path == path)?.id;
+        let uid = self
+            .related_ids
+            .iter()
+            .find(|((a, f, _), id)| *a == account_id && *f == fid && **id == message_id)
+            .map_or(message_id, |((_, _, uid), _)| *uid);
+        Some((account_id, fid, uid))
+    }
+
+    /// Give the message at `key` its paperclip or take it away, in its own
+    /// folder only, where the list keeps it and on its row.
+    fn set_has_attachment(&mut self, key: Option<BodyKey>, has: bool) {
+        let Some((account_id, folder_id, uid)) = key else { return };
+        if let Some(msgs) = self.message_cache.get_mut(&(account_id, folder_id)) {
+            for m in msgs.iter_mut().filter(|m| m.uid == uid) {
+                m.has_attachment = has;
+            }
+        }
+        self.message_list
+            .emit(MessageListInput::SetHasAttachment { account_id, folder_id, uid, has });
+    }
+
     /// Hand the reader what each message on screen has attached (#213), as
     /// far as the cache knows: names and sizes only, never the bytes — the
     /// document lists them, and the app opens or saves them on request.
@@ -13325,7 +13334,7 @@ impl AppModel {
         use crate::ui::message_view::CardAttachment;
         let mut map: HashMap<(u32, u32), Vec<CardAttachment>> = HashMap::new();
         for key in self.conversation_members() {
-            if let Some(items) = self.attachment_cache.get(&key) {
+            if let Some(items) = self.member_key(key).and_then(|k| self.attachment_cache.get(&k)) {
                 let atts: Vec<CardAttachment> = items
                     .iter()
                     .map(|a| CardAttachment { name: a.name.clone(), size: a.data.len() as u64 })
@@ -13347,7 +13356,7 @@ impl AppModel {
             .current_thread
             .iter()
             .filter(|tm| tm.has_attachment)
-            .filter(|tm| !self.attachment_cache.contains_key(&(tm.account_id, tm.id)))
+            .filter(|tm| !self.attachment_cache.contains_key(&body_key(tm)))
             .filter_map(|tm| {
                 self.resolve_folder_path(tm)
                     .map(|p| (tm.account_id, tm.id, tm.uid, p))
@@ -13374,7 +13383,7 @@ impl AppModel {
         let mut seen = HashSet::new();
         let mut merged = Vec::new();
         for tm in &self.current_thread {
-            if let Some(items) = self.attachment_cache.get(&(tm.account_id, tm.id)) {
+            if let Some(items) = self.attachment_cache.get(&body_key(tm)) {
                 for a in items {
                     if seen.insert((a.name.clone(), a.data.len())) {
                         merged.push(a.clone());
@@ -13881,7 +13890,7 @@ impl AppModel {
         };
         let stored_check = message
             .as_ref()
-            .and_then(|m| self.sender_cache.get(&(m.account_id, m.id)))
+            .and_then(|m| self.sender_cache.get(&body_key(m)))
             .cloned();
         self.message_view.emit(MessageViewInput::Show {
             thread: message.into_iter().collect(),
@@ -14048,7 +14057,7 @@ impl AppModel {
         let mut atts: Vec<Attachment> = Vec::new();
         let mut atts_loading = false;
         if display.has_attachment {
-            if let Some(cached) = self.attachment_cache.get(&key).cloned() {
+            if let Some(cached) = self.attachment_cache.get(&body_key(&m)).cloned() {
                 atts = cached;
             } else if let Some(path) = self.resolve_folder_path(&m) {
                 atts_loading = true;
@@ -14150,7 +14159,7 @@ impl AppModel {
         controller.emit(MessageWindowInput::SetIdentities(self.identities_map()));
         controller.emit(MessageWindowInput::SetInviteAnswers(self.invite_answers_map()));
 
-        self.popouts.insert(key, PopOut { window, controller });
+        self.popouts.insert(key, PopOut { window, controller, message: body_key(&m) });
     }
 
     /// Push every cached sender verdict for the on-screen conversation into
@@ -14172,7 +14181,8 @@ impl AppModel {
             .and(std::env::var("HYLKI_SHOWCASE_PGP").ok())
             .map(|v| Box::new(crate::models::SenderCheck { pgp: showcase_pgp(&v), ..Default::default() }));
         for key in keys {
-            if let Some(check) = showcase.as_ref().or_else(|| self.sender_cache.get(&key)) {
+            let stored = self.member_key(key).and_then(|k| self.sender_cache.get(&k));
+            if let Some(check) = showcase.as_ref().or(stored) {
                 self.message_view.emit(MessageViewInput::SenderCheckFor {
                     account_id: key.0,
                     id: key.1,
@@ -14443,7 +14453,6 @@ impl AppModel {
     /// the composer opens where a reply does; otherwise in a window.
     fn forward(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
         let m = self.with_cached_body(m);
-        let key = (m.account_id, m.id);
         if m.body.is_empty() {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(
@@ -14454,7 +14463,7 @@ impl AppModel {
                 return;
             }
         }
-        if m.has_attachment && !self.attachment_cache.contains_key(&key) {
+        if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(m.account_id, MailRequest::LoadAttachments {
                     message_id: m.id,
@@ -14468,7 +14477,7 @@ impl AppModel {
         }
         let attachments = self
             .attachment_cache
-            .get(&key)
+            .get(&body_key(&m))
             .map(|items| stage_attachments(&format!("hylki-forward-{}-{}", m.account_id, m.id), items))
             .unwrap_or_default();
         tracing::info!(
@@ -14498,7 +14507,6 @@ impl AppModel {
     /// is being copied is actually in hand.
     fn edit_as_new(&mut self, m: Message, sender: &ComponentSender<Self>) {
         let m = self.with_cached_body(m);
-        let key = (m.account_id, m.id);
         if m.body.is_empty() {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(
@@ -14509,7 +14517,7 @@ impl AppModel {
                 return;
             }
         }
-        if m.has_attachment && !self.attachment_cache.contains_key(&key) {
+        if m.has_attachment && !self.attachment_cache.contains_key(&body_key(&m)) {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(m.account_id, MailRequest::LoadAttachments {
                     message_id: m.id,
@@ -14523,7 +14531,7 @@ impl AppModel {
         }
         let attachments = self
             .attachment_cache
-            .get(&key)
+            .get(&body_key(&m))
             .map(|items| {
                 stage_attachments(&format!("hylki-copy-{}-{}", m.account_id, m.id), items)
             })
@@ -15770,7 +15778,7 @@ impl AppModel {
     /// bytes, when known), as the drawer's Show in Message finds it.
     fn attachment_target(&self, name: &str, len: Option<usize>) -> Option<AttachmentTarget> {
         let (m, size) = self.current_thread.iter().chain(self.current.iter()).find_map(|m| {
-            let items = self.attachment_cache.get(&(m.account_id, m.id))?;
+            let items = self.attachment_cache.get(&body_key(m))?;
             let a = items.iter().find(|a| a.name == name && len.is_none_or(|l| a.data.len() == l))?;
             Some((m, a.data.len() as u64))
         })?;
@@ -18808,7 +18816,7 @@ impl AppModel {
     fn reply_context(&self, m: &Message, mut prefill: ComposePrefill) -> ComposePrefill {
         prefill.encrypt = self
             .sender_cache
-            .get(&(m.account_id, m.id))
+            .get(&body_key(m))
             .and_then(|c| c.pgp.as_ref())
             .is_some_and(|p| p.encrypted);
         self.quoting(m, prefill)
@@ -18863,7 +18871,7 @@ impl AppModel {
     fn record_unsubscribed(&mut self, message: &Message) {
         let Some(info) = self
             .sender_cache
-            .get(&(message.account_id, message.id))
+            .get(&body_key(message))
             .and_then(|c| c.unsubscribe.as_ref())
         else {
             return;
@@ -20904,21 +20912,21 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
         WorkerEvent::Body { message_id, path, body } => {
             AppMsg::Body { account_id, message_id, path, body }
         }
-        WorkerEvent::SenderChecked { message_id, check } => {
-            AppMsg::SenderChecked { account_id, message_id, check: Box::new(check) }
+        WorkerEvent::SenderChecked { path, message_id, check } => {
+            AppMsg::SenderChecked { account_id, path, message_id, check: Box::new(check) }
         }
         WorkerEvent::Source { text, .. } => AppMsg::Source { text },
-        WorkerEvent::Attachments { message_id, items } => {
-            AppMsg::Attachments { account_id, message_id, items }
+        WorkerEvent::Attachments { path, message_id, items } => {
+            AppMsg::Attachments { account_id, path, message_id, items }
         }
-        WorkerEvent::AttachmentsPending { message_id } => {
-            AppMsg::AttachmentsPending { account_id, message_id }
+        WorkerEvent::AttachmentsPending { path, message_id } => {
+            AppMsg::AttachmentsPending { account_id, path, message_id }
         }
-        WorkerEvent::NoAttachments { message_id } => {
-            AppMsg::NoAttachments { account_id, message_id }
+        WorkerEvent::NoAttachments { path, message_id } => {
+            AppMsg::NoAttachments { account_id, path, message_id }
         }
-        WorkerEvent::HasAttachments { message_id } => {
-            AppMsg::HasAttachments { account_id, message_id }
+        WorkerEvent::HasAttachments { path, message_id } => {
+            AppMsg::HasAttachments { account_id, path, message_id }
         }
         WorkerEvent::Sent => AppMsg::Sent { account_id },
         WorkerEvent::Outbox { items } => AppMsg::OutboxItems { account_id, items },
@@ -20933,6 +20941,16 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
 
 /// Where a body is kept in the app's RAM cache: (account, folder, UID).
 type BodyKey = (u32, u32, u32);
+
+/// Whether a worker event about `message_id` (whose [`AppModel::event_key`]
+/// is `key`) is about `m`. Without a key, for a folder the app does not
+/// know, the id alone has to do.
+fn is_event_target(m: &Message, key: Option<BodyKey>, account_id: u32, message_id: u32) -> bool {
+    match key {
+        Some(k) => body_key(m) == k,
+        None => m.account_id == account_id && m.id == message_id,
+    }
+}
 
 /// A message's [`BodyKey`]. The folder and UID are the message's real ones
 /// even where its id is not (a member opened out from another folder), so

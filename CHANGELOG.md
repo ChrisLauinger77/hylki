@@ -8,6 +8,13 @@
   Inbox message with the same number. The Inbox message then opened with the
   Sent message's text, often just a signature, under its own header. Bodies
   are now kept per folder.
+- **Fixed: paperclips, attachments and sender checks on the wrong message.**
+  The same mix-up affected what arrives with a message's text: whether it has
+  attachments, the files themselves, and the sender check with its OpenPGP
+  result and Unsubscribe and invitation banners. A message in one folder could
+  gain or lose a paperclip, or show a verdict, that belonged to the message
+  with the same number in another folder. Each now reaches only its own
+  message.
 - **Added: how much storage a mail account uses** (#298, requested by
   rsx-xp). An account's page in Settings → Mail Accounts shows the space in
   use, the limit and what is free, with a bar that turns amber past 90% and

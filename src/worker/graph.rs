@@ -571,9 +571,9 @@ pub(super) async fn run_graph(
                 if let Some(body) = cache.as_ref().and_then(|c| c.load_body(account_id, &path, uid))
                 {
                     let check = cache.as_ref().and_then(|c| c.load_sender_check(account_id, &path, uid));
-                    emit(WorkerEvent::Body { message_id, path, body });
+                    emit(WorkerEvent::Body { message_id, path: path.clone(), body });
                     if let Some(check) = check {
-                        emit(WorkerEvent::SenderChecked { message_id, check });
+                        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
                     }
                     continue;
                 }
@@ -586,8 +586,8 @@ pub(super) async fn run_graph(
                             }
                             c.save_sender_check(account_id, &path, uid, &check);
                         }
-                        emit(WorkerEvent::Body { message_id, path, body });
-                        emit(WorkerEvent::SenderChecked { message_id, check });
+                        emit(WorkerEvent::Body { message_id, path: path.clone(), body });
+                        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
                     }
                     Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
                 }
@@ -600,7 +600,7 @@ pub(super) async fn run_graph(
                     {
                         emit(WorkerEvent::Body { message_id, path: path.clone(), body });
                         if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, &path, uid)) {
-                            emit(WorkerEvent::SenderChecked { message_id, check });
+                            emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
                         }
                         continue;
                     }
@@ -614,7 +614,7 @@ pub(super) async fn run_graph(
                                 c.save_sender_check(account_id, &path, uid, &check);
                             }
                             emit(WorkerEvent::Body { message_id, path: path.clone(), body });
-                            emit(WorkerEvent::SenderChecked { message_id, check });
+                            emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
                         }
                         Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
                     }
@@ -634,12 +634,12 @@ pub(super) async fn run_graph(
                 if let Some(c) = cache.as_ref() {
                     let items = c.load_attachments(account_id, &path, uid);
                     if !items.is_empty() {
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                         continue;
                     }
                 }
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { message_id });
+                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id });
                     continue;
                 }
                 match graph_fetch_raw(&account, &mut state, &path, uid, &emit).await {
@@ -648,7 +648,7 @@ pub(super) async fn run_graph(
                         if let Some(c) = cache.as_ref() {
                             c.save_attachments(account_id, &path, uid, &items);
                         }
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                     }
                     Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &(e).to_string())]))),
                 }

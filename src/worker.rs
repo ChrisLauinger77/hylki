@@ -651,21 +651,23 @@ pub enum WorkerEvent {
     /// cached row has been dropped.
     Gone { message_id: u32, path: String, uid: u32 },
     /// Whether the message's From: address survived its provider's SPF/DKIM/DMARC
-    /// checks. Sent right after `Body`, from the same fetch.
-    SenderChecked { message_id: u32, check: crate::models::SenderCheck },
+    /// checks. Sent right after `Body`, from the same fetch. This and the
+    /// attachment events below name the folder, like `Body`: a UID means a
+    /// message only within its folder.
+    SenderChecked { path: String, message_id: u32, check: crate::models::SenderCheck },
     Source { text: String },
-    Attachments { message_id: u32, items: Vec<crate::models::Attachment> },
+    Attachments { path: String, message_id: u32, items: Vec<crate::models::Attachment> },
     /// The message has attachments that aren't cached; the UI should offer to
     /// download them rather than fetching automatically.
-    AttachmentsPending { message_id: u32 },
+    AttachmentsPending { path: String, message_id: u32 },
     /// A message flagged as having an attachment turned out to have none once its
     /// body was fetched (e.g. iCloud marketing mail whose only extra parts are
     /// inline `cid:` images). The UI should drop its paperclip.
-    NoAttachments { message_id: u32 },
+    NoAttachments { path: String, message_id: u32 },
     /// The opposite: a message with no paperclip turned out to carry attachments
     /// after all (an inline PDF the structure didn't advertise — issue #9). The
     /// UI should show the paperclip and offer the files.
-    HasAttachments { message_id: u32 },
+    HasAttachments { path: String, message_id: u32 },
     Sent,
     /// Something worth telling the user that isn't a failure — a queued message
     /// going out on its own, say.
@@ -822,10 +824,10 @@ fn cache_lane(
             MailRequest::LoadAttachments { message_id, path, uid, download } => {
                 let items = c.load_attachments(account_id, &path, uid);
                 if !items.is_empty() {
-                    emit(WorkerEvent::Attachments { message_id, items });
+                    emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                     None
                 } else if !download {
-                    emit(WorkerEvent::AttachmentsPending { message_id });
+                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id });
                     None
                 } else {
                     Some(MailRequest::LoadAttachments { message_id, path, uid, download })
@@ -878,7 +880,7 @@ fn serve_cached_body(
     }
     emit(WorkerEvent::Body { message_id, path: path.to_string(), body });
     if let Some(check) = cache.load_sender_check(account_id, path, uid) {
-        emit(WorkerEvent::SenderChecked { message_id, check });
+        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
     }
     true
 }
@@ -1563,6 +1565,7 @@ async fn run_imap(
                     let items = c.load_attachments(account_id, path, *uid);
                     if !items.is_empty() {
                         emit(WorkerEvent::Attachments {
+                            path: path.to_string(),
                             message_id: *message_id,
                             items,
                         });
@@ -1572,7 +1575,7 @@ async fn run_imap(
                 // Not cached and the user hasn't asked to download — tell the UI
                 // so it can offer a "Load attachments" button instead of fetching.
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { message_id: *message_id });
+                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id: *message_id });
                     continue;
                 }
             }
@@ -1735,11 +1738,11 @@ async fn run_imap(
                         c.set_has_attachment(account_id, &path, uid, has_attachments);
                     }
                     emit(WorkerEvent::Body { message_id, path: path.clone(), body });
-                    emit(WorkerEvent::SenderChecked { message_id, check });
+                    emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
                     emit(if has_attachments {
-                        WorkerEvent::HasAttachments { message_id }
+                        WorkerEvent::HasAttachments { path: path.to_string(), message_id }
                     } else {
-                        WorkerEvent::NoAttachments { message_id }
+                        WorkerEvent::NoAttachments { path: path.to_string(), message_id }
                     });
                 }
                 Err(e) => {
@@ -1782,13 +1785,14 @@ async fn run_imap(
                                     body,
                                 });
                                 emit(WorkerEvent::SenderChecked {
+                                    path: path.to_string(),
                                     message_id: *message_id,
                                     check,
                                 });
                                 emit(if has_attachments {
-                                    WorkerEvent::HasAttachments { message_id: *message_id }
+                                    WorkerEvent::HasAttachments { path: path.to_string(), message_id: *message_id }
                                 } else {
-                                    WorkerEvent::NoAttachments { message_id: *message_id }
+                                    WorkerEvent::NoAttachments { path: path.to_string(), message_id: *message_id }
                                 });
                             }
                             if !missing.is_empty() {
@@ -1833,7 +1837,7 @@ async fn run_imap(
                             c.mark_attachments_checked(account_id, &path, uid);
                         }
                     }
-                    emit(WorkerEvent::Attachments { message_id, items });
+                    emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                 }
                 Err(e) => {
                     emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &(e).to_string())])));
@@ -2989,7 +2993,7 @@ async fn run_one_prefetch(
                 }
                 let (body, check, _) = render_raw(&raw);
                 let (attachments, _) = attachments_of(&raw);
-                emit(WorkerEvent::SenderChecked { message_id: uid, check: check.clone() });
+                emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check: check.clone() });
                 if let Some(c) = cache {
                     c.save_body(account_id, &path, uid, &body);
                     c.save_sender_check(account_id, &path, uid, &check);
@@ -3002,7 +3006,7 @@ async fn run_one_prefetch(
                 // attachment but with none once fetched (iCloud multipart/mixed
                 // wrapping only inline images).
                 if attachments.is_empty() {
-                    emit(WorkerEvent::NoAttachments { message_id: uid });
+                    emit(WorkerEvent::NoAttachments { path: path.to_string(), message_id: uid });
                 }
             }
         }
@@ -3112,7 +3116,7 @@ async fn run_one_body_prefetch(
         queue.pop_front();
         emit(WorkerEvent::Body { message_id: uid, path: path.clone(), body });
         if let Some(check) = cache.and_then(|c| c.load_sender_check(account_id, &path, uid)) {
-            emit(WorkerEvent::SenderChecked { message_id: uid, check });
+            emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check });
         }
         emitted.insert((path, uid));
         return;
@@ -3147,11 +3151,11 @@ async fn run_one_body_prefetch(
             c.set_has_attachment(account_id, &path, uid, has_attachments);
         }
         emit(WorkerEvent::Body { message_id: uid, path: path.clone(), body });
-        emit(WorkerEvent::SenderChecked { message_id: uid, check });
+        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id: uid, check });
         // The background prefetch reads the whole message anyway, so a wrong
         // paperclip corrects itself before the message is ever opened.
         if has_attachments {
-            emit(WorkerEvent::HasAttachments { message_id: uid });
+            emit(WorkerEvent::HasAttachments { path: path.to_string(), message_id: uid });
         }
         emitted.insert((path, uid));
     }
@@ -8546,7 +8550,7 @@ async fn run_pop3(
                 if let Some(body) = cache.as_ref().and_then(|c| c.load_body(account_id, INBOX, uid)) {
                     emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
                     if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
-                        emit(WorkerEvent::SenderChecked { message_id, check });
+                        emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
                     }
                     continue;
                 }
@@ -8560,7 +8564,7 @@ async fn run_pop3(
                             c.save_sender_check(account_id, INBOX, uid, &check);
                         }
                         emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                        emit(WorkerEvent::SenderChecked { message_id, check });
+                        emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
                     }
                     Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
                 }
@@ -8575,7 +8579,7 @@ async fn run_pop3(
                     {
                         emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
                         if let Some(check) = cache.as_ref().and_then(|c| c.load_sender_check(account_id, INBOX, uid)) {
-                            emit(WorkerEvent::SenderChecked { message_id, check });
+                            emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
                         }
                         continue;
                     }
@@ -8589,7 +8593,7 @@ async fn run_pop3(
                                 c.save_sender_check(account_id, INBOX, uid, &check);
                             }
                             emit(WorkerEvent::Body { message_id, path: INBOX.to_string(), body });
-                            emit(WorkerEvent::SenderChecked { message_id, check });
+                            emit(WorkerEvent::SenderChecked { path: INBOX.to_string(), message_id, check });
                         }
                         Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &(e).to_string())]))),
                     }
@@ -8609,12 +8613,12 @@ async fn run_pop3(
                 if let Some(c) = cache.as_ref() {
                     let items = c.load_attachments(account_id, INBOX, uid);
                     if !items.is_empty() {
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: INBOX.to_string(), message_id, items });
                         continue;
                     }
                 }
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { message_id });
+                    emit(WorkerEvent::AttachmentsPending { path: INBOX.to_string(), message_id });
                     continue;
                 }
                 match pop3_fetch_raw(&account, uid).await {
@@ -8623,7 +8627,7 @@ async fn run_pop3(
                         if let Some(c) = cache.as_ref() {
                             c.save_attachments(account_id, INBOX, uid, &items);
                         }
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: INBOX.to_string(), message_id, items });
                     }
                     Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &(e).to_string())]))),
                 }
@@ -8894,10 +8898,10 @@ fn demo_attachment_files(message_id: u32) -> Vec<crate::models::Attachment> {
 /// The demo's sender verdict for a message that has a header block: the
 /// real check, run over those headers, so the card's seal and the
 /// Unsubscribe banner appear as they would for fetched mail.
-fn mock_sender_check(message_id: u32, emit: &impl Fn(WorkerEvent)) {
+fn mock_sender_check(path: &str, message_id: u32, emit: &impl Fn(WorkerEvent)) {
     if let Some(raw) = crate::backend::demo_raw(message_id) {
         let check = crate::verify::check_sender(raw.as_bytes());
-        emit(WorkerEvent::SenderChecked { message_id, check });
+        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
     }
 }
 
@@ -8981,8 +8985,14 @@ async fn run_mock(
                 // a fetched body are served with the listing instead.
                 let ids: Vec<u32> = messages.iter().map(|m| m.id).collect();
                 emit(WorkerEvent::Messages { folder_id, messages });
+                let path = backend
+                    .folders(account_id)
+                    .into_iter()
+                    .find(|f| f.id == folder_id)
+                    .map(|f| f.path)
+                    .unwrap_or_default();
                 for id in ids {
-                    mock_sender_check(id, &emit);
+                    mock_sender_check(&path, id, &emit);
                 }
                 // HYLKI_DEMO_SYNC_DELAY=<secs> holds the "been to the server"
                 // signal back, so the progress a long sync shows (the manual
@@ -9004,7 +9014,7 @@ async fn run_mock(
             MailRequest::LoadBody { message_id, ref path, .. } => {
                 let body = backend.message(message_id).map(|m| m.body).unwrap_or_default();
                 emit(WorkerEvent::Body { message_id, path: path.clone(), body });
-                mock_sender_check(message_id, &emit);
+                mock_sender_check(path, message_id, &emit);
             }
             MailRequest::LoadBodies { ref items, ref path } => {
                 for (message_id, _) in items {
@@ -9014,14 +9024,14 @@ async fn run_mock(
                         path: path.clone(),
                         body,
                     });
-                    mock_sender_check(*message_id, &emit);
+                    mock_sender_check(path, *message_id, &emit);
                 }
             }
             MailRequest::LoadSource { message_id, .. } => {
                 let text = backend.message(message_id).map(|m| m.body).unwrap_or_default();
                 emit(WorkerEvent::Source { text });
             }
-            MailRequest::LoadAttachments { message_id, .. } => {
+            MailRequest::LoadAttachments { message_id, ref path, .. } => {
                 // A demo message flagged as carrying attachments gets two
                 // small files, so the reader's per-card rows and the drawer
                 // have something to show (#213).
@@ -9039,7 +9049,7 @@ async fn run_mock(
                 } else {
                     Vec::new()
                 };
-                emit(WorkerEvent::Attachments { message_id, items });
+                emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
             }
             // Mutations are no-ops offline; the UI updates optimistically.
             MailRequest::SetSeen { .. }

@@ -2879,7 +2879,9 @@ pub enum MessageListInput {
     /// A row's tag menu toggled a tag — passed up to the app.
     SetTagFor { message: Box<Message>, keyword: String, add: bool },
     /// Update a message's attachment indicator (e.g. clearing a false paperclip).
-    SetHasAttachment { id: u32, has: bool },
+    /// A message's paperclip, found by where it lives: its own folder and
+    /// UID, since a UID is unique only within its folder.
+    SetHasAttachment { account_id: u32, folder_id: u32, uid: u32, has: bool },
     Remove(u32),
     /// Remove many messages in a single batch (bulk archive/delete/spam), so the
     /// list updates in one render pass instead of one per message.
@@ -4105,11 +4107,12 @@ impl SimpleComponent for MessageList {
             MessageListInput::SetTagFor { message, keyword, add } => {
                 let _ = sender.output(MessageListOutput::SetTag { message, keyword, add });
             }
-            MessageListInput::SetHasAttachment { id, has } => {
-                if let Some(m) = self.all.iter_mut().find(|m| m.id == id) {
+            MessageListInput::SetHasAttachment { account_id, folder_id, uid, has } => {
+                let is = |m: &Message| m.account_id == account_id && m.folder_id == folder_id && m.uid == uid;
+                if let Some(m) = self.all.iter_mut().find(|m| is(m)) {
                     m.has_attachment = has;
                 }
-                if let Some(idx) = self.shown.iter().position(|m| m.id == id) {
+                if let Some(idx) = self.shown.iter().position(|m| is(m)) {
                     self.shown[idx].has_attachment = has;
                     self.row_send(idx, MessageRowInput::SetHasAttachment(has));
                 }

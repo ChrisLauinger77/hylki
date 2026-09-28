@@ -1537,7 +1537,7 @@ fn serve_cached(
     let Some(body) = c.load_body(account_id, path, uid) else { return false };
     emit(WorkerEvent::Body { message_id, path: path.to_string(), body });
     if let Some(check) = c.load_sender_check(account_id, path, uid) {
-        emit(WorkerEvent::SenderChecked { message_id, check });
+        emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
     }
     true
 }
@@ -1563,7 +1563,7 @@ async fn jmap_deliver_body(
                 c.save_sender_check(account_id, path, uid, &check);
             }
             emit(WorkerEvent::Body { message_id, path: path.to_string(), body });
-            emit(WorkerEvent::SenderChecked { message_id, check });
+            emit(WorkerEvent::SenderChecked { path: path.to_string(), message_id, check });
         }
         Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load message: {e}", &[("e", &e)]))),
     }
@@ -1845,12 +1845,12 @@ pub(super) async fn run_jmap(
                 if let Some(c) = cache.as_ref() {
                     let items = c.load_attachments(account_id, &path, uid);
                     if !items.is_empty() {
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                         continue;
                     }
                 }
                 if !download {
-                    emit(WorkerEvent::AttachmentsPending { message_id });
+                    emit(WorkerEvent::AttachmentsPending { path: path.to_string(), message_id });
                     continue;
                 }
                 let Some(s) = jmap_session(&account, &mut state, &emit).await else { continue };
@@ -1860,7 +1860,7 @@ pub(super) async fn run_jmap(
                         if let Some(c) = cache.as_ref() {
                             c.save_attachments(account_id, &path, uid, &items);
                         }
-                        emit(WorkerEvent::Attachments { message_id, items });
+                        emit(WorkerEvent::Attachments { path: path.to_string(), message_id, items });
                     }
                     Err(e) => emit(WorkerEvent::net_error(i18n_f("Could not load attachments: {e}", &[("e", &e)]))),
                 }
