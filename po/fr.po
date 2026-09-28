@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: hylki\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-26 15:13+0200\n"
+"PO-Revision-Date: 2026-09-28 18:38+0200\n"
 "Last-Translator: cartes <cartes341@free.fr>\n"
 "Language-Team: French\n"
 "Language: fr\n"
@@ -948,20 +948,17 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} message non lu"
 msgstr[1] "{n} messages non lus"
 
-#, fuzzy
 msgid "Custom Order"
-msgstr "Fichier personnalisé"
+msgstr "Ordre personnalisé"
 
-#, fuzzy
 msgid "Name (A to Z)"
-msgstr "Nom (A–Z)"
+msgstr "Nom (A à Z)"
 
-#, fuzzy
 msgid "Name (Z to A)"
-msgstr "Nom (Z–A)"
+msgstr "Nom (Z à A)"
 
 msgid "Full Path"
-msgstr ""
+msgstr "Chemin complet"
 
 msgid "Spam"
 msgstr "Spam"
@@ -988,19 +985,21 @@ msgid "{date} at {time}"
 msgstr "{date} à {time}"
 
 msgid "Evolution Data Server is not available"
-msgstr ""
+msgstr "Evolution Data Server n'est pas disponible"
 
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
+"L'annuaire nécessite un mot de passe. Ajoutez-le dans Paramètres → Annuaires "
+"LDAP."
 
 msgid "The directory did not accept the password."
-msgstr ""
+msgstr "L'annuaire n'a pas accepté le mot de passe."
 
 msgid "{used} of {limit} used"
-msgstr ""
+msgstr "{used} sur {limit} utilisés"
 
 msgid "{free} free ({pct}%)"
-msgstr ""
+msgstr "{free} libres ({pct} %)"
 
 msgid "Encrypted message"
 msgstr "Message chiffré"
@@ -1054,46 +1053,37 @@ msgid "Signed by {signer}; the signature has expired"
 msgstr "Signé par {signer} ; la signature a expiré"
 
 msgid "Not decrypted"
-msgstr ""
+msgstr "Non déchiffré"
 
-#, fuzzy
 msgid "Encrypted"
-msgstr "Message chiffré"
+msgstr "Chiffré"
 
-#, fuzzy
 msgid "Signature not checked"
-msgstr "Signature dans les réponses"
+msgstr "Signature non vérifiée"
 
-#, fuzzy
 msgid "Encrypted and signed"
-msgstr "Chiffré et signé par {signer}"
+msgstr "Chiffré et signé"
 
-#, fuzzy
 msgid "Signed"
-msgstr "Signature"
+msgstr "Signé"
 
 msgid "Signed, key not trusted"
-msgstr ""
+msgstr "Signé, clé non fiable"
 
-#, fuzzy
 msgid "Bad signature"
-msgstr "Signature"
+msgstr "Signature invalide"
 
-#, fuzzy
 msgid "Signed, unknown key"
-msgstr "Signé avec la clé {id}."
+msgstr "Signé, clé inconnue"
 
-#, fuzzy
 msgid "Signed, key expired"
-msgstr "Signé avec la clé {id}."
+msgstr "Signé, clé expirée"
 
-#, fuzzy
 msgid "Signed, key revoked"
-msgstr "Signé par : {d}"
+msgstr "Signé, clé révoquée"
 
-#, fuzzy
 msgid "Signature expired"
-msgstr "Signature dans les réponses"
+msgstr "Signature expirée"
 
 msgid "This message hasn't been checked."
 msgstr "Ce message n'a pas été vérifié."
@@ -1382,9 +1372,8 @@ msgstr ""
 msgid "Open Online Accounts…"
 msgstr "Ouvrir Comptes en ligne…"
 
-#, fuzzy
 msgid "Storage"
-msgstr "Stockage en ligne"
+msgstr "Stockage"
 
 msgid "Mail Account"
 msgstr "Compte e-mail"
@@ -1605,18 +1594,18 @@ msgstr ""
 "Supprimer définitivement les e-mails de la corbeille datant d'avant cette "
 "date, vérification à chaque synchronisation."
 
-#, fuzzy
 msgid "Folder Order"
-msgstr "Nom du dossier"
+msgstr "Ordre des dossiers"
 
 msgid ""
 "How this account's folders are sorted in the sidebar. Also in the right-"
 "click menu of its Folders heading."
 msgstr ""
+"Comment les dossiers de ce compte sont triés dans la barre latérale. "
+"Également dans le menu contextuel de son en-tête Dossiers."
 
-#, fuzzy
 msgid "Sort by"
-msgstr "Trier"
+msgstr "Trier par"
 
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
@@ -2862,100 +2851,99 @@ msgid "Add website"
 msgstr "Ajouter un site web"
 
 msgid "LDAP Directories"
-msgstr ""
+msgstr "Annuaires LDAP"
 
 msgid "LDAP directories"
-msgstr ""
+msgstr "Annuaires LDAP"
 
 msgid ""
 "The composer looks up recipients in these directories as you type an "
 "address. They are kept by Evolution Data Server, so a directory set up in "
 "Evolution is listed here too."
 msgstr ""
+"Le compositeur recherche les destinataires dans ces annuaires pendant que "
+"vous saisissez une adresse. Ils sont gérés par Evolution Data Server ; un "
+"annuaire configuré dans Evolution est donc également répertorié ici."
 
-#, fuzzy
 msgid "Add Directory…"
-msgstr "Ajouter un filtre…"
+msgstr "Ajouter un annuaire…"
 
 msgid "No directories yet."
-msgstr ""
+msgstr "Aucun annuaire pour le moment."
 
 msgid "LDAP Directory"
-msgstr ""
+msgstr "Annuaire LDAP"
 
 msgid ""
 "Evolution Data Server, which keeps the directories, is not available on this "
 "system."
 msgstr ""
+"Evolution Data Server, qui gère les annuaires, n'est pas disponible sur ce "
+"système."
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
 "apps that use it stop seeing it too. Nothing on the server changes."
 msgstr ""
+"L'annuaire est supprimé d'Evolution Data Server ; Evolution et les autres "
+"applications qui l'utilisent cessent donc également de le voir. Rien ne "
+"change sur le serveur."
 
-#, fuzzy
 msgid "Connected to {name}"
-msgstr "Déplacer vers {name}"
+msgstr "Connecté à {name}"
 
 msgid "{name} did not answer: {error}"
-msgstr ""
+msgstr "{name} n'a pas répondu : {error}"
 
-#, fuzzy
 msgid "Edit Directory"
-msgstr "Modifier le filtre"
+msgstr "Modifier l'annuaire"
 
-#, fuzzy
 msgid "Add Directory"
-msgstr "Ajouter un filtre"
+msgstr "Ajouter un annuaire"
 
 msgid "Look up recipients in this directory"
-msgstr ""
+msgstr "Rechercher les destinataires dans cet annuaire"
 
-#, fuzzy
 msgid "Server"
-msgstr "Service"
+msgstr "Serveur"
 
-#, fuzzy
 msgid "Encryption"
-msgstr "Message chiffré"
+msgstr "Chiffrement"
 
-#, fuzzy
 msgid "StartTLS"
-msgstr "Ajouter une étoile"
+msgstr "StartTLS"
 
 msgid "TLS (LDAPS)"
-msgstr ""
+msgstr "TLS (LDAPS)"
 
 msgid "Port"
 msgstr "Port"
 
 msgid "Search base, such as dc=example,dc=com"
-msgstr ""
+msgstr "Base de recherche, par exemple dc=example,dc=com"
 
 msgid "Whole tree"
-msgstr ""
+msgstr "Arborescence complète"
 
-#, fuzzy
 msgid "First level"
-msgstr "Prénom"
+msgstr "Premier niveau"
 
-#, fuzzy
 msgid "Sign-in"
-msgstr "Signature"
+msgstr "Connexion"
 
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
-msgstr ""
+msgstr "Laissez ces champs vides pour un annuaire consultable sans connexion."
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr ""
+"Se connecter en tant que, par exemple cn=jane,ou=people,dc=example,dc=com"
 
-#, fuzzy
 msgid "Password (saved; type to replace it)"
-msgstr "Mot de passe (laisser vide pour le conserver)"
+msgstr "Mot de passe (enregistré ; saisissez-en un pour le remplacer)"
 
 msgid "Enter the directory's server."
-msgstr ""
+msgstr "Indiquez le serveur de l'annuaire."
 
 msgid "Attach"
 msgstr "Joindre"
@@ -3438,29 +3426,23 @@ msgstr "La clé de l'expéditeur a été récupérée et importée."
 msgid "The sender's key was already in your keyring."
 msgstr "La clé de l'expéditeur figurait déjà dans votre trousseau de clés."
 
-#, fuzzy
 msgid "Open Link"
-msgstr "Ouvrir les liens dans"
+msgstr "Ouvrir le lien"
 
-#, fuzzy
 msgid "Copy Email Address"
-msgstr "Adresse e-mail"
+msgstr "Copier l'adresse e-mail"
 
-#, fuzzy
 msgid "Copy Link Address"
-msgstr "Adresse e-mail"
+msgstr "Copier l'adresse du lien"
 
-#, fuzzy
 msgid "Save Image As…"
-msgstr "Enregistrer l'image"
+msgstr "Enregistrer l'image sous…"
 
-#, fuzzy
 msgid "Copy Image"
-msgstr "Images"
+msgstr "Copier l'image"
 
-#, fuzzy
 msgid "Copy Image Address"
-msgstr "Adresse e-mail"
+msgstr "Copier l'adresse de l'image"
 
 msgid "Load attachments from server"
 msgstr "Charger les pièces jointes depuis le serveur"
@@ -3870,16 +3852,14 @@ msgstr ""
 "L'éditeur de tag est ouvert. Enregistrez vos modifications, ou annulez-les, "
 "avant de continuer."
 
-#, fuzzy
 msgid "Save the directory?"
-msgstr "Enregistrer le filtre ?"
+msgstr "Enregistrer l'annuaire ?"
 
-#, fuzzy
 msgid ""
 "The directory editor is open. Save what you changed, or discard it, before "
 "moving on."
 msgstr ""
-"L'éditeur de filtre est ouvert. Enregistrez vos modifications, ou annulez-"
+"L'éditeur d'annuaire est ouvert. Enregistrez vos modifications, ou annulez-"
 "les, avant de continuer."
 
 msgid "Save the account?"
@@ -4114,15 +4094,17 @@ msgstr ""
 "ses tags. Désactivé, seule la section unifiée reste affichée. Également "
 "disponible dans le menu principal, et via Ctrl+Maj+A."
 
-#, fuzzy
 msgid "Folder order"
-msgstr "Nom du dossier"
+msgstr "Ordre des dossiers"
 
 msgid ""
 "How each account's folders are sorted. Dragging a folder puts that account "
 "in Custom Order. An account can choose its own in its settings, or from the "
 "right-click menu of its Folders heading."
 msgstr ""
+"Comment les dossiers de chaque compte sont triés. Faire glisser un dossier "
+"place ce compte en Ordre personnalisé. Un compte peut choisir son propre tri "
+"dans ses paramètres, ou depuis le menu contextuel de son en-tête Dossiers."
 
 msgid "Chevron placement"
 msgstr "Emplacement des chevrons"
@@ -4628,12 +4610,15 @@ msgstr ""
 "bouton disparaît complètement."
 
 msgid "Name the OpenPGP result"
-msgstr ""
+msgstr "Nommer le résultat OpenPGP"
 
 msgid ""
 "Beside the sender, say in words whether a message is signed or encrypted and "
 "whether it checks out. Off shows the lock and shield icons alone."
 msgstr ""
+"À côté de l'expéditeur, indiquer en toutes lettres si un message est signé "
+"ou chiffré et si la vérification est concluante. Désactivé n'affiche que les "
+"icônes de cadenas et de bouclier."
 
 msgid "Reader View switch"
 msgstr "Commutateur du mode Lecture"
@@ -4664,14 +4649,15 @@ msgstr ""
 "réponse — détachez-le dans une fenêtre distincte depuis son en-tête. "
 "Désactivé = ouvre directement une fenêtre séparée."
 
-#, fuzzy
 msgid "Reply and forward in the main window"
-msgstr "Rédiger dans la fenêtre principale"
+msgstr "Répondre et transférer dans la fenêtre principale"
 
 msgid ""
 "A reply or a forward opens in the reading pane, beside the message it "
 "answers. Off = open a separate window."
 msgstr ""
+"Une réponse ou un transfert s'ouvre dans le panneau de lecture, à côté du "
+"message concerné. Désactivé = ouvrir une fenêtre séparée."
 
 msgid "Show From, To and Subject in the reply panel"
 msgstr ""
@@ -4740,13 +4726,16 @@ msgstr ""
 "l'ensemble de la conversation."
 
 msgid "Separator line above the signature"
-msgstr ""
+msgstr "Ligne de séparation au-dessus de la signature"
 
 msgid ""
 "Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
 "Mutt use it to dim the signature and to leave it out when they quote your "
 "message."
 msgstr ""
+"Ajoute la ligne standard « -- » au-dessus de la signature. Thunderbird, "
+"Evolution et Mutt s'en servent pour estomper la signature et l'omettre "
+"lorsqu'ils citent votre message."
 
 msgid "Spelling"
 msgstr "Orthographe"
@@ -5312,9 +5301,8 @@ msgstr "Actualiser"
 msgid "New Folder…"
 msgstr "Nouveau dossier…"
 
-#, fuzzy
 msgid "Reset Folder Order"
-msgstr "Renommer le dossier"
+msgstr "Réinitialiser l'ordre des dossiers"
 
 msgid "Account Settings…"
 msgstr "Paramètres du compte…"
@@ -5325,9 +5313,8 @@ msgstr "Supprimer le compte…"
 msgid "Show or hide sub-folders"
 msgstr "Afficher ou masquer les sous-dossiers"
 
-#, fuzzy
 msgid "Show or hide folders"
-msgstr "Afficher ou masquer les sous-dossiers"
+msgstr "Afficher ou masquer les dossiers"
 
 msgid "Folders ({len})"
 msgstr "Dossiers ({len})"
@@ -5335,9 +5322,8 @@ msgstr "Dossiers ({len})"
 msgid "Folders"
 msgstr "Dossiers"
 
-#, fuzzy
 msgid "Sort Folders"
-msgstr "Dossiers"
+msgstr "Trier les dossiers"
 
 msgid "Add Folder"
 msgstr "Ajouter un dossier"
@@ -5357,17 +5343,14 @@ msgstr "Afficher chaque tag"
 msgid "Long-press to expand or collapse"
 msgstr "Appui long pour déplier ou replier"
 
-#, fuzzy
 msgid "Show or hide filters"
-msgstr "Afficher ou masquer les sous-dossiers"
+msgstr "Afficher ou masquer les filtres"
 
-#, fuzzy
 msgid "Show or hide tags"
-msgstr "Afficher ou masquer les sous-dossiers"
+msgstr "Afficher ou masquer les tags"
 
-#, fuzzy
 msgid "Follow Settings: {sort}"
-msgstr "Suivre les paramètres"
+msgstr "Suivre les paramètres : {sort}"
 
 msgid "Apply Filters"
 msgstr "Appliquer des filtres"
