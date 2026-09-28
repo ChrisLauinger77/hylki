@@ -6,7 +6,7 @@ msgstr ""
 "Project-Id-Version: hylki\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
 "POT-Creation-Date: \n"
-"PO-Revision-Date: 2026-09-26 17:02+0200\n"
+"PO-Revision-Date: 2026-09-28 17:02+0200\n"
 "Last-Translator: Christian Lauinger <christian@lauinger-clan.de>\n"
 "Language-Team: German\n"
 "Language: de\n"
@@ -984,19 +984,21 @@ msgid "{date} at {time}"
 msgstr "{date} um {time}"
 
 msgid "Evolution Data Server is not available"
-msgstr ""
+msgstr "Evolution Data Server ist nicht verfügbar"
 
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
+"Für das Verzeichnis ist ein Passwort erforderlich. Fügen Sie es unter "
+"Einstellungen → LDAP-Verzeichnisse hinzu."
 
 msgid "The directory did not accept the password."
-msgstr ""
+msgstr "Das Verzeichnis hat das Passwort nicht akzeptiert."
 
 msgid "{used} of {limit} used"
-msgstr ""
+msgstr "{used} von {limit} verwendet"
 
 msgid "{free} free ({pct}%)"
-msgstr ""
+msgstr "{free} frei ({pct} %)"
 
 msgid "Encrypted message"
 msgstr "Verschlüsselte Nachricht"
@@ -1055,46 +1057,37 @@ msgid "Signed by {signer}; the signature has expired"
 msgstr "Unterzeichnet von {signer}; die Unterschrift ist abgelaufen"
 
 msgid "Not decrypted"
-msgstr ""
+msgstr "Nicht entschlüsselt"
 
-#, fuzzy
 msgid "Encrypted"
-msgstr "Verschlüsselte Nachricht"
+msgstr "Verschlüsselt"
 
-#, fuzzy
 msgid "Signature not checked"
-msgstr "Signatur in Antworten"
+msgstr "Signatur nicht überprüft"
 
-#, fuzzy
 msgid "Encrypted and signed"
-msgstr "Verschlüsselt und signiert von {signer}"
+msgstr "Verschlüsselt und signiert"
 
-#, fuzzy
 msgid "Signed"
-msgstr "Signatur"
+msgstr "Unterzeichnet"
 
 msgid "Signed, key not trusted"
-msgstr ""
+msgstr "Signiert, Schlüssel nicht vertrauenswürdig"
 
-#, fuzzy
 msgid "Bad signature"
-msgstr "Signatur"
+msgstr "Falsche Unterschrift"
 
-#, fuzzy
 msgid "Signed, unknown key"
-msgstr "Signiert mit dem Schlüssel {id}."
+msgstr "Signiert, unbekannter Schlüssel"
 
-#, fuzzy
 msgid "Signed, key expired"
-msgstr "Signiert mit dem Schlüssel {id}."
+msgstr "Signiert, Schlüssel abgelaufen"
 
-#, fuzzy
 msgid "Signed, key revoked"
-msgstr "Unterzeichnet von: {d}"
+msgstr "Signiert, Schlüssel widerrufen"
 
-#, fuzzy
 msgid "Signature expired"
-msgstr "Signatur in Antworten"
+msgstr "Signatur abgelaufen"
 
 msgid "This message hasn't been checked."
 msgstr "Diese Nachricht wurde nicht überprüft."
@@ -1382,9 +1375,8 @@ msgstr ""
 msgid "Open Online Accounts…"
 msgstr "Online-Konten öffnen…"
 
-#, fuzzy
 msgid "Storage"
-msgstr "Cloud-Speicher"
+msgstr "Speicher"
 
 msgid "Mail Account"
 msgstr "E-Mail-Konto"
@@ -1974,7 +1966,7 @@ msgid "Color"
 msgstr "Farbe"
 
 msgid "Custom color…"
-msgstr "Benutzerdefinierte Farbe... "
+msgstr "Benutzerdefinierte Farbe…"
 
 msgid "Tag Color"
 msgstr "Tagfarbe"
@@ -2852,100 +2844,101 @@ msgid "Add website"
 msgstr "Website hinzufügen"
 
 msgid "LDAP Directories"
-msgstr ""
+msgstr "LDAP-Verzeichnisse"
 
 msgid "LDAP directories"
-msgstr ""
+msgstr "LDAP-Verzeichnisse"
 
 msgid ""
 "The composer looks up recipients in these directories as you type an "
 "address. They are kept by Evolution Data Server, so a directory set up in "
 "Evolution is listed here too."
 msgstr ""
+"Der Komponist sucht während der Eingabe einer Adresse in diesen "
+"Verzeichnissen nach Empfängern. Diese werden vom Evolution Data Server "
+"verwaltet, sodass auch ein in Evolution eingerichtetes Verzeichnis hier "
+"aufgeführt wird."
 
-#, fuzzy
 msgid "Add Directory…"
-msgstr "Filter hinzufügen..."
+msgstr "Verzeichnis hinzufügen..."
 
 msgid "No directories yet."
-msgstr ""
+msgstr "Noch keine Verzeichnisse vorhanden."
 
 msgid "LDAP Directory"
-msgstr ""
+msgstr "LDAP-Verzeichnis"
 
 msgid ""
 "Evolution Data Server, which keeps the directories, is not available on this "
 "system."
 msgstr ""
+"Evolution Data Server, der die Verzeichnisse verwaltet, ist auf diesem "
+"System nicht verfügbar."
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
 "apps that use it stop seeing it too. Nothing on the server changes."
 msgstr ""
+"Das Verzeichnis wird aus Evolution Data Server entfernt. Dadurch ist es auch "
+"in Evolution und anderen Anwendungen, die ihn verwenden, nicht mehr "
+"sichtbar. Auf dem Server ändert sich nichts."
 
-#, fuzzy
 msgid "Connected to {name}"
-msgstr "Nach {name} verschieben"
+msgstr "Verbunden mit {name}"
 
 msgid "{name} did not answer: {error}"
-msgstr ""
+msgstr "{name} hat nicht geantwortet: {error}"
 
-#, fuzzy
 msgid "Edit Directory"
-msgstr "Filter bearbeiten"
+msgstr "Verzeichnis bearbeiten"
 
-#, fuzzy
 msgid "Add Directory"
-msgstr "Filter hinzufügen"
+msgstr "Verzeichnis hinzufügen"
 
 msgid "Look up recipients in this directory"
-msgstr ""
+msgstr "Empfänger in diesem Verzeichnis suchen"
 
-#, fuzzy
 msgid "Server"
-msgstr "Dienst"
+msgstr "Server"
 
-#, fuzzy
 msgid "Encryption"
-msgstr "Verschlüsselte Nachricht"
+msgstr "Verschlüsselung"
 
-#, fuzzy
 msgid "StartTLS"
-msgstr "Stern"
+msgstr "StartTLS"
 
 msgid "TLS (LDAPS)"
-msgstr ""
+msgstr "TLS (LDAPS)"
 
 msgid "Port"
 msgstr "Port"
 
 msgid "Search base, such as dc=example,dc=com"
-msgstr ""
+msgstr "Suchbasis, z. B. dc=example,dc=com"
 
 msgid "Whole tree"
-msgstr ""
+msgstr "Gesamter Verzeichnisbaum"
 
-#, fuzzy
 msgid "First level"
-msgstr "Vorname"
+msgstr "Oberste Ebene"
 
-#, fuzzy
 msgid "Sign-in"
-msgstr "Signatur"
+msgstr "Anmelden"
 
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
+"Lassen Sie diese Felder leer, wenn das Verzeichnis ohne Anmeldung durchsucht "
+"werden kann."
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
-msgstr ""
+msgstr "Anmelden als, z. B. cn=jane,ou=people,dc=example,dc=com"
 
-#, fuzzy
 msgid "Password (saved; type to replace it)"
-msgstr "Passwort (leer lassen, um es beizubehalten)"
+msgstr "Passwort (gespeichert; zum Ändern eingeben)"
 
 msgid "Enter the directory's server."
-msgstr ""
+msgstr "Geben Sie den Server des Verzeichnisses ein."
 
 msgid "Attach"
 msgstr "Anhängen"
@@ -3427,29 +3420,23 @@ msgstr "Der Schlüssel des Absenders wurde abgeholt und importiert."
 msgid "The sender's key was already in your keyring."
 msgstr "Der Schlüssel des Absenders war bereits in Ihrem Schlüsselring."
 
-#, fuzzy
 msgid "Open Link"
-msgstr "Links öffnen mit"
+msgstr "Link öffnen"
 
-#, fuzzy
 msgid "Copy Email Address"
-msgstr "E-Mail-Adresse"
+msgstr "E-Mail-Adresse kopieren"
 
-#, fuzzy
 msgid "Copy Link Address"
-msgstr "E-Mail-Adresse"
+msgstr "Link-Adresse kopieren"
 
-#, fuzzy
 msgid "Save Image As…"
-msgstr "Bild speichern"
+msgstr "Bild speichern unter…"
 
-#, fuzzy
 msgid "Copy Image"
-msgstr "Bilder"
+msgstr "Bild kopieren"
 
-#, fuzzy
 msgid "Copy Image Address"
-msgstr "E-Mail-Adresse"
+msgstr "Bildadresse kopieren"
 
 msgid "Load attachments from server"
 msgstr "Anhänge vom Server laden"
@@ -3858,17 +3845,15 @@ msgstr ""
 "Der Tag-Editor ist geöffnet. Speichern Sie, was Sie geändert haben, oder "
 "verwerfen Sie es, bevor Sie fortfahren."
 
-#, fuzzy
 msgid "Save the directory?"
-msgstr "Filter speichern?"
+msgstr "Verzeichnis speichern?"
 
-#, fuzzy
 msgid ""
 "The directory editor is open. Save what you changed, or discard it, before "
 "moving on."
 msgstr ""
-"Der Filter-Editor ist geöffnet. Speichern Sie, was Sie geändert haben, oder "
-"verwerfen Sie es, bevor Sie fortfahren."
+"Der Verzeichniseditor ist geöffnet. Speichern oder verwerfen Sie Ihre "
+"Änderungen, bevor Sie fortfahren."
 
 msgid "Save the account?"
 msgstr "Konto speichern?"
@@ -4612,12 +4597,15 @@ msgstr ""
 "Empfängerchip zu klicken."
 
 msgid "Name the OpenPGP result"
-msgstr ""
+msgstr "OpenPGP-Ergebnis in Worten anzeigen"
 
 msgid ""
 "Beside the sender, say in words whether a message is signed or encrypted and "
 "whether it checks out. Off shows the lock and shield icons alone."
 msgstr ""
+"Neben dem Absender in Worten anzeigen, ob eine Nachricht signiert oder "
+"verschlüsselt ist und ob die Prüfung erfolgreich war. Wenn diese Option "
+"deaktiviert ist, werden nur die Schloss- und Schildsymbole angezeigt."
 
 msgid "Reader View switch"
 msgstr "Schalter für die Leseansicht"
@@ -4723,13 +4711,16 @@ msgstr ""
 "unten folgt es dem gesamten Gespräch."
 
 msgid "Separator line above the signature"
-msgstr ""
+msgstr "Trennzeile oberhalb der Signatur"
 
 msgid ""
 "Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
 "Mutt use it to dim the signature and to leave it out when they quote your "
 "message."
 msgstr ""
+"Fügt die standardmäßige Zeile „-- “ oberhalb der Signatur ein. Thunderbird, "
+"Evolution und Mutt verwenden sie, um die Signatur abgeschwächt darzustellen "
+"und beim Zitieren Ihrer Nachricht auszulassen."
 
 msgid "Spelling"
 msgstr "Rechtschreibung"
