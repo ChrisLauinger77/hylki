@@ -998,6 +998,15 @@ msgstr "Książka adresowa CardDAV"
 msgid "{date} at {time}"
 msgstr "{date} o {time}"
 
+msgid "Evolution Data Server is not available"
+msgstr ""
+
+msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+msgstr ""
+
+msgid "The directory did not accept the password."
+msgstr ""
+
 msgid "{used} of {limit} used"
 msgstr ""
 
@@ -2845,6 +2854,102 @@ msgstr "Dodaj telefon"
 msgid "Add website"
 msgstr "Dodaj witrynę"
 
+msgid "LDAP Directories"
+msgstr ""
+
+msgid "LDAP directories"
+msgstr ""
+
+msgid ""
+"The composer looks up recipients in these directories as you type an "
+"address. They are kept by Evolution Data Server, so a directory set up in "
+"Evolution is listed here too."
+msgstr ""
+
+#, fuzzy
+msgid "Add Directory…"
+msgstr "Dodaj filtr…"
+
+msgid "No directories yet."
+msgstr ""
+
+msgid "LDAP Directory"
+msgstr ""
+
+msgid ""
+"Evolution Data Server, which keeps the directories, is not available on this "
+"system."
+msgstr ""
+
+msgid ""
+"The directory is removed from Evolution Data Server, so Evolution and other "
+"apps that use it stop seeing it too. Nothing on the server changes."
+msgstr ""
+
+#, fuzzy
+msgid "Connected to {name}"
+msgstr "Przenieś do katalogu {name}"
+
+msgid "{name} did not answer: {error}"
+msgstr ""
+
+#, fuzzy
+msgid "Edit Directory"
+msgstr "Modyfikuj filtr"
+
+#, fuzzy
+msgid "Add Directory"
+msgstr "Dodaj filtr"
+
+msgid "Look up recipients in this directory"
+msgstr ""
+
+#, fuzzy
+msgid "Server"
+msgstr "Usługa"
+
+#, fuzzy
+msgid "Encryption"
+msgstr "Wiadomość zaszyfrowana"
+
+#, fuzzy
+msgid "StartTLS"
+msgstr "Oznacz gwiazdką"
+
+msgid "TLS (LDAPS)"
+msgstr ""
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Search base, such as dc=example,dc=com"
+msgstr ""
+
+msgid "Whole tree"
+msgstr ""
+
+#, fuzzy
+msgid "First level"
+msgstr "Imię"
+
+#, fuzzy
+msgid "Sign-in"
+msgstr "Podpis"
+
+msgid ""
+"Leave these empty for a directory that can be searched without signing in."
+msgstr ""
+
+msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
+msgstr ""
+
+#, fuzzy
+msgid "Password (saved; type to replace it)"
+msgstr "Hasło (pozostaw puste, aby zachować obecne)"
+
+msgid "Enter the directory's server."
+msgstr ""
+
 msgid "Attach"
 msgstr "Załącz"
 
@@ -3763,6 +3868,18 @@ msgid ""
 msgstr ""
 "Edytor etykiety jest otwarty. Przed przejściem dalej zapisz wprowadzone "
 "zmiany lub je odrzuć."
+
+#, fuzzy
+msgid "Save the directory?"
+msgstr "Czy zapisać filtr?"
+
+#, fuzzy
+msgid ""
+"The directory editor is open. Save what you changed, or discard it, before "
+"moving on."
+msgstr ""
+"Edytor filtru jest otwarty. Przed przejściem dalej zapisz wprowadzone zmiany "
+"lub je odrzuć."
 
 msgid "Save the account?"
 msgstr "Czy zapisać konto?"
@@ -5399,9 +5516,6 @@ msgstr "Kontynuuj"
 
 msgid "Sign In & Add"
 msgstr "Zaloguj się i dodaj"
-
-msgid "Port"
-msgstr "Port"
 
 msgid "Enter your email address and password first."
 msgstr "Najpierw wprowadź adres e-mail i hasło."

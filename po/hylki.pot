@@ -915,6 +915,15 @@ msgstr ""
 msgid "{date} at {time}"
 msgstr ""
 
+msgid "Evolution Data Server is not available"
+msgstr ""
+
+msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+msgstr ""
+
+msgid "The directory did not accept the password."
+msgstr ""
+
 msgid "{used} of {limit} used"
 msgstr ""
 
@@ -2553,6 +2562,92 @@ msgstr ""
 msgid "Add website"
 msgstr ""
 
+msgid "LDAP Directories"
+msgstr ""
+
+msgid "LDAP directories"
+msgstr ""
+
+msgid ""
+"The composer looks up recipients in these directories as you type an "
+"address. They are kept by Evolution Data Server, so a directory set up in "
+"Evolution is listed here too."
+msgstr ""
+
+msgid "Add Directory…"
+msgstr ""
+
+msgid "No directories yet."
+msgstr ""
+
+msgid "LDAP Directory"
+msgstr ""
+
+msgid ""
+"Evolution Data Server, which keeps the directories, is not available on this "
+"system."
+msgstr ""
+
+msgid ""
+"The directory is removed from Evolution Data Server, so Evolution and other "
+"apps that use it stop seeing it too. Nothing on the server changes."
+msgstr ""
+
+msgid "Connected to {name}"
+msgstr ""
+
+msgid "{name} did not answer: {error}"
+msgstr ""
+
+msgid "Edit Directory"
+msgstr ""
+
+msgid "Add Directory"
+msgstr ""
+
+msgid "Look up recipients in this directory"
+msgstr ""
+
+msgid "Server"
+msgstr ""
+
+msgid "Encryption"
+msgstr ""
+
+msgid "StartTLS"
+msgstr ""
+
+msgid "TLS (LDAPS)"
+msgstr ""
+
+msgid "Port"
+msgstr ""
+
+msgid "Search base, such as dc=example,dc=com"
+msgstr ""
+
+msgid "Whole tree"
+msgstr ""
+
+msgid "First level"
+msgstr ""
+
+msgid "Sign-in"
+msgstr ""
+
+msgid ""
+"Leave these empty for a directory that can be searched without signing in."
+msgstr ""
+
+msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr ""
+
+msgid "Enter the directory's server."
+msgstr ""
+
 msgid "Attach"
 msgstr ""
 
@@ -3388,6 +3483,14 @@ msgstr ""
 msgid ""
 "The tag editor is open. Save what you changed, or discard it, before moving "
 "on."
+msgstr ""
+
+msgid "Save the directory?"
+msgstr ""
+
+msgid ""
+"The directory editor is open. Save what you changed, or discard it, before "
+"moving on."
 msgstr ""
 
 msgid "Save the account?"
@@ -4765,9 +4868,6 @@ msgid "Continue"
 msgstr ""
 
 msgid "Sign In & Add"
-msgstr ""
-
-msgid "Port"
 msgstr ""
 
 msgid "Enter your email address and password first."
