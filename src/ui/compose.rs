@@ -269,6 +269,14 @@ pub struct Compose {
     outbox_origin: Option<u32>,
     /// Recipient suggestions, filtered as the user types.
     suggestions: Vec<Suggestion>,
+    /// Whether an LDAP directory is switched on (#307), found once the
+    /// composer opens; without one, typing asks nothing.
+    directories: bool,
+    /// What the directories answered for the recipient being typed.
+    directory_matches: Vec<Suggestion>,
+    /// Bumped on every keystroke, so a slow directory's answer to an
+    /// earlier fragment is dropped.
+    directory_generation: u64,
     /// Shared autocomplete popover and which field it's currently attached to.
     completion: gtk::Popover,
     completion_field: Option<Field>,
@@ -466,6 +474,11 @@ pub enum ComposeInput {
     OpenContacts,
     /// The given recipient field changed — refresh autocomplete.
     Suggest(Field),
+    /// Whether any LDAP directory is switched on (#307).
+    DirectoriesKnown(bool),
+    /// The typing paused: ask the directories, unless it went on since.
+    DirectoryLookup { field: Field, token: String, generation: u64 },
+    DirectoryResults { field: Field, token: String, generation: u64, matches: Vec<Suggestion> },
     /// Addresses just sent to from another composer: into this one's
     /// suggestions at once, without waiting for a reopen.
     AddSuggestions(Vec<Suggestion>),
@@ -1007,6 +1020,9 @@ impl Component for Compose {
             attachments: prefill_attachments,
             attach_thumbs: Default::default(),
             suggestions,
+            directories: false,
+            directory_matches: Vec::new(),
+            directory_generation: 0,
             completion,
             completion_field: None,
             completion_list: None,
@@ -1253,6 +1269,14 @@ impl Component for Compose {
                     }
                 });
             }
+        }
+
+        {
+            let s = sender.input_sender().clone();
+            std::thread::spawn(move || {
+                let any = crate::directory::list().is_ok_and(|d| d.iter().any(|d| d.enabled));
+                let _ = s.send(ComposeInput::DirectoriesKnown(any));
+            });
         }
 
         // Wire autocomplete *after* prefilling, so the initial text doesn't pop it.
@@ -1940,7 +1964,44 @@ impl Component for Compose {
                     Field::Cc => &widgets.cc_row,
                     Field::Bcc => &widgets.bcc_row,
                 };
+                self.directory_generation = self.directory_generation.wrapping_add(1);
+                self.directory_matches.clear();
+                let token = recipient_token(row);
+                if self.directories && token.chars().count() >= crate::directory::MIN_QUERY {
+                    // A directory is asked once the typing pauses, not per key.
+                    let generation = self.directory_generation;
+                    let s = sender.input_sender().clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                        let _ = s.send(ComposeInput::DirectoryLookup { field, token, generation });
+                    });
+                }
                 self.show_completion(field, row);
+            }
+
+            ComposeInput::DirectoriesKnown(any) => self.directories = any,
+
+            ComposeInput::DirectoryLookup { field, token, generation } => {
+                if generation == self.directory_generation {
+                    let s = sender.input_sender().clone();
+                    std::thread::spawn(move || {
+                        let matches = crate::directory::search(&token);
+                        let _ = s.send(ComposeInput::DirectoryResults { field, token, generation, matches });
+                    });
+                }
+            }
+
+            ComposeInput::DirectoryResults { field, token, generation, matches } => {
+                let row = match field {
+                    Field::To => &widgets.to_row,
+                    Field::Cc => &widgets.cc_row,
+                    Field::Bcc => &widgets.bcc_row,
+                };
+                if generation == self.directory_generation && recipient_token(row) == token && !matches.is_empty() {
+                    self.directory_matches = matches;
+                    if recipient_focused(row) {
+                        self.show_completion(field, row);
+                    }
+                }
             }
 
             ComposeInput::AddSuggestions(new) => {
@@ -2350,6 +2411,17 @@ impl Compose {
         let q = token.to_lowercase();
         let mut matches: Vec<Suggestion> =
             self.suggestions.iter().filter(|s| s.matches(token)).cloned().collect();
+        // A directory matched on attributes the entry may not show (a
+        // surname under a display name), so its answers are not filtered
+        // again; one already known from Contacts or mail is not repeated.
+        let known: std::collections::HashSet<String> = matches.iter().map(|s| s.email.to_lowercase()).collect();
+        let mut seen = std::collections::HashSet::new();
+        matches.extend(
+            self.directory_matches
+                .iter()
+                .filter(|s| !known.contains(&s.email.to_lowercase()) && seen.insert(s.email.to_lowercase()))
+                .cloned(),
+        );
         matches.sort_by(|a, b| {
             let pa = a.email.to_lowercase().starts_with(&q) || a.name.to_lowercase().starts_with(&q);
             let pb = b.email.to_lowercase().starts_with(&q) || b.name.to_lowercase().starts_with(&q);
@@ -2880,6 +2952,20 @@ fn cloud_upload_dialog(
 
 /// The GtkText embedded somewhere inside a composite row — where Pango
 /// attributes (the spell-check underlines) actually live.
+/// The recipient being typed: the part of the field after the last comma.
+fn recipient_token(row: &adw::EntryRow) -> String {
+    row.text().rsplit(',').next().unwrap_or("").trim().to_string()
+}
+
+/// Whether the field has the keyboard. An EntryRow holds its focus in the
+/// GtkText inside it, so the row's own has_focus() is never true.
+fn recipient_focused(row: &adw::EntryRow) -> bool {
+    row.root()
+        .and_downcast::<gtk::Window>()
+        .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w))
+        .is_some_and(|focus| focus == *row.upcast_ref::<gtk::Widget>() || focus.is_ancestor(row))
+}
+
 fn inner_text(widget: &gtk::Widget) -> Option<gtk::Text> {
     if let Some(t) = widget.downcast_ref::<gtk::Text>() {
         return Some(t.clone());

@@ -9,6 +9,7 @@ pub mod compose;
 pub mod contacts_browser;
 pub mod contacts_page;
 pub mod context_menu;
+pub mod directories;
 pub mod drop_zones;
 pub mod folder_picker;
 pub mod grab_pill;

@@ -378,10 +378,12 @@ pub struct Preferences {
     identities: Vec<(String, String)>,
     /// The Cloud Storage page (#144), likewise.
     cloud: Option<Controller<crate::ui::cloud_accounts::CloudAccounts>>,
+    /// The LDAP Directories page (#307), likewise.
+    directories: Option<Controller<crate::ui::directories::Directories>>,
     /// The account editor is up in the accounts slot: leaving it for another
     /// category asks about the unsaved changes first.
     editor_open: bool,
-    /// Which side page's editor is up: "accounts" or "cloud".
+    /// Which side page's editor is up: "accounts", "cloud" or "directories".
     editor_page: &'static str,
     /// The GNOME Files extension (#188): installed, loaded, loader present.
     nautilus: crate::nautilus_ext::State,
@@ -663,6 +665,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "senders", title: i18n_noop("Senders"), icon: "contact-new-symbolic", accounts: true },
             SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "channel-secure-symbolic", accounts: false },
             SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "cloud-symbolic", accounts: false },
+            SidePage { id: "directories", title: i18n_noop("LDAP Directories"), icon: "x-office-address-book-symbolic", accounts: false },
         ],
     ),
     (
@@ -915,6 +918,8 @@ pub enum PrefInput {
     EditorOpen(Option<&'static str>),
     /// The Cloud Storage page's account editor is up (or gone).
     CloudEditorOpen(bool),
+    /// The LDAP Directories page's editor is up (or gone).
+    DirectoriesEditorOpen(bool),
 }
 
 #[derive(Debug)]
@@ -1364,6 +1369,10 @@ impl Preferences {
                 i18n("Save the tag?"),
                 i18n("The tag editor is open. Save what you changed, or discard it, before moving on."),
             ),
+            "directories" => (
+                i18n("Save the directory?"),
+                i18n("The directory editor is open. Save what you changed, or discard it, before moving on."),
+            ),
             _ => (
                 i18n("Save the account?"),
                 i18n("The account editor is open. Save what you changed, or discard it, before moving on."),
@@ -1380,15 +1389,21 @@ impl Preferences {
         let s = sender.clone();
         let accounts = self.accounts_sender.clone();
         let cloud = self.cloud.as_ref().map(|c| c.sender().clone());
+        let directories = self.directories.as_ref().map(|c| c.sender().clone());
         let editor_page = self.editor_page;
         let id = id.to_string();
         dialog.connect_response(None, move |_, resp| {
             let cloud_editor = editor_page == "cloud";
+            let directories_editor = editor_page == "directories";
             match resp {
                 "save" => {
                     if cloud_editor {
                         if let Some(c) = &cloud {
                             let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::SaveClicked);
+                        }
+                    } else if directories_editor {
+                        if let Some(d) = &directories {
+                            let _ = d.send(crate::ui::directories::DirectoriesInput::SaveClicked);
                         }
                     } else {
                         let _ = accounts.send(crate::ui::accounts::AccountsInput::SaveOpenPage);
@@ -1399,6 +1414,10 @@ impl Preferences {
                     if cloud_editor {
                         if let Some(c) = &cloud {
                             let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::CloseEditor);
+                        }
+                    } else if directories_editor {
+                        if let Some(d) = &directories {
+                            let _ = d.send(crate::ui::directories::DirectoriesInput::CloseEditor);
                         }
                     } else {
                         let _ = accounts.send(crate::ui::accounts::AccountsInput::CloseEditor);
@@ -1496,7 +1515,7 @@ impl Component for Preferences {
             set_default_width: 920,
             // The same size every time: the two-pane layout (#141) fits its
             // sidebar at this height, and nothing is remembered from a resize.
-            set_default_height: 810,
+            set_default_height: 848,
             set_title: Some(i18n("Settings").as_str()),
             // Closing hides: the window is kept and shown again next time.
             set_hide_on_close: true,
@@ -1590,6 +1609,10 @@ impl Component for Preferences {
                             // Cloud attachment accounts (#144), its own component.
                             #[name = "cloud_slot"]
                             add_named[Some("cloud")] = &adw::Bin {},
+
+                            // LDAP directories (#307), their own component.
+                            #[name = "directories_slot"]
+                            add_named[Some("directories")] = &adw::Bin {},
 
                             add_named[Some("general")] = &adw::PreferencesPage {
                                 add = &adw::PreferencesGroup {
@@ -3326,6 +3349,7 @@ impl Component for Preferences {
             pgp_keys: None,
             identities: init.identities.clone(),
             cloud: None,
+            directories: None,
             editor_open: false,
             editor_page: "accounts",
         };
@@ -3983,6 +4007,13 @@ impl Component for Preferences {
             });
         widgets.cloud_slot.set_child(Some(cloud.widget()));
         model.cloud = Some(cloud);
+        let directories = crate::ui::directories::Directories::builder()
+            .launch(())
+            .forward(sender.input_sender(), |o| match o {
+                crate::ui::directories::DirectoriesOutput::EditorOpen(open) => PrefInput::DirectoriesEditorOpen(open),
+            });
+        widgets.directories_slot.set_child(Some(directories.widget()));
+        model.directories = Some(directories);
         // The sidebar (#141): a heading per section, a row per category.
         tracing::debug!("settings window: prefs tail D (before sidebar rows) at {:?}", t_init.elapsed());
         for (section, pages) in SIDE_PAGES {
@@ -4579,6 +4610,13 @@ impl Component for Preferences {
             PrefInput::CloudEditorOpen(open) => {
                 self.editor_open = open;
                 self.editor_page = "cloud";
+                if let Some(header) = &self.host_header {
+                    header.set_visible(!open);
+                }
+            }
+            PrefInput::DirectoriesEditorOpen(open) => {
+                self.editor_open = open;
+                self.editor_page = "directories";
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);
                 }

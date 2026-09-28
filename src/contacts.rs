@@ -488,7 +488,7 @@ fn find_dbs(root: &std::path::Path, file: &str) -> Vec<PathBuf> {
 /// Extract the display name (`FN`) from a vCard, preserving its capitalisation.
 /// Handles line folding (a CRLF/LF followed by a space or tab continues the
 /// previous line) and the standard text escapes.
-fn unfold_vcard(vcard: &str) -> String {
+pub(crate) fn unfold_vcard(vcard: &str) -> String {
     vcard
         .replace("\r\n ", "")
         .replace("\r\n\t", "")
@@ -501,7 +501,7 @@ fn unfold_vcard(vcard: &str) -> String {
 /// breaks on quoted parameter values — iCloud's photo lines carry
 /// `X-EVOLUTION-WEBDAV-IMG-URL="https://…"` before the real value, and the
 /// `https:` inside the quotes swallowed everything after it.
-fn split_vcard_line(line: &str) -> Option<(&str, &str)> {
+pub(crate) fn split_vcard_line(line: &str) -> Option<(&str, &str)> {
     let mut in_quotes = false;
     for (i, ch) in line.char_indices() {
         match ch {
@@ -631,7 +631,7 @@ fn confine_to_roots(path: &std::path::Path, roots: &[PathBuf]) -> Option<PathBuf
 
 /// Unescape a vCard TEXT value: `\n`/`\N` → newline, `\,` → `,`, `\;` → `;`,
 /// `\\` → `\`.
-fn unescape_vcard_text(s: &str) -> String {
+pub(crate) fn unescape_vcard_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars();
     while let Some(c) = chars.next() {
@@ -750,7 +750,7 @@ fn source_display_name(uid: &str) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 /// Discover the versioned AddressBook factory bus name (e.g. `…AddressBook10`).
-fn factory_dest() -> Option<String> {
+pub(crate) fn factory_dest() -> Option<String> {
     let dir = std::path::Path::new("/usr/share/dbus-1/services");
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -769,10 +769,10 @@ fn factory_dest() -> Option<String> {
 
 const FACTORY_PATH: &str = "/org/gnome/evolution/dataserver/AddressBookFactory";
 const FACTORY_IFACE: &str = "org.gnome.evolution.dataserver.AddressBookFactory";
-const BOOK_IFACE: &str = "org.gnome.evolution.dataserver.AddressBook";
+pub(crate) const BOOK_IFACE: &str = "org.gnome.evolution.dataserver.AddressBook";
 
 /// Open a book by source UID; returns (bus_name, object_path) for the book.
-fn open_book(
+pub(crate) fn open_book(
     conn: &zbus::blocking::Connection,
     dest: &str,
     uid: &str,
@@ -964,6 +964,24 @@ impl ContactDetails {
 /// never written to disk. `None` when the registry can't be reached (then
 /// keep everything rather than hide it all).
 fn registry_books() -> Option<HashMap<String, String>> {
+    let sources: HashMap<String, String> =
+        registry_sources()?.into_iter().map(|(_, uid, data)| (uid, data)).collect();
+    let mut books = HashMap::new();
+    for (uid, data) in &sources {
+        // An address book, and not switched off (GOA sets the book source's
+        // [Data Source] Enabled=false when Contacts is toggled off for the
+        // account). Only that section's Enabled counts — other sections
+        // (Refresh etc.) have Enabled keys of their own.
+        if data.contains("[Address Book]") && !data_source_disabled(data) {
+            books.insert(uid.clone(), book_display_name(data, &sources));
+        }
+    }
+    Some(books)
+}
+
+/// Every source the EDS registry holds: (object path, UID, key file).
+/// `None` when the registry can't be reached.
+pub(crate) fn registry_sources() -> Option<Vec<(String, String, String)>> {
     let dest = sources_dest()?;
     let conn = zbus::blocking::Connection::session().ok()?;
     let reply = conn
@@ -978,8 +996,8 @@ fn registry_books() -> Option<HashMap<String, String>> {
     type Props = HashMap<String, zbus::zvariant::OwnedValue>;
     type Objects = HashMap<zbus::zvariant::OwnedObjectPath, HashMap<String, Props>>;
     let (objects,): (Objects,) = reply.body().deserialize().ok()?;
-    let mut sources: HashMap<String, String> = HashMap::new();
-    for ifaces in objects.values() {
+    let mut sources = Vec::new();
+    for (path, ifaces) in &objects {
         let Some(props) = ifaces.get("org.gnome.evolution.dataserver.Source") else {
             continue;
         };
@@ -988,20 +1006,10 @@ fn registry_books() -> Option<HashMap<String, String>> {
         let data =
             props.get("Data").and_then(|v| v.downcast_ref::<&str>().ok()).map(str::to_string);
         if let (Some(uid), Some(data)) = (uid, data) {
-            sources.insert(uid, data);
+            sources.push((path.to_string(), uid, data));
         }
     }
-    let mut books = HashMap::new();
-    for (uid, data) in &sources {
-        // An address book, and not switched off (GOA sets the book source's
-        // [Data Source] Enabled=false when Contacts is toggled off for the
-        // account). Only that section's Enabled counts — other sections
-        // (Refresh etc.) have Enabled keys of their own.
-        if data.contains("[Address Book]") && !data_source_disabled(data) {
-            books.insert(uid.clone(), book_display_name(data, &sources));
-        }
-    }
-    Some(books)
+    Some(sources)
 }
 
 /// A book's friendly name: which account it belongs to and over what — walked
@@ -1033,6 +1041,8 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
         (Some("google"), None) => "Google".to_string(),
         (Some("microsoft365"), Some(a)) => format!("Microsoft 365 — {a}"),
         (Some("microsoft365"), None) => "Microsoft 365".to_string(),
+        (Some("ldap"), Some(a)) => format!("LDAP — {a}"),
+        (Some("ldap"), None) => "LDAP".to_string(),
         (_, Some(a)) => format!("CardDAV — {a}"),
         (_, None) => i18n("CardDAV Address Book"),
     }
@@ -1044,7 +1054,7 @@ fn data_source_disabled(data: &str) -> bool {
 }
 
 /// Discover the versioned Sources registry bus name (e.g. `…Sources5`).
-fn sources_dest() -> Option<String> {
+pub(crate) fn sources_dest() -> Option<String> {
     let dir = std::path::Path::new("/usr/share/dbus-1/services");
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().to_string();

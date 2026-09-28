@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Added: recipients from LDAP directories** (#307, requested by Isak
+  Samsten, whose branch the composer's lookup is based on). Settings → LDAP
+  Directories adds a company directory: server, encryption, search base and,
+  when the directory needs one, who to sign in as and a password. Typing
+  three characters of a name or address in To, Cc or Bcc asks every
+  directory that is switched on, and the people it finds join the
+  suggestions. Directories are Evolution Data Server address books, the
+  same kind Evolution makes, so Hylki carries no LDAP client of its own and
+  a directory set up in Evolution is listed and searched too. Saving checks
+  the connection and reports a refused password or an unreachable server.
 - **Fixed: some senders' names showed with backslashes and quotes** (#312,
   reported by mfschumann), as `\"Sender Name\"` in the message list and the
   reader. Some IMAP servers pass the quotes around a name in the From header

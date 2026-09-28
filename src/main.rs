@@ -14,6 +14,7 @@ mod console_log;
 mod contacts;
 mod datefmt;
 mod desktop;
+mod directory;
 mod goa;
 mod i18n;
 mod icon_fallback;

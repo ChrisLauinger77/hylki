@@ -82,6 +82,10 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   longer asks for root; and a long run of requests and design feedback that
   shaped tags, split replies, the reader's own font and colours, Empty Trash
   and the reply panel's fields.
+- [**Isak Samsten**](https://github.com/isaksamsten) ([#307](https://github.com/hyprlab/hylki/issues/307)):
+  recipient lookups in LDAP directories. The composer asks the directories
+  as an address is typed, once the typing pauses, and drops an answer that
+  arrives for text since changed, as the #307 branch did.
 
 
 ## Reports, design and ideas
