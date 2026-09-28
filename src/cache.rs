@@ -178,7 +178,11 @@ CREATE INDEX IF NOT EXISTS attachment_meta_by_folder
 /// check stored by an earlier build knows nothing of them, and a cached
 /// body is served without ever re-fetching — so the derived tables are
 /// dropped once and every message read again gains its Unsubscribe banner.
-const SCHEMA_VERSION: i64 = 19;
+/// v20: sender names and subjects were stored with the backslash escapes of
+/// the server's quoted string, and a name with the header's own quotes
+/// around it (#312). The rows are cleaned in place, see
+/// [`Cache::clean_quoted_names`].
+const SCHEMA_VERSION: i64 = 20;
 
 /// The newest version whose change altered how bodies are *rendered* or how
 /// senders are checked. Opening a database older than this drops `bodies` and
@@ -566,6 +570,9 @@ impl Cache {
         if upgrading_index {
             Self::redecode_encoded_subjects(&conn);
         }
+        if upgrading_index && version < 20 {
+            Self::clean_quoted_names(&conn);
+        }
         // `attachment_meta` is the gallery's record of every attachment that
         // *exists*; `attachments` holds the few whose bytes were downloaded.
         // Seed the first from the second so files already in hand keep showing
@@ -644,6 +651,55 @@ impl Cache {
                     "UPDATE messages SET subject = ?1 \
                      WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
                     params![decoded, account_id, folder_path, uid],
+                );
+            }
+        }
+    }
+
+    /// Clean the names and subjects an earlier build stored as the server
+    /// quoted them (#312). Only rows holding a backslash or a leading quote
+    /// are read, which is a handful in a large mailbox.
+    fn clean_quoted_names(conn: &Connection) {
+        let rows: Vec<(i64, String, String)> = {
+            let Ok(mut stmt) = conn.prepare(
+                "SELECT rowid, from_name, subject FROM messages \
+                 WHERE from_name LIKE '%\\%' OR from_name LIKE '\"%' OR subject LIKE '%\\%'",
+            ) else {
+                return;
+            };
+            let Ok(mapped) = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))) else {
+                return;
+            };
+            mapped.flatten().collect()
+        };
+        for (rowid, name, subject) in rows {
+            let clean_name = crate::worker::clean_display_name(&name);
+            let clean_subject = crate::worker::unescape_quoted_str(&subject);
+            if clean_name != name || clean_subject != subject {
+                let _ = conn.execute(
+                    "UPDATE messages SET from_name = ?1, subject = ?2 WHERE rowid = ?3",
+                    params![clean_name, clean_subject, rowid],
+                );
+            }
+        }
+        // A reply to such a sender recorded the name as it was shown.
+        let names: Vec<(String, String)> = {
+            let Ok(mut stmt) =
+                conn.prepare("SELECT email, name FROM addresses WHERE name LIKE '%\\%' OR name LIKE '\"%'")
+            else {
+                return;
+            };
+            let Ok(mapped) = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))) else {
+                return;
+            };
+            mapped.flatten().collect()
+        };
+        for (email, name) in names {
+            let clean = crate::worker::clean_display_name(&name);
+            if clean != name {
+                let _ = conn.execute(
+                    "UPDATE addresses SET name = ?1 WHERE email = ?2",
+                    params![clean, email],
                 );
             }
         }
@@ -2720,6 +2776,28 @@ mod tests {
             .query_row("SELECT subject FROM messages WHERE uid = 2", [], |r| r.get(0))
             .unwrap();
         assert_eq!(plain, "Already fine");
+    }
+
+    #[test]
+    fn clean_quoted_names_strips_the_escapes_in_place() {
+        let c = Cache::in_memory().unwrap();
+        add_folder(&c, "INBOX", FolderKind::Inbox);
+        add_msg(&c, "INBOX", 1, r#"\"Sender Name\""#, r#"Re: \"Plans\""#, 100);
+        add_msg(&c, "INBOX", 2, "Plain Name", "Already fine", 200);
+
+        Cache::clean_quoted_names(&c.conn);
+
+        let row = |uid: u32| -> (String, String) {
+            c.conn
+                .query_row(
+                    "SELECT from_name, subject FROM messages WHERE uid = ?1",
+                    [uid],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .unwrap()
+        };
+        assert_eq!(row(1), ("Sender Name".to_string(), r#"Re: "Plans""#.to_string()));
+        assert_eq!(row(2), ("Plain Name".to_string(), "Already fine".to_string()));
     }
 
     /// Insert a message carrying threading headers.

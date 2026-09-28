@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixed: some senders' names showed with backslashes and quotes** (#312,
+  reported by mfschumann), as `\"Sender Name\"` in the message list and the
+  reader. Some IMAP servers pass the quotes around a name in the From header
+  on to the app, escaped with backslashes, and the backslashes were kept.
+  Names and subjects are now read without them, and names already stored
+  are cleaned when the new version first opens the mail cache.
 - **Fixed: a message sometimes opened showing another message's text.** The
   bodies kept in memory were filed by message number, and the number is only
   unique within a folder, so a message in Sent could replace the text of the

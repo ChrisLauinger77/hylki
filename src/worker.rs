@@ -7830,7 +7830,7 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
         .unwrap_or_else(|| ("Unknown".to_string(), String::new()));
     let subject = env
         .and_then(|e| e.subject.as_deref())
-        .map(decode_header)
+        .map(|s| decode_header(&unescape_quoted(s)))
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "(no subject)".to_string());
     let (date, timestamp) = env
@@ -9200,10 +9200,55 @@ fn address_parts(addr: &async_imap::imap_proto::types::Address) -> (String, Stri
     let name = addr
         .name
         .as_deref()
-        .map(decode_header)
+        .map(|n| clean_display_name(&decode_header(&unescape_quoted(n))))
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| email.clone());
     (name, email)
+}
+
+/// Undo an IMAP quoted string's backslash escapes. imap-proto hands ENVELOPE
+/// strings back as they were on the wire, so a server that keeps the header's
+/// own quotes sends `"\"Sender Name\""` and the backslashes would reach the
+/// list (#312).
+fn unescape_quoted(raw: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(raw.len());
+    let mut bytes = raw.iter().copied().peekable();
+    while let Some(b) = bytes.next() {
+        // Only the two escapes a quoted string has: a backslash before
+        // anything else came in a literal and is the name's own.
+        match bytes.peek() {
+            Some(&next @ (b'\\' | b'"')) if b == b'\\' => {
+                out.push(next);
+                bytes.next();
+            }
+            _ => out.push(b),
+        }
+    }
+    out
+}
+
+/// [`unescape_quoted`] for a string already stored.
+pub(crate) fn unescape_quoted_str(s: &str) -> String {
+    if s.contains('\\') {
+        String::from_utf8_lossy(&unescape_quoted(s.as_bytes())).into_owned()
+    } else {
+        s.to_string()
+    }
+}
+
+/// A display name without the quotes its header wrapped it in. RFC 3501 has
+/// the server give the phrase alone, but some pass `"Sender Name"` through
+/// whole (#312). Called on stored names too, which may still carry the
+/// escapes an earlier build kept.
+pub(crate) fn clean_display_name(name: &str) -> String {
+    let name = unescape_quoted_str(name);
+    let trimmed = name.trim();
+    trimmed
+        .strip_prefix('"')
+        .and_then(|n| n.strip_suffix('"'))
+        .map(str::trim)
+        .unwrap_or(trimmed)
+        .to_string()
 }
 
 fn bytes_to_string(b: &[u8]) -> String {
@@ -9829,6 +9874,36 @@ pub(super) fn sample_account() -> AccountConfig {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn envelope_names_lose_the_quotes_a_server_kept() {
+        // #312: the name as imap-proto hands it back, escapes and all.
+        let name = clean_display_name(&decode_header(&unescape_quoted(br#"\"Sender Name\""#)));
+        assert_eq!(name, "Sender Name");
+        let inner = clean_display_name(&decode_header(&unescape_quoted(br#"Ann \"Nan\" Lee"#)));
+        assert_eq!(inner, r#"Ann "Nan" Lee"#);
+        assert_eq!(clean_display_name("Plain Name"), "Plain Name");
+        // A backslash that escapes nothing is the name's own.
+        assert_eq!(unescape_quoted(br"DOM\user"), br"DOM\user".to_vec());
+        assert_eq!(unescape_quoted(br#"a\\\""#), br#"a\""#.to_vec());
+        // A name an earlier build stored with the escapes still in it.
+        assert_eq!(clean_display_name(r#"\"Sender Name\""#), "Sender Name");
+    }
+
+    #[test]
+    fn envelope_name_with_the_headers_quotes_parses_clean() {
+        use async_imap::imap_proto::{AttributeValue, Response};
+        let line = b"* 1 FETCH (ENVELOPE (NIL \"S\" ((\"\\\"Sender Name\\\"\" NIL \"some\" \"mail.tld\")) \
+NIL NIL NIL NIL NIL NIL NIL))\r\n";
+        let (_, resp) = async_imap::imap_proto::parser::parse_response(line).unwrap();
+        let Response::Fetch(_, attrs) = resp else { panic!("not a FETCH") };
+        let Some(AttributeValue::Envelope(env)) = attrs.first() else { panic!("no ENVELOPE") };
+        let from = env.from.as_ref().unwrap();
+        assert_eq!(
+            address_parts(&from[0]),
+            ("Sender Name".to_string(), "some@mail.tld".to_string())
+        );
+    }
 
     #[test]
     fn imap_storage_quota_reads_kibibytes() {
