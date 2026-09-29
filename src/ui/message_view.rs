@@ -3578,14 +3578,14 @@ impl MessageView {
                                 read_svg = inline_icon_svg("hylki-mail-read-symbolic"),
                                 unread_svg = inline_icon_svg("mail-unread-symbolic"),
                             ),
-                            // The star keeps one glyph; the flagged state is
+                            // The star keeps one glyph; the starred state is
                             // color alone (`.on`, toggled optimistically on
                             // click too).
                             format!(
                                 "<button type=\"button\" class=\"vireo-act{on}\" data-act=\"star\" \
                                  data-key=\"{aid}:{id}\" title=\"{title}\">{svg}</button>",
                                 on = if m.starred { " on" } else { "" },
-                                title = gtk::glib::markup_escape_text(&i18n("Flag this message")),
+                                title = gtk::glib::markup_escape_text(&i18n("Star this message")),
                                 aid = key.0,
                                 id = key.1,
                                 svg = inline_icon_svg("hylki-non-starred-symbolic"),

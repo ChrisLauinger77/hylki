@@ -22,6 +22,11 @@ this list in the app; the same key closes it again.
 | | | <kbd>1</kbd> … <kbd>9</kbd> | Add or remove a tag (the first nine, in Settings order) |
 | | | <kbd>0</kbd> | Remove every tag |
 
+With several messages selected, in the list or as cards of a conversation,
+archive, delete, spam, star, read and tag keys act on all of them. Star, read
+and a tag key set the state on every message unless all of them already have
+it, in which case they clear it from all.
+
 <kbd>Esc</kbd> backs out of a reply, forward or compose and returns you to the
 message list. Once something has been written, it asks first whether to save
 the message to Drafts, discard it or keep editing, as the Cancel button and

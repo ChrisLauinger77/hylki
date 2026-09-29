@@ -60,8 +60,11 @@ msgstr "Ответить всем"
 msgid "Forward"
 msgstr "Переслать"
 
-msgid "Flag"
-msgstr "Отметить"
+msgid "Remove Star"
+msgstr "Снять звёздочку"
+
+msgid "Star"
+msgstr "Отметить звёздочкой"
 
 msgid "Archive"
 msgstr "Архив"
@@ -328,9 +331,6 @@ msgstr "{cur} из {total}"
 msgid "View Source"
 msgstr "Просмотр исходного кода"
 
-msgid "Remove Flag"
-msgstr "Снять метку"
-
 msgid "Move to Inbox"
 msgstr "Переместить во Входящие"
 
@@ -353,12 +353,6 @@ msgstr "Исходный код сообщения"
 #, fuzzy
 msgid "Edit as New Message"
 msgstr "Новое сообщение"
-
-msgid "Remove Star"
-msgstr "Снять звёздочку"
-
-msgid "Star"
-msgstr "Отметить звёздочкой"
 
 msgid "Add Sender to Contacts"
 msgstr "Добавить отправителя в «Контакты»"
@@ -3383,8 +3377,9 @@ msgstr "Переслать это сообщение"
 msgid "Mark as read or unread"
 msgstr "Отметить как прочитанное или непрочитанное"
 
-msgid "Flag this message"
-msgstr "Отметить это сообщение"
+#, fuzzy
+msgid "Star this message"
+msgstr "Редактировать сообщение"
 
 msgid "Move this message to a folder"
 msgstr "Переместить это сообщение в папку"
@@ -5714,8 +5709,9 @@ msgstr "Не удалось загрузить обсуждение: {e}"
 msgid "Could not update message: {e}"
 msgstr "Не удалось обновить сообщение: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Не удалось отметить на сообщение: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Не удалось добавить тег к сообщению: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5908,6 +5904,18 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Отметить"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Снять метку"
+
+#~ msgid "Flag this message"
+#~ msgstr "Отметить это сообщение"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Не удалось отметить на сообщение: {e}"
 
 #, fuzzy
 #~ msgid "Move Up"

@@ -4131,7 +4131,7 @@ impl ToolbarItem {
             ToolbarItem::Reply => crate::i18n::i18n_noop("Reply"),
             ToolbarItem::ReplyAll => crate::i18n::i18n_noop("Reply All"),
             ToolbarItem::Forward => crate::i18n::i18n_noop("Forward"),
-            ToolbarItem::Star => crate::i18n::i18n_noop("Flag"),
+            ToolbarItem::Star => crate::i18n::i18n_noop("Star"),
             ToolbarItem::Archive => crate::i18n::i18n_noop("Archive"),
             ToolbarItem::Delete => crate::i18n::i18n_noop("Delete"),
             ToolbarItem::Spam => crate::i18n::i18n_noop("Spam"),

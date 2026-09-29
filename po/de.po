@@ -61,8 +61,11 @@ msgstr "Allen antworten"
 msgid "Forward"
 msgstr "Weiterleiten"
 
-msgid "Flag"
-msgstr "Markieren"
+msgid "Remove Star"
+msgstr "Stern entfernen"
+
+msgid "Star"
+msgstr "Stern"
 
 msgid "Archive"
 msgstr "Archivieren"
@@ -328,9 +331,6 @@ msgstr "{name} · {current} von {total}"
 msgid "View Source"
 msgstr "Quelltext anzeigen"
 
-msgid "Remove Flag"
-msgstr "Markierung entfernen"
-
 msgid "Move to Inbox"
 msgstr "In den Posteingang verschieben"
 
@@ -351,12 +351,6 @@ msgstr "Nachrichtenquelle"
 
 msgid "Edit as New Message"
 msgstr "Als neue Nachricht bearbeiten"
-
-msgid "Remove Star"
-msgstr "Stern entfernen"
-
-msgid "Star"
-msgstr "Stern"
 
 msgid "Add Sender to Contacts"
 msgstr "Absender zu Kontakten hinzufügen"
@@ -3370,8 +3364,9 @@ msgstr "Diese Nachricht weiterleiten"
 msgid "Mark as read or unread"
 msgstr "Als gelesen oder ungelesen markieren"
 
-msgid "Flag this message"
-msgstr "Markieren Sie diese Nachricht"
+#, fuzzy
+msgid "Star this message"
+msgstr "Diese Nachricht bearbeiten"
 
 msgid "Move this message to a folder"
 msgstr "Verschieben Sie diese Nachricht in einen Ordner"
@@ -5731,8 +5726,9 @@ msgstr "Konnte die Konversation nicht laden: {e}"
 msgid "Could not update message: {e}"
 msgstr "Nachricht konnte nicht aktualisiert werden: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Meldung konnte nicht markiert werden: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Nachricht konnte nicht mit Tag versehen werden: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5957,6 +5953,18 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Markieren"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Markierung entfernen"
+
+#~ msgid "Flag this message"
+#~ msgstr "Markieren Sie diese Nachricht"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Meldung konnte nicht markiert werden: {e}"
 
 #, fuzzy
 #~ msgid "Move Up"

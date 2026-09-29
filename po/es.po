@@ -59,8 +59,11 @@ msgstr "Responder a todos"
 msgid "Forward"
 msgstr "Reenviar"
 
-msgid "Flag"
-msgstr "Marcar"
+msgid "Remove Star"
+msgstr "Quitar destacado"
+
+msgid "Star"
+msgstr "Destacar"
 
 msgid "Archive"
 msgstr "Archivar"
@@ -329,9 +332,6 @@ msgstr "{name} · {current} de {total}"
 msgid "View Source"
 msgstr "Ver código fuente"
 
-msgid "Remove Flag"
-msgstr "Quitar marca"
-
 msgid "Move to Inbox"
 msgstr "Mover a Bandeja de entrada"
 
@@ -352,12 +352,6 @@ msgstr "Código fuente del mensaje"
 
 msgid "Edit as New Message"
 msgstr "Editar como mensaje nuevo"
-
-msgid "Remove Star"
-msgstr "Quitar destacado"
-
-msgid "Star"
-msgstr "Destacar"
 
 msgid "Add Sender to Contacts"
 msgstr "Añadir remitente a Contactos"
@@ -3356,8 +3350,9 @@ msgstr "Reenviar este mensaje"
 msgid "Mark as read or unread"
 msgstr "Marcar como leído o no leído"
 
-msgid "Flag this message"
-msgstr "Marcar este mensaje"
+#, fuzzy
+msgid "Star this message"
+msgstr "Editar este mensaje"
 
 msgid "Move this message to a folder"
 msgstr "Mover este mensaje a una carpeta"
@@ -5725,8 +5720,9 @@ msgstr "No se pudo cargar la conversación: {e}"
 msgid "Could not update message: {e}"
 msgstr "No se pudo actualizar el mensaje: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "No se pudo marcar el mensaje: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "No se pudo etiquetar el mensaje: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5944,6 +5940,18 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Marcar"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Quitar marca"
+
+#~ msgid "Flag this message"
+#~ msgstr "Marcar este mensaje"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "No se pudo marcar el mensaje: {e}"
 
 #, fuzzy
 #~ msgid "Move Up"

@@ -59,8 +59,11 @@ msgstr "Válasz mindenkinek"
 msgid "Forward"
 msgstr "Továbbítás"
 
-msgid "Flag"
-msgstr "Megjelölés"
+msgid "Remove Star"
+msgstr "Csillag eltávolítása"
+
+msgid "Star"
+msgstr "Csillagozás"
 
 msgid "Archive"
 msgstr "Archiválás"
@@ -329,9 +332,6 @@ msgstr "{cur} / {total}"
 msgid "View Source"
 msgstr "Forrás megtekintése"
 
-msgid "Remove Flag"
-msgstr "Jelölés eltávolítása"
-
 msgid "Move to Inbox"
 msgstr "Áthelyezés a Beérkezett üzenetek közé"
 
@@ -354,12 +354,6 @@ msgstr "Üzenetforrás"
 #, fuzzy
 msgid "Edit as New Message"
 msgstr "Új üzenet"
-
-msgid "Remove Star"
-msgstr "Csillag eltávolítása"
-
-msgid "Star"
-msgstr "Csillagozás"
 
 msgid "Add Sender to Contacts"
 msgstr "Feladó hozzáadása a névjegyekhez"
@@ -3358,8 +3352,9 @@ msgstr "Üzenet továbbítása"
 msgid "Mark as read or unread"
 msgstr "Megjelölés olvasottként vagy olvasatlanként"
 
-msgid "Flag this message"
-msgstr "Üzenet megjelölése"
+#, fuzzy
+msgid "Star this message"
+msgstr "Üzenet szerkesztése"
 
 #, fuzzy
 msgid "Move this message to a folder"
@@ -5617,8 +5612,9 @@ msgstr "A beszélgetés nem tölthető be: {e}"
 msgid "Could not update message: {e}"
 msgstr "Az üzenet nem frissíthető: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Az üzenet nem jelölhető meg: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Az üzenet nem címkézhető: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5808,6 +5804,18 @@ msgstr "Az egységes beérkezett nézet világos módban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Megjelölés"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Jelölés eltávolítása"
+
+#~ msgid "Flag this message"
+#~ msgstr "Üzenet megjelölése"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Az üzenet nem jelölhető meg: {e}"
 
 #, fuzzy
 #~ msgid "Move Up"

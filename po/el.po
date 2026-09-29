@@ -61,8 +61,11 @@ msgstr "Απάντηση σε όλους"
 msgid "Forward"
 msgstr "Προώθηση"
 
-msgid "Flag"
-msgstr "Επισήμανση"
+msgid "Remove Star"
+msgstr "Αφαίρεση αστεριού"
+
+msgid "Star"
+msgstr "Προσθήκη αστεριού"
 
 msgid "Archive"
 msgstr "Αρχειοθέτηση"
@@ -330,9 +333,6 @@ msgstr "{name} · {current} από {total}"
 msgid "View Source"
 msgstr "Προβολή πηγαίου κώδικα"
 
-msgid "Remove Flag"
-msgstr "Αφαίρεση επισήμανσης"
-
 msgid "Move to Inbox"
 msgstr "Μετακίνηση στα Εισερχόμενα"
 
@@ -353,12 +353,6 @@ msgstr "Πηγαίος κώδικας μηνύματος"
 
 msgid "Edit as New Message"
 msgstr "Επεξεργασία ως νέο μήνυμα"
-
-msgid "Remove Star"
-msgstr "Αφαίρεση αστεριού"
-
-msgid "Star"
-msgstr "Προσθήκη αστεριού"
 
 msgid "Add Sender to Contacts"
 msgstr "Προσθήκη αποστολέα στις επαφές"
@@ -3366,8 +3360,9 @@ msgstr "Προώθηση αυτού του μηνύματος"
 msgid "Mark as read or unread"
 msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
 
-msgid "Flag this message"
-msgstr "Προσθήκη σημαίας σε αυτό το μήνυμα"
+#, fuzzy
+msgid "Star this message"
+msgstr "Επεξεργασία αυτού του μηνύματος"
 
 msgid "Move this message to a folder"
 msgstr "Μετακίνηση αυτού του μηνύματος σε φάκελο"
@@ -5745,8 +5740,9 @@ msgstr "Δεν ήταν δυνατή η φόρτωση της συζήτησης
 msgid "Could not update message: {e}"
 msgstr "Δεν ήταν δυνατή η ενημέρωση του μηνύματος: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Δεν ήταν δυνατή η προσθήκη σημαίας στο μήνυμα: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Δεν ήταν δυνατή η προσθήκη ετικέτας στο μήνυμα: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5973,6 +5969,18 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Επισήμανση"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Αφαίρεση επισήμανσης"
+
+#~ msgid "Flag this message"
+#~ msgstr "Προσθήκη σημαίας σε αυτό το μήνυμα"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Δεν ήταν δυνατή η προσθήκη σημαίας στο μήνυμα: {e}"
 
 #, fuzzy
 #~ msgid "Remove Sound"

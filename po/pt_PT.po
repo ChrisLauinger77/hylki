@@ -62,8 +62,11 @@ msgstr "Responder a todos"
 msgid "Forward"
 msgstr "Reencaminhar"
 
-msgid "Flag"
-msgstr "Marcar com estrela"
+msgid "Remove Star"
+msgstr "Remover estrela"
+
+msgid "Star"
+msgstr "Adicionar estrela"
 
 msgid "Archive"
 msgstr "Arquivar"
@@ -330,9 +333,6 @@ msgstr "{name} · {current} de {total}"
 msgid "View Source"
 msgstr "Ver fonte"
 
-msgid "Remove Flag"
-msgstr "Remover estrela"
-
 msgid "Move to Inbox"
 msgstr "Mover para a Caixa de entrada"
 
@@ -353,12 +353,6 @@ msgstr "Código fonte da mensagem"
 
 msgid "Edit as New Message"
 msgstr "Editar como nova mensagem"
-
-msgid "Remove Star"
-msgstr "Remover estrela"
-
-msgid "Star"
-msgstr "Adicionar estrela"
 
 msgid "Add Sender to Contacts"
 msgstr "Adicionar remetente aos contactos"
@@ -3382,8 +3376,9 @@ msgstr "Reencaminhar esta mensagem"
 msgid "Mark as read or unread"
 msgstr "Marcar como lida ou não lida"
 
-msgid "Flag this message"
-msgstr "Marcar esta mensagem com estrela"
+#, fuzzy
+msgid "Star this message"
+msgstr "Editar esta mensagem"
 
 msgid "Move this message to a folder"
 msgstr "Mover esta mensagem para uma pasta"
@@ -5753,8 +5748,9 @@ msgstr "Não foi possível carregar a conversa: {e}"
 msgid "Could not update message: {e}"
 msgstr "Não foi possível atualizar a mensagem: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Não foi possível marcar a mensagem com estrela: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Não foi possível atribuir uma etiqueta à mensagem: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5972,6 +5968,18 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Marcar com estrela"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Remover estrela"
+
+#~ msgid "Flag this message"
+#~ msgstr "Marcar esta mensagem com estrela"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Não foi possível marcar a mensagem com estrela: {e}"
 
 #, fuzzy
 #~ msgid "Move Up"

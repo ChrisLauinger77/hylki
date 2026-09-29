@@ -2570,6 +2570,8 @@ pub struct MessageList {
     palette_hover: std::rc::Rc<std::cell::Cell<bool>>,
     /// The tags (#71), shared with every row for its chips and tag menu.
     tags: std::rc::Rc<std::cell::RefCell<Vec<crate::config::Tag>>>,
+    /// The bulk bar's tag button, which its menu hangs from (#313).
+    bulk_tag_btn: gtk::Button,
     /// Shared with every row: swap the swipe-gesture sides (#swipe).
     swipe_reversed: std::rc::Rc<std::cell::Cell<bool>>,
     /// Shared with every row: whether swiping is on at all (#92).
@@ -2833,6 +2835,12 @@ pub enum MessageListInput {
     RowActivated(i32),
     /// Apply a bulk action to every selected message.
     Bulk(BulkAction),
+    /// The bulk bar's read button: read when any selected message is
+    /// unread, unread when none is (#313).
+    BulkToggleRead,
+    /// The bulk bar's tag button: the tag menu for the selection, under
+    /// the button.
+    BulkTagMenu,
     /// Deselect everything.
     ClearSelection,
     /// Move the selection by `delta` rows (single-key j/k and the arrow keys).
@@ -2957,6 +2965,8 @@ pub enum MessageListOutput {
     Action { action: RowAction, message: Box<Message>, conversation: Vec<Message> },
     /// A tag toggled on a specific message (#71).
     SetTag { message: Box<Message>, keyword: String, add: bool },
+    /// A tag toggled on every selected message from the bulk bar (#313).
+    SetTagMany { messages: Vec<Message>, keyword: String, add: bool },
     /// A bulk action chosen for every currently-selected message.
     Bulk { action: BulkAction, messages: Vec<Message> },
     /// "Move To…" from a row's menu: open the folder picker for `messages`
@@ -3079,6 +3089,9 @@ impl SimpleComponent for MessageList {
                 gtk::Box {
                     add_css_class: "bulk-bar",
                     set_spacing: 2,
+                    // The buttons never take focus from the list: the
+                    // selection keeps its focused highlight and the
+                    // single-key shortcuts keep working after a click.
 
                     gtk::Label {
                         #[watch]
@@ -3088,34 +3101,55 @@ impl SimpleComponent for MessageList {
                         set_ellipsize: gtk::pango::EllipsizeMode::End,
                         add_css_class: "bulk-count",
                     },
-                    // Drafts are neither read nor unread: both go when the
-                    // list shows them.
+                    // One toggle, like the star: it shows what a click will
+                    // do. Drafts are neither read nor unread: it goes when
+                    // the list shows them.
                     gtk::Button {
-                        set_icon_name: "hylki-mail-read-symbolic",
-                        set_tooltip_text: Some(i18n("Mark as Read").as_str()),
+                        #[watch]
+                        set_icon_name: if model.selection_any_unread() {
+                            "hylki-mail-read-symbolic"
+                        } else {
+                            "mail-unread-symbolic"
+                        },
+                        #[watch]
+                        set_tooltip_text: Some(if model.selection_any_unread() { i18n("Mark as Read") } else { i18n("Mark as Unread") }.as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         #[watch]
                         set_visible: !model.in_drafts,
-                        connect_clicked => MessageListInput::Bulk(BulkAction::MarkRead),
+                        connect_clicked => MessageListInput::BulkToggleRead,
                     },
+                    // Mapped to Unflag by the Bulk handler once every
+                    // selected message is starred (#313).
                     gtk::Button {
-                        set_icon_name: "mail-unread-symbolic",
-                        set_tooltip_text: Some(i18n("Mark as Unread").as_str()),
-                        add_css_class: "flat",
                         #[watch]
-                        set_visible: !model.in_drafts,
-                        connect_clicked => MessageListInput::Bulk(BulkAction::MarkUnread),
-                    },
-                    gtk::Button {
-                        set_icon_name: "starred-symbolic",
-                        set_tooltip_text: Some(i18n("Flag").as_str()),
+                        set_icon_name: if model.selection_all_starred() {
+                            "hylki-non-starred-symbolic"
+                        } else {
+                            "starred-symbolic"
+                        },
+                        #[watch]
+                        set_tooltip_text: Some(if model.selection_all_starred() { i18n("Remove Star") } else { i18n("Star") }.as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         connect_clicked => MessageListInput::Bulk(BulkAction::Flag),
+                    },
+                    // Only once a tag exists, like the row menu's Tags.
+                    #[local_ref]
+                    bulk_tag_btn -> gtk::Button {
+                        set_icon_name: "tag-outline-symbolic",
+                        set_tooltip_text: Some(i18n("Tags").as_str()),
+                        add_css_class: "flat",
+                        set_focus_on_click: false,
+                        #[watch]
+                        set_visible: !model.tags.borrow().is_empty(),
+                        connect_clicked => MessageListInput::BulkTagMenu,
                     },
                     gtk::Button {
                         set_icon_name: "mail-archive-symbolic",
                         set_tooltip_text: Some(i18n("Archive").as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         connect_clicked => MessageListInput::Bulk(BulkAction::Archive),
                     },
                     gtk::Button {
@@ -3128,6 +3162,7 @@ impl SimpleComponent for MessageList {
                         #[watch]
                         set_tooltip_text: Some(if model.in_junk { i18n("Not Spam") } else { i18n("Mark as Spam") }.as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         // Mapped to NotSpam in Junk by the Bulk handler.
                         connect_clicked => MessageListInput::Bulk(BulkAction::Spam),
                     },
@@ -3135,6 +3170,7 @@ impl SimpleComponent for MessageList {
                         set_icon_name: "user-trash-symbolic",
                         set_tooltip_text: Some(i18n("Delete").as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         connect_clicked => MessageListInput::Bulk(BulkAction::Delete),
                     },
                     gtk::Separator {
@@ -3144,6 +3180,7 @@ impl SimpleComponent for MessageList {
                         set_icon_name: "edit-clear-symbolic",
                         set_tooltip_text: Some(i18n("Clear selection").as_str()),
                         add_css_class: "flat",
+                        set_focus_on_click: false,
                         connect_clicked => MessageListInput::ClearSelection,
                     },
                 },
@@ -3324,10 +3361,11 @@ impl SimpleComponent for MessageList {
             threading: true,
             thread_expansion: true,
             list_palette: true,
-
+            bulk_tag_btn: gtk::Button::new(),
         };
 
         let row_box = model.rows.widget();
+        let bulk_tag_btn = model.bulk_tag_btn.clone();
         Self::wire_list(row_box, sender.input_sender());
 
         let widgets = view_output!();
@@ -3856,35 +3894,26 @@ impl SimpleComponent for MessageList {
                 // The bulk bar's spam button is one button: in Junk it means
                 // the reverse.
                 let action = if self.in_junk && action == BulkAction::Spam { BulkAction::NotSpam } else { action };
-                let messages: Vec<Message> = self
-                    .rows
-                    .widget()
-                    .selected_rows()
-                    .iter()
-                    .filter_map(|r| self.shown.get(r.index() as usize).cloned())
-                    .collect();
+                let messages = self.selected_messages();
+                // Likewise the star: it clears a selection that is starred
+                // throughout, or it could never be taken off again (#313).
+                let action = if action == BulkAction::Flag
+                    && !messages.is_empty()
+                    && messages.iter().all(|m| m.starred)
+                {
+                    BulkAction::Unflag
+                } else {
+                    action
+                };
                 if !messages.is_empty() {
                     let _ = sender.output(MessageListOutput::Bulk { action, messages });
                 }
-                // Row-removing actions keep the selection: the RemoveMany that
-                // follows reads it to know the viewed message is going away and
-                // to advance the selection (and reader) in its place — clearing
-                // here left the reader stale on the deleted message. In-place
-                // actions (read/flag) drop the selection as before, dismissing
-                // the bulk bar.
-                if matches!(
-                    action,
-                    BulkAction::MarkRead
-                        | BulkAction::MarkUnread
-                        | BulkAction::Flag
-                        | BulkAction::Unflag
-                )
-                {
-                    self.rows.widget().unselect_all();
-                    self.selected_id = None;
-                    self.selected_ids.clear();
-                    self.selection_count = 0;
-                }
+                // The selection stays, and with it the bulk bar: read and star
+                // change rows in place, so a second action (or the same one
+                // again, to undo it) can follow without selecting anew (#313).
+                // Row-removing actions need it too: the RemoveMany that
+                // follows reads it to know the viewed message is going away
+                // and to advance the selection (and reader) in its place.
             }
             MessageListInput::MoveSelection(delta) => {
                 let list = self.rows.widget();
@@ -4004,6 +4033,36 @@ impl SimpleComponent for MessageList {
                 self.rebuild_preserving_scroll();
             }
 
+            MessageListInput::BulkToggleRead => {
+                let action = if self.selection_any_unread() {
+                    BulkAction::MarkRead
+                } else {
+                    BulkAction::MarkUnread
+                };
+                sender.input(MessageListInput::Bulk(action));
+            }
+            MessageListInput::BulkTagMenu => {
+                let btn = self.bulk_tag_btn.clone();
+                let entries = self.bulk_tag_entries(&sender);
+                if !entries.is_empty() {
+                    // The menu takes the keyboard while it is open and does
+                    // not hand it back, which greys the selection and stops
+                    // the single-key shortcuts: give it back to the list.
+                    let before = btn.root().and_then(|r| r.focus());
+                    let popover = crate::ui::context_menu::show_context_menu_popover(
+                        &btn,
+                        (btn.width() / 2) as f64,
+                        btn.height() as f64,
+                        None,
+                        vec![entries],
+                    );
+                    popover.connect_closed(move |_| {
+                        if let Some(w) = &before {
+                            w.grab_focus();
+                        }
+                    });
+                }
+            }
             MessageListInput::ClearSelection => {
                 self.rows.widget().unselect_all();
                 self.selected_id = None;
@@ -4624,6 +4683,44 @@ impl MessageList {
         show_context_menu(self.rows.widget(), x, y, sections);
     }
 
+    /// The messages of the selected rows.
+    fn selected_messages(&self) -> Vec<Message> {
+        self.rows
+            .widget()
+            .selected_rows()
+            .iter()
+            .filter_map(|r| self.shown.get(r.index() as usize).cloned())
+            .collect()
+    }
+
+    /// Whether every selected message is starred, so the bulk star takes
+    /// the stars off rather than adding them.
+    fn selection_all_starred(&self) -> bool {
+        let messages = self.selected_messages();
+        !messages.is_empty() && messages.iter().all(|m| m.starred)
+    }
+
+    /// Whether any selected message is unread, so the bulk read toggle
+    /// marks the selection read rather than unread.
+    fn selection_any_unread(&self) -> bool {
+        self.selected_messages().iter().any(|m| m.unread)
+    }
+
+    /// One toggle per tag for the whole selection (#313). A tag is ticked
+    /// when every selected message carries it: choosing it then takes it
+    /// off them all, and otherwise puts it on them all.
+    fn bulk_tag_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
+        let messages = self.selected_messages();
+        let Some(first) = messages.first() else { return Vec::new() };
+        let mut all = first.clone();
+        all.keywords.retain(|k| messages.iter().all(|m| m.has_keyword(k)));
+        let tags = self.tags.borrow().clone();
+        let s = sender.clone();
+        tag_menu_entries(&tags, &all, move |keyword, add| {
+            let _ = s.output(MessageListOutput::SetTagMany { messages: messages.clone(), keyword, add });
+        })
+    }
+
     /// Build and pop up the bulk-action menu for the current multi-selection.
     fn show_bulk_menu(&self, x: f64, y: f64, sender: &ComponentSender<Self>) {
         let item = |action: BulkAction, label: &str, icon: &str| -> MenuEntry {
@@ -4635,11 +4732,25 @@ impl MessageList {
             {
                 let mut section = Vec::new();
                 // Drafts are neither read nor unread.
+                // One entry, the way the bar's button toggles.
                 if !self.in_drafts {
-                    section.push(item(BulkAction::MarkRead, &i18n("Mark as Read"), "hylki-mail-read-symbolic"));
-                    section.push(item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "mail-unread-symbolic"));
+                    section.push(if self.selection_any_unread() {
+                        item(BulkAction::MarkRead, &i18n("Mark as Read"), "hylki-mail-read-symbolic")
+                    } else {
+                        item(BulkAction::MarkUnread, &i18n("Mark as Unread"), "mail-unread-symbolic")
+                    });
                 }
-                section.push(item(BulkAction::Flag, &i18n("Flag"), "starred-symbolic"));
+                // The Bulk handler turns this into Unflag for a starred
+                // selection.
+                section.push(if self.selection_all_starred() {
+                    item(BulkAction::Flag, &i18n("Remove Star"), "hylki-non-starred-symbolic")
+                } else {
+                    item(BulkAction::Flag, &i18n("Star"), "starred-symbolic")
+                });
+                let tags = self.bulk_tag_entries(sender);
+                if !tags.is_empty() {
+                    section.push(MenuEntry::submenu(i18n("Tags"), vec![tags]).icon("tag-outline-symbolic"));
+                }
                 section
             },
             {

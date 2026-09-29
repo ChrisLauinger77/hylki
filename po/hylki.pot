@@ -55,7 +55,10 @@ msgstr ""
 msgid "Forward"
 msgstr ""
 
-msgid "Flag"
+msgid "Remove Star"
+msgstr ""
+
+msgid "Star"
 msgstr ""
 
 msgid "Archive"
@@ -309,9 +312,6 @@ msgstr ""
 msgid "View Source"
 msgstr ""
 
-msgid "Remove Flag"
-msgstr ""
-
 msgid "Move to Inbox"
 msgstr ""
 
@@ -331,12 +331,6 @@ msgid "Message Source"
 msgstr ""
 
 msgid "Edit as New Message"
-msgstr ""
-
-msgid "Remove Star"
-msgstr ""
-
-msgid "Star"
 msgstr ""
 
 msgid "Add Sender to Contacts"
@@ -3052,7 +3046,7 @@ msgstr ""
 msgid "Mark as read or unread"
 msgstr ""
 
-msgid "Flag this message"
+msgid "Star this message"
 msgstr ""
 
 msgid "Move this message to a folder"
@@ -5081,7 +5075,7 @@ msgstr ""
 msgid "Could not update message: {e}"
 msgstr ""
 
-msgid "Could not flag message: {e}"
+msgid "Could not change the star: {e}"
 msgstr ""
 
 msgid ""

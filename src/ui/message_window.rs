@@ -255,7 +255,8 @@ impl Component for MessageWindow {
                         connect_clicked => MessageWindowInput::AddToContacts,
                     },
                     pack_start = &gtk::Button {
-                        set_tooltip_text: Some(i18n("Flag").as_str()),
+                        #[watch]
+                        set_tooltip_text: Some(if model.msg.starred { i18n("Remove Star") } else { i18n("Star") }.as_str()),
                         set_icon_name: "hylki-non-starred-symbolic",
                         #[watch]
                         set_css_classes: if model.msg.starred {

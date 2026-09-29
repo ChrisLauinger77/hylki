@@ -60,7 +60,10 @@ msgstr "Odpowiedz wszystkim"
 msgid "Forward"
 msgstr "Przekaż dalej"
 
-msgid "Flag"
+msgid "Remove Star"
+msgstr "Usuń gwiazdkę"
+
+msgid "Star"
 msgstr "Oznacz gwiazdką"
 
 msgid "Archive"
@@ -325,9 +328,6 @@ msgstr "{name} · {current} z {total}"
 msgid "View Source"
 msgstr "Wyświetl źródło"
 
-msgid "Remove Flag"
-msgstr "Usuń gwiazdkę"
-
 msgid "Move to Inbox"
 msgstr "Przenieś do skrzynki odbiorczej"
 
@@ -348,12 +348,6 @@ msgstr "Źródło wiadomości"
 
 msgid "Edit as New Message"
 msgstr "Modyfikuj jako nową wiadomość"
-
-msgid "Remove Star"
-msgstr "Usuń gwiazdkę"
-
-msgid "Star"
-msgstr "Oznacz gwiazdką"
 
 msgid "Add Sender to Contacts"
 msgstr "Dodaj nadawcę do kontaktów"
@@ -3386,8 +3380,9 @@ msgstr "Przekaż dalej tę wiadomość"
 msgid "Mark as read or unread"
 msgstr "Oznacz jako przeczytane lub nieprzeczytane"
 
-msgid "Flag this message"
-msgstr "Oznacz tę wiadomość gwiazdką"
+#, fuzzy
+msgid "Star this message"
+msgstr "Modyfikuj tę wiadomość"
 
 msgid "Move this message to a folder"
 msgstr "Przenieś tę wiadomość do katalogu"
@@ -5741,8 +5736,9 @@ msgstr "Nie udało się wczytać rozmowy: {e}"
 msgid "Could not update message: {e}"
 msgstr "Nie udało się zaktualizować wiadomości: {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Nie udało się oznaczyć wiadomości gwiazdką: {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Nie udało się oznaczyć wiadomości etykietą: {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5968,3 +5964,15 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Oznacz gwiazdką"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Usuń gwiazdkę"
+
+#~ msgid "Flag this message"
+#~ msgstr "Oznacz tę wiadomość gwiazdką"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Nie udało się oznaczyć wiadomości gwiazdką: {e}"

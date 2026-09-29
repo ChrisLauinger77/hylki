@@ -18,6 +18,29 @@
   on to the app, escaped with backslashes, and the backslashes were kept.
   Names and subjects are now read without them, and names already stored
   are cleaned when the new version first opens the mail cache.
+- **Fixed: shortcuts acted on one message of a selection** (#313, reported
+  by Amadeus Paulussen). With several messages selected, the star, archive,
+  spam, read and tag keys changed only one of them. They now act on every
+  selected message, as Delete already did, and so do the matching buttons
+  on the reader's toolbar. Star, read and a tag are set on the whole
+  selection, or cleared from it when every message already has them, and
+  one Ctrl+Z undoes the lot. The star in the bar over a selection in the
+  list, and in its right-click menu, could only add stars; it now takes them
+  off when every selected message has one, and shows which it will do. Its
+  Mark as Read and Mark as Unread buttons are one button that works the same
+  way: it marks the selection read when any of it is unread, and unread
+  otherwise. A Tags button there, and a Tags submenu in the selection's
+  right-click menu, put a tag on every selected message, or take it off
+  them all when each already has it.
+- **Changed: "Flag" is called "Star" everywhere.** The reader's toolbar and
+  its overflow menu, the message window, the selection bar and Settings →
+  Appearance → Toolbar said Flag for the same star the list, the sidebar's
+  Starred folders and the `s` key call a star. The reader's and the message
+  window's star button now also say whether a click adds or removes it.
+  Marking a selection read or unread, or starring it, from that bar no
+  longer clears the selection and closes the bar, so another action can
+  follow. Its buttons no longer take the keyboard focus from the list either,
+  which turned the selection grey and stopped the single-key shortcuts.
 - **Fixed: a message sometimes opened showing another message's text.** The
   bodies kept in memory were filed by message number, and the number is only
   unique within a folder, so a message in Sent could replace the text of the

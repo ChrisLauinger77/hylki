@@ -61,8 +61,11 @@ msgstr "Répondre à tous"
 msgid "Forward"
 msgstr "Transférer"
 
-msgid "Flag"
-msgstr "Suivre"
+msgid "Remove Star"
+msgstr "Retirer l'étoile"
+
+msgid "Star"
+msgstr "Ajouter une étoile"
 
 msgid "Archive"
 msgstr "Archiver"
@@ -329,9 +332,6 @@ msgstr "{name} · {current} sur {total}"
 msgid "View Source"
 msgstr "Afficher le code source"
 
-msgid "Remove Flag"
-msgstr "Retirer le drapeau"
-
 msgid "Move to Inbox"
 msgstr "Déplacer vers la boîte de réception"
 
@@ -352,12 +352,6 @@ msgstr "Code source du message"
 
 msgid "Edit as New Message"
 msgstr "Modifier en tant que nouveau message"
-
-msgid "Remove Star"
-msgstr "Retirer l'étoile"
-
-msgid "Star"
-msgstr "Ajouter une étoile"
 
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
@@ -3376,8 +3370,9 @@ msgstr "Transférer ce message"
 msgid "Mark as read or unread"
 msgstr "Marquer comme lu ou non lu"
 
-msgid "Flag this message"
-msgstr "Marquer ce message"
+#, fuzzy
+msgid "Star this message"
+msgstr "Modifier ce message"
 
 msgid "Move this message to a folder"
 msgstr "Déplacer ce message vers un dossier"
@@ -5744,8 +5739,9 @@ msgstr "Impossible de charger la conversation : {e}"
 msgid "Could not update message: {e}"
 msgstr "Impossible de mettre à jour le message : {e}"
 
-msgid "Could not flag message: {e}"
-msgstr "Impossible de marquer le message : {e}"
+#, fuzzy
+msgid "Could not change the star: {e}"
+msgstr "Impossible d'ajouter un tag au message : {e}"
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5970,6 +5966,18 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Flag"
+#~ msgstr "Suivre"
+
+#~ msgid "Remove Flag"
+#~ msgstr "Retirer le drapeau"
+
+#~ msgid "Flag this message"
+#~ msgstr "Marquer ce message"
+
+#~ msgid "Could not flag message: {e}"
+#~ msgstr "Impossible de marquer le message : {e}"
 
 #, fuzzy
 #~ msgid "Remove Sound"

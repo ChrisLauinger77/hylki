@@ -1862,7 +1862,7 @@ async fn run_imap(
             } => {
                 let sess = session.as_mut().unwrap();
                 if let Err(e) = store_flag(sess, &path, uid, "\\Flagged", flagged).await {
-                    emit(WorkerEvent::error(i18n_f("Could not flag message: {e}", &[("e", &(e).to_string())])));
+                    emit(WorkerEvent::error(i18n_f("Could not change the star: {e}", &[("e", &(e).to_string())])));
                     lost = true;
                 } else if let Some(c) = cache.as_ref() {
                     c.set_starred(account_id, &path, uid, flagged);

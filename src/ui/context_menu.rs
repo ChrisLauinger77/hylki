@@ -109,6 +109,18 @@ pub fn show_context_menu_with_header(
     header: Option<&str>,
     sections: Vec<Vec<MenuEntry>>,
 ) {
+    show_context_menu_popover(parent, x, y, header, sections);
+}
+
+/// [`show_context_menu_with_header`], handing back the popover for a caller
+/// that needs to know when it closes.
+pub fn show_context_menu_popover(
+    parent: &impl IsA<gtk::Widget>,
+    x: f64,
+    y: f64,
+    header: Option<&str>,
+    sections: Vec<Vec<MenuEntry>>,
+) -> gtk::Popover {
     let popover = gtk::Popover::new();
     popover.set_has_arrow(false);
     popover.set_position(gtk::PositionType::Bottom);
@@ -162,6 +174,7 @@ pub fn show_context_menu_with_header(
             });
         }
     }
+    popover
 }
 
 /// Room left between a menu and the window's edges.
