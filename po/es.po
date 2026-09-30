@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hylki\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
-"PO-Revision-Date: 2026-09-24 23:28+0200\n"
+"PO-Revision-Date: 2026-09-28 19:59+0200\n"
 "Last-Translator: Daniel Miguel <danielmigueltejedor@icloud.com>\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -259,9 +259,8 @@ msgstr "No hay ninguna libreta de direcciones disponible"
 msgid "Could not update contact: {e}"
 msgstr "No se pudo actualizar el contacto: {e}"
 
-#, fuzzy
 msgid "Hide Status Bar"
-msgstr "Mostrar barra de estado"
+msgstr "Ocultar barra de estado"
 
 msgid "Reveal Status Bar"
 msgstr "Mostrar barra de estado"
@@ -445,14 +444,15 @@ msgstr "¿Eliminar esta conversación?"
 msgid "Delete Conversation"
 msgstr "Eliminar conversación"
 
-#, fuzzy
 msgid "Delete the attachment from the server?"
-msgstr "Cargar archivos adjuntos desde el servidor"
+msgstr "¿Eliminar el archivo adjunto del servidor?"
 
 msgid ""
 "“{name}” will be removed from the message on the server. The rest of the "
 "message stays. This can’t be undone."
 msgstr ""
+"«{name}» se eliminará del mensaje en el servidor. El resto del mensaje "
+"permanecerá. Esta acción no se puede deshacer."
 
 msgid "Delete this message permanently?"
 msgid_plural "Delete {n} messages permanently?"
@@ -939,20 +939,17 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} mensaje sin leer"
 msgstr[1] "{n} mensajes sin leer"
 
-#, fuzzy
 msgid "Custom Order"
-msgstr "Color personalizado…"
+msgstr "Orden personalizado"
 
-#, fuzzy
 msgid "Name (A to Z)"
-msgstr "Nombre (A–Z)"
+msgstr "Nombre (A a Z)"
 
-#, fuzzy
 msgid "Name (Z to A)"
-msgstr "Nombre (Z–A)"
+msgstr "Nombre (Z a A)"
 
 msgid "Full Path"
-msgstr ""
+msgstr "Ruta completa"
 
 msgid "Spam"
 msgstr "Correo no deseado"
@@ -979,19 +976,20 @@ msgid "{date} at {time}"
 msgstr "{date} a las {time}"
 
 msgid "Evolution Data Server is not available"
-msgstr ""
+msgstr "Evolution Data Server no está disponible"
 
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
+"El directorio necesita una contraseña. Añádela en Ajustes → Directorios LDAP."
 
 msgid "The directory did not accept the password."
-msgstr ""
+msgstr "El directorio no aceptó la contraseña."
 
 msgid "{used} of {limit} used"
-msgstr ""
+msgstr "{used} de {limit} usados"
 
 msgid "{free} free ({pct}%)"
-msgstr ""
+msgstr "{free} libres ({pct}%)"
 
 msgid "Encrypted message"
 msgstr "Mensaje cifrado"
@@ -1046,46 +1044,37 @@ msgid "Signed by {signer}; the signature has expired"
 msgstr "Firmado por {signer}; la firma ha caducado"
 
 msgid "Not decrypted"
-msgstr ""
+msgstr "No descifrado"
 
-#, fuzzy
 msgid "Encrypted"
-msgstr "Mensaje cifrado"
+msgstr "Cifrado"
 
-#, fuzzy
 msgid "Signature not checked"
-msgstr "Firma en las respuestas"
+msgstr "Firma no comprobada"
 
-#, fuzzy
 msgid "Encrypted and signed"
-msgstr "Cifrado y firmado por {signer}"
+msgstr "Cifrado y firmado"
 
-#, fuzzy
 msgid "Signed"
-msgstr "Firma"
+msgstr "Firmado"
 
 msgid "Signed, key not trusted"
-msgstr ""
+msgstr "Firmado, clave no fiable"
 
-#, fuzzy
 msgid "Bad signature"
-msgstr "Firma"
+msgstr "Firma no válida"
 
-#, fuzzy
 msgid "Signed, unknown key"
-msgstr "Firmado con la clave {id}."
+msgstr "Firmado, clave desconocida"
 
-#, fuzzy
 msgid "Signed, key expired"
-msgstr "Firmado con la clave {id}."
+msgstr "Firmado, clave caducada"
 
-#, fuzzy
 msgid "Signed, key revoked"
-msgstr "Firmado por: {d}"
+msgstr "Firmado, clave revocada"
 
-#, fuzzy
 msgid "Signature expired"
-msgstr "Firma en las respuestas"
+msgstr "Firma caducada"
 
 msgid "This message hasn't been checked."
 msgstr "Este mensaje no se ha comprobado."
@@ -1361,9 +1350,8 @@ msgstr ""
 msgid "Open Online Accounts…"
 msgstr "Abrir Cuentas en línea…"
 
-#, fuzzy
 msgid "Storage"
-msgstr "Almacenamiento en la nube"
+msgstr "Almacenamiento"
 
 msgid "Mail Account"
 msgstr "Cuenta de correo"
@@ -1584,18 +1572,18 @@ msgstr ""
 "Eliminar definitivamente el correo de la Papelera que supere esta "
 "antigüedad; se comprueba en cada sincronización."
 
-#, fuzzy
 msgid "Folder Order"
-msgstr "Renombrar carpeta"
+msgstr "Orden de las carpetas"
 
 msgid ""
 "How this account's folders are sorted in the sidebar. Also in the right-"
 "click menu of its Folders heading."
 msgstr ""
+"Cómo se ordenan las carpetas de esta cuenta en la barra lateral. También "
+"está disponible en el menú contextual del encabezado Carpetas."
 
-#, fuzzy
 msgid "Sort by"
-msgstr "Ordenar"
+msgstr "Ordenar por"
 
 msgid "Special Folders"
 msgstr "Carpetas especiales"
@@ -2087,9 +2075,8 @@ msgstr "No se pudo importar la clave"
 msgid "Show in Message"
 msgstr "Mostrar en el mensaje"
 
-#, fuzzy
 msgid "Delete from Server…"
-msgstr "Eliminar carpeta…"
+msgstr "Eliminar del servidor…"
 
 msgid "Import OpenPGP key"
 msgstr "Importar clave OpenPGP"
@@ -2197,9 +2184,8 @@ msgstr "Ir al mensaje"
 msgid "All accounts"
 msgstr "Todas las cuentas"
 
-#, fuzzy
 msgid "Deleting…"
-msgstr "Eliminar…"
+msgstr "Eliminando…"
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
@@ -2706,16 +2692,16 @@ msgstr "{name} (enlace)"
 msgid "Uploading…"
 msgstr "Subiendo…"
 
-#, fuzzy
 msgid "Save the message?"
-msgstr "Encima de los mensajes"
+msgstr "¿Guardar el mensaje?"
 
 msgid "It has not been sent. Save it to Drafts to finish later, or discard it."
 msgstr ""
+"No se ha enviado. Guárdalo en Borradores para terminarlo más tarde o "
+"descártalo."
 
-#, fuzzy
 msgid "Keep Editing"
-msgstr "Reunión"
+msgstr "Seguir editando"
 
 msgid "Discard"
 msgstr "Descartar"
@@ -2824,178 +2810,171 @@ msgid "Add website"
 msgstr "Añadir sitio web"
 
 msgid "LDAP Directories"
-msgstr ""
+msgstr "Directorios LDAP"
 
 msgid "LDAP directories"
-msgstr ""
+msgstr "Directorios LDAP"
 
 msgid ""
 "The composer looks up recipients in these directories as you type an "
 "address. They are kept by Evolution Data Server, so a directory set up in "
 "Evolution is listed here too."
 msgstr ""
+"El redactor busca destinatarios en estos directorios mientras escribes una "
+"dirección. Los gestiona Evolution Data Server, por lo que los directorios "
+"configurados en Evolution también aparecen aquí."
 
-#, fuzzy
 msgid "Add Directory…"
-msgstr "Añadir filtro…"
+msgstr "Añadir directorio…"
 
 msgid "No directories yet."
-msgstr ""
+msgstr "Todavía no hay directorios."
 
 msgid "LDAP Directory"
-msgstr ""
+msgstr "Directorio LDAP"
 
 msgid ""
 "Evolution Data Server, which keeps the directories, is not available on this "
 "system."
 msgstr ""
+"Evolution Data Server, que gestiona los directorios, no está disponible en "
+"este sistema."
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
 "apps that use it stop seeing it too. Nothing on the server changes."
 msgstr ""
+"El directorio se elimina de Evolution Data Server, por lo que Evolution y "
+"las demás aplicaciones que lo usan también dejan de verlo. No cambia nada en "
+"el servidor."
 
-#, fuzzy
 msgid "Connected to {name}"
-msgstr "Mover a {name}"
+msgstr "Conectado a {name}"
 
 msgid "{name} did not answer: {error}"
-msgstr ""
+msgstr "{name} no respondió: {error}"
 
-#, fuzzy
 msgid "Edit Directory"
-msgstr "Editar filtro"
+msgstr "Editar directorio"
 
-#, fuzzy
 msgid "Add Directory"
-msgstr "Añadir filtro"
+msgstr "Añadir directorio"
 
 msgid "Look up recipients in this directory"
-msgstr ""
+msgstr "Buscar destinatarios en este directorio"
 
-#, fuzzy
 msgid "Server"
-msgstr "Servicio"
+msgstr "Servidor"
 
-#, fuzzy
 msgid "Encryption"
-msgstr "Mensaje cifrado"
+msgstr "Cifrado"
 
-#, fuzzy
 msgid "StartTLS"
-msgstr "Destacar"
+msgstr "StartTLS"
 
 msgid "TLS (LDAPS)"
-msgstr ""
+msgstr "TLS (LDAPS)"
 
 msgid "Port"
 msgstr "Puerto"
 
 msgid "Search base, such as dc=example,dc=com"
-msgstr ""
+msgstr "Base de búsqueda, por ejemplo dc=example,dc=com"
 
 msgid "Whole tree"
-msgstr ""
+msgstr "Árbol completo"
 
-#, fuzzy
 msgid "First level"
-msgstr "Nombre"
+msgstr "Primer nivel"
 
-#, fuzzy
 msgid "Sign-in"
-msgstr "Firma"
+msgstr "Inicio de sesión"
 
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
+"Deja estos campos vacíos para un directorio que pueda consultarse sin "
+"iniciar sesión."
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
-msgstr ""
+msgstr "Iniciar sesión como, por ejemplo cn=jane,ou=people,dc=example,dc=com"
 
-#, fuzzy
 msgid "Password (saved; type to replace it)"
-msgstr "Contraseña (déjala vacía para conservarla)"
+msgstr "Contraseña (guardada; escribe para reemplazarla)"
 
 msgid "Enter the directory's server."
-msgstr ""
+msgstr "Introduce el servidor del directorio."
 
-#, fuzzy
 msgid "Attach"
-msgstr "Archivos adjuntos"
+msgstr "Adjuntar"
 
-#, fuzzy
 msgid "Insert in Text"
-msgstr "Insertar enlace"
+msgstr "Insertar en el texto"
 
-#, fuzzy
 msgid "Upload to Cloud"
 msgstr "Subir al almacenamiento en la nube"
 
-#, fuzzy
 msgid "Attach to New Message"
-msgstr "Archivos adjuntos en cada mensaje"
+msgstr "Adjuntar a un mensaje nuevo"
 
-#, fuzzy
 msgid "Insert in New Message"
-msgstr "Editar como mensaje nuevo"
+msgstr "Insertar en un mensaje nuevo"
 
-#, fuzzy
 msgid "Share Link in New Message"
 msgid_plural "Share Links in New Message"
-msgstr[0] "Buscar en el mensaje"
-msgstr[1] "Buscar en el mensaje"
+msgstr[0] "Compartir enlace en un mensaje nuevo"
+msgstr[1] "Compartir enlaces en un mensaje nuevo"
 
 msgid "{n} file · {size}"
 msgid_plural "{n} files · {size}"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{n} archivo · {size}"
+msgstr[1] "{n} archivos · {size}"
 
-#, fuzzy
 msgid "Send as a normal attachment"
 msgid_plural "Send as normal attachments"
-msgstr[0] "Enviar como archivo adjunto en su lugar"
-msgstr[1] "Enviar como archivo adjunto en su lugar"
+msgstr[0] "Enviar como archivo adjunto normal"
+msgstr[1] "Enviar como archivos adjuntos normales"
 
-#, fuzzy
 msgid "Place the picture where the cursor is"
 msgid_plural "Place the pictures where the cursor is"
-msgstr[0] "Paleta de acciones en la lista de mensajes"
-msgstr[1] "Paleta de acciones en la lista de mensajes"
+msgstr[0] "Colocar la imagen donde está el cursor"
+msgstr[1] "Colocar las imágenes donde está el cursor"
 
 msgid "Pictures insert where the cursor is placed, other files attach normally"
 msgstr ""
+"Las imágenes se insertan donde esté el cursor; los demás archivos se "
+"adjuntan normalmente."
 
 msgid "Share a download link from {name}"
-msgstr ""
+msgstr "Compartir un enlace de descarga desde {name}"
 
 msgid "Share a download link"
-msgstr ""
+msgstr "Compartir un enlace de descarga"
 
-#, fuzzy
 msgid "Start a message with the file attached"
 msgid_plural "Start a message with the files attached"
-msgstr[0] "Hay un mensaje nuevo con {n} archivo adjunto abierto en Hylki."
-msgstr[1] "Hay un mensaje nuevo con {n} archivos adjuntos abierto en Hylki."
+msgstr[0] "Iniciar un mensaje con el archivo adjunto"
+msgstr[1] "Iniciar un mensaje con los archivos adjuntos"
 
-#, fuzzy
 msgid "Start a message with the picture in the text"
 msgid_plural "Start a message with the pictures in the text"
-msgstr[0] "Abre primero un mensaje y después imprímelo."
-msgstr[1] "Abre primero un mensaje y después imprímelo."
+msgstr[0] "Iniciar un mensaje con la imagen en el texto"
+msgstr[1] "Iniciar un mensaje con las imágenes en el texto"
 
 msgid ""
 "Start a message with the pictures in the text and the other files attached"
 msgstr ""
+"Iniciar un mensaje con las imágenes en el texto y los demás archivos adjuntos"
 
 msgid "Start a message with a download link from {name}"
 msgid_plural "Start a message with download links from {name}"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Iniciar un mensaje con un enlace de descarga desde {name}"
+msgstr[1] "Iniciar un mensaje con enlaces de descarga desde {name}"
 
 msgid "Start a message with a download link"
 msgid_plural "Start a message with download links"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Iniciar un mensaje con un enlace de descarga"
+msgstr[1] "Iniciar un mensaje con enlaces de descarga"
 
 msgid "Whole conversation"
 msgstr "Conversación completa"
@@ -3093,6 +3072,7 @@ msgstr "Intentar de nuevo"
 #. "unsubscribed" over the proof that it was not.
 msgid "You unsubscribed on {date}, but this list is still sending mail."
 msgstr ""
+"Cancelaste la suscripción el {date}, pero esta lista sigue enviando correo."
 
 msgid "You unsubscribed from this list on {date}."
 msgstr "Cancelaste la suscripción a esta lista el {date}."
@@ -3350,9 +3330,8 @@ msgstr "Reenviar este mensaje"
 msgid "Mark as read or unread"
 msgstr "Marcar como leído o no leído"
 
-#, fuzzy
 msgid "Star this message"
-msgstr "Editar este mensaje"
+msgstr ""
 
 msgid "Move this message to a folder"
 msgstr "Mover este mensaje a una carpeta"
@@ -3401,29 +3380,23 @@ msgstr "La clave del remitente se ha obtenido e importado."
 msgid "The sender's key was already in your keyring."
 msgstr "La clave del remitente ya estaba en tu llavero."
 
-#, fuzzy
 msgid "Open Link"
-msgstr "Abrir enlaces en"
+msgstr "Abrir enlace"
 
-#, fuzzy
 msgid "Copy Email Address"
-msgstr "Dirección de correo electrónico"
+msgstr "Copiar dirección de correo electrónico"
 
-#, fuzzy
 msgid "Copy Link Address"
-msgstr "Dirección de correo electrónico"
+msgstr "Copiar dirección del enlace"
 
-#, fuzzy
 msgid "Save Image As…"
-msgstr "Guardar imagen"
+msgstr "Guardar imagen como…"
 
-#, fuzzy
 msgid "Copy Image"
-msgstr "Imágenes"
+msgstr "Copiar imagen"
 
-#, fuzzy
 msgid "Copy Image Address"
-msgstr "Dirección de correo electrónico"
+msgstr "Copiar dirección de la imagen"
 
 msgid "Load attachments from server"
 msgstr "Cargar archivos adjuntos desde el servidor"
@@ -3830,17 +3803,15 @@ msgstr ""
 "El editor de etiquetas está abierto. Guarda los cambios o descártalos antes "
 "de continuar."
 
-#, fuzzy
 msgid "Save the directory?"
-msgstr "¿Guardar el filtro?"
+msgstr "¿Guardar el directorio?"
 
-#, fuzzy
 msgid ""
 "The directory editor is open. Save what you changed, or discard it, before "
 "moving on."
 msgstr ""
-"El editor de filtros está abierto. Guarda los cambios o descártalos antes de "
-"continuar."
+"El editor de directorios está abierto. Guarda los cambios o descártalos "
+"antes de continuar."
 
 msgid "Save the account?"
 msgstr "¿Guardar la cuenta?"
@@ -3874,19 +3845,17 @@ msgstr ""
 msgid "Show sender and subject"
 msgstr "Mostrar remitente y asunto"
 
-#, fuzzy
 msgid "Sound for new mail"
-msgstr "Comprobar correo nuevo"
+msgstr "Sonido para correo nuevo"
 
 msgid "Sound"
-msgstr ""
+msgstr "Sonido"
 
 msgid "Play"
-msgstr ""
+msgstr "Reproducir"
 
-#, fuzzy
 msgid "Sound file"
-msgstr "Comprobar correo nuevo"
+msgstr "Archivo de sonido"
 
 msgid "Notification Buttons"
 msgstr "Botones de notificación"
@@ -4075,15 +4044,17 @@ msgstr ""
 "etiquetas. Al desactivarlo solo permanece la sección unificada. También está "
 "disponible en el menú principal y con Ctrl+Shift+A."
 
-#, fuzzy
 msgid "Folder order"
-msgstr "Renombrar carpeta"
+msgstr "Orden de las carpetas"
 
 msgid ""
 "How each account's folders are sorted. Dragging a folder puts that account "
 "in Custom Order. An account can choose its own in its settings, or from the "
 "right-click menu of its Folders heading."
 msgstr ""
+"Cómo se ordenan las carpetas de cada cuenta. Al arrastrar una carpeta, esa "
+"cuenta pasa a Orden personalizado. Cada cuenta puede elegir su propio orden "
+"en sus ajustes o desde el menú contextual del encabezado Carpetas."
 
 msgid "Chevron placement"
 msgstr "Posición de los indicadores"
@@ -4587,12 +4558,15 @@ msgstr ""
 "desaparece por completo."
 
 msgid "Name the OpenPGP result"
-msgstr ""
+msgstr "Describir el estado de OpenPGP"
 
 msgid ""
 "Beside the sender, say in words whether a message is signed or encrypted and "
 "whether it checks out. Off shows the lock and shield icons alone."
 msgstr ""
+"Junto al remitente, indica con palabras si un mensaje está firmado o cifrado "
+"y si la comprobación es correcta. Desactivado muestra solo los iconos de "
+"candado y escudo."
 
 msgid "Reader View switch"
 msgstr "Interruptor de Vista de lectura"
@@ -4624,14 +4598,15 @@ msgstr ""
 "puedes separarlo en una ventana desde su cabecera. Desactivado = abrir "
 "directamente una ventana independiente."
 
-#, fuzzy
 msgid "Reply and forward in the main window"
-msgstr "Redactar en la ventana principal"
+msgstr "Responder y reenviar en la ventana principal"
 
 msgid ""
 "A reply or a forward opens in the reading pane, beside the message it "
 "answers. Off = open a separate window."
 msgstr ""
+"Una respuesta o un reenvío se abre en el panel de lectura, junto al mensaje "
+"al que responde. Desactivado = abrir una ventana independiente."
 
 msgid "Show From, To and Subject in the reply panel"
 msgstr "Mostrar De, Para y Asunto en el panel de respuesta"
@@ -4664,13 +4639,16 @@ msgstr ""
 "opciones."
 
 msgid "Return starts a new paragraph"
-msgstr ""
+msgstr "Intro inicia un párrafo nuevo"
 
 msgid ""
 "Return ends the paragraph with a hard return and leaves space before the "
 "next. Off, Return starts a new line in the same paragraph. Shift+Return "
 "always does the other."
 msgstr ""
+"Intro termina el párrafo con un salto de párrafo y deja espacio antes del "
+"siguiente. Desactivado, Intro inicia una línea nueva en el mismo párrafo. "
+"Mayús+Intro siempre hace lo contrario."
 
 msgid "Write messages in"
 msgstr "Escribir mensajes en"
@@ -4696,13 +4674,15 @@ msgstr ""
 "cierra lo que escribiste; debajo aparece tras toda la conversación."
 
 msgid "Separator line above the signature"
-msgstr ""
+msgstr "Línea separadora sobre la firma"
 
 msgid ""
 "Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
 "Mutt use it to dim the signature and to leave it out when they quote your "
 "message."
 msgstr ""
+"Añade el separador estándar «-- » encima de la firma. Thunderbird, Evolution "
+"y Mutt lo utilizan para atenuar la firma y omitirla cuando citan tu mensaje."
 
 msgid "Spelling"
 msgstr "Ortografía"
@@ -5138,35 +5118,33 @@ msgstr "No se pudo eliminar la extensión"
 msgid "Could not restart Files"
 msgstr "No se pudo reiniciar Archivos"
 
-#, fuzzy
 msgid "Choose a Sound"
-msgstr "Elegir una imagen"
+msgstr "Elegir un sonido"
 
 msgid "Sounds"
-msgstr ""
+msgstr "Sonidos"
 
 msgid "Forget this word"
 msgstr "Olvidar esta palabra"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Click"
-msgstr ""
+msgstr "Clic"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Hum"
-msgstr ""
+msgstr "Zumbido"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "String"
-msgstr ""
+msgstr "Cuerda"
 
 #. GNOME Settings' own names for its alert sounds.
 msgid "Swing"
-msgstr ""
+msgstr "Swing"
 
-#, fuzzy
 msgid "Custom File"
-msgstr "Color personalizado…"
+msgstr "Archivo personalizado"
 
 msgid "Print Message"
 msgstr "Imprimir mensaje"
@@ -5269,9 +5247,8 @@ msgstr "Actualizar"
 msgid "New Folder…"
 msgstr "Nueva carpeta…"
 
-#, fuzzy
 msgid "Reset Folder Order"
-msgstr "Renombrar carpeta"
+msgstr "Restablecer el orden de las carpetas"
 
 msgid "Account Settings…"
 msgstr "Ajustes de la cuenta…"
@@ -5282,9 +5259,8 @@ msgstr "Eliminar cuenta…"
 msgid "Show or hide sub-folders"
 msgstr "Mostrar u ocultar subcarpetas"
 
-#, fuzzy
 msgid "Show or hide folders"
-msgstr "Mostrar u ocultar subcarpetas"
+msgstr "Mostrar u ocultar carpetas"
 
 msgid "Folders ({len})"
 msgstr "Carpetas ({len})"
@@ -5292,9 +5268,8 @@ msgstr "Carpetas ({len})"
 msgid "Folders"
 msgstr "Carpetas"
 
-#, fuzzy
 msgid "Sort Folders"
-msgstr "Carpetas"
+msgstr "Ordenar carpetas"
 
 msgid "Add Folder"
 msgstr "Añadir carpeta"
@@ -5314,17 +5289,14 @@ msgstr "Mostrar cada etiqueta"
 msgid "Long-press to expand or collapse"
 msgstr "Mantén pulsado para expandir o contraer"
 
-#, fuzzy
 msgid "Show or hide filters"
-msgstr "Mostrar u ocultar subcarpetas"
+msgstr "Mostrar u ocultar filtros"
 
-#, fuzzy
 msgid "Show or hide tags"
-msgstr "Mostrar u ocultar subcarpetas"
+msgstr "Mostrar u ocultar etiquetas"
 
-#, fuzzy
 msgid "Follow Settings: {sort}"
-msgstr "Seguir Ajustes"
+msgstr "Seguir Ajustes: {sort}"
 
 msgid "Apply Filters"
 msgstr "Aplicar filtros"
@@ -5661,20 +5633,17 @@ msgstr "Enviando…"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Una cuenta de Microsoft no puede recibir correo de otra cuenta"
 
-#, fuzzy
 msgid "Removing the attachment…"
-msgstr "Cargando archivos adjuntos…"
+msgstr "Eliminando el archivo adjunto…"
 
-#, fuzzy
 msgid "Could not remove the attachment: {e}"
-msgstr "No se pudieron cargar los archivos adjuntos: {e}"
+msgstr "No se pudo eliminar el archivo adjunto: {e}"
 
 msgid "Could not list folders: {e}"
 msgstr "No se pudieron listar las carpetas: {e}"
 
-#, fuzzy
 msgid "The attachment is no longer in the message on the server"
-msgstr "Esa carpeta no está en el servidor"
+msgstr "El archivo adjunto ya no está en el mensaje del servidor"
 
 msgid "Still could not send “{subject}”: {e}"
 msgstr "Todavía no se pudo enviar «{subject}»: {e}"
@@ -5693,17 +5662,18 @@ msgstr "Esa carpeta no está en el servidor"
 
 msgid "The message is signed or encrypted, and removing a file would break it"
 msgstr ""
+"El mensaje está firmado o cifrado, y eliminar un archivo lo invalidaría"
 
-#, fuzzy
 msgid "The attachment is the whole message; delete the message instead"
 msgstr ""
-"Reunir todos los archivos adjuntos de la conversación abierta en un panel "
-"situado debajo de los mensajes."
+"El archivo adjunto es el mensaje completo; elimina el mensaje en su lugar"
 
 msgid ""
 "You deleted an attachment from this message. The original MIME headers for "
 "the attachment were:"
 msgstr ""
+"Has eliminado un archivo adjunto de este mensaje. Las cabeceras MIME "
+"originales del archivo adjunto eran:"
 
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "no se pudo leer la respuesta del servidor (comenzaba por: {reply})"
@@ -5720,9 +5690,8 @@ msgstr "No se pudo cargar la conversación: {e}"
 msgid "Could not update message: {e}"
 msgstr "No se pudo actualizar el mensaje: {e}"
 
-#, fuzzy
 msgid "Could not change the star: {e}"
-msgstr "No se pudo etiquetar el mensaje: {e}"
+msgstr ""
 
 msgid ""
 "This server does not store tags, so Hylki keeps them on this computer only"
@@ -5740,6 +5709,8 @@ msgid ""
 "Gmail keeps a copy of every message in All Mail, so Hylki cannot remove an "
 "attachment there"
 msgstr ""
+"Gmail conserva una copia de cada mensaje en «Todos», por lo que Hylki no "
+"puede eliminar allí un archivo adjunto"
 
 msgid "Could not move {len} messages: {e}"
 msgstr "No se pudieron mover {len} mensajes: {e}"
@@ -5803,6 +5774,8 @@ msgstr "Una cuenta POP3 no puede recibir correo de otra cuenta"
 msgid ""
 "POP3 cannot change a message on the server, so the attachment was not removed"
 msgstr ""
+"POP3 no puede modificar un mensaje en el servidor, por lo que el archivo "
+"adjunto no se eliminó"
 
 msgid "Inbox"
 msgstr "Bandeja de entrada"
