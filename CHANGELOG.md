@@ -46,6 +46,13 @@
   have. It now asks the session bus for the service instead. The LDAP
   directories added in #307 were affected the same way and work in the
   Flatpak too.
+- **Fixed: Add to Contacts offered books it could not write to** (#315, by
+  Felix Günther). An account with several address books, such as Nextcloud
+  with Contacts, Recently contacted and System address book, listed each
+  under the account's name alone, and picking a read-only one failed with
+  "Permission denied". Each book is now named after its account and itself,
+  and read-only books are left out, both there and when a new contact is
+  created. The books are looked up without holding up the window.
 - **Changed: "Flag" is called "Star" everywhere.** The reader's toolbar and
   its overflow menu, the message window, the selection bar and Settings →
   Appearance → Toolbar said Flag for the same star the list, the sidebar's

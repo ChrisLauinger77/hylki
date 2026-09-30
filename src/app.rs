@@ -1554,6 +1554,9 @@ pub enum AppMsg {
     /// the composer it announced.
     PresentComposers,
     ContactAdded(Result<crate::contacts::AddOutcome, String>),
+    /// The address books an "Add to Contacts" can go to, gathered off the
+    /// UI thread: the dialog for `name` and `email` opens with them.
+    AddContactBooks { name: String, email: String, books: Vec<crate::contacts::Book> },
     ViewSource,
     /// User clicked "Load attachments" for a message whose attachments weren't
     /// pre-downloaded — fetch them from the server now.
@@ -6817,6 +6820,9 @@ impl SimpleComponent for AppModel {
                 self.show_add_contact_dialog("", &addr, &sender);
             }
 
+            AppMsg::AddContactBooks { name, email, books } => {
+                self.add_contact_dialog(&name, &email, books, &sender);
+            }
             AppMsg::ContactAdded(result) => {
                 use crate::contacts::AddOutcome;
                 let (text, error) = match result {
@@ -17318,8 +17324,24 @@ impl AppModel {
     }
 
     /// Dialog to add an email to GNOME Contacts (choosing the address book).
+    /// Which books can take it is asked of EDS first, off the UI thread:
+    /// that opens every book, and a remote one can go to its server (#315).
     fn show_add_contact_dialog(&self, name: &str, email: &str, sender: &ComponentSender<Self>) {
-        let books = crate::contacts::writable_books();
+        let (name, email) = (name.to_string(), email.to_string());
+        let input = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let books = crate::contacts::writable_books();
+            let _ = input.send(AppMsg::AddContactBooks { name, email, books });
+        });
+    }
+
+    fn add_contact_dialog(
+        &self,
+        name: &str,
+        email: &str,
+        books: Vec<crate::contacts::Book>,
+        sender: &ComponentSender<Self>,
+    ) {
         if books.is_empty() || email.trim().is_empty() {
             self.notifications.emit(NotifyInput::Push {
                 text: i18n("No address book available to add contacts"),

@@ -736,7 +736,29 @@ pub fn writable_books() -> Vec<Book> {
             books.push(Book { uid, name });
         }
     }
+    if let (Some(dest), Ok(conn)) = (factory_dest(), zbus::blocking::Connection::session()) {
+        books.retain(|b| !book_read_only(&conn, &dest, &b.uid));
+    }
     books
+}
+
+/// Whether EDS says the book is read-only (Nextcloud's "Recently contacted"
+/// and system address books are). `Open` fills in `Writable` — from the
+/// server's privileges on first connect, cached after that. Any error counts
+/// as writable, so a save still reports EDS's real failure.
+fn book_read_only(conn: &zbus::blocking::Connection, dest: &str, uid: &str) -> bool {
+    let Ok((bus, path)) = open_book(conn, dest, uid) else { return false };
+    conn.call_method(
+        Some(bus.as_str()),
+        path.as_str(),
+        Some("org.freedesktop.DBus.Properties"),
+        "Get",
+        &(BOOK_IFACE, "Writable"),
+    )
+    .ok()
+    .and_then(|r| r.body().deserialize::<(zbus::zvariant::OwnedValue,)>().ok())
+    .and_then(|(v,)| v.downcast_ref::<bool>().ok())
+        == Some(false)
 }
 
 /// Best-effort display name from the EDS source file for a book UID.
@@ -1069,7 +1091,8 @@ pub(crate) fn registry_sources() -> Option<Vec<(String, String, String)>> {
 fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
     let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
     let mut identity: Option<String> = None;
-    let mut top_display = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
+    let own = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
+    let mut top_display = own.clone();
     let mut current = book_data.to_string();
     for _ in 0..4 {
         let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else { break };
@@ -1086,7 +1109,7 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
         current = parent_data.clone();
     }
     let account = identity.or(top_display);
-    match (backend.as_deref(), account) {
+    let label = match (backend.as_deref(), account.as_deref()) {
         (Some("local"), _) | (None, None) => i18n("On This Computer"),
         (Some("google"), Some(a)) => format!("Google — {a}"),
         (Some("google"), None) => "Google".to_string(),
@@ -1096,6 +1119,13 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
         (Some("ldap"), None) => "LDAP".to_string(),
         (_, Some(a)) => format!("CardDAV — {a}"),
         (_, None) => i18n("CardDAV Address Book"),
+    };
+    // One account can hold several books (Nextcloud: Contacts, Recently
+    // contacted, System address book), so name the book too — unless it is
+    // the account itself.
+    match own {
+        Some(own) if !own.is_empty() && Some(&own) != account.as_ref() => format!("{label} · {own}"),
+        _ => label,
     }
 }
 
@@ -1757,8 +1787,18 @@ mod tests {
                     Identity=someone@gmail.com\n";
         let sources: std::collections::HashMap<String, String> =
             [("acct".to_string(), acct.to_string())].into();
-        assert_eq!(super::book_display_name(book, &sources), "Google — someone@gmail.com");
+        assert_eq!(super::book_display_name(book, &sources), "Google — someone@gmail.com · Contacts");
         assert!(!super::data_source_disabled(book), "[Refresh] Enabled=false is not the switch");
+        // Nextcloud: several books under one account get distinct names…
+        let nc = "[Data Source]\nDisplayName=alice@cloud.example\n\n[Collection]\nBackendName=webdav\n\
+                  Identity=alice\n";
+        let sources: std::collections::HashMap<String, String> = [("acct".to_string(), nc.to_string())].into();
+        let recent = book.replace("DisplayName=Contacts", "DisplayName=Recently contacted");
+        assert_eq!(super::book_display_name(book, &sources), "CardDAV — alice · Contacts");
+        assert_eq!(super::book_display_name(&recent, &sources), "CardDAV — alice · Recently contacted");
+        // …while a standalone book (no parent) isn't named twice.
+        let lone = "[Data Source]\nDisplayName=Work\n\n[Address Book]\nBackendName=carddav\n";
+        assert_eq!(super::book_display_name(lone, &sources), "CardDAV — Work");
         assert!(super::data_source_disabled(&book.replace("Enabled=true", "Enabled=false")));
         assert_eq!(crate::platform::keyfile_value(book, "Address Book", "Missing"), None);
     }
