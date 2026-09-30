@@ -2410,9 +2410,9 @@ fn unasked_threads(
 
 /// Group messages into conversations by their reply headers (Message-ID linked
 /// via In-Reply-To / References), scoped per account. Returns each message's
-/// thread key `(account_id, root)`. Messages with no reply relationship get a
-/// unique key (a thread of one) — so unrelated messages that merely share a
-/// subject are never threaded together.
+/// thread key `(account_id, root)`, looked up by [`thread_slot`]. Messages with
+/// no reply relationship get a unique key (a thread of one) — so unrelated
+/// messages that merely share a subject are never threaded together.
 ///
 /// Age plays no part: a message threads because its headers say what it answers,
 /// and those are indexed with every message. Grouping runs over the rendered
@@ -2422,7 +2422,7 @@ fn unasked_threads(
 fn compute_thread_keys(
     msgs: &[Message],
     links: &[(u32, String, String)],
-) -> std::collections::HashMap<(u32, u32), (u32, String)> {
+) -> std::collections::HashMap<(u32, u32, u32), (u32, String)> {
     use std::collections::HashMap;
 
     // Union-find over message-id nodes (namespaced by account).
@@ -2445,10 +2445,11 @@ fn compute_thread_keys(
         }
     }
     // A message with its own Message-ID is a real node; one without gets a unique
-    // node keyed by uid so it only links through its references (if any).
+    // node keyed by folder and uid so it only links through its references (if
+    // any). A UID names a message in one folder only (#317).
     let self_node = |m: &Message| -> String {
         if m.message_id.is_empty() {
-            format!("{}\u{0}uid{}", m.account_id, m.uid)
+            format!("{}\u{0}uid{}/{}", m.account_id, m.folder_id, m.uid)
         } else {
             format!("{}\u{0}{}", m.account_id, m.message_id)
         }
@@ -2480,9 +2481,17 @@ fn compute_thread_keys(
     let mut out = HashMap::new();
     for m in msgs {
         let root = find(&mut parent, &self_node(m));
-        out.insert((m.account_id, m.id), (m.account_id, root));
+        out.insert(thread_slot(m), (m.account_id, root));
     }
     out
+}
+
+/// Where [`compute_thread_keys`] files a message: its account, folder and id.
+/// The id alone is a UID, which only means something inside one folder, and a
+/// search over every folder holds the same UID many times; keyed without the
+/// folder, one of them joins the other's conversation (#317).
+fn thread_slot(m: &Message) -> (u32, u32, u32) {
+    (m.account_id, m.folder_id, m.id)
 }
 
 /// Style classes for a row: highlight unread messages with a pale accent.
@@ -5229,9 +5238,9 @@ impl MessageList {
             std::collections::HashMap::new()
         };
         let key_for = |m: &Message| -> (u32, String) {
-            keys.get(&(m.account_id, m.id))
+            keys.get(&thread_slot(m))
                 .cloned()
-                .unwrap_or_else(|| (m.account_id, format!("\u{0}uid{}", m.uid)))
+                .unwrap_or_else(|| (m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)))
         };
         let mut order: Vec<(u32, String)> = Vec::new();
         let mut groups: std::collections::HashMap<(u32, String), Vec<Message>> =
@@ -5807,12 +5816,12 @@ impl MessageList {
             return None;
         }
         let source = self.active_source();
-        source.iter().find(|m| (m.account_id, m.id) == key)?;
+        let m = source.iter().find(|m| (m.account_id, m.id) == key)?;
         let keys = compute_thread_keys(source, &self.thread_links);
-        let thread = keys.get(&key)?;
+        let thread = keys.get(&thread_slot(m))?;
         self.shown
             .iter()
-            .find(|m| keys.get(&(m.account_id, m.id)) == Some(thread))
+            .find(|m| keys.get(&thread_slot(m)) == Some(thread))
             .map(|m| (m.account_id, m.id))
     }
 
@@ -5850,12 +5859,12 @@ impl MessageList {
         }
         let source = self.active_source();
         let keys = compute_thread_keys(source, &self.thread_links);
-        let Some(key) = keys.get(&(m.account_id, m.id)).cloned() else {
+        let Some(key) = keys.get(&thread_slot(m)).cloned() else {
             return Vec::new();
         };
         let mut members: Vec<Message> = source
             .iter()
-            .filter(|x| keys.get(&(x.account_id, x.id)) == Some(&key))
+            .filter(|x| keys.get(&thread_slot(x)) == Some(&key))
             .cloned()
             .collect();
         if members.len() <= 1 {
@@ -5881,12 +5890,12 @@ impl MessageList {
         // otherwise the current folder) so the conversation matches the rows shown.
         let source = self.active_source();
         let keys = compute_thread_keys(source, &self.thread_links);
-        let Some(key) = keys.get(&(m.account_id, m.id)).cloned() else {
+        let Some(key) = keys.get(&thread_slot(m)).cloned() else {
             return (vec![m.clone()], false);
         };
         let mut members: Vec<Message> = source
             .iter()
-            .filter(|x| keys.get(&(x.account_id, x.id)) == Some(&key))
+            .filter(|x| keys.get(&thread_slot(x)) == Some(&key))
             .cloned()
             .collect();
         if members.len() <= 1 {
@@ -6034,7 +6043,7 @@ impl MessageList {
 mod tests {
     use super::{
         compute_thread_keys, heads_its_row, latest_elsewhere, nested_members, reader_conversation,
-        row_for_reader_key, swipe_progress_px, unasked_threads, SWIPE_ARM, SWIPE_MAX,
+        row_for_reader_key, swipe_progress_px, thread_slot, unasked_threads, SWIPE_ARM, SWIPE_MAX,
     };
     use crate::models::Message;
 
@@ -6151,8 +6160,8 @@ mod tests {
         // Without the Sent messages there is nothing to join them.
         let alone = compute_thread_keys(&shown, &[]);
         assert_ne!(
-            alone.get(&(1, 1)),
-            alone.get(&(1, 2)),
+            alone.get(&(1, 1, 1)),
+            alone.get(&(1, 1, 2)),
             "nothing on screen links these two"
         );
 
@@ -6163,8 +6172,8 @@ mod tests {
         ];
         let joined = compute_thread_keys(&shown, &links);
         assert_eq!(
-            joined.get(&(1, 1)),
-            joined.get(&(1, 2)),
+            joined.get(&(1, 1, 1)),
+            joined.get(&(1, 1, 2)),
             "the messages in Sent say they belong together"
         );
     }
@@ -6186,9 +6195,9 @@ mod tests {
 
         let shown = [root, first, second];
         let keys = compute_thread_keys(&shown, &[]);
-        let root_key = keys.get(&(1, 1)).cloned().expect("the root is threaded");
-        assert_eq!(keys.get(&(1, 2)), Some(&root_key), "first reply joins");
-        assert_eq!(keys.get(&(1, 3)), Some(&root_key), "second reply joins");
+        let root_key = keys.get(&(1, 1, 1)).cloned().expect("the root is threaded");
+        assert_eq!(keys.get(&(1, 1, 2)), Some(&root_key), "first reply joins");
+        assert_eq!(keys.get(&(1, 1, 3)), Some(&root_key), "second reply joins");
     }
 
     fn listed(items: &[(u32, &str)]) -> Vec<(u32, String, Vec<String>)> {
@@ -6247,13 +6256,42 @@ mod tests {
         assert_eq!(fresh.iter().map(|(a, _, _)| *a).collect::<Vec<_>>(), vec![2]);
     }
 
+    /// A search over every folder holds the same UID once per folder. Those
+    /// are different messages, and each keeps its own conversation (#317).
+    #[test]
+    fn the_same_uid_in_two_folders_stays_two_messages() {
+        let root = msg(5, "root@x", "");
+        let reply = msg(6, "reply@x", "root@x");
+        let mut other = msg(6, "other@y", "");
+        other.folder_id = 2;
+        let mut bare_here = msg(9, "", "");
+        bare_here.folder_id = 1;
+        let mut bare_there = msg(9, "", "");
+        bare_there.folder_id = 2;
+        let pool = [root, reply, other.clone(), bare_here, bare_there];
+        let keys = compute_thread_keys(&pool, &[]);
+        let conversation = keys.get(&(1, 1, 5)).cloned().expect("threaded");
+        let members: Vec<(u32, u32)> = pool
+            .iter()
+            .filter(|m| keys.get(&thread_slot(m)) == Some(&conversation))
+            .map(|m| (m.folder_id, m.uid))
+            .collect();
+        assert_eq!(members, vec![(1, 5), (1, 6)], "only the root and its reply");
+        assert_ne!(keys.get(&thread_slot(&other)), Some(&conversation));
+        assert_ne!(
+            keys.get(&(1, 1, 9)),
+            keys.get(&(1, 2, 9)),
+            "no Message-ID and one UID in two folders: still two messages"
+        );
+    }
+
     /// Links are evidence, not glue: unrelated mail must not be pulled in.
     #[test]
     fn links_do_not_merge_unrelated_conversations() {
         let shown = [msg(1, "a@x", ""), msg(2, "b@x", "")];
         let links = vec![(1u32, "c@x".to_string(), "a@x".to_string())];
         let keys = compute_thread_keys(&shown, &links);
-        assert_ne!(keys.get(&(1, 1)), keys.get(&(1, 2)), "still two conversations");
+        assert_ne!(keys.get(&(1, 1, 1)), keys.get(&(1, 1, 2)), "still two conversations");
     }
 
     /// A long conversation groups whole. What it may drag in from *other*
@@ -6270,13 +6308,13 @@ mod tests {
         }
         // All one conversation by their shared reference.
         let keys = compute_thread_keys(&members, &[]);
-        let root = keys.get(&(1, 1)).cloned().expect("threaded");
+        let root = keys.get(&(1, 1, 1)).cloned().expect("threaded");
         assert!(
-            members.iter().all(|m| keys.get(&(1, m.id)) == Some(&root)),
+            members.iter().all(|m| keys.get(&(1, 1, m.id)) == Some(&root)),
             "one conversation"
         );
         assert_eq!(
-            members.iter().filter(|m| keys.get(&(1, m.id)) == Some(&root)).count(),
+            members.iter().filter(|m| keys.get(&(1, 1, m.id)) == Some(&root)).count(),
             n,
             "every message belongs to it, however long the thread runs"
         );

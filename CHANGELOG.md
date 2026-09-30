@@ -32,6 +32,14 @@
   otherwise. A Tags button there, and a Tags submenu in the selection's
   right-click menu, put a tag on every selected message, or take it off
   them all when each already has it.
+- **Fixed: a conversation found by searching all folders showed mail from
+  other conversations** (#317, reported by Nonchalantcz). The search
+  grouped its results into conversations by message number, and a number
+  is only unique within one folder, so a message in another folder with the
+  same number as one in the conversation was shown in it as well. Results
+  are now grouped by folder and number. A conversation opened earlier is
+  also remembered by its folder, so returning to one no longer shows
+  another folder's conversation with the same number.
 - **Changed: "Flag" is called "Star" everywhere.** The reader's toolbar and
   its overflow menu, the message window, the selection bar and Settings →
   Appearance → Toolbar said Flag for the same star the list, the sidebar's

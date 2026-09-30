@@ -795,17 +795,18 @@ pub struct AppModel {
     /// Returning to a thread paints from here rather than re-running the
     /// cross-folder lookup and re-gathering bodies: the wait belongs to the
     /// first open, not to every one. Bounded — a conversation holds its
-    /// messages' bodies, which are not small.
-    thread_cache: HashMap<(u32, u32), Vec<Message>>,
+    /// messages' bodies, which are not small. Keyed by the head's folder and
+    /// UID: a UID alone names a different message in every folder (#317).
+    thread_cache: HashMap<BodyKey, Vec<Message>>,
     /// Attachments being deleted from the server (#289), shown as such in
     /// the drawer and the gallery until the worker answers.
     deleting_attachments: Vec<AttachmentTarget>,
     /// Showcase only: answer the next delete question with Delete.
     showcase_confirm_delete: bool,
     /// Insertion order for `thread_cache`, oldest first.
-    thread_cache_order: Vec<(u32, u32)>,
+    thread_cache_order: Vec<BodyKey>,
     /// Which conversation `current_thread` is, for storing it back.
-    thread_key: Option<(u32, u32)>,
+    thread_key: Option<BodyKey>,
     /// Whether conversation threads start expanded in the message list.
     threads_expanded: bool,
     /// Reading pane shows conversations newest-message-first.
@@ -6155,7 +6156,7 @@ impl SimpleComponent for AppModel {
                 }
 
                 if thread.len() > 1 {
-                    self.thread_key = Some((account_id, m.id));
+                    self.thread_key = Some(body_key(&m));
                     // Already assembled: paint it now. No lookup, no body
                     // gathering, no spinner — returning to a thread shouldn't
                     // cost what opening it did.
@@ -6164,9 +6165,9 @@ impl SimpleComponent for AppModel {
                         "select {}: thread of {}, remembered={}, needs_body={needs_body}",
                         m.id,
                         thread.len(),
-                        self.thread_cache.contains_key(&(account_id, m.id)),
+                        self.thread_cache.contains_key(&body_key(&m)),
                     );
-                    if let Some(cached) = self.thread_cache.get(&(account_id, m.id)).cloned() {
+                    if let Some(cached) = self.thread_cache.get(&body_key(&m)).cloned() {
                         self.current_thread = cached;
                         // The message just opened is read, whatever the stored
                         // copy said when it was put away.
@@ -6333,7 +6334,7 @@ impl SimpleComponent for AppModel {
                     conv.len()
                 );
                 self.current_thread = conv;
-                self.thread_key = Some(key);
+                self.thread_key = Some(body_key(&m));
                 // The conversation is already painted: the new card joins it
                 // in place. Its body, when not prefetched, is asked for and
                 // the render follows its arrival (the Body handler repaints a
@@ -9841,7 +9842,7 @@ impl SimpleComponent for AppModel {
                             "re-filed conversation under id {}",
                             m.id,
                         );
-                        self.remember_thread_for((account_id, m.id), thread);
+                        self.remember_thread_for(body_key(m), thread);
                     }
                 }
                 if self.unified {
@@ -11594,7 +11595,7 @@ impl AppModel {
             .iter()
             .filter_map(|m| {
                 self.thread_cache
-                    .get(&(account_id, m.id))
+                    .get(&body_key(m))
                     .map(|t| (m.message_id.clone(), t.clone()))
             })
             .collect();
@@ -14169,7 +14170,7 @@ impl AppModel {
         // included), else what the list handed over. Members still missing
         // bodies get them fetched; the replies land via SetBody below.
         let mut thread = if thread.len() > 1 {
-            self.thread_cache.get(&key).cloned().unwrap_or(thread)
+            self.thread_cache.get(&body_key(&m)).cloned().unwrap_or(thread)
         } else {
             thread
         };
@@ -16985,7 +16986,7 @@ impl AppModel {
 
     /// The same, for a conversation that isn't the one on screen — carrying
     /// one over a move that changed its key (#200).
-    fn remember_thread_for(&mut self, key: (u32, u32), thread: Vec<Message>) {
+    fn remember_thread_for(&mut self, key: BodyKey, thread: Vec<Message>) {
         if thread.len() <= 1 {
             return;
         }
@@ -17001,8 +17002,8 @@ impl AppModel {
     /// Forget assembled conversations for an account — its mail has changed
     /// underneath them, so what they hold may no longer be the conversation.
     fn forget_threads(&mut self, account_id: u32) {
-        self.thread_cache.retain(|(aid, _), _| *aid != account_id);
-        self.thread_cache_order.retain(|(aid, _)| *aid != account_id);
+        self.thread_cache.retain(|(aid, _, _), _| *aid != account_id);
+        self.thread_cache_order.retain(|(aid, _, _)| *aid != account_id);
     }
 
     /// Reply headers for every cached message, so the list can see that two
