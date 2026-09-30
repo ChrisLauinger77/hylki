@@ -4963,6 +4963,28 @@ impl SimpleComponent for AppModel {
                         s.input(AppMsg::ShowSettingsPage(page.clone()));
                     });
                 }
+                // HYLKI_SHOWCASE_ADD_CONTACT=<address> opens Add to Contacts
+                // for it at 6s and captures the dialog at 10s, beside the
+                // HYLKI_SHOWCASE file, so the books it offers can be checked.
+                if let Ok(addr) = std::env::var("HYLKI_SHOWCASE_ADD_CONTACT") {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                        s.input(AppMsg::AddContactAddr(addr));
+                    });
+                    gtk::glib::timeout_add_seconds_local_once(10, move || {
+                        let tops = gtk::Window::toplevels();
+                        let dialog = (0..tops.n_items())
+                            .filter_map(|i| tops.item(i))
+                            .filter_map(|o| o.downcast::<adw::MessageDialog>().ok())
+                            .find(|d| d.is_visible());
+                        match (dialog, std::env::var("HYLKI_SHOWCASE")) {
+                            (Some(d), Ok(path)) => {
+                                showcase_capture(d.upcast_ref(), &format!("{path}.contact.png"))
+                            }
+                            _ => tracing::warn!("showcase: no Add to Contacts dialog"),
+                        }
+                    });
+                }
                 // HYLKI_SHOWCASE_DIALOG=save|discard|cancel answers whatever
                 // message dialog is on screen at 10s.
                 if let Ok(answer) = std::env::var("HYLKI_SHOWCASE_DIALOG") {
