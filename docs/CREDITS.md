@@ -86,6 +86,11 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   recipient lookups in LDAP directories. The composer asks the directories
   as an address is typed, once the typing pauses, and drops an answer that
   arrives for text since changed, as the #307 branch did.
+- [**Felix Günther**](https://github.com/fegue) ([#314](https://github.com/hyprlab/hylki/pull/314),
+  [#315](https://github.com/hyprlab/hylki/pull/315)): saving contacts and
+  reading LDAP directories in the Flatpak, which finds Evolution Data Server
+  by asking the session bus, and an address book picker that names each book
+  and leaves out the read-only ones.
 
 
 ## Reports, design and ideas

@@ -749,8 +749,59 @@ fn source_display_name(uid: &str) -> Option<String> {
 // Writing (EDS D-Bus)
 // ---------------------------------------------------------------------------
 
+/// Find a versioned EDS bus name (`<prefix><digits>`, e.g. `…AddressBook10`)
+/// by asking the session bus itself.
+///
+/// Inside Flatpak, `/usr/share/dbus-1/services` is the *runtime's* directory
+/// and holds none of the host's EDS service files, so the file scan below
+/// finds nothing there. The bus, however, lists the host's EDS names (the
+/// `--talk-name=org.gnome.evolution.dataserver.*` grant makes them visible),
+/// so query it first and keep the file scan as a fallback.
+fn bus_dest(prefix: &str) -> Option<String> {
+    let conn = zbus::blocking::Connection::session().ok()?;
+    let proxy = zbus::blocking::fdo::DBusProxy::new(&conn).ok()?;
+    let mut names: Vec<String> =
+        proxy.list_names().unwrap_or_default().iter().map(|n| n.as_str().to_string()).collect();
+    names.extend(
+        proxy.list_activatable_names().unwrap_or_default().iter().map(|n| n.as_str().to_string()),
+    );
+    // Highest interface version wins if several are present.
+    names
+        .into_iter()
+        .filter_map(|n| {
+            let ver: u32 = n.strip_prefix(prefix)?.parse().ok()?;
+            Some((ver, n))
+        })
+        .max_by_key(|(ver, _)| *ver)
+        .map(|(_, n)| n)
+}
+
+/// The EDS name for `prefix`, from the bus or else the service files, looked
+/// up once per run: callers ask on every contact write and directory search,
+/// some of them on the UI thread, and the name does not change under a
+/// running session. Only a name found is kept, so EDS starting late is
+/// still picked up.
+fn remembered(prefix: &'static str, from_files: fn() -> Option<String>) -> Option<String> {
+    static FOUND: std::sync::Mutex<Vec<(&'static str, String)>> = std::sync::Mutex::new(Vec::new());
+    if let Some((_, name)) = FOUND.lock().ok()?.iter().find(|(p, _)| *p == prefix) {
+        return Some(name.clone());
+    }
+    let name = bus_dest(prefix).or_else(from_files)?;
+    tracing::debug!("EDS: {prefix} is {name}");
+    if let Ok(mut found) = FOUND.lock() {
+        found.push((prefix, name.clone()));
+    }
+    Some(name)
+}
+
 /// Discover the versioned AddressBook factory bus name (e.g. `…AddressBook10`).
 pub(crate) fn factory_dest() -> Option<String> {
+    remembered("org.gnome.evolution.dataserver.AddressBook", factory_dest_from_files)
+}
+
+/// Fallback: read the name from the host's D-Bus service files (works outside
+/// Flatpak only).
+fn factory_dest_from_files() -> Option<String> {
     let dir = std::path::Path::new("/usr/share/dbus-1/services");
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -1055,6 +1106,12 @@ fn data_source_disabled(data: &str) -> bool {
 
 /// Discover the versioned Sources registry bus name (e.g. `…Sources5`).
 pub(crate) fn sources_dest() -> Option<String> {
+    remembered("org.gnome.evolution.dataserver.Sources", sources_dest_from_files)
+}
+
+/// Fallback: read the name from the host's D-Bus service files (works outside
+/// Flatpak only).
+fn sources_dest_from_files() -> Option<String> {
     let dir = std::path::Path::new("/usr/share/dbus-1/services");
     for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().to_string();

@@ -40,6 +40,12 @@
   are now grouped by folder and number. A conversation opened earlier is
   also remembered by its folder, so returning to one no longer shows
   another folder's conversation with the same number.
+- **Fixed: saving a contact failed in the Flatpak** (#314, by Felix
+  Günther), with "Evolution Data Server is not available". Hylki looked for
+  Evolution Data Server's service files, which the Flatpak runtime does not
+  have. It now asks the session bus for the service instead. The LDAP
+  directories added in #307 were affected the same way and work in the
+  Flatpak too.
 - **Changed: "Flag" is called "Star" everywhere.** The reader's toolbar and
   its overflow menu, the message window, the selection bar and Settings →
   Appearance → Toolbar said Flag for the same star the list, the sidebar's
