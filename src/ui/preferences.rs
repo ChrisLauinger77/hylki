@@ -158,6 +158,7 @@ pub struct PrefInit {
     pub list_headings: bool,
     pub single_key_shortcuts: bool,
     pub gmail_keys: bool,
+    pub keep_downloads_days: u32,
     pub run_in_background: bool,
     pub autostart: bool,
     pub tray: bool,
@@ -416,6 +417,9 @@ pub struct Preferences {
     editor_open: bool,
     /// Which side page's editor is up: "accounts", "cloud" or "directories".
     editor_page: &'static str,
+    /// What downloaded mail takes up (#394): message bodies, attachment
+    /// files and the whole cache file, in bytes; `None` while measuring.
+    storage: Option<(u64, u64, u64)>,
     /// The GNOME Files extension (#188): installed, loaded, loader present.
     nautilus: crate::nautilus_ext::State,
     /// The terminal command that installs the nautilus-python package on
@@ -1057,6 +1061,25 @@ fn hide_edit_icon(widget: &gtk::Widget) {
 }
 
 /// A plain error alert over the settings window.
+/// The choices of Settings → System → Keep downloaded mail, in days; 0 keeps
+/// it (#394).
+const KEEP_DOWNLOADS_DAYS: [u32; 4] = [0, 365, 90, 30];
+
+/// What the Downloaded mail row says.
+fn storage_text(storage: Option<(u64, u64, u64)>) -> String {
+    match storage {
+        None => i18n("Measuring…"),
+        Some((bodies, files, total)) => i18n_f(
+            "Messages {bodies}, attachments {files}. The cache, message list included, is {total}.",
+            &[
+                ("bodies", gtk::glib::format_size(bodies).as_str()),
+                ("files", gtk::glib::format_size(files).as_str()),
+                ("total", gtk::glib::format_size(total).as_str()),
+            ],
+        ),
+    }
+}
+
 fn report(parent: &adw::Window, heading: &str, body: &str) {
     let dialog = adw::MessageDialog::new(Some(parent), Some(heading), Some(body));
     dialog.add_response("ok", &i18n("OK"));
@@ -1098,6 +1121,13 @@ pub enum PrefInput {
     /// Re-read the extension's state (the System page came into view; Files
     /// may have loaded the extension since).
     NautilusRefresh,
+    /// Settings → System → Storage (#394): measure what downloaded mail
+    /// takes up, off the main thread, and the answer.
+    MeasureStorage,
+    StorageMeasured { bodies: u64, files: u64, total: u64 },
+    RemoveDownloads,
+    RemoveDownloadsNow,
+    ChangeKeepDownloads(u32),
     ToggleThreading(bool),
     ChangeReaderDefault(u32),
     ChangeReaderZoom(u32),
@@ -1326,6 +1356,8 @@ pub enum PrefOutput {
     ResetColumnWidths,
     SetSingleKey(bool),
     SetGmailKeys(bool),
+    /// How many days downloaded mail is kept; 0 keeps it (#394).
+    SetKeepDownloads(u32),
     SetRunInBackground(bool),
     SetAutostart(bool),
     SetTray(bool),
@@ -3751,6 +3783,41 @@ impl Component for Preferences {
                                     },
                                 },
 
+                                // What downloaded mail takes up, and how long it
+                                // stays (#394).
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Storage"),
+                                    set_description: Some(
+                                        i18n("Messages and attachments opened or fetched ahead are kept on this \
+                                              computer, so they open at once and offline. The list of every \
+                                              message, which the message list and search read, always stays.").as_str()
+                                    ),
+
+                                    adw::ActionRow {
+                                        set_title: &i18n("Downloaded mail"),
+                                        #[watch]
+                                        set_subtitle: &storage_text(model.storage),
+                                        add_suffix = &gtk::Button {
+                                            set_label: &i18n("Remove…"),
+                                            set_valign: gtk::Align::Center,
+                                            add_css_class: "destructive-action",
+                                            #[watch]
+                                            set_sensitive: model.storage.is_some_and(|(b, f, _)| b + f > 0),
+                                            connect_clicked => PrefInput::RemoveDownloads,
+                                        },
+                                    },
+
+                                    #[name = "keep_downloads_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Keep downloaded mail"),
+                                        set_subtitle: &i18n("Older messages and their attachments are removed \
+                                                       from this computer and fetched again when opened."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeKeepDownloads(row.selected()));
+                                        },
+                                    },
+                                },
+
                                 // The Files right-click extension (#188).
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("GNOME Files Integration"),
@@ -3931,6 +3998,7 @@ impl Component for Preferences {
             contact_books: Vec::new(),
             contact_book_row: None,
             contact_book_guard: std::cell::Cell::new(false),
+            storage: None,
             nautilus: crate::nautilus_ext::State::read(),
             nautilus_cmd: crate::platform::nautilus_python_install_command(),
             files: init.files,
@@ -4270,6 +4338,15 @@ impl Component for Preferences {
         tracing::debug!("settings window: prefs tail A (tray) at {:?}", t_init.elapsed());
         widgets.single_key_row.set_active(init.single_key_shortcuts);
         widgets.gmail_keys_row.set_active(init.gmail_keys);
+        widgets.keep_downloads_row.set_model(Some(&gtk::StringList::new(&[
+            &i18n("Always"),
+            &i18n("A year"),
+            &i18n("90 days"),
+            &i18n("30 days"),
+        ])));
+        widgets.keep_downloads_row.set_selected(
+            KEEP_DOWNLOADS_DAYS.iter().position(|d| *d == init.keep_downloads_days).unwrap_or(0) as u32,
+        );
         widgets.console_mode_row.set_active(init.console_mode);
         widgets.read_mark_row.set_model(Some(&gtk::StringList::new(&[
             i18n("When displayed").as_str(),
@@ -4823,6 +4900,61 @@ impl Component for Preferences {
                 }
                 self.nautilus = crate::nautilus_ext::State::read();
             }
+            PrefInput::MeasureStorage => {
+                let s = sender.input_sender().clone();
+                gtk::glib::spawn_future_local(async move {
+                    let measured = gtk::gio::spawn_blocking(|| {
+                        let (bodies, files) = crate::cache::Cache::open().map(|c| c.downloaded_size()).unwrap_or((0, 0));
+                        (bodies, files, crate::cache::Cache::file_size())
+                    })
+                    .await;
+                    if let Ok((bodies, files, total)) = measured {
+                        let _ = s.send(PrefInput::StorageMeasured { bodies, files, total });
+                    }
+                });
+            }
+            PrefInput::StorageMeasured { bodies, files, total } => self.storage = Some((bodies, files, total)),
+            PrefInput::RemoveDownloads => {
+                let dialog = adw::AlertDialog::new(
+                    Some(&i18n("Remove downloaded mail?")),
+                    Some(&i18n("Every message and attachment kept on this computer is removed, and fetched \
+                               again from the server when it is opened. Nothing on the server changes.")),
+                );
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("remove", &i18n("Remove"));
+                dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_close_response("cancel");
+                let s = sender.input_sender().clone();
+                dialog.connect_response(None, move |_, resp| {
+                    if resp == "remove" {
+                        let _ = s.send(PrefInput::RemoveDownloadsNow);
+                    }
+                });
+                dialog.present(Some(root));
+            }
+            PrefInput::RemoveDownloadsNow => {
+                self.storage = None;
+                let s = sender.input_sender().clone();
+                gtk::glib::spawn_future_local(async move {
+                    let _ = gtk::gio::spawn_blocking(|| {
+                        match crate::cache::Cache::open().and_then(|c| {
+                            let n = c.remove_downloaded(None)?;
+                            let _ = c.compact();
+                            Ok(n)
+                        }) {
+                            Ok(n) => tracing::info!("storage: removed {n} downloaded message(s)"),
+                            Err(e) => tracing::warn!("storage: could not remove downloaded mail: {e}"),
+                        }
+                    })
+                    .await;
+                    let _ = s.send(PrefInput::MeasureStorage);
+                });
+            }
+            PrefInput::ChangeKeepDownloads(idx) => {
+                let days = KEEP_DOWNLOADS_DAYS.get(idx as usize).copied().unwrap_or(0);
+                let _ = sender.output(PrefOutput::SetKeepDownloads(days));
+            }
             PrefInput::NautilusRemove => {
                 if let Err(e) = crate::nautilus_ext::remove() {
                     report(root, &i18n("Could not remove the extension"), &e);
@@ -5366,6 +5498,7 @@ impl Component for Preferences {
                     self.show_page(&id);
                     if id == "system" {
                         sender.input(PrefInput::NautilusRefresh);
+                        sender.input(PrefInput::MeasureStorage);
                     }
                     let _ = sender.output(PrefOutput::PageShown(id));
                 }

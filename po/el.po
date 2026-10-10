@@ -4520,6 +4520,15 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Εγκατεστημένο, αλλά όχι το αντίγραφο αυτής της έκδοσης"
 
+#, fuzzy
+msgid "Measuring…"
+msgstr "Αναζήτηση…"
+
+msgid ""
+"Messages {bodies}, attachments {files}. The cache, message list included, is "
+"{total}."
+msgstr ""
+
 msgid "Search Settings"
 msgstr "Αναζήτηση στις Ρυθμίσεις"
 
@@ -5861,6 +5870,28 @@ msgstr ""
 "για επισύναψη σε αναφορά σφάλματος. Οι διευθύνσεις email συντομεύονται στον "
 "τομέα τους."
 
+msgid ""
+"Messages and attachments opened or fetched ahead are kept on this computer, "
+"so they open at once and offline. The list of every message, which the "
+"message list and search read, always stays."
+msgstr ""
+
+#, fuzzy
+msgid "Downloaded mail"
+msgstr "Λήψη…"
+
+#, fuzzy
+msgid "Remove…"
+msgstr "Αφαίρεση"
+
+msgid "Keep downloaded mail"
+msgstr ""
+
+msgid ""
+"Older messages and their attachments are removed from this computer and "
+"fetched again when opened."
+msgstr ""
+
 msgid "GNOME Files Integration"
 msgstr "Ενσωμάτωση με τα Αρχεία GNOME"
 
@@ -6005,6 +6036,20 @@ msgstr ""
 "Η εκκίνηση εμφανίζει ένα σύνολο εικονιδίων εκτός του Hylki. Η επιλογή ενός "
 "εδώ το αντικαθιστά."
 
+#, fuzzy
+msgid "Always"
+msgstr "Πάντα ορατή"
+
+#, fuzzy
+msgid "A year"
+msgstr "1 έτος"
+
+msgid "90 days"
+msgstr ""
+
+msgid "30 days"
+msgstr ""
+
 msgid "When displayed"
 msgstr "Κατά την εμφάνιση"
 
@@ -6085,6 +6130,14 @@ msgstr "{percent}%"
 
 msgid "Could not install the extension"
 msgstr "Δεν ήταν δυνατή η εγκατάσταση της επέκτασης"
+
+msgid "Remove downloaded mail?"
+msgstr ""
+
+msgid ""
+"Every message and attachment kept on this computer is removed, and fetched "
+"again from the server when it is opened. Nothing on the server changes."
+msgstr ""
 
 msgid "Could not remove the extension"
 msgstr "Δεν ήταν δυνατή η αφαίρεση της επέκτασης"

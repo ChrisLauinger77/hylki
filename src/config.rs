@@ -1432,6 +1432,10 @@ pub(crate) struct PrivacyFile {
     /// then a letter goes to a folder. Off by default.
     #[serde(default)]
     pub(crate) gmail_keys: bool,
+    /// How many days downloaded mail (bodies and attachment files) is kept
+    /// on this computer (#394); 0 keeps it. The message index always stays.
+    #[serde(default)]
+    pub(crate) keep_downloads_days: u32,
     /// Keep running after the window is closed, so new mail still arrives and
     /// notifies. Off by default: closing a window is expected to quit.
     #[serde(default)]
@@ -1709,6 +1713,7 @@ impl Default for PrivacyFile {
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
             gmail_keys: false,
+            keep_downloads_days: 0,
             run_in_background: false,
             autostart: false,
             tray: false,

@@ -1122,6 +1122,17 @@ manager shows it, and so do the Dash to Dock and Dash to Panel extensions
 for GNOME; GNOME's own dash has no badges. **Settings → System → Unread count
 on the app icon** turns it off. Stored as `launcher_count` in `privacy.toml`.
 
+### Storage
+
+Messages and attachments that have been opened, or fetched ahead for the
+newest mail in each folder, are kept on the computer so they open at once and
+offline. **Settings → System → Storage** shows what they take up.
+**Remove…** clears them all; **Keep downloaded mail** (Always, a year, 90 days
+or 30 days) removes older ones a couple of minutes after Hylki starts and
+every six hours after. Either way the list of every message stays, so the
+message list and search are unchanged, and a removed message is fetched again
+when it is opened. Nothing on the server changes.
+
 ### Notifications
 
 A new-mail notification opens the message when clicked. When it is about a

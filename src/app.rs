@@ -810,6 +810,8 @@ pub struct AppModel {
     /// Gmail's single-key map in place of Hylki's (#392), shared with the
     /// key controller like `single_key`.
     gmail_keys: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Settings → System → Keep downloaded mail, in days; 0 keeps it (#394).
+    keep_downloads_days: u32,
     /// Whether messages are grouped into conversation threads.
     threading: bool,
     /// A conversation re-render is already scheduled, so further bodies arriving
@@ -3225,6 +3227,7 @@ impl SimpleComponent for AppModel {
                 config::load_privacy().single_key_shortcuts,
             )),
             gmail_keys: std::rc::Rc::new(std::cell::Cell::new(config::load_privacy().gmail_keys)),
+            keep_downloads_days: config::load_privacy().keep_downloads_days,
             threading: prefs.threading,
             thread_render_queued: false,
             thread_opened_at: None,
@@ -3370,6 +3373,16 @@ impl SimpleComponent for AppModel {
         model.refresh_own_faces();
         model.warm_own_gravatars(&sender);
         model.spawn_workers(&sender);
+        // Downloaded mail past Settings → System → Keep downloaded mail goes
+        // a little after start, once the first syncs are under way, and
+        // every six hours after (#394).
+        gtk::glib::timeout_add_seconds_local_once(120, || {
+            prune_downloads(config::load_privacy().keep_downloads_days);
+            gtk::glib::timeout_add_seconds_local(6 * 3600, || {
+                prune_downloads(config::load_privacy().keep_downloads_days);
+                gtk::glib::ControlFlow::Continue
+            });
+        });
         // GNOME keeps a notification after the app that posted it has quit,
         // and a new instance knows nothing of what it pointed at, so it
         // could only linger (#333). New mail since is notified afresh.
@@ -7654,6 +7667,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetKeepDownloads(days)) => {
+                if self.keep_downloads_days != days {
+                    self.keep_downloads_days = days;
+                    self.save_settings();
+                    prune_downloads(days);
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetGmailKeys(on)) => {
                 if self.gmail_keys.get() != on {
                     self.gmail_keys.set(on);
@@ -11591,6 +11612,7 @@ impl AppModel {
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
+            keep_downloads_days: self.keep_downloads_days,
             run_in_background: self.run_in_background.get(),
             autostart: self.autostart,
             tray: self.tray_enabled,
@@ -19042,6 +19064,7 @@ impl AppModel {
             list_headings: self.list_headings,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
+            keep_downloads_days: self.keep_downloads_days,
             run_in_background: self.run_in_background.get(),
             autostart: self.autostart,
             tray: self.tray_enabled,
@@ -22255,6 +22278,22 @@ pub fn queue_attach_files(paths: Vec<std::path::PathBuf>) {
         }
         None => ATTACH_PENDING.lock().unwrap().push(paths),
     }
+}
+
+/// Remove downloaded mail older than `days` (#394), off the main thread;
+/// 0 keeps it all.
+fn prune_downloads(days: u32) {
+    if days == 0 {
+        return;
+    }
+    let before = crate::datefmt::now() - i64::from(days) * 86_400;
+    std::thread::spawn(move || {
+        match crate::cache::Cache::open().and_then(|c| c.remove_downloaded(Some(before))) {
+            Ok(0) => {}
+            Ok(n) => tracing::info!("storage: removed {n} downloaded message(s) older than {days} days"),
+            Err(e) => tracing::warn!("storage: could not remove old downloaded mail: {e}"),
+        }
+    });
 }
 
 /// Message files that arrived before the component was up (see `MAILTO_PENDING`).

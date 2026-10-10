@@ -4570,6 +4570,15 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Zainstalowane, ale nie z tej wersji aplikacji"
 
+#, fuzzy
+msgid "Measuring…"
+msgstr "Wyszukiwanie…"
+
+msgid ""
+"Messages {bodies}, attachments {files}. The cache, message list included, is "
+"{total}."
+msgstr ""
+
 msgid "Search Settings"
 msgstr "Wyszukaj ustawienia"
 
@@ -5870,6 +5879,28 @@ msgstr ""
 "Hylki, aby dołączyć to do zgłoszenia błędu. Adresy e-mail są skracane do "
 "domeny."
 
+msgid ""
+"Messages and attachments opened or fetched ahead are kept on this computer, "
+"so they open at once and offline. The list of every message, which the "
+"message list and search read, always stays."
+msgstr ""
+
+#, fuzzy
+msgid "Downloaded mail"
+msgstr "Pobierz…"
+
+#, fuzzy
+msgid "Remove…"
+msgstr "Usuń"
+
+msgid "Keep downloaded mail"
+msgstr ""
+
+msgid ""
+"Older messages and their attachments are removed from this computer and "
+"fetched again when opened."
+msgstr ""
+
 msgid "GNOME Files Integration"
 msgstr "Integracja z aplikacją Pliki"
 
@@ -6014,6 +6045,20 @@ msgstr ""
 "Program uruchamiający wyświetla ikonę ustawioną poza aplikacją Hylki. "
 "Wybranie ikony w tym miejscu ją zastąpi."
 
+#, fuzzy
+msgid "Always"
+msgstr "Zawsze widoczna"
+
+#, fuzzy
+msgid "A year"
+msgstr "1 rok"
+
+msgid "90 days"
+msgstr ""
+
+msgid "30 days"
+msgstr ""
+
 msgid "When displayed"
 msgstr "Po wyświetleniu"
 
@@ -6096,6 +6141,14 @@ msgstr "{percent}%"
 
 msgid "Could not install the extension"
 msgstr "Nie udało się zainstalować rozszerzenia"
+
+msgid "Remove downloaded mail?"
+msgstr ""
+
+msgid ""
+"Every message and attachment kept on this computer is removed, and fetched "
+"again from the server when it is opened. Nothing on the server changes."
+msgstr ""
 
 msgid "Could not remove the extension"
 msgstr "Nie udało się usunąć rozszerzenia"

@@ -4464,6 +4464,15 @@ msgstr ""
 msgid "Installed, but not this version's copy"
 msgstr "Instalado, pero no corresponde a esta versión"
 
+#, fuzzy
+msgid "Measuring…"
+msgstr "Buscando…"
+
+msgid ""
+"Messages {bodies}, attachments {files}. The cache, message list included, is "
+"{total}."
+msgstr ""
+
 msgid "Search Settings"
 msgstr "Buscar en Ajustes"
 
@@ -5788,6 +5797,28 @@ msgstr ""
 "para adjuntarlo a un informe de error. Las direcciones de correo se reducen "
 "a su dominio."
 
+msgid ""
+"Messages and attachments opened or fetched ahead are kept on this computer, "
+"so they open at once and offline. The list of every message, which the "
+"message list and search read, always stays."
+msgstr ""
+
+#, fuzzy
+msgid "Downloaded mail"
+msgstr "Descargar…"
+
+#, fuzzy
+msgid "Remove…"
+msgstr "Eliminar"
+
+msgid "Keep downloaded mail"
+msgstr ""
+
+msgid ""
+"Older messages and their attachments are removed from this computer and "
+"fetched again when opened."
+msgstr ""
+
 msgid "GNOME Files Integration"
 msgstr "Integración con Archivos de GNOME"
 
@@ -5929,6 +5960,20 @@ msgstr ""
 "El lanzador muestra un icono configurado fuera de Hylki. Al elegir uno aquí, "
 "se reemplazará."
 
+#, fuzzy
+msgid "Always"
+msgstr "Siempre visible"
+
+#, fuzzy
+msgid "A year"
+msgstr "1 año"
+
+msgid "90 days"
+msgstr ""
+
+msgid "30 days"
+msgstr ""
+
 msgid "When displayed"
 msgstr "Al mostrarse"
 
@@ -6009,6 +6054,14 @@ msgstr "{percent}%"
 
 msgid "Could not install the extension"
 msgstr "No se pudo instalar la extensión"
+
+msgid "Remove downloaded mail?"
+msgstr ""
+
+msgid ""
+"Every message and attachment kept on this computer is removed, and fetched "
+"again from the server when it is opened. Nothing on the server changes."
+msgstr ""
 
 msgid "Could not remove the extension"
 msgstr "No se pudo eliminar la extensión"
