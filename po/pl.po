@@ -5907,12 +5907,6 @@ msgstr ""
 "Hylki, aby dołączyć to do zgłoszenia błędu. Adresy e-mail są skracane do "
 "domeny."
 
-msgid ""
-"Messages and attachments opened or fetched ahead are kept on this computer, "
-"so they open at once and offline. The list of every message, which the "
-"message list and search read, always stays."
-msgstr ""
-
 #, fuzzy
 msgid "Downloaded mail"
 msgstr "Pobierz…"

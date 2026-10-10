@@ -5858,12 +5858,6 @@ msgstr ""
 "afin de le joindre à un rapport de bug. Les adresses e-mail sont raccourcies "
 "à leur domaine."
 
-msgid ""
-"Messages and attachments opened or fetched ahead are kept on this computer, "
-"so they open at once and offline. The list of every message, which the "
-"message list and search read, always stays."
-msgstr ""
-
 #, fuzzy
 msgid "Downloaded mail"
 msgstr "Télécharger…"

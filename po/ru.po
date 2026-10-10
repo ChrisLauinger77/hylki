@@ -5842,12 +5842,6 @@ msgstr ""
 "Сохранить все записи консоли с момента запуска Hylki для прикрепления к "
 "отчёту об ошибке. Адреса электронной почты сокращаются до домена."
 
-msgid ""
-"Messages and attachments opened or fetched ahead are kept on this computer, "
-"so they open at once and offline. The list of every message, which the "
-"message list and search read, always stays."
-msgstr ""
-
 #, fuzzy
 msgid "Downloaded mail"
 msgstr "Скачать…"

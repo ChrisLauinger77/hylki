@@ -5830,12 +5830,6 @@ msgstr ""
 "anexar a um relatório de erro. Os endereços de email são abreviados para o "
 "respectivo domínio."
 
-msgid ""
-"Messages and attachments opened or fetched ahead are kept on this computer, "
-"so they open at once and offline. The list of every message, which the "
-"message list and search read, always stays."
-msgstr ""
-
 #, fuzzy
 msgid "Downloaded mail"
 msgstr "Baixar…"

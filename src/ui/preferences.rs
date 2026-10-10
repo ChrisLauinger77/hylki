@@ -3805,11 +3805,6 @@ impl Component for Preferences {
                                 // stays (#394).
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Storage"),
-                                    set_description: Some(
-                                        i18n("Messages and attachments opened or fetched ahead are kept on this \
-                                              computer, so they open at once and offline. The list of every \
-                                              message, which the message list and search read, always stays.").as_str()
-                                    ),
 
                                     adw::ActionRow {
                                         set_title: &i18n("Downloaded mail"),
