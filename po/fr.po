@@ -851,23 +851,26 @@ msgstr "Notes de version complètes sur GitHub"
 msgid "Move around"
 msgstr "Se déplacer"
 
-msgid "Next message"
-msgstr "Message suivant"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Message précédent"
-
-msgid "Open the selected message"
-msgstr "Ouvrir le message sélectionné"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Ouvre le message en démarrant un transfert."
 
 msgid "Back to the message list"
 msgstr "Retour à la liste des messages"
 
-msgid "Next message in the conversation"
-msgstr "Message suivant dans la conversation"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "Message précédent dans la conversation"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Ajouter aux contacts"
 
 msgid "Search"
 msgstr "Rechercher"
@@ -884,16 +887,51 @@ msgstr "Marquer comme indésirable"
 msgid "Star or unstar"
 msgstr "Ajouter ou retirer l'étoile"
 
-msgid "Mark read or unread"
-msgstr "Marquer comme lu ou non lu"
+msgid "Mark as read"
+msgstr "Marquer comme lu"
+
+msgid "Mark as unread"
+msgstr "Marquer comme non lu"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Sélectionner cette ligne (pour une action groupée)"
+
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Déplacer le dossier"
+
+#, fuzzy
+msgid "Undo the last action"
+msgstr "Annuler le dernier déplacement ou la dernière suppression"
 
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Ajouter ou supprimer un tag (les neuf premiers, dans l'ordre défini dans les "
 "paramètres)"
+
+msgid "Compose"
+msgstr "Rédiger"
+
+msgid "Next message"
+msgstr "Message suivant"
+
+msgid "Previous message"
+msgstr "Message précédent"
+
+msgid "Open the selected message"
+msgstr "Ouvrir le message sélectionné"
+
+msgid "Next message in the conversation"
+msgstr "Message suivant dans la conversation"
+
+msgid "Previous message in the conversation"
+msgstr "Message précédent dans la conversation"
+
+msgid "Mark read or unread"
+msgstr "Marquer comme lu ou non lu"
 
 msgid "Remove every tag"
 msgstr "Supprimer tous les tags"
@@ -906,9 +944,6 @@ msgstr "Commencez par le prévisualiser au format PDF"
 
 msgid "Writing"
 msgstr "Rédaction"
-
-msgid "Compose"
-msgstr "Rédiger"
 
 msgid "New message from a template"
 msgstr "Nouveau message à partir d'un modèle"
@@ -3551,9 +3586,6 @@ msgstr "Importance haute"
 msgid "Low importance"
 msgstr "Importance basse"
 
-msgid "Mark as read"
-msgstr "Marquer comme lu"
-
 msgid "Move to…"
 msgstr "Déplacer vers…"
 
@@ -3562,9 +3594,6 @@ msgstr "Non indésirable"
 
 msgid "Add sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
-
-msgid "Mark as unread"
-msgstr "Marquer comme non lu"
 
 msgid "Remove star"
 msgstr "Retirer l'étoile"
@@ -5668,6 +5697,15 @@ msgstr ""
 "k pour se déplacer, r pour répondre, a pour archiver. Pressez Ctrl+? pour la "
 "liste complète."
 
+#, fuzzy
+msgid "Gmail keys"
+msgstr "Adresse e-mail"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
+
 msgid "Console mode"
 msgstr "Mode console"
 
@@ -7024,9 +7062,6 @@ msgstr "Hyprlab"
 #~ msgstr ""
 #~ "Ses messages seront déplacés vers la Corbeille et le dossier sera "
 #~ "supprimé."
-
-#~ msgid "Undo the last move or delete"
-#~ msgstr "Annuler le dernier déplacement ou la dernière suppression"
 
 #~ msgid ""
 #~ "Where sent, deleted and junk mail goes. Automatically follows the "

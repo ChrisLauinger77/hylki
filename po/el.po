@@ -859,23 +859,26 @@ msgstr "Όλες οι σημειώσεις έκδοσης στο GitHub"
 msgid "Move around"
 msgstr "Μετακίνηση"
 
-msgid "Next message"
-msgstr "Επόμενο μήνυμα"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Προηγούμενο μήνυμα"
-
-msgid "Open the selected message"
-msgstr "Άνοιγμα επιλεγμένου μηνύματος"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Ανοίγει το μήνυμα με έτοιμη προώθηση."
 
 msgid "Back to the message list"
 msgstr "Επιστροφή στη λίστα μηνυμάτων"
 
-msgid "Next message in the conversation"
-msgstr "Επόμενο μήνυμα στη συνομιλία"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "Προηγούμενο μήνυμα στη συνομιλία"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Προσθήκη στις επαφές"
 
 msgid "Search"
 msgstr "Αναζήτηση"
@@ -892,15 +895,49 @@ msgstr "Σήμανση ως ανεπιθύμητο"
 msgid "Star or unstar"
 msgstr "Προσθήκη ή αφαίρεση αστεριού"
 
-msgid "Mark read or unread"
-msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
+msgid "Mark as read"
+msgstr "Σήμανση ως αναγνωσμένο"
+
+msgid "Mark as unread"
+msgstr "Σήμανση ως μη αναγνωσμένο"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Επιλογή αυτής της σειράς (για μαζική ενέργεια)"
 
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Μετακίνηση φακέλου"
+
+msgid "Undo the last action"
+msgstr ""
+
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Προσθήκη ή αφαίρεση ετικέτας (οι πρώτες εννέα, με τη σειρά των Ρυθμίσεων)"
+
+msgid "Compose"
+msgstr "Σύνταξη"
+
+msgid "Next message"
+msgstr "Επόμενο μήνυμα"
+
+msgid "Previous message"
+msgstr "Προηγούμενο μήνυμα"
+
+msgid "Open the selected message"
+msgstr "Άνοιγμα επιλεγμένου μηνύματος"
+
+msgid "Next message in the conversation"
+msgstr "Επόμενο μήνυμα στη συνομιλία"
+
+msgid "Previous message in the conversation"
+msgstr "Προηγούμενο μήνυμα στη συνομιλία"
+
+msgid "Mark read or unread"
+msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
 
 msgid "Remove every tag"
 msgstr "Αφαίρεση όλων των ετικετών"
@@ -912,9 +949,6 @@ msgid "Preview it as a PDF first"
 msgstr "Προεπισκόπηση πρώτα ως PDF"
 
 msgid "Writing"
-msgstr "Σύνταξη"
-
-msgid "Compose"
 msgstr "Σύνταξη"
 
 msgid "New message from a template"
@@ -3579,9 +3613,6 @@ msgstr "Υψηλή σημασία"
 msgid "Low importance"
 msgstr "Χαμηλή σπουδαιότητα"
 
-msgid "Mark as read"
-msgstr "Σήμανση ως αναγνωσμένο"
-
 msgid "Move to…"
 msgstr "Μετακίνηση σε…"
 
@@ -3590,9 +3621,6 @@ msgstr "Μη ανεπιθύμητο"
 
 msgid "Add sender to Contacts"
 msgstr "Προσθήκη αποστολέα στις Επαφές"
-
-msgid "Mark as unread"
-msgstr "Σήμανση ως μη αναγνωσμένο"
 
 msgid "Remove star"
 msgstr "Αφαίρεση αστεριού"
@@ -5708,6 +5736,15 @@ msgstr ""
 "Εκτελέστε ενέργειες στην αλληλογραφία με ένα πλήκτρο χωρίς τροποποιητή — j/k "
 "για μετακίνηση, r για απάντηση, a για αρχειοθέτηση. Πατήστε Ctrl+? για την "
 "πλήρη λίστα."
+
+#, fuzzy
+msgid "Gmail keys"
+msgstr "Διεύθυνση email"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
 
 msgid "Console mode"
 msgstr "Λειτουργία κονσόλας"

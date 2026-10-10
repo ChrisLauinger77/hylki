@@ -871,23 +871,26 @@ msgstr "Полные примечания к выпуску на GitHub"
 msgid "Move around"
 msgstr "Перемещаться"
 
-msgid "Next message"
-msgstr "Следующее сообщение"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Предыдущее сообщение"
-
-msgid "Open the selected message"
-msgstr "Открыть выбранное сообщение"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Открывает сообщение с готовым черновиком пересылки."
 
 msgid "Back to the message list"
 msgstr "Вернуться к списку сообщений"
 
-msgid "Next message in the conversation"
-msgstr "Следующее сообщение в беседе"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "Предыдущее сообщение в беседе"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Добавить в Контакты"
 
 msgid "Search"
 msgstr "Поиск"
@@ -904,14 +907,49 @@ msgstr "Отметить как спам"
 msgid "Star or unstar"
 msgstr "Поставить или снять отметку"
 
-msgid "Mark read or unread"
-msgstr "Отметить прочитанным/непрочитанным"
+msgid "Mark as read"
+msgstr "Отметить как прочитанное"
+
+msgid "Mark as unread"
+msgstr "Отметить как непрочитанное"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Выбрать эту строку (для массового действия)"
 
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Переместить папку"
+
+#, fuzzy
+msgid "Undo the last action"
+msgstr "Отменить последнее перемещение или удаление"
+
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr "Добавить или удалить тег (первые девять — в порядке настроек)"
+
+msgid "Compose"
+msgstr "Написать"
+
+msgid "Next message"
+msgstr "Следующее сообщение"
+
+msgid "Previous message"
+msgstr "Предыдущее сообщение"
+
+msgid "Open the selected message"
+msgstr "Открыть выбранное сообщение"
+
+msgid "Next message in the conversation"
+msgstr "Следующее сообщение в беседе"
+
+msgid "Previous message in the conversation"
+msgstr "Предыдущее сообщение в беседе"
+
+msgid "Mark read or unread"
+msgstr "Отметить прочитанным/непрочитанным"
 
 msgid "Remove every tag"
 msgstr "Удалить все теги"
@@ -924,9 +962,6 @@ msgstr "Предпросмотр в формате PDF"
 
 msgid "Writing"
 msgstr "Составление писем"
-
-msgid "Compose"
-msgstr "Написать"
 
 msgid "New message from a template"
 msgstr "Новое сообщение из шаблона"
@@ -3550,9 +3585,6 @@ msgstr "Высокая важность"
 msgid "Low importance"
 msgstr "Низкая важность"
 
-msgid "Mark as read"
-msgstr "Отметить как прочитанное"
-
 msgid "Move to…"
 msgstr "Переместить в…"
 
@@ -3561,9 +3593,6 @@ msgstr "Не спам"
 
 msgid "Add sender to Contacts"
 msgstr "Добавить отправителя в «Контакты»"
-
-msgid "Mark as unread"
-msgstr "Отметить как непрочитанное"
 
 msgid "Remove star"
 msgstr "Снять отметку"
@@ -5652,6 +5681,15 @@ msgstr ""
 "перемещения, r — ответить, a — архивировать. Нажмите Ctrl+? для просмотра "
 "полного списка."
 
+#, fuzzy
+msgid "Gmail keys"
+msgstr "Адрес электронной почты"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
+
 msgid "Console mode"
 msgstr "Режим консоли"
 
@@ -6969,9 +7007,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Отменяем перемещение…"
-
-#~ msgid "Undo the last move or delete"
-#~ msgstr "Отменить последнее перемещение или удаление"
 
 #~ msgid "Plain text: send without formatting"
 #~ msgstr "Обычный текст: отправлять без форматирования"

@@ -22,6 +22,39 @@ this list in the app; the same key closes it again.
 | | | <kbd>1</kbd> … <kbd>9</kbd> | Add or remove a tag (the first nine, in Settings order) |
 | | | <kbd>0</kbd> | Remove every tag |
 
+<kbd>w</kbd> and <kbd>b</kbd> step through the cards of the conversation you
+are reading, opening a folded one; outside a conversation they move along the
+list. The keys keep working after a click in the message, apart from the ones
+that scroll it (the arrows, Page Up and Down, Space).
+
+## Gmail keys
+
+**Settings → System → Gmail keys** swaps in Gmail's single keys. The list
+moves under a cursor without opening anything until you ask, and a key
+followed by another goes somewhere.
+
+| Move around | | Act on a message | |
+| --- | --- | --- | --- |
+| <kbd>j</kbd> <kbd>k</kbd> | Move down or up the list without opening | <kbd>r</kbd> | Reply |
+| <kbd>o</kbd> <kbd>Enter</kbd> | Open the message the cursor is on | <kbd>a</kbd> | Reply to all |
+| <kbd>u</kbd> | Back to the message list | <kbd>f</kbd> | Forward |
+| <kbd>n</kbd> <kbd>p</kbd> | Next or previous message in the conversation | <kbd>e</kbd> | Archive |
+| <kbd>g</kbd> <kbd>i</kbd> | Inbox | <kbd>#</kbd> | Delete |
+| <kbd>g</kbd> <kbd>s</kbd> | Starred | <kbd>!</kbd> | Mark as spam |
+| <kbd>g</kbd> <kbd>t</kbd> | Sent | <kbd>s</kbd> | Star or unstar |
+| <kbd>g</kbd> <kbd>d</kbd> | Drafts | <kbd>Shift+I</kbd> | Mark as read |
+| <kbd>g</kbd> <kbd>a</kbd> | Archive | <kbd>Shift+U</kbd> <kbd>_</kbd> | Mark as unread |
+| <kbd>g</kbd> <kbd>c</kbd> | Contacts | <kbd>x</kbd> | Select the row the cursor is on |
+| <kbd>/</kbd> | Search | <kbd>*</kbd> <kbd>a</kbd> / <kbd>*</kbd> <kbd>n</kbd> | Select every row, or none |
+| <kbd>c</kbd> | Compose | <kbd>v</kbd> | Move to a folder |
+| <kbd>?</kbd> | This list | <kbd>l</kbd> | Tags |
+| | | <kbd>z</kbd> | Undo |
+| | | <kbd>1</kbd> … <kbd>9</kbd>, <kbd>0</kbd> | Tags by number, as above |
+
+<kbd>Enter</kbd> on a message that is already open opens it in a window of
+its own. A <kbd>g</kbd> or <kbd>*</kbd> waits a second and a half for the key
+that follows.
+
 With several messages selected, in the list or as cards of a conversation,
 archive, delete, spam, star, read and tag keys act on all of them. Star, read
 and a tag key set the state on every message unless all of them already have

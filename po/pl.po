@@ -883,23 +883,26 @@ msgstr "Pełne informacje o wydaniu w serwisie GitHub"
 msgid "Move around"
 msgstr "Nawigacja"
 
-msgid "Next message"
-msgstr "Następna wiadomość"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Poprzednia wiadomość"
-
-msgid "Open the selected message"
-msgstr "Otwórz zaznaczoną wiadomość"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Otwiera wiadomość z rozpoczętym przekazywaniem dalej."
 
 msgid "Back to the message list"
 msgstr "Powrót do listy wiadomości"
 
-msgid "Next message in the conversation"
-msgstr "Następna wiadomość w rozmowie"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "Poprzednia wiadomość w rozmowie"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Dodaj do kontaktów"
 
 msgid "Search"
 msgstr "Wyszukaj"
@@ -916,14 +919,48 @@ msgstr "Oznacz jako spam"
 msgid "Star or unstar"
 msgstr "Oznacz gwiazdką lub usuń gwiazdkę"
 
-msgid "Mark read or unread"
-msgstr "Oznacz jako przeczytane lub nieprzeczytane"
+msgid "Mark as read"
+msgstr "Oznacz jako przeczytane"
+
+msgid "Mark as unread"
+msgstr "Oznacz jako nieprzeczytane"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Zaznacz ten wiersz (do działania zbiorczego)"
 
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Przenieś katalog"
+
+msgid "Undo the last action"
+msgstr ""
+
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr "Dodaj lub usuń etykietę (pierwsze dziewięć, w kolejności z ustawień)"
+
+msgid "Compose"
+msgstr "Napisz nową wiadomość"
+
+msgid "Next message"
+msgstr "Następna wiadomość"
+
+msgid "Previous message"
+msgstr "Poprzednia wiadomość"
+
+msgid "Open the selected message"
+msgstr "Otwórz zaznaczoną wiadomość"
+
+msgid "Next message in the conversation"
+msgstr "Następna wiadomość w rozmowie"
+
+msgid "Previous message in the conversation"
+msgstr "Poprzednia wiadomość w rozmowie"
+
+msgid "Mark read or unread"
+msgstr "Oznacz jako przeczytane lub nieprzeczytane"
 
 msgid "Remove every tag"
 msgstr "Usuń wszystkie etykiety"
@@ -937,9 +974,6 @@ msgstr "Najpierw wyświetl podgląd w formacie PDF"
 #, fuzzy
 msgid "Writing"
 msgstr "Pisanie:"
-
-msgid "Compose"
-msgstr "Napisz nową wiadomość"
 
 #, fuzzy
 msgid "New message from a template"
@@ -3607,9 +3641,6 @@ msgstr ""
 msgid "Low importance"
 msgstr "Zaimportowano klucz"
 
-msgid "Mark as read"
-msgstr "Oznacz jako przeczytane"
-
 msgid "Move to…"
 msgstr "Przenieś do…"
 
@@ -3618,9 +3649,6 @@ msgstr "To nie jest spam"
 
 msgid "Add sender to Contacts"
 msgstr "Dodaj nadawcę do kontaktów"
-
-msgid "Mark as unread"
-msgstr "Oznacz jako nieprzeczytane"
 
 msgid "Remove star"
 msgstr "Usuń gwiazdkę"
@@ -5716,6 +5744,15 @@ msgstr ""
 "Działania na poczcie jednym klawiszem bez modyfikatora – j/k do poruszania "
 "się, r do odpowiadania, a do archiwizowania. Naciśnij Ctrl+?, aby wyświetlić "
 "pełną listę."
+
+#, fuzzy
+msgid "Gmail keys"
+msgstr "Adres e-mail"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
 
 msgid "Console mode"
 msgstr "Tryb konsoli"

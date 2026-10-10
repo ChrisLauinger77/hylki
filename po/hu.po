@@ -851,23 +851,26 @@ msgstr "A teljes verzióinformáció a GitHub-on"
 msgid "Move around"
 msgstr "Navigáció"
 
-msgid "Next message"
-msgstr "Következő üzenet"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Előző üzenet"
-
-msgid "Open the selected message"
-msgstr "Kijelölt üzenet megnyitása"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Megnyitja az üzenetet, amelyben már megkezdődött az átirányítás."
 
 msgid "Back to the message list"
 msgstr "Vissza az üzenetlistához"
 
-msgid "Next message in the conversation"
-msgstr "A beszélgetés következő üzenete"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "A beszélgetés előző üzenete"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Hozzáadás a névjegyekhez"
 
 msgid "Search"
 msgstr "Keresés"
@@ -884,16 +887,51 @@ msgstr "Megjelölés levélszemétként"
 msgid "Star or unstar"
 msgstr "Csillagozás vagy csillag eltávolítása"
 
-msgid "Mark read or unread"
-msgstr "Megjelölés olvasottként vagy olvasatlanként"
+msgid "Mark as read"
+msgstr "Megjelölés olvasottként"
+
+msgid "Mark as unread"
+msgstr "Megjelölés olvasatlanként"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Sor kijelölése (csoportos művelethez)"
+
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Mappa áthelyezése"
+
+#, fuzzy
+msgid "Undo the last action"
+msgstr "Legutóbbi áthelyezés vagy törlés visszavonása"
 
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Címke hozzáadása vagy eltávolítása (az első kilenc, a Beállítások "
 "sorrendjében)"
+
+msgid "Compose"
+msgstr "Levélírás"
+
+msgid "Next message"
+msgstr "Következő üzenet"
+
+msgid "Previous message"
+msgstr "Előző üzenet"
+
+msgid "Open the selected message"
+msgstr "Kijelölt üzenet megnyitása"
+
+msgid "Next message in the conversation"
+msgstr "A beszélgetés következő üzenete"
+
+msgid "Previous message in the conversation"
+msgstr "A beszélgetés előző üzenete"
+
+msgid "Mark read or unread"
+msgstr "Megjelölés olvasottként vagy olvasatlanként"
 
 msgid "Remove every tag"
 msgstr "Minden címke eltávolítása"
@@ -907,9 +945,6 @@ msgstr "Először PDF-ként való megtekintés"
 #, fuzzy
 msgid "Writing"
 msgstr "Írás:"
-
-msgid "Compose"
-msgstr "Levélírás"
 
 #, fuzzy
 msgid "New message from a template"
@@ -3564,9 +3599,6 @@ msgstr ""
 msgid "Low importance"
 msgstr "Kulcs importálva"
 
-msgid "Mark as read"
-msgstr "Megjelölés olvasottként"
-
 msgid "Move to…"
 msgstr "Áthelyezés…"
 
@@ -3575,9 +3607,6 @@ msgstr "Nem levélszemét"
 
 msgid "Add sender to Contacts"
 msgstr "Feladó hozzáadása a névjegyekhez"
-
-msgid "Mark as unread"
-msgstr "Megjelölés olvasatlanként"
 
 msgid "Remove star"
 msgstr "Csillag eltávolítása"
@@ -5684,6 +5713,15 @@ msgstr ""
 "lapozáshoz, r a válaszhoz, a az archiváláshoz. A teljes lista "
 "megtekintéséhez nyomd meg a Ctrl+? billentyűkombinációt."
 
+#, fuzzy
+msgid "Gmail keys"
+msgstr "E-mail-cím"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
+
 msgid "Console mode"
 msgstr "Konzol mód"
 
@@ -7031,9 +7069,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Áthelyezés visszavonása…"
-
-#~ msgid "Undo the last move or delete"
-#~ msgstr "Legutóbbi áthelyezés vagy törlés visszavonása"
 
 #, fuzzy
 #~ msgid "Plain text: send without formatting"

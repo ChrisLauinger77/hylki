@@ -802,6 +802,9 @@ pub struct AppModel {
     /// feature off, keystrokes must pass straight through rather than be consumed
     /// and dropped.
     single_key: std::rc::Rc<std::cell::Cell<bool>>,
+    /// Gmail's single-key map in place of Hylki's (#392), shared with the
+    /// key controller like `single_key`.
+    gmail_keys: std::rc::Rc<std::cell::Cell<bool>>,
     /// Whether messages are grouped into conversation threads.
     threading: bool,
     /// A conversation re-render is already scheduled, so further bodies arriving
@@ -3204,6 +3207,7 @@ impl SimpleComponent for AppModel {
             single_key: std::rc::Rc::new(std::cell::Cell::new(
                 config::load_privacy().single_key_shortcuts,
             )),
+            gmail_keys: std::rc::Rc::new(std::cell::Cell::new(config::load_privacy().gmail_keys)),
             threading: prefs.threading,
             thread_render_queued: false,
             thread_opened_at: None,
@@ -4153,6 +4157,9 @@ impl SimpleComponent for AppModel {
             let s = sender.clone();
             let window = root.clone();
             let enabled = model.single_key.clone();
+            let gmail = model.gmail_keys.clone();
+            // The first key of a Gmail sequence (g or *) and when it came.
+            let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> = Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
                 let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
                 let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
@@ -4213,8 +4220,40 @@ impl SimpleComponent for AppModel {
                     s.input(AppMsg::Shortcut(Shortcut::BackToList));
                     return gtk::glib::Propagation::Stop;
                 }
-                if !enabled.get() || focus_takes_keys(&window) {
+                if !enabled.get() || focus_is_text(&window) || focus_in_compose(&window) {
                     return gtk::glib::Propagation::Proceed;
+                }
+                if focus_takes_keys(&window) && reader_keeps(keyval) {
+                    return gtk::glib::Propagation::Proceed;
+                }
+                if gmail.get() {
+                    // Shift alone starts nothing and ends nothing.
+                    if matches!(keyval, gtk::gdk::Key::Shift_L | gtk::gdk::Key::Shift_R) {
+                        return gtk::glib::Propagation::Proceed;
+                    }
+                    let first = pending.take().filter(|(_, at)| at.elapsed() < std::time::Duration::from_millis(1500));
+                    if let Some((first, _)) = first {
+                        if let Some(action) = gmail_sequence(first, keyval) {
+                            s.input(AppMsg::Shortcut(action));
+                        }
+                        return gtk::glib::Propagation::Stop;
+                    }
+                    let start = match keyval {
+                        gtk::gdk::Key::g => Some('g'),
+                        gtk::gdk::Key::asterisk => Some('*'),
+                        _ => None,
+                    };
+                    if let Some(c) = start {
+                        pending.set(Some((c, std::time::Instant::now())));
+                        return gtk::glib::Propagation::Stop;
+                    }
+                    return match gmail_shortcut_for(keyval, shift) {
+                        Some(action) => {
+                            s.input(AppMsg::Shortcut(action));
+                            gtk::glib::Propagation::Stop
+                        }
+                        None => gtk::glib::Propagation::Proceed,
+                    };
                 }
                 match shortcut_for(keyval, shift) {
                     Some(action) => {
@@ -7581,6 +7620,14 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetSingleKey(on)) => {
                 if self.single_key.get() != on {
                     self.single_key.set(on);
+                    self.save_settings();
+                }
+            }
+
+            AppMsg::Pref(PrefOutput::SetGmailKeys(on)) => {
+                if self.gmail_keys.get() != on {
+                    self.gmail_keys.set(on);
+                    self.message_list.emit(MessageListInput::SetGmailKeys(on));
                     self.save_settings();
                 }
             }
@@ -11487,6 +11534,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
+            gmail_keys: self.gmail_keys.get(),
             run_in_background: self.run_in_background.get(),
             autostart: self.autostart,
             tray: self.tray_enabled,
@@ -11533,9 +11581,38 @@ impl AppModel {
             Shortcut::ToggleSelect => self.message_list.emit(MessageListInput::ToggleSelection),
             Shortcut::BackToList => self.message_list.emit(MessageListInput::FocusList),
             Shortcut::Search => self.message_list.emit(MessageListInput::FocusSearch),
-            Shortcut::OpenMessage => {
-                if let Some(view) = self.message_view.widget().first_child() {
-                    view.grab_focus();
+            // The open message's own view, not the reader's first page,
+            // which is the "No message selected" one and takes no focus.
+            Shortcut::OpenMessage => self.message_view.emit(MessageViewInput::FocusBody),
+            Shortcut::MoveCursor(delta) => self.message_list.emit(MessageListInput::MoveCursor(delta)),
+            Shortcut::OpenCursor => self.message_list.emit(MessageListInput::OpenCursor),
+            Shortcut::MarkRead(read) => {
+                let mut targets = self.multi_selection();
+                if targets.is_empty() {
+                    targets.extend(self.reply_target());
+                }
+                targets.retain(|m| m.unread == read);
+                if !targets.is_empty() {
+                    self.user_set_flags(read_label(read), &targets, FlagKind::Read, read);
+                }
+            }
+            Shortcut::Undo => sender.input(AppMsg::Undo),
+            Shortcut::MoveTo => sender.input(AppMsg::MoveToMenu),
+            Shortcut::Label => sender.input(AppMsg::ReaderTagMenu),
+            Shortcut::SelectAll => self.message_list.emit(MessageListInput::SelectAllShown),
+            Shortcut::SelectNone => self.message_list.emit(MessageListInput::ClearSelection),
+            Shortcut::GoTo(GoTarget::Contacts) => sender.input(AppMsg::OpenContacts),
+            Shortcut::GoTo(GoTarget::Kind(kind)) => {
+                // The merged view when the sidebar lists one, else the
+                // account's own folder of that kind.
+                let merged = match kind {
+                    FolderKind::Inbox => self.unified_inboxes_shown(),
+                    _ => self.unified_kinds.has(kind),
+                };
+                if merged {
+                    self.open_unified(UnifiedView::Kind(kind));
+                } else {
+                    sender.input(AppMsg::ShowcaseFolder { kind, account: None });
                 }
             }
             Shortcut::NextInThread => self.step_thread(1),
@@ -11603,28 +11680,21 @@ impl AppModel {
         }
     }
 
-    /// Move to the next (or previous) message of the open conversation.
+    /// Move to the next (or previous) message of the open conversation:
+    /// its card in the reader, opened and scrolled to, which is what actions
+    /// then apply to. Selecting the message in the list instead landed on
+    /// the conversation's row again, so the keys went nowhere (#392).
     fn step_thread(&mut self, delta: i32) {
-        let Some(current) = self.current.clone() else {
-            return;
-        };
-        let thread = self.current_thread.clone();
-        let Some(index) = thread
-            .iter()
-            .position(|m| m.id == current.id && m.account_id == current.account_id)
-        else {
-            // Not in a conversation: fall back to moving through the list, which
-            // is what someone pressing "next" almost certainly meant.
-            self.message_list.emit(MessageListInput::MoveSelection(delta));
-            return;
-        };
-        let next = index as i32 + delta;
-        if next < 0 || next as usize >= thread.len() {
+        if self.current.is_none() {
             return;
         }
-        let target = &thread[next as usize];
-        self.message_list
-            .emit(MessageListInput::SelectAndLoad((target.account_id, target.id)));
+        if self.current_thread.len() > 1 {
+            self.message_view.emit(MessageViewInput::StepCard(delta));
+        } else {
+            // Not in a conversation: moving through the list is what someone
+            // pressing "next" almost certainly meant.
+            self.message_list.emit(MessageListInput::MoveSelection(delta));
+        }
     }
 
     /// Open the keyboard-shortcut reference, or close it if it is already up:
@@ -11667,7 +11737,12 @@ impl AppModel {
             page.append(&off);
         }
 
-        for (section, keys) in SHORTCUT_HELP {
+        let sections: Vec<&(&str, &[(&str, &str)])> = if self.gmail_keys.get() {
+            GMAIL_HELP.iter().chain(SHORTCUT_HELP.iter().skip(2)).collect()
+        } else {
+            SHORTCUT_HELP.iter().collect()
+        };
+        for (section, keys) in sections {
             let title = gtk::Label::new(Some(i18n(section).as_str()));
             title.add_css_class("heading");
             title.set_halign(gtk::Align::Start);
@@ -18703,6 +18778,7 @@ impl AppModel {
             list_columns: self.list_columns.clone(),
             list_headings: self.list_headings,
             single_key_shortcuts: self.single_key.get(),
+            gmail_keys: self.gmail_keys.get(),
             run_in_background: self.run_in_background.get(),
             autostart: self.autostart,
             tray: self.tray_enabled,
@@ -21288,6 +21364,94 @@ pub enum Shortcut {
     Tag(u8),
     /// Take every tag off the message being read.
     ClearTags,
+    /// Gmail's j/k (#392): the keyboard cursor moves, nothing opens.
+    MoveCursor(i32),
+    /// Gmail's o: open the row the cursor is on.
+    OpenCursor,
+    /// Gmail's Shift+I (read) and Shift+U or _ (unread).
+    MarkRead(bool),
+    /// Gmail's z.
+    Undo,
+    /// Gmail's v: the Move To picker.
+    MoveTo,
+    /// Gmail's l: the tag menu.
+    Label,
+    /// Gmail's g then a letter.
+    GoTo(GoTarget),
+    /// Gmail's * then a or n.
+    SelectAll,
+    SelectNone,
+}
+
+/// Where Gmail's g sequences go (#392).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GoTarget {
+    Kind(FolderKind),
+    Contacts,
+}
+
+/// Gmail's single keys (#392), in place of `shortcut_for` when Settings asks
+/// for them: support.google.com/mail/answer/6594. j/k move a cursor without
+/// opening, o or Enter opens, and the action keys are Gmail's. The digits
+/// still toggle tags. `g` and `*` start a sequence (`gmail_sequence`).
+fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
+    use gtk::gdk::Key;
+    let action = match key {
+        Key::j => Shortcut::MoveCursor(1),
+        Key::k => Shortcut::MoveCursor(-1),
+        Key::o => Shortcut::OpenCursor,
+        Key::u if !shift => Shortcut::BackToList,
+        Key::n => Shortcut::NextInThread,
+        Key::p => Shortcut::PrevInThread,
+        Key::x => Shortcut::ToggleSelect,
+        Key::s => Shortcut::Star,
+        Key::e => Shortcut::Archive,
+        Key::numbersign => Shortcut::Delete,
+        Key::exclam => Shortcut::Spam,
+        Key::r => Shortcut::Reply,
+        Key::a => Shortcut::ReplyAll,
+        Key::f => Shortcut::Forward,
+        Key::c => Shortcut::Compose,
+        Key::slash => Shortcut::Search,
+        Key::question => Shortcut::Shortcuts,
+        Key::U | Key::underscore => Shortcut::MarkRead(false),
+        Key::I => Shortcut::MarkRead(true),
+        Key::z => Shortcut::Undo,
+        Key::v => Shortcut::MoveTo,
+        Key::l => Shortcut::Label,
+        Key::Down => Shortcut::NextMessage,
+        Key::Up => Shortcut::PrevMessage,
+        _ => return shortcut_for(key, shift).filter(|s| matches!(s, Shortcut::Tag(_) | Shortcut::ClearTags)),
+    };
+    Some(action)
+}
+
+/// The second key of a Gmail sequence: `g` goes to a folder, `*` selects.
+fn gmail_sequence(first: char, key: gtk::gdk::Key) -> Option<Shortcut> {
+    use gtk::gdk::Key;
+    match (first, key) {
+        ('g', Key::i) => Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Inbox))),
+        ('g', Key::s) => Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Starred))),
+        ('g', Key::t) => Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Sent))),
+        ('g', Key::d) => Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Drafts))),
+        ('g', Key::a) => Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Archive))),
+        ('g', Key::c) => Some(Shortcut::GoTo(GoTarget::Contacts)),
+        ('*', Key::a) => Some(Shortcut::SelectAll),
+        ('*', Key::n) => Some(Shortcut::SelectNone),
+        _ => None,
+    }
+}
+
+/// Keys the reader keeps while it has focus, because they scroll it or move
+/// through its links. Letters and the rest go to the shortcuts, so a click
+/// in a message no longer turns them off (#392).
+fn reader_keeps(key: gtk::gdk::Key) -> bool {
+    use gtk::gdk::Key;
+    matches!(
+        key,
+        Key::Up | Key::Down | Key::Left | Key::Right | Key::Page_Up | Key::Page_Down | Key::Home | Key::End
+            | Key::space | Key::Return | Key::KP_Enter | Key::Tab | Key::ISO_Left_Tab | Key::BackSpace
+    )
 }
 
 /// The shortcut for a key press, if any. `shift` distinguishes `r` from `R`.
@@ -21340,6 +21504,44 @@ fn ctrl_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<AppMsg> {
         _ => None,
     }
 }
+
+/// Gmail's keys (#392), shown in place of the first two sections of
+/// `SHORTCUT_HELP` when Settings turns them on.
+const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
+    (
+        i18n_noop("Move around"),
+        &[
+            ("j  /  k", i18n_noop("Move down or up the list without opening")),
+            ("o  or  Enter", i18n_noop("Open the message the cursor is on")),
+            ("u", i18n_noop("Back to the message list")),
+            ("n  /  p", i18n_noop("Next or previous message in the conversation")),
+            ("g  i  /  g  s  /  g  t  /  g  d  /  g  a", i18n_noop("Go to Inbox, Starred, Sent, Drafts or Archive")),
+            ("g  c", i18n_noop("Go to Contacts")),
+            ("/", i18n_noop("Search")),
+        ],
+    ),
+    (
+        i18n_noop("Act on a message"),
+        &[
+            ("r", i18n_noop("Reply")),
+            ("a", i18n_noop("Reply to all")),
+            ("f", i18n_noop("Forward")),
+            ("e", i18n_noop("Archive")),
+            ("#", i18n_noop("Delete")),
+            ("!", i18n_noop("Mark as spam")),
+            ("s", i18n_noop("Star or unstar")),
+            ("Shift+I", i18n_noop("Mark as read")),
+            ("Shift+U  or  _", i18n_noop("Mark as unread")),
+            ("x", i18n_noop("Select this row (for a bulk action)")),
+            ("*  a  /  *  n", i18n_noop("Select every row, or none")),
+            ("v", i18n_noop("Move to a folder")),
+            ("l", i18n_noop("Tags")),
+            ("z", i18n_noop("Undo the last action")),
+            ("1 … 9", i18n_noop("Add or remove a tag (the first nine, in Settings order)")),
+            ("c", i18n_noop("Compose")),
+        ],
+    ),
+];
 
 /// Every shortcut with its key and description, for the reference window.
 const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
@@ -23780,6 +23982,32 @@ mod tests {
         assert_eq!(next_after_vanish(None, &after, 8), None);
         // Nothing left at all.
         assert_eq!(next_after_vanish(Some(&previous), &[], 8), None);
+    }
+
+    #[test]
+    fn gmail_map_matches_gmail() {
+        use gtk::gdk::Key;
+        assert_eq!(gmail_shortcut_for(Key::j, false), Some(Shortcut::MoveCursor(1)));
+        assert_eq!(gmail_shortcut_for(Key::k, false), Some(Shortcut::MoveCursor(-1)));
+        assert_eq!(gmail_shortcut_for(Key::o, false), Some(Shortcut::OpenCursor));
+        assert_eq!(gmail_shortcut_for(Key::e, false), Some(Shortcut::Archive));
+        assert_eq!(gmail_shortcut_for(Key::numbersign, true), Some(Shortcut::Delete));
+        assert_eq!(gmail_shortcut_for(Key::a, false), Some(Shortcut::ReplyAll));
+        assert_eq!(gmail_shortcut_for(Key::U, true), Some(Shortcut::MarkRead(false)));
+        assert_eq!(gmail_shortcut_for(Key::underscore, true), Some(Shortcut::MarkRead(false)));
+        assert_eq!(gmail_shortcut_for(Key::I, true), Some(Shortcut::MarkRead(true)));
+        assert_eq!(gmail_shortcut_for(Key::n, false), Some(Shortcut::NextInThread));
+        assert_eq!(gmail_shortcut_for(Key::_3, false), Some(Shortcut::Tag(3)));
+        // Hylki's own keys that Gmail does not have stay off.
+        assert_eq!(gmail_shortcut_for(Key::d, false), None);
+        assert_eq!(gmail_shortcut_for(Key::w, false), None);
+        assert_eq!(gmail_sequence('g', Key::i), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Inbox))));
+        assert_eq!(gmail_sequence('g', Key::t), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Sent))));
+        assert_eq!(gmail_sequence('*', Key::a), Some(Shortcut::SelectAll));
+        assert_eq!(gmail_sequence('g', Key::q), None);
+        // The reader keeps what scrolls it, and only that.
+        assert!(reader_keeps(Key::space) && reader_keeps(Key::Down));
+        assert!(!reader_keeps(Key::r) && !reader_keeps(Key::j));
     }
 
     #[test]

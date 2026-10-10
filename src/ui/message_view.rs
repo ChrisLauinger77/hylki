@@ -1082,6 +1082,11 @@ pub enum MessageViewInput {
     CardClicked { account_id: u32, id: u32, mode: SelectMode },
     /// Ctrl+A in the conversation — select every card.
     SelectAllCards,
+    /// Step to the next or previous card of the conversation, opening a
+    /// folded one, and make it the one actions apply to (#392).
+    StepCard(i32),
+    /// Keyboard focus into the message, so the arrow keys scroll it (#392).
+    FocusBody,
     /// Ctrl+C reached the window rather than this view: copy the selection
     /// made in a message body, if there is one.
     CopySelection,
@@ -3193,6 +3198,47 @@ impl Component for MessageView {
                     self.selected_cards = keys.clone();
                     self.apply_card_selection();
                     let _ = sender.output(MessageViewOutput::SelectCards(keys));
+                }
+            }
+            MessageViewInput::StepCard(delta) => {
+                // A lone message has nothing to step through: the app moves
+                // along the list instead.
+                if self.thread.len() <= 1 {
+                    return;
+                }
+                let order: Vec<(u32, u32)> = self.thread.iter().map(|m| (m.account_id, m.id)).collect();
+                let from = match self.selected_cards.as_slice() {
+                    [key] => order.iter().position(|k| k == key),
+                    _ => None,
+                }
+                .or_else(|| {
+                    let c = self.current.as_ref()?;
+                    order.iter().position(|k| *k == (c.account_id, c.id))
+                });
+                let last = order.len() as i64 - 1;
+                let next = match from {
+                    Some(i) => (i as i64 + i64::from(delta)).clamp(0, last) as usize,
+                    None if delta > 0 => 0,
+                    None => last as usize,
+                };
+                let key = order[next];
+                if self.folded_cards().contains(&key) {
+                    self.folds.insert(key, false);
+                    self.patch_folds();
+                }
+                self.selected_cards = vec![key];
+                self.apply_card_selection();
+                let _ = sender.output(MessageViewOutput::SelectCards(vec![key]));
+                let js = format!(
+                    "(function(){{var s=document.querySelector('.vireo-msg[data-key=\"{}:{}\"]');\
+                     if(s)s.scrollIntoView({{behavior:'smooth',block:'start'}});}})()",
+                    key.0, key.1
+                );
+                self.webview.evaluate_javascript(&js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+            }
+            MessageViewInput::FocusBody => {
+                if self.current.is_some() {
+                    self.webview.grab_focus();
                 }
             }
             MessageViewInput::ComposeTo(addr) => {

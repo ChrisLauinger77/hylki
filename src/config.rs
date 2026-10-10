@@ -1427,6 +1427,11 @@ pub(crate) struct PrivacyFile {
     /// a stray keystroke shouldn't archive mail for someone who never asked.
     #[serde(default)]
     pub(crate) single_key_shortcuts: bool,
+    /// Gmail's keys in place of Hylki's own for the single-key shortcuts
+    /// (#392): j/k move without opening, o opens, e archives, # deletes, g
+    /// then a letter goes to a folder. Off by default.
+    #[serde(default)]
+    pub(crate) gmail_keys: bool,
     /// Keep running after the window is closed, so new mail still arrives and
     /// notifies. Off by default: closing a window is expected to quit.
     #[serde(default)]
@@ -1703,6 +1708,7 @@ impl Default for PrivacyFile {
             list_headings: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
+            gmail_keys: false,
             run_in_background: false,
             autostart: false,
             tray: false,

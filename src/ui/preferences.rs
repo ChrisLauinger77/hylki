@@ -157,6 +157,7 @@ pub struct PrefInit {
     pub list_columns: Vec<crate::config::ListColumn>,
     pub list_headings: bool,
     pub single_key_shortcuts: bool,
+    pub gmail_keys: bool,
     pub run_in_background: bool,
     pub autostart: bool,
     pub tray: bool,
@@ -1324,6 +1325,7 @@ pub enum PrefOutput {
     /// Every column back to its own width (#334).
     ResetColumnWidths,
     SetSingleKey(bool),
+    SetGmailKeys(bool),
     SetRunInBackground(bool),
     SetAutostart(bool),
     SetTray(bool),
@@ -3715,6 +3717,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "gmail_keys_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Gmail keys"),
+                                        set_subtitle: &i18n("Single-key shortcuts as Gmail has them: j/k move \
+                                                       without opening, o opens, e archives, # deletes, g then \
+                                                       a letter goes to a folder."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetGmailKeys(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "console_mode_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Console mode"),
@@ -4256,6 +4269,7 @@ impl Component for Preferences {
         }
         tracing::debug!("settings window: prefs tail A (tray) at {:?}", t_init.elapsed());
         widgets.single_key_row.set_active(init.single_key_shortcuts);
+        widgets.gmail_keys_row.set_active(init.gmail_keys);
         widgets.console_mode_row.set_active(init.console_mode);
         widgets.read_mark_row.set_model(Some(&gtk::StringList::new(&[
             i18n("When displayed").as_str(),

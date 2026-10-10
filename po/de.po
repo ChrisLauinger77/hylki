@@ -867,23 +867,26 @@ msgstr "Vollständige Versionshinweise auf GitHub"
 msgid "Move around"
 msgstr "Navigation"
 
-msgid "Next message"
-msgstr "Nächste Nachricht"
+msgid "Move down or up the list without opening"
+msgstr ""
 
-msgid "Previous message"
-msgstr "Vorherige Nachricht"
-
-msgid "Open the selected message"
-msgstr "Öffnen Sie die ausgewählte Nachricht"
+#, fuzzy
+msgid "Open the message the cursor is on"
+msgstr "Öffnet die Nachricht zum Weiterleiten."
 
 msgid "Back to the message list"
 msgstr "Zurück zur Nachrichtenliste"
 
-msgid "Next message in the conversation"
-msgstr "Nächste Nachricht im Gespräch"
-
-msgid "Previous message in the conversation"
+#, fuzzy
+msgid "Next or previous message in the conversation"
 msgstr "Vorherige Nachricht im Gespräch"
+
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+#, fuzzy
+msgid "Go to Contacts"
+msgstr "Zu Kontakten hinzufügen"
 
 msgid "Search"
 msgstr "Suchen"
@@ -900,16 +903,50 @@ msgstr "Als Spam markieren"
 msgid "Star or unstar"
 msgstr "Stern hinzufügen oder entfernen"
 
-msgid "Mark read or unread"
-msgstr "Als gelesen oder ungelesen markieren"
+msgid "Mark as read"
+msgstr "Als gelesen markieren"
+
+msgid "Mark as unread"
+msgstr "Als ungelesen markieren"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Diese Zeile auswählen (für eine Sammelaktion)"
+
+msgid "Select every row, or none"
+msgstr ""
+
+#, fuzzy
+msgid "Move to a folder"
+msgstr "Ordner verschieben"
+
+msgid "Undo the last action"
+msgstr ""
 
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Hinzufügen oder Entfernen eines Tags (die ersten neun, in der Reihenfolge "
 "der Einstellungen)"
+
+msgid "Compose"
+msgstr "Verfassen"
+
+msgid "Next message"
+msgstr "Nächste Nachricht"
+
+msgid "Previous message"
+msgstr "Vorherige Nachricht"
+
+msgid "Open the selected message"
+msgstr "Öffnen Sie die ausgewählte Nachricht"
+
+msgid "Next message in the conversation"
+msgstr "Nächste Nachricht im Gespräch"
+
+msgid "Previous message in the conversation"
+msgstr "Vorherige Nachricht im Gespräch"
+
+msgid "Mark read or unread"
+msgstr "Als gelesen oder ungelesen markieren"
 
 msgid "Remove every tag"
 msgstr "Alle Tags entfernen"
@@ -923,9 +960,6 @@ msgstr "Vorschau als PDF zuerst"
 #, fuzzy
 msgid "Writing"
 msgstr "Schreiben:"
-
-msgid "Compose"
-msgstr "Verfassen"
 
 #, fuzzy
 msgid "New message from a template"
@@ -3588,9 +3622,6 @@ msgstr ""
 msgid "Low importance"
 msgstr "Schlüssel importiert"
 
-msgid "Mark as read"
-msgstr "Als gelesen markieren"
-
 msgid "Move to…"
 msgstr "Verschieben nach…"
 
@@ -3599,9 +3630,6 @@ msgstr "Nicht Spam"
 
 msgid "Add sender to Contacts"
 msgstr "Absender zu Kontakten hinzufügen"
-
-msgid "Mark as unread"
-msgstr "Als ungelesen markieren"
 
 msgid "Remove star"
 msgstr "Stern entfernen"
@@ -5698,6 +5726,15 @@ msgid ""
 msgstr ""
 "Handeln Sie per Post mit einem Schlüssel und ohne Modifikator - j / k zu "
 "verschieben, r zu antworten, a zu archivieren."
+
+#, fuzzy
+msgid "Gmail keys"
+msgstr "E-Mail-Adresse"
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
+msgstr ""
 
 msgid "Console mode"
 msgstr "Konsolenmodus"

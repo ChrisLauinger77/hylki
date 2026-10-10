@@ -787,22 +787,22 @@ msgstr ""
 msgid "Move around"
 msgstr ""
 
-msgid "Next message"
+msgid "Move down or up the list without opening"
 msgstr ""
 
-msgid "Previous message"
-msgstr ""
-
-msgid "Open the selected message"
+msgid "Open the message the cursor is on"
 msgstr ""
 
 msgid "Back to the message list"
 msgstr ""
 
-msgid "Next message in the conversation"
+msgid "Next or previous message in the conversation"
 msgstr ""
 
-msgid "Previous message in the conversation"
+msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgstr ""
+
+msgid "Go to Contacts"
 msgstr ""
 
 msgid "Search"
@@ -820,13 +820,46 @@ msgstr ""
 msgid "Star or unstar"
 msgstr ""
 
-msgid "Mark read or unread"
+msgid "Mark as read"
+msgstr ""
+
+msgid "Mark as unread"
 msgstr ""
 
 msgid "Select this row (for a bulk action)"
 msgstr ""
 
+msgid "Select every row, or none"
+msgstr ""
+
+msgid "Move to a folder"
+msgstr ""
+
+msgid "Undo the last action"
+msgstr ""
+
 msgid "Add or remove a tag (the first nine, in Settings order)"
+msgstr ""
+
+msgid "Compose"
+msgstr ""
+
+msgid "Next message"
+msgstr ""
+
+msgid "Previous message"
+msgstr ""
+
+msgid "Open the selected message"
+msgstr ""
+
+msgid "Next message in the conversation"
+msgstr ""
+
+msgid "Previous message in the conversation"
+msgstr ""
+
+msgid "Mark read or unread"
 msgstr ""
 
 msgid "Remove every tag"
@@ -839,9 +872,6 @@ msgid "Preview it as a PDF first"
 msgstr ""
 
 msgid "Writing"
-msgstr ""
-
-msgid "Compose"
 msgstr ""
 
 msgid "New message from a template"
@@ -3205,9 +3235,6 @@ msgstr ""
 msgid "Low importance"
 msgstr ""
 
-msgid "Mark as read"
-msgstr ""
-
 msgid "Move to…"
 msgstr ""
 
@@ -3215,9 +3242,6 @@ msgid "Not spam"
 msgstr ""
 
 msgid "Add sender to Contacts"
-msgstr ""
-
-msgid "Mark as unread"
 msgstr ""
 
 msgid "Remove star"
@@ -4990,6 +5014,14 @@ msgstr ""
 msgid ""
 "Act on mail with one key and no modifier — j/k to move, r to reply, a to "
 "archive. Press Ctrl+? for the full list."
+msgstr ""
+
+msgid "Gmail keys"
+msgstr ""
+
+msgid ""
+"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
+"archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"
