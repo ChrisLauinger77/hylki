@@ -140,7 +140,7 @@ fn chevron_icon(open: bool) -> &'static str {
 }
 
 /// What a unified row is called.
-fn kind_label(kind: FolderKind) -> String {
+pub(crate) fn kind_label(kind: FolderKind) -> String {
     match kind {
         FolderKind::Inbox => i18n("Inboxes"),
         FolderKind::Starred => i18n("Starred"),

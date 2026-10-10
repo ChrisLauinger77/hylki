@@ -298,14 +298,92 @@ msgstr ""
 msgid "Remove Tags"
 msgstr ""
 
+msgid "Action"
+msgstr ""
+
+msgid "New Message"
+msgstr ""
+
+msgid "New Message from Template"
+msgstr ""
+
+msgid "Reply to All"
+msgstr ""
+
+msgid "Edit as New Message"
+msgstr ""
+
+msgid "View Source"
+msgstr ""
+
+msgid "Print"
+msgstr ""
+
+msgid "Print Preview"
+msgstr ""
+
+msgid "Find in Message"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Star or Remove Star"
+msgstr ""
+
+msgid "Mark as Read or Unread"
+msgstr ""
+
+msgid "Move to Folder"
+msgstr ""
+
+msgid "Undo"
+msgstr ""
+
+msgid "Redo"
+msgstr ""
+
+msgid "Check for New Mail"
+msgstr ""
+
+msgid "Search Messages"
+msgstr ""
+
+msgid "Show or Hide the Sidebar"
+msgstr ""
+
+msgid "Mail Accounts"
+msgstr ""
+
+msgid "About Hylki"
+msgstr ""
+
+msgid "Turn Focus Mode On"
+msgstr ""
+
+msgid "Turn Focus Mode Off"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "All accounts"
+msgstr ""
+
+msgid "Contacts"
+msgstr ""
+
+msgid "Outbox"
+msgstr ""
+
+msgid "Tag"
+msgstr ""
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
 
 msgid "Your tags"
-msgstr ""
-
-msgid "Delete"
 msgstr ""
 
 msgid "Move to {name}"
@@ -315,12 +393,6 @@ msgid "Add Tag {name}"
 msgstr ""
 
 msgid "Remove Tag {name}"
-msgstr ""
-
-msgid "Undo"
-msgstr ""
-
-msgid "Redo"
 msgstr ""
 
 msgid "Restarting Hylki"
@@ -339,16 +411,7 @@ msgstr ""
 msgid "Restart Now"
 msgstr ""
 
-msgid "View Source"
-msgstr ""
-
 msgid "Move to Inbox"
-msgstr ""
-
-msgid "Find in Message"
-msgstr ""
-
-msgid "Print Preview"
 msgstr ""
 
 msgid "Search Messages…"
@@ -364,9 +427,6 @@ msgid "Use Template"
 msgstr ""
 
 msgid "Edit Template"
-msgstr ""
-
-msgid "Edit as New Message"
 msgstr ""
 
 msgid "Add Sender to Contacts"
@@ -388,9 +448,6 @@ msgid "Print…"
 msgstr ""
 
 msgid "Delete {n} messages"
-msgstr ""
-
-msgid "New Message"
 msgstr ""
 
 msgid "Could not attach {names}: Hylki cannot read the file."
@@ -440,9 +497,6 @@ msgid "Attach Anyway"
 msgstr ""
 
 msgid "Upload to Cloud Storage"
-msgstr ""
-
-msgid "New Message from Template"
 msgstr ""
 
 msgid "The new message starts as a copy of the template you pick."
@@ -937,6 +991,9 @@ msgstr ""
 msgid "Quit Hylki entirely"
 msgstr ""
 
+msgid "Command palette: search actions, folders and tags"
+msgstr ""
+
 msgid "This list"
 msgstr ""
 
@@ -1037,9 +1094,6 @@ msgid "Move To"
 msgstr ""
 
 msgid "Find"
-msgstr ""
-
-msgid "Print"
 msgstr ""
 
 msgid "Hylki Address Book"
@@ -1350,9 +1404,6 @@ msgid ""
 msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
-msgstr ""
-
-msgid "Mail Accounts"
 msgstr ""
 
 msgid "Drag to set the order they appear in the sidebar."
@@ -2301,9 +2352,6 @@ msgstr ""
 msgid "Go to Message"
 msgstr ""
 
-msgid "All accounts"
-msgstr ""
-
 msgid "Deleting…"
 msgstr ""
 
@@ -2339,6 +2387,12 @@ msgid "To remove {old}, run:"
 msgstr ""
 
 msgid "Copy"
+msgstr ""
+
+msgid "Command Palette"
+msgstr ""
+
+msgid "Type an action, a folder or a tag"
 msgstr ""
 
 msgid "Cloud Storage"
@@ -2915,9 +2969,6 @@ msgid "The file was moved or deleted. Attach it again from where it is now."
 msgstr ""
 
 msgid "Not found"
-msgstr ""
-
-msgid "Contacts"
 msgstr ""
 
 msgid "Open in GNOME Contacts"
@@ -5440,9 +5491,6 @@ msgid "No accounts yet"
 msgstr ""
 
 msgid "New Message from Template…"
-msgstr ""
-
-msgid "Outbox"
 msgstr ""
 
 msgid "Mark Inbox as Read"

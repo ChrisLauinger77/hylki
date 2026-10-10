@@ -322,6 +322,100 @@ msgid "Remove Tags"
 msgstr "Tags entfernen"
 
 #, fuzzy
+msgid "Action"
+msgstr "Aktionen"
+
+msgid "New Message"
+msgstr "Neue Nachricht"
+
+#, fuzzy
+msgid "New Message from Template"
+msgstr "Stattdessen neue Nachricht verfassen"
+
+#, fuzzy
+msgid "Reply to All"
+msgstr "Allen antworten"
+
+msgid "Edit as New Message"
+msgstr "Als neue Nachricht bearbeiten"
+
+msgid "View Source"
+msgstr "Quelltext anzeigen"
+
+msgid "Print"
+msgstr "Drucken"
+
+msgid "Print Preview"
+msgstr "Druckvorschau"
+
+msgid "Find in Message"
+msgstr "In Nachricht suchen"
+
+msgid "Delete"
+msgstr "Löschen"
+
+#, fuzzy
+msgid "Star or Remove Star"
+msgstr "Stern entfernen"
+
+#, fuzzy
+msgid "Mark as Read or Unread"
+msgstr "Als gelesen oder ungelesen markieren"
+
+#, fuzzy
+msgid "Move to Folder"
+msgstr "Ordner verschieben"
+
+msgid "Undo"
+msgstr "Rückgängig"
+
+msgid "Redo"
+msgstr "Wiederholen"
+
+#, fuzzy
+msgid "Check for New Mail"
+msgstr "Auf neue Nachrichten prüfen"
+
+#, fuzzy
+msgid "Search Messages"
+msgstr "Nachrichten durchsuchen…"
+
+#, fuzzy
+msgid "Show or Hide the Sidebar"
+msgstr "Konten in der Seitenleiste ein- oder ausblenden"
+
+msgid "Mail Accounts"
+msgstr "E-Mail-Konten"
+
+#, fuzzy
+msgid "About Hylki"
+msgstr "Über Hylki"
+
+#, fuzzy
+msgid "Turn Focus Mode On"
+msgstr "Fokusmodus"
+
+#, fuzzy
+msgid "Turn Focus Mode Off"
+msgstr "Fokusmodus"
+
+msgid "View"
+msgstr ""
+
+msgid "All accounts"
+msgstr "Alle Konten"
+
+msgid "Contacts"
+msgstr "Kontakte"
+
+msgid "Outbox"
+msgstr "Postausgang"
+
+#, fuzzy
+msgid "Tag"
+msgstr "Tags"
+
+#, fuzzy
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -331,9 +425,6 @@ msgstr ""
 msgid "Your tags"
 msgstr "Ihre Tags"
 
-msgid "Delete"
-msgstr "Löschen"
-
 msgid "Move to {name}"
 msgstr "Nach {name} verschieben"
 
@@ -342,12 +433,6 @@ msgstr "Tag {name} hinzufügen"
 
 msgid "Remove Tag {name}"
 msgstr "Tag {name} entfernen"
-
-msgid "Undo"
-msgstr "Rückgängig"
-
-msgid "Redo"
-msgstr "Wiederholen"
 
 msgid "Restarting Hylki"
 msgstr "Neustart von Hylki"
@@ -369,17 +454,8 @@ msgstr ""
 msgid "Restart Now"
 msgstr "Jetzt neu starten"
 
-msgid "View Source"
-msgstr "Quelltext anzeigen"
-
 msgid "Move to Inbox"
 msgstr "In den Posteingang verschieben"
-
-msgid "Find in Message"
-msgstr "In Nachricht suchen"
-
-msgid "Print Preview"
-msgstr "Druckvorschau"
 
 msgid "Search Messages…"
 msgstr "Nachrichten durchsuchen…"
@@ -396,9 +472,6 @@ msgstr ""
 #, fuzzy
 msgid "Edit Template"
 msgstr "Tag bearbeiten"
-
-msgid "Edit as New Message"
-msgstr "Als neue Nachricht bearbeiten"
 
 msgid "Add Sender to Contacts"
 msgstr "Absender zu Kontakten hinzufügen"
@@ -422,9 +495,6 @@ msgstr "Drucken…"
 
 msgid "Delete {n} messages"
 msgstr "{n} Nachrichten löschen"
-
-msgid "New Message"
-msgstr "Neue Nachricht"
 
 msgid "Could not attach {names}: Hylki cannot read the file."
 msgid_plural "Could not attach {n} files (Hylki cannot read them): {names}"
@@ -484,10 +554,6 @@ msgstr "Trotzdem anhängen"
 
 msgid "Upload to Cloud Storage"
 msgstr "In Cloud-Speicher hochladen"
-
-#, fuzzy
-msgid "New Message from Template"
-msgstr "Stattdessen neue Nachricht verfassen"
 
 #, fuzzy
 msgid "The new message starts as a copy of the template you pick."
@@ -1026,6 +1092,9 @@ msgstr "Schließen Sie das Fenster (Hintergrund-Sync läuft weiter)"
 msgid "Quit Hylki entirely"
 msgstr "Beenden Sie Hylki ganz"
 
+msgid "Command palette: search actions, folders and tags"
+msgstr ""
+
 msgid "This list"
 msgstr "Diese Liste"
 
@@ -1134,9 +1203,6 @@ msgstr "Verschieben nach"
 
 msgid "Find"
 msgstr "Suchen"
-
-msgid "Print"
-msgstr "Drucken"
 
 #, fuzzy
 msgid "Hylki Address Book"
@@ -1486,9 +1552,6 @@ msgstr ""
 
 msgid "Enable POP/IMAP access in GMX settings first."
 msgstr "Aktivieren Sie zuerst den POP/IMAP-Zugriff in den GMX-Einstellungen."
-
-msgid "Mail Accounts"
-msgstr "E-Mail-Konten"
 
 msgid "Drag to set the order they appear in the sidebar."
 msgstr "Ziehen, um die Reihenfolge in der Seitenleiste festzulegen."
@@ -2548,9 +2611,6 @@ msgstr "Mit der Standardanwendung öffnen"
 msgid "Go to Message"
 msgstr "Zur Nachricht wechseln"
 
-msgid "All accounts"
-msgstr "Alle Konten"
-
 msgid "Deleting…"
 msgstr "Lösche…"
 
@@ -2594,6 +2654,12 @@ msgstr "Um {old} zu entfernen, führen Sie aus:"
 
 msgid "Copy"
 msgstr "Kopieren"
+
+msgid "Command Palette"
+msgstr ""
+
+msgid "Type an action, a folder or a tag"
+msgstr ""
 
 msgid "Cloud Storage"
 msgstr "Cloud-Speicher"
@@ -3277,9 +3343,6 @@ msgstr ""
 #, fuzzy
 msgid "Not found"
 msgstr "Nicht angezeigt"
-
-msgid "Contacts"
-msgstr "Kontakte"
 
 msgid "Open in GNOME Contacts"
 msgstr "In GNOME Kontakte öffnen"
@@ -6200,9 +6263,6 @@ msgstr "Noch keine Konten"
 
 msgid "New Message from Template…"
 msgstr ""
-
-msgid "Outbox"
-msgstr "Postausgang"
 
 msgid "Mark Inbox as Read"
 msgstr "Posteingang als gelesen markieren"

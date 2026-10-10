@@ -1520,6 +1520,8 @@ pub enum AppMsg {
     Shortcut(Shortcut),
     /// Show the keyboard-shortcut reference.
     ShowShortcuts,
+    /// Ctrl+K: search what the app can do and where it can go (#399).
+    CommandPalette,
     /// Print the message in the reader (issue #16).
     PrintMessage,
     /// Render it to a PDF and open that, to see what will come out.
@@ -7633,6 +7635,10 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ShowShortcuts => self.show_shortcuts(),
+            AppMsg::CommandPalette => {
+                let entries = self.command_palette_entries(&sender);
+                crate::ui::command_palette::show(&self.window, entries);
+            }
 
             AppMsg::PrintPreview | AppMsg::PrintMessage => {
                 // Only the reader can print: it holds the rendered message, and
@@ -11678,6 +11684,131 @@ impl AppModel {
                 }
             }
         }
+    }
+
+    /// What the command palette offers now (#399): the actions that apply
+    /// to what is open or selected, then the views, every account's folders
+    /// and the tags.
+    fn command_palette_entries(&self, sender: &ComponentSender<Self>) -> Vec<crate::ui::command_palette::Entry> {
+        use crate::ui::command_palette::Entry;
+        let mut out = Vec::new();
+        let action = i18n("Action");
+        let mut add = |title: String, detail: &str, key: &str, msg: fn() -> AppMsg| {
+            let s = sender.input_sender().clone();
+            out.push(Entry {
+                title,
+                detail: detail.to_string(),
+                key: key.to_string(),
+                run: Box::new(move || {
+                    let _ = s.send(msg());
+                }),
+            });
+        };
+        add(i18n("New Message"), &action, "Ctrl+N", || AppMsg::Compose);
+        add(i18n("New Message from Template"), &action, "Ctrl+Shift+N", || AppMsg::NewFromTemplate);
+        if self.reply_target().is_some() {
+            add(i18n("Reply"), &action, "Ctrl+R", || AppMsg::Reply);
+            add(i18n("Reply to All"), &action, "Ctrl+Shift+R", || AppMsg::ReplyAll);
+            add(i18n("Forward"), &action, "", || AppMsg::Forward);
+            add(i18n("Edit as New Message"), &action, "", || AppMsg::EditAsNewCurrent);
+            add(i18n("View Source"), &action, "Ctrl+U", || AppMsg::ViewSource);
+            add(i18n("Print"), &action, "Ctrl+P", || AppMsg::PrintMessage);
+            add(i18n("Print Preview"), &action, "Ctrl+Shift+P", || AppMsg::PrintPreview);
+            add(i18n("Find in Message"), &action, "", || AppMsg::OpenReaderFind);
+        }
+        if self.acts_on_selection() {
+            add(i18n("Archive"), &action, "", || AppMsg::Archive);
+            add(i18n("Delete"), &action, "Delete", || AppMsg::Delete);
+            add(i18n("Mark as Spam"), &action, "", || AppMsg::MarkSpam);
+            add(i18n("Star or Remove Star"), &action, "", || AppMsg::ToggleStar);
+            add(i18n("Mark as Read or Unread"), &action, "", || AppMsg::ToggleReadCurrent);
+            add(i18n("Move to Folder"), &action, "", || AppMsg::MoveToMenu);
+            add(i18n("Tags"), &action, "", || AppMsg::ReaderTagMenu);
+        }
+        add(i18n("Undo"), &action, "Ctrl+Z", || AppMsg::Undo);
+        add(i18n("Redo"), &action, "Ctrl+Shift+Z", || AppMsg::Redo);
+        add(i18n("Check for New Mail"), &action, "", || AppMsg::Refresh);
+        add(i18n("Search Messages"), &action, "Ctrl+F", || AppMsg::OpenListSearch);
+        add(i18n("Show or Hide the Sidebar"), &action, "", || AppMsg::ToggleSidebar);
+        add(i18n("Settings"), &action, "Ctrl+,", || AppMsg::OpenPreferences);
+        add(i18n("Mail Accounts"), &action, "", || AppMsg::OpenAccounts);
+        add(i18n("Keyboard Shortcuts"), &action, "Ctrl+?", || AppMsg::ShowShortcuts);
+        add(i18n("About Hylki"), &action, "", || AppMsg::OpenAbout);
+        {
+            let mut focus = self.focus;
+            focus.enabled = !focus.enabled;
+            let s = sender.input_sender().clone();
+            out.push(Entry {
+                title: if focus.enabled { i18n("Turn Focus Mode On") } else { i18n("Turn Focus Mode Off") },
+                detail: action.clone(),
+                key: "Ctrl+Shift+F".into(),
+                run: Box::new(move || {
+                    let _ = s.send(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
+                }),
+            });
+        }
+
+        let view = i18n("View");
+        let mut go = |title: String, detail: String, msg: Box<dyn Fn() -> AppMsg>| {
+            let s = sender.input_sender().clone();
+            out.push(Entry {
+                title,
+                detail,
+                key: String::new(),
+                run: Box::new(move || {
+                    let _ = s.send(msg());
+                }),
+            });
+        };
+        // The merged views the sidebar lists, under the sidebar's names.
+        let every = i18n("All accounts");
+        for kind in [
+            FolderKind::Inbox,
+            FolderKind::Starred,
+            FolderKind::Sent,
+            FolderKind::Drafts,
+            FolderKind::Archive,
+            FolderKind::Junk,
+            FolderKind::Trash,
+        ] {
+            let listed = if kind == FolderKind::Inbox { self.unified_inboxes_shown() } else { self.unified_kinds.has(kind) };
+            if listed {
+                go(
+                    crate::ui::sidebar::kind_label(kind),
+                    every.clone(),
+                    Box::new(move || AppMsg::UnifiedSelected(UnifiedView::Kind(kind))),
+                );
+            }
+        }
+        go(i18n("Contacts"), view.clone(), Box::new(|| AppMsg::OpenContacts));
+        go(i18n("Attachments"), view.clone(), Box::new(|| AppMsg::ShowAttachments));
+        go(i18n("Outbox"), view.clone(), Box::new(|| AppMsg::ShowOutbox));
+        for email in self.ordered_emails() {
+            let Some(account) = self.accounts.iter().find(|a| a.email == email) else { continue };
+            for f in self.folders.get(&account.id).into_iter().flatten() {
+                let (account_id, folder_id, name, path) = (account.id, f.id, f.name.clone(), f.path.clone());
+                go(
+                    f.name.clone(),
+                    format!("{} · {}", account.label, f.path),
+                    Box::new(move || AppMsg::FolderSelected {
+                        account_id,
+                        folder_id,
+                        name: name.clone(),
+                        path: path.clone(),
+                    }),
+                );
+            }
+        }
+        let tag = i18n("Tag");
+        for t in &self.tags {
+            let keyword = t.keyword.clone();
+            go(
+                t.name.clone(),
+                tag.clone(),
+                Box::new(move || AppMsg::TagSelected { keyword: Some(keyword.clone()), account: None }),
+            );
+        }
+        out
     }
 
     /// Move to the next (or previous) message of the open conversation:
@@ -21501,6 +21632,7 @@ fn ctrl_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<AppMsg> {
         Key::r | Key::R if !shift => Some(AppMsg::Shortcut(Shortcut::Reply)),
         Key::r | Key::R => Some(AppMsg::Shortcut(Shortcut::ReplyAll)),
         Key::u | Key::U if !shift => Some(AppMsg::ViewSource),
+        Key::k | Key::K if !shift => Some(AppMsg::CommandPalette),
         _ => None,
     }
 }
@@ -21610,6 +21742,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
             ("Ctrl+Q", i18n_noop("Quit Hylki entirely")),
+            ("Ctrl+K", i18n_noop("Command palette: search actions, folders and tags")),
             ("?  or  Ctrl+?  or  F1", i18n_noop("This list")),
         ],
     ),
