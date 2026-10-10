@@ -204,6 +204,10 @@ msgstr "Mégse"
 msgid "Delete All"
 msgstr "Törlés"
 
+#, fuzzy
+msgid "The renderer applies the next time Hylki starts."
+msgstr "A nyelvi módosítások a Hylki következő indításakor lépnek életbe."
+
 msgid "The language applies the next time Hylki starts."
 msgstr "A nyelvi módosítások a Hylki következő indításakor lépnek életbe."
 
@@ -5741,6 +5745,16 @@ msgstr ""
 "követi, és ahol nincs fordítás, ott az angol nyelv jelenik meg. A módosítás "
 "a Hylki következő indításakor lép érvénybe."
 
+#, fuzzy
+msgid "Renderer"
+msgstr "Feladók"
+
+msgid ""
+"How the windows are drawn. OpenGL or Software can help on older graphics "
+"hardware where Vulkan is incomplete. A change applies the next time Hylki "
+"starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Futás a háttérben"
 
@@ -5965,6 +5979,9 @@ msgstr ""
 "Felülírja a jelenlegi fiókokat és beállításokat. Ne távolítsa el előbb a "
 "fiókokat: az eltávolítás során a kulcstartó jelszavai is törlődnek, "
 "amelyekről nincs biztonsági másolat."
+
+msgid "Software"
+msgstr ""
 
 msgid "In the unified section"
 msgstr "Az összevont részben"

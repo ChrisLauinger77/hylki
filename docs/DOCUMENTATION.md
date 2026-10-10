@@ -1122,6 +1122,20 @@ manager shows it, and so do the Dash to Dock and Dash to Panel extensions
 for GNOME; GNOME's own dash has no badges. **Settings → System → Unread count
 on the app icon** turns it off. Stored as `launcher_count` in `privacy.toml`.
 
+### Renderer
+
+**Settings → System → Renderer** chooses how the windows are drawn:
+**Automatic** (GTK's own choice, Vulkan where it works), **Vulkan**,
+**OpenGL** or **Software**. On older graphics hardware where Vulkan support
+is incomplete (Intel HD 4000 and its generation, for instance), OpenGL or
+Software can draw more reliably. The choice applies the next time Hylki
+starts. A `GSK_RENDERER` set for the session wins over it, so this still
+works:
+
+```sh
+flatpak override --user --env=GSK_RENDERER=gl co.hyprlab.Hylki
+```
+
 ### Storage
 
 Messages and attachments that have been opened, or fetched ahead for the

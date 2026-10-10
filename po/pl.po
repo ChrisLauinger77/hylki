@@ -205,6 +205,10 @@ msgstr "Anuluj"
 msgid "Delete All"
 msgstr "Usuń"
 
+#, fuzzy
+msgid "The renderer applies the next time Hylki starts."
+msgstr "Język zostanie zmieniony przy następnym uruchomieniu aplikacji Hylki."
+
 msgid "The language applies the next time Hylki starts."
 msgstr "Język zostanie zmieniony przy następnym uruchomieniu aplikacji Hylki."
 
@@ -5774,6 +5778,16 @@ msgstr ""
 "środowiska, a tam, gdzie brak tłumaczenia, używany jest angielski. Zmiana "
 "zostanie zastosowana przy następnym uruchomieniu aplikacji Hylki."
 
+#, fuzzy
+msgid "Renderer"
+msgstr "Nadawcy"
+
+msgid ""
+"How the windows are drawn. OpenGL or Software can help on older graphics "
+"hardware where Vulkan is incomplete. A change applies the next time Hylki "
+"starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Działanie w tle"
 
@@ -5998,6 +6012,9 @@ msgstr ""
 "Zastępuje bieżące konta i preferencje. Nie usuwaj wcześniej kont: usunięcie "
 "konta kasuje też jego hasła w bazie kluczy, których nie zawiera żadna kopia "
 "zapasowa."
+
+msgid "Software"
+msgstr ""
 
 msgid "In the unified section"
 msgstr "W sekcji widoków zbiorczych"

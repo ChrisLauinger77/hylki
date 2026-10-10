@@ -204,6 +204,10 @@ msgstr "Ακύρωση"
 msgid "Delete All"
 msgstr "Διαγραφή"
 
+#, fuzzy
+msgid "The renderer applies the next time Hylki starts."
+msgstr "Η γλώσσα θα εφαρμοστεί την επόμενη φορά που θα εκκινηθεί το Hylki."
+
 msgid "The language applies the next time Hylki starts."
 msgstr "Η γλώσσα θα εφαρμοστεί την επόμενη φορά που θα εκκινηθεί το Hylki."
 
@@ -5765,6 +5769,16 @@ msgstr ""
 "επιφάνεια εργασίας, με αγγλικά όπου δεν υπάρχει μετάφραση. Η αλλαγή "
 "εφαρμόζεται την επόμενη φορά που θα ξεκινήσει το Hylki."
 
+#, fuzzy
+msgid "Renderer"
+msgstr "Αποστολέας"
+
+msgid ""
+"How the windows are drawn. OpenGL or Software can help on older graphics "
+"hardware where Vulkan is incomplete. A change applies the next time Hylki "
+"starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Διατήρηση εκτέλεσης στο παρασκήνιο"
 
@@ -5990,6 +6004,9 @@ msgstr ""
 "αφαιρέσετε πρώτα λογαριασμούς: η αφαίρεση διαγράφει επίσης τους κωδικούς "
 "τους από την κλειδοθήκη, τους οποίους δεν περιέχει κανένα αντίγραφο "
 "ασφαλείας."
+
+msgid "Software"
+msgstr ""
 
 msgid "In the unified section"
 msgstr "Στην ενοποιημένη ενότητα"

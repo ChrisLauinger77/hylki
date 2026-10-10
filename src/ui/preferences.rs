@@ -1061,6 +1061,10 @@ fn hide_edit_icon(widget: &gtk::Widget) {
 }
 
 /// A plain error alert over the settings window.
+/// The choices of Settings → System → Renderer, as `GSK_RENDERER` values;
+/// empty is GTK's own choice (#403).
+const RENDERERS: [&str; 4] = ["", "vulkan", "gl", "cairo"];
+
 /// The choices of Settings → System → Keep downloaded mail, in days; 0 keeps
 /// it (#394).
 const KEEP_DOWNLOADS_DAYS: [u32; 4] = [0, 365, 90, 30];
@@ -1102,6 +1106,7 @@ pub enum PrefInput {
     ChangeDateStyle(u32),
     ChangeClockStyle(u32),
     ChangeLanguage(u32),
+    ChangeRenderer(u32),
     /// The GNOME Files extension (#188): install this build's copy, remove
     /// the installed one, ask Files to quit so it reloads.
     NautilusInstall,
@@ -1273,6 +1278,8 @@ pub enum PrefOutput {
     SetClockStyle(ClockStyle),
     /// The interface language code chosen, "" for the system's (#179).
     SetLanguage(String),
+    /// A `GSK_RENDERER` value, or empty for GTK's own choice (#403).
+    SetRenderer(String),
     SetThreading(bool),
     SetThreadsExpanded(bool),
     SetThreadNewestFirst(bool),
@@ -3675,6 +3682,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "renderer_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Renderer"),
+                                        set_subtitle: &i18n("How the windows are drawn. OpenGL or Software can help \
+                                                       on older graphics hardware where Vulkan is incomplete. \
+                                                       A change applies the next time Hylki starts."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeRenderer(row.selected()));
+                                        },
+                                    },
+
                                     #[name = "background_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Keep running in the background"),
@@ -4094,6 +4112,7 @@ impl Component for Preferences {
             &widgets.date_style_row,
             &widgets.clock_style_row,
             &widgets.language_row,
+            &widgets.renderer_row,
             &widgets.chevron_side_row,
             &widgets.start_view_row,
             &widgets.folder_sort_row,
@@ -4112,6 +4131,17 @@ impl Component for Preferences {
         widgets.language_row.set_selected(
             choices.iter().position(|(_, c)| *c == init.language).unwrap_or(0) as u32,
         );
+
+        widgets.renderer_row.set_model(Some(&gtk::StringList::new(&[
+            &i18n("Automatic"),
+            "Vulkan",
+            "OpenGL",
+            &i18n("Software"),
+        ])));
+        let renderer = crate::config::load_renderer();
+        widgets
+            .renderer_row
+            .set_selected(RENDERERS.iter().position(|r| *r == renderer).unwrap_or(0) as u32);
 
         widgets.auto_remote_content_row.set_active(init.auto_remote_content);
         widgets.show_remote_banner_row.set_active(init.show_remote_banner);
@@ -4887,6 +4917,11 @@ impl Component for Preferences {
             PrefInput::ChangeClockStyle(i) => {
                 if let Some((_, style)) = CLOCK_STYLES.get(i as usize) {
                     let _ = sender.output(PrefOutput::SetClockStyle(*style));
+                }
+            }
+            PrefInput::ChangeRenderer(i) => {
+                if let Some(r) = RENDERERS.get(i as usize) {
+                    let _ = sender.output(PrefOutput::SetRenderer((*r).to_string()));
                 }
             }
             PrefInput::ChangeLanguage(i) => {

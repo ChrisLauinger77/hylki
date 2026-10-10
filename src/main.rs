@@ -82,6 +82,29 @@ pub const WIZARD_AGAIN_VAR: &str = "HYLKI_WIZARD_AGAIN";
 /// activation from presenting the window that was deliberately not shown.
 pub static HIDDEN_START: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// Marks a `GSK_RENDERER` that Hylki set itself, so a restart, which
+/// inherits the environment, does not take it for the session's own.
+const RENDERER_SET: &str = "HYLKI_GSK_RENDERER_SET";
+
+/// Settings → System → Renderer (#403), into `GSK_RENDERER` before GTK
+/// starts. One the session already has (a `flatpak override --env`) wins.
+/// Single-threaded here, so setting the environment is safe.
+fn apply_renderer() {
+    if std::env::var_os(RENDERER_SET).is_some() {
+        std::env::remove_var("GSK_RENDERER");
+        std::env::remove_var(RENDERER_SET);
+    }
+    if std::env::var_os("GSK_RENDERER").is_some() {
+        return;
+    }
+    let renderer = config::load_renderer();
+    if !renderer.is_empty() {
+        tracing::info!("renderer: {renderer}, from Settings");
+        std::env::set_var("GSK_RENDERER", &renderer);
+        std::env::set_var(RENDERER_SET, "1");
+    }
+}
+
 fn main() {
     // The allocator's tunables before the first allocation that matters (see
     // memory_report::tune_allocator).
@@ -151,6 +174,7 @@ fn main() {
     // StartupWMClass, the app ID, and showed a second icon without it (#402).
     // Wayland takes the app ID from the application, so nothing changes there.
     // The display name keeps sound mixers from showing the app ID instead.
+    apply_renderer();
     gtk::glib::set_prgname(Some(APP_ID));
     gtk::glib::set_application_name("Hylki");
 

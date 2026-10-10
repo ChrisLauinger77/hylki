@@ -203,6 +203,10 @@ msgstr "Отмена"
 msgid "Delete All"
 msgstr "Удалить"
 
+#, fuzzy
+msgid "The renderer applies the next time Hylki starts."
+msgstr "Язык изменится при следующем запуске Hylki."
+
 msgid "The language applies the next time Hylki starts."
 msgstr "Язык изменится при следующем запуске Hylki."
 
@@ -5710,6 +5714,16 @@ msgstr ""
 "при отсутствии перевода — английский. Изменения вступят в силу при следующем "
 "запуске Hylki."
 
+#, fuzzy
+msgid "Renderer"
+msgstr "Отправитель"
+
+msgid ""
+"How the windows are drawn. OpenGL or Software can help on older graphics "
+"hardware where Vulkan is incomplete. A change applies the next time Hylki "
+"starts."
+msgstr ""
+
 msgid "Keep running in the background"
 msgstr "Продолжать работу в фоновом режиме"
 
@@ -5931,6 +5945,9 @@ msgstr ""
 "Заменяет текущие учётные записи и параметры. Не удаляйте учётные записи "
 "предварительно: удаление также стирает их пароли из связки ключей, которые "
 "не содержатся в резервной копии."
+
+msgid "Software"
+msgstr ""
 
 msgid "In the unified section"
 msgstr "В общем разделе"

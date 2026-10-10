@@ -7427,6 +7427,19 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetRenderer(renderer)) => {
+                // The combo notifies as its model is set too: only a real
+                // change is saved and announced.
+                if config::load_renderer() != renderer {
+                    config::save_renderer(&renderer);
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n("The renderer applies the next time Hylki starts."),
+                        error: false,
+                        connectivity: false,
+                    });
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetLanguage(code)) => {
                 // The combo also notifies as its model is set; only a real
                 // change is saved and announced.
