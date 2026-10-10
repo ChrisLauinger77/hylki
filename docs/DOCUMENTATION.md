@@ -45,7 +45,9 @@ Any mail account set up in *GNOME Settings → Online Accounts* can be
 imported: Google, Microsoft 365 and plain **IMAP and SMTP** accounts alike.
 They are listed on the first-run wizard's first account page, which can be
 skipped, and under **Settings → Accounts → GNOME Online Accounts**, where a
-switch brings one into Hylki.
+switch brings one into Hylki. An account added in GNOME Settings while Hylki
+is open joins the list as soon as GNOME announces it; the refresh button
+beside **Add Account…** looks again at once.
 
 GNOME keeps such an account's address, servers and password, and Hylki
 follows it. The password is read from GNOME Online Accounts each time the

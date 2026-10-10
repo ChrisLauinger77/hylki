@@ -1568,6 +1568,10 @@ msgid "Drag to set the order they appear in the sidebar."
 msgstr ""
 "Arrastra para establecer el orden en el que aparecen en la barra lateral."
 
+#, fuzzy
+msgid "Check GNOME Online Accounts for new accounts"
+msgstr "Cuentas en línea de GNOME"
+
 msgid "Add Account…"
 msgstr "Añadir cuenta…"
 

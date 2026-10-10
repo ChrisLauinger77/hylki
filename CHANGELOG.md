@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: a refresh button for GNOME Online Accounts.** In **Settings →
+  Accounts**, beside **Add Account…**, it looks for accounts added in GNOME
+  Settings since the list was made.
+- **Fixed: an account added to GNOME Online Accounts was slow to appear** in
+  Hylki's import list. Hylki watched only for accounts removed or changed
+  there; it now notices one added as soon as GNOME announces it.
+
 - **Added: Gmail keys** (#392, requested by 3v1n0). **Settings → System →
   Gmail keys** swaps in Gmail's single-key shortcuts: j/k move a cursor down
   the list without opening, o or Enter opens, e archives, # deletes, Shift+U

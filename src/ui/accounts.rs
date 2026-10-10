@@ -284,6 +284,9 @@ struct AliasDialog {
 
 #[derive(Debug)]
 pub enum AccountsInput {
+    /// Read GNOME Online Accounts again, for accounts added there since the
+    /// list was made: the refresh button, and GOA saying one was added.
+    RefreshGoa,
     /// An account's folder order was changed from the sidebar: this copy of
     /// the account, and its editor if open, follow, so saving the editor
     /// later doesn't put the old order back.
@@ -533,7 +536,12 @@ const SENT_COPY_HINT: &str =
 /// account is offered again and re-importing repairs it. Accounts GOA can
 /// neither serve IMAP nor Graph mail for can never connect and aren't listed.
 fn importable_goa_accounts(configured: &[AccountConfig]) -> Vec<crate::goa::GoaMailAccount> {
-    crate::goa::list_mail_accounts()
+    importable_of(crate::goa::list_mail_accounts(), configured)
+}
+
+/// The importable ones among `listed` (see [`importable_goa_accounts`]).
+fn importable_of(listed: Vec<crate::goa::GoaMailAccount>, configured: &[AccountConfig]) -> Vec<crate::goa::GoaMailAccount> {
+    listed
         .into_iter()
         .filter(|g| {
             !configured.iter().any(|a| {
@@ -557,6 +565,9 @@ pub enum AccountsCmd {
     OAuth(Result<(String, Option<(String, String)>), String>),
     /// Alias SMTP test result (#34).
     AliasTested(Result<(), String>),
+    /// GNOME Online Accounts read again: its mail accounts, for the import
+    /// list.
+    GoaListed(Vec<crate::goa::GoaMailAccount>),
     /// An account's secrets, read from the keyring for its editor.
     Secrets(AccountSecrets),
     /// The Gravatar looked up for the address in the editor (#189).
@@ -702,10 +713,20 @@ impl Component for AccountsWindow {
                                     // Cloud Storage panels place theirs.
                                     #[wrap(Some)]
                                     set_header_suffix = &gtk::Box {
-                                        set_orientation: gtk::Orientation::Vertical,
+                                        set_orientation: gtk::Orientation::Horizontal,
+                                        set_spacing: 6,
                                         set_valign: gtk::Align::Start,
                                         set_halign: gtk::Align::End,
                                         set_margin_start: 24,
+                                        // An account just added in GNOME
+                                        // Settings, without waiting for GOA
+                                        // to say so.
+                                        #[name = "goa_refresh_btn"]
+                                        gtk::Button {
+                                            set_icon_name: "view-refresh-symbolic",
+                                            set_tooltip_text: Some(&i18n("Check GNOME Online Accounts for new accounts")),
+                                            connect_clicked => AccountsInput::RefreshGoa,
+                                        },
                                         gtk::Button {
                                             set_label: &i18n("Add Account…"),
                                             set_size_request: (130, -1),
@@ -1918,6 +1939,15 @@ impl Component for AccountsWindow {
             AccountsInput::ShowPage(id) => {
                 widgets.list_stack.set_visible_child_name(&id);
             }
+            AccountsInput::RefreshGoa => {
+                // Off the main thread: GOA answers over D-Bus, and a busy
+                // goa-daemon is slow to.
+                widgets.goa_refresh_btn.set_sensitive(false);
+                sender.oneshot_command(async move {
+                    let listed = tokio::task::spawn_blocking(crate::goa::list_mail_accounts).await.unwrap_or_default();
+                    AccountsCmd::GoaListed(listed)
+                });
+            }
             AccountsInput::CloseEditor => {
                 if widgets
                     .nav
@@ -3018,6 +3048,13 @@ impl Component for AccountsWindow {
                 if found {
                     self.rebuild_account_list(&widgets.accounts_list, &sender);
                 }
+            }
+
+            AccountsCmd::GoaListed(listed) => {
+                widgets.goa_refresh_btn.set_sensitive(true);
+                self.goa = importable_of(listed, &self.accounts);
+                self.rebuild_goa_list(&widgets.goa_list, &sender);
+                widgets.goa_group.set_visible(!self.goa.is_empty());
             }
 
             AccountsCmd::Secrets(secrets) => {

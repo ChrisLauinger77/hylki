@@ -1577,6 +1577,10 @@ msgstr "Ative primeiro o acesso POP/IMAP nas definições do GMX."
 msgid "Drag to set the order they appear in the sidebar."
 msgstr "Arraste para definir a ordem pela qual aparecem na barra lateral."
 
+#, fuzzy
+msgid "Check GNOME Online Accounts for new accounts"
+msgstr "Contas online do GNOME"
+
 msgid "Add Account…"
 msgstr "Adicionar conta…"
 

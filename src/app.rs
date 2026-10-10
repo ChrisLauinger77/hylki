@@ -9824,6 +9824,10 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::GoaChanged(live) => {
+                // An account added there shows in Settings' import list.
+                if let Some(acc) = &self.accounts_win {
+                    acc.emit(crate::ui::accounts::AccountsInput::RefreshGoa);
+                }
                 // GOA changed in GNOME Settings. Drop any imported account that
                 // no longer exists there; pause/resume any whose Mail service
                 // was toggled. (Adding an account to GOA never auto-imports —

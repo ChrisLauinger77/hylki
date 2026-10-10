@@ -1582,6 +1582,10 @@ msgstr "Ενεργοποιήστε πρώτα την πρόσβαση POP/IMAP �
 msgid "Drag to set the order they appear in the sidebar."
 msgstr "Σύρετε για να ορίσετε τη σειρά εμφάνισής τους στην πλευρική στήλη."
 
+#, fuzzy
+msgid "Check GNOME Online Accounts for new accounts"
+msgstr "Διαδικτυακοί λογαριασμοί GNOME"
+
 msgid "Add Account…"
 msgstr "Προσθήκη λογαριασμού…"
 

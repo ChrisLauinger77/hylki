@@ -1568,6 +1568,10 @@ msgstr "Először engedélyezze a POP/IMAP hozzáférést a GMX beállításaiba
 msgid "Drag to set the order they appear in the sidebar."
 msgstr "Húzással állítsa be az oldalsávban való megjelenési sorrendet."
 
+#, fuzzy
+msgid "Check GNOME Online Accounts for new accounts"
+msgstr "GNOME Internetes Fiókok"
+
 msgid "Add Account…"
 msgstr "Fiók hozzáadása…"
 

@@ -416,8 +416,8 @@ pub fn live_state() -> Option<GoaLiveState> {
     Some(state)
 }
 
-/// Watch GNOME Online Accounts for changes — account removals and property
-/// edits (e.g. the Mail service being switched on or off) — and hand `on_change`
+/// Watch GNOME Online Accounts for changes — accounts added and removed, and
+/// property edits (e.g. the Mail service being switched on or off) — and hand `on_change`
 /// a fresh [`GoaLiveState`] for each. Signals arrive in bursts for a single
 /// Settings edit, so they are coalesced for 300 ms and snapshotted once, on a
 /// dedicated thread — never the GTK main thread. Silently no-ops if GOA or the
@@ -436,6 +436,16 @@ pub fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
             }
         });
 
+    // An account added in GNOME Settings: without this, the import list only
+    // learned of it the next time something else made it look again.
+    let added_tx = tx.clone();
+    let _ = std::thread::Builder::new()
+        .name("goa-added-watch".into())
+        .spawn(move || {
+            if let Err(e) = watch_added_signals(&added_tx) {
+                tracing::debug!("GOA added watch stopped: {e}");
+            }
+        });
     let removed_tx = tx.clone();
     let _ = std::thread::Builder::new()
         .name("goa-removed-watch".into())
@@ -451,6 +461,21 @@ pub fn watch_changes<F: Fn(GoaLiveState) + Send + 'static>(on_change: F) {
                 tracing::debug!("GOA properties watch stopped: {e}");
             }
         });
+}
+
+fn watch_added_signals(
+    tx: &std::sync::mpsc::Sender<()>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let conn = zbus::blocking::Connection::session()?;
+    let om = zbus::blocking::fdo::ObjectManagerProxy::builder(&conn)
+        .destination(GOA_DEST)?
+        .path(GOA_PATH)?
+        .build()?;
+    let mut added = om.receive_interfaces_added()?;
+    for _ in added.by_ref() {
+        let _ = tx.send(());
+    }
+    Ok(())
 }
 
 fn watch_removed_signals(

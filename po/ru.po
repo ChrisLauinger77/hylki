@@ -1582,6 +1582,10 @@ msgstr "Сначала включите доступ по POP/IMAP в настр
 msgid "Drag to set the order they appear in the sidebar."
 msgstr "Перетащите, чтобы изменить порядок отображения на боковой панели."
 
+#, fuzzy
+msgid "Check GNOME Online Accounts for new accounts"
+msgstr "Сетевые учётные записи GNOME"
+
 msgid "Add Account…"
 msgstr "Добавить учётную запись…"
 
