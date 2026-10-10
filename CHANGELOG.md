@@ -22,6 +22,14 @@
   File…** in the command palette, shows in a window of its own instead of
   being attached to a new message. **Save as File…** on a message's
   right-click menu and its card saves it whole as a `.eml`.
+- **Added: Outlook .msg files open in Hylki** (#398). They show like a
+  `.eml`: the server's headers when Outlook kept them, else the sender,
+  recipients, subject and date from the file, with the text, attachments and
+  inline pictures. A body kept only as RTF is not read.
+- **Added: old list mail can leave the Inbox on its own** (#407). Each IMAP
+  or JMAP account's **Move list mail to Trash**, under Syncing, moves Inbox
+  mail with an unsubscribe link older than 30, 60, 90 or 180 days to the
+  Trash at each sync, starred mail excepted. Off unless chosen.
 - **Added: Settings → System → Storage** (#394, requested by somepaulo). It
   shows what downloaded messages and attachments take up, removes them on
   request, and **Keep downloaded mail** removes those older than a year, 90
