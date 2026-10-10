@@ -127,7 +127,8 @@ The full list. The [README](../README.md) carries a shorter one.
   the language of the message you are answering. See
   [Translating messages](DOCUMENTATION.md#translating-messages).
 - **One-click unsubscribe:** a banner on list mail that leaves the list for
-  you, by request or by email, without a browser where the list allows it.
+  you, by request or by email, without a browser where the list allows it,
+  and can delete the mail already received from the same address.
 - **OpenPGP:** read encrypted and signed mail, sign and encrypt what you
   send, and manage keys from Settings, through the GnuPG already on your
   computer. See [OpenPGP](DOCUMENTATION.md#openpgp-encrypted-and-signed-mail).

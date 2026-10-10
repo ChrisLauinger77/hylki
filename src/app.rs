@@ -1424,6 +1424,9 @@ pub enum AppMsg {
     DeleteThread(Vec<Message>),
     /// The thread-delete dialog was confirmed.
     DeleteThreadConfirmed(Vec<Message>),
+    /// Delete every message in an account from this address, after leaving
+    /// its list (#407).
+    DeleteFromAddress { account_id: u32, addr: String },
     /// Reader View on or off (the header's switch).
     SetReaderMode(bool),
     /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
@@ -7860,6 +7863,14 @@ impl SimpleComponent for AppModel {
 
             AppMsg::DeleteThreadConfirmed(messages) => {
                 self.delete_messages(messages, &sender);
+            }
+
+            AppMsg::DeleteFromAddress { account_id, addr } => {
+                let messages = self.mail_from_address(account_id, &addr);
+                tracing::info!("unsubscribe: deleting {} message(s) from {addr}", messages.len());
+                if !messages.is_empty() {
+                    self.delete_messages(messages, &sender);
+                }
             }
 
             AppMsg::Pref(PrefOutput::SetCardActionsMode { hover_toggle, hover_auto }) => {
@@ -20689,6 +20700,27 @@ impl AppModel {
         })
     }
 
+    /// The mail in an account from `addr` that leaving a list can take with
+    /// it (#407): every folder but Sent, Drafts, Templates and Trash, where
+    /// it is either the user's own or already on its way out.
+    fn mail_from_address(&self, account_id: u32, addr: &str) -> Vec<Message> {
+        let Some(cache) = self.cache.as_ref() else { return Vec::new() };
+        let Some(folders) = self.folders.get(&account_id) else { return Vec::new() };
+        let mut by_path: HashMap<String, std::collections::HashSet<u32>> = HashMap::new();
+        for (path, uid) in cache.messages_from_address(account_id, addr) {
+            by_path.entry(path).or_default().insert(uid);
+        }
+        let mut out = Vec::new();
+        for f in folders {
+            if matches!(f.kind, FolderKind::Sent | FolderKind::Drafts | FolderKind::Templates | FolderKind::Trash) {
+                continue;
+            }
+            let Some(uids) = by_path.get(&f.path) else { continue };
+            out.extend(cache.load_messages(account_id, &f.path, f.id).into_iter().filter(|m| uids.contains(&m.uid)));
+        }
+        out
+    }
+
     /// Ask before leaving a list: what will happen depends on the route the
     /// list offers, and a mail sent in the user's name is said so up front.
     fn confirm_unsubscribe(
@@ -20724,12 +20756,32 @@ impl AppModel {
         dialog.set_default_response(Some("unsub"));
         dialog.set_close_response("cancel");
         dialog.set_response_appearance("unsub", adw::ResponseAppearance::Suggested);
+        // The mail already received from the list's address can go with it
+        // (#407). Off unless ticked: the address may send other mail too.
+        let n = self.mail_from_address(message.account_id, &message.from_addr).len();
+        let delete_too = (n > 0).then(|| {
+            let check = gtk::CheckButton::with_label(&ni18n_f(
+                "Also delete the message from {addr}",
+                "Also delete the {n} messages from {addr}",
+                n as u32,
+                &[("n", &n.to_string()), ("addr", &message.from_addr)],
+            ));
+            check.set_halign(gtk::Align::Center);
+            dialog.set_extra_child(Some(&check));
+            check
+        });
         let s = sender.clone();
         let message = Box::new(message);
         let info = Box::new(info);
         dialog.connect_response(None, move |_, resp| {
             if resp == "unsub" {
                 s.input(AppMsg::UnsubscribeGo { message: message.clone(), info: info.clone() });
+                if delete_too.as_ref().is_some_and(|c| c.is_active()) {
+                    s.input(AppMsg::DeleteFromAddress {
+                        account_id: message.account_id,
+                        addr: message.from_addr.clone(),
+                    });
+                }
             }
         });
         dialog.present();

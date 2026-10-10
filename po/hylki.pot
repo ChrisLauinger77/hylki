@@ -829,6 +829,11 @@ msgstr ""
 msgid "Unsubscribe"
 msgstr ""
 
+msgid "Also delete the message from {addr}"
+msgid_plural "Also delete the {n} messages from {addr}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "the message offers no way to unsubscribe"
 msgstr ""
 

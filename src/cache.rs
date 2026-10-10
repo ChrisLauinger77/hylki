@@ -840,6 +840,22 @@ impl Cache {
         }
     }
 
+    /// Every message in an account from `addr`, as (folder path, uid): what
+    /// Unsubscribe offers to delete along with leaving the list (#407).
+    pub fn messages_from_address(&self, account_id: u32, addr: &str) -> Vec<(String, u32)> {
+        let run = || -> rusqlite::Result<Vec<(String, u32)>> {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT folder_path, uid FROM messages WHERE account_id = ?1 AND lower(from_addr) = lower(?2)")?;
+            let rows = stmt.query_map(params![account_id, addr.trim()], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect()
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache messages_from_address failed: {e}");
+            Vec::new()
+        })
+    }
+
     pub fn load_messages(&self, account_id: u32, folder_path: &str, folder_id: u32) -> Vec<Message> {
         let run = || -> rusqlite::Result<Vec<Message>> {
             let mut stmt = self.conn.prepare(&format!(

@@ -913,6 +913,12 @@ msgstr ""
 msgid "Unsubscribe"
 msgstr "Κατάργηση εγγραφής"
 
+#, fuzzy
+msgid "Also delete the message from {addr}"
+msgid_plural "Also delete the {n} messages from {addr}"
+msgstr[0] "Δεν ήταν δυνατή η διαγραφή του μηνύματος: {e}"
+msgstr[1] "Δεν ήταν δυνατή η διαγραφή του μηνύματος: {e}"
+
 msgid "the message offers no way to unsubscribe"
 msgstr "το μήνυμα δεν προσφέρει τρόπο κατάργησης εγγραφής"
 

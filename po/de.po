@@ -921,6 +921,12 @@ msgstr ""
 msgid "Unsubscribe"
 msgstr "Abmelden"
 
+#, fuzzy
+msgid "Also delete the message from {addr}"
+msgid_plural "Also delete the {n} messages from {addr}"
+msgstr[0] "Nachricht konnte nicht gelöscht werden: {e}"
+msgstr[1] "Nachricht konnte nicht gelöscht werden: {e}"
+
 msgid "the message offers no way to unsubscribe"
 msgstr "Die Nachricht bietet keine Möglichkeit, sich abzumelden"
 

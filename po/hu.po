@@ -905,6 +905,12 @@ msgstr ""
 msgid "Unsubscribe"
 msgstr "Leiratkozás"
 
+#, fuzzy
+msgid "Also delete the message from {addr}"
+msgid_plural "Also delete the {n} messages from {addr}"
+msgstr[0] "Az üzenet nem törölhető: {e}"
+msgstr[1] "Az üzenet nem törölhető: {e}"
+
 msgid "the message offers no way to unsubscribe"
 msgstr "az üzenet nem kínál leiratkozási lehetőséget"
 

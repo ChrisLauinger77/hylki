@@ -914,6 +914,12 @@ msgstr ""
 msgid "Unsubscribe"
 msgstr "Cancelar subscrição"
 
+#, fuzzy
+msgid "Also delete the message from {addr}"
+msgid_plural "Also delete the {n} messages from {addr}"
+msgstr[0] "Não foi possível eliminar a mensagem: {e}"
+msgstr[1] "Não foi possível eliminar a mensagem: {e}"
+
 msgid "the message offers no way to unsubscribe"
 msgstr "a mensagem não disponibiliza nenhuma forma de cancelar a subscrição"
 
