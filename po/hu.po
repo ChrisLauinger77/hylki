@@ -279,6 +279,10 @@ msgstr "Az importálás sikertelen: {e}"
 msgid "Could not import account: {e}"
 msgstr "A fiók nem importálható: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Az üzenet nem frissíthető: {e}"
+
 msgid "No address book available"
 msgstr "Nem érhető el címjegyzék"
 
@@ -364,6 +368,10 @@ msgstr "Megjelölés olvasottként vagy olvasatlanként"
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Mappa áthelyezése"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Nyomtatás…"
 
 msgid "Undo"
 msgstr "Visszavonás"
@@ -487,8 +495,28 @@ msgstr "Keresés az üzenetben"
 msgid "Collapse All Messages"
 msgstr "Olvasói nézetre váltás"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Mentés PDF-ként…"
+
 msgid "Print…"
 msgstr "Nyomtatás…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Új üzenet"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Új üzenet"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "{n} db üzenet"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "A mappa nem helyezhető át: {e}"
 
 msgid "Delete {n} messages"
 msgstr "{n} üzenet törlése"

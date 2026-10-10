@@ -172,6 +172,9 @@ fn main() {
                 } else if uri.starts_with("mid:") || uri.starts_with("MID:") {
                     // A Message-ID link (#130): open that message.
                     app::queue_mid(uri);
+                } else if let Some(path) = f.path().filter(|p| app::is_message_file(p)) {
+                    // A saved message (#398): read it, rather than attach it.
+                    app::queue_message_file(path);
                 } else if let Some(path) = f.path() {
                     // A file handed in from a file manager's "Open With" (or
                     // the command line): open a fresh composer with it

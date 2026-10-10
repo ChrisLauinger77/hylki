@@ -609,6 +609,11 @@ pub struct AppModel {
     /// Messages on their way to another account (#265), by token.
     transfers: HashMap<u64, Transfer>,
     next_transfer: u64,
+    /// Ids for messages opened from files (#398), counting down from the
+    /// top so they never meet a server's UIDs.
+    next_local_id: u32,
+    /// The `ExportRaw` tokens of Save as File, with the name to offer.
+    pending_saves: HashMap<u64, String>,
     /// How the moves to other accounts under way are going, for the status
     /// line and the one report at the end.
     transfer_tally: TransferTally,
@@ -1604,6 +1609,11 @@ pub enum AppMsg {
     /// A `mid:` link (RFC 2392) from anywhere on the system (#130): open the
     /// message with that Message-ID.
     OpenMid(String),
+    /// A message file (.eml) handed in from a file manager or the command
+    /// line, or picked with Open Message File (#398).
+    OpenMessageFile(std::path::PathBuf),
+    /// Choose a message file to read (#398).
+    PickMessageFile,
     /// An account's answer to a server-side Message-ID search.
     MidLocated { account_id: u32, message_id: String, hit: Option<(String, u32)> },
     /// The tag finder: scan every account for keywords in use.
@@ -3108,6 +3118,8 @@ impl SimpleComponent for AppModel {
             pending_moves: std::cell::RefCell::new(HashMap::new()),
             transfers: HashMap::new(),
             next_transfer: 0,
+            next_local_id: u32::MAX - 1,
+            pending_saves: HashMap::new(),
             transfer_tally: TransferTally::default(),
             sidebar_split: None,
             app_title: None,
@@ -5314,6 +5326,9 @@ impl SimpleComponent for AppModel {
         for uri in MID_PENDING.lock().unwrap().drain(..) {
             sender.input(AppMsg::OpenMid(uri));
         }
+        for path in FILE_PENDING.lock().unwrap().drain(..) {
+            sender.input(AppMsg::OpenMessageFile(path));
+        }
         for paths in ATTACH_PENDING.lock().unwrap().drain(..) {
             sender.input(AppMsg::OpenWithFiles(paths));
         }
@@ -6902,6 +6917,16 @@ impl SimpleComponent for AppModel {
                                 path,
                                 uid: m.uid,
                             });
+                        }
+                    }
+                    RowAction::SaveAsFile => {
+                        // The whole message as the server keeps it, asked
+                        // for first: the save dialog opens once it is here.
+                        if let Some(path) = self.resolve_folder_path(&m) {
+                            let token = self.next_transfer;
+                            self.next_transfer += 1;
+                            self.pending_saves.insert(token, eml_file_name(&m.subject));
+                            self.send_to(m.account_id, MailRequest::ExportRaw { token, path, uid: m.uid, for_reader: true });
                         }
                     }
                     RowAction::AddContact => {
@@ -8666,6 +8691,9 @@ impl SimpleComponent for AppModel {
                 self.message_view.emit(MessageViewInput::CopySelection);
             }
 
+            AppMsg::OpenMessageFile(path) => self.open_message_file(&path, &sender),
+            AppMsg::PickMessageFile => self.pick_message_file(&sender),
+
             AppMsg::OpenMid(uri) => {
                 // The cache first: it holds every message Hylki has listed,
                 // across accounts, and answers at once. Only a miss asks the
@@ -10148,6 +10176,17 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::RawExported { token, raw } => {
+                if let Some(name) = self.pending_saves.remove(&token) {
+                    match raw {
+                        Ok(raw) => self.save_message_file(name, raw),
+                        Err(e) => self.notifications.emit(NotifyInput::Push {
+                            text: i18n_f("Could not save the message: {e}", &[("e", &e)]),
+                            error: true,
+                            connectivity: false,
+                        }),
+                    }
+                    return;
+                }
                 if self.pending_draft_token == Some(token) {
                     self.pending_draft_token = None;
                     let Some((m, inline, extra)) = self.pending_draft.take() else { return };
@@ -11736,6 +11775,7 @@ impl AppModel {
             add(i18n("Move to Folder"), &action, "", || AppMsg::MoveToMenu);
             add(i18n("Tags"), &action, "", || AppMsg::ReaderTagMenu);
         }
+        add(i18n("Open Message File…"), &action, "", || AppMsg::PickMessageFile);
         add(i18n("Undo"), &action, "Ctrl+Z", || AppMsg::Undo);
         add(i18n("Redo"), &action, "Ctrl+Shift+Z", || AppMsg::Redo);
         add(i18n("Check for New Mail"), &action, "", || AppMsg::Refresh);
@@ -14816,6 +14856,7 @@ impl AppModel {
             );
         }
         last.push(item(RowAction::ViewSource, i18n("View Source"), "code"));
+        last.push(item(RowAction::SaveAsFile, i18n("Save as File…"), "document-save"));
         sections.push(last);
         // Printing prints what the reader shows, the whole conversation in
         // it, so the reader that was right-clicked is the one asked (#359).
@@ -15113,6 +15154,76 @@ impl AppModel {
             .collect()
     }
 
+    /// Ask where to put a message's bytes, and write them there (#398).
+    fn save_message_file(&self, name: String, raw: Vec<u8>) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Save Message"));
+        dialog.set_initial_name(Some(&name));
+        let notifications = self.notifications.sender().clone();
+        dialog.save(Some(&self.window), gtk::gio::Cancellable::NONE, move |res| {
+            let Ok(file) = res else { return };
+            let Some(path) = file.path() else { return };
+            if let Err(e) = std::fs::write(&path, &raw) {
+                tracing::warn!("save {}: {e}", path.display());
+                let _ = notifications.send(NotifyInput::Push {
+                    text: i18n_f("Could not save the message: {e}", &[("e", &e.to_string())]),
+                    error: true,
+                    connectivity: false,
+                });
+            }
+        });
+    }
+
+    /// Pick a message file to read (#398).
+    fn pick_message_file(&self, sender: &ComponentSender<Self>) {
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title(&i18n("Open Message File"));
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&i18n("Email messages")));
+        filter.add_mime_type("message/rfc822");
+        filter.add_suffix("eml");
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        dialog.set_filters(Some(&filters));
+        let s = sender.input_sender().clone();
+        dialog.open(Some(&self.window), gtk::gio::Cancellable::NONE, move |res| {
+            if let Some(path) = res.ok().and_then(|f| f.path()) {
+                let _ = s.send(AppMsg::OpenMessageFile(path));
+            }
+        });
+    }
+
+    /// Read a message file in a window of its own (#398), rendered as the
+    /// reader renders mail from a server. It belongs to the account in view,
+    /// which is where Reply and Forward send from, and to no folder.
+    fn open_message_file(&mut self, path: &std::path::Path, sender: &ComponentSender<Self>) {
+        let raw = match std::fs::read(path) {
+            Ok(raw) => raw,
+            Err(e) => {
+                tracing::warn!("open {}: {e}", path.display());
+                self.notifications.emit(NotifyInput::Push {
+                    text: i18n_f("Could not open {file}: {e}", &[("file", &path.display().to_string()), ("e", &e.to_string())]),
+                    error: true,
+                    connectivity: false,
+                });
+                return;
+            }
+        };
+        let id = self.next_local_id;
+        self.next_local_id -= 1;
+        let mut m = crate::worker::summary_from_raw(self.active_account(), FILE_FOLDER, id, &raw);
+        let (body, check, has_attachment) = crate::worker::render_raw(&raw);
+        m.unread = false;
+        m.has_attachment = has_attachment;
+        m.body = body.clone();
+        let key = body_key(&m);
+        self.body_cache.insert(key, body);
+        self.attachment_cache.insert(key, crate::worker::extract_attachments_of(&raw));
+        self.sender_cache.insert(key, Box::new(check));
+        tracing::info!("open: {} as a message", path.display());
+        self.open_message_window(m, Vec::new(), sender);
+    }
+
     /// Pop a message out into its own standalone window with a dedicated
     /// reader. `thread` is the whole conversation when `m` heads one (the
     /// window then shows every card); empty for a single message.
@@ -15220,6 +15331,7 @@ impl AppModel {
 
         let allow_remote = self.remote_allowed(&display);
         let folder_kind = self.folder_kind(display.account_id, display.folder_id);
+        let init_from_file = display.folder_id == FILE_FOLDER;
         let init = MessageWindowInit {
             message: display,
             thread,
@@ -15231,7 +15343,16 @@ impl AppModel {
             attachments_loading: atts_loading,
             drawer_enabled: self.drawer_enabled,
             card_attachments: self.card_attachments,
-            toolbar: self.reader_toolbar.clone(),
+            // A message from a file is in no folder: there is nothing to
+            // star, file or delete on a server.
+            toolbar: if init_from_file {
+                config::ReaderToolbar {
+                    left: vec![config::ToolbarItem::Reply, config::ToolbarItem::ReplyAll, config::ToolbarItem::Forward],
+                    right: vec![config::ToolbarItem::Find, config::ToolbarItem::Print],
+                }
+            } else {
+                self.reader_toolbar.clone()
+            },
             in_junk: folder_kind == Some(FolderKind::Junk),
             restorable: matches!(folder_kind, Some(FolderKind::Trash | FolderKind::Junk)),
             content_dark: self.message_theme.dark_override(),
@@ -22136,6 +22257,41 @@ pub fn queue_attach_files(paths: Vec<std::path::PathBuf>) {
     }
 }
 
+/// Message files that arrived before the component was up (see `MAILTO_PENDING`).
+static FILE_PENDING: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+/// Route a message file (.eml) to the app (from main's `connect_open`, #398).
+pub fn queue_message_file(path: std::path::PathBuf) {
+    match MAILTO_SENDER.get() {
+        Some(s) => {
+            let _ = s.send(AppMsg::OpenMessageFile(path));
+        }
+        None => FILE_PENDING.lock().unwrap().push(path),
+    }
+}
+
+/// The name Save as File offers: the subject, without what a file name
+/// cannot hold, and `.eml`.
+fn eml_file_name(subject: &str) -> String {
+    let stem: String = subject
+        .chars()
+        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '-' } else { c })
+        .collect();
+    let stem = stem.trim().trim_matches('.');
+    let stem: String = stem.chars().take(80).collect();
+    if stem.is_empty() { "message.eml".to_string() } else { format!("{stem}.eml") }
+}
+
+/// Whether a file handed in is a message to read rather than one to attach:
+/// a `.eml`, the usual name for a message saved whole (#398).
+pub fn is_message_file(path: &std::path::Path) -> bool {
+    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("eml"))
+}
+
+/// The folder id a message read from a file carries (#398): no folder has
+/// it, so nothing moves, deletes or refetches the message.
+pub const FILE_FOLDER: u32 = u32::MAX;
+
 /// `mid:` links that arrived before the component was up (see `MAILTO_PENDING`).
 static MID_PENDING: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
@@ -24167,6 +24323,15 @@ mod tests {
         assert_eq!(next_after_vanish(None, &after, 8), None);
         // Nothing left at all.
         assert_eq!(next_after_vanish(Some(&previous), &[], 8), None);
+    }
+
+    #[test]
+    fn save_as_file_offers_the_subject() {
+        assert_eq!(super::eml_file_name("Re: Q3 roadmap / review?"), "Re- Q3 roadmap - review-.eml");
+        assert_eq!(super::eml_file_name("   "), "message.eml");
+        assert_eq!(super::eml_file_name("..."), "message.eml");
+        assert!(super::is_message_file(std::path::Path::new("/tmp/A.EML")));
+        assert!(!super::is_message_file(std::path::Path::new("/tmp/a.pdf")));
     }
 
     #[test]

@@ -986,6 +986,20 @@ gathers the files of every message in it. Its Reader View switch changes
 that window alone; the main window and the choice Hylki remembers stay as
 they were. **Ctrl+F** finds in the message and **Ctrl+P** prints it.
 
+### Message files (.eml)
+
+A message saved whole, as a `.eml` file, opens in a window of its own:
+double-click it in GNOME Files (Hylki is offered for email files), pass it to
+`hylki` on the command line, or pick **Open Message File…** in the command
+palette (**Ctrl+K**). It is drawn as mail from a server is, with its
+attachments in the drawer, and **Reply**, **Reply All** and **Forward**
+write from the account in view. It belongs to no folder, so there is nothing
+to star, move or delete.
+
+**Save as File…**, in a message's right-click menu in the list or on its card,
+saves the message whole, as the server keeps it, under its subject with
+`.eml` on the end. Outlook's `.msg` files are not read.
+
 ### One message light or dark
 
 **Settings → Reading → Message appearance** draws every message light, dark

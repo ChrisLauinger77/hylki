@@ -45,6 +45,8 @@ pub enum RowAction {
     /// Put a message from Trash or Junk back in its account's Inbox (#138).
     MoveToInbox,
     ViewSource,
+    /// Save the message whole, as a .eml file (#398).
+    SaveAsFile,
     AddContact,
 }
 

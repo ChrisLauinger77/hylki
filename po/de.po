@@ -280,6 +280,10 @@ msgstr "Import fehlgeschlagen: {e}"
 msgid "Could not import account: {e}"
 msgstr "Konnte kein Konto importieren: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Nachricht konnte nicht aktualisiert werden: {e}"
+
 msgid "No address book available"
 msgstr "Kein Adressbuch verfügbar"
 
@@ -365,6 +369,10 @@ msgstr "Als gelesen oder ungelesen markieren"
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Ordner verschieben"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Nachricht drucken…"
 
 msgid "Undo"
 msgstr "Rückgängig"
@@ -490,8 +498,28 @@ msgstr "In Nachricht suchen"
 msgid "Collapse All Messages"
 msgstr "Im Lesebereich einklappen"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Als PDF speichern…"
+
 msgid "Print…"
 msgstr "Drucken…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Neue Nachricht"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Neue Nachricht"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "{n} Nachrichten"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "Ordner konnte nicht verschoben werden: {e}"
 
 msgid "Delete {n} messages"
 msgstr "{n} Nachrichten löschen"

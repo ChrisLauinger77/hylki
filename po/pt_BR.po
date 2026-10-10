@@ -279,6 +279,10 @@ msgstr "Falha ao importar: {e}"
 msgid "Could not import account: {e}"
 msgstr "Não foi possível importar a conta: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Não foi possível atualizar a mensagem: {e}"
+
 msgid "No address book available"
 msgstr "Não está disponível nenhum catálogo de endereços"
 
@@ -363,6 +367,10 @@ msgstr "Marcar como lida ou não lida"
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Mover pasta"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Imprimir mensagem…"
 
 msgid "Undo"
 msgstr "Desfazer"
@@ -484,8 +492,28 @@ msgstr "Expandir todas as mensagens"
 msgid "Collapse All Messages"
 msgstr "Recolher todas as mensagens"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Salvar como PDF…"
+
 msgid "Print…"
 msgstr "Imprimir…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Nova mensagem"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Nova mensagem"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "Mensagens: {n}"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "Não foi possível mover a pasta: {e}"
 
 msgid "Delete {n} messages"
 msgstr "Excluir {n} mensagens"

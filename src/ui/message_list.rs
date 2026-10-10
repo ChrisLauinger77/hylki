@@ -2890,7 +2890,10 @@ impl MessageList {
                 &i18n("Add Sender to Contacts"),
                 "contact-new-symbolic",
             )],
-            vec![item(RowAction::ViewSource, &i18n("View Source"), "code-symbolic")],
+            vec![
+                item(RowAction::ViewSource, &i18n("View Source"), "code-symbolic"),
+                item(RowAction::SaveAsFile, &i18n("Save as File…"), "document-save-symbolic"),
+            ],
         ];
 
         self.popup_menu(x, y, None, sections);

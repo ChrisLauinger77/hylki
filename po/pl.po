@@ -280,6 +280,10 @@ msgstr "Nie udało się zaimportować ustawień: {e}"
 msgid "Could not import account: {e}"
 msgstr "Nie udało się zaimportować konta: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Nie udało się zaktualizować wiadomości: {e}"
+
 msgid "No address book available"
 msgstr "Brak dostępnej książki adresowej"
 
@@ -365,6 +369,10 @@ msgstr "Oznacz jako przeczytane lub nieprzeczytane"
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Przenieś katalog"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Drukuj wiadomość…"
 
 msgid "Undo"
 msgstr "Cofnij"
@@ -489,8 +497,28 @@ msgstr "Znajdź w wiadomości"
 msgid "Collapse All Messages"
 msgstr "Zwiń do panelu czytania"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Zapisz jako PDF…"
+
 msgid "Print…"
 msgstr "Drukuj…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Nowa wiadomość"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Nowa wiadomość"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "wiadomości: {n}"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "Nie udało się przenieść katalogu: {e}"
 
 msgid "Delete {n} messages"
 msgstr "Usuń wiadomości ({n})"

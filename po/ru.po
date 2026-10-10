@@ -277,6 +277,10 @@ msgstr "Ошибка импорта: {e}"
 msgid "Could not import account: {e}"
 msgstr "Не удалось импортировать учетную запись: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Не удалось обновить сообщение: {e}"
+
 msgid "No address book available"
 msgstr "Адресная книга недоступна"
 
@@ -361,6 +365,10 @@ msgstr "Отметить как прочитанное или непрочита
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Переместить папку"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Печать сообщения…"
 
 msgid "Undo"
 msgstr "Отменить"
@@ -482,8 +490,28 @@ msgstr "Развернуть все сообщения"
 msgid "Collapse All Messages"
 msgstr "Свернуть все сообщения"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Сохранить как PDF…"
+
 msgid "Print…"
 msgstr "Печать…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Новое сообщение"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Новое сообщение"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "{n} сообщений"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "Не удалось переместить папку: {e}"
 
 msgid "Delete {n} messages"
 msgstr "Удалить {n} сообщений"

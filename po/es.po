@@ -278,6 +278,10 @@ msgstr "Error al importar: {e}"
 msgid "Could not import account: {e}"
 msgstr "No se pudo importar la cuenta: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "No se pudo actualizar el mensaje: {e}"
+
 msgid "No address book available"
 msgstr "No hay ninguna libreta de direcciones disponible"
 
@@ -362,6 +366,10 @@ msgstr "Marcar como leído o no leído"
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Mover carpeta"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Imprimir mensaje…"
 
 msgid "Undo"
 msgstr "Deshacer"
@@ -483,8 +491,28 @@ msgstr "Expandir todos los mensajes"
 msgid "Collapse All Messages"
 msgstr "Contraer todos los mensajes"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Guardar como PDF…"
+
 msgid "Print…"
 msgstr "Imprimir…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Mensaje nuevo"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Mensaje nuevo"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "{n} mensajes"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "No se pudo mover la carpeta: {e}"
 
 msgid "Delete {n} messages"
 msgstr "Eliminar {n} mensajes"

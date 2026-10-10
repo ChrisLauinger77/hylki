@@ -280,6 +280,10 @@ msgstr "Η εισαγωγή απέτυχε: {e}"
 msgid "Could not import account: {e}"
 msgstr "Αδυναμία εισαγωγής λογαριασμού: {e}"
 
+#, fuzzy
+msgid "Could not save the message: {e}"
+msgstr "Δεν ήταν δυνατή η ενημέρωση του μηνύματος: {e}"
+
 msgid "No address book available"
 msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων"
 
@@ -364,6 +368,10 @@ msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμέν�
 #, fuzzy
 msgid "Move to Folder"
 msgstr "Μετακίνηση φακέλου"
+
+#, fuzzy
+msgid "Open Message File…"
+msgstr "Εκτύπωση μηνύματος…"
 
 msgid "Undo"
 msgstr "Αναίρεση"
@@ -485,8 +493,28 @@ msgstr "Ανάπτυξη όλων των μηνυμάτων"
 msgid "Collapse All Messages"
 msgstr "Σύμπτυξη όλων των μηνυμάτων"
 
+#, fuzzy
+msgid "Save as File…"
+msgstr "Αποθήκευση ως PDF…"
+
 msgid "Print…"
 msgstr "Εκτύπωση…"
+
+#, fuzzy
+msgid "Save Message"
+msgstr "Νέο μήνυμα"
+
+#, fuzzy
+msgid "Open Message File"
+msgstr "Νέο μήνυμα"
+
+#, fuzzy
+msgid "Email messages"
+msgstr "{n} μηνύματα"
+
+#, fuzzy
+msgid "Could not open {file}: {e}"
+msgstr "Δεν ήταν δυνατή η μετακίνηση φακέλου: {e}"
 
 msgid "Delete {n} messages"
 msgstr "Διαγραφή {n} μηνυμάτων"

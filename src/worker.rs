@@ -3755,7 +3755,7 @@ pub fn extract_attachments_of(raw: &[u8]) -> Vec<crate::models::Attachment> {
 /// attachments. An encrypted message is decrypted through the user's GnuPG
 /// here, which may raise the agent's passphrase prompt — so this runs only
 /// for an explicit open, never for the background prefetch.
-fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, bool) {
+pub(crate) fn render_raw(raw: &[u8]) -> (String, crate::models::SenderCheck, bool) {
     let mut check = crate::verify::check_sender(raw);
     match crate::pgp::unwrap_message(raw, &crate::pgp::Gpg::system()) {
         Some(u) => {
@@ -8967,7 +8967,7 @@ fn label_from_timestamp(ts: i64) -> String {
 }
 
 /// Build a message summary from a full RFC 822 message (POP3 has no ENVELOPE).
-fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &[u8]) -> Message {
+pub(crate) fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &[u8]) -> Message {
     use mail_parser::MessageParser;
     let parsed = MessageParser::default().parse(raw);
     let addr = parsed

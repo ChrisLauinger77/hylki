@@ -260,6 +260,9 @@ msgstr ""
 msgid "Could not import account: {e}"
 msgstr ""
 
+msgid "Could not save the message: {e}"
+msgstr ""
+
 msgid "No address book available"
 msgstr ""
 
@@ -335,6 +338,9 @@ msgid "Mark as Read or Unread"
 msgstr ""
 
 msgid "Move to Folder"
+msgstr ""
+
+msgid "Open Message File…"
 msgstr ""
 
 msgid "Undo"
@@ -444,7 +450,22 @@ msgstr ""
 msgid "Collapse All Messages"
 msgstr ""
 
+msgid "Save as File…"
+msgstr ""
+
 msgid "Print…"
+msgstr ""
+
+msgid "Save Message"
+msgstr ""
+
+msgid "Open Message File"
+msgstr ""
+
+msgid "Email messages"
+msgstr ""
+
+msgid "Could not open {file}: {e}"
 msgstr ""
 
 msgid "Delete {n} messages"
