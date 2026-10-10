@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- **Added: Gmail keys** (#392, requested by 3v1n0). **Settings → System →
+  Gmail keys** swaps in Gmail's single-key shortcuts: j/k move a cursor down
+  the list without opening, o or Enter opens, e archives, # deletes, Shift+U
+  and Shift+I mark unread and read, x selects, z undoes, and g then i, s, t,
+  d, a or c goes to Inbox, Starred, Sent, Drafts, Archive or Contacts.
+- **Fixed: l, w and b did nothing useful** (#392). l now puts the keyboard in
+  the open message, w and b step through the conversation's cards, opening a
+  folded one, and the single-key shortcuts keep working after a click in the
+  message. x selected no row from the keyboard.
+- **Added: a command palette** (#399, requested by 3v1n0). **Ctrl+K** opens a
+  search over the actions that apply to the open mail, the views, every
+  account's folders and the tags; Enter runs the one picked.
+- **Added: Unsubscribe can delete what the list sent** (#407, requested by
+  zachrdavis). The unsubscribe dialog offers to move the mail already
+  received from the same address to Trash; off unless ticked, and undoable.
+- **Added: .eml files open in Hylki** (#398, requested by 3v1n0). A message
+  file opened from GNOME Files or the command line, or with **Open Message
+  File…** in the command palette, shows in a window of its own instead of
+  being attached to a new message. **Save as File…** on a message's
+  right-click menu and its card saves it whole as a `.eml`.
+- **Added: Settings → System → Storage** (#394, requested by somepaulo). It
+  shows what downloaded messages and attachments take up, removes them on
+  request, and **Keep downloaded mail** removes those older than a year, 90
+  days or 30 days. The message list and search are unaffected.
+- **Added: Settings → System → Renderer** (#403, requested by narcarsiss).
+  Automatic, Vulkan, OpenGL or Software, for older graphics hardware where
+  Vulkan is incomplete; applies at the next start.
+
 - **Fixed: choosing an MP3 as the new-mail sound crashed Hylki** (#397,
   reported by JavierLopezBravo). An MP3 that starts with an ID3v2 tag made
   GStreamer abort the app when the sound was chosen, previewed or played for
