@@ -555,6 +555,11 @@ pub struct AccountConfig {
     /// The same for the Trash folder.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub empty_trash_days: u32,
+    /// Mailing-list mail (#407): Inbox messages with a List-Unsubscribe
+    /// header, not starred, older than this many days go to the Trash at
+    /// each sync. 0 = never.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub clean_lists_days: u32,
     /// The OpenPGP key (fingerprint) that signs mail from this account and
     /// opens what is encrypted to it (#133); `None` = the key whose address
     /// matches.
@@ -4671,6 +4676,7 @@ dest_path = "Lists"
             server_saves_sent: false,
             empty_junk_days: 0,
             empty_trash_days: 0,
+            clean_lists_days: 0,
             pgp_key: None,
             in_unified: true,
             folder_sort: None,

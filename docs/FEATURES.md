@@ -51,7 +51,8 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Unified and filtered folders:** Inboxes, Starred, Sent, Drafts, Archive,
   Junk and Trash across accounts, plus a folder per filter and any folders
   you keep in Favorites.
-- **Empty Trash and Junk**, by hand or automatically after a number of days.
+- **Empty Trash and Junk**, by hand or automatically after a number of days,
+  and move old newsletter and mailing-list mail out of the Inbox the same way.
 - **Attachment gallery:** every attachment in an account or folder in one
   place, with PDF first-page thumbnails, scoped by account and folder, and a
   deep archive scan that finds old attachments without downloading them.

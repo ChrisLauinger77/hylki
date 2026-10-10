@@ -1147,6 +1147,87 @@ async fn auto_empty_jmap(
     }
 }
 
+/// Move the Inbox's list mail older than the account's chosen age to the
+/// Trash (#407): the same choice as over IMAP, as a JMAP query filter.
+async fn clean_lists_jmap(
+    s: &JmapSession,
+    account_id: u32,
+    account: &AccountConfig,
+    cache: Option<&Cache>,
+    state: &mut JmapState,
+    last: &mut Option<std::time::Instant>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if !clean_lists_due(account, last) {
+        return;
+    }
+    let days = account.clean_lists_days;
+    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox).cloned() else { return };
+    let Some(trash) = role_folder_path(account, &folders, FolderKind::Trash, "trash") else { return };
+    let (Some((_, inbox_id)), Some((_, trash_id))) = (state.folders.get(&inbox.path).cloned(), state.folders.get(&trash).cloned()) else {
+        return;
+    };
+    let before = graph_before_date(days);
+    let sess = s.clone();
+    let moved = blocking(move || {
+        // The candidates, then their List-Unsubscribe header read: a
+        // `header` filter would do both, but not every server answers one
+        // (Stalwart finds nothing), as with IMAP's HEADER search.
+        let filter = serde_json::json!({ "before": before, "notKeyword": "$flagged" });
+        let candidates = jmap_all_ids_in(&sess, &inbox_id, filter)?;
+        let mut ids = Vec::new();
+        for chunk in candidates.chunks(500) {
+            let responses = jmap_call(
+                &sess,
+                &[CAP_CORE, CAP_MAIL],
+                vec![call(
+                    0,
+                    "Email/get",
+                    serde_json::json!({
+                        "accountId": sess.account,
+                        "ids": chunk,
+                        "properties": ["id", "header:List-Unsubscribe"],
+                    }),
+                )],
+            )?;
+            for email in args(&responses, 0)["list"].as_array().into_iter().flatten() {
+                let listed = email["header:List-Unsubscribe"].as_str().is_some_and(|v| !v.trim().is_empty());
+                if let (true, Some(id)) = (listed, email["id"].as_str()) {
+                    ids.push(id.to_string());
+                }
+            }
+        }
+        if !ids.is_empty() {
+            let update: serde_json::Map<String, serde_json::Value> = ids
+                .iter()
+                .map(|id| (id.clone(), serde_json::json!({ "mailboxIds": { trash_id.clone(): true } })))
+                .collect();
+            jmap_set_emails(&sess, serde_json::Value::Object(update), &[])?;
+        }
+        Ok(ids)
+    })
+    .await;
+    match moved {
+        Ok(ids) if !ids.is_empty() => {
+            tracing::info!(
+                "list clean-up: moved {} list message(s) older than {days} days to {trash} on account {account_id}",
+                ids.len()
+            );
+            if let Some(c) = cache {
+                for id in &ids {
+                    let uid = hash_uid(id);
+                    state.uids.remove(&uid);
+                    c.delete_message(account_id, &inbox.path, uid);
+                }
+                emit(WorkerEvent::Messages { folder_id: inbox.id, messages: c.load_messages(account_id, &inbox.path, inbox.id) });
+            }
+        }
+        Ok(_) => {}
+        Err(e) => tracing::warn!("list clean-up: could not move list mail on account {account_id}: {e}"),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Sending
 // ---------------------------------------------------------------------------
@@ -1701,6 +1782,7 @@ pub(super) async fn run_jmap(
     }
 
     let mut last_auto_empty: Option<std::time::Instant> = None;
+    let mut last_list_clean: Option<std::time::Instant> = None;
     let mut state = JmapState {
         session: None,
         folders: HashMap::new(),
@@ -2337,6 +2419,7 @@ pub(super) async fn run_jmap(
                 if let Some(s) = jmap_session(&account, &mut state, &|_| {}).await {
                     jmap_refresh_unread(&s, account_id, cache.as_ref(), &mut state, &emit).await;
                     auto_empty_jmap(&s, account_id, &account, cache.as_ref(), &mut state, &mut last_auto_empty, &emit).await;
+                    clean_lists_jmap(&s, account_id, &account, cache.as_ref(), &mut state, &mut last_list_clean, &emit).await;
                 }
             }
 

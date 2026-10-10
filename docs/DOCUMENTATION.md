@@ -1143,6 +1143,19 @@ works:
 flatpak override --user --env=GSK_RENDERER=gl co.hyprlab.Hylki
 ```
 
+### Newsletters and list mail
+
+The Unsubscribe banner on mail from a list asks before it leaves the list, and
+can take the mail already received from that address to the Trash with it:
+tick **Also delete the messages from …** in that dialog.
+
+For the rest, each account's settings have **Move list mail to Trash**, under
+Syncing: Inbox mail with an unsubscribe link (a List-Unsubscribe header) that
+is older than 30, 60, 90 or 180 days goes to the Trash, checked at each sync
+and at most every six hours. Starred mail stays, and so does anything without
+the header, however old. It works for IMAP and JMAP accounts; Microsoft 365
+offers no way to search for the header, so the choice is not shown there.
+
 ### Storage
 
 Messages and attachments that have been opened, or fetched ahead for the

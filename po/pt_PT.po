@@ -1954,6 +1954,15 @@ msgstr ""
 "Eliminar permanentemente do Lixo o correio mais antigo do que este período, "
 "verificando-o em cada sincronização."
 
+#, fuzzy
+msgid "Move list mail to Trash"
+msgstr "Mover este rascunho para o Lixo"
+
+msgid ""
+"Inbox mail from mailing lists and newsletters (anything with an unsubscribe "
+"link) older than this, unless starred. Checked at each sync."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Ordem das pastas"
 

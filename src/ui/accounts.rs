@@ -1536,6 +1536,15 @@ impl Component for AccountsWindow {
                                     set_subtitle: &i18n("Delete mail in the Trash older than this for \
                                                    good, checked at each sync."),
                                 },
+                                // Mailing-list mail past the chosen age goes
+                                // to the Trash (#407).
+                                #[name = "clean_lists_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Move list mail to Trash"),
+                                    set_subtitle: &i18n("Inbox mail from mailing lists and newsletters \
+                                                   (anything with an unsubscribe link) older than this, \
+                                                   unless starred. Checked at each sync."),
+                                },
                             },
 
                             // Its own folder order, or Settings → Sidebar's.
@@ -1834,6 +1843,10 @@ impl Component for AccountsWindow {
             row.set_model(Some(&gtk::StringList::new(&empty_labels)));
             row.set_list_factory(Some(&non_ellipsizing_factory()));
         }
+        let list_labels = age_labels(CLEAN_LISTS_DAYS);
+        let list_labels: Vec<&str> = list_labels.iter().map(String::as_str).collect();
+        widgets.clean_lists_row.set_model(Some(&gtk::StringList::new(&list_labels)));
+        widgets.clean_lists_row.set_list_factory(Some(&non_ellipsizing_factory()));
 
         // Show the SMTP credential fields only when the toggle is on.
         widgets
@@ -3798,6 +3811,9 @@ impl AccountsWindow {
             _ => form_protocol(widgets),
         };
         widgets.push_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        // The list-mail search is a server search for a header, which
+        // Microsoft 365 does not offer and POP3 has no folders for.
+        widgets.clean_lists_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
     }
 
     fn apply_provider(&self, widgets: &AccountsWindowWidgets) {
@@ -4267,6 +4283,10 @@ fn read_account(
             .get(widgets.empty_trash_row.selected() as usize)
             .copied()
             .unwrap_or(0),
+        clean_lists_days: CLEAN_LISTS_DAYS
+            .get(widgets.clean_lists_row.selected() as usize)
+            .copied()
+            .unwrap_or(0),
         // Row 0 is Automatic; the rest follow PGP_KEY_CHOICES. Until gpg
         // has answered, the account keeps the key it had.
         pgp_key: PGP_KEY_CHOICES.with(|c| {
@@ -4381,9 +4401,17 @@ fn auto_empty_index(days: u32) -> u32 {
     AUTO_EMPTY_DAYS.iter().position(|d| *d == days).unwrap_or(0) as u32
 }
 
+/// Moving list mail to the Trash (#407): never, then the ages.
+const CLEAN_LISTS_DAYS: &[u32] = &[0, 30, 60, 90, 180];
+
 /// The combo's labels, translated.
 fn auto_empty_labels() -> Vec<String> {
-    AUTO_EMPTY_DAYS
+    age_labels(AUTO_EMPTY_DAYS)
+}
+
+/// "Never", then "After N days" for each age.
+fn age_labels(days: &[u32]) -> Vec<String> {
+    days
         .iter()
         .map(|d| {
             if *d == 0 {
@@ -4483,6 +4511,9 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     });
     widgets.empty_junk_row.set_selected(auto_empty_index(acc.empty_junk_days));
     widgets.empty_trash_row.set_selected(auto_empty_index(acc.empty_trash_days));
+    widgets
+        .clean_lists_row
+        .set_selected(CLEAN_LISTS_DAYS.iter().position(|d| *d == acc.clean_lists_days).unwrap_or(0) as u32);
     fill_pgp_key_row(widgets, acc.pgp_key.as_deref());
     widgets.in_unified_row.set_active(acc.in_unified);
     widgets.folder_sort_row.set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
@@ -4577,6 +4608,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.push_row.set_selected(0);
     widgets.empty_junk_row.set_selected(0);
     widgets.empty_trash_row.set_selected(0);
+    widgets.clean_lists_row.set_selected(0);
     fill_pgp_key_row(widgets, None);
     widgets.in_unified_row.set_active(true);
     widgets.folder_sort_row.set_selected(0);

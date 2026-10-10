@@ -22144,6 +22144,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         server_saves_sent: false,
         empty_junk_days: 0,
         empty_trash_days: 0,
+        clean_lists_days: 0,
         pgp_key: None,
         in_unified: true,
         folder_sort: None,

@@ -1244,6 +1244,7 @@ async fn run_imap(
     let mut last_unread_sweep: Option<std::time::Instant> = None;
     // When the Junk / Trash auto-empty (#140) last ran for this connection.
     let mut last_auto_empty: Option<std::time::Instant> = None;
+    let mut last_list_clean: Option<std::time::Instant> = None;
     // Whether the Inbox's permanent IDLE watcher has been spawned. It waits for
     // the main session to be up first — its connection must win the first slot
     // on servers with a per-user cap — and needs the folder list in the cache.
@@ -1410,6 +1411,9 @@ async fn run_imap(
                         last_unread_sweep = Some(std::time::Instant::now());
                         auto_empty_imap(
                             account_id, &account, sess, cache.as_ref(), &mut last_auto_empty, &emit,
+                        ).await;
+                        clean_lists_imap(
+                            account_id, &account, sess, cache.as_ref(), &mut last_list_clean, &emit,
                         ).await;
                     }
                     continue;
@@ -6744,6 +6748,104 @@ async fn auto_empty_imap(
     }
 }
 
+/// Whether moving old list mail (#407) is due, on the same terms as
+/// [`auto_empty_due`]: set for the account, and not run in the last
+/// [`AUTO_EMPTY_MIN`] on this connection.
+fn clean_lists_due(account: &AccountConfig, last: &mut Option<std::time::Instant>) -> bool {
+    if account.clean_lists_days == 0 || last.is_some_and(|t| t.elapsed() < AUTO_EMPTY_MIN) {
+        return false;
+    }
+    *last = Some(std::time::Instant::now());
+    true
+}
+
+/// The candidates for the list clean-up (#407), as an IMAP search: older
+/// than the cut-off and not starred. Which of them are list mail is read
+/// from their headers: a `HEADER List-Unsubscribe ""` search would be one
+/// round trip, but not every server answers it (Stalwart searches only the
+/// headers it indexes, and finds nothing).
+fn clean_lists_query(days: u32) -> String {
+    format!("UNFLAGGED BEFORE {}", imap_before_date(days))
+}
+
+/// Which of `uids` (in the selected folder) carry a List-Unsubscribe
+/// header, read 500 at a time.
+async fn with_list_header(session: &mut ImapSession, uids: &[u32]) -> Result<Vec<u32>, async_imap::error::Error> {
+    let mut out = Vec::new();
+    for chunk in uids.chunks(500) {
+        let fetches: Vec<Fetch> = fetch_uids(session, uid_set(chunk), "(UID BODY.PEEK[HEADER.FIELDS (LIST-UNSUBSCRIBE)])")
+            .await?
+            .try_collect()
+            .await?;
+        out.extend(fetches.iter().filter_map(|f| {
+            let listed = fetched_fields(f).iter().any(|(name, value)| name.eq_ignore_ascii_case("list-unsubscribe") && !value.is_empty());
+            listed.then_some(f.uid?)
+        }));
+    }
+    Ok(out)
+}
+
+/// Move the Inbox's list mail older than the account's chosen age to the
+/// Trash (#407), searched for on the server, so mail never opened counts
+/// too. It rides the unread sweep like auto-empty, and a failure is logged
+/// and tried again next time. The Inbox list is redrawn from the cache.
+async fn clean_lists_imap(
+    account_id: u32,
+    account: &AccountConfig,
+    session: &mut ImapSession,
+    cache: Option<&Cache>,
+    last: &mut Option<std::time::Instant>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    if !clean_lists_due(account, last) {
+        return;
+    }
+    let days = account.clean_lists_days;
+    let folders = cache.map(|c| c.load_folders(account_id)).unwrap_or_default();
+    let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox).cloned() else { return };
+    let Some(trash) = role_folder_path(account, &folders, FolderKind::Trash, "trash") else {
+        tracing::info!("list clean-up: account {account_id} has no Trash folder");
+        return;
+    };
+    let found = match sel(session, &inbox.path).await {
+        Ok(_) => search_uids(session, clean_lists_query(days)).await,
+        Err(e) => Err(e),
+    };
+    let found = match found {
+        Ok(set) => {
+            let mut candidates: Vec<u32> = set.into_iter().collect();
+            candidates.sort_unstable();
+            with_list_header(session, &candidates).await
+        }
+        Err(e) => Err(e),
+    };
+    let uids: Vec<u32> = match found {
+        Ok(uids) => uids,
+        Err(e) => {
+            tracing::warn!("list clean-up: could not search {} on account {account_id}: {e}", inbox.path);
+            return;
+        }
+    };
+    if uids.is_empty() {
+        return;
+    }
+    match move_messages(session, &inbox.path, &uids, &trash).await {
+        Ok(_) => {
+            tracing::info!(
+                "list clean-up: moved {} list message(s) older than {days} days to {trash} on account {account_id}",
+                uids.len()
+            );
+            if let Some(c) = cache {
+                for uid in &uids {
+                    c.delete_message(account_id, &inbox.path, *uid);
+                }
+                emit(WorkerEvent::Messages { folder_id: inbox.id, messages: c.load_messages(account_id, &inbox.path, inbox.id) });
+            }
+        }
+        Err(e) => tracing::warn!("list clean-up: could not move list mail on account {account_id}: {e}"),
+    }
+}
+
 async fn refresh_folder_names(
     account_id: u32,
     account: &AccountConfig,
@@ -10465,6 +10567,7 @@ pub(super) fn sample_account() -> AccountConfig {
         server_saves_sent: false,
         empty_junk_days: 0,
         empty_trash_days: 0,
+        clean_lists_days: 0,
         pgp_key: None,
         in_unified: true,
         folder_sort: None,
@@ -12482,6 +12585,20 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(!auto_empty_due(&acc, &mut last), "just ran");
         last = Some(std::time::Instant::now() - AUTO_EMPTY_MIN - Duration::from_secs(1));
         assert!(auto_empty_due(&acc, &mut last));
+    }
+
+    /// Moving list mail (#407) runs on the same terms: set, and not twice
+    /// within the interval. Its search leaves starred mail out.
+    #[test]
+    fn list_clean_up_is_throttled_and_spares_starred_mail() {
+        let mut acc = sample_account();
+        let mut last = None;
+        assert!(!clean_lists_due(&acc, &mut last), "not set");
+        acc.clean_lists_days = 90;
+        assert!(clean_lists_due(&acc, &mut last));
+        assert!(!clean_lists_due(&acc, &mut last), "just ran");
+        let q = clean_lists_query(90);
+        assert!(q.starts_with("UNFLAGGED BEFORE "), "{q}");
     }
 
     /// IMAP wants "1-Aug-2026" (no zero padding); Graph an RFC 3339 instant.
