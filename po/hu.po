@@ -518,6 +518,11 @@ msgstr "Új üzenet"
 msgid "Email messages"
 msgstr "{n} db üzenet"
 
+#. Other programs name files .msg too (Tcl's catalogues).
+#, fuzzy
+msgid "it is not an Outlook message"
+msgstr "A gpg nem írta alá az üzenetet."
+
 #, fuzzy
 msgid "Could not open {file}: {e}"
 msgstr "A mappa nem helyezhető át: {e}"

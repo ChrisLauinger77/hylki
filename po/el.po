@@ -516,6 +516,11 @@ msgstr "Νέο μήνυμα"
 msgid "Email messages"
 msgstr "{n} μηνύματα"
 
+#. Other programs name files .msg too (Tcl's catalogues).
+#, fuzzy
+msgid "it is not an Outlook message"
+msgstr "Το gpg δεν υπέγραψε το μήνυμα."
+
 #, fuzzy
 msgid "Could not open {file}: {e}"
 msgstr "Δεν ήταν δυνατή η μετακίνηση φακέλου: {e}"

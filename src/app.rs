@@ -15216,7 +15216,9 @@ impl AppModel {
         let filter = gtk::FileFilter::new();
         filter.set_name(Some(&i18n("Email messages")));
         filter.add_mime_type("message/rfc822");
+        filter.add_mime_type("application/vnd.ms-outlook");
         filter.add_suffix("eml");
+        filter.add_suffix("msg");
         let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&filter);
         dialog.set_filters(Some(&filters));
@@ -15232,7 +15234,19 @@ impl AppModel {
     /// reader renders mail from a server. It belongs to the account in view,
     /// which is where Reply and Forward send from, and to no folder.
     fn open_message_file(&mut self, path: &std::path::Path, sender: &ComponentSender<Self>) {
-        let raw = match std::fs::read(path) {
+        // An Outlook .msg is turned into a message first (see outlook_msg).
+        let read = std::fs::read(path).and_then(|bytes| {
+            let outlook = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("msg"));
+            if crate::outlook_msg::is_msg(&bytes) {
+                crate::outlook_msg::to_eml(&bytes).map_err(std::io::Error::other)
+            } else if outlook {
+                // Other programs name files .msg too (Tcl's catalogues).
+                Err(std::io::Error::other(i18n("it is not an Outlook message")))
+            } else {
+                Ok(bytes)
+            }
+        });
+        let raw = match read {
             Ok(raw) => raw,
             Err(e) => {
                 tracing::warn!("open {}: {e}", path.display());
@@ -22335,9 +22349,10 @@ fn eml_file_name(subject: &str) -> String {
 }
 
 /// Whether a file handed in is a message to read rather than one to attach:
-/// a `.eml`, the usual name for a message saved whole (#398).
+/// a `.eml`, the usual name for a message saved whole, or Outlook's `.msg`
+/// (#398).
 pub fn is_message_file(path: &std::path::Path) -> bool {
-    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("eml"))
+    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("eml") || e.eq_ignore_ascii_case("msg"))
 }
 
 /// The folder id a message read from a file carries (#398): no folder has

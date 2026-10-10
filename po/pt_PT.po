@@ -515,6 +515,11 @@ msgstr "Nova mensagem"
 msgid "Email messages"
 msgstr "Mensagens: {n}"
 
+#. Other programs name files .msg too (Tcl's catalogues).
+#, fuzzy
+msgid "it is not an Outlook message"
+msgstr "O gpg não assinou a mensagem."
+
 #, fuzzy
 msgid "Could not open {file}: {e}"
 msgstr "Não foi possível mover a pasta: {e}"

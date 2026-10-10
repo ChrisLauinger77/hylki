@@ -986,9 +986,10 @@ gathers the files of every message in it. Its Reader View switch changes
 that window alone; the main window and the choice Hylki remembers stay as
 they were. **Ctrl+F** finds in the message and **Ctrl+P** prints it.
 
-### Message files (.eml)
+### Message files (.eml and .msg)
 
-A message saved whole, as a `.eml` file, opens in a window of its own:
+A message saved whole, as a `.eml` file or Outlook's `.msg`, opens in a
+window of its own:
 double-click it in GNOME Files (Hylki is offered for email files), pass it to
 `hylki` on the command line, or pick **Open Message File…** in the command
 palette (**Ctrl+K**). It is drawn as mail from a server is, with its
@@ -998,7 +999,13 @@ to star, move or delete.
 
 **Save as File…**, in a message's right-click menu in the list or on its card,
 saves the message whole, as the server keeps it, under its subject with
-`.eml` on the end. Outlook's `.msg` files are not read.
+`.eml` on the end.
+
+A `.msg` keeps the headers the mail server sent when Outlook has them, and
+otherwise its sender, recipients, subject and date are read from the file.
+Its HTML or plain text, its attachments and the pictures in its text all
+come through. A message whose text Outlook kept only as RTF shows no text,
+and a message attached to it is left out.
 
 ### One message light or dark
 

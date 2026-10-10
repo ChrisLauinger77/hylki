@@ -513,6 +513,11 @@ msgstr "Новое сообщение"
 msgid "Email messages"
 msgstr "{n} сообщений"
 
+#. Other programs name files .msg too (Tcl's catalogues).
+#, fuzzy
+msgid "it is not an Outlook message"
+msgstr "Программе gpg не удалось подписать сообщение."
+
 #, fuzzy
 msgid "Could not open {file}: {e}"
 msgstr "Не удалось переместить папку: {e}"

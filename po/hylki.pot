@@ -468,6 +468,10 @@ msgstr ""
 msgid "Email messages"
 msgstr ""
 
+#. Other programs name files .msg too (Tcl's catalogues).
+msgid "it is not an Outlook message"
+msgstr ""
+
 msgid "Could not open {file}: {e}"
 msgstr ""
 

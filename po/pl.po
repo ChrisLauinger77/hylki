@@ -520,6 +520,11 @@ msgstr "Nowa wiadomość"
 msgid "Email messages"
 msgstr "wiadomości: {n}"
 
+#. Other programs name files .msg too (Tcl's catalogues).
+#, fuzzy
+msgid "it is not an Outlook message"
+msgstr "Nie udało się podpisać wiadomości za pomocą programu gpg."
+
 #, fuzzy
 msgid "Could not open {file}: {e}"
 msgstr "Nie udało się przenieść katalogu: {e}"
