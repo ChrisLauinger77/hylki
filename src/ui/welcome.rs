@@ -1373,5 +1373,6 @@ pub(crate) fn blank_account() -> AccountConfig {
         in_unified: true,
         folder_sort: None,
         sign_by_default: false,
+        graph_directory: false,
     }
 }

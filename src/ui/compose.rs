@@ -302,6 +302,9 @@ pub struct Compose {
     /// Whether an LDAP directory is switched on (#307), found once the
     /// composer opens; without one, typing asks nothing.
     directories: bool,
+    /// The Microsoft 365 accounts whose organization directory is searched
+    /// too (#410), found with the LDAP directories.
+    graph_directories: std::sync::Arc<Vec<crate::config::AccountConfig>>,
     /// What the directories answered for the recipient being typed.
     directory_matches: Vec<Suggestion>,
     /// Bumped on every keystroke, so a slow directory's answer to an
@@ -581,8 +584,9 @@ pub enum ComposeInput {
     OpenContacts,
     /// The given recipient field changed — refresh autocomplete.
     Suggest(Field),
-    /// Whether any LDAP directory is switched on (#307).
-    DirectoriesKnown(bool),
+    /// Whether any LDAP directory is switched on (#307), and the accounts
+    /// whose organization directory is searched (#410).
+    DirectoriesKnown { ldap: bool, graph: Vec<crate::config::AccountConfig> },
     /// The typing paused: ask the directories, unless it went on since.
     DirectoryLookup { field: Field, token: String, generation: u64 },
     DirectoryResults { field: Field, token: String, generation: u64, matches: Vec<Suggestion> },
@@ -1225,6 +1229,7 @@ impl Component for Compose {
             attach_thumbs: Default::default(),
             suggestions,
             directories: false,
+            graph_directories: Default::default(),
             directory_matches: Vec::new(),
             directory_generation: 0,
             completion,
@@ -1561,8 +1566,9 @@ impl Component for Compose {
         {
             let s = sender.input_sender().clone();
             std::thread::spawn(move || {
-                let any = crate::directory::list().is_ok_and(|d| d.iter().any(|d| d.enabled));
-                let _ = s.send(ComposeInput::DirectoriesKnown(any));
+                let ldap = crate::directory::list().is_ok_and(|d| d.iter().any(|d| d.enabled));
+                let graph = crate::graph_directory::accounts();
+                let _ = s.send(ComposeInput::DirectoriesKnown { ldap, graph });
             });
         }
 
@@ -2248,7 +2254,8 @@ impl Component for Compose {
                 self.directory_generation = self.directory_generation.wrapping_add(1);
                 self.directory_matches.clear();
                 let token = recipient_token(row);
-                if self.directories && token.chars().count() >= crate::directory::MIN_QUERY {
+                let any = self.directories || !self.graph_directories.is_empty();
+                if any && token.chars().count() >= crate::directory::MIN_QUERY {
                     // A directory is asked once the typing pauses, not per key.
                     let generation = self.directory_generation;
                     let s = sender.input_sender().clone();
@@ -2259,13 +2266,28 @@ impl Component for Compose {
                 self.show_completion(field, row);
             }
 
-            ComposeInput::DirectoriesKnown(any) => self.directories = any,
+            ComposeInput::DirectoriesKnown { ldap, graph } => {
+                self.directories = ldap;
+                self.graph_directories = std::sync::Arc::new(graph);
+            }
 
             ComposeInput::DirectoryLookup { field, token, generation } => {
                 if generation == self.directory_generation {
                     let s = sender.input_sender().clone();
+                    let graph = self.graph_directories.clone();
+                    let ldap = self.directories;
                     std::thread::spawn(move || {
-                        let matches = crate::directory::search(&token);
+                        // Both at once: the slower decides when the list
+                        // grows, not the two one after the other.
+                        let matches = std::thread::scope(|scope| {
+                            let org = (!graph.is_empty())
+                                .then(|| scope.spawn(|| crate::graph_directory::search(&token, &graph)));
+                            let mut matches = if ldap { crate::directory::search(&token) } else { Vec::new() };
+                            if let Some(found) = org.and_then(|h| h.join().ok()) {
+                                matches.extend(found);
+                            }
+                            matches
+                        });
                         let _ = s.send(ComposeInput::DirectoryResults { field, token, generation, matches });
                     });
                 }

@@ -16,6 +16,7 @@ mod datefmt;
 mod desktop;
 mod directory;
 mod goa;
+mod graph_directory;
 mod i18n;
 mod invite;
 mod launcher_badge;

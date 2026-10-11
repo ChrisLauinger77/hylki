@@ -581,6 +581,13 @@ pub struct AccountConfig {
     /// for one message.
     #[serde(default, skip_serializing_if = "is_false")]
     pub sign_by_default: bool,
+    /// The composer's recipient suggestions also search the organization's
+    /// directory through Microsoft Graph (#410). Only for a Microsoft 365
+    /// account signed in within Hylki: the scopes it needs are asked for
+    /// when it is turned on, and a token from GNOME Online Accounts cannot
+    /// be given them.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub graph_directory: bool,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -5025,6 +5032,7 @@ dest_path = "Lists"
             in_unified: true,
             folder_sort: None,
             sign_by_default: false,
+            graph_directory: false,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {

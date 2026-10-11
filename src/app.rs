@@ -22716,6 +22716,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         in_unified: true,
         folder_sort: None,
         sign_by_default: false,
+        graph_directory: false,
     };
     vec![
         mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", Some("🚀")),

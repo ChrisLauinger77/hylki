@@ -73,6 +73,7 @@ impl GoaMailAccount {
             in_unified: true,
             folder_sort: None,
             sign_by_default: false,
+            graph_directory: false,
             name: if self.name.trim().is_empty() {
                 self.email.clone()
             } else {

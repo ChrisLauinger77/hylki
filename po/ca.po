@@ -2054,6 +2054,10 @@ msgstr ""
 "cosa amb un enllaç de baixa) més antic que això, tret que estigui destacat. "
 "Comprovat a cada sincronització."
 
+#, fuzzy
+msgid "Search the organization directory"
+msgstr "Vols desar el directori?"
+
 msgid "Folder Order"
 msgstr "Ordre de carpetes"
 
@@ -2182,6 +2186,14 @@ msgstr "Completa l'inici de sessió a la finestra que s'ha obert."
 msgid "Opening browser… complete sign-in there."
 msgstr "S'està obrint el navegador… completa-hi l'inici de sessió."
 
+#, fuzzy
+msgid "Opening browser… approve access to the directory there."
+msgstr "S'està obrint el navegador… completa-hi l'inici de sessió."
+
+#, fuzzy
+msgid "Approve access to the directory in the window that opened."
+msgstr "Completa l'inici de sessió a la finestra que s'ha obert."
+
 msgid "Signature HTML"
 msgstr "HTML de la signatura"
 
@@ -2222,6 +2234,16 @@ msgstr "✓ Sessió iniciada — desa el compte per acabar"
 
 msgid "Sign-in failed: {e}"
 msgstr "L'inici de sessió ha fallat: {e}"
+
+#, fuzzy
+msgid "Signed in as {address}, not {email}."
+msgstr "Sessió iniciada com a {who}. {terms}"
+
+msgid "Access to the directory approved. Save the account to finish."
+msgstr ""
+
+msgid "Access to the directory was not approved: {e}"
+msgstr ""
 
 msgid "✓ SMTP: connected"
 msgstr "✓ SMTP: connectat"
@@ -2323,6 +2345,18 @@ msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Utilitza aquest compte a l'Hylki"
+
+msgid ""
+"Only for an account signed in within Hylki. To use it, add this account with "
+"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Accounts."
+msgstr ""
+
+msgid ""
+"Suggest people from your organization as you type a recipient. Turning this "
+"on asks Microsoft for access to the directory; some organizations need an "
+"administrator to approve it."
+msgstr ""
 
 msgid "Never"
 msgstr "Mai"

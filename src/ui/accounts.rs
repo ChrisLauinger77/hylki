@@ -255,6 +255,13 @@ pub struct AccountsWindow {
     goa: Vec<crate::goa::GoaMailAccount>,
     /// Refresh token captured from a successful OAuth sign-in, applied on save.
     pending_oauth_refresh: Option<String>,
+    /// The editor's Microsoft sign-in may search the organization's
+    /// directory (#410): saved with those scopes, or just approved for them.
+    /// Save keeps asking for them, or the next sign-in would drop them.
+    directory_granted: bool,
+    /// What the directory switch is known to show, so the notify that
+    /// filling the editor sets off is not taken for the user turning it on.
+    directory_on: bool,
     /// The send-as aliases being edited for the account in the editor (#34).
     /// Committed to the account on Save.
     alias_edits: Vec<AliasConfig>,
@@ -346,6 +353,8 @@ pub enum AccountsInput {
     ProtocolChanged,
     /// Start the OAuth browser sign-in flow.
     OAuthSignIn,
+    /// The "Search the organization directory" switch moved (#410).
+    SetGraphDirectory(bool),
     /// Open GNOME Settings → Online Accounts (the Google path).
     OpenOnlineAccounts,
     SetEmoji(String),
@@ -574,6 +583,9 @@ pub enum AccountsCmd {
     /// A browser sign-in finished: the refresh token, and who signed in
     /// when the provider says (Microsoft).
     OAuth(Result<(String, Option<(String, String)>), String>),
+    /// The sign-in that asked for the directory's scopes (#410) finished,
+    /// as [`AccountsCmd::OAuth`].
+    DirectoryConsent(Result<(String, Option<(String, String)>), String>),
     /// Alias SMTP test result (#34).
     AliasTested(Result<(), String>),
     /// GNOME Online Accounts read again: its mail accounts, for the import
@@ -1606,6 +1618,30 @@ impl Component for AccountsWindow {
                                 },
                             },
 
+                            // The composer's suggestions from the tenant's
+                            // directory (#410), for Microsoft 365 only.
+                            #[name = "directory_group"]
+                            add = &adw::PreferencesGroup {
+                                set_visible: false,
+
+                                #[name = "graph_directory_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Search the organization directory"),
+                                    connect_active_notify[sender] => move |row| {
+                                        sender.input(AccountsInput::SetGraphDirectory(row.is_active()));
+                                    },
+                                },
+                                #[name = "directory_status"]
+                                gtk::Label {
+                                    set_visible: false,
+                                    set_halign: gtk::Align::Start,
+                                    set_xalign: 0.0,
+                                    set_wrap: true,
+                                    set_selectable: true,
+                                    set_margin_top: 8,
+                                },
+                            },
+
                             // Its own folder order, or Settings → Sidebar's.
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Folder Order"),
@@ -1777,6 +1813,8 @@ impl Component for AccountsWindow {
             label_synced: String::new(),
             goa,
             pending_oauth_refresh: None,
+            directory_granted: false,
+            directory_on: false,
             alias_edits: Vec::new(),
             server_identities: Vec::new(),
             hidden_edits: Vec::new(),
@@ -2081,6 +2119,8 @@ impl Component for AccountsWindow {
                 widgets.mode_glyph_btn.set_active(true);
                 self.label_synced = String::new();
                 self.pending_oauth_refresh = None;
+                self.directory_granted = false;
+                self.directory_on = false;
                 self.close_alias_dialog();
                 self.alias_edits.clear();
                 self.server_identities.clear();
@@ -2129,6 +2169,15 @@ impl Component for AccountsWindow {
                 };
                 self.editing = Some(i);
                 self.pending_oauth_refresh = None;
+                self.directory_granted = acc.goa_id.is_none()
+                    && acc.oauth
+                    && acc
+                        .oauth_settings
+                        .as_ref()
+                        .is_some_and(|s| crate::oauth::has_directory_scopes(&s.scopes));
+                // On without the scopes would only be refused.
+                self.directory_on = acc.graph_directory && self.directory_granted;
+                widgets.graph_directory_row.set_active(self.directory_on);
                 self.close_alias_dialog();
                 self.alias_edits = acc.aliases.clone();
                 self.server_identities.clear();
@@ -2454,49 +2503,47 @@ impl Component for AccountsWindow {
                 widgets.oauth_signin_btn.set_sensitive(false);
                 widgets.oauth_status.set_visible(true);
                 widgets.oauth_status.set_css_classes(&["dim-label"]);
-                // A redirect Hylki cannot listen on (#329): the sign-in runs
-                // in a window of its own, which catches it.
-                if !settings.redirect_uri.trim().is_empty() {
-                    widgets.oauth_status.set_label(&i18n("Complete the sign-in in the window that opened."));
-                    let parent = root.root().and_downcast::<gtk::Window>();
-                    let s = sender.clone();
-                    // The address typed so far names the identity broker's
-                    // account, where one is in charge of sign-ins.
-                    let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
-                    crate::ui::web_signin::run(parent.as_ref(), &settings.clone(), user.clone(), move |answer| {
-                        s.oneshot_command(async move {
-                            let r = tokio::task::spawn_blocking(move || {
-                                let (request, code) = answer?;
-                                let refresh = crate::oauth::exchange_code(&settings, &request, &code)?.refresh_token;
-                                let (name, address, refresh) =
-                                    crate::oauth::microsoft_whoami(&settings, &refresh, user.as_deref())?;
-                                Ok((refresh, Some((name, address))))
-                            })
-                            .await
-                            .unwrap_or_else(|_| Err("sign-in task failed".into()));
-                            AccountsCmd::OAuth(r)
-                        });
-                    });
+                let in_window = !settings.redirect_uri.trim().is_empty();
+                widgets.oauth_status.set_label(&if in_window {
+                    i18n("Complete the sign-in in the window that opened.")
+                } else {
+                    i18n("Opening browser… complete sign-in there.")
+                });
+                // The address typed so far names the identity broker's
+                // account, where one is in charge of sign-ins.
+                let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+                sign_in(root, &sender, settings, user, false, AccountsCmd::OAuth);
+            }
+
+            AccountsInput::SetGraphDirectory(on) => {
+                if on == self.directory_on {
                     return;
                 }
-                widgets
-                    .oauth_status
-                    .set_label(&i18n("Opening browser… complete sign-in there."));
-                sender.oneshot_command(async move {
-                    let r = tokio::task::spawn_blocking(move || {
-                        let refresh = crate::oauth::run_flow(&settings)?.refresh_token;
-                        // Microsoft says who signed in, so the account is named
-                        // for the mailbox reached (#329).
-                        if settings.token_url.contains("microsoftonline") {
-                            let (name, address, refresh) = crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
-                            return Ok((refresh, Some((name, address))));
-                        }
-                        Ok((refresh, None))
-                    })
-                    .await
-                    .unwrap_or_else(|_| Err("sign-in task failed".into()));
-                    AccountsCmd::OAuth(r)
+                self.directory_on = on;
+                widgets.directory_status.set_visible(false);
+                // Turning it off keeps the scopes: they cost nothing, and
+                // turning it on again then asks nothing.
+                if !on || self.directory_granted {
+                    return;
+                }
+                let mut settings = self.oauth_settings_from_form(widgets);
+                if settings.client_id.trim().is_empty() || !settings.token_url.contains("microsoftonline") {
+                    return;
+                }
+                settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
+                widgets.graph_directory_row.set_sensitive(false);
+                widgets.oauth_signin_btn.set_sensitive(false);
+                widgets.directory_status.set_visible(true);
+                widgets.directory_status.set_css_classes(&["dim-label"]);
+                widgets.directory_status.set_label(&if settings.redirect_uri.trim().is_empty() {
+                    i18n("Opening browser… approve access to the directory there.")
+                } else {
+                    i18n("Approve access to the directory in the window that opened.")
                 });
+                // Straight to the account being edited: Microsoft then asks
+                // only for what it has not approved yet.
+                let user = Some(widgets.email_row.text().trim().to_string()).filter(|u| !u.is_empty());
+                sign_in(root, &sender, settings, user, true, AccountsCmd::DirectoryConsent);
             }
 
             AccountsInput::OpenOnlineAccounts => open_online_accounts(),
@@ -2648,6 +2695,10 @@ impl Component for AccountsWindow {
                         account.security = orig.security.clone();
                     }
                 }
+
+                // Only once Microsoft has approved the scopes; an account from
+                // GNOME Online Accounts cannot have them.
+                account.graph_directory &= account.goa_id.is_none() && self.directory_granted;
 
                 // Native account: authentication comes from the provider dropdown.
                 let is_oauth = provider_at(widgets.provider_row.selected()).is_oauth();
@@ -3212,6 +3263,52 @@ impl Component for AccountsWindow {
                     Err(e) => {
                         widgets.oauth_status.set_css_classes(&["error"]);
                         widgets.oauth_status.set_label(&i18n_f("Sign-in failed: {e}", &[("e", &(e).to_string())]));
+                    }
+                }
+            }
+            AccountsCmd::DirectoryConsent(result) => {
+                widgets.graph_directory_row.set_sensitive(true);
+                widgets.oauth_signin_btn.set_sensitive(true);
+                widgets.directory_status.set_visible(true);
+                // A saved account signs in as itself: another mailbox
+                // picked in the browser would swap the account's token.
+                let saved = self
+                    .editing
+                    .and_then(|i| self.accounts.get(i))
+                    .filter(|a| a.oauth && a.goa_id.is_none())
+                    .map(|a| a.email.clone());
+                let result = result.and_then(|(refresh, who)| match (&saved, &who) {
+                    (Some(email), Some((_, address))) if !address.is_empty() && !address.eq_ignore_ascii_case(email) => {
+                        Err(i18n_f("Signed in as {address}, not {email}.", &[("address", address), ("email", email)]))
+                    }
+                    _ => Ok((refresh, who)),
+                });
+                match result {
+                    Ok((refresh, who)) => {
+                        self.pending_oauth_refresh = Some(refresh);
+                        self.directory_granted = true;
+                        // A new account was signed in by this as well.
+                        if let Some((name, address)) = who {
+                            if !address.is_empty() {
+                                widgets.email_row.set_text(&address);
+                            }
+                            if !name.is_empty() && widgets.name_row.text().trim().is_empty() {
+                                widgets.name_row.set_text(&name);
+                            }
+                        }
+                        widgets.directory_status.set_css_classes(&["success"]);
+                        widgets
+                            .directory_status
+                            .set_label(&i18n("Access to the directory approved. Save the account to finish."));
+                    }
+                    Err(e) => {
+                        self.directory_on = false;
+                        widgets.graph_directory_row.set_active(false);
+                        widgets.directory_status.set_css_classes(&["error"]);
+                        widgets.directory_status.set_label(&i18n_f(
+                            "Access to the directory was not approved: {e}",
+                            &[("e", &e)],
+                        ));
                     }
                 }
             }
@@ -3921,6 +4018,16 @@ impl AccountsWindow {
         // The list-mail search is a server search for a header, which
         // Microsoft 365 does not offer and POP3 has no folders for.
         widgets.clean_lists_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        // GNOME Online Accounts asked Microsoft for its own scopes, and
+        // Hylki cannot add the directory's to a token GNOME holds.
+        let from_goa = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.goa_id.is_some());
+        widgets.directory_group.set_visible(protocol == Protocol::Graph);
+        widgets.graph_directory_row.set_sensitive(!from_goa);
+        widgets.graph_directory_row.set_subtitle(&if from_goa {
+            i18n("Only for an account signed in within Hylki. To use it, add this account with Microsoft 365 / Outlook as the provider, instead of from GNOME Online Accounts.")
+        } else {
+            i18n("Suggest people from your organization as you type a recipient. Turning this on asks Microsoft for access to the directory; some organizations need an administrator to approve it.")
+        });
     }
 
     fn apply_provider(&self, widgets: &AccountsWindowWidgets) {
@@ -4031,6 +4138,11 @@ impl AccountsWindow {
                     &trimmed(&widgets.ms_scopes_row),
                     &trimmed(&widgets.ms_redirect_row),
                 );
+                // Built from the preset, the scopes would lose the
+                // directory's at the next sign-in or refresh (#410).
+                if self.directory_granted {
+                    settings.scopes = crate::oauth::with_directory_scopes(&settings.scopes);
+                }
             }
             settings
         } else {
@@ -4044,6 +4156,55 @@ impl AccountsWindow {
             }
         }
     }
+}
+
+/// The editor's sign-in: in a window of Hylki's own for a redirect Hylki
+/// cannot listen on (#329), otherwise in the browser. `user` is the address
+/// typed, which picks the identity broker's account and, with `hint`, the
+/// account Microsoft signs in (#410). The answer comes back through `wrap`.
+fn sign_in(
+    root: &adw::Bin,
+    sender: &ComponentSender<AccountsWindow>,
+    settings: OAuthSettings,
+    user: Option<String>,
+    hint: bool,
+    wrap: fn(Result<(String, Option<(String, String)>), String>) -> AccountsCmd,
+) {
+    if !settings.redirect_uri.trim().is_empty() {
+        let parent = root.root().and_downcast::<gtk::Window>();
+        let s = sender.clone();
+        crate::ui::web_signin::run(parent.as_ref(), &settings.clone(), user.clone(), hint, move |answer| {
+            s.oneshot_command(async move {
+                let r = tokio::task::spawn_blocking(move || {
+                    let (request, code) = answer?;
+                    let refresh = crate::oauth::exchange_code(&settings, &request, &code)?.refresh_token;
+                    let (name, address, refresh) =
+                        crate::oauth::microsoft_whoami(&settings, &refresh, user.as_deref())?;
+                    Ok((refresh, Some((name, address))))
+                })
+                .await
+                .unwrap_or_else(|_| Err("sign-in task failed".into()));
+                wrap(r)
+            });
+        });
+        return;
+    }
+    sender.oneshot_command(async move {
+        let r = tokio::task::spawn_blocking(move || {
+            let hint = user.as_deref().filter(|_| hint);
+            let refresh = crate::oauth::run_flow_as(&settings, hint)?.refresh_token;
+            // Microsoft says who signed in, so the account is named
+            // for the mailbox reached (#329).
+            if settings.token_url.contains("microsoftonline") {
+                let (name, address, refresh) = crate::oauth::microsoft_whoami(&settings, &refresh, None)?;
+                return Ok((refresh, Some((name, address))));
+            }
+            Ok((refresh, None))
+        })
+        .await
+        .unwrap_or_else(|_| Err("sign-in task failed".into()));
+        wrap(r)
+    });
 }
 
 /// A list-item factory whose labels never ellipsize, so a `ComboRow` popup grows
@@ -4412,6 +4573,7 @@ fn read_account(
             .checked_sub(1)
             .and_then(|i| crate::config::FolderSort::ALL.get(i as usize).copied()),
         sign_by_default: widgets.sign_default_row.is_active(),
+        graph_directory: protocol == Protocol::Graph && widgets.graph_directory_row.is_active(),
     }
 }
 
@@ -4720,6 +4882,8 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.in_unified_row.set_active(true);
     widgets.folder_sort_row.set_selected(0);
     widgets.sign_default_row.set_active(false);
+    widgets.graph_directory_row.set_active(false);
+    widgets.directory_status.set_visible(false);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");
     widgets.label_row.set_text("");

@@ -2095,6 +2095,10 @@ msgid ""
 "link) older than this, unless starred. Checked at each sync."
 msgstr ""
 
+#, fuzzy
+msgid "Search the organization directory"
+msgstr "Сохранить каталог?"
+
 msgid "Folder Order"
 msgstr "Порядок папок"
 
@@ -2225,6 +2229,14 @@ msgstr "Завершите вход в открывшемся окне."
 msgid "Opening browser… complete sign-in there."
 msgstr "Открытие браузера… завершите вход в нём."
 
+#, fuzzy
+msgid "Opening browser… approve access to the directory there."
+msgstr "Открытие браузера… завершите вход в нём."
+
+#, fuzzy
+msgid "Approve access to the directory in the window that opened."
+msgstr "Завершите вход в открывшемся окне."
+
 msgid "Signature HTML"
 msgstr "HTML-код подписи"
 
@@ -2265,6 +2277,16 @@ msgstr "✓ Вход выполнен — сохраните учётную за
 
 msgid "Sign-in failed: {e}"
 msgstr "Ошибка входа: {e}"
+
+#, fuzzy
+msgid "Signed in as {address}, not {email}."
+msgstr "Выполнен вход как {who}. {terms}"
+
+msgid "Access to the directory approved. Save the account to finish."
+msgstr ""
+
+msgid "Access to the directory was not approved: {e}"
+msgstr ""
 
 msgid "✓ SMTP: connected"
 msgstr "✓ SMTP: подключено"
@@ -2365,6 +2387,18 @@ msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Использовать эту учётную запись в Hylki"
+
+msgid ""
+"Only for an account signed in within Hylki. To use it, add this account with "
+"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Accounts."
+msgstr ""
+
+msgid ""
+"Suggest people from your organization as you type a recipient. Turning this "
+"on asks Microsoft for access to the directory; some organizations need an "
+"administrator to approve it."
+msgstr ""
 
 msgid "Never"
 msgstr "Никогда"

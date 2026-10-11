@@ -2077,6 +2077,10 @@ msgstr ""
 "d'information (tout ce qui comporte un lien de désabonnement) plus anciens "
 "que ce délai, sauf s'ils sont en favoris. Vérifié à chaque synchronisation."
 
+#, fuzzy
+msgid "Search the organization directory"
+msgstr "Enregistrer l'annuaire ?"
+
 msgid "Folder Order"
 msgstr "Ordre des dossiers"
 
@@ -2207,6 +2211,14 @@ msgstr "Terminez la connexion dans la fenêtre qui s'est ouverte."
 msgid "Opening browser… complete sign-in there."
 msgstr "Ouverture du navigateur… terminez la connexion à partir de là."
 
+#, fuzzy
+msgid "Opening browser… approve access to the directory there."
+msgstr "Ouverture du navigateur… terminez la connexion à partir de là."
+
+#, fuzzy
+msgid "Approve access to the directory in the window that opened."
+msgstr "Terminez la connexion dans la fenêtre qui s'est ouverte."
+
 msgid "Signature HTML"
 msgstr "Signature HTML"
 
@@ -2248,6 +2260,16 @@ msgstr "✓ Connecté — enregistrez le compte pour terminer"
 
 msgid "Sign-in failed: {e}"
 msgstr "Échec de la connexion : {e}"
+
+#, fuzzy
+msgid "Signed in as {address}, not {email}."
+msgstr "Connecté en tant que {who}. {terms}"
+
+msgid "Access to the directory approved. Save the account to finish."
+msgstr ""
+
+msgid "Access to the directory was not approved: {e}"
+msgstr ""
 
 msgid "✓ SMTP: connected"
 msgstr "✓ SMTP : connecté"
@@ -2350,6 +2372,18 @@ msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Utiliser ce compte dans Hylki"
+
+msgid ""
+"Only for an account signed in within Hylki. To use it, add this account with "
+"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Accounts."
+msgstr ""
+
+msgid ""
+"Suggest people from your organization as you type a recipient. Turning this "
+"on asks Microsoft for access to the directory; some organizations need an "
+"administrator to approve it."
+msgstr ""
 
 msgid "Never"
 msgstr "Jamais"

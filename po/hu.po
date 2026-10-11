@@ -2089,6 +2089,10 @@ msgid ""
 "link) older than this, unless starred. Checked at each sync."
 msgstr ""
 
+#, fuzzy
+msgid "Search the organization directory"
+msgstr "El akarod menteni a könyvtárat?"
+
 msgid "Folder Order"
 msgstr "Mappák sorrendje"
 
@@ -2218,6 +2222,14 @@ msgstr "A bejelentkezés nem tárolható a kulcstartón: {e}"
 msgid "Opening browser… complete sign-in there."
 msgstr "Böngésző megnyitása… ott fejezze be a bejelentkezést."
 
+#, fuzzy
+msgid "Opening browser… approve access to the directory there."
+msgstr "Böngésző megnyitása… ott fejezze be a bejelentkezést."
+
+#, fuzzy
+msgid "Approve access to the directory in the window that opened."
+msgstr "A bejelentkezés nem tárolható a kulcstartón: {e}"
+
 msgid "Signature HTML"
 msgstr "Aláírás HTML kódja"
 
@@ -2260,6 +2272,16 @@ msgstr "✓ Bejelentkezve — a befejezéshez mentse a fiókot"
 
 msgid "Sign-in failed: {e}"
 msgstr "A bejelentkezés sikertelen: {e}"
+
+#, fuzzy
+msgid "Signed in as {address}, not {email}."
+msgstr "Bejelentkezve mint: {who}. {terms}"
+
+msgid "Access to the directory approved. Save the account to finish."
+msgstr ""
+
+msgid "Access to the directory was not approved: {e}"
+msgstr ""
 
 msgid "✓ SMTP: connected"
 msgstr "✓ SMTP: kapcsolódva"
@@ -2361,6 +2383,18 @@ msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Fiók használata a Hylki-ben"
+
+msgid ""
+"Only for an account signed in within Hylki. To use it, add this account with "
+"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Accounts."
+msgstr ""
+
+msgid ""
+"Suggest people from your organization as you type a recipient. Turning this "
+"on asks Microsoft for access to the directory; some organizations need an "
+"administrator to approve it."
+msgstr ""
 
 msgid "Never"
 msgstr "Soha"

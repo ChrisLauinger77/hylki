@@ -5338,47 +5338,66 @@ fn oauth_user(account: &AccountConfig) -> String {
 /// Fetch a fresh OAuth access token for this account — from GNOME Online Accounts
 /// (imported) or by refreshing a natively-added account's stored refresh token.
 async fn fetch_oauth_token(account: &AccountConfig) -> Option<String> {
-    if let Some(goa_id) = account.goa_id.clone() {
-        return tokio::task::spawn_blocking(move || crate::goa::oauth_token(&goa_id))
+    // The keyring and the remembered tokens answer at once; only a refresh
+    // goes over the network, and it goes off the async threads.
+    if account.goa_id.is_none() {
+        let settings = account.oauth_settings.clone()?;
+        let refresh = crate::config::load_oauth_refresh(&account.email)?;
+        if let Some(token) = cached_access_token(&refresh) {
+            return Some(token);
+        }
+        let account = account.clone();
+        return tokio::task::spawn_blocking(move || refreshed_access_token(&account, &settings, refresh))
             .await
             .ok()
             .flatten();
+    }
+    let account = account.clone();
+    tokio::task::spawn_blocking(move || oauth_token_blocking(&account)).await.ok().flatten()
+}
+
+/// [`fetch_oauth_token`] for a plain thread (blocking): the composer's
+/// directory search asks from one (#410). It shares the remembered access
+/// tokens, so it seldom costs a refresh of its own.
+pub(crate) fn oauth_token_blocking(account: &AccountConfig) -> Option<String> {
+    if let Some(goa_id) = account.goa_id.as_deref() {
+        return crate::goa::oauth_token(goa_id);
     }
     // Natively-added OAuth account: refresh with the keyring-stored refresh token.
     // The client credentials saved with the account MUST be used — a refresh token
     // is bound to the OAuth client that issued it, so switching clients requires
     // re-adding the account (a fresh sign-in), not swapping creds here.
-    let settings = account.oauth_settings.clone()?;
+    let settings = account.oauth_settings.as_ref()?;
     let refresh = crate::config::load_oauth_refresh(&account.email)?;
     if let Some(token) = cached_access_token(&refresh) {
         return Some(token);
     }
-    let email = account.email.clone();
+    refreshed_access_token(account, settings, refresh)
+}
+
+/// A new access token from the provider for `refresh` (blocking).
+fn refreshed_access_token(account: &AccountConfig, settings: &crate::config::OAuthSettings, refresh: String) -> Option<String> {
+    let email = &account.email;
     let user = oauth_user(account);
-    tokio::task::spawn_blocking(move || {
-        let fresh = crate::oauth::refresh_access_token_as(&settings, &refresh, Some(&user))
-            .map_err(|e| tracing::warn!("OAuth token refresh for {email} failed: {e}"))
-            .ok()?;
-        // The provider spent the old refresh token and handed out another:
-        // that one is what works from now on.
-        let refresh = match fresh.refresh_token {
-            Some(rotated) => match crate::config::store_oauth_refresh(&email, &rotated) {
-                Ok(()) => rotated,
-                Err(e) => {
-                    tracing::warn!("could not keep the new OAuth refresh token for {email}: {e}");
-                    refresh
-                }
-            },
-            None => refresh,
-        };
-        if let Some(secs) = fresh.expires_in {
-            remember_access_token(&refresh, &fresh.access_token, secs);
-        }
-        Some(fresh.access_token)
-    })
-    .await
-    .ok()
-    .flatten()
+    let fresh = crate::oauth::refresh_access_token_as(settings, &refresh, Some(&user))
+        .map_err(|e| tracing::warn!("OAuth token refresh for {email} failed: {e}"))
+        .ok()?;
+    // The provider spent the old refresh token and handed out another:
+    // that one is what works from now on.
+    let refresh = match fresh.refresh_token {
+        Some(rotated) => match crate::config::store_oauth_refresh(email, &rotated) {
+            Ok(()) => rotated,
+            Err(e) => {
+                tracing::warn!("could not keep the new OAuth refresh token for {email}: {e}");
+                refresh
+            }
+        },
+        None => refresh,
+    };
+    if let Some(secs) = fresh.expires_in {
+        remember_access_token(&refresh, &fresh.access_token, secs);
+    }
+    Some(fresh.access_token)
 }
 
 /// Access tokens minted for natively-added OAuth accounts, by the refresh
@@ -5416,7 +5435,7 @@ fn remember_access_token(refresh: &str, token: &str, expires_in: u64) {
 
 /// Stop handing out this account's remembered access token: the server
 /// turned it down, so the next sign-in asks the provider for a new one.
-fn forget_access_token(account: &AccountConfig) {
+pub(crate) fn forget_access_token(account: &AccountConfig) {
     if account.goa_id.is_some() || account.oauth_settings.is_none() {
         return;
     }
@@ -10859,6 +10878,7 @@ pub(super) fn sample_account() -> AccountConfig {
         in_unified: true,
         folder_sort: None,
         sign_by_default: false,
+        graph_directory: false,
         push: None,
         name: String::new(),
         email: "me@example.com".into(),
