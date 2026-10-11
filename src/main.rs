@@ -17,7 +17,6 @@ mod desktop;
 mod directory;
 mod goa;
 mod i18n;
-mod icon_fallback;
 mod invite;
 mod launcher_badge;
 mod local_contacts;

@@ -22838,17 +22838,43 @@ fn apply_app_theme(theme: config::AppTheme) {
     adw::StyleManager::default().set_color_scheme(scheme);
 }
 
-/// Register the app icon so windows and dialogs can find it by name.
+/// Hylki's icon theme: a name no theme on disk carries, so the user's icon
+/// theme is never consulted and the app looks the same on every desktop.
+/// Lookups fall through to hicolor, which holds the bundle below, GTK's and
+/// libadwaita's built-in icons, and the app icons of every installed app.
+const ICON_THEME: &str = "Hylki";
+
+/// Where the bundled icons sit in the app's GResource (registered in `main`).
+const ICON_RESOURCE: &str = "/co/hyprlab/Hylki/icons";
+
+/// Draw every icon from the copies built into the binary, and register the
+/// app icon so windows and dialogs can find it by name.
 ///
-/// Hylki's toolbar/list icons are shipped inside the binary as a GResource
-/// (registered in `main`), so they no longer depend on the host icon theme.
-/// GTK auto-adds the bundle's resource path (`/co/hyprlab/Hylki/icons`) to the
-/// default theme; we add it explicitly too, so lookups work even if that
-/// convention ever changes.
+/// The bundle (tools/gen-icon-gresource.sh) holds every icon Hylki names and
+/// every one GTK and libadwaita draw for their own widgets, as found on the
+/// build machine. Icons once followed the user's theme (#260); a theme that
+/// restyled some of them made the app look different from one distribution
+/// to the next, so none of them do any more.
 fn register_icons() {
+    // Set by the app, the name outranks the desktop's setting, now and
+    // whenever it changes: GTK would otherwise switch the theme back to it.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_icon_theme_name(Some(ICON_THEME));
+    }
     if let Some(display) = gtk::gdk::Display::default() {
         let theme = gtk::IconTheme::for_display(&display);
-        theme.add_resource_path("/co/hyprlab/Hylki/icons");
+        // Ahead of GTK's and libadwaita's own copies, so their widgets take
+        // the bundle's: those copies come with whatever GTK the system has.
+        let mut paths = vec![ICON_RESOURCE.to_string()];
+        paths.extend(
+            theme
+                .resource_path()
+                .into_iter()
+                .map(|p| p.to_string())
+                .filter(|p| p.trim_end_matches('/') != ICON_RESOURCE),
+        );
+        let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
+        theme.set_resource_path(&paths);
         // Dev-only: lets the window/about app icon resolve when running from the
         // source tree (uninstalled). Silently ignored on installed systems.
         theme.add_search_path(concat!(env!("CARGO_MANIFEST_DIR"), "/data/icons"));
@@ -22858,17 +22884,6 @@ fn register_icons() {
         if let Some(home) = std::env::var_os("HOME") {
             theme.add_search_path(std::path::Path::new(&home).join(".local/share/icons"));
         }
-    }
-    // HYLKI_SHOWCASE_ICON_THEME=<name> draws the app in that icon theme, to
-    // check a theme's icons replace Hylki's and the bundle fills in any it
-    // lacks (#260).
-    if let (Ok(name), Some(settings)) =
-        (std::env::var("HYLKI_SHOWCASE_ICON_THEME"), gtk::Settings::default())
-    {
-        settings.set_gtk_icon_theme_name(Some(&name));
-    }
-    if let Some(display) = gtk::gdk::Display::default() {
-        crate::icon_fallback::install(&display);
     }
     gtk::Window::set_default_icon_name(crate::APP_ID);
 }
