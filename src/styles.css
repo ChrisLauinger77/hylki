@@ -4,6 +4,21 @@
   font-weight: 700;
 }
 
+/* ---- Switches ---- */
+
+/* A smaller switch than libadwaita's 20px knob, everywhere. GTK sizes the
+   track from the knob (twice its width), so the knob is all that changes.
+   The hidden on/off status icons count towards that size as well, so they
+   shrink with the knob or their 16px would hold the switch at its old size. */
+switch > slider {
+  min-width: 14px;
+  min-height: 14px;
+}
+
+switch > image {
+  -gtk-icon-size: 14px;
+}
+
 /* ---- Sidebar / account header ---- */
 
 /* The sidebar's "New message" action: a standing accent button shaped like a
