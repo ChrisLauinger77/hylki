@@ -270,6 +270,19 @@ const DEMO_HEADERS: &[(u32, &str, &str)] = &[
      Subject: This Week in Rust #612\r\n\r\n",
         "",
     ),
+    // A sensitivity label (#411), as Outlook writes one for a tenant that
+    // uses Microsoft Purview: the reader shows it as a pill.
+    (
+        23,
+        "From: Sophie Turner <sophie@studio.dev>\r\n\
+         Subject: Q3 roadmap review\r\n\
+         msip_labels: MSIP_Label_9c2a4f1e-5b3d-4c7a-8e21-0d6f3b9a1c42_Enabled=true;\r\n \
+         MSIP_Label_9c2a4f1e-5b3d-4c7a-8e21-0d6f3b9a1c42_Method=Standard;\r\n \
+         MSIP_Label_9c2a4f1e-5b3d-4c7a-8e21-0d6f3b9a1c42_Name=Confidential\\Internal Use;\r\n \
+         MSIP_Label_9c2a4f1e-5b3d-4c7a-8e21-0d6f3b9a1c42_SiteId=2b7c5e90-1f4d-4a6b-9c3e-8d1a0f2e6b57\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\r\n",
+        "",
+    ),
     // A meeting request, as a calendar sends one: the readable half that
     // every client shows, and the `text/calendar` part that is the meeting
     // (#223). The event floats — no TZID — so it reads 2:00 PM wherever the

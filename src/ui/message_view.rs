@@ -267,8 +267,20 @@ impl MessageView {
             ),
             None => String::new(),
         };
+        // The sensitivity label (#411): read-only, shown as the sender's
+        // organization named it.
+        let label = match &check.label {
+            Some(l) => format!(
+                "var l=document.querySelector('.vireo-sens[data-key=\"{account_id}:{id}\"]');\
+                 if(l){{l.className='vireo-sens on';l.title={title:?};\
+                 var t=l.querySelector('.vireo-sens-text');if(t)t.textContent={text:?};}}",
+                title = l.summary(),
+                text = l.short_label(),
+            ),
+            None => String::new(),
+        };
         let js = format!(
-            "(function(){{{pgp}\
+            "(function(){{{pgp}{label}\
              var b=document.querySelector('.vireo-verify[data-key=\"{account_id}:{id}\"]');\
              if(!b)return;b.className='vireo-verify on {cls}';b.title={title:?};}})()",
             cls = check.trust.css_class(),
@@ -4441,7 +4453,9 @@ impl MessageView {
                         "<button type=\"button\" class=\"vireo-verify\" data-key=\"{aid}:{id}\" \
                          title=\"\">{svg}</button>\
                          <button type=\"button\" class=\"vireo-pgp\" data-key=\"{aid}:{id}\" \
-                         title=\"\">{lock}{sig}<span class=\"vireo-pgp-text\"></span></button>",
+                         title=\"\">{lock}{sig}<span class=\"vireo-pgp-text\"></span></button>\
+                         <span class=\"vireo-sens\" data-key=\"{aid}:{id}\" title=\"\">{sens}\
+                         <span class=\"vireo-sens-text\"></span></span>",
                         aid = m.account_id,
                         id = m.id,
                         svg = inline_icon_svg("verified-checkmark-symbolic"),
@@ -4451,6 +4465,9 @@ impl MessageView {
                         // is patched in.
                         lock = inline_icon_svg("channel-secure-symbolic"),
                         sig = inline_icon_svg("security-high-symbolic"),
+                        // The sensitivity label (#411), hidden until a
+                        // label is patched in.
+                        sens = inline_icon_svg("tag-outline-symbolic"),
                     ),
                     // An initials circle, tinted per sender address, so who
                     // wrote each card — and which cards are your own replies —
@@ -4824,6 +4841,19 @@ impl MessageView {
                .vireo-pgp.pgp-warn{{color:#cd9309;background:rgba(205,147,9,0.16);}}\
                .vireo-pgp.pgp-bad{{color:#c01c28;background:rgba(192,28,40,0.14);}}\
                .vireo-pgp:hover{{filter:brightness(1.1);}}\
+               /* The sensitivity label (#411): the OpenPGP pill's shape in a\
+                  neutral wash, since a label is a statement, not a verdict.\
+                  Zero flex-basis and a small share, like the address: the\
+                  name fills first and a long label ellipsizes before it. */\
+               .vireo-sens{{display:none;font-size:0.78em;font-weight:600;\
+                 border-radius:999px;padding-block:0.1em;padding-inline:0.45em 0.6em;\
+                 margin-inline-start:4px;align-items:center;gap:0.3em;\
+                 align-self:baseline;white-space:nowrap;flex:1 1 0;min-width:3.5em;max-width:max-content;\
+                 background:rgba(128,128,128,0.16);cursor:default;}}\
+               .vireo-sens.on{{display:inline-flex;}}\
+               .vireo-sens svg{{width:1em;height:1em;flex:none;}}\
+               .vireo-sens svg,.vireo-sens svg *{{fill:currentColor;}}\
+               .vireo-sens-text{{overflow:hidden;text-overflow:ellipsis;}}\
                /* The icons alone (Settings, #300): the chip as it was before\
                   it had words, sitting on the name's line like the seal. */\
                body[data-vireo-pgpicons] .vireo-pgp{{background:none;padding:0 2px;\

@@ -1225,6 +1225,22 @@ works:
 flatpak override --user --env=GSK_RENDERER=gl co.hyprlab.Hylki
 ```
 
+### Sensitivity labels
+
+A message an organization has classified with Microsoft Purview, such as
+Internal Use or Confidential, shows its label as a pill beside the sender's
+name, with a tag icon. The label comes from the message's `msip_labels`
+header, so it shows on any account, not only Microsoft 365. A tenant that
+leaves the label's name out of the message shows the pill as **Labeled**.
+Outlook's older Sensitivity setting (Personal, Private, Confidential) shows
+the same way.
+
+Hylki only shows the label: it does not apply the rules the organization
+attached to it, and it cannot set a label on a message you write. A message
+protected with encryption is a separate matter the label only names. Mail
+downloaded before Hylki read labels shows its label once it is downloaded
+again.
+
 ### Newsletters and list mail
 
 The Unsubscribe banner on mail from a list asks before it leaves the list, and

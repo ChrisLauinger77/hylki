@@ -1635,6 +1635,32 @@ msgstr "Сервис отклонил запрос (ошибка {code})."
 msgid "Enter the LibreTranslate server's address in Settings → Translation."
 msgstr "Введите адрес сервера LibreTranslate в меню Параметры → Перевод."
 
+msgid "Labeled"
+msgstr ""
+
+msgid "Personal"
+msgstr ""
+
+#, fuzzy
+msgid "Private"
+msgstr "Конфиденциальность"
+
+msgid "Confidential"
+msgstr ""
+
+msgid "The sender marked this message “{label}”."
+msgstr ""
+
+msgid ""
+"The sender's organization labeled this message, without saying the label's "
+"name. Hylki shows the label but does not apply its rules."
+msgstr ""
+
+msgid ""
+"The sender's organization labeled this message “{label}”. Hylki shows the "
+"label but does not apply its rules."
+msgstr ""
+
 msgid "Open Hylki"
 msgstr "Открыть Hylki"
 

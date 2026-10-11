@@ -57,6 +57,10 @@
   by amadeusp), from the right-click menu of the unified Trash or Junk row.
 - **Added: `>` in the command palette lists actions only** (#399, suggested
   by 3v1n0), the way an editor's palette tells commands from places.
+- **Added: sensitivity labels show in the reader** (#411, requested by
+  erenoglu). A message classified with Microsoft Purview, or with Outlook's
+  older Sensitivity setting, shows its label as a pill beside the sender's
+  name. Hylki shows the label only; it does not apply its rules or set one.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.

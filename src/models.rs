@@ -828,6 +828,9 @@ pub struct SenderCheck {
     /// carries a `text/calendar` part. Read in the same pass, for the same
     /// reason: the raw message is in hand exactly once.
     pub invite: Option<Box<Invite>>,
+    /// The sensitivity label the sender's organization set (#411), read in
+    /// the same pass.
+    pub label: Option<crate::sensitivity::SensitivityLabel>,
 }
 
 impl Default for SenderCheck {
@@ -839,6 +842,7 @@ impl Default for SenderCheck {
             pgp: None,
             unsubscribe: None,
             invite: None,
+            label: None,
         }
     }
 }
