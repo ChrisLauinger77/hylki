@@ -4265,6 +4265,8 @@ impl SimpleComponent for AppModel {
             "F1",
         ]);
 
+        root.add_controller(palette_key(&sender));
+
         // Single-key shortcuts. The controller is on the window in the bubble
         // phase, so the focused widget always gets first refusal: a search entry
         // or the composer consumes the letter itself and nothing here fires.
@@ -7824,7 +7826,17 @@ impl SimpleComponent for AppModel {
             AppMsg::ShowShortcuts => self.show_shortcuts(),
             AppMsg::CommandPalette => {
                 let entries = self.command_palette_entries(&sender);
-                crate::ui::command_palette::show(&self.window, entries);
+                // Over the window it was asked from: a composer of its own
+                // window would otherwise hide it behind.
+                let tops = gtk::Window::toplevels();
+                let active = (0..tops.n_items())
+                    .filter_map(|i| tops.item(i))
+                    .filter_map(|o| o.downcast::<gtk::Window>().ok())
+                    .find(|w| w.is_active() && w.is_visible());
+                match active {
+                    Some(w) => crate::ui::command_palette::show(&w, entries),
+                    None => crate::ui::command_palette::show(&self.window, entries),
+                }
             }
 
             AppMsg::PrintPreview | AppMsg::PrintMessage => {
@@ -16529,6 +16541,7 @@ impl AppModel {
             .transient_for(&self.window)
             .build();
         win.set_content(Some(content));
+        win.add_controller(palette_key(sender));
         let s = sender.input_sender().clone();
         win.connect_close_request(move |_| {
             let _ = s.send(AppMsg::ComposeCloseRequested(id));
@@ -22413,6 +22426,35 @@ fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
     Some(action)
 }
 
+/// Ctrl+K opens the command palette (#399) wherever the keyboard is, a
+/// composer included: in the capture phase, ahead of a focused editor that
+/// keeps the other Ctrl keys for its text.
+fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let s = sender.input_sender().clone();
+    keys.connect_key_pressed(move |keys, keyval, _, state| {
+        use gtk::gdk::ModifierType as M;
+        let mods = state & (M::CONTROL_MASK | M::SHIFT_MASK | M::ALT_MASK | M::SUPER_MASK);
+        if mods == M::CONTROL_MASK && matches!(keyval, gtk::gdk::Key::k | gtk::gdk::Key::K) {
+            // Not over a dialog already up, the palette itself among them.
+            let dialog = keys.widget().is_some_and(|w| {
+                w.downcast_ref::<adw::ApplicationWindow>()
+                    .map(|w| w.visible_dialog().is_some())
+                    .or_else(|| w.downcast_ref::<adw::Window>().map(|w| w.visible_dialog().is_some()))
+                    .unwrap_or(false)
+            });
+            if dialog {
+                return gtk::glib::Propagation::Proceed;
+            }
+            let _ = s.send(AppMsg::CommandPalette);
+            return gtk::glib::Propagation::Stop;
+        }
+        gtk::glib::Propagation::Proceed
+    });
+    keys
+}
+
 /// The Ctrl shortcuts that work whether or not single-key ones are on (#328).
 fn ctrl_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<AppMsg> {
     use gtk::gdk::Key;
@@ -22422,7 +22464,6 @@ fn ctrl_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<AppMsg> {
         Key::r | Key::R if !shift => Some(AppMsg::Shortcut(Shortcut::Reply)),
         Key::r | Key::R => Some(AppMsg::Shortcut(Shortcut::ReplyAll)),
         Key::u | Key::U if !shift => Some(AppMsg::ViewSource),
-        Key::k | Key::K if !shift => Some(AppMsg::CommandPalette),
         _ => None,
     }
 }
