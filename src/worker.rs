@@ -4801,7 +4801,9 @@ fn build_message(
     let email = if msg.attachments.is_empty() {
         match content {
             Some(content) => builder.multipart(content)?,
-            None => builder.body(msg.body.clone())?,
+            // A bare body() writes no MIME-Version and no charset, so a
+            // client that doesn't guess UTF-8 garbles every accent (#412).
+            None => builder.singlepart(SinglePart::plain(msg.body.clone()))?,
         }
     } else {
         builder.multipart(attachments_multipart(content, msg)?)?
@@ -12192,6 +12194,29 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(raw.contains("base64"), "{raw}");
         assert!(raw.contains("JVBERi0xLjQAgP8="), "{raw}");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Every line on the wire ends CRLF, as RFC 5322 has it.
+    fn has_bare_lf(raw: &[u8]) -> bool {
+        raw.iter().enumerate().any(|(i, &b)| b == b'\n' && (i == 0 || raw[i - 1] != b'\r'))
+    }
+
+    /// #412: plain text with nothing attached still says it is UTF-8 text,
+    /// or a client that doesn't guess garbles every accent.
+    #[test]
+    fn plain_text_declares_its_charset() {
+        let msg = OutgoingMessage {
+            to: "ada@example.com".into(),
+            body: "Plain text with öäü and 🙂\nsecond line".into(),
+            ..sample_outgoing()
+        };
+        let raw = build_email(&sample_account(), &msg).expect("email builds").formatted();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(text.contains("MIME-Version: 1.0\r\n"), "{text}");
+        assert!(text.contains("Content-Type: text/plain; charset=utf-8\r\n"), "{text}");
+        assert!(!has_bare_lf(&raw), "{text}");
+        let parsed = mail_parser::MessageParser::default().parse(&raw).expect("parses");
+        assert_eq!(parsed.body_text(0).as_deref().map(str::trim_end), Some("Plain text with öäü and 🙂\r\nsecond line"));
     }
 
     /// A picture pasted into the composer rides the HTML as a data: URI; the
