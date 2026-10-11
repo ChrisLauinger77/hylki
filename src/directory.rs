@@ -14,7 +14,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::contacts::Suggestion;
-use crate::i18n::i18n;
+use crate::i18n::{i18n, i18n_f};
 
 const SOURCE_IFACE: &str = "org.gnome.evolution.dataserver.Source";
 const WRITABLE_IFACE: &str = "org.gnome.evolution.dataserver.Source.Writable";
@@ -53,6 +53,35 @@ impl Security {
     pub fn default_port(self) -> u16 {
         if self == Security::Ldaps { 636 } else { 389 }
     }
+}
+
+/// What was typed as the server, taken apart: `ldaps://host:636/dc=x` is a
+/// common way to write one (curl and ldapsearch take it), but EDS wants the
+/// bare host, and resolving the whole URL as a name fails as "Not
+/// connected" (#307). Answers the host, and the encryption and port the
+/// text named, if any.
+pub fn parse_server(text: &str) -> (String, Option<Security>, Option<u16>) {
+    let text = text.trim();
+    let (security, rest) = match text.split_once("://") {
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldaps") => (Some(Security::Ldaps), rest),
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("ldap") => (None, rest),
+        _ => (None, text),
+    };
+    let authority = rest.split(['/', '?']).next().unwrap_or("");
+    // A bracketed IPv6 address keeps its colons.
+    let (host, port) = if let Some(inner) = authority.strip_prefix('[') {
+        match inner.split_once(']') {
+            Some((h, tail)) => (h, tail.strip_prefix(':')),
+            None => (inner, None),
+        }
+    } else {
+        match authority.rsplit_once(':') {
+            Some((h, p)) if !h.contains(':') => (h, Some(p)),
+            _ => (authority, None),
+        }
+    };
+    let port = port.and_then(|p| p.parse::<u16>().ok()).filter(|p| *p != 0);
+    (host.to_string(), security, port)
 }
 
 #[derive(Debug, Clone)]
@@ -108,7 +137,14 @@ impl Directory {
         if get("Address Book", "BackendName") != "ldap" {
             return None;
         }
-        let security = Security::from_key(&get("LDAP Backend", "SecurityMethod"));
+        // EDS keeps the encryption in the Security extension. Hylki used to
+        // write it under a key EDS never reads, so a directory saved then
+        // still holds what the user chose there (#307).
+        let mut method = get("Security", "Method");
+        if method.is_empty() {
+            method = get("LDAP Backend", "SecurityMethod");
+        }
+        let security = Security::from_key(&method);
         Some(Directory {
             uid: uid.to_string(),
             name: get("Data Source", "DisplayName"),
@@ -133,6 +169,15 @@ impl Directory {
         })
     }
 
+    /// Saved by Hylki before 1.44, with its encryption only under a key EDS
+    /// never read, so EDS has been connecting without any (#307).
+    fn wants_security_moved(&self) -> bool {
+        crate::platform::keyfile(&self.data).is_some_and(|kf| {
+            kf.has_key("LDAP Backend", "SecurityMethod").unwrap_or(false)
+                && !kf.has_key("Security", "Method").unwrap_or(false)
+        })
+    }
+
     /// The source key file for this directory, over what EDS had.
     fn to_source(&self) -> String {
         let kf = crate::platform::keyfile(&self.data).unwrap_or_else(gtk::glib::KeyFile::new);
@@ -147,7 +192,7 @@ impl Directory {
             kf.set_boolean("Authentication", "RememberPassword", true);
         }
         kf.set_string("Address Book", "BackendName", "ldap");
-        kf.set_string("Authentication", "Host", self.host.trim());
+        kf.set_string("Authentication", "Host", &parse_server(&self.host).0);
         kf.set_integer("Authentication", "Port", i32::from(self.port));
         kf.set_string("Authentication", "User", self.bind_dn.trim());
         let method = kf.string("Authentication", "Method").map(|s| s.to_string()).unwrap_or_default();
@@ -163,7 +208,8 @@ impl Directory {
         kf.set_string("Authentication", "Method", method);
         kf.set_string("LDAP Backend", "RootDn", self.base_dn.trim());
         kf.set_string("LDAP Backend", "Scope", if self.subtree { "subtree" } else { "onelevel" });
-        kf.set_string("LDAP Backend", "SecurityMethod", self.security.key());
+        kf.set_string("Security", "Method", self.security.key());
+        let _ = kf.remove_key("LDAP Backend", "SecurityMethod");
         kf.to_data().to_string()
     }
 }
@@ -193,6 +239,9 @@ pub fn list() -> Result<Vec<Directory>, String> {
         .iter()
         .filter_map(|(path, uid, data)| Directory::from_source(uid, path, data))
         .collect();
+    for dir in out.iter_mut().filter(|d| d.wants_security_moved()) {
+        move_security(dir);
+    }
     out.sort_by_key(|d| d.title().to_lowercase());
     Ok(out)
 }
@@ -218,6 +267,23 @@ pub fn save(dir: &Directory, password: Option<&str>) -> Result<String, String> {
     // The open book signed in with the old settings.
     forget_book(&dir.uid);
     Ok(dir.uid)
+}
+
+/// Write a directory's encryption where EDS reads it, once.
+fn move_security(dir: &mut Directory) {
+    let written = registry().and_then(|dest| {
+        bus()?
+            .call_method(Some(dest.as_str()), dir.path.as_str(), Some(WRITABLE_IFACE), "Write", &(dir.to_source(),))
+            .map_err(|e| e.to_string())
+    });
+    match written {
+        Ok(_) => {
+            tracing::info!(directory = %dir.title(), security = ?dir.security, "LDAP directory's encryption moved where EDS reads it");
+            dir.data = dir.to_source();
+            forget_book(&dir.uid);
+        }
+        Err(e) => tracing::warn!(directory = %dir.title(), "LDAP directory's encryption could not be moved: {e}"),
+    }
 }
 
 /// Switch a directory on or off without touching the rest of it.
@@ -279,15 +345,50 @@ fn contact_list(conn: &zbus::blocking::Connection, book: &(String, String), quer
     Ok(cards)
 }
 
-/// Why EDS last asked for the directory's sign-in: "required", "rejected",
-/// or empty once it is connected.
-fn credentials_reason(conn: &zbus::blocking::Connection, dir: &Directory) -> String {
-    let Ok(dest) = registry() else { return String::new() };
+/// Why EDS last asked for the directory's sign-in, and what went wrong.
+#[derive(Debug, Default)]
+struct LastCredentials {
+    /// "required", "rejected", "ssl_failed", "error", or empty once the
+    /// directory is connected.
+    reason: String,
+    /// What the server or the TLS library said, when it said anything.
+    message: String,
+}
+
+fn last_credentials(conn: &zbus::blocking::Connection, dir: &Directory) -> LastCredentials {
+    let Ok(dest) = registry() else { return LastCredentials::default() };
     conn.call_method(Some(dest.as_str()), dir.path.as_str(), Some(SOURCE_IFACE), "GetLastCredentialsRequiredArguments", &())
         .ok()
         .and_then(|r| r.body().deserialize::<(String, String, String, String, String)>().ok())
-        .map(|(reason, ..)| reason)
+        .map(|(reason, _cert_pem, _cert_errors, _error_name, message)| LastCredentials { reason, message })
         .unwrap_or_default()
+}
+
+/// The error worth showing for a directory that failed to connect: what
+/// EDS recorded, which says why, over the bare "Not connected" the book
+/// answers with (#307).
+fn connect_error(dir: &Directory, last: &LastCredentials, fallback: String) -> String {
+    let detail = last.message.trim();
+    let server = format!("{}:{}", dir.host.trim(), dir.port);
+    match last.reason.as_str() {
+        "rejected" => i18n("The directory did not accept the password."),
+        "ssl_failed" if detail.is_empty() => i18n("The directory's certificate could not be verified."),
+        "ssl_failed" => i18n_f("The directory's certificate could not be verified: {error}", &[("error", detail)]),
+        // EDS's own words for a connection that never came up.
+        _ if detail == "Repository offline" => match dir.security {
+            Security::Ldaps => i18n_f(
+                "Could not connect to {server} over TLS. Check the server, the port and that it takes LDAPS.",
+                &[("server", &server)],
+            ),
+            _ => i18n_f("Could not connect to {server}. Check the server and the port.", &[("server", &server)]),
+        },
+        _ if detail == "TLS not available" => i18n_f(
+            "Could not start StartTLS with {server}: the server does not offer it, or its certificate is not trusted.",
+            &[("server", &server)],
+        ),
+        _ if !detail.is_empty() => detail.to_string(),
+        _ => fallback,
+    }
 }
 
 fn authenticate(conn: &zbus::blocking::Connection, dir: &Directory, password: &str) -> Result<(), String> {
@@ -305,6 +406,11 @@ fn query_directory(dir: &Directory, query: &str) -> Result<Vec<String>, String> 
         Ok(b) => b,
         Err(e) => {
             forget_book(&dir.uid);
+            // EDS takes a server it cannot resolve or route to as offline.
+            if e.contains("Offline unavailable") {
+                let server = format!("{}:{}", dir.host.trim(), dir.port);
+                return Err(i18n_f("Could not reach {server}. Check the server's name and the network.", &[("server", &server)]));
+            }
             return Err(e);
         }
     };
@@ -318,29 +424,39 @@ fn query_directory(dir: &Directory, query: &str) -> Result<Vec<String>, String> 
         let book = open(&conn, &dir.uid)?;
         return contact_list(&conn, &book, query);
     }
-    match credentials_reason(&conn, dir).as_str() {
-        "required" | "rejected" if !dir.bind_dn.trim().is_empty() => {
+    let last = last_credentials(&conn, dir);
+    tracing::debug!(directory = %dir.title(), reason = %last.reason, message = %last.message, "LDAP directory not answering: {first}");
+    let signs_in = !dir.bind_dn.trim().is_empty();
+    match last.reason.as_str() {
+        // Wants the password, or failed to connect last time: sign in
+        // again, which also makes the backend try the server again.
+        "required" | "rejected" | "ssl_failed" | "error" if signs_in => {
             let Some(pw) = crate::config::load_cloud_password(&dir.keyring_key()) else {
                 return Err(i18n("The directory needs a password. Add it in Settings → LDAP Directories."));
             };
             authenticate(&conn, dir, &pw)?;
         }
+        "ssl_failed" | "error" => return Err(connect_error(dir, &last, first)),
         _ => {}
     }
-    // Signing in and connecting happen after the call returns: give the
-    // backend a moment before calling the directory unreachable.
-    let deadline = Instant::now() + Duration::from_secs(4);
+    // Signing in and connecting happen after the call returns, and a TLS
+    // handshake with a distant server takes a while: give the backend time
+    // before calling the directory unreachable. EDS keeps the last reason it
+    // recorded, so only a new one ends the wait early.
+    let before = (last.reason, last.message);
+    let deadline = Instant::now() + Duration::from_secs(12);
     loop {
-        std::thread::sleep(Duration::from_millis(200));
+        std::thread::sleep(Duration::from_millis(250));
         match contact_list(&conn, &book, query) {
             Ok(cards) => return Ok(cards),
-            Err(e) if Instant::now() >= deadline => {
-                if credentials_reason(&conn, dir) == "rejected" {
-                    return Err(i18n("The directory did not accept the password."));
+            Err(e) => {
+                let now = last_credentials(&conn, dir);
+                let failed = matches!(now.reason.as_str(), "rejected" | "ssl_failed" | "error")
+                    && (now.reason.as_str(), now.message.as_str()) != (before.0.as_str(), before.1.as_str());
+                if failed || Instant::now() >= deadline {
+                    return Err(connect_error(dir, &now, e));
                 }
-                return Err(e);
             }
-            Err(_) => {}
         }
     }
 }
@@ -388,7 +504,12 @@ pub fn search(typed: &str) -> Vec<Suggestion> {
 
 /// Check a saved directory answers, signing in as it would for a search.
 pub fn check(dir: &Directory) -> Result<(), String> {
-    query_directory(dir, "(is \"email\" \"hylki-check@invalid\")").map(|_| ())
+    let r = query_directory(dir, "(is \"email\" \"hylki-check@invalid\")").map(|_| ());
+    match &r {
+        Ok(()) => tracing::info!(directory = %dir.title(), host = %dir.host, port = dir.port, security = ?dir.security, "LDAP directory connected"),
+        Err(e) => tracing::warn!(directory = %dir.title(), host = %dir.host, port = dir.port, security = ?dir.security, "LDAP directory check failed: {e}"),
+    }
+    r
 }
 
 /// A suggestion per address on a directory entry.
@@ -427,6 +548,88 @@ mod tests {
         assert!(s.iter().all(|s| s.from_contacts));
     }
 
+    /// Save a directory through a real EDS, check it as Settings does, and
+    /// remove it again: `LDAP_LIVE=server|base|bind dn|password`, the server
+    /// as typed in Settings (`ldaps://host:636` and all). Run it on a sealed
+    /// session bus with a keyring of its own (see the EDS rig), never the
+    /// desktop's.
+    #[test]
+    #[ignore]
+    fn live() {
+        let Ok(spec) = std::env::var("LDAP_LIVE") else { return };
+        let mut f = spec.splitn(4, '|').map(str::to_string);
+        let (server, base, bind, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
+        let (host, security, port) = parse_server(&server);
+        let mut d = Directory::empty();
+        d.name = "live".into();
+        d.host = host;
+        d.security = security.unwrap_or(Security::StartTls);
+        d.port = port.unwrap_or(d.security.default_port());
+        d.base_dn = base;
+        d.bind_dn = bind;
+        // LDAP_LIVE_OLD=1: the source as Hylki wrote it before #307's fix,
+        // encryption under the key EDS never read.
+        let uid = if std::env::var_os("LDAP_LIVE_OLD").is_some() {
+            d.uid = "hylkiliveold".into();
+            let old = d.to_source().replace("[Security]\nMethod=", "[Old]\nX=").replace(
+                "[LDAP Backend]\n",
+                &format!("[LDAP Backend]\nSecurityMethod={}\n", d.security.key()),
+            );
+            let sources: HashMap<&str, String> = HashMap::from([("hylkiliveold", old)]);
+            bus()
+                .unwrap()
+                .call_method(Some(registry().unwrap().as_str()), MANAGER_PATH, Some(MANAGER_IFACE), "CreateSources", &(sources,))
+                .expect("old source");
+            crate::config::store_cloud_password("ldap:hylkiliveold", &pw).unwrap();
+            "hylkiliveold".to_string()
+        } else {
+            save(&d, Some(&pw)).expect("saved")
+        };
+        let mut found = None;
+        for _ in 0..20 {
+            found = list().unwrap().into_iter().find(|x| x.uid == uid);
+            if found.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        let found = found.expect("listed");
+        println!("saved host={:?} port={} security={:?}", found.host, found.port, found.security);
+        let t = Instant::now();
+        println!("check: {:?} after {:?}", check(&found), t.elapsed());
+        remove(&found).expect("removed");
+    }
+
+    #[test]
+    fn a_server_typed_as_a_url_is_taken_apart() {
+        assert_eq!(parse_server("ldaps://ldap.example.com"), ("ldap.example.com".into(), Some(Security::Ldaps), None));
+        assert_eq!(
+            parse_server(" ldaps://ldap.example.com:3269/ou=x,dc=example,dc=com "),
+            ("ldap.example.com".into(), Some(Security::Ldaps), Some(3269))
+        );
+        assert_eq!(parse_server("LDAP://ldap.example.com:389"), ("ldap.example.com".into(), None, Some(389)));
+        assert_eq!(parse_server("ldap.example.com"), ("ldap.example.com".into(), None, None));
+        assert_eq!(parse_server("ldap.example.com:636"), ("ldap.example.com".into(), None, Some(636)));
+        assert_eq!(parse_server("[::1]:636"), ("::1".into(), None, Some(636)));
+        assert_eq!(parse_server("::1"), ("::1".into(), None, None));
+    }
+
+    #[test]
+    fn the_recorded_reason_beats_not_connected() {
+        let not_connected = || "Cannot get contact list: Not connected".to_string();
+        let last = |reason: &str, message: &str| LastCredentials { reason: reason.into(), message: message.into() };
+        let mut d = Directory::empty();
+        d.host = "ldap.example.com".into();
+        d.port = 636;
+        d.security = Security::Ldaps;
+        assert_eq!(connect_error(&d, &last("error", "Can't contact LDAP server"), not_connected()), "Can't contact LDAP server");
+        assert!(connect_error(&d, &last("error", "Repository offline"), not_connected()).contains("ldap.example.com:636 over TLS"));
+        assert!(connect_error(&d, &last("error", "TLS not available"), not_connected()).contains("StartTLS"));
+        assert!(connect_error(&d, &last("ssl_failed", ""), not_connected()).contains("certificate"));
+        assert!(connect_error(&d, &last("rejected", ""), not_connected()).contains("password"));
+        assert_eq!(connect_error(&d, &last("", ""), not_connected()), not_connected());
+    }
+
     #[test]
     fn query_text_is_quoted_for_eds() {
         assert_eq!(sexp_str(r#"a"b\c"#), r#""a\"b\\c""#);
@@ -437,7 +640,8 @@ mod tests {
         let data = "[Data Source]\nDisplayName=Work\nEnabled=true\nParent=ldap-stub\n\n\
                     [Address Book]\nBackendName=ldap\n\n\
                     [Authentication]\nHost=ldap.example.org\nPort=636\nUser=cn=me,dc=example,dc=org\nMethod=ldap/simple-binddn\n\n\
-                    [LDAP Backend]\nRootDn=dc=example,dc=org\nScope=onelevel\nSecurityMethod=ldaps\nFilter=(ou=staff)\n";
+                    [LDAP Backend]\nRootDn=dc=example,dc=org\nScope=onelevel\nFilter=(ou=staff)\n\n\
+                    [Security]\nMethod=ldaps\n";
         let d = Directory::from_source("abc", "/p", data).unwrap();
         assert_eq!(d.host, "ldap.example.org");
         assert_eq!(d.port, 636);
@@ -452,6 +656,20 @@ mod tests {
         assert!(Directory::from_source("x", "/p", "[Address Book]\nBackendName=carddav\n").is_none());
     }
 
+    /// #307: Hylki once wrote the encryption where EDS never looks, so EDS
+    /// ran every such directory unencrypted; reading takes the old key, and
+    /// saving moves it to the one EDS reads.
+    #[test]
+    fn the_old_security_key_is_read_and_moved() {
+        let data = "[Address Book]\nBackendName=ldap\n\n[Authentication]\nHost=ldap.example.org\nPort=636\n\n\
+                    [LDAP Backend]\nRootDn=dc=example,dc=org\nSecurityMethod=ldaps\n";
+        let d = Directory::from_source("abc", "/p", data).unwrap();
+        assert_eq!(d.security, Security::Ldaps);
+        let out = d.to_source();
+        assert!(out.contains("[Security]\nMethod=ldaps"), "{out}");
+        assert!(!out.contains("SecurityMethod"), "{out}");
+    }
+
     #[test]
     fn a_new_source_is_filed_where_evolution_files_them() {
         let mut d = Directory::empty();
@@ -459,7 +677,8 @@ mod tests {
         d.base_dn = "dc=example,dc=org".into();
         let out = d.to_source();
         assert!(out.contains("Parent=ldap-stub"));
-        assert!(out.contains("SecurityMethod=starttls"));
+        assert!(out.contains("[Security]\nMethod=starttls"), "{out}");
+        assert!(!out.contains("SecurityMethod"), "{out}");
         assert!(out.contains("DisplayName=ldap.example.org"));
     }
 }

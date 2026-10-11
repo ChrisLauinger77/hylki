@@ -1263,13 +1263,37 @@ msgstr "{date} {time} órakor"
 msgid "Evolution Data Server is not available"
 msgstr "Az Evolution Data Server nem érhető el"
 
+msgid "The directory did not accept the password."
+msgstr "A könyvtár nem fogadta el a jelszót."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified."
+msgstr "a lista e-mail-címét nem sikerült beolvasni"
+
+#, fuzzy
+msgid "The directory's certificate could not be verified: {error}"
+msgstr "A fájl nem megnyitható"
+
+msgid ""
+"Could not connect to {server} over TLS. Check the server, the port and that "
+"it takes LDAPS."
+msgstr ""
+
+msgid "Could not connect to {server}. Check the server and the port."
+msgstr ""
+
+msgid ""
+"Could not start StartTLS with {server}: the server does not offer it, or its "
+"certificate is not trusted."
+msgstr ""
+
+msgid "Could not reach {server}. Check the server's name and the network."
+msgstr ""
+
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "A könyvtár jelszót igényel. Adja hozzá a Beállítások → LDAP könyvtárak "
 "menüpontban."
-
-msgid "The directory did not accept the password."
-msgstr "A könyvtár nem fogadta el a jelszót."
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3645,6 +3669,9 @@ msgstr "Kapcsolódva erre: {name}"
 
 msgid "{name} did not answer: {error}"
 msgstr "{name} nem válaszolt: {error}"
+
+msgid "The server took too long to answer."
+msgstr ""
 
 msgid "Edit Directory"
 msgstr "Könyvtár szerkesztése"

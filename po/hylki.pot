@@ -1153,10 +1153,32 @@ msgstr ""
 msgid "Evolution Data Server is not available"
 msgstr ""
 
-msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+msgid "The directory did not accept the password."
 msgstr ""
 
-msgid "The directory did not accept the password."
+msgid "The directory's certificate could not be verified."
+msgstr ""
+
+msgid "The directory's certificate could not be verified: {error}"
+msgstr ""
+
+msgid ""
+"Could not connect to {server} over TLS. Check the server, the port and that "
+"it takes LDAPS."
+msgstr ""
+
+msgid "Could not connect to {server}. Check the server and the port."
+msgstr ""
+
+msgid ""
+"Could not start StartTLS with {server}: the server does not offer it, or its "
+"certificate is not trusted."
+msgstr ""
+
+msgid "Could not reach {server}. Check the server's name and the network."
+msgstr ""
+
+msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 
 msgid "A contact needs a name or an email address"
@@ -3252,6 +3274,9 @@ msgid "Connected to {name}"
 msgstr ""
 
 msgid "{name} did not answer: {error}"
+msgstr ""
+
+msgid "The server took too long to answer."
 msgstr ""
 
 msgid "Edit Directory"

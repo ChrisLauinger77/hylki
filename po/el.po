@@ -1263,13 +1263,37 @@ msgstr "{date} στις {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Ο Evolution Data Server δεν είναι διαθέσιμος"
 
+msgid "The directory did not accept the password."
+msgstr "Ο κατάλογος δεν αποδέχθηκε τον κωδικό πρόσβασης."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified."
+msgstr "Δεν ήταν δυνατή η ανάγνωση της απάντησης της υπηρεσίας."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified: {error}"
+msgstr "Δεν ήταν δυνατή η πρόσβαση στην υπηρεσία: {e}"
+
+msgid ""
+"Could not connect to {server} over TLS. Check the server, the port and that "
+"it takes LDAPS."
+msgstr ""
+
+msgid "Could not connect to {server}. Check the server and the port."
+msgstr ""
+
+msgid ""
+"Could not start StartTLS with {server}: the server does not offer it, or its "
+"certificate is not trusted."
+msgstr ""
+
+msgid "Could not reach {server}. Check the server's name and the network."
+msgstr ""
+
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "Ο κατάλογος απαιτεί κωδικό πρόσβασης. Προσθέστε τον στις Ρυθμίσεις → "
 "Κατάλογοι LDAP."
-
-msgid "The directory did not accept the password."
-msgstr "Ο κατάλογος δεν αποδέχθηκε τον κωδικό πρόσβασης."
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3664,6 +3688,9 @@ msgstr "Συνδέθηκε με το {name}"
 
 msgid "{name} did not answer: {error}"
 msgstr "Το {name} δεν αποκρίθηκε: {error}"
+
+msgid "The server took too long to answer."
+msgstr ""
 
 msgid "Edit Directory"
 msgstr "Επεξεργασία καταλόγου"

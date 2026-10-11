@@ -1261,12 +1261,36 @@ msgstr "{date} às {time}"
 msgid "Evolution Data Server is not available"
 msgstr "O Evolution Data Server não está disponível"
 
+msgid "The directory did not accept the password."
+msgstr "O diretório não aceitou a senha."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified."
+msgstr "Não foi possível ler a resposta do serviço."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified: {error}"
+msgstr "Não foi possível contatar o serviço: {e}"
+
+msgid ""
+"Could not connect to {server} over TLS. Check the server, the port and that "
+"it takes LDAPS."
+msgstr ""
+
+msgid "Could not connect to {server}. Check the server and the port."
+msgstr ""
+
+msgid ""
+"Could not start StartTLS with {server}: the server does not offer it, or its "
+"certificate is not trusted."
+msgstr ""
+
+msgid "Could not reach {server}. Check the server's name and the network."
+msgstr ""
+
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "O diretório requer uma senha. Adicione-a em Configurações → Diretórios LDAP."
-
-msgid "The directory did not accept the password."
-msgstr "O diretório não aceitou a senha."
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3618,6 +3642,9 @@ msgstr "Conectado a {name}"
 
 msgid "{name} did not answer: {error}"
 msgstr "{name} não respondeu: {error}"
+
+msgid "The server took too long to answer."
+msgstr ""
 
 msgid "Edit Directory"
 msgstr "Editar diretório"

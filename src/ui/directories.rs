@@ -316,7 +316,10 @@ impl SimpleComponent for Directories {
                                 }
                                 std::thread::sleep(std::time::Duration::from_millis(200));
                             }
-                            let checked = found.map(|d| (d.title(), directory::check(&d)));
+                            // The list shows the new directory now, not once
+                            // the server has answered, which can take a while.
+                            let _ = s.send(DirectoriesInput::Load);
+                            let checked = found.map(|d| (d.title(), check_within(d, CHECK_LIMIT)));
                             DirectoriesInput::Done { error: None, checked }
                         }
                         Ok(_) => DirectoriesInput::Done { error: None, checked: None },
@@ -339,6 +342,24 @@ impl SimpleComponent for Directories {
             }
         }
     }
+}
+
+/// How long Settings waits on a directory's first answer. EDS sets no
+/// timeout of its own on the connection, and holds the book while it waits.
+const CHECK_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// [`directory::check`], given up on after `limit`; the check itself runs on
+/// to its end in the background.
+fn check_within(dir: Directory, limit: std::time::Duration) -> Result<(), String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let name = dir.title();
+    std::thread::spawn(move || {
+        let _ = tx.send(directory::check(&dir));
+    });
+    rx.recv_timeout(limit).unwrap_or_else(|_| {
+        tracing::warn!(directory = %name, "LDAP directory check gave no answer in {}s", limit.as_secs());
+        Err(i18n("The server took too long to answer."))
+    })
 }
 
 impl Directories {
@@ -487,7 +508,8 @@ fn build_editor(dir: Directory, sender: relm4::Sender<DirectoriesInput>) -> (gtk
     form.append(&error);
 
     let save: Rc<dyn Fn() -> bool> = Rc::new(move || {
-        let host_text = host.text().trim().to_string();
+        // A server pasted as a URL names its encryption and port too.
+        let (host_text, typed_security, typed_port) = directory::parse_server(&host.text());
         if host_text.is_empty() {
             error.set_label(&i18n("Enter the directory's server."));
             error.set_visible(true);
@@ -497,8 +519,14 @@ fn build_editor(dir: Directory, sender: relm4::Sender<DirectoriesInput>) -> (gtk
         let mut d = dir.clone();
         d.name = name.text().trim().to_string();
         d.host = host_text;
-        d.security = SECURITY.get(security.selected() as usize).copied().unwrap_or(Security::StartTls);
-        d.port = port.value() as u16;
+        let chosen = SECURITY.get(security.selected() as usize).copied().unwrap_or(Security::StartTls);
+        d.security = typed_security.unwrap_or(chosen);
+        d.port = match typed_port {
+            Some(p) => p,
+            // The usual port of the encryption picked, when the URL changed it.
+            None if SECURITY.iter().any(|s| f64::from(s.default_port()) == port.value()) => d.security.default_port(),
+            None => port.value() as u16,
+        };
         d.base_dn = base.text().trim().to_string();
         d.subtree = scope.selected() == 0;
         d.bind_dn = bind.text().trim().to_string();

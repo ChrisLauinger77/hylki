@@ -491,7 +491,12 @@ so a directory set up in Evolution is listed here as well, and one added
 here shows in Evolution. Removing one removes it for both.
 
 - **Server** and **Port**: 389 for StartTLS or no encryption, 636 for TLS
-  (LDAPS). The port follows the encryption unless you set another.
+  (LDAPS). The port follows the encryption unless you set another. A server
+  written as a URL, such as `ldaps://ldap.example.com:636`, sets the
+  encryption and the port from it.
+- **Encryption**: StartTLS checks the server's certificate against the
+  system's trusted certificates, so a server with a self-signed one needs
+  TLS (LDAPS), which Evolution Data Server connects to without that check.
 - **Search base**: where in the directory people are, such as
   `ou=people,dc=example,dc=com`. **Search** takes the whole tree under it or
   only its first level.
@@ -502,7 +507,8 @@ here shows in Evolution. Removing one removes it for both.
   for it.
 
 Saving checks the connection and says whether the directory answered, or
-why not (a password it refused, a server it could not reach). The Flatpak
+why not (a password it refused, a server it could not reach or find, TLS
+that could not start). The check gives up after 30 seconds. The Flatpak
 reaches the desktop's Evolution Data Server, which has to be installed on
 the system, as it is with GNOME.
 

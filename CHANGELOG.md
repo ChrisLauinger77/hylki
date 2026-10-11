@@ -17,6 +17,15 @@
   Elliot). A folder whose name has a non-ASCII character in its first six
   bytes, such as `abcd摘要`, crashed the app while it worked out the
   account's folder namespace.
+- **Fixed: LDAP directories ignored the encryption chosen for them** (#307,
+  reported by 3v1n0). Hylki wrote it under a key Evolution Data Server never
+  reads, so EDS connected without encryption: an LDAPS directory failed
+  with "Not connected", and a StartTLS one sent its sign-in unencrypted.
+  Directories saved before are moved over the first time Hylki lists them.
+  A server typed as a URL (`ldaps://host:636/...`) now sets the encryption
+  and port, a failed check says why (the password, the server's name, the
+  port, TLS), and the new directory is listed as soon as it is saved, not
+  after the check, which gives up after 30 seconds.
 - **Fixed: tagging with the number keys while arrowing down the list could
   tag the wrong message** (#416, reported by amadeusp). A key pressed just
   after an arrow key could tag the message before, and the next press then

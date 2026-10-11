@@ -1277,13 +1277,37 @@ msgstr "{date} в {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Сервис Evolution Data Server недоступен"
 
+msgid "The directory did not accept the password."
+msgstr "Каталог не принял пароль."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified."
+msgstr "Не удалось прочитать ответ сервиса."
+
+#, fuzzy
+msgid "The directory's certificate could not be verified: {error}"
+msgstr "Не удалось связаться с сервисом: {e}"
+
+msgid ""
+"Could not connect to {server} over TLS. Check the server, the port and that "
+"it takes LDAPS."
+msgstr ""
+
+msgid "Could not connect to {server}. Check the server and the port."
+msgstr ""
+
+msgid ""
+"Could not start StartTLS with {server}: the server does not offer it, or its "
+"certificate is not trusted."
+msgstr ""
+
+msgid "Could not reach {server}. Check the server's name and the network."
+msgstr ""
+
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "Для доступа к каталогу требуется пароль. Добавьте его в меню Параметры → "
 "Каталоги LDAP."
-
-msgid "The directory did not accept the password."
-msgstr "Каталог не принял пароль."
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3626,6 +3650,9 @@ msgstr "Подключено к {name}"
 
 msgid "{name} did not answer: {error}"
 msgstr "Сервер {name} не ответил: {error}"
+
+msgid "The server took too long to answer."
+msgstr ""
 
 msgid "Edit Directory"
 msgstr "Редактировать каталог"
