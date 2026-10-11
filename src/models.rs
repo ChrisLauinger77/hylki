@@ -408,12 +408,12 @@ impl SenderTrust {
     /// Heading for the details popover, and the badge's tooltip. Not drawn on
     /// screen: the toolbar badge is the icon alone, colored by verdict.
     pub fn label(self) -> String {
-        i18n(match self {
-            SenderTrust::Pass => "Verified sender",
-            SenderTrust::Unverified => "Sender not verified",
-            SenderTrust::Suspicious => "Check this sender",
-            SenderTrust::Fail => "Possible forgery",
-        })
+        match self {
+            SenderTrust::Pass => i18n("Verified sender"),
+            SenderTrust::Unverified => i18n("Sender not verified"),
+            SenderTrust::Suspicious => i18n("Check this sender"),
+            SenderTrust::Fail => i18n("Possible forgery"),
+        }
     }
 
     /// CSS class for the badge's color.
@@ -879,9 +879,9 @@ impl OutboxItem {
             .unwrap_or(queued_at);
         let secs = (now - queued_at).max(0);
         let ago = match secs {
-            s if s < 90 => "just now".to_string(),
-            s if s < 3600 => format!("{} minutes ago", s / 60),
-            s if s < 7200 => "an hour ago".to_string(),
+            s if s < 90 => i18n("just now"),
+            s if s < 3600 => i18n_f("{n} minutes ago", &[("n", &(s / 60).to_string())]),
+            s if s < 7200 => i18n("an hour ago"),
             s if s < 86400 => i18n_f("{n} hours ago", &[("n", &(s / 3600).to_string())]),
             s if s < 172_800 => i18n("yesterday"),
             s => i18n_f("{n} days ago", &[("n", &(s / 86400).to_string())]),

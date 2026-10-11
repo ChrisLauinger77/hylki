@@ -1113,6 +1113,18 @@ msgstr "Cerca per remitent, assumpte o compte"
 msgid "(no subject)"
 msgstr "(sense assumpte)"
 
+#, fuzzy
+msgid "archive"
+msgstr "Arxiva"
+
+#, fuzzy
+msgid "trash"
+msgstr "Paperera"
+
+#, fuzzy
+msgid "destination"
+msgstr "Invitació actualitzada"
+
 msgid "Default"
 msgstr "Per defecte"
 
@@ -1237,6 +1249,21 @@ msgstr "{used} de {limit} utilitzats"
 msgid "{free} free ({pct}%)"
 msgstr "{free} lliures ({pct}%)"
 
+#, fuzzy
+msgid "Verified sender"
+msgstr "Cerca remitents"
+
+#, fuzzy
+msgid "Sender not verified"
+msgstr "Envia-ho ara"
+
+#, fuzzy
+msgid "Check this sender"
+msgstr "Bloca aquest remitent"
+
+msgid "Possible forgery"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Missatge xifrat"
 
@@ -1326,6 +1353,17 @@ msgstr "Signatura caducada"
 msgid "This message hasn't been checked."
 msgstr "Aquest missatge no s'ha comprovat."
 
+msgid "just now"
+msgstr ""
+
+#, fuzzy
+msgid "{n} minutes ago"
+msgstr "fa {n} hores"
+
+#, fuzzy
+msgid "an hour ago"
+msgstr "fa {n} hores"
+
 msgid "{n} hours ago"
 msgstr "fa {n} hores"
 
@@ -1403,6 +1441,32 @@ msgstr "Signat amb la clau {id}."
 
 msgid "Import the sender's public key to verify it."
 msgstr "Importa la clau pública del remitent per verificar-ho."
+
+msgid "Revoked"
+msgstr ""
+
+#, fuzzy
+msgid "Expired"
+msgstr "Caduca"
+
+#, fuzzy
+msgid "Not trusted yet"
+msgstr "No traduït"
+
+#, fuzzy
+msgid "Marked as not trusted"
+msgstr "Marca com a no llegit"
+
+#, fuzzy
+msgid "Marginally trusted"
+msgstr "Clau de confiança."
+
+msgid "Trusted"
+msgstr "De confiança"
+
+#, fuzzy
+msgid "Your own key"
+msgstr "Les teves claus"
 
 msgid "No key was found in that file."
 msgstr "No s'ha trobat cap clau en aquest fitxer."
@@ -2119,6 +2183,14 @@ msgstr ""
 "Es conserva al servidor; canvia-la a través de la interfície de correu web "
 "del teu proveïdor."
 
+#, fuzzy
+msgid "Edit Alias"
+msgstr "Edita l'etiqueta"
+
+#, fuzzy
+msgid "Add Alias"
+msgstr "Afegeix un àlies…"
+
 msgid "Display name (optional)"
 msgstr "Nom visible (opcional)"
 
@@ -2173,8 +2245,14 @@ msgstr "Compte en línia del GNOME importat"
 msgid "Added directly in Hylki"
 msgstr "Afegit directament a l'Hylki"
 
+msgid "Paused: Mail is switched off for this account in GNOME Settings"
+msgstr ""
+
 msgid "Enable this account"
 msgstr "Activa aquest compte"
+
+msgid "Mail"
+msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Utilitza aquest compte a l'Hylki"
@@ -2481,6 +2559,10 @@ msgstr "Mostra al missatge"
 msgid "Delete from Server…"
 msgstr "Suprimeix del servidor…"
 
+#, fuzzy
+msgid "Download"
+msgstr "Baixa…"
+
 msgid "Import OpenPGP key"
 msgstr "Importa una clau OpenPGP"
 
@@ -2505,6 +2587,12 @@ msgid ""
 msgstr ""
 "Prova una cerca diferent, o comprova de quins comptes i carpetes està "
 "extraient el peu de pàgina."
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
+msgstr ""
 
 msgid "Thumbnail grid"
 msgstr "Graella de miniatures"
@@ -2592,6 +2680,12 @@ msgstr "Ves al missatge"
 
 msgid "Deleting…"
 msgstr "S'està suprimint…"
+
+msgid "Unknown"
+msgstr ""
+
+msgid "File"
+msgstr ""
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
@@ -3376,17 +3470,48 @@ msgstr "Suprimeix…"
 msgid "View photo"
 msgstr "Mostra la foto"
 
+msgid "Phone"
+msgstr "Telèfon"
+
+msgid "Address"
+msgstr "Adreça"
+
+msgid "Birthday"
+msgstr ""
+
+#. ---- note ----
+msgid "Note"
+msgstr ""
+
+#, fuzzy
+msgid "Address Book"
+msgstr "Llibreta d'adreces"
+
+msgid "Details"
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Edita el contacte"
 
 msgid "New Contact"
 msgstr "Contacte nou"
 
+#. ---- identity fields ----
+msgid "Identity"
+msgstr ""
+
+msgid "Nickname"
+msgstr ""
+
+#, fuzzy
+msgid "Organization"
+msgstr "Traducció"
+
+msgid "Title"
+msgstr ""
+
 msgid "Add email"
 msgstr "Afegeix un correu"
-
-msgid "Phone"
-msgstr "Telèfon"
 
 msgid "Add phone"
 msgstr "Afegeix un telèfon"
@@ -3634,6 +3759,14 @@ msgstr "Marca-ho tot com a llegit"
 
 msgid "Mark All as Unread"
 msgstr "Marca-ho tot com a no llegit"
+
+#, fuzzy
+msgid "Search all folders"
+msgstr "Cerca carpetes"
+
+#, fuzzy
+msgid "Search this folder"
+msgstr "Cerca carpetes"
 
 msgid "Due"
 msgstr "Venciment"
@@ -4023,6 +4156,10 @@ msgstr "Mostra el text citat"
 msgid "Hide quoted text"
 msgstr "Amaga el text citat"
 
+#, fuzzy
+msgid "Message"
+msgstr "Missatges"
+
 msgid "Save Image"
 msgstr "Desa la imatge"
 
@@ -4067,6 +4204,22 @@ msgstr "Copia la imatge"
 
 msgid "Copy Image Address"
 msgstr "Copia l'adreça de la imatge"
+
+#, fuzzy
+msgid "From:"
+msgstr "De"
+
+#, fuzzy
+msgid "To:"
+msgstr "A"
+
+#, fuzzy
+msgid "Cc:"
+msgstr "Cc"
+
+#, fuzzy
+msgid "Date:"
+msgstr "Data"
 
 msgid "Clear all"
 msgstr "Neteja-ho tot"
@@ -4236,9 +4389,6 @@ msgstr ""
 msgid "Generate"
 msgstr "Genera"
 
-msgid "Address"
-msgstr "Adreça"
-
 msgid "Expires"
 msgstr "Caduca"
 
@@ -4276,9 +4426,6 @@ msgstr "Exporta la clau pública…"
 
 msgid "Delete this key"
 msgstr "Suprimeix aquesta clau"
-
-msgid "Trusted"
-msgstr "De confiança"
 
 msgid "Trust…"
 msgstr "Confia-hi…"

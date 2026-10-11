@@ -935,7 +935,7 @@ impl ContactsPage {
 
         // ---- field groups ----
         if !c.emails.is_empty() {
-            let list = group(detail, "Email");
+            let list = group(detail, &i18n("Email"));
             for e in &c.emails {
                 let row = labeled_row(e);
                 let compose = flat_button(
@@ -960,7 +960,7 @@ impl ContactsPage {
         }
 
         if !c.phones.is_empty() {
-            let list = group(detail, "Phone");
+            let list = group(detail, &i18n("Phone"));
             for p in &c.phones {
                 let row = labeled_row(p);
                 row.add_suffix(&copy_button(&p.value));
@@ -969,7 +969,7 @@ impl ContactsPage {
         }
 
         if !c.addresses.is_empty() {
-            let list = group(detail, "Address");
+            let list = group(detail, &i18n("Address"));
             for a in &c.addresses {
                 let row = labeled_row(a);
                 row.add_suffix(&copy_button(&a.value));
@@ -978,7 +978,7 @@ impl ContactsPage {
         }
 
         if !c.urls.is_empty() {
-            let list = group(detail, "Website");
+            let list = group(detail, &i18n("Website"));
             for url in &c.urls {
                 let row = adw::ActionRow::new();
                 row.set_title(&gtk::glib::markup_escape_text(url));
@@ -998,17 +998,17 @@ impl ContactsPage {
 
         let mut extras: Vec<Labeled> = Vec::new();
         if !c.birthday.is_empty() {
-            extras.push(Labeled { label: "Birthday".into(), value: c.birthday.clone() });
+            extras.push(Labeled { label: i18n("Birthday"), value: c.birthday.clone() });
         }
         if !c.note.is_empty() {
-            extras.push(Labeled { label: "Note".into(), value: c.note.clone() });
+            extras.push(Labeled { label: i18n("Note"), value: c.note.clone() });
         }
         // Where this entry lives — the local book or a synced account.
         if !c.book_name.is_empty() {
-            extras.push(Labeled { label: "Address Book".into(), value: c.book_name.clone() });
+            extras.push(Labeled { label: i18n("Address Book"), value: c.book_name.clone() });
         }
         if !extras.is_empty() {
-            let list = group(detail, "Details");
+            let list = group(detail, &i18n("Details"));
             for x in &extras {
                 let row = adw::ActionRow::new();
                 row.set_title(&gtk::glib::markup_escape_text(&x.label));
@@ -1053,11 +1053,11 @@ impl ContactsPage {
         detail.append(&bar);
 
         // ---- identity fields ----
-        let identity = group(detail, "Identity");
-        let name = entry_row("Name", &c.name);
-        let nickname = entry_row("Nickname", &c.nickname);
-        let org = entry_row("Organization", &c.org);
-        let title = entry_row("Title", &c.title);
+        let identity = group(detail, &i18n("Identity"));
+        let name = entry_row(&i18n("Name"), &c.name);
+        let nickname = entry_row(&i18n("Nickname"), &c.nickname);
+        let org = entry_row(&i18n("Organization"), &c.org);
+        let title = entry_row(&i18n("Title"), &c.title);
         identity.append(&name);
         identity.append(&nickname);
         identity.append(&org);
@@ -1110,7 +1110,7 @@ impl ContactsPage {
         );
 
         // ---- note ----
-        let note_list = group(detail, "Note");
+        let note_list = group(detail, &i18n("Note"));
         let note = gtk::TextView::new();
         note.set_wrap_mode(gtk::WrapMode::WordChar);
         note.buffer().set_text(&c.note);

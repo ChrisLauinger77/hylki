@@ -1051,6 +1051,15 @@ msgstr ""
 msgid "(no subject)"
 msgstr ""
 
+msgid "archive"
+msgstr ""
+
+msgid "trash"
+msgstr ""
+
+msgid "destination"
+msgstr ""
+
 msgid "Default"
 msgstr ""
 
@@ -1171,6 +1180,18 @@ msgstr ""
 msgid "{free} free ({pct}%)"
 msgstr ""
 
+msgid "Verified sender"
+msgstr ""
+
+msgid "Sender not verified"
+msgstr ""
+
+msgid "Check this sender"
+msgstr ""
+
+msgid "Possible forgery"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr ""
 
@@ -1256,6 +1277,15 @@ msgstr ""
 msgid "This message hasn't been checked."
 msgstr ""
 
+msgid "just now"
+msgstr ""
+
+msgid "{n} minutes ago"
+msgstr ""
+
+msgid "an hour ago"
+msgstr ""
+
 msgid "{n} hours ago"
 msgstr ""
 
@@ -1323,6 +1353,27 @@ msgid "Signed with key {id}."
 msgstr ""
 
 msgid "Import the sender's public key to verify it."
+msgstr ""
+
+msgid "Revoked"
+msgstr ""
+
+msgid "Expired"
+msgstr ""
+
+msgid "Not trusted yet"
+msgstr ""
+
+msgid "Marked as not trusted"
+msgstr ""
+
+msgid "Marginally trusted"
+msgstr ""
+
+msgid "Trusted"
+msgstr ""
+
+msgid "Your own key"
 msgstr ""
 
 msgid "No key was found in that file."
@@ -1944,6 +1995,12 @@ msgid ""
 "Kept on the server; change it through your provider's webmail interface."
 msgstr ""
 
+msgid "Edit Alias"
+msgstr ""
+
+msgid "Add Alias"
+msgstr ""
+
 msgid "Display name (optional)"
 msgstr ""
 
@@ -1996,7 +2053,13 @@ msgstr ""
 msgid "Added directly in Hylki"
 msgstr ""
 
+msgid "Paused: Mail is switched off for this account in GNOME Settings"
+msgstr ""
+
 msgid "Enable this account"
+msgstr ""
+
+msgid "Mail"
 msgstr ""
 
 msgid "Use this account in Hylki"
@@ -2289,6 +2352,9 @@ msgstr ""
 msgid "Delete from Server…"
 msgstr ""
 
+msgid "Download"
+msgstr ""
+
 msgid "Import OpenPGP key"
 msgstr ""
 
@@ -2310,6 +2376,12 @@ msgstr ""
 msgid ""
 "Try a different search, or check which accounts and folders the footer is "
 "pulling from."
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
 msgstr ""
 
 msgid "Thumbnail grid"
@@ -2397,6 +2469,12 @@ msgid "Go to Message"
 msgstr ""
 
 msgid "Deleting…"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "File"
 msgstr ""
 
 #. Deliberately counts messages, not attachments: until a message has
@@ -3083,16 +3161,45 @@ msgstr ""
 msgid "View photo"
 msgstr ""
 
+msgid "Phone"
+msgstr ""
+
+msgid "Address"
+msgstr ""
+
+msgid "Birthday"
+msgstr ""
+
+#. ---- note ----
+msgid "Note"
+msgstr ""
+
+msgid "Address Book"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
 msgid "Edit Contact"
 msgstr ""
 
 msgid "New Contact"
 msgstr ""
 
-msgid "Add email"
+#. ---- identity fields ----
+msgid "Identity"
 msgstr ""
 
-msgid "Phone"
+msgid "Nickname"
+msgstr ""
+
+msgid "Organization"
+msgstr ""
+
+msgid "Title"
+msgstr ""
+
+msgid "Add email"
 msgstr ""
 
 msgid "Add phone"
@@ -3322,6 +3429,12 @@ msgid "Mark All as Read"
 msgstr ""
 
 msgid "Mark All as Unread"
+msgstr ""
+
+msgid "Search all folders"
+msgstr ""
+
+msgid "Search this folder"
 msgstr ""
 
 msgid "Due"
@@ -3701,6 +3814,9 @@ msgstr ""
 msgid "Hide quoted text"
 msgstr ""
 
+msgid "Message"
+msgstr ""
+
 msgid "Save Image"
 msgstr ""
 
@@ -3741,6 +3857,18 @@ msgid "Copy Image"
 msgstr ""
 
 msgid "Copy Image Address"
+msgstr ""
+
+msgid "From:"
+msgstr ""
+
+msgid "To:"
+msgstr ""
+
+msgid "Cc:"
+msgstr ""
+
+msgid "Date:"
 msgstr ""
 
 msgid "Clear all"
@@ -3889,9 +4017,6 @@ msgstr ""
 msgid "Generate"
 msgstr ""
 
-msgid "Address"
-msgstr ""
-
 msgid "Expires"
 msgstr ""
 
@@ -3928,9 +4053,6 @@ msgid "Export public key…"
 msgstr ""
 
 msgid "Delete this key"
-msgstr ""
-
-msgid "Trusted"
 msgstr ""
 
 msgid "Trust…"

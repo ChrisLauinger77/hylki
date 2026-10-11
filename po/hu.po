@@ -1151,6 +1151,18 @@ msgstr "Keresés feladó, tárgy vagy fiók szerint"
 msgid "(no subject)"
 msgstr "(nincs tárgy)"
 
+#, fuzzy
+msgid "archive"
+msgstr "Archiválás"
+
+#, fuzzy
+msgid "trash"
+msgstr "Kuka"
+
+#, fuzzy
+msgid "destination"
+msgstr "Frissített meghívó"
+
 msgid "Default"
 msgstr "Alapértelmezett"
 
@@ -1281,6 +1293,21 @@ msgstr "{used} / {limit} felhasználva"
 msgid "{free} free ({pct}%)"
 msgstr "{free} szabad ({pct}%)"
 
+#, fuzzy
+msgid "Verified sender"
+msgstr "Feladók keresése"
+
+#, fuzzy
+msgid "Sender not verified"
+msgstr "Küldés inkább most"
+
+#, fuzzy
+msgid "Check this sender"
+msgstr "Feladó blokkolása"
+
+msgid "Possible forgery"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Titkosított üzenet"
 
@@ -1366,6 +1393,17 @@ msgstr "Az aláírás érvényessége lejárt"
 msgid "This message hasn't been checked."
 msgstr "Ezt az üzenetet még nem ellenőrizték."
 
+msgid "just now"
+msgstr ""
+
+#, fuzzy
+msgid "{n} minutes ago"
+msgstr "{n} órája"
+
+#, fuzzy
+msgid "an hour ago"
+msgstr "{n} órája"
+
 msgid "{n} hours ago"
 msgstr "{n} órája"
 
@@ -1438,6 +1476,32 @@ msgstr "A(z) {id} kulccsal aláírva."
 
 msgid "Import the sender's public key to verify it."
 msgstr "Az ellenőrzéshez importálja a feladó nyilvános kulcsát."
+
+msgid "Revoked"
+msgstr ""
+
+#, fuzzy
+msgid "Expired"
+msgstr "Lejárat"
+
+#, fuzzy
+msgid "Not trusted yet"
+msgstr "Fordította"
+
+#, fuzzy
+msgid "Marked as not trusted"
+msgstr "Megjelölés olvasatlanként"
+
+#, fuzzy
+msgid "Marginally trusted"
+msgstr "A kulcs hitelesítve."
+
+msgid "Trusted"
+msgstr "Megbízható"
+
+#, fuzzy
+msgid "Your own key"
+msgstr "Saját kulcsok"
 
 msgid "No key was found in that file."
 msgstr "A fájlban nem található kulcs."
@@ -2156,6 +2220,14 @@ msgid ""
 "Kept on the server; change it through your provider's webmail interface."
 msgstr ""
 
+#, fuzzy
+msgid "Edit Alias"
+msgstr "Címke szerkesztése"
+
+#, fuzzy
+msgid "Add Alias"
+msgstr "Álnév (alias) hozzáadása…"
+
 msgid "Display name (optional)"
 msgstr "Megjelenítendő név (opcionális)"
 
@@ -2212,8 +2284,14 @@ msgstr "Importált GNOME Internetes Fiók"
 msgid "Added directly in Hylki"
 msgstr "Közvetlenül a Hylki-ben hozzáadva"
 
+msgid "Paused: Mail is switched off for this account in GNOME Settings"
+msgstr ""
+
 msgid "Enable this account"
 msgstr "Fiók engedélyezése"
+
+msgid "Mail"
+msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Fiók használata a Hylki-ben"
@@ -2528,6 +2606,10 @@ msgstr "Megjelenítés az üzenetben"
 msgid "Delete from Server…"
 msgstr "Törlés a kiszolgálóról…"
 
+#, fuzzy
+msgid "Download"
+msgstr "Letöltés…"
+
 msgid "Import OpenPGP key"
 msgstr "OpenPGP kulcs importálása"
 
@@ -2552,6 +2634,12 @@ msgid ""
 msgstr ""
 "Próbáljon meg másképp keresni, vagy ellenőrizze, mely fiókokból és mappákból "
 "származnak az oldalalján szereplő adatok."
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
+msgstr ""
 
 msgid "Thumbnail grid"
 msgstr "Bélyegképrács"
@@ -2639,6 +2727,12 @@ msgstr "Ugrás az üzenethez"
 
 msgid "Deleting…"
 msgstr "Törlés…"
+
+msgid "Unknown"
+msgstr ""
+
+msgid "File"
+msgstr ""
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
@@ -3447,17 +3541,48 @@ msgstr "Törlés…"
 msgid "View photo"
 msgstr "Fénykép megtekintése"
 
+msgid "Phone"
+msgstr "Telefon"
+
+msgid "Address"
+msgstr "Cím"
+
+msgid "Birthday"
+msgstr ""
+
+#. ---- note ----
+msgid "Note"
+msgstr ""
+
+#, fuzzy
+msgid "Address Book"
+msgstr "Címjegyzék"
+
+msgid "Details"
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Névjegy szerkesztése"
 
 msgid "New Contact"
 msgstr "Új névjegy"
 
+#. ---- identity fields ----
+msgid "Identity"
+msgstr ""
+
+msgid "Nickname"
+msgstr ""
+
+#, fuzzy
+msgid "Organization"
+msgstr "Fordította"
+
+msgid "Title"
+msgstr ""
+
 msgid "Add email"
 msgstr "E-mail hozzáadása"
-
-msgid "Phone"
-msgstr "Telefon"
 
 msgid "Add phone"
 msgstr "Telefonszám hozzáadása"
@@ -3712,6 +3837,14 @@ msgstr "Összes megjelölése olvasottként"
 
 msgid "Mark All as Unread"
 msgstr "Összes megjelölése olvasatlanként"
+
+#, fuzzy
+msgid "Search all folders"
+msgstr "Keresés a mappákban"
+
+#, fuzzy
+msgid "Search this folder"
+msgstr "Keresés a mappákban"
 
 msgid "Due"
 msgstr ""
@@ -4117,6 +4250,10 @@ msgstr "Távoli tartalom megjelenítése"
 msgid "Hide quoted text"
 msgstr "Elrejtés a preview text"
 
+#, fuzzy
+msgid "Message"
+msgstr "Nincsenek üzenetek"
+
 msgid "Save Image"
 msgstr "Kép mentése"
 
@@ -4161,6 +4298,21 @@ msgstr "Kép másolása"
 
 msgid "Copy Image Address"
 msgstr "Kép címének másolása"
+
+#, fuzzy
+msgid "From:"
+msgstr "Feladó"
+
+#, fuzzy
+msgid "To:"
+msgstr "Címzett"
+
+#, fuzzy
+msgid "Cc:"
+msgstr "Másolat (Cc)"
+
+msgid "Date:"
+msgstr ""
 
 msgid "Clear all"
 msgstr "Összes törlése"
@@ -4332,9 +4484,6 @@ msgstr ""
 msgid "Generate"
 msgstr "Létrehozás"
 
-msgid "Address"
-msgstr "Cím"
-
 msgid "Expires"
 msgstr "Lejárat"
 
@@ -4372,9 +4521,6 @@ msgstr "Nyilvános kulcs exportálása…"
 
 msgid "Delete this key"
 msgstr "Kulcs törlése"
-
-msgid "Trusted"
-msgstr "Megbízható"
 
 msgid "Trust…"
 msgstr "Megbízhatóvá tétel…"

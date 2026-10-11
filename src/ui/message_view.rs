@@ -4951,7 +4951,7 @@ impl MessageView {
             .as_ref()
             .map(|m| m.subject.clone())
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| "Message".to_string())
+            .unwrap_or_else(|| i18n("Message"))
     }
 
     /// The document that gets printed: the header, then each message inlined
@@ -7665,7 +7665,7 @@ fn print_header_html(message: Option<&Message>) -> String {
         format!("{} <{}>", m.from_name, m.from_addr)
     };
     let subject = if m.subject.trim().is_empty() {
-        "(no subject)".to_string()
+        i18n("(no subject)")
     } else {
         m.subject.clone()
     };
@@ -7674,10 +7674,10 @@ fn print_header_html(message: Option<&Message>) -> String {
            <div class=\"vireo-print-subject\">{subject}</div>{from}{to}{cc}{date}\
          </div>",
         subject = escape_text(&subject),
-        from = row("From:", &from),
-        to = row("To:", &m.to),
-        cc = row("Cc:", &m.cc),
-        date = row("Date:", &m.datetime_full()),
+        from = row(&i18n("From:"), &from),
+        to = row(&i18n("To:"), &m.to),
+        cc = row(&i18n("Cc:"), &m.cc),
+        date = row(&i18n("Date:"), &m.datetime_full()),
     )
 }
 

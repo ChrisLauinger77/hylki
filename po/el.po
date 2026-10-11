@@ -1155,6 +1155,18 @@ msgstr "Αναζήτηση κατά αποστολέα, θέμα ή λογαρι
 msgid "(no subject)"
 msgstr "(χωρίς θέμα)"
 
+#, fuzzy
+msgid "archive"
+msgstr "Αρχειοθέτηση"
+
+#, fuzzy
+msgid "trash"
+msgstr "Κάδος"
+
+#, fuzzy
+msgid "destination"
+msgstr "Ενημερωμένη πρόσκληση"
+
 msgid "Default"
 msgstr "Προεπιλογή"
 
@@ -1281,6 +1293,21 @@ msgstr "Χρησιμοποιούνται {used} από {limit}"
 msgid "{free} free ({pct}%)"
 msgstr "{free} ελεύθερα ({pct}%)"
 
+#, fuzzy
+msgid "Verified sender"
+msgstr "Αναζήτηση αποστολέων"
+
+#, fuzzy
+msgid "Sender not verified"
+msgstr "Αποστολή τώρα αντί για αργότερα"
+
+#, fuzzy
+msgid "Check this sender"
+msgstr "Αποκλεισμός αυτού του αποστολέα"
+
+msgid "Possible forgery"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Κρυπτογραφημένο μήνυμα"
 
@@ -1369,6 +1396,17 @@ msgstr "Η υπογραφή έχει λήξει"
 msgid "This message hasn't been checked."
 msgstr "Αυτό το μήνυμα δεν έχει ελεγχθεί."
 
+msgid "just now"
+msgstr ""
+
+#, fuzzy
+msgid "{n} minutes ago"
+msgstr "Πριν από {n} ώρες"
+
+#, fuzzy
+msgid "an hour ago"
+msgstr "Πριν από {n} ώρες"
+
 msgid "{n} hours ago"
 msgstr "Πριν από {n} ώρες"
 
@@ -1446,6 +1484,32 @@ msgstr "Υπογεγραμμένο με το κλειδί {id}."
 
 msgid "Import the sender's public key to verify it."
 msgstr "Εισαγάγετε το δημόσιο κλειδί του αποστολέα για να το επαληθεύσετε."
+
+msgid "Revoked"
+msgstr ""
+
+#, fuzzy
+msgid "Expired"
+msgstr "Λήγει"
+
+#, fuzzy
+msgid "Not trusted yet"
+msgstr "Δεν έχει μεταφραστεί"
+
+#, fuzzy
+msgid "Marked as not trusted"
+msgstr "Σήμανση ως μη αναγνωσμένο"
+
+#, fuzzy
+msgid "Marginally trusted"
+msgstr "Το κλειδί ορίστηκε ως έμπιστο."
+
+msgid "Trusted"
+msgstr "Έμπιστο"
+
+#, fuzzy
+msgid "Your own key"
+msgstr "Τα κλειδιά σας"
 
 msgid "No key was found in that file."
 msgstr "Δεν βρέθηκε κλειδί σε αυτό το αρχείο."
@@ -2178,6 +2242,14 @@ msgstr ""
 "Διατηρείται στον διακομιστή· αλλάξτε το μέσω της διεπαφής webmail του "
 "παρόχου σας."
 
+#, fuzzy
+msgid "Edit Alias"
+msgstr "Επεξεργασία ετικέτας"
+
+#, fuzzy
+msgid "Add Alias"
+msgstr "Προσθήκη ψευδωνύμου…"
+
 msgid "Display name (optional)"
 msgstr "Εμφανιζόμενο όνομα (προαιρετικό)"
 
@@ -2234,8 +2306,14 @@ msgstr "Εισηγμένος διαδικτυακός λογαριασμός GNO
 msgid "Added directly in Hylki"
 msgstr "Προστέθηκε απευθείας στο Hylki"
 
+msgid "Paused: Mail is switched off for this account in GNOME Settings"
+msgstr ""
+
 msgid "Enable this account"
 msgstr "Ενεργοποίηση αυτού του λογαριασμού"
+
+msgid "Mail"
+msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Χρήση αυτού του λογαριασμού στο Hylki"
@@ -2553,6 +2631,10 @@ msgstr "Εμφάνιση στο μήνυμα"
 msgid "Delete from Server…"
 msgstr "Διαγραφή από τον διακομιστή…"
 
+#, fuzzy
+msgid "Download"
+msgstr "Λήψη…"
+
 msgid "Import OpenPGP key"
 msgstr "Εισαγωγή κλειδιού OpenPGP"
 
@@ -2577,6 +2659,12 @@ msgid ""
 msgstr ""
 "Δοκιμάστε διαφορετική αναζήτηση ή ελέγξτε από ποιους λογαριασμούς και "
 "φακέλους αντλεί στοιχεία το υποσέλιδο."
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
+msgstr ""
 
 msgid "Thumbnail grid"
 msgstr "Πλέγμα μικρογραφιών"
@@ -2664,6 +2752,12 @@ msgstr "Μετάβαση στο μήνυμα"
 
 msgid "Deleting…"
 msgstr "Διαγραφή…"
+
+msgid "Unknown"
+msgstr ""
+
+msgid "File"
+msgstr ""
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
@@ -3466,17 +3560,48 @@ msgstr "Διαγραφή…"
 msgid "View photo"
 msgstr "Προβολή φωτογραφίας"
 
+msgid "Phone"
+msgstr "Τηλέφωνο"
+
+msgid "Address"
+msgstr "Διεύθυνση"
+
+msgid "Birthday"
+msgstr ""
+
+#. ---- note ----
+msgid "Note"
+msgstr ""
+
+#, fuzzy
+msgid "Address Book"
+msgstr "Βιβλίο διευθύνσεων"
+
+msgid "Details"
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Επεξεργασία επαφής"
 
 msgid "New Contact"
 msgstr "Νέα επαφή"
 
+#. ---- identity fields ----
+msgid "Identity"
+msgstr ""
+
+msgid "Nickname"
+msgstr ""
+
+#, fuzzy
+msgid "Organization"
+msgstr "Μετάφραση"
+
+msgid "Title"
+msgstr ""
+
 msgid "Add email"
 msgstr "Προσθήκη email"
-
-msgid "Phone"
-msgstr "Τηλέφωνο"
 
 msgid "Add phone"
 msgstr "Προσθήκη τηλεφώνου"
@@ -3727,6 +3852,14 @@ msgstr "Σήμανση όλων ως αναγνωσμένων"
 
 msgid "Mark All as Unread"
 msgstr "Σήμανση όλων ως μη αναγνωσμένων"
+
+#, fuzzy
+msgid "Search all folders"
+msgstr "Αναζήτηση φακέλων"
+
+#, fuzzy
+msgid "Search this folder"
+msgstr "Αναζήτηση φακέλων"
 
 msgid "Due"
 msgstr "Λήξη"
@@ -4117,6 +4250,10 @@ msgstr "Εμφάνιση παρατιθέμενου κειμένου"
 msgid "Hide quoted text"
 msgstr "Απόκρυψη παρατιθέμενου κειμένου"
 
+#, fuzzy
+msgid "Message"
+msgstr "Μηνύματα"
+
 msgid "Save Image"
 msgstr "Αποθήκευση εικόνας"
 
@@ -4161,6 +4298,22 @@ msgstr "Αντιγραφή εικόνας"
 
 msgid "Copy Image Address"
 msgstr "Αντιγραφή διεύθυνσης εικόνας"
+
+#, fuzzy
+msgid "From:"
+msgstr "Από"
+
+#, fuzzy
+msgid "To:"
+msgstr "Προς"
+
+#, fuzzy
+msgid "Cc:"
+msgstr "Κοιν."
+
+#, fuzzy
+msgid "Date:"
+msgstr "Ημερομηνία"
 
 msgid "Clear all"
 msgstr "Εκκαθάριση όλων"
@@ -4335,9 +4488,6 @@ msgstr ""
 msgid "Generate"
 msgstr "Δημιουργία"
 
-msgid "Address"
-msgstr "Διεύθυνση"
-
 msgid "Expires"
 msgstr "Λήγει"
 
@@ -4375,9 +4525,6 @@ msgstr "Εξαγωγή δημόσιου κλειδιού…"
 
 msgid "Delete this key"
 msgstr "Διαγραφή αυτού του κλειδιού"
-
-msgid "Trusted"
-msgstr "Έμπιστο"
 
 msgid "Trust…"
 msgstr "Ορισμός ως έμπιστου…"

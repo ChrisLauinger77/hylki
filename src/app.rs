@@ -23821,11 +23821,11 @@ pub fn message_text(body: &str) -> String {
 }
 
 fn kind_label(kind: FolderKind) -> String {
-    i18n(match kind {
-        FolderKind::Archive => "archive",
-        FolderKind::Trash => "trash",
-        _ => "destination",
-    })
+    match kind {
+        FolderKind::Archive => i18n("archive"),
+        FolderKind::Trash => i18n("trash"),
+        _ => i18n("destination"),
+    }
 }
 
 /// Flatten every folder's indexed messages into one pool for cross-folder search.

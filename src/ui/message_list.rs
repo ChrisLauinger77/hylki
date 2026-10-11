@@ -3564,10 +3564,10 @@ impl MessageList {
     }
 
     fn search_placeholder(&self) -> String {
-        i18n(match self.scope {
-            SearchScope::AllFolders => "Search all folders",
-            SearchScope::ThisFolder => "Search this folder",
-        })
+        match self.scope {
+            SearchScope::AllFolders => i18n("Search all folders"),
+            SearchScope::ThisFolder => i18n("Search this folder"),
+        }
     }
 
     /// Drop any active search: clear the query and the entry text so a folder

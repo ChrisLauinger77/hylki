@@ -3293,7 +3293,7 @@ impl AccountsWindow {
         let window = adw::Window::builder()
             .modal(true)
             .default_width(440)
-            .title(if self.alias_editing.is_some() { "Edit Alias" } else { "Add Alias" })
+            .title(if self.alias_editing.is_some() { i18n("Edit Alias") } else { i18n("Add Alias") })
             .build();
         // Parent to whatever window the embedded panel currently sits in.
         window.set_transient_for(root.root().and_downcast::<gtk::Window>().as_ref());
@@ -3702,9 +3702,9 @@ impl AccountsWindow {
             let toggle = gtk::Switch::new();
             toggle.set_valign(gtk::Align::Center);
             if acc.goa_mail_disabled {
-                toggle.set_tooltip_text(Some(
+                toggle.set_tooltip_text(Some(&i18n(
                     "Paused: Mail is switched off for this account in GNOME Settings",
-                ));
+                )));
                 toggle.set_sensitive(false);
             } else {
                 toggle.set_tooltip_text(Some(i18n("Enable this account").as_str()));
@@ -3786,7 +3786,7 @@ impl AccountsWindow {
             row.set_title(&g.email);
             row.add_prefix(&crate::brand::mark(brand_for_goa(&g.provider), 24, crate::brand::GENERIC_MAIL));
             let mut subtitle = if g.provider.is_empty() {
-                "Mail".to_string()
+                i18n("Mail")
             } else {
                 g.provider.clone()
             };

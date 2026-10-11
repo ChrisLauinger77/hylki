@@ -1132,6 +1132,18 @@ msgstr "Rechercher par expéditeur, objet ou compte"
 msgid "(no subject)"
 msgstr "(sans objet)"
 
+#, fuzzy
+msgid "archive"
+msgstr "Archiver"
+
+#, fuzzy
+msgid "trash"
+msgstr "Corbeille"
+
+#, fuzzy
+msgid "destination"
+msgstr "Invitation mise à jour"
+
 msgid "Default"
 msgstr "Par défaut"
 
@@ -1256,6 +1268,21 @@ msgstr "{used} sur {limit} utilisés"
 msgid "{free} free ({pct}%)"
 msgstr "{free} libres ({pct} %)"
 
+#, fuzzy
+msgid "Verified sender"
+msgstr "Rechercher les expéditeurs"
+
+#, fuzzy
+msgid "Sender not verified"
+msgstr "Envoyer maintenant à la place"
+
+#, fuzzy
+msgid "Check this sender"
+msgstr "Bloquer cet expéditeur"
+
+msgid "Possible forgery"
+msgstr ""
+
 msgid "Encrypted message"
 msgstr "Message chiffré"
 
@@ -1343,6 +1370,17 @@ msgstr "Signature expirée"
 msgid "This message hasn't been checked."
 msgstr "Ce message n'a pas été vérifié."
 
+msgid "just now"
+msgstr ""
+
+#, fuzzy
+msgid "{n} minutes ago"
+msgstr "Il y a {n} heures"
+
+#, fuzzy
+msgid "an hour ago"
+msgstr "Il y a {n} heures"
+
 msgid "{n} hours ago"
 msgstr "Il y a {n} heures"
 
@@ -1422,6 +1460,32 @@ msgstr "Signé avec la clé {id}."
 
 msgid "Import the sender's public key to verify it."
 msgstr "Importez la clé publique de l'expéditeur pour la vérifier."
+
+msgid "Revoked"
+msgstr ""
+
+#, fuzzy
+msgid "Expired"
+msgstr "Date d'expiration"
+
+#, fuzzy
+msgid "Not trusted yet"
+msgstr "Non traduit"
+
+#, fuzzy
+msgid "Marked as not trusted"
+msgstr "Marquer comme non lu"
+
+#, fuzzy
+msgid "Marginally trusted"
+msgstr "Clé marquée comme fiable."
+
+msgid "Trusted"
+msgstr "De confiance"
+
+#, fuzzy
+msgid "Your own key"
+msgstr "Vos clés"
 
 msgid "No key was found in that file."
 msgstr "Aucune clé n'a été trouvée dans ce fichier."
@@ -2145,6 +2209,14 @@ msgstr ""
 "Conservé sur le serveur ; modifiez-le via l'interface webmail de votre "
 "fournisseur."
 
+#, fuzzy
+msgid "Edit Alias"
+msgstr "Modifier le tag"
+
+#, fuzzy
+msgid "Add Alias"
+msgstr "Ajouter un alias…"
+
 msgid "Display name (optional)"
 msgstr "Nom d'affichage (facultatif)"
 
@@ -2200,8 +2272,14 @@ msgstr "Compte en ligne de GNOME importé"
 msgid "Added directly in Hylki"
 msgstr "Ajouté directement dans Hylki"
 
+msgid "Paused: Mail is switched off for this account in GNOME Settings"
+msgstr ""
+
 msgid "Enable this account"
 msgstr "Activer ce compte"
+
+msgid "Mail"
+msgstr ""
 
 msgid "Use this account in Hylki"
 msgstr "Utiliser ce compte dans Hylki"
@@ -2511,6 +2589,10 @@ msgstr "Afficher dans le message"
 msgid "Delete from Server…"
 msgstr "Supprimer du serveur…"
 
+#, fuzzy
+msgid "Download"
+msgstr "Télécharger…"
+
 msgid "Import OpenPGP key"
 msgstr "Importer une clé OpenPGP"
 
@@ -2535,6 +2617,12 @@ msgid ""
 msgstr ""
 "Essayez une autre recherche, ou vérifiez quels comptes et dossiers le pied "
 "de page utilise."
+
+msgid "Type"
+msgstr ""
+
+msgid "Size"
+msgstr ""
 
 msgid "Thumbnail grid"
 msgstr "Grille de vignettes"
@@ -2622,6 +2710,12 @@ msgstr "Aller au message"
 
 msgid "Deleting…"
 msgstr "Suppression…"
+
+msgid "Unknown"
+msgstr ""
+
+msgid "File"
+msgstr ""
 
 #. Deliberately counts messages, not attachments: until a message has
 #. been described there is no telling how many files it holds.
@@ -3425,17 +3519,48 @@ msgstr "Supprimer…"
 msgid "View photo"
 msgstr "Voir la photo"
 
+msgid "Phone"
+msgstr "Téléphone"
+
+msgid "Address"
+msgstr "Adresse"
+
+msgid "Birthday"
+msgstr ""
+
+#. ---- note ----
+msgid "Note"
+msgstr ""
+
+#, fuzzy
+msgid "Address Book"
+msgstr "Carnet d'adresses"
+
+msgid "Details"
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Modifier le contact"
 
 msgid "New Contact"
 msgstr "Nouveau contact"
 
+#. ---- identity fields ----
+msgid "Identity"
+msgstr ""
+
+msgid "Nickname"
+msgstr ""
+
+#, fuzzy
+msgid "Organization"
+msgstr "Traduction"
+
+msgid "Title"
+msgstr ""
+
 msgid "Add email"
 msgstr "Ajouter une adresse e-mail"
-
-msgid "Phone"
-msgstr "Téléphone"
 
 msgid "Add phone"
 msgstr "Ajouter un numéro de téléphone"
@@ -3685,6 +3810,14 @@ msgstr "Tout marquer comme lu"
 
 msgid "Mark All as Unread"
 msgstr "Tout marquer comme non lu"
+
+#, fuzzy
+msgid "Search all folders"
+msgstr "Rechercher des dossiers"
+
+#, fuzzy
+msgid "Search this folder"
+msgstr "Rechercher des dossiers"
 
 msgid "Due"
 msgstr "Échéance"
@@ -4077,6 +4210,10 @@ msgstr "Afficher le texte cité"
 msgid "Hide quoted text"
 msgstr "Masquer le texte cité"
 
+#, fuzzy
+msgid "Message"
+msgstr "Messages"
+
 msgid "Save Image"
 msgstr "Enregistrer l'image"
 
@@ -4122,6 +4259,22 @@ msgstr "Copier l'image"
 
 msgid "Copy Image Address"
 msgstr "Copier l'adresse de l'image"
+
+#, fuzzy
+msgid "From:"
+msgstr "De"
+
+#, fuzzy
+msgid "To:"
+msgstr "À"
+
+#, fuzzy
+msgid "Cc:"
+msgstr "Cc"
+
+#, fuzzy
+msgid "Date:"
+msgstr "Date"
 
 msgid "Clear all"
 msgstr "Tout effacer"
@@ -4296,9 +4449,6 @@ msgstr ""
 msgid "Generate"
 msgstr "Générer"
 
-msgid "Address"
-msgstr "Adresse"
-
 msgid "Expires"
 msgstr "Date d'expiration"
 
@@ -4336,9 +4486,6 @@ msgstr "Exporter la clé publique…"
 
 msgid "Delete this key"
 msgstr "Supprimer cette clé"
-
-msgid "Trusted"
-msgstr "De confiance"
 
 msgid "Trust…"
 msgstr "Faire confiance…"
