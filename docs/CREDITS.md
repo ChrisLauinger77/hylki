@@ -112,6 +112,8 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
 - [**Elliot**](https://github.com/Elliot-32) ([#409](https://github.com/hyprlab/hylki/pull/409)):
   a startup crash when a folder's name has a non-ASCII character near its
   start.
+- [**jolupa**](https://github.com/jolupa) ([#415](https://github.com/hyprlab/hylki/pull/415)): the
+  Catalan translation.
 
 
 ## Reports, design and ideas
@@ -162,6 +164,7 @@ report, all in 1.38; and to everyone who files issues and ideas.
 
 Every language Hylki speaks was given to it by somebody:
 
+- **Catalan:** [jolupa](https://github.com/jolupa)
 - **French:** [frenchy82](https://github.com/frenchy82)
 - **German:** [Christian Lauinger](https://github.com/ChrisLauinger77)
 - **Greek:** [Yiannis Ioannides](https://github.com/yioannides), with the bulk

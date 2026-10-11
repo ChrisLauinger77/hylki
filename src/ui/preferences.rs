@@ -233,6 +233,7 @@ pub fn language_choices() -> Vec<(String, String)> {
 /// A language's name in itself, for the Language row.
 fn native_language_name(code: &str) -> &str {
     match code {
+        "ca" => "Català",
         "fr" => "Français",
         "el" => "Ελληνικά",
         "hu" => "Magyar",
