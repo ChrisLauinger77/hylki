@@ -94,9 +94,12 @@
 - **Added: clicking the unread dot marks a message read** (PR #380 by Fabio
   Rotondo), without selecting or opening it.
 - **Added: one message can be drawn light or dark** (PR #386 by Fabio
-  Rotondo). With **Settings → Reading → Light / Dark Mode switch** on, a
-  switch beside Reader View draws the message on screen in the other
-  scheme, for that message alone, until Hylki is closed; off by default.
+  Rotondo). A switch beside Reader View draws the message on screen
+  opposite the theme, for that message alone, until Hylki is closed. It
+  starts off for every message, and a message keeps the scheme chosen for
+  it when the theme changes. Shown by default, for those who had it hidden
+  in a beta too; **Settings → Reading → Light / Dark Mode switch** hides it.
+  Its label and Reader View's are icons.
 - **Added: a Hylki address book, and importing vCard files** (PR #379 by
   Fabio Rotondo). A book called **Hylki** sits beside the ones Evolution
   Data Server keeps, so the Contacts view works without GNOME or EDS. Its
