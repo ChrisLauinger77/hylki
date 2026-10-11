@@ -643,6 +643,8 @@ pub enum WorkerEvent {
     /// A `SetSeen` has been stored (or failed): the app stops holding its own
     /// read state for that message over what the server reports.
     SeenSettled { path: String, uid: u32 },
+    /// A `SetKeyword` has been stored (or failed), the same for a tag.
+    TagSettled { path: String, uid: u32, keyword: String },
     /// The answer to [`MailRequest::Settle`]: whatever took these messages
     /// out of `path` has been done or has failed.
     MovesSettled { path: String, uids: Vec<u32> },
@@ -2022,6 +2024,7 @@ async fn run_imap(
                         lost = true;
                     }
                 }
+                emit(WorkerEvent::TagSettled { path, uid, keyword });
             }
 
             MailRequest::MarkAllRead { folder_id, path } => {

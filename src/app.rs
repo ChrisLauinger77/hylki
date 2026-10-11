@@ -55,6 +55,12 @@ const READER_MIN_WIDTH: i32 = 400;
 /// and read mail used to turn unread again in the meantime (#255).
 const PENDING_SEEN_MAX: std::time::Duration = std::time::Duration::from_secs(60);
 
+/// The same for a tag, which the worker confirms: a confirmed tag still
+/// wins for a few seconds over a list another connection fetched before
+/// the STORE, and an unconfirmed one for as long as a busy queue can take.
+const PENDING_TAG_MAX: std::time::Duration = std::time::Duration::from_secs(300);
+const PENDING_TAG_SETTLED: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// How wide the list pane has to be dragged before Automatic lays the list
 /// out on one line, and how far back before it returns to cards (#334).
 const LIST_WIDE_ON: i32 = 600;
@@ -590,8 +596,8 @@ pub struct AppModel {
     /// ahead of the STORE still shows the old state; while an entry is
     /// young the app's own state for that message and folder wins over it.
     pending_seen: HashMap<(u32, String, u32), (bool, std::time::Instant)>,
-    /// (account, folder path, uid, lower-cased keyword) → (on, when sent):
-    /// the same for tags. A folder list fetched ahead of the STORE took a
+    /// (account, folder path, uid, lower-cased keyword) → (on, held until,
+    /// keyword): the same for tags. A folder list fetched ahead of the STORE took a
     /// tag just set off the row until the next sync put it back.
     pending_tags: HashMap<(u32, String, u32, String), (bool, std::time::Instant, String)>,
     /// Folders (account, folder) whose server unread count arrived while a
@@ -1080,6 +1086,9 @@ pub struct AppModel {
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
+    /// The list's own selection as it last reported it; `list_selection`
+    /// also follows the reader's cards.
+    list_heard: Vec<(u32, u32)>,
     /// Undoable actions (#200): moves, flag changes, and folder creates and
     /// renames, newest last. Unlimited: entries are a few strings each.
     /// Ctrl+Z pops one, applies it, and pushes its inverse onto `redo_stack`.
@@ -1745,6 +1754,9 @@ pub enum AppMsg {
     SetTagMany { messages: Vec<Message>, keyword: String, add: bool },
     /// The reader toolbar's tag menu: toggle a tag on the reader's target.
     ToggleTagCurrent(String),
+    /// A tag's number key, with the list rows selected when it was pressed
+    /// (#416).
+    TagKey { n: u8, keys: Vec<(u32, u32)> },
     /// Put the reader's target back in its Inbox (from Trash or Junk, #138).
     MoveToInbox,
     /// Pop the tag menu on the reader toolbar's tag button.
@@ -1810,6 +1822,7 @@ pub enum AppMsg {
     /// The worker stored (or failed to store) a read/unread change the app
     /// had applied ahead of it.
     SeenSettled { account_id: u32, path: String, uid: u32 },
+    TagSettled { account_id: u32, path: String, uid: u32, keyword: String },
     /// The worker has run (or failed) the move that took these messages
     /// out of `path`: its lists can be believed about them again.
     MovesSettled { account_id: u32, path: String, uids: Vec<u32> },
@@ -3104,6 +3117,7 @@ impl SimpleComponent for AppModel {
             popouts: HashMap::new(),
             current_thread: Vec::new(),
             list_selection: Vec::new(),
+            list_heard: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             compose_history: (None, None),
@@ -4191,6 +4205,12 @@ impl SimpleComponent for AppModel {
             let window = root.clone();
             let enabled = model.single_key.clone();
             let gmail = model.gmail_keys.clone();
+            let probe = model.message_list.model().selection_probe();
+            // A tag key carries the rows selected as it is pressed (#416).
+            let shortcut = move |action: Shortcut| match action {
+                Shortcut::Tag(n) => AppMsg::TagKey { n, keys: probe.keys() },
+                action => AppMsg::Shortcut(action),
+            };
             // The first key of a Gmail sequence (g or *) and when it came.
             let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> = Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
@@ -4267,7 +4287,7 @@ impl SimpleComponent for AppModel {
                     let first = pending.take().filter(|(_, at)| at.elapsed() < std::time::Duration::from_millis(1500));
                     if let Some((first, _)) = first {
                         if let Some(action) = gmail_sequence(first, keyval) {
-                            s.input(AppMsg::Shortcut(action));
+                            s.input(shortcut(action));
                         }
                         return gtk::glib::Propagation::Stop;
                     }
@@ -4282,7 +4302,7 @@ impl SimpleComponent for AppModel {
                     }
                     return match gmail_shortcut_for(keyval, shift) {
                         Some(action) => {
-                            s.input(AppMsg::Shortcut(action));
+                            s.input(shortcut(action));
                             gtk::glib::Propagation::Stop
                         }
                         None => gtk::glib::Propagation::Proceed,
@@ -4290,7 +4310,7 @@ impl SimpleComponent for AppModel {
                 }
                 match shortcut_for(keyval, shift) {
                     Some(action) => {
-                        s.input(AppMsg::Shortcut(action));
+                        s.input(shortcut(action));
                         gtk::glib::Propagation::Stop
                     }
                     None => gtk::glib::Propagation::Proceed,
@@ -9429,20 +9449,29 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ToggleTagCurrent(keyword) => {
-                // Several selected: the tag goes on all of them, or comes off
-                // all of them once every one carries it (#313).
-                let many = self.multi_selection();
-                if !many.is_empty() {
-                    let add = !many.iter().all(|m| m.has_keyword(&keyword));
-                    let what = self.tag_label(&keyword, add);
-                    self.user_set_flags(what, &many, FlagKind::Tag(keyword), add);
+                let targets = self.selected_targets();
+                self.toggle_tag(keyword, &targets);
+            }
+
+            AppMsg::TagKey { n, keys } => {
+                // Settings order, first nine. A number past the list does
+                // nothing rather than something surprising.
+                let Some(keyword) = self.tags.get(usize::from(n).saturating_sub(1)).map(|t| t.keyword.clone()) else {
                     return;
-                }
-                if let Some(m) = self.reply_target() {
-                    let add = !m.has_keyword(&keyword);
-                    let what = self.tag_label(&keyword, add);
-                    self.user_set_flags(what, &[m], FlagKind::Tag(keyword), add);
-                }
+                };
+                // Arrowing quickly, the key can arrive before the app has
+                // heard the list moved: the rows selected at the key press are
+                // the ones meant, or the tag lands on the row before and the
+                // next press takes it back off (#416).
+                let targets = if !keys.is_empty() && keys != self.list_heard && keys != self.list_selection {
+                    keys.iter()
+                        .filter_map(|&(account_id, id)| self.shown_copy(account_id, id))
+                        .filter(|m| self.outbox_item(m.account_id, m.id).is_none())
+                        .collect()
+                } else {
+                    self.selected_targets()
+                };
+                self.toggle_tag(keyword, &targets);
             }
 
             AppMsg::ReaderTagMenu => {
@@ -10221,6 +10250,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::TagSettled { account_id, path, uid, keyword } => {
+                let soon = std::time::Instant::now() + PENDING_TAG_SETTLED;
+                if let Some((_, until, _)) = self.pending_tags.get_mut(&(account_id, path, uid, keyword.to_lowercase())) {
+                    *until = (*until).min(soon);
+                }
+            }
+
             AppMsg::RawExported { token, raw } => {
                 if let Some(name) = self.pending_saves.remove(&token) {
                     match raw {
@@ -10855,6 +10891,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SelectionKeys(keys) => {
+                self.list_heard = keys.clone();
                 self.list_selection = keys.clone();
                 self.selection_from_cards = false;
                 self.message_view.emit(MessageViewInput::SetSelectedCards(keys));
@@ -14705,6 +14742,8 @@ impl AppModel {
                     .unwrap_or_default();
                 if !from_disk.is_empty() {
                     let from_disk = self.merge_local_tags(*account_id, from_disk);
+                    let from_disk = self.apply_pending_seen(*account_id, *folder_id, from_disk);
+                    let from_disk = self.apply_pending_tags(*account_id, *folder_id, from_disk);
                     self.message_cache.insert((*account_id, *folder_id), from_disk);
                 }
             }
@@ -14978,7 +15017,8 @@ impl AppModel {
     /// [`apply_pending_seen`] for tags: a list fetched before a tag reached
     /// the server keeps the tag as the user just set it.
     fn apply_pending_tags(&mut self, account_id: u32, folder_id: u32, mut messages: Vec<Message>) -> Vec<Message> {
-        self.pending_tags.retain(|_, (_, at, _)| at.elapsed() < PENDING_SEEN_MAX);
+        let now = std::time::Instant::now();
+        self.pending_tags.retain(|_, (_, until, _)| *until > now);
         if !self.pending_tags.keys().any(|(a, _, _, _)| *a == account_id) {
             return messages;
         }
@@ -18835,6 +18875,27 @@ impl AppModel {
         self.tag_provider.load(css);
     }
 
+    /// What a flag action means: every message of a multi-selection, else
+    /// the reply target.
+    fn selected_targets(&self) -> Vec<Message> {
+        let mut targets = self.multi_selection();
+        if targets.is_empty() {
+            targets.extend(self.reply_target());
+        }
+        targets
+    }
+
+    /// Toggle a tag on `targets`: on all of them, or off all of them once
+    /// every one carries it (#313).
+    fn toggle_tag(&mut self, keyword: String, targets: &[Message]) {
+        if targets.is_empty() {
+            return;
+        }
+        let add = !targets.iter().all(|m| m.has_keyword(&keyword));
+        let what = self.tag_label(&keyword, add);
+        self.user_set_flags(what, targets, FlagKind::Tag(keyword), add);
+    }
+
     /// Put a tag on a message or take it off (#71): the server (or the local
     /// store, where the server keeps none), then every copy the UI holds —
     /// the list row, the reader, a pop-out — so nothing waits for a sync.
@@ -18845,7 +18906,7 @@ impl AppModel {
         let Some(path) = self.resolve_folder_path(m) else { return };
         self.pending_tags.insert(
             (m.account_id, path.clone(), m.uid, keyword.to_lowercase()),
-            (add, std::time::Instant::now(), keyword.to_string()),
+            (add, std::time::Instant::now() + PENDING_TAG_MAX, keyword.to_string()),
         );
         self.send_to(m.account_id, MailRequest::SetKeyword {
             path,
@@ -23062,6 +23123,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::FolderUnreadByPath { account_id, path, unread }
         }
         WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
+        WorkerEvent::TagSettled { path, uid, keyword } => AppMsg::TagSettled { account_id, path, uid, keyword },
         WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
         WorkerEvent::RawExported { token, raw } => AppMsg::RawExported { token, raw },
         WorkerEvent::RawImported { token, result } => AppMsg::RawImported { token, result },

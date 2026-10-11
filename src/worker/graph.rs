@@ -733,6 +733,7 @@ pub(super) async fn run_graph(
                     &emit,
                 )
                 .await;
+                emit(WorkerEvent::TagSettled { path, uid, keyword });
             }
 
             MailRequest::MarkAllRead { folder_id, path } => {

@@ -2098,6 +2098,7 @@ pub(super) async fn run_jmap(
                     let patch = serde_json::json!({ format!("keywords/{keyword}"): if add { serde_json::Value::Bool(true) } else { serde_json::Value::Null } });
                     jmap_patch_message(&s, &mut state, &path, uid, patch).await;
                 }
+                emit(WorkerEvent::TagSettled { path, uid, keyword });
             }
 
             MailRequest::MarkAllRead { folder_id, path } => {

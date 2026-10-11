@@ -2695,7 +2695,36 @@ impl SimpleComponent for MessageList {
     }
 }
 
+/// The rows GTK has selected right now, read without a trip through the
+/// component's queue: a key pressed straight after an arrow key belongs to
+/// the row the arrow reached, even when the app has not heard of it yet
+/// (#416).
+#[derive(Clone)]
+pub struct SelectionProbe {
+    selection: gtk::MultiSelection,
+    model: crate::ui::message_row::MessageModel,
+}
+
+impl SelectionProbe {
+    /// `(account_id, id)` of each selected row, in list order.
+    pub fn keys(&self) -> Vec<(u32, u32)> {
+        let set = self.selection.selection();
+        let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else {
+            return Vec::new();
+        };
+        std::iter::once(first)
+            .chain(iter)
+            .filter_map(|p| self.model.row(p as usize))
+            .map(|r| (r.msg.account_id, r.msg.id))
+            .collect()
+    }
+}
+
 impl MessageList {
+    pub fn selection_probe(&self) -> SelectionProbe {
+        SelectionProbe { selection: self.shared.selection.clone(), model: self.shared.model.clone() }
+    }
+
     /// What the list holds in RAM, for the memory section of an export: the
     /// folder's index, the rows listed from it, and the whole-mailbox search
     /// pool (empty unless a search is open), each as (messages, bytes). The
