@@ -6393,11 +6393,22 @@ msgstr "Con remates"
 msgid "Monospace"
 msgstr "Monoespaciada"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Color personalizado…"
+
 msgid "Paragraph style"
 msgstr "Estilo de párrafo"
 
 msgid "Font"
 msgstr "Fuente"
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Tamaño del texto"
 
 msgid "Bold"
 msgstr "Negrita"

@@ -5659,10 +5659,19 @@ msgstr ""
 msgid "Monospace"
 msgstr ""
 
+msgid "Custom…"
+msgstr ""
+
 msgid "Paragraph style"
 msgstr ""
 
 msgid "Font"
+msgstr ""
+
+msgid "Other Font…"
+msgstr ""
+
+msgid "Font size"
 msgstr ""
 
 msgid "Bold"

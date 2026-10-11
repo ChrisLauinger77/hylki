@@ -6469,11 +6469,22 @@ msgstr ""
 msgid "Monospace"
 msgstr "Monospace-Schrift"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Benutzerdefinierte Farbe…"
+
 msgid "Paragraph style"
 msgstr ""
 
 msgid "Font"
 msgstr ""
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Textgröße"
 
 msgid "Bold"
 msgstr "Fett"

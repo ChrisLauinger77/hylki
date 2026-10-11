@@ -6433,11 +6433,22 @@ msgstr "Serif"
 msgid "Monospace"
 msgstr "Monospace"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Couleur personnalisée…"
+
 msgid "Paragraph style"
 msgstr "Style de paragraphe"
 
 msgid "Font"
 msgstr "Police"
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Taille du texte"
 
 msgid "Bold"
 msgstr "Gras"

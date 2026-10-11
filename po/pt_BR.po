@@ -6398,11 +6398,22 @@ msgstr "Com serifa"
 msgid "Monospace"
 msgstr "Largura fixa"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Cor personalizada…"
+
 msgid "Paragraph style"
 msgstr "Estilo de parágrafo"
 
 msgid "Font"
 msgstr "Fonte"
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Tamanho do texto"
 
 msgid "Bold"
 msgstr "Negrito"

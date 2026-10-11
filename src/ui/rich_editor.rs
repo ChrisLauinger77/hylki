@@ -1255,16 +1255,17 @@ pub fn is_inline_image(path: &std::path::Path) -> bool {
 
 /// What the format bar shows of where the caret is: the block toggles,
 /// keyed the way `fmtState` in PASTE_SCRIPT reports them (`q` quote, `u`
-/// bulleted list, `o` numbered list), and the paragraph-style and font
-/// menus, whose labels name the caret's block and font (#358).
+/// bulleted list, `o` numbered list), and the paragraph-style, font and size
+/// menus, whose labels name the caret's block, font and size (#358).
 struct ToolbarState {
     toggles: Vec<(char, gtk::ToggleButton)>,
     style: gtk::MenuButton,
     font: gtk::MenuButton,
+    size: gtk::MenuButton,
 }
 
 impl ToolbarState {
-    /// Follow a `fmtState` report: `<toggles>|<block tag>|<font kind>`.
+    /// Follow a `fmtState` report: `<toggles>|<block tag>|<font>|<points>`.
     fn update(&self, report: &str) {
         let mut parts = report.split('|');
         let toggles = parts.next().unwrap_or("");
@@ -1277,9 +1278,24 @@ impl ToolbarState {
         let block = parts.next().unwrap_or("");
         let style = BLOCK_STYLES.iter().find(|(tag, _)| *tag == block).map_or(BLOCK_STYLES[0].1, |(_, l)| *l);
         self.style.set_label(&i18n(style));
-        let font = parts.next().unwrap_or("");
-        let font = FONTS.iter().find(|(kind, _, _)| *kind == font).map_or(FONTS[0].2, |(_, _, l)| *l);
-        self.font.set_label(&i18n(font));
+        self.font.set_label(&font_label(parts.next().unwrap_or("")));
+        let size = parts.next().unwrap_or("");
+        if !size.is_empty() {
+            self.size.set_label(size);
+        }
+    }
+}
+
+/// The font menu's label for the family `fmtState` reports: the name the
+/// menu gives it, or a family set some other way (a custom pick, a quoted
+/// message) by its own name.
+fn font_label(family: &str) -> String {
+    let key = family.to_lowercase();
+    match FONTS.iter().find(|(k, _, _)| *k == key) {
+        Some((_, _, label)) => i18n(label),
+        None if family.is_empty() => i18n(FONTS[0].2),
+        None if family.chars().count() > 18 => format!("{}…", family.chars().take(17).collect::<String>()),
+        None => family.to_string(),
     }
 }
 
@@ -1292,20 +1308,46 @@ const BLOCK_STYLES: &[(&str, &str)] = &[
     ("pre", i18n_noop("Preformatted")),
 ];
 
-/// The font families (#358): the kind `fmtState` reports, the CSS family,
-/// and its name. Generic families, so the recipient's own fonts stand in.
+/// The font families (#358): the family `fmtState` reports, lower case,
+/// the CSS family list, and the name. The generic families come first, so
+/// the recipient's own fonts stand in; the named ones are the fonts most
+/// mail programs offer, each with fallbacks for a system without it. Their
+/// names are not translated.
 const FONTS: &[(&str, &str, &str)] = &[
-    ("sans", "sans-serif", i18n_noop("Sans Serif")),
+    ("sans-serif", "sans-serif", i18n_noop("Sans Serif")),
     ("serif", "serif", i18n_noop("Serif")),
-    ("mono", "monospace", i18n_noop("Monospace")),
+    ("monospace", "monospace", i18n_noop("Monospace")),
+    ("arial", "Arial, Helvetica, sans-serif", "Arial"),
+    ("verdana", "Verdana, Geneva, sans-serif", "Verdana"),
+    ("tahoma", "Tahoma, Verdana, sans-serif", "Tahoma"),
+    ("trebuchet ms", "'Trebuchet MS', Helvetica, sans-serif", "Trebuchet MS"),
+    ("georgia", "Georgia, serif", "Georgia"),
+    ("times new roman", "'Times New Roman', Times, serif", "Times New Roman"),
+    ("garamond", "Garamond, serif", "Garamond"),
+    ("courier new", "'Courier New', Courier, monospace", "Courier New"),
 ];
 
-/// Text colors (#358), dark enough to read on the white most mail is read
-/// on, and light enough to read on a dark composer.
-const TEXT_COLORS: &[&str] = &["#e01b24", "#e66100", "#c88800", "#26a269", "#1c71d8", "#813d9c", "#865e3c", "#77767b"];
+/// The font sizes (#358), in points, the unit mail programs show.
+const SIZES: &[u32] = &[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36];
 
-/// Highlight colors (#358): the light shades, so black text stays readable.
-const HIGHLIGHT_COLORS: &[&str] = &["#f9f06b", "#ffbe6f", "#f66151", "#dc8add", "#99c1f1", "#8ff0a4", "#cdab8f", "#deddda"];
+/// The color palette (#358): the GNOME palette, a column per hue from light
+/// to dark, then the greys from white to black.
+const PALETTE: &[[&str; 5]] = &[
+    ["#99c1f1", "#62a0ea", "#3584e4", "#1c71d8", "#1a5fb4"],
+    ["#8ff0a4", "#57e389", "#33d17a", "#2ec27e", "#26a269"],
+    ["#f9f06b", "#f8e45c", "#f6d32d", "#f5c211", "#e5a50a"],
+    ["#ffbe6f", "#ffa348", "#ff7800", "#e66100", "#c64600"],
+    ["#f66151", "#ed333b", "#e01b24", "#c01c28", "#a51d2d"],
+    ["#dc8add", "#c061cb", "#9141ac", "#813d9c", "#613583"],
+    ["#cdab8f", "#b5835a", "#986a44", "#865e3c", "#63452c"],
+    ["#ffffff", "#f6f5f4", "#deddda", "#c0bfbc", "#9a9996"],
+    ["#77767b", "#5e5c64", "#3d3846", "#241f31", "#000000"],
+];
+
+/// A JavaScript string literal of `s`.
+fn js_str(s: &str) -> String {
+    serde_json::to_string(s).unwrap_or_else(|_| "''".into())
+}
 
 /// One command of the format bar: a flat icon button that never takes the
 /// focus, so the editor keeps its selection.
@@ -1370,16 +1412,15 @@ fn menu_items(webview: &webkit6::WebView, popover: &gtk::glib::WeakRef<gtk::Popo
     list
 }
 
-/// A color menu (#358): a clearing item, then the palette. `cmd` is the
-/// editing command (`foreColor`, `hiliteColor`), and `glyph` the button's
-/// face, repainted with the color last chosen.
+/// A color menu (#358): a clearing item, the palette, and Custom… for any
+/// other color. `cmd` is the editing command (`foreColor`, `hiliteColor`),
+/// and `glyph` the button's face, repainted with the color last chosen.
 fn color_menu(
     webview: &webkit6::WebView,
     tip: &str,
     clear: &str,
     cmd: &'static str,
     none: &'static str,
-    palette: &'static [&'static str],
     (glyph, repaint): (gtk::Widget, std::rc::Rc<dyn Fn()>),
     chosen: std::rc::Rc<std::cell::RefCell<Option<gtk::gdk::RGBA>>>,
 ) -> gtk::MenuButton {
@@ -1390,37 +1431,67 @@ fn color_menu(
     let (btn, popover) = bar_menu(webview, tip, &content);
     btn.set_child(Some(&glyph));
     let weak_pop = popover.downgrade();
+    // The one place every way of choosing ends: the button's face, then the
+    // command, with the caret put back first.
+    let apply: std::rc::Rc<dyn Fn(Option<gtk::gdk::RGBA>)> = {
+        let (weak, repaint, chosen) = (webview.downgrade(), repaint.clone(), chosen.clone());
+        std::rc::Rc::new(move |color| {
+            let value = color.as_ref().map_or_else(|| none.to_string(), crate::color::to_hex);
+            *chosen.borrow_mut() = color;
+            repaint();
+            run_restored(&weak, &format!("window.__hylkiStyled('{cmd}',{})", js_str(&value)));
+        })
+    };
     let reset = gtk::Button::with_label(&i18n(clear));
     reset.add_css_class("flat");
     {
-        let (weak, pop, repaint, chosen) = (webview.downgrade(), weak_pop.clone(), repaint.clone(), chosen.clone());
+        let (pop, apply) = (weak_pop.clone(), apply.clone());
         reset.connect_clicked(move |_| {
             if let Some(p) = pop.upgrade() {
                 p.popdown();
             }
-            *chosen.borrow_mut() = None;
-            repaint();
-            run_restored(&weak, &format!("window.__hylkiStyled('{cmd}','{none}')"));
+            apply(None);
         });
     }
     content.append(&reset);
-    for (i, color) in palette.iter().enumerate() {
-        let swatch = gtk::Button::new();
-        swatch.set_child(Some(&crate::ui::context_menu::swatch_widget(color, true)));
-        swatch.add_css_class("flat");
-        swatch.set_tooltip_text(Some(color));
-        let (weak, pop, repaint, chosen) = (webview.downgrade(), weak_pop.clone(), repaint.clone(), chosen.clone());
-        swatch.connect_clicked(move |_| {
+    for (col, hue) in PALETTE.iter().enumerate() {
+        for (row, color) in hue.iter().enumerate() {
+            let swatch = gtk::Button::new();
+            swatch.set_child(Some(&crate::ui::context_menu::swatch_widget(color, true)));
+            swatch.add_css_class("flat");
+            swatch.set_tooltip_text(Some(color));
+            let (pop, apply) = (weak_pop.clone(), apply.clone());
+            swatch.connect_clicked(move |_| {
+                if let Some(p) = pop.upgrade() {
+                    p.popdown();
+                }
+                apply(gtk::gdk::RGBA::parse(*color).ok());
+            });
+            grid.attach(&swatch, col as i32, row as i32, 1, 1);
+        }
+    }
+    content.append(&grid);
+    let custom = gtk::Button::with_label(&i18n("Custom…"));
+    custom.add_css_class("flat");
+    {
+        let (pop, weak, apply, chosen) = (weak_pop.clone(), webview.downgrade(), apply.clone(), chosen.clone());
+        custom.connect_clicked(move |b| {
             if let Some(p) = pop.upgrade() {
                 p.popdown();
             }
-            *chosen.borrow_mut() = gtk::gdk::RGBA::parse(*color).ok();
-            repaint();
-            run_restored(&weak, &format!("window.__hylkiStyled('{cmd}','{color}')"));
+            let picker = gtk::ColorDialog::new();
+            picker.set_with_alpha(false);
+            let initial = chosen.borrow().clone().unwrap_or(gtk::gdk::RGBA::new(0.5, 0.5, 0.5, 1.0));
+            let parent = b.root().and_downcast::<gtk::Window>();
+            let (weak, apply) = (weak.clone(), apply.clone());
+            picker.choose_rgba(parent.as_ref(), Some(&initial), None::<&gtk::gio::Cancellable>, move |res| match res {
+                Ok(rgba) => apply(Some(rgba)),
+                // Cancelled: the caret goes back where it was all the same.
+                Err(_) => run_restored(&weak, ""),
+            });
         });
-        grid.attach(&swatch, (i % 4) as i32, (i / 4) as i32, 1, 1);
     }
-    content.append(&grid);
+    content.append(&custom);
     btn
 }
 
@@ -1541,16 +1612,58 @@ fn build_toolbar(
         .iter()
         .map(|(_, family, label)| {
             let class = (*family == "monospace").then_some("monospace");
-            (i18n(label), format!("window.__hylkiStyled('fontName','{family}')"), class)
+            (i18n(label), format!("window.__hylkiStyled('fontName',{})", js_str(family)), class)
         })
         .collect();
     let font_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let (font, font_pop) = bar_menu(webview, i18n_noop("Font"), &font_box);
     font_box.append(&menu_items(webview, &font_pop.downgrade(), &font_items));
+    // Any installed font. The recipient may not have it, so the family's
+    // generic kind follows it.
+    let other_font = gtk::Button::new();
+    let other_label = gtk::Label::new(Some(&i18n("Other Font…")));
+    other_label.set_xalign(0.0);
+    other_font.set_child(Some(&other_label));
+    other_font.add_css_class("flat");
+    {
+        let (weak, pop) = (webview.downgrade(), font_pop.downgrade());
+        other_font.connect_clicked(move |b| {
+            if let Some(p) = pop.upgrade() {
+                p.popdown();
+            }
+            let parent = b.root().and_downcast::<gtk::Window>();
+            let weak = weak.clone();
+            gtk::FontDialog::new().choose_family(
+                parent.as_ref(),
+                None::<&gtk::pango::FontFamily>,
+                None::<&gtk::gio::Cancellable>,
+                move |res| match res {
+                    Ok(family) => {
+                        let name: String = family.name().chars().filter(|c| !matches!(c, '\'' | '"' | '\\')).collect();
+                        let generic = if family.is_monospace() { "monospace" } else { "sans-serif" };
+                        let value = format!("'{name}', {generic}");
+                        run_restored(&weak, &format!("window.__hylkiStyled('fontName',{})", js_str(&value)));
+                    }
+                    Err(_) => run_restored(&weak, ""),
+                },
+            );
+        });
+    }
+    font_box.append(&other_font);
     font.set_label(&i18n(FONTS[0].2));
     font.set_always_show_arrow(true);
+    let size_items: Vec<(String, String, Option<&str>)> = std::iter::once((i18n("Default"), "window.__hylkiSize(0)".to_string(), None))
+        .chain(SIZES.iter().map(|pt| (pt.to_string(), format!("window.__hylkiSize({pt})"), None)))
+        .collect();
+    let size_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let (size, size_pop) = bar_menu(webview, i18n_noop("Font size"), &size_box);
+    size_box.append(&menu_items(webview, &size_pop.downgrade(), &size_items));
+    // The editor's own 14px, until the caret reports.
+    size.set_label("11");
+    size.set_always_show_arrow(true);
     styles.append(&style);
     styles.append(&font);
+    styles.append(&size);
 
     // (icon, tooltip, execCommand snippet).
     let simple = |cluster: &gtk::Box, commands: &[(&str, &str, &str)]| {
@@ -1587,7 +1700,6 @@ fn build_toolbar(
         i18n_noop("Automatic"),
         "foreColor",
         "inherit",
-        TEXT_COLORS,
         color_glyph(false, text_chosen.clone()),
         text_chosen,
     ));
@@ -1598,7 +1710,6 @@ fn build_toolbar(
         i18n_noop("No highlight"),
         "hiliteColor",
         "transparent",
-        HIGHLIGHT_COLORS,
         color_glyph(true, hl_chosen.clone()),
         hl_chosen,
     ));
@@ -1772,7 +1883,7 @@ fn build_toolbar(
 
     bar.append(&group);
     bar.append(&end);
-    (bar, group, end, ToolbarState { toggles, style, font })
+    (bar, group, end, ToolbarState { toggles, style, font, size })
 }
 
 /// Choose pictures to put in the message at the caret (#358), the way a
@@ -2105,13 +2216,26 @@ const PASTE_SCRIPT: &str = r#"<script>
     }
     return b;
   }
-  /* The caret's font, by the generic family it falls under. */
-  function fontKind(el){
-    var f = '';
-    try{ f = getComputedStyle(el).fontFamily.toLowerCase(); }catch(_){}
-    if(/mono/.test(f)) return 'mono';
-    if(/(^|,)\s*"?serif/.test(f) || (/serif/.test(f) && !/sans/.test(f))) return 'serif';
-    return 'sans';
+  /* The caret's font (#358): the first family of the nearest font set on
+     the way up to the body, or else the generic family the editor's own
+     falls under. */
+  function fontOf(el){
+    for(var e = el; e && e !== document.body && e.nodeType === 1; e = e.parentElement){
+      var f = (e.style && e.style.fontFamily) || (e.tagName === 'FONT' && e.getAttribute('face')) || '';
+      if(f) return f.split(',')[0].replace(/["']/g, '').trim();
+    }
+    var g = '';
+    try{ g = getComputedStyle(el).fontFamily.toLowerCase(); }catch(_){}
+    if(/mono/.test(g)) return 'monospace';
+    if(/(^|,)\s*"?serif/.test(g) || (/serif/.test(g) && !/sans/.test(g))) return 'serif';
+    return 'sans-serif';
+  }
+  /* The caret's text size in points, the unit the size menu shows. */
+  function sizeOf(el){
+    var px = 0;
+    try{ px = parseFloat(getComputedStyle(el).fontSize); }catch(_){}
+    // A view not laid out yet reports nonsense; the label keeps what it had.
+    return px >= 4 ? String(Math.round(px * 0.75)) : '';
   }
   function fmtState(){
     var el = caretBlock();
@@ -2122,8 +2246,9 @@ const PASTE_SCRIPT: &str = r#"<script>
       ol = document.queryCommandState('insertOrderedList');
       block = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
     }catch(_){}
+    var at = el && el.nodeType === 1 ? el : document.body;
     var s = (q ? 'q' : '') + (ul ? 'u' : '') + (ol ? 'o' : '')
-      + '|' + block + '|' + (el && el.nodeType === 1 ? fontKind(el) : 'sans');
+      + '|' + block + '|' + fontOf(at) + '|' + sizeOf(at);
     if(s === lastFmt) return;
     lastFmt = s;
     try{ window.webkit.messageHandlers.hylkiFormat.postMessage(s); }catch(_){}
@@ -2171,6 +2296,67 @@ const PASTE_SCRIPT: &str = r#"<script>
     document.execCommand('styleWithCSS', false, false);
     fmtState();
   };
+  /* Font size (#358) in points. WebKit's own command knows only the seven
+     <font size> steps, so the text is marked with the largest, which no
+     message written here uses, and the mark turns into the size asked for
+     (a <font> other mail kept as it was is left alone). With nothing
+     selected, the next character typed opens a span of that size, the way
+     the other styles carry on from the caret. 0 is the editor's own size. */
+  var sizeWant = null, sizeNext = false;
+  function sizeValue(pt){
+    return pt ? pt + 'pt' : getComputedStyle(document.body).fontSize;
+  }
+  function clearSizes(root){
+    root.querySelectorAll('[style]').forEach(function(d){
+      d.style.fontSize = '';
+      if(!d.getAttribute('style')) d.removeAttribute('style');
+    });
+    root.querySelectorAll('font[size]').forEach(function(d){ d.removeAttribute('size'); });
+  }
+  window.__hylkiSize = function(pt){
+    var sel = getSelection();
+    if(!sel.rangeCount) return;
+    sizeWant = sizeValue(pt);
+    if(sel.isCollapsed){
+      sizeNext = true;
+      return;
+    }
+    var before = new Set(document.body.querySelectorAll('font[size="7"]'));
+    document.execCommand('styleWithCSS', false, false);
+    document.execCommand('fontSize', false, '7');
+    document.body.querySelectorAll('font[size="7"]').forEach(function(f){
+      if(before.has(f)) return;
+      clearSizes(f);
+      f.removeAttribute('size');
+      f.style.fontSize = sizeWant;
+    });
+    fmtState();
+  };
+  document.addEventListener('beforeinput', function(e){
+    if(!sizeNext || e.inputType !== 'insertText' || !e.data) return;
+    sizeNext = false;
+    var sel = getSelection();
+    if(!sel.rangeCount || !sel.isCollapsed) return;
+    e.preventDefault();
+    var span = document.createElement('span');
+    span.style.fontSize = sizeWant;
+    // A lone space at the end of a line would collapse, and the caret
+    // with it out of the span.
+    var text = document.createTextNode(e.data === ' ' ? '\u00a0' : e.data);
+    span.appendChild(text);
+    var r = sel.getRangeAt(0);
+    r.insertNode(span);
+    r.setStart(text, text.length);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    fmtState();
+  });
+  /* A size chosen with nothing selected is for the caret where it was. */
+  document.addEventListener('mousedown', function(){ sizeNext = false; });
+  document.addEventListener('keydown', function(e){
+    if(e.key && e.key.indexOf('Arrow') === 0 || e.key === 'Home' || e.key === 'End') sizeNext = false;
+  });
   /* Indent and outdent (#358). In a list they nest the item under the one
      above, or bring it back out. */
   window.__hylkiIndent = function(more){

@@ -6490,11 +6490,22 @@ msgstr ""
 msgid "Monospace"
 msgstr "Czcionka o stałej szerokości"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Własny kolor…"
+
 msgid "Paragraph style"
 msgstr ""
 
 msgid "Font"
 msgstr ""
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Rozmiar tekstu"
 
 msgid "Bold"
 msgstr "Pogrubienie"

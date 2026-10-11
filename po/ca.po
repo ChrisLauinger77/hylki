@@ -6355,11 +6355,22 @@ msgstr "Serif"
 msgid "Monospace"
 msgstr "Monoespaiada"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Color personalitzat…"
+
 msgid "Paragraph style"
 msgstr "Estil de paràgraf"
 
 msgid "Font"
 msgstr "Font"
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Mida del text"
 
 msgid "Bold"
 msgstr "Negreta"

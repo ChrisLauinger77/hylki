@@ -6455,11 +6455,22 @@ msgstr ""
 msgid "Monospace"
 msgstr "Fix szélességű betűtípus"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Egyéni szín…"
+
 msgid "Paragraph style"
 msgstr ""
 
 msgid "Font"
 msgstr ""
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Text méret"
 
 msgid "Bold"
 msgstr "Félkövér"

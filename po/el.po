@@ -6469,11 +6469,22 @@ msgstr "Serif"
 msgid "Monospace"
 msgstr "Σταθερού πλάτους"
 
+#, fuzzy
+msgid "Custom…"
+msgstr "Προσαρμοσμένο χρώμα…"
+
 msgid "Paragraph style"
 msgstr "Στυλ παραγράφου"
 
 msgid "Font"
 msgstr "Γραμματοσειρά"
+
+msgid "Other Font…"
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Μέγεθος κειμένου"
 
 msgid "Bold"
 msgstr "Έντονα"
