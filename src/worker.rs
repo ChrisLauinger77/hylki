@@ -29,6 +29,7 @@ use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, M
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The JMAP path (#245), a child module so it shares this file's helpers.
+mod ews;
 mod graph;
 mod imap_io;
 mod jmap;
