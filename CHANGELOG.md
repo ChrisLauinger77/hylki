@@ -19,6 +19,7 @@
   account's folder namespace.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
+- **Translations:** French (PR #418 by frenchy82) brought up to date.
 
 - **Added: Gmail keys** (#392, requested by 3v1n0). **Settings → System →
   Gmail keys** swaps in Gmail's single-key shortcuts: j/k move a cursor down
