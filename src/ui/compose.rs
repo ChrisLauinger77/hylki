@@ -1780,14 +1780,9 @@ impl Component for Compose {
                     MenuEntry::new(&label, move || s.input(msg()))
                         .icon(&format!("{icon}-symbolic"))
                 };
-                let mut drafts = if self.template {
-                    vec![entry(i18n("Save Template"), "document-save", || ComposeInput::SaveDraft)]
-                } else {
-                    vec![
-                        entry(i18n("Save Draft"), "document-save", || ComposeInput::SaveDraft),
-                        entry(i18n("Save as Template"), "folder-templates", || ComposeInput::SaveAsTemplate),
-                    ]
-                };
+                // Save Draft and Save as Template are not here: the Save
+                // Draft button and its arrow stay in the header at any width.
+                let mut drafts = Vec::new();
                 if self.draft_origin.is_some() && !self.template {
                     drafts.push(entry(i18n("Delete Draft"), "user-trash", || ComposeInput::DeleteDraft));
                 }
