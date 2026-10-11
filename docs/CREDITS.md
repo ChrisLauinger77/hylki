@@ -109,6 +109,9 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   in Contacts, the per-message Light / Dark Mode switch, tag-colored rows,
   marking a message read from its unread dot, and a search that stays open
   while its folder scope is picked.
+- [**Elliot**](https://github.com/Elliot-32) ([#409](https://github.com/hyprlab/hylki/pull/409)):
+  a startup crash when a folder's name has a non-ASCII character near its
+  start.
 
 
 ## Reports, design and ideas

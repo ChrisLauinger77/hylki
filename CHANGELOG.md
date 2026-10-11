@@ -13,6 +13,10 @@
 - **Fixed: an account added to GNOME Online Accounts was slow to appear** in
   Hylki's import list. Hylki watched only for accounts removed or changed
   there; it now notices one added as soon as GNOME announces it.
+- **Fixed: Hylki crashed at startup on some folder names** (#409, by
+  Elliot). A folder whose name has a non-ASCII character in its first six
+  bytes, such as `abcd摘要`, crashed the app while it worked out the
+  account's folder namespace.
 
 - **Added: Gmail keys** (#392, requested by 3v1n0). **Settings → System →
   Gmail keys** swaps in Gmail's single-key shortcuts: j/k move a cursor down
