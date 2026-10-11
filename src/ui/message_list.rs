@@ -4204,13 +4204,15 @@ impl MessageList {
 
     /// Update the display-wide CSS that rings each account's avatar with its
     /// color (used in the unified "All Inboxes" view to identify the account).
+    /// The ring is the sidebar's, a pixel off the disc, so an account's
+    /// avatar reads the same in both places.
     fn refresh_tint_css(&self) {
         // In account order, so the same colors read as the same rules.
         let colors: std::collections::BTreeMap<_, _> = self.account_colors.iter().collect();
         let mut css = String::new();
         for (id, color) in colors {
             css.push_str(&format!(
-                ".vireo-acct-ring-{0} {{ border-radius: 9999px; box-shadow: 0 0 0 3px {1}; }}\n",
+                ".vireo-acct-ring-{0} {{ border-radius: 9999px; outline: 2px solid {1}; outline-offset: 1px; }}\n",
                 id, color
             ));
         }
