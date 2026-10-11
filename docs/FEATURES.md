@@ -47,7 +47,10 @@ The full list. The [README](../README.md) carries a shorter one.
   over mail that is already in a folder.
 - **Tags:** IMAP keywords, Graph categories, or a local fallback where the
   server has neither; custom colours, drag to reorder, and number-key
-  shortcuts.
+  shortcuts. Gmail's labels show beside them.
+- **Smart folders:** saved searches across accounts and folders, on
+  starred, unread, attachments, tags and the filter conditions, with unread
+  counts. See [Smart folders](DOCUMENTATION.md#smart-folders).
 - **Unified and filtered folders:** Inboxes, Starred, Sent, Drafts, Archive,
   Junk and Trash across accounts, plus a folder per filter and any folders
   you keep in Favorites.
@@ -71,6 +74,7 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Four formats:** rich text, Markdown, hand-written HTML, or plain text,
   switched per message from the composer's format button. See
   [Writing in Markdown or HTML](DOCUMENTATION.md#writing-in-markdown-or-html).
+  Rich text has fonts, sizes, any color, headings, lists and pictures.
 - **HTML signatures**, per account, with a default sender for new mail. In a
   reply or forward the signature sits above the quoted message, or below it
   if you prefer.
@@ -168,6 +172,7 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Hylki address book:** a book of your own, beside the ones Evolution Data
   Server keeps, with vCard (`.vcf`) import. It works without GNOME.
 - **LDAP directories:** recipients looked up in a company directory as you
-  type, through Evolution Data Server.
+  type, through Evolution Data Server, and in a Microsoft 365
+  organization's directory.
 - **Your language:** the desktop's, or one you pick; a 12- or 24-hour clock
   following the desktop setting.

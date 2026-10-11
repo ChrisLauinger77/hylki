@@ -34,6 +34,29 @@
   translated** (#419, reported by frenchy82), among them the sender check,
   OpenPGP key trust, the attachment gallery's columns and buttons, the
   contact page's headings and the printed message header.
+- **Added: smart folders** (#417, requested by amadeusp). A smart folder
+  is a saved search over the mail on this computer: starred or not, unread
+  or read, has attachments, tagged, and the filter conditions, all of them
+  or any one, held to one account and one kind of folder or not. They are
+  listed in a Smart Folders row of the unified section with unread counts,
+  and made in **Settings → Smart Folders**, from the row's right-click menu
+  or with **New Smart Folder…** in the command palette.
+- **Added: Gmail labels show as pills** (#374, requested by vieira-temes and
+  3v1n0), beside the tags in the message list and the reader. Gmail's own
+  labels and the label of the folder being read are left out.
+- **Added: the Microsoft 365 organization directory** (#410, requested by
+  erenoglu). A Microsoft 365 account signed in within Hylki can suggest
+  colleagues as a recipient is typed: **Search the organization directory**
+  in the account's settings asks Microsoft for access to the directory.
+  Accounts from GNOME Online Accounts cannot use it.
+- **Added: font sizes, more fonts and any color in the composer** (#358,
+  requested by urkos101). The font menu offers the fonts most mail programs
+  do and **Other Font…** for any installed one, a size menu sets points from
+  8 to 36, and both color menus carry the GNOME palette and **Custom…**.
+- **Added: empty Trash or Junk in every account at once** (#413, requested
+  by amadeusp), from the right-click menu of the unified Trash or Junk row.
+- **Added: `>` in the command palette lists actions only** (#399, suggested
+  by 3v1n0), the way an editor's palette tells commands from places.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.
