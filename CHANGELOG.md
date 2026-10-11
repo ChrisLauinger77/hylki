@@ -17,6 +17,23 @@
   Elliot). A folder whose name has a non-ASCII character in its first six
   bytes, such as `abcd摘要`, crashed the app while it worked out the
   account's folder namespace.
+- **Fixed: accents in plain-text mail arrived garbled in some apps** (#412,
+  reported by amadeusp). A plain-text message with nothing attached went
+  out without `MIME-Version` or `Content-Type: text/plain; charset=utf-8`,
+  so FairEmail and other clients that don't guess showed `ö` as `Ã¶`.
+- **Fixed: signed mail could not be sent from some JMAP servers** (#414,
+  reported by andreamoro). The server refused it: "Message contains bare
+  newlines". The OpenPGP signature, encrypted mail and text files with
+  Unix line endings now go out with CRLF line endings throughout, and every
+  message uploaded over JMAP is checked for lone LFs first.
+- **Fixed: tagging with the number keys while arrowing down the list could
+  tag the wrong message** (#416, reported by amadeusp). A key pressed just
+  after an arrow key could tag the message before, and the next press then
+  took that tag off again.
+- **Fixed: the search field and about 40 other strings could not be
+  translated** (#419, reported by frenchy82), among them the sender check,
+  OpenPGP key trust, the attachment gallery's columns and buttons, the
+  contact page's headings and the printed message header.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.
