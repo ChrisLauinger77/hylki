@@ -295,6 +295,11 @@ pub struct Message {
     /// When a Microsoft 365 follow-up flag falls due (Unix seconds), or 0.
     /// Only Graph has such a date; IMAP and JMAP have no standard for one.
     pub due: i64,
+    /// The Gmail labels the message wears besides the folder it is listed
+    /// in (#374), as the server names them (modified UTF-7, `Parent/Child`
+    /// for a nested one). System labels (`\Inbox`, `\Important`…) are left
+    /// out. Empty on every other server.
+    pub labels: Vec<String>,
 }
 
 /// How important a message's sender marked it: the `X-Priority`, `Importance`
@@ -953,6 +958,7 @@ impl OutboxItem {
             references: String::new(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 }
@@ -1185,6 +1191,11 @@ impl Message {
         }
     }
 
+    /// The pills the message wears in the list and the reader; see [`pills`].
+    pub fn pills<'a>(&self, tags: &'a [crate::config::Tag]) -> Vec<Pill<'a>> {
+        pills(&self.keywords, &self.labels, tags)
+    }
+
     /// Strip interior NUL bytes from every text field. GTK's C strings end at
     /// the first NUL and glib panics rather than truncate when handed one
     /// mid-string — a single message with a stray 0x00 in its envelope (they
@@ -1229,6 +1240,45 @@ impl Message {
         datetime_list_at(self.timestamp, &self.date)
     }
 
+}
+
+/// One pill on a message: a tag (#71), or a Gmail label no tag stands for
+/// (#374), by its display name.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pill<'a> {
+    Tag(&'a crate::config::Tag),
+    Label(String),
+}
+
+/// The tags a message carries, in the order Settings lists them, then the
+/// Gmail labels none of them stands for, in the server's order. A label
+/// named like a tag (by keyword or by name) shows as that tag, once: on
+/// Gmail, which keeps no keywords, a label is how such a tag arrives.
+pub fn pills<'a>(
+    keywords: &[String],
+    labels: &[String],
+    tags: &'a [crate::config::Tag],
+) -> Vec<Pill<'a>> {
+    // A decoded name can hold a NUL (`&AAA-`), which a GTK label aborts on.
+    let shown: Vec<String> =
+        labels.iter().map(|l| crate::mutf7::decode(l).replace('\0', " ")).collect();
+    let names_label = |t: &crate::config::Tag, i: usize| {
+        t.keyword.eq_ignore_ascii_case(&labels[i]) || t.name.eq_ignore_ascii_case(&shown[i])
+    };
+    let mut out: Vec<Pill<'a>> = tags
+        .iter()
+        .filter(|t| {
+            keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))
+                || (0..labels.len()).any(|i| names_label(t, i))
+        })
+        .map(Pill::Tag)
+        .collect();
+    for (i, name) in shown.iter().enumerate() {
+        if !tags.iter().any(|t| names_label(t, i)) {
+            out.push(Pill::Label(name.clone()));
+        }
+    }
+    out
 }
 
 /// A short date for a single line: the time for today, the day and month
@@ -1327,6 +1377,34 @@ pub fn thread_ids<'a>(msgs: impl IntoIterator<Item = &'a Message>) -> Vec<String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #374: tags first in Settings order, then the labels no tag stands
+    /// for, decoded; a label named like a tag shows as that tag, once.
+    #[test]
+    fn pills_put_tags_first_and_show_a_label_once() {
+        let tag = |name: &str, keyword: &str| crate::config::Tag {
+            name: name.into(),
+            keyword: keyword.into(),
+            color: "#1c71d8".into(),
+        };
+        let tags = [tag("Urgent", "$label1"), tag("Work", "Work"), tag("Receipts", "receipts")];
+        let keywords = vec!["$Label1".to_string()];
+        let labels: Vec<String> =
+            ["Clients/Acme", "work", "&AOk-t&AOk-", "My Label", "Receipts"].iter().map(|l| l.to_string()).collect();
+        let names: Vec<String> = pills(&keywords, &labels, &tags)
+            .into_iter()
+            .map(|p| match p {
+                Pill::Tag(t) => format!("tag:{}", t.name),
+                Pill::Label(l) => format!("label:{l}"),
+            })
+            .collect();
+        assert_eq!(
+            names,
+            ["tag:Urgent", "tag:Work", "tag:Receipts", "label:Clients/Acme", "label:été", "label:My Label"]
+        );
+        assert!(pills(&[], &[], &tags).is_empty());
+        assert_eq!(pills(&[], &["&AAA-".to_string()], &[]), [Pill::Label(" ".into())]);
+    }
 
     /// #334: each priority header's spellings, and normal for anything else.
     #[test]

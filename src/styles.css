@@ -1015,6 +1015,12 @@ flowbox.attach-flow > flowboxchild {
   opacity: 0.95;
 }
 
+/* A Gmail label no tag stands for (#374): the tag pill's shape in a tint of
+   the text's own color, so it reads on either scheme and on a selected row. */
+.tag-chip.label-chip {
+  background-color: alpha(currentColor, 0.14);
+}
+
 /* A tag row's glyph in the sidebar, in the tag's color (.tag-tint keeps
    the background off). */
 .tag-tint {

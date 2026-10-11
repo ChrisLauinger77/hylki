@@ -24934,6 +24934,7 @@ mod tests {
             references: String::new(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 
@@ -25228,6 +25229,7 @@ mod tests {
             references: String::new(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 

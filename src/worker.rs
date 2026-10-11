@@ -141,6 +141,36 @@ static PREVIEW_ITEMS_REJECTED: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashSet<u32>>,
 > = std::sync::LazyLock::new(Default::default);
 
+/// Gmail accounts whose labels are read (#374): `true` while they are,
+/// `false` once the server has refused `X-GM-LABELS` or answered it with
+/// something the parser cannot read, for the rest of the session. A server
+/// that only looks like Gmail by its folder names (a mailbox migrated with
+/// its `[Gmail]/` folders) refuses the item, and an unreadable reply would
+/// otherwise fail every sync after it.
+static GMAIL_LABELS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<u32, bool>>,
+> = std::sync::LazyLock::new(Default::default);
+
+/// Start reading the account's Gmail labels if it is Gmail, unless the
+/// server has already refused them this session.
+fn note_gmail_account(account_id: u32, account: &AccountConfig, folders: &[Folder]) {
+    if has_gmail_labels(account, folders) {
+        if let Ok(mut g) = GMAIL_LABELS.lock() {
+            g.entry(account_id).or_insert(true);
+        }
+    }
+}
+
+fn gmail_labels_wanted(account_id: u32) -> bool {
+    GMAIL_LABELS.lock().map(|g| g.get(&account_id) == Some(&true)).unwrap_or(false)
+}
+
+fn refuse_gmail_labels(account_id: u32) {
+    if let Ok(mut g) = GMAIL_LABELS.lock() {
+        g.insert(account_id, false);
+    }
+}
+
 /// Whether the server has rejected the preview items for this account.
 fn previews_rejected(account_id: u32) -> bool {
     PREVIEW_ITEMS_REJECTED
@@ -663,7 +693,8 @@ pub enum WorkerEvent {
     /// its folder, so without it a background prefetch's body can be applied to a
     /// different message that happens to share the number.
     /// A chunk of a folder's threading references was repaired, so what the list
-    /// is showing may now group differently.
+    /// is showing may now group differently; or its Gmail labels were filled
+    /// in (#374).
     RefsRepaired { folder_id: u32 },
     Body { message_id: u32, path: String, body: String },
     /// A message the cache listed is no longer in `path` on the server; its
@@ -1201,6 +1232,7 @@ async fn run_imap(
         .map(|c| c.load_folders(account_id))
         .unwrap_or_default();
     let have_cached_folders = !cached_folders.is_empty();
+    note_gmail_account(account_id, &account, &cached_folders);
     if have_cached_folders {
         emit(WorkerEvent::Folders(cached_folders));
     }
@@ -1233,6 +1265,10 @@ async fn run_imap(
     // [`run_one_refs_repair`]). Every folder gets one: a message indexed by an
     // older build carries only its In-Reply-To, and threading reads References.
     let mut refs_repair: std::collections::VecDeque<(u32, String)> =
+        std::collections::VecDeque::new();
+    // Folders queued for the one-time Gmail label fill (see
+    // [`run_one_label_fill`]).
+    let mut label_fill: std::collections::VecDeque<(u32, String)> =
         std::collections::VecDeque::new();
     // Requests already queued when one was taken, reordered so the reader's
     // loads come before list syncs (see `reorder_reader_loads`).
@@ -1298,6 +1334,11 @@ async fn run_imap(
                 .is_some_and(|c| !c.refs_repair_state(account_id, &f.path).1)
             {
                 refs_repair.push_back((f.id, f.path.clone()));
+            }
+            if gmail_labels_wanted(account_id)
+                && cache.as_ref().is_some_and(|c| !c.label_fill_state(account_id, &f.path).1)
+            {
+                label_fill.push_back((f.id, f.path.clone()));
             }
             backfill.push_back(Backfill {
                 folder_id: f.id,
@@ -1442,6 +1483,10 @@ async fn run_imap(
                         &emit,
                     )
                     .await;
+                    continue;
+                } else if !label_fill.is_empty() && session.is_some() && backfill.is_empty() {
+                    run_one_label_fill(&mut label_fill, &mut session, account_id, cache.as_ref(), &emit)
+                        .await;
                     continue;
                 } else if !backfill.is_empty() {
                     // Index the rest of the mailbox in the background. Connect first
@@ -2832,6 +2877,7 @@ async fn connect_and_list(
                 // 3501). Keep whatever the cache has instead of wiping it.
                 Ok(folders) if folders.is_empty() => {}
                 Ok(folders) => {
+                    note_gmail_account(account_id, account, &folders);
                     let changed = cache
                         .map(|c| !crate::cache::folders_equal(&c.load_folders(account_id), &folders))
                         .unwrap_or(true);
@@ -7220,12 +7266,16 @@ async fn load_messages(
     if cached.is_empty() {
         let mut messages =
             fetch_window(account_id, session, folder_id, total, FIRST_PAGE, use_envelope).await?;
+        let uids: Vec<u32> = messages.iter().map(|m| m.uid).collect();
+        read_gmail_labels(account_id, session, path, &uids, &mut messages).await?;
         reconcile_attachment_flags(cache, account_id, path, &mut messages);
         Ok(messages)
     } else {
         let recent =
             fetch_window(account_id, session, folder_id, total, PAGE_SIZE, use_envelope).await?;
+        let window: Vec<u32> = recent.iter().map(|m| m.uid).collect();
         let mut merged = merge_index(cached, recent);
+        read_gmail_labels(account_id, session, path, &window, &mut merged).await?;
         redecode_garbled_previews(session, &mut merged).await;
         // Reconcile deletions/moves made on the server or another device: drop any
         // message whose UID the server no longer lists (a plain merge would keep it
@@ -7360,6 +7410,148 @@ async fn logged_fetch(
     .await;
     wired(&cmd, &r);
     r
+}
+
+/// Put each message's Gmail labels on it, for the `uids` asked about, on an
+/// account whose labels are read (#374). A message the server said nothing
+/// about keeps the labels it has.
+async fn read_gmail_labels<T>(
+    account_id: u32,
+    session: &mut Session<T>,
+    path: &str,
+    uids: &[u32],
+    messages: &mut [Message],
+) -> Result<(), async_imap::error::Error>
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + std::fmt::Debug + Send,
+{
+    if uids.is_empty() || !gmail_labels_wanted(account_id) {
+        return Ok(());
+    }
+    let Some(mut labels) = fetch_gmail_labels(account_id, session, path, uids).await? else {
+        return Ok(());
+    };
+    for m in messages.iter_mut() {
+        if let Some(l) = labels.remove(&m.uid) {
+            m.labels = l;
+        }
+    }
+    Ok(())
+}
+
+/// Each message's shown Gmail labels by UID, or `None` when the server
+/// refused to say and the labels already known should stand.
+///
+/// async-imap's `Fetch` keeps its parsed reply private and has no getter for
+/// `X-GM-LABELS`, so the command is run raw and its replies read here. An
+/// unreadable reply leaves the rest of it in the stream, so it is an error
+/// the caller reconnects after, and labels are left off for the session so
+/// the same reply cannot fail the retry too. It is not passed on as a parse
+/// error: that would move the summary fetch down its ladder (#226) for a
+/// fault that is not the summary's.
+async fn fetch_gmail_labels<T>(
+    account_id: u32,
+    session: &mut Session<T>,
+    path: &str,
+    uids: &[u32],
+) -> Result<Option<std::collections::HashMap<u32, Vec<String>>>, async_imap::error::Error>
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + std::fmt::Debug + Send,
+{
+    use async_imap::imap_proto::{Response, Status};
+    let cmd = format!("UID FETCH {} (UID X-GM-LABELS)", uid_set(uids));
+    wire(&cmd);
+    let id = session.run_command(&cmd).await?;
+    let mut out = std::collections::HashMap::new();
+    loop {
+        let reply = match session.read_response().await {
+            Some(Ok(reply)) => reply,
+            Some(Err(e)) => {
+                let r: Result<(), _> = Err(async_imap::error::Error::Io(e));
+                wired(&cmd, &r);
+                let e = r.unwrap_err();
+                if !is_parse_error(&e) {
+                    return Err(e);
+                }
+                refuse_gmail_labels(account_id);
+                return Err(async_imap::error::Error::Io(std::io::Error::other(
+                    "unreadable X-GM-LABELS reply",
+                )));
+            }
+            None => {
+                wired::<()>(&cmd, &Err(async_imap::error::Error::ConnectionLost));
+                return Err(async_imap::error::Error::ConnectionLost);
+            }
+        };
+        match reply.parsed() {
+            Response::Fetch(_, attrs) => {
+                if let Some((uid, labels)) = gmail_labels_of(attrs, path) {
+                    out.insert(uid, labels);
+                }
+            }
+            Response::Done { tag, status, information, .. } if *tag == id => {
+                let why = information.as_deref().unwrap_or("");
+                return Ok(match status {
+                    Status::Ok => {
+                        tracing::debug!(target: "hylki::imap", "< OK ({})", cmd_head(&cmd));
+                        Some(out)
+                    }
+                    // A server that does not know the item. Gmail itself
+                    // answers NO when a message went while it was being
+                    // read, and what it did send still holds.
+                    Status::Bad => {
+                        tracing::warn!(
+                            target: "hylki::imap",
+                            "< BAD {why} ({cmd}): Gmail labels left off for the session"
+                        );
+                        refuse_gmail_labels(account_id);
+                        None
+                    }
+                    _ => {
+                        tracing::warn!(target: "hylki::imap", "< {status:?} {why} ({cmd})");
+                        Some(out)
+                    }
+                });
+            }
+            // EXISTS, EXPUNGE and the like: the next sync reads them.
+            _ => {}
+        }
+    }
+}
+
+/// The UID and shown labels in one `FETCH` reply's attributes, if it carries
+/// `X-GM-LABELS`.
+fn gmail_labels_of(
+    attrs: &[async_imap::imap_proto::AttributeValue<'_>],
+    folder: &str,
+) -> Option<(u32, Vec<String>)> {
+    use async_imap::imap_proto::AttributeValue;
+    let uid = attrs.iter().find_map(|a| match a {
+        AttributeValue::Uid(uid) => Some(*uid),
+        _ => None,
+    })?;
+    let labels = attrs.iter().find_map(|a| match a {
+        AttributeValue::GmailLabels(labels) => Some(labels),
+        _ => None,
+    })?;
+    Some((uid, shown_gmail_labels(labels.iter().map(|l| l.as_ref()), folder)))
+}
+
+/// The labels worth a pill: not Gmail's system labels (`\Inbox`,
+/// `\Important`, `\Starred`…), which the folder list and the star already
+/// show, and not the one the folder being read is, which every message in
+/// it carries.
+fn shown_gmail_labels<'a>(labels: impl Iterator<Item = &'a str>, folder: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for l in labels {
+        if l.is_empty() || l.starts_with('\\') || l.eq_ignore_ascii_case(folder) {
+            continue;
+        }
+        if !out.iter().any(|o| o == l) {
+            out.push(l.to_string());
+        }
+    }
+    out
 }
 
 /// The preview snippet from a fetch that asked for `BODY.PEEK[1]` together with
@@ -8127,6 +8319,7 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
         references,
         importance: mp_importance(parsed.as_ref()),
         due: 0,
+        labels: Vec::new(),
     };
     msg.scrub_nuls();
     msg
@@ -8174,9 +8367,15 @@ fn merge_index(cached: Vec<Message>, recent: Vec<Message>) -> Vec<Message> {
     let mut map: std::collections::HashMap<u32, Message> =
         cached.into_iter().map(|m| (m.uid, m)).collect();
     for mut m in recent {
-        if m.preview.is_empty() {
-            if let Some(old) = map.get_mut(&m.uid) {
+        if let Some(old) = map.get_mut(&m.uid) {
+            if m.preview.is_empty() {
                 m.preview = std::mem::take(&mut old.preview);
+            }
+            // The summary fetch carries no Gmail labels: they are read after
+            // the merge, and a message they could not be read for keeps the
+            // ones it had.
+            if m.labels.is_empty() {
+                m.labels = std::mem::take(&mut old.labels);
             }
         }
         map.insert(m.uid, m);
@@ -8265,6 +8464,69 @@ async fn run_one_refs_repair(
     }
 }
 
+/// How many messages one label-fill step asks Gmail about. A label reply is a
+/// line per message, smaller than a References one.
+const LABEL_FILL_CHUNK: usize = 1_000;
+
+/// One step of the one-time Gmail label fill for the folder at the head of
+/// the queue (#374).
+///
+/// Labels come down with the summaries, and a sync asks again only about its
+/// recent window, so mail indexed before Hylki read labels would never get
+/// any. This asks about the rest of each folder once, newest first, resuming
+/// from a watermark like [`run_one_refs_repair`].
+async fn run_one_label_fill(
+    queue: &mut std::collections::VecDeque<(u32, String)>,
+    session: &mut Option<ImapSession>,
+    account_id: u32,
+    cache: Option<&Cache>,
+    emit: &impl Fn(WorkerEvent),
+) {
+    let Some(c) = cache else {
+        queue.clear();
+        return;
+    };
+    if !gmail_labels_wanted(account_id) {
+        // Refused this session: the fill waits for the next one.
+        queue.clear();
+        return;
+    }
+    let Some((folder_id, path)) = queue.pop_front() else { return };
+    let Some(mut s) = session.take() else {
+        queue.push_front((folder_id, path));
+        return;
+    };
+    let (below, _) = c.label_fill_state(account_id, &path);
+    let chunk = c.uids_below(account_id, &path, below, LABEL_FILL_CHUNK);
+    if chunk.is_empty() {
+        c.set_label_fill_state(account_id, &path, 0, true);
+        *session = Some(s);
+        return;
+    }
+    let read = async {
+        sel(&mut s, &path).await?;
+        fetch_gmail_labels(account_id, &mut s, &path, &chunk).await
+    }
+    .await;
+    match read {
+        Ok(Some(found)) => {
+            let changed = c.set_gmail_labels(account_id, &path, &found);
+            let lowest = chunk.iter().copied().min().unwrap_or(0);
+            c.set_label_fill_state(account_id, &path, lowest, false);
+            queue.push_back((folder_id, path));
+            *session = Some(s);
+            if changed > 0 {
+                emit(WorkerEvent::RefsRepaired { folder_id });
+            }
+        }
+        // Refused; the queue is dropped at the next step.
+        Ok(None) => *session = Some(s),
+        // The session may be left mid-reply: drop it, and the main loop
+        // reconnects when it next needs one.
+        Err(_) => queue.push_back((folder_id, path)),
+    }
+}
+
 /// A background job to index the rest of a folder (everything past the fast first
 /// page) so search covers the whole mailbox. `remaining` is the still-to-fetch
 /// UIDs (newest first), computed lazily on the first drain.
@@ -8332,7 +8594,7 @@ async fn fetch_summaries_by_uid(
         "(UID FLAGS BODY.PEEK[HEADER] INTERNALDATE)".to_string()
     };
     let fetches: Vec<Fetch> = fetch_uids(session, set, items).await?.try_collect().await?;
-    Ok(fetches
+    let mut messages: Vec<Message> = fetches
         .iter()
         .map(|f| {
             if use_envelope {
@@ -8341,7 +8603,9 @@ async fn fetch_summaries_by_uid(
                 summary_from_headers(account_id, f, folder_id)
             }
         })
-        .collect())
+        .collect();
+    read_gmail_labels(account_id, session, path, uids, &mut messages).await?;
+    Ok(messages)
 }
 
 /// Advance one backfill job by a chunk. Fetches the next `BACKFILL_CHUNK` UIDs,
@@ -8584,6 +8848,7 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
         references,
         importance: importance_of(fetch),
         due: 0,
+        labels: Vec::new(),
     };
     msg.scrub_nuls();
     msg
@@ -9163,6 +9428,7 @@ pub(crate) fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &
         references,
         importance: mp_importance(parsed.as_ref()),
         due: 0,
+        labels: Vec::new(),
     };
     msg.scrub_nuls();
     msg
@@ -11151,6 +11417,7 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             references: String::new(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 
@@ -11170,6 +11437,52 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let previews: Vec<&str> = merged.iter().map(|m| m.preview.as_str()).collect();
         assert_eq!(previews, ["text 3", "new text", "text 1"]);
         assert!(!merged[0].unread, "the server's flags still win");
+    }
+
+    /// The summary fetch never carries Gmail labels (#374): a merge keeps
+    /// the cached ones until the label read replaces them.
+    #[test]
+    fn merging_a_recent_window_keeps_the_cached_labels() {
+        let cached: Vec<Message> = (1..=2)
+            .map(|uid| Message { labels: vec![format!("Label {uid}")], ..flagged_message(uid) })
+            .collect();
+        let merged = merge_index(cached, vec![flagged_message(2), flagged_message(3)]);
+        let labels: Vec<Vec<String>> = merged.iter().map(|m| m.labels.clone()).collect();
+        assert_eq!(labels, [vec![], vec!["Label 2".to_string()], vec!["Label 1".to_string()]]);
+    }
+
+    fn fetch_attrs(raw: &[u8]) -> Vec<async_imap::imap_proto::AttributeValue<'_>> {
+        match async_imap::imap_proto::parser::parse_response(raw) {
+            Ok((_, async_imap::imap_proto::Response::Fetch(_, attrs))) => attrs,
+            other => panic!("not a FETCH reply: {other:?}"),
+        }
+    }
+
+    /// What Gmail answers `X-GM-LABELS` with (#374): system labels and the
+    /// folder's own label stay off the pills, the rest come through as the
+    /// server spells them.
+    #[test]
+    fn gmail_labels_are_read_from_a_fetch_reply() {
+        let attrs = fetch_attrs(
+            b"* 3 FETCH (UID 7 X-GM-LABELS (\\Inbox \\Important \"My Label\" Work &AOk-t&AOk- \"Clients/Acme\" \\Starred))\r\n",
+        );
+        let (uid, labels) = gmail_labels_of(&attrs, "INBOX").expect("labels");
+        assert_eq!(uid, 7);
+        assert_eq!(labels, ["My Label", "Work", "&AOk-t&AOk-", "Clients/Acme"]);
+        // Read in the Work folder, Work is the folder, not a label on top.
+        let (_, labels) = gmail_labels_of(&attrs, "Work").expect("labels");
+        assert_eq!(labels, ["My Label", "&AOk-t&AOk-", "Clients/Acme"]);
+        // Nested labels keep their whole path; the folder match is exact.
+        let (_, labels) = gmail_labels_of(&attrs, "Clients").expect("labels");
+        assert!(labels.contains(&"Clients/Acme".to_string()));
+
+        let none = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS ())\r\n");
+        assert_eq!(gmail_labels_of(&none, "INBOX"), Some((8, Vec::new())));
+        let system_only = fetch_attrs(b"* 4 FETCH (UID 8 X-GM-LABELS (\\Sent \\Draft))\r\n");
+        assert_eq!(gmail_labels_of(&system_only, "INBOX"), Some((8, Vec::new())));
+        // A flag change Gmail volunteers says nothing about labels.
+        let flags = fetch_attrs(b"* 5 FETCH (UID 9 FLAGS (\\Seen))\r\n");
+        assert_eq!(gmail_labels_of(&flags, "INBOX"), None);
     }
 
     /// The loop behind the 2.6 GB report: a message the attachment prefetch
@@ -13624,5 +13937,126 @@ mod reader_preemption_tests {
             7
         }, &mut rx, &mut Default::default()).await;
         assert_eq!(result, Some(7));
+    }
+}
+
+#[cfg(test)]
+mod gmail_label_tests {
+    use super::*;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream};
+
+    async fn session() -> (Session<DuplexStream>, BufReader<DuplexStream>) {
+        let (client, server) = tokio::io::duplex(4096);
+        let login =
+            tokio::spawn(async move { async_imap::Client::new(client).login("test", "test").await.unwrap() });
+        let mut server = BufReader::new(server);
+        let tag = command(&mut server, "LOGIN").await;
+        server.get_mut().write_all(format!("{tag} OK logged in\r\n").as_bytes()).await.unwrap();
+        (login.await.unwrap(), server)
+    }
+
+    async fn command(server: &mut BufReader<DuplexStream>, expected: &str) -> String {
+        let mut line = String::new();
+        server.read_line(&mut line).await.unwrap();
+        assert!(line.contains(expected), "{line:?}");
+        line.split_whitespace().next().unwrap().to_string()
+    }
+
+    fn labelled(uid: u32, labels: &[&str]) -> Message {
+        Message {
+            id: uid,
+            account_id: 7,
+            folder_id: 1,
+            uid,
+            from_name: String::new(),
+            from_addr: String::new(),
+            reply_to: String::new(),
+            to: String::new(),
+            cc: String::new(),
+            subject: String::new(),
+            preview: String::new(),
+            body: String::new(),
+            date: String::new(),
+            timestamp: 0,
+            unread: false,
+            starred: false,
+            keywords: Vec::new(),
+            has_attachment: false,
+            message_id: String::new(),
+            references: String::new(),
+            importance: Default::default(),
+            due: 0,
+            labels: labels.iter().map(|l| l.to_string()).collect(),
+        }
+    }
+
+    /// Read the labels for UIDs 7, 8 and 9 against a server that answers
+    /// with `reply` (`{tag}` standing for the command's tag).
+    async fn read(account_id: u32, reply: &str) -> (Result<(), async_imap::error::Error>, Vec<Message>) {
+        GMAIL_LABELS.lock().unwrap().insert(account_id, true);
+        let (mut client, mut server) = session().await;
+        let mut msgs = vec![labelled(7, &["Old"]), labelled(8, &["Gone"]), labelled(9, &["Kept"])];
+        let task = tokio::spawn(async move {
+            let r = read_gmail_labels(account_id, &mut client, "INBOX", &[7, 8, 9], &mut msgs).await;
+            (r, msgs)
+        });
+        let tag = command(&mut server, "UID FETCH 7:9 (UID X-GM-LABELS)").await;
+        server.get_mut().write_all(reply.replace("{tag}", &tag).as_bytes()).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(5), task).await.expect("the read finished").unwrap()
+    }
+
+    fn labels_of(msgs: &[Message]) -> Vec<Vec<String>> {
+        msgs.iter().map(|m| m.labels.clone()).collect()
+    }
+
+    /// The labels are read past what else the server says in between, a
+    /// message left with none loses its old ones, and one the server said
+    /// nothing about keeps what it had.
+    #[tokio::test]
+    async fn labels_are_read_past_unsolicited_replies() {
+        let account_id = 900_374;
+        let (r, msgs) = read(
+            account_id,
+            "* 3 FETCH (UID 7 X-GM-LABELS (\\Inbox \"My Label\"))\r\n\
+             * 12 EXISTS\r\n\
+             * 4 FETCH (UID 8 X-GM-LABELS ())\r\n\
+             {tag} OK Success\r\n",
+        )
+        .await;
+        r.expect("read");
+        assert_eq!(labels_of(&msgs), [vec!["My Label".to_string()], vec![], vec!["Kept".to_string()]]);
+        assert!(gmail_labels_wanted(account_id));
+    }
+
+    /// A server that only looks like Gmail refuses the item: nothing
+    /// changes, the session carries on, and it is not asked again.
+    #[tokio::test]
+    async fn a_refused_item_leaves_labels_alone_and_is_not_asked_again() {
+        let account_id = 900_375;
+        let (r, msgs) = read(account_id, "{tag} BAD Unknown FETCH item\r\n").await;
+        r.expect("a refusal is no error");
+        assert_eq!(
+            labels_of(&msgs),
+            [vec!["Old".to_string()], vec!["Gone".to_string()], vec!["Kept".to_string()]]
+        );
+        assert!(!gmail_labels_wanted(account_id));
+    }
+
+    /// An unreadable reply wedges the stream: the caller has to reconnect,
+    /// but not move its summary fetch down the ladder (#226), and the retry
+    /// must not ask for labels again. A label sent as a literal is one such
+    /// reply: imap-proto reads labels as atoms and quoted strings only.
+    #[tokio::test]
+    async fn an_unreadable_reply_asks_for_a_reconnect_without_labels() {
+        let account_id = 900_376;
+        let (r, mut msgs) =
+            read(account_id, "* 3 FETCH (UID 7 X-GM-LABELS ({5}\r\nHello))\r\n{tag} OK Success\r\n").await;
+        let e = r.expect_err("the stream cannot be trusted");
+        assert!(!is_parse_error(&e), "{e}");
+        assert_eq!(labels_of(&msgs)[0], ["Old"]);
+        assert!(!gmail_labels_wanted(account_id));
+        // The retry on a fresh connection sends the server nothing.
+        let (mut client, _server) = session().await;
+        read_gmail_labels(account_id, &mut client, "INBOX", &[7], &mut msgs).await.expect("skipped");
     }
 }

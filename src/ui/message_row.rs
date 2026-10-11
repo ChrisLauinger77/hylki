@@ -1070,6 +1070,26 @@ fn due_label(due: i64) -> String {
     }
 }
 
+/// A pill as a GTK label: a tag in its color class (from the app's tag
+/// stylesheet), a Gmail label in the neutral one.
+pub fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
+    match pill {
+        crate::models::Pill::Tag(t) => {
+            let chip = gtk::Label::new(Some(&t.name));
+            chip.add_css_class("tag-chip");
+            chip.add_css_class(&t.css_class());
+            chip
+        }
+        crate::models::Pill::Label(name) => {
+            let chip = gtk::Label::new(Some(name));
+            chip.add_css_class("tag-chip");
+            chip.add_css_class("label-chip");
+            chip.set_tooltip_text(Some(name));
+            chip
+        }
+    }
+}
+
 /// The tag section of a message menu (#71): one entry per tag, its swatch
 /// filled where the message carries it; choosing an entry toggles that tag
 /// through `toggle(keyword, add)`.
@@ -1398,8 +1418,8 @@ struct RowState {
     initials: Option<(String, crate::ui::initials::InitialsPaintable)>,
     /// The address and look generation the circle was last looked up for.
     face_for: Option<(String, u64)>,
-    /// The keywords and tag generation the chips were built for.
-    tags_for: Option<(Vec<String>, u64)>,
+    /// The keywords, Gmail labels and tag generation the chips were built for.
+    tags_for: Option<(Vec<String>, Vec<String>, u64)>,
     avatar_shown: bool,
     hovered: bool,
     /// The columns the widgets are laid out in on one line, or `None` for
@@ -2012,8 +2032,11 @@ impl Row {
         // The first tag (in tag order) the message carries tints its row.
         let tint = self.shared().and_then(|shared| {
             let tags = shared.tags.borrow();
-            let tag = tags.iter().find(|t| data.msg.has_keyword(&t.keyword))?;
-            Some(format!("rowtint-{}", tag.css_class()))
+            let tag = data.msg.pills(&tags).into_iter().find_map(|p| match p {
+                crate::models::Pill::Tag(t) => Some(t.css_class()),
+                crate::models::Pill::Label(_) => None,
+            })?;
+            Some(format!("rowtint-{tag}"))
         });
         let st = self.st.borrow();
         let mut v = vec!["message-item"];
@@ -2042,10 +2065,11 @@ impl Row {
         self.w.host.set_css_classes(&v);
     }
 
-    /// Rebuild the row's tag chips (#71) when the keywords or the tags
-    /// changed: one pill per keyword that names a tag, in tag order.
+    /// Rebuild the row's chips when the keywords, the labels or the tags
+    /// changed: one pill per tag the message carries (#71), then one per
+    /// Gmail label no tag stands for (#374).
     fn render_tags(&self, msg: &Message, shared: &RowShared, look: &RowLook) {
-        let want = Some((msg.keywords.clone(), look.tags_gen));
+        let want = Some((msg.keywords.clone(), msg.labels.clone(), look.tags_gen));
         if self.st.borrow().tags_for == want {
             return;
         }
@@ -2054,10 +2078,8 @@ impl Row {
         while let Some(child) = tags_box.first_child() {
             tags_box.remove(&child);
         }
-        for t in shared.tags.borrow().iter().filter(|t| msg.has_keyword(&t.keyword)) {
-            let chip = gtk::Label::new(Some(&t.name));
-            chip.add_css_class("tag-chip");
-            chip.add_css_class(&t.css_class());
+        for pill in msg.pills(&shared.tags.borrow()) {
+            let chip = pill_label(&pill);
             chip.set_valign(gtk::Align::Center);
             chip.set_ellipsize(gtk::pango::EllipsizeMode::End);
             chip.set_max_width_chars(14);

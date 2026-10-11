@@ -619,6 +619,7 @@ fn jmap_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Optio
         references: refs.join(" "),
         importance: crate::models::Importance::from_headers(|name| v[format!("header:{name}:asText")].as_str()),
         due: 0,
+        labels: Vec::new(),
     };
     Some((msg, id, blob))
 }

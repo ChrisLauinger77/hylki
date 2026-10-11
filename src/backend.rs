@@ -367,6 +367,7 @@ fn build(s: &Spec) -> Message {
             .unwrap_or_default(),
         importance: Default::default(),
         due: 0,
+        labels: Vec::new(),
     }
 }
 
@@ -422,6 +423,7 @@ pub fn seed_demo_cache(cache: &crate::cache::Cache) {
                 references: String::new(),
                 importance: Default::default(),
                 due: 0,
+                labels: Vec::new(),
             };
             // Insert-or-replace, not save: `save_messages` clears the folder
             // first, so seeding one message at a time would leave only the last.
@@ -484,6 +486,7 @@ pub fn seed_demo_cache(cache: &crate::cache::Cache) {
                     references: String::new(),
                     importance: Default::default(),
                     due: 0,
+                    labels: Vec::new(),
                 };
                 cache.upsert_messages(account.id, folder, std::slice::from_ref(&message));
                 cache.save_attachment_meta(
@@ -830,6 +833,7 @@ fn sample_messages() -> Vec<Message> {
                         references: String::new(),
                         importance: Default::default(),
                         due: 0,
+                        labels: Vec::new(),
                     });
                 }
             }

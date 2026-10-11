@@ -322,6 +322,7 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
             _ => crate::models::Importance::Normal,
         },
         due: graph_due(&v["flag"]),
+        labels: Vec::new(),
     };
     Some((msg, gid))
 }

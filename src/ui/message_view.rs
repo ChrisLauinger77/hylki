@@ -41,9 +41,10 @@ pub struct MessageView {
     folder_labels: std::collections::HashMap<(u32, u32), String>,
     /// The tags (#71): what a message's keywords are drawn as.
     tags: Vec<crate::config::Tag>,
-    /// The keywords the GTK header's chips were last built for (a lone
-    /// full-bleed message; cards carry their chips in the document).
-    header_tags_rendered: std::cell::RefCell<Option<Vec<String>>>,
+    /// The keywords and Gmail labels the GTK header's chips were last built
+    /// for (a lone full-bleed message; cards carry their chips in the
+    /// document).
+    header_tags_rendered: std::cell::RefCell<Option<(Vec<String>, Vec<String>)>>,
     /// Remote content was detected and is currently withheld — this drives the
     /// "blocked" banner, and nothing else.
     blocked: bool,
@@ -1290,35 +1291,34 @@ pub enum InviteAction {
 
 impl MessageView {
     /// Whether the GTK header carries tag chips: a lone message shown
-    /// full-bleed (not as a card) that has a tag to show.
+    /// full-bleed (not as a card) that has a tag or a Gmail label to show.
     fn header_tags_shown(&self) -> bool {
         self.thread.len() == 1
             && !self.single_message_card
-            && self
-                .current
-                .as_ref()
-                .is_some_and(|c| self.tags.iter().any(|t| c.has_keyword(&t.keyword)))
+            && self.current.as_ref().is_some_and(|c| !c.pills(&self.tags).is_empty())
     }
 
-    /// Rebuild the GTK header's chips when the shown message's keywords (or
-    /// the tags) changed since they were last built.
+    /// Rebuild the GTK header's chips when the shown message's keywords or
+    /// labels (or the tags) changed since they were last built.
     fn sync_header_tags(&self, header_tags: &gtk::Box) {
-        let keywords = self.current.as_ref().map(|c| c.keywords.clone()).unwrap_or_default();
-        if self.header_tags_rendered.borrow().as_ref() == Some(&keywords) {
+        let shown = self
+            .current
+            .as_ref()
+            .map(|c| (c.keywords.clone(), c.labels.clone()))
+            .unwrap_or_default();
+        if self.header_tags_rendered.borrow().as_ref() == Some(&shown) {
             return;
         }
         while let Some(child) = header_tags.first_child() {
             header_tags.remove(&child);
         }
-        for t in self.tags.iter().filter(|t| keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))) {
-            let chip = gtk::Label::new(Some(&t.name));
-            chip.add_css_class("tag-chip");
-            chip.add_css_class(&t.css_class());
+        for pill in crate::models::pills(&shown.0, &shown.1, &self.tags) {
+            let chip = crate::ui::message_row::pill_label(&pill);
             chip.set_ellipsize(gtk::pango::EllipsizeMode::End);
             chip.set_max_width_chars(20);
             header_tags.append(&chip);
         }
-        *self.header_tags_rendered.borrow_mut() = Some(keywords);
+        *self.header_tags_rendered.borrow_mut() = Some(shown);
     }
 }
 
@@ -1477,15 +1477,21 @@ fn att_chips_html(key: (u32, u32), atts: &[CardAttachment]) -> String {
     out
 }
 
-fn tag_chips_html(tags: &[crate::config::Tag], keywords: &[String]) -> String {
+fn tag_chips_html(tags: &[crate::config::Tag], keywords: &[String], labels: &[String]) -> String {
     let mut out = String::new();
-    for t in tags.iter().filter(|t| keywords.iter().any(|k| k.eq_ignore_ascii_case(&t.keyword))) {
-        out.push_str(&format!(
-            "<span class=\"vireo-tag\" style=\"background:{bg};color:{fg}\">{name}</span>",
-            bg = gtk::glib::markup_escape_text(&t.color),
-            fg = crate::color::readable_text(&t.color),
-            name = gtk::glib::markup_escape_text(&t.name),
-        ));
+    for pill in crate::models::pills(keywords, labels, tags) {
+        match pill {
+            crate::models::Pill::Tag(t) => out.push_str(&format!(
+                "<span class=\"vireo-tag\" style=\"background:{bg};color:{fg}\">{name}</span>",
+                bg = gtk::glib::markup_escape_text(&t.color),
+                fg = crate::color::readable_text(&t.color),
+                name = gtk::glib::markup_escape_text(&t.name),
+            )),
+            crate::models::Pill::Label(name) => out.push_str(&format!(
+                "<span class=\"vireo-tag vireo-label\" title=\"{name}\">{name}</span>",
+                name = gtk::glib::markup_escape_text(&name),
+            )),
+        }
     }
     out
 }
@@ -3497,7 +3503,13 @@ impl Component for MessageView {
                         c.keywords = keywords.clone();
                     }
                 }
-                let chips = tag_chips_html(&self.tags, &keywords);
+                let labels = self
+                    .thread
+                    .iter()
+                    .find(|m| m.account_id == account_id && m.id == id)
+                    .map(|m| m.labels.clone())
+                    .unwrap_or_default();
+                let chips = tag_chips_html(&self.tags, &keywords, &labels);
                 let js = format!(
                     "(function(){{\
                      var t=document.querySelector('.vireo-tags[data-key=\"{account_id}:{id}\"]');\
@@ -4006,6 +4018,9 @@ impl MessageView {
             self.sender_style.contains(&key).hash(&mut h);
             self.folder_labels.get(&key).hash(&mut h);
             self.template_folders.contains(&(m.account_id, m.folder_id)).hash(&mut h);
+            // Tags are patched into a card live; Gmail labels (#374) only
+            // change with a sync, and are drawn with the card.
+            m.labels.hash(&mut h);
         }
         h.finish()
     }
@@ -4275,7 +4290,7 @@ impl MessageView {
                     hdr_title = gtk::glib::markup_escape_text(
                         &i18n("Double-click to open in a new window")
                     ),
-                    tags = LIVE_TAGS.with(|t| tag_chips_html(&t.borrow(), &m.keywords)),
+                    tags = LIVE_TAGS.with(|t| tag_chips_html(&t.borrow(), &m.keywords, &m.labels)),
                     // The ⋯ toggle that expands/collapses the action row when
                     // the hidden-until-hover preference is on; CSS keeps it
                     // display:none otherwise, so it costs nothing when off.
@@ -4755,6 +4770,8 @@ impl MessageView {
                  100%{{box-shadow:0 0 0 3px rgba(53,132,228,0);}}}}\
                .vireo-tag{{font-size:0.72em;font-weight:700;line-height:1.4;padding:1px 7px;\
                  border-radius:9999px;white-space:nowrap;}}\
+               .vireo-label{{background:rgba(128,128,128,0.2);color:inherit;max-width:16em;\
+                 overflow:hidden;text-overflow:ellipsis;}}\
                .vireo-addr{{opacity:0.55;font-size:0.9em;flex:1 1 0;max-width:max-content;\
                  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:clip;\
                  position:relative;}}\
@@ -8191,6 +8208,7 @@ mod tests {
             references: String::new(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 

@@ -4420,6 +4420,7 @@ mod tests {
             references: references.into(),
             importance: Default::default(),
             due: 0,
+            labels: Vec::new(),
         }
     }
 
