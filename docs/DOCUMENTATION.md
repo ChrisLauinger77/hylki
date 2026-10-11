@@ -570,6 +570,11 @@ dashes and a space) between them, as Hylki did before 1.42. Thunderbird,
 Evolution and Mutt use that line to show the signature dimmed and to leave it
 out when they quote your message; Gmail, Apple Mail and Outlook ignore it.
 
+**Edit as New** leaves the signature out, since the copied message already
+has one. **Insert Signature**, the button beside Translate at the end of the
+formatting row, adds the From account's signature, replacing one already in
+the message. The button is there only for an account that has a signature.
+
 ### Replies and forwards
 
 A reply or a forward opens in the reading pane, beside the message it

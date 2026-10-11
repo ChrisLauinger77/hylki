@@ -32,6 +32,7 @@
     <file>icons/scalable/actions/filter-symbolic.svg</file>
     <file>icons/scalable/actions/folder-download-symbolic.svg</file>
     <file>icons/scalable/actions/folder-symbolic.svg</file>
+    <file>icons/scalable/actions/folder-templates-symbolic.svg</file>
     <file>icons/scalable/actions/format-indent-less-symbolic.svg</file>
     <file>icons/scalable/actions/format-indent-more-symbolic.svg</file>
     <file>icons/scalable/actions/format-quote-symbolic.svg</file>
@@ -77,11 +78,13 @@
     <file>icons/scalable/actions/puzzle-piece-symbolic.svg</file>
     <file>icons/scalable/actions/security-high-symbolic.svg</file>
     <file>icons/scalable/actions/sidebar-show-symbolic.svg</file>
+    <file>icons/scalable/actions/signature-symbolic.svg</file>
     <file>icons/scalable/actions/starred-symbolic.svg</file>
     <file>icons/scalable/actions/system-search-symbolic.svg</file>
     <file>icons/scalable/actions/tag-outline-symbolic.svg</file>
     <file>icons/scalable/actions/text-x-generic-symbolic.svg</file>
     <file>icons/scalable/actions/translate-symbolic.svg</file>
+    <file>icons/scalable/actions/user-bookmarks-symbolic.svg</file>
     <file>icons/scalable/actions/user-trash-symbolic.svg</file>
     <file>icons/scalable/actions/verified-checkmark-symbolic.svg</file>
     <file>icons/scalable/actions/video-x-generic-symbolic.svg</file>

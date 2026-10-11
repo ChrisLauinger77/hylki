@@ -373,6 +373,10 @@ pub struct Compose {
     /// Translate what is being written (#327), beside the format chooser;
     /// shown only with a translation service set up.
     translate_btn: gtk::Button,
+    /// Insert Signature (#385), beside Translate: Edit as New leaves the
+    /// signature out, and this puts it back by hand. Shown only while the
+    /// From account has one.
+    signature_btn: gtk::Button,
     /// A translation is out: the button waits and the body is locked.
     translating: bool,
     /// Saving on its own (#340): a save on its way, what the last one held
@@ -1147,6 +1151,18 @@ impl Component for Compose {
                 let _ = s.send(ComposeInput::TranslateMenu);
             });
         }
+        let signature_btn = gtk::Button::from_icon_name("signature-symbolic");
+        signature_btn.set_tooltip_text(Some(i18n("Insert Signature").as_str()));
+        signature_btn.add_css_class("flat");
+        signature_btn.set_can_focus(false);
+        signature_btn.set_visible(!current_sig.is_empty());
+        {
+            let s = sender.input_sender().clone();
+            signature_btn.connect_clicked(move |_| {
+                let _ = s.send(ComposeInput::InsertSignature);
+            });
+        }
+        editor.toolbar_end().append(&signature_btn);
         editor.toolbar_end().append(&translate_btn);
         editor.toolbar_end().append(&preview_btn);
         editor.toolbar_end().append(&format_btn);
@@ -1219,6 +1235,7 @@ impl Component for Compose {
             format,
             format_btn,
             translate_btn,
+            signature_btn,
             translating: false,
             autosaving: false,
             autosaved: None,
@@ -1782,10 +1799,6 @@ impl Component for Compose {
                     );
                 }
                 attach.push(entry(i18n("Open Contacts"), "x-office-address-book", || ComposeInput::OpenContacts));
-                let idx = widgets.from_row.selected() as usize;
-                if self.accounts.get(idx).is_some_and(|a| !a.signature.is_empty()) {
-                    attach.push(entry(i18n("Insert Signature"), "document-edit", || ComposeInput::InsertSignature));
-                }
                 // The OpenPGP toggles go through their buttons so the
                 // toggled handlers keep the model and the buttons agreeing.
                 let mut pgp = Vec::new();
@@ -1805,9 +1818,9 @@ impl Component for Compose {
                         .icon(&format!("{}-symbolic", check(self.encrypt, "channel-secure"))),
                     );
                 }
-                // The format chooser and the preview toggle are not here:
-                // they sit at the end of the formatting row, which a narrow
-                // pane never folds away.
+                // The format chooser, the preview toggle and Insert Signature
+                // are not here: they sit at the end of the formatting row,
+                // which a narrow pane never folds away.
                 let mut host = Vec::new();
                 if self.can_toggle {
                     host.push(if self.windowed {
@@ -2178,6 +2191,7 @@ impl Component for Compose {
                 // Swap the editor's signature block for the new account's.
                 let idx = widgets.from_row.selected() as usize;
                 let new_sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
+                self.signature_btn.set_visible(!new_sig.is_empty());
                 if new_sig == self.current_sig {
                     break 'handle;
                 }
