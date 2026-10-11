@@ -3230,6 +3230,10 @@ msgstr "Wyświetl wiadomość tak, jak zostanie wysłana"
 msgid "Translate what you wrote"
 msgstr "Tłumacze"
 
+#, fuzzy
+msgid "Insert Signature"
+msgstr "Importuj podpis"
+
 msgid "More"
 msgstr "Więcej"
 
@@ -3241,10 +3245,6 @@ msgstr ""
 
 msgid "Choose from your addresses"
 msgstr ""
-
-#, fuzzy
-msgid "Insert Signature"
-msgstr "Importuj podpis"
 
 msgid "Not signed in"
 msgstr "Nie zalogowano"
@@ -3273,6 +3273,14 @@ msgstr "Usuń {name}"
 
 msgid "Typing"
 msgstr "Pisanie"
+
+#, fuzzy
+msgid "Insert Before the Text"
+msgstr "Wstaw w treść"
+
+#, fuzzy
+msgid "Insert After the Text"
+msgstr "Wstaw w treść"
 
 #, fuzzy
 msgid "Show Original"

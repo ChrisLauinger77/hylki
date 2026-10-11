@@ -572,8 +572,12 @@ out when they quote your message; Gmail, Apple Mail and Outlook ignore it.
 
 **Edit as New** leaves the signature out, since the copied message already
 has one. **Insert Signature**, the button beside Translate at the end of the
-formatting row, adds the From account's signature, replacing one already in
-the message. The button is there only for an account that has a signature.
+formatting row, puts the From account's signature where the cursor is, on a
+line of its own. Right-click the button for **Insert Before the Text** or
+**Insert After the Text**, the top or the end of the message. A signature
+already in the message moves rather than doubling; one inside a quoted
+message is left alone. The button is there only for an account that has a
+signature.
 
 ### Replies and forwards
 

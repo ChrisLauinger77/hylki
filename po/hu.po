@@ -3192,6 +3192,10 @@ msgstr "Az üzenet megjelenítése úgy, ahogyan elküldésre kerül"
 msgid "Translate what you wrote"
 msgstr "Fordította"
 
+#, fuzzy
+msgid "Insert Signature"
+msgstr "Aláírás importálása"
+
 msgid "More"
 msgstr "Továbbiak"
 
@@ -3204,10 +3208,6 @@ msgstr "Feladó címe"
 
 msgid "Choose from your addresses"
 msgstr ""
-
-#, fuzzy
-msgid "Insert Signature"
-msgstr "Aláírás importálása"
 
 msgid "Not signed in"
 msgstr "Nincs bejelentkezve"
@@ -3236,6 +3236,14 @@ msgstr "{name} eltávolítása"
 
 msgid "Typing"
 msgstr "Gépelés"
+
+#, fuzzy
+msgid "Insert Before the Text"
+msgstr "Beillesztés a szövegbe"
+
+#, fuzzy
+msgid "Insert After the Text"
+msgstr "Beillesztés a szövegbe"
 
 #, fuzzy
 msgid "Show Original"

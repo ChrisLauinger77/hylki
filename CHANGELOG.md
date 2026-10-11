@@ -59,7 +59,8 @@
 - **Fixed: Edit as New added a second signature** (#385, reported by
   urkos101). The copy keeps the signature it already has. **Insert
   Signature**, a button beside Translate at the end of the formatting row,
-  adds the account's signature by hand.
+  puts the account's signature at the cursor; right-click it to put the
+  signature before or after the text.
 - **Fixed: an opened conversation showed your own replies with "Show your own
   replies in the message list" off** (#388, reported by amadeusp). Mail sent
   from your addresses now nests under a conversation only when the setting is

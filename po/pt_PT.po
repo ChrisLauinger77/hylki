@@ -3197,6 +3197,10 @@ msgstr "Mostrar a mensagem tal como será enviada"
 msgid "Translate what you wrote"
 msgstr "Traduzir o que escreveu"
 
+#, fuzzy
+msgid "Insert Signature"
+msgstr "Importar assinatura"
+
 msgid "More"
 msgstr "Mais"
 
@@ -3208,10 +3212,6 @@ msgstr "Introduzir um endereço no campo De"
 
 msgid "Choose from your addresses"
 msgstr "Escolher entre os seus endereços"
-
-#, fuzzy
-msgid "Insert Signature"
-msgstr "Importar assinatura"
 
 msgid "Not signed in"
 msgstr "Sessão não iniciada"
@@ -3240,6 +3240,14 @@ msgstr "Remover {name}"
 
 msgid "Typing"
 msgstr "Escrita"
+
+#, fuzzy
+msgid "Insert Before the Text"
+msgstr "Inserir no texto"
+
+#, fuzzy
+msgid "Insert After the Text"
+msgstr "Inserir no texto"
 
 msgid "Show Original"
 msgstr "Mostrar original"

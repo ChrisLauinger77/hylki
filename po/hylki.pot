@@ -2859,6 +2859,9 @@ msgstr ""
 msgid "Translate what you wrote"
 msgstr ""
 
+msgid "Insert Signature"
+msgstr ""
+
 msgid "More"
 msgstr ""
 
@@ -2869,9 +2872,6 @@ msgid "Type a From address"
 msgstr ""
 
 msgid "Choose from your addresses"
-msgstr ""
-
-msgid "Insert Signature"
 msgstr ""
 
 msgid "Not signed in"
@@ -2898,6 +2898,12 @@ msgid "Remove {name}"
 msgstr ""
 
 msgid "Typing"
+msgstr ""
+
+msgid "Insert Before the Text"
+msgstr ""
+
+msgid "Insert After the Text"
 msgstr ""
 
 msgid "Show Original"

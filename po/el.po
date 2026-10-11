@@ -3217,6 +3217,10 @@ msgstr "Εμφάνιση του μηνύματος όπως θα σταλεί"
 msgid "Translate what you wrote"
 msgstr "Μετάφραση όσων γράψατε"
 
+#, fuzzy
+msgid "Insert Signature"
+msgstr "Εισαγωγή υπογραφής"
+
 msgid "More"
 msgstr "Περισσότερα"
 
@@ -3228,10 +3232,6 @@ msgstr "Πληκτρολογήστε μια διεύθυνση αποστολέ�
 
 msgid "Choose from your addresses"
 msgstr "Επιλέξτε από τις διευθύνσεις σας"
-
-#, fuzzy
-msgid "Insert Signature"
-msgstr "Εισαγωγή υπογραφής"
 
 msgid "Not signed in"
 msgstr "Δεν έχει γίνει σύνδεση"
@@ -3260,6 +3260,14 @@ msgstr "Αφαίρεση του {name}"
 
 msgid "Typing"
 msgstr "Πληκτρολόγηση"
+
+#, fuzzy
+msgid "Insert Before the Text"
+msgstr "Εισαγωγή στο κείμενο"
+
+#, fuzzy
+msgid "Insert After the Text"
+msgstr "Εισαγωγή στο κείμενο"
 
 msgid "Show Original"
 msgstr "Εμφάνιση πρωτοτύπου"

@@ -450,6 +450,18 @@ struct CloudLink {
     url: String,
 }
 
+/// Where Insert Signature puts the signature (#385).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SigPlace {
+    /// Where the caret is; where the setting puts it when the body has no
+    /// caret.
+    Cursor,
+    /// The top of the message.
+    Start,
+    /// The end of the message.
+    End,
+}
+
 #[derive(Debug)]
 pub enum ComposeInput {
     Send,
@@ -522,8 +534,11 @@ pub enum ComposeInput {
     SaveDraft,
     /// Save a copy of the message as a template (#360), and go on writing.
     SaveAsTemplate,
-    /// The From account's signature into a message that has none (#385).
-    InsertSignature,
+    /// The From account's signature, put in by hand (#385): at the caret,
+    /// or before or after the text from the button's right-click menu.
+    InsertSignature(SigPlace),
+    /// The Insert Signature button was right-clicked.
+    SignatureMenu,
     /// The editor content came back — finish saving the draft, or the copy
     /// kept as a template.
     SaveDraftBody { html: String, text: String, to: String, cc: String, bcc: String, reply_to: String, subject: String, from_account_id: u32, from_alias: Option<String>, as_template: bool },
@@ -1159,8 +1174,16 @@ impl Component for Compose {
         {
             let s = sender.input_sender().clone();
             signature_btn.connect_clicked(move |_| {
-                let _ = s.send(ComposeInput::InsertSignature);
+                let _ = s.send(ComposeInput::InsertSignature(SigPlace::Cursor));
             });
+            let s = sender.input_sender().clone();
+            let right = gtk::GestureClick::new();
+            right.set_button(gtk::gdk::BUTTON_SECONDARY);
+            right.connect_pressed(move |g, _, _, _| {
+                g.set_state(gtk::EventSequenceState::Claimed);
+                let _ = s.send(ComposeInput::SignatureMenu);
+            });
+            signature_btn.add_controller(right);
         }
         editor.toolbar_end().append(&signature_btn);
         editor.toolbar_end().append(&translate_btn);
@@ -2193,14 +2216,27 @@ impl Component for Compose {
                 self.put_signature(new_sig);
             }
 
-            ComposeInput::InsertSignature => {
-                // The From account's signature, where the setting puts it,
-                // for a message that opened without one (Edit as New, #385).
-                // A block already there is replaced, not doubled.
+            ComposeInput::InsertSignature(place) => {
                 let idx = widgets.from_row.selected() as usize;
                 let sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
-                self.current_sig.clear();
-                self.put_signature(sig);
+                self.insert_signature(sig, place);
+            }
+
+            ComposeInput::SignatureMenu => {
+                let entry = |label: String, place: SigPlace| {
+                    let s = sender.clone();
+                    MenuEntry::new(&label, move || s.input(ComposeInput::InsertSignature(place)))
+                };
+                let btn = &self.signature_btn;
+                show_context_menu(
+                    btn,
+                    (btn.width() / 2) as f64,
+                    btn.height() as f64,
+                    vec![vec![
+                        entry(i18n("Insert Before the Text"), SigPlace::Start),
+                        entry(i18n("Insert After the Text"), SigPlace::End),
+                    ]],
+                );
             }
 
             ComposeInput::Suggest(field) => {
@@ -2974,20 +3010,7 @@ impl Compose {
             // in source is found by its text. HTML keeps the quote's
             // tags; Markdown has the `> ` lines, with the attribution
             // line ("On …, X wrote:" or the forward header) above.
-            let place = match (self.signature_position, kind) {
-                (SignaturePosition::BelowQuote, _) => "v=v+n;",
-                (SignaturePosition::AboveQuote, SourceKind::Html) => {
-                    "var q=v.search(/<p class=\"vireo-quote-attr\"|<blockquote/);\
-                     if(q<0){v=v+n;}else{v=v.slice(0,q).replace(/\\s*$/,'')+n+v.slice(q);}"
-                }
-                (SignaturePosition::AboveQuote, SourceKind::Markdown) => {
-                    "var L=v.split('\\n');var qi=-1;\
-                     for(var k=0;k<L.length;k++){if(L[k]==='>'||L[k].indexOf('> ')===0){qi=k;break;}}\
-                     if(qi<0){v=v+n;}else{var a=qi-1;while(a>=0&&L[a].trim()==='')a--;\
-                     if(a>=0&&(/wrote:\\s*$/.test(L[a])||/^-{5,} Forwarded message/.test(L[a])))qi=a;\
-                     v=L.slice(0,qi).join('\\n').replace(/\\s*$/,'')+n+'\\n'+L.slice(qi).join('\\n');}"
-                }
-            };
+            let place = self.source_sig_place(kind);
             self.editor.run_js(&format!(
                 "(function(){{var t=document.getElementById('src');if(!t)return;\
                  var o='{}',p='{}',n='{}';var v=t.value;\
@@ -3011,19 +3034,7 @@ impl Compose {
             // No signature block to replace (the previous account
             // had none): a new one goes where the setting puts it,
             // above the quoted original or at the end (#237).
-            let anchor = match self.signature_position {
-                SignaturePosition::AboveQuote => {
-                    "var b=document.body;var q=null;\
-                     var cands=b.querySelectorAll('.vireo-quote-attr,blockquote');\
-                     for(var i=0;i<cands.length;i++){{var t=cands[i];\
-                     while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
-                     if(t.parentNode===b&&(!q||(t.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING)))q=t;}}\
-                     if(q){{q.insertAdjacentHTML('beforebegin',h);}}else{{b.insertAdjacentHTML('beforeend',h);}}"
-                }
-                SignaturePosition::BelowQuote => {
-                    "document.body.insertAdjacentHTML('beforeend',h);"
-                }
-            };
+            let anchor = self.rich_sig_anchor();
             let js = format!(
                 "(function(){{var s=document.querySelector('.vireo-sig');\
                  var h='{}';\
@@ -3034,6 +3045,115 @@ impl Compose {
             self.editor.run_js(&js);
             self.current_sig = new_sig;
         }
+    }
+
+    /// Source-mode JS that puts `n` into `v` where the setting puts a
+    /// signature: at the end, or above the quoted original (#237), which in
+    /// source is found by its text. HTML keeps the quote's tags; Markdown
+    /// has the `> ` lines, with the attribution line ("On …, X wrote:" or
+    /// the forward header) above.
+    fn source_sig_place(&self, kind: SourceKind) -> &'static str {
+        match (self.signature_position, kind) {
+            (SignaturePosition::BelowQuote, _) => "v=v+n;",
+            (SignaturePosition::AboveQuote, SourceKind::Html) => {
+                "var q=v.search(/<p class=\"vireo-quote-attr\"|<blockquote/);\
+                 if(q<0){v=v+n;}else{v=v.slice(0,q).replace(/\\s*$/,'')+n+v.slice(q);}"
+            }
+            (SignaturePosition::AboveQuote, SourceKind::Markdown) => {
+                "var L=v.split('\\n');var qi=-1;\
+                 for(var k=0;k<L.length;k++){if(L[k]==='>'||L[k].indexOf('> ')===0){qi=k;break;}}\
+                 if(qi<0){v=v+n;}else{var a=qi-1;while(a>=0&&L[a].trim()==='')a--;\
+                 if(a>=0&&(/wrote:\\s*$/.test(L[a])||/^-{5,} Forwarded message/.test(L[a])))qi=a;\
+                 v=L.slice(0,qi).join('\\n').replace(/\\s*$/,'')+n+'\\n'+L.slice(qi).join('\\n');}"
+            }
+        }
+    }
+
+    /// Rich-mode JS that puts the HTML `h` where the setting puts a
+    /// signature: above the quoted original, or at the end (#237).
+    fn rich_sig_anchor(&self) -> &'static str {
+        match self.signature_position {
+            SignaturePosition::AboveQuote => {
+                "var b=document.body;var q=null;\
+                 var cands=b.querySelectorAll('.vireo-quote-attr,blockquote');\
+                 for(var i=0;i<cands.length;i++){var t=cands[i];\
+                 while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
+                 if(t.parentNode===b&&(!q||(t.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING)))q=t;}\
+                 if(q){q.insertAdjacentHTML('beforebegin',h);}else{b.insertAdjacentHTML('beforeend',h);}"
+            }
+            SignaturePosition::BelowQuote => "document.body.insertAdjacentHTML('beforeend',h);",
+        }
+    }
+
+    /// Insert Signature (#385): `sig` at the caret, or at the top or the
+    /// end of the message. The message's own signature block moves rather
+    /// than doubling; one inside a quote is the other person's and stays.
+    fn insert_signature(&mut self, sig: String, place: SigPlace) {
+        if sig.is_empty() {
+            return;
+        }
+        let place_js = match place {
+            SigPlace::Cursor => "cursor",
+            SigPlace::Start => "start",
+            SigPlace::End => "end",
+        };
+        if let Some(kind) = self.editor.source_kind() {
+            let old = sig_source(kind, &self.current_sig, self.sig_dashes);
+            let old_other = sig_source(kind, &self.current_sig, !self.sig_dashes);
+            let new = sig_source(kind, &sig, self.sig_dashes);
+            // A caret only counts while the field has focus: a fresh
+            // composer's field reports 0, which is the top, not a choice.
+            let js = r#"(function(){var t=document.getElementById('src');if(!t)return;
+var o=@OLD@,p=@OTHER@,n=@NEW@,where=@WHERE@,v=t.value;
+var a=document.activeElement===t?t.selectionEnd:-1;
+var i=o?v.lastIndexOf(o):-1;if(i<0&&p){i=v.lastIndexOf(p);if(i>=0)o=p;}
+if(i>=0){v=v.slice(0,i)+v.slice(i+o.length);if(a>i+o.length)a-=o.length;else if(a>i)a=i;}
+if(where==='start'){v=n.replace(/^\s+/,'')+'\n'+v;a=-1;}
+else if(where==='end'){v=v.replace(/\s*$/,'')+n;a=-1;}
+else if(a>=0){v=v.slice(0,a)+n+v.slice(a);}
+else{@PLACE@}
+t.value=v;if(a>=0){t.selectionStart=t.selectionEnd=a;}window.__hylkiDirty=true;})()"#
+                // The signature text goes in last, so nothing in it is
+                // taken for a placeholder.
+                .replace("@WHERE@", &format!("'{place_js}'"))
+                .replace("@PLACE@", self.source_sig_place(kind))
+                .replace("@OTHER@", &format!("'{}'", js_escape(&old_other)))
+                .replace("@OLD@", &format!("'{}'", js_escape(&old)))
+                .replace("@NEW@", &format!("'{}'", js_escape(&new)));
+            self.editor.run_js(&js);
+            self.current_sig = sig;
+            return;
+        }
+        // At the caret the line it sits on is split, so the signature
+        // stands as a block of its own between the two halves; an empty
+        // line gives up its place to it.
+        let js = r#"(function(){var b=document.body,h=@SIG@,where=@WHERE@;
+var olds=[].filter.call(b.querySelectorAll('.vireo-sig'),function(s){return !s.closest('blockquote');});
+var sel=window.getSelection(),r=null;
+if(where==='cursor'&&sel.rangeCount){r=sel.getRangeAt(0).cloneRange();r.collapse(false);if(!b.contains(r.startContainer)||r.startContainer===b&&b.childNodes.length===0)r=null;}
+if(r){for(var k=0;k<olds.length;k++){if(olds[k].contains(r.startContainer)){r.setStartBefore(olds[k]);r.collapse(true);}}}
+var spot=null;
+if(r){var top=r.startContainer;
+ if(top===b){spot=b.childNodes[r.startOffset]||null;}
+ else{while(top.parentNode!==b)top=top.parentNode;
+  if(olds.indexOf(top)>=0){spot=top;}
+  else{var tail=document.createRange();tail.setStart(r.startContainer,r.startOffset);tail.setEndAfter(top);
+   var rest=tail.extractContents();var keep=function(n){return n&&(n.textContent.trim()!==''||n.querySelector&&n.querySelector('img,table,hr'));};
+   spot=top.nextSibling;
+   if(keep(rest)){b.insertBefore(rest,spot);spot=top.nextSibling;}
+   if(!keep(top)){spot=top.nextSibling;top.remove();}}}}
+for(var k=0;k<olds.length;k++){if(spot===olds[k])spot=olds[k].nextSibling;olds[k].remove();}
+var tpl=document.createElement('template');tpl.innerHTML=h;var sig=tpl.content.firstElementChild;
+if(where==='start'){b.insertBefore(sig,b.firstChild);}
+else if(where==='end'){b.appendChild(sig);}
+else if(r){b.insertBefore(sig,spot);var c=document.createRange();c.setStartBefore(sig);c.collapse(true);sel.removeAllRanges();sel.addRange(c);}
+else{@ANCHOR@}
+window.__hylkiDirty=true;})()"#
+            .replace("@WHERE@", &format!("'{place_js}'"))
+            .replace("@ANCHOR@", self.rich_sig_anchor())
+            .replace("@SIG@", &format!("'{}'", rich_editor::js_escape(&sig_html(&sig, self.sig_dashes))));
+        self.editor.run_js(&js);
+        self.current_sig = sig;
     }
 
     fn follow_account_signing(&mut self, widgets: &ComposeWidgets) {

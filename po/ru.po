@@ -3184,6 +3184,10 @@ msgstr "Показать сообщение в том виде, в которо�
 msgid "Translate what you wrote"
 msgstr "Перевести написанный текст"
 
+#, fuzzy
+msgid "Insert Signature"
+msgstr "Импортировать подпись"
+
 msgid "More"
 msgstr "Ещё"
 
@@ -3195,10 +3199,6 @@ msgstr "Введите адрес отправителя"
 
 msgid "Choose from your addresses"
 msgstr "Выберите из ваших адресов"
-
-#, fuzzy
-msgid "Insert Signature"
-msgstr "Импортировать подпись"
 
 msgid "Not signed in"
 msgstr "Вход не выполнен"
@@ -3227,6 +3227,14 @@ msgstr "Удалить {name}?"
 
 msgid "Typing"
 msgstr "Ввод текста"
+
+#, fuzzy
+msgid "Insert Before the Text"
+msgstr "Вставить в текст"
+
+#, fuzzy
+msgid "Insert After the Text"
+msgstr "Вставить в текст"
 
 msgid "Show Original"
 msgstr "Показать оригинал"
