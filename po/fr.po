@@ -3980,8 +3980,7 @@ msgstr ""
 "ramène à la valeur par défaut des paramètres."
 
 msgid ""
-"Shows this message dark or light, whatever the message theme. Other messages "
-"are not affected."
+"Show this message in light or dark mode. Other messages are not affected."
 msgstr ""
 
 msgid "Light / Dark Mode"

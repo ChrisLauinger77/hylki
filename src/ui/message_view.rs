@@ -1879,24 +1879,25 @@ impl Component for MessageView {
 
                         // Light / Dark Mode: the message on screen in the
                         // other scheme, for that message alone. Sits just
-                        // before the Reader View switch.
+                        // before the Reader View switch, the highlights icon
+                        // for a label.
                         gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
-                            set_spacing: 8,
+                            set_spacing: 6,
                             set_halign: gtk::Align::End,
                             set_valign: gtk::Align::Center,
                             add_css_class: "reader-toggle",
-                            set_tooltip_text: Some(i18n("Shows this message dark or light, whatever the message theme. Other messages are not affected.").as_str()),
+                            set_tooltip_text: Some(i18n("Show this message in light or dark mode. Other messages are not affected.").as_str()),
                             #[watch]
                             set_visible: model.current.is_some() && model.theme_switch_shown,
 
-                            gtk::Label {
-                                set_label: &i18n("Light / Dark Mode"),
-                                add_css_class: "caption",
+                            gtk::Image {
+                                set_icon_name: Some("highlights-symbolic"),
                                 add_css_class: "dim-label",
                             },
                             gtk::Switch {
                                 set_valign: gtk::Align::Center,
+                                update_property: &[gtk::accessible::Property::Label(&i18n("Light / Dark Mode"))],
                                 #[watch]
                                 set_active: model.effective_dark(),
                                 // Setting it to what is already shown (a new
@@ -1908,12 +1909,12 @@ impl Component for MessageView {
                         },
 
                         // Reader View: the message(s) as content alone. A
-                        // labelled switch on the account chip's line, at its
-                        // right end — part of the message header, not the
-                        // action row.
+                        // switch behind a pair of reading glasses on the
+                        // account chip's line, at its right end — part of
+                        // the message header, not the action row.
                         gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
-                            set_spacing: 8,
+                            set_spacing: 6,
                             set_halign: gtk::Align::End,
                             set_valign: gtk::Align::Center,
                             add_css_class: "reader-toggle",
@@ -1921,13 +1922,13 @@ impl Component for MessageView {
                             #[watch]
                             set_visible: model.current.is_some() && model.reader_switch_shown,
 
-                            gtk::Label {
-                                set_label: &i18n("Reader View"),
-                                add_css_class: "caption",
+                            gtk::Image {
+                                set_icon_name: Some("glasses-symbolic"),
                                 add_css_class: "dim-label",
                             },
                             gtk::Switch {
                                 set_valign: gtk::Align::Center,
+                                update_property: &[gtk::accessible::Property::Label(&i18n("Reader View"))],
                                 #[watch]
                                 set_active: model.reader_mode,
                                 // The owner decides what a flip does, so it

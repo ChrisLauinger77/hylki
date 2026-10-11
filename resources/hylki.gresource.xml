@@ -41,8 +41,10 @@
     <file>icons/scalable/actions/format-text-rich-symbolic.svg</file>
     <file>icons/scalable/actions/format-text-strikethrough-symbolic.svg</file>
     <file>icons/scalable/actions/format-text-underline-symbolic.svg</file>
+    <file>icons/scalable/actions/glasses-symbolic.svg</file>
     <file>icons/scalable/actions/go-next-symbolic.svg</file>
     <file>icons/scalable/actions/go-previous-symbolic.svg</file>
+    <file>icons/scalable/actions/highlights-symbolic.svg</file>
     <file>icons/scalable/actions/hylki-importance-low-symbolic.svg</file>
     <file>icons/scalable/actions/hylki-mail-read-symbolic.svg</file>
     <file>icons/scalable/actions/hylki-non-starred-symbolic.svg</file>
