@@ -425,13 +425,17 @@ fn jmap_download(s: &JmapSession, blob_id: &str) -> Result<Vec<u8>, String> {
 
 /// Upload raw bytes; the blob id to import or attach.
 fn jmap_upload(s: &JmapSession, raw: &[u8], content_type: &str) -> Result<String, String> {
+    // Cyrus (Fastmail) refuses a message with a lone LF anywhere in it:
+    // "Message contains bare newlines" (#414). Our builder writes CRLF
+    // throughout; mail moved in from a laxer server may not.
+    let raw = if content_type == "message/rfc822" { crlf_line_endings(raw) } else { raw.into() };
     let url = fill_template(&s.upload_url, &[("accountId", &s.account)]);
     jmap_wire("POST upload");
     let r: Result<serde_json::Value, String> = agent()
         .post(&url)
         .set("Authorization", &s.auth)
         .set("Content-Type", content_type)
-        .send_bytes(raw)
+        .send_bytes(&raw)
         .map_err(jmap_err)
         .and_then(|resp| resp.into_json().map_err(|e| e.to_string()));
     jmap_wired("POST upload", &r);
@@ -1434,6 +1438,22 @@ fn jmap_create_mailbox(s: &JmapSession, name: &str, parent: Option<&str>) -> Res
     }
 }
 
+/// `raw` with every lone LF made CRLF, borrowed untouched when it has none.
+fn crlf_line_endings(raw: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    let bare = |i: usize| raw[i] == b'\n' && (i == 0 || raw[i - 1] != b'\r');
+    if !(0..raw.len()).any(bare) {
+        return std::borrow::Cow::Borrowed(raw);
+    }
+    let mut out = Vec::with_capacity(raw.len() + raw.len() / 32);
+    for i in 0..raw.len() {
+        if bare(i) {
+            out.push(b'\r');
+        }
+        out.push(raw[i]);
+    }
+    std::borrow::Cow::Owned(out)
+}
+
 /// Upload a message's bytes and import them into `mailbox` with
 /// `keywords`: a draft being saved, or mail moved in from another account
 /// (#265).
@@ -2423,6 +2443,14 @@ pub(super) async fn run_jmap(
 
 #[cfg(test)]
 mod tests {
+    /// #414: lone LFs become CRLF; CRLFs stay as they are.
+    #[test]
+    fn submission_bytes_get_crlf_line_endings() {
+        assert_eq!(&*super::crlf_line_endings(b"a\r\nb"), b"a\r\nb");
+        assert!(matches!(super::crlf_line_endings(b"a\r\nb"), std::borrow::Cow::Borrowed(_)));
+        assert_eq!(&*super::crlf_line_endings(b"\na\nb\r\nc\n"), b"\r\na\r\nb\r\nc\r\n");
+    }
+
     /// #346: the From picks its identity by address, then by a domain's
     /// catch-all, before falling back to the first.
     #[test]
@@ -2739,6 +2767,56 @@ mod tests {
         let Some(WorkerEvent::Identities(ids)) = got.first() else { panic!("no Identities event") };
         assert!(ids.iter().any(|(_, a)| a.eq_ignore_ascii_case(&acc.username)), "{ids:?}");
         assert!(jmap_identity_for(&s, &acc.username).is_ok());
+    }
+
+    /// A signed message with a Unix-ending text file attached, sent to the
+    /// account itself (#414), with `JMAP_LIVE` as for [`live`]. Stalwart
+    /// takes bare newlines; Cyrus (Fastmail) is the server that refuses them.
+    #[test]
+    #[ignore]
+    fn live_signed_send() {
+        let Ok(spec) = std::env::var("JMAP_LIVE") else { return };
+        if !crate::pgp::available() {
+            return;
+        }
+        let mut parts = spec.splitn(3, ',');
+        let acc = AccountConfig {
+            imap_host: parts.next().unwrap_or_default().into(),
+            imap_port: 443,
+            username: parts.next().unwrap_or_default().into(),
+            password: parts.next().unwrap_or_default().into(),
+            jmap_token: std::env::var_os("JMAP_LIVE_TOKEN").is_some(),
+            ..sample_account()
+        };
+        let home = std::env::temp_dir().join(format!("hylki-gpg-jmap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&home, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        std::env::set_var("HYLKI_GNUPGHOME", &home);
+        let me = acc.username.clone();
+        let account = AccountConfig { email: me.clone(), ..acc.clone() };
+        crate::pgp::generate_key(&crate::pgp::Gpg::system(), "Me", &me, "never", "").expect("own key");
+        let file = home.join("notes.txt");
+        std::fs::write(&file, b"one\ntwo\n").unwrap();
+        let msg = OutgoingMessage {
+            to: me.clone(),
+            subject: "live signed test".into(),
+            body: "signed over JMAP".into(),
+            attachments: vec![file.to_string_lossy().to_string()],
+            sign: true,
+            ..super::super::tests::sample_outgoing()
+        };
+        let raw = super::super::build_email(&account, &msg).expect("builds").formatted();
+        let s = jmap_connect(&acc).expect("session");
+        let folders = jmap_list_folders(&s, 1, &BTreeMap::new()).expect("folders");
+        let sent = folders.iter().find(|f| f.folder.kind == FolderKind::Sent).expect("sent");
+        let sid = jmap_submit(&s, &raw, &me, &[me.clone()], &sent.mailbox_id).expect("submit");
+        println!("submitted {sid}");
+        std::fs::remove_dir_all(&home).ok();
     }
 
     /// Removing an attachment over JMAP (#289), with `JMAP_LIVE` as for
