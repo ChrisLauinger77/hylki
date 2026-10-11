@@ -687,6 +687,8 @@ pub enum CtxAction {
     RefreshFolder { account_id: u32, folder_id: u32 },
     MarkAllInboxesRead,
     RefreshAllInboxes,
+    /// Erase every unified account's Trash or Junk at once (#413).
+    EmptyAll(FolderKind),
     /// Open Settings → Accounts with this account's editor up.
     OpenAccountSettings(u32),
     RemoveAccount(u32),
@@ -3307,6 +3309,18 @@ impl Sidebar {
                     ],
                     &cs,
                 );
+            });
+            list.add_controller(click);
+        } else if let UnifiedRow::Kind(kind @ (FolderKind::Trash | FolderKind::Junk)) = row_kind {
+            // Right-click the merged Trash or Junk: empty every account's
+            // (#413), each one still a row of its own below for one at a time.
+            let label = if kind == FolderKind::Trash { i18n_noop("Empty Trash…") } else { i18n_noop("Empty Junk…") };
+            let click = gtk::GestureClick::new();
+            click.set_button(gtk::gdk::BUTTON_SECONDARY);
+            let cs = sender.clone();
+            let list_w = list.clone();
+            click.connect_pressed(move |_, _, x, y| {
+                show_sidebar_menu(&list_w, x, y, vec![(label, CtxAction::EmptyAll(kind))], &cs);
             });
             list.add_controller(click);
         }

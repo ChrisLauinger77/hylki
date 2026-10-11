@@ -721,6 +721,19 @@ msgstr ""
 msgid "Empty"
 msgstr "Άδειασμα"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Κάθε μήνυμα σε αυτόν θα διαγραφεί από τον διακομιστή. Αυτή η ενέργεια δεν "
+"αναιρείται."
+
 msgid "No Junk folder available for this account"
 msgstr "Δεν υπάρχει φάκελος Ανεπιθύμητων για αυτόν τον λογαριασμό"
 

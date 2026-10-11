@@ -699,6 +699,19 @@ msgstr ""
 msgid "Empty"
 msgstr "Vider"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Tous les messages qu'il contient seront supprimés du serveur. Cette action "
+"est irréversible."
+
 msgid "No Junk folder available for this account"
 msgstr "Aucun dossier Indésirables disponible pour ce compte"
 

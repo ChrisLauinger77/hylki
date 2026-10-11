@@ -715,6 +715,19 @@ msgstr ""
 msgid "Empty"
 msgstr "Esvaziar"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Todas as mensagens da pasta serão excluídas do servidor. Esta ação não pode "
+"ser desfeita."
+
 msgid "No Junk folder available for this account"
 msgstr "Não existe uma pasta Spam disponível para esta conta"
 

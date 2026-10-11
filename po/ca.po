@@ -688,6 +688,19 @@ msgstr ""
 msgid "Empty"
 msgstr "Buida"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Tots els missatges que conté s'esborraran del servidor. Això no es pot "
+"desfer."
+
 msgid "No Junk folder available for this account"
 msgstr "No hi ha cap carpeta de brossa disponible per a aquest compte"
 

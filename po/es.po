@@ -716,6 +716,19 @@ msgstr ""
 msgid "Empty"
 msgstr "Vaciar"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Todos los mensajes que contiene se eliminarán del servidor. Esta acción no "
+"se puede deshacer."
+
 msgid "No Junk folder available for this account"
 msgstr ""
 "No hay ninguna carpeta de correo no deseado disponible para esta cuenta"

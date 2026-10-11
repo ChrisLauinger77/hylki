@@ -646,6 +646,16 @@ msgstr ""
 msgid "Empty"
 msgstr ""
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+
 msgid "No Junk folder available for this account"
 msgstr ""
 

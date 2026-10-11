@@ -6118,6 +6118,9 @@ impl SimpleComponent for AppModel {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
+                CtxAction::EmptyAll(kind) => {
+                    self.confirm_empty_all(kind, &sender);
+                }
                 CtxAction::ApplyFilters { account_id, folder_id } => {
                     self.start_filter_run(vec![(account_id, folder_id)], &sender);
                 }
@@ -18486,6 +18489,54 @@ impl AppModel {
             }
         });
         dialog.present();
+    }
+
+    /// Empty every unified account's Trash or Junk (#413). One folder asks
+    /// the way its own row does; more name each account they belong to.
+    fn confirm_empty_all(&self, kind: FolderKind, sender: &ComponentSender<Self>) {
+        let targets: Vec<(u32, u32, String, String, String)> = self
+            .accounts
+            .iter()
+            .filter(|a| self.in_unified(a.id))
+            .filter_map(|a| {
+                let f = self.folder_of_kind(a.id, kind)?;
+                Some((a.id, f.id, f.name.clone(), f.path.clone(), a.email.clone()))
+            })
+            .collect();
+        match targets.as_slice() {
+            [] => {}
+            [(account_id, folder_id, name, path, _)] => {
+                self.confirm_empty_folder(*account_id, *folder_id, name.clone(), path.clone(), sender);
+            }
+            _ => {
+                let heading = if kind == FolderKind::Trash {
+                    i18n("Empty Trash in Every Account?")
+                } else {
+                    i18n("Empty Junk in Every Account?")
+                };
+                let accounts: Vec<&str> = targets.iter().map(|t| t.4.as_str()).collect();
+                let body = format!(
+                    "{}\n\n{}",
+                    i18n("Every message in them will be erased from the server. This can’t be undone."),
+                    accounts.join("\n")
+                );
+                let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("empty", &i18n("Empty"));
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_close_response("cancel");
+                dialog.set_response_appearance("empty", adw::ResponseAppearance::Destructive);
+                let s = sender.clone();
+                dialog.connect_response(None, move |_, resp| {
+                    if resp == "empty" {
+                        for (account_id, folder_id, _, path, _) in &targets {
+                            s.input(AppMsg::EmptyFolder { account_id: *account_id, folder_id: *folder_id, path: path.clone() });
+                        }
+                    }
+                });
+                dialog.present();
+            }
+        }
     }
 
     /// Mark `m` as spam: tag `$Junk` and move it to the account's Junk folder

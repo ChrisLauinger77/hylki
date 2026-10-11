@@ -715,6 +715,18 @@ msgstr ""
 msgid "Empty"
 msgstr "Kiürítés"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"A benne lévő összes üzenet törlődik a kiszolgálóról. Ez nem vonható vissza."
+
 msgid "No Junk folder available for this account"
 msgstr "Ehhez a fiókhoz nem érhető el Levélszemét mappa"
 

@@ -722,6 +722,18 @@ msgstr ""
 msgid "Empty"
 msgstr "Очистить"
 
+msgid "Empty Trash in Every Account?"
+msgstr ""
+
+msgid "Empty Junk in Every Account?"
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Every message in them will be erased from the server. This can’t be undone."
+msgstr ""
+"Все сообщения в нем будут удалены с сервера. Это действие нельзя отменить."
+
 msgid "No Junk folder available for this account"
 msgstr "Для этой учётной записи недоступна папка «Спам»"
 
