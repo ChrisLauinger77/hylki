@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.43.2 — 2026-10-11
+
+Plain-text mail declares UTF-8, signed mail sends over JMAP, and an MP3 new-mail sound no longer crashes Hylki.
+
+- **Fixed: choosing an MP3 as the new-mail sound crashed Hylki** (#397,
+  reported by JavierLopezBravo). An MP3 that starts with an ID3v2 tag made
+  GStreamer abort the app when the sound was chosen, previewed or played for
+  new mail. The tag is taken off when the file is copied in, and off a sound
+  chosen with an earlier version before it next plays.
+- **Fixed: docks on X11 showed Hylki twice** (#402, reported by narcarsiss).
+  The window's class was `hylki` while the launcher names the app ID, so a
+  pinned launcher and the open window did not group. Wayland was not affected.
+- **Fixed: accents in plain-text mail arrived garbled in some apps** (#412,
+  reported by amadeusp). A plain-text message with nothing attached went
+  out without `MIME-Version` or `Content-Type: text/plain; charset=utf-8`,
+  so FairEmail and other clients that don't guess showed `ö` as `Ã¶`.
+- **Fixed: signed mail could not be sent from some JMAP servers** (#414,
+  reported by andreamoro). The server refused it: "Message contains bare
+  newlines". The OpenPGP signature, encrypted mail and text files with
+  Unix line endings now go out with CRLF line endings throughout, and every
+  message uploaded over JMAP is checked for lone LFs first.
+
 ## 1.43.1 — 2026-10-09
 
 The new-mail sound plays whatever alert sound GNOME is set to.
