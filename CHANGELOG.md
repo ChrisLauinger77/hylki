@@ -61,6 +61,13 @@
   erenoglu). A message classified with Microsoft Purview, or with Outlook's
   older Sensitivity setting, shows its label as a pill beside the sender's
   name. Hylki shows the label only; it does not apply its rules or set one.
+- **Added: on-premise Exchange servers** (#391, requested by
+  johanneskoester). **Microsoft Exchange (on-premise)** in the Provider list
+  connects over Exchange Web Services, finding the server from the email
+  address with Autodiscover, and signs in with NTLM, the TLS channel binding
+  included, or Basic over HTTPS. Folders, reading, read state, stars,
+  categories, moving, deleting, sending and drafts work; creating or
+  renaming folders does not yet.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.

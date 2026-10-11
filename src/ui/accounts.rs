@@ -32,6 +32,9 @@ enum ProviderKind {
     /// A JMAP server (#245), signed in with a password: the servers are the
     /// user's own, so nothing is pre-filled but the protocol.
     Jmap,
+    /// An on-premise Exchange server over EWS (#391), signed in with a
+    /// password; its address can be left for Autodiscover to find.
+    Ews,
 }
 
 /// One entry in the Provider dropdown. It selects both the sign-in method and,
@@ -111,13 +114,14 @@ impl Provider {
     }
 
     fn is_password(&self) -> bool {
-        matches!(self.kind, ProviderKind::Manual | ProviderKind::Preset | ProviderKind::Jmap)
+        matches!(self.kind, ProviderKind::Manual | ProviderKind::Preset | ProviderKind::Jmap | ProviderKind::Ews)
     }
     /// The incoming protocol the entry stands for; the manual entry and the
     /// presets leave it to the Incoming Protocol row.
     pub(crate) fn wizard_protocol(&self) -> Protocol {
         match self.kind {
             ProviderKind::Jmap => Protocol::Jmap,
+            ProviderKind::Ews => Protocol::Ews,
             ProviderKind::Microsoft => Protocol::Graph,
             _ => Protocol::Imap,
         }
@@ -146,6 +150,7 @@ pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "IMAP/POP3 Account", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
     Provider { label: "Custom (OAuth)…", brand: "mail-oauth", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
     Provider { label: "JMAP Server", brand: "mail-jmap", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your JMAP server's address, or the URL of its session resource. Mail is read and sent over JMAP; no SMTP settings are needed.") },
+    Provider { label: "Microsoft Exchange (on-premise)", brand: "mail-ews", kind: ProviderKind::Ews, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("For your organization's own Exchange server. Leave the server empty to find it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 accounts use the entry below.") },
     Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
     Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
     Provider { label: "iCloud", brand: "icloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
@@ -2461,6 +2466,7 @@ impl Component for AccountsWindow {
                     .unwrap_or_else(|_| ConnTest {
                         incoming: Err("test could not run".into()),
                         smtp: Err("test could not run".into()),
+                        ews_url: None,
                     });
                     AccountsCmd::Test(r)
                 });
@@ -3222,10 +3228,17 @@ impl Component for AccountsWindow {
                 let incoming_label = match protocol {
                     Protocol::Pop3 => "POP3",
                     Protocol::Jmap => "JMAP",
+                    Protocol::Ews => "Exchange",
                     _ => "IMAP",
                 };
-                // A JMAP account sends through the server: no SMTP line.
-                let text = if protocol == Protocol::Jmap {
+                // The address Autodiscover found goes into the form, to be
+                // saved with the account.
+                if let Some(url) = &result.ews_url {
+                    widgets.host_row.set_text(url);
+                }
+                // A JMAP or Exchange account sends through the server: no
+                // SMTP line.
+                let text = if matches!(protocol, Protocol::Jmap | Protocol::Ews) {
                     line(incoming_label, &result.incoming)
                 } else {
                     format!(
@@ -4053,7 +4066,7 @@ impl AccountsWindow {
 
         // Server/credential fields (password or Custom-OAuth manual servers).
         // JMAP is the JMAP entries' own protocol, not a choice.
-        widgets.protocol_row.set_visible(is_password && p.kind != ProviderKind::Jmap);
+        widgets.protocol_row.set_visible(is_password && !matches!(p.kind, ProviderKind::Jmap | ProviderKind::Ews));
         widgets.host_row.set_visible(show_servers);
         widgets.port_row.set_visible(show_servers);
         widgets.smtp_row.set_visible(show_servers);
@@ -4090,7 +4103,7 @@ impl AccountsWindow {
             ProviderKind::Preset => Some((p.imap_host, p.imap_port, p.smtp_host, p.smtp_port)),
             ProviderKind::Google | ProviderKind::Microsoft => crate::oauth::preset(p.oauth_name().unwrap())
                 .map(|o| (o.imap_host, o.imap_port, o.smtp_host, o.smtp_port)),
-            ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap => None,
+            ProviderKind::Manual | ProviderKind::CustomOAuth | ProviderKind::Jmap | ProviderKind::Ews => None,
         };
         if let Some((ih, ip, sh, sp)) = servers {
             widgets.protocol_row.set_selected(0); // IMAP
@@ -4111,6 +4124,16 @@ impl AccountsWindow {
             widgets.port_row.set_text("443");
             widgets.smtp_row.set_text("");
             widgets.jmap_token_row.set_active(p.wizard_token());
+        }
+        if p.kind == ProviderKind::Ews {
+            // A preset's IMAP host is no EWS address: the field is left for
+            // the address, or empty for Autodiscover.
+            let host = widgets.host_row.text();
+            if PROVIDERS.iter().any(|q| !q.imap_host.is_empty() && q.imap_host == host) {
+                widgets.host_row.set_text("");
+            }
+            widgets.port_row.set_text("443");
+            widgets.smtp_row.set_text("");
         }
         apply_protocol(widgets);
     }
@@ -4475,7 +4498,7 @@ fn read_account(
     let protocol = form_protocol(widgets);
     let default_port = match protocol {
         Protocol::Pop3 => 995,
-        Protocol::Jmap => 443,
+        Protocol::Jmap | Protocol::Ews => 443,
         _ => 993,
     };
     let jmap_token = protocol == Protocol::Jmap && widgets.jmap_token_row.is_active();
@@ -4966,6 +4989,9 @@ fn provider_index_for_account(acc: &AccountConfig) -> u32 {
     if acc.protocol == Protocol::Jmap {
         return jmap_index(acc);
     }
+    if acc.protocol == Protocol::Ews {
+        return kind_index(ProviderKind::Ews);
+    }
     preset_index_for_host(&acc.imap_host)
 }
 
@@ -4982,6 +5008,7 @@ fn protocol_at(idx: u32) -> Protocol {
 fn form_protocol(widgets: &AccountsWindowWidgets) -> Protocol {
     match provider_at(widgets.provider_row.selected()).kind {
         ProviderKind::Jmap => Protocol::Jmap,
+        ProviderKind::Ews => Protocol::Ews,
         // Hylki's own Microsoft sign-in asks for Graph, not IMAP (#329).
         ProviderKind::Microsoft => Protocol::Graph,
         _ => protocol_at(widgets.protocol_row.selected()),
@@ -4997,13 +5024,17 @@ fn protocol_index(protocol: Protocol) -> u32 {
 /// or a URL rather than an IMAP host and port.
 fn apply_protocol(widgets: &AccountsWindowWidgets) {
     let jmap = form_protocol(widgets) == Protocol::Jmap;
+    let ews = form_protocol(widgets) == Protocol::Ews;
     // Only where the servers are shown at all (OAuth providers hide them).
     let servers_shown = widgets.host_row.is_visible();
-    widgets.smtp_row.set_visible(servers_shown && !jmap);
-    widgets.smtp_port_row.set_visible(servers_shown && !jmap);
-    widgets.smtp_separate_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
+    widgets.smtp_row.set_visible(servers_shown && !jmap && !ews);
+    widgets.smtp_port_row.set_visible(servers_shown && !jmap && !ews);
+    widgets.smtp_separate_row.set_visible(widgets.protocol_row.is_visible() && !jmap && !ews);
+    // An EWS address is a whole URL, port and all.
+    widgets.port_row.set_visible(servers_shown && !ews);
     // JMAP runs over a different TLS stack (rustls), which offers no such waiver.
-    widgets.tls_mismatch_row.set_visible(widgets.protocol_row.is_visible() && !jmap);
+    // EWS runs over the IMAP stack's TLS, so the waiver applies there too.
+    widgets.tls_mismatch_row.set_visible((widgets.protocol_row.is_visible() || ews && servers_shown) && !jmap);
     // A token stands in for the username and password (#356); the rows
     // only change where the password is asked for at all.
     let password_shown = widgets.pass_row.is_visible();
@@ -5017,6 +5048,9 @@ fn apply_protocol(widgets: &AccountsWindowWidgets) {
         widgets.smtp_separate_row.set_active(false);
         widgets.host_row.set_title(&i18n("Server (host name or URL)"));
         widgets.port_row.set_title(&i18n("Port (default 443)"));
+    } else if ews {
+        widgets.smtp_separate_row.set_active(false);
+        widgets.host_row.set_title(&i18n("EWS address (empty to find it)"));
     } else {
         widgets.host_row.set_title(&i18n("Incoming Server"));
         widgets.port_row.set_title(&i18n("Port (IMAP 993 / POP3 995)"));
@@ -5033,6 +5067,9 @@ fn brand_for_account(acc: &AccountConfig) -> &'static str {
     }
     if acc.protocol == Protocol::Jmap {
         return jmap_brand(acc);
+    }
+    if acc.protocol == Protocol::Ews {
+        return "mail-ews";
     }
     if let Some(s) = acc.oauth_settings.as_ref().filter(|_| acc.oauth) {
         if s.token_url.contains("googleapis") {
@@ -5067,6 +5104,7 @@ fn brand_for_account(acc: &AccountConfig) -> &'static str {
 fn manual_brand(protocol: Protocol) -> &'static str {
     match protocol {
         Protocol::Jmap => "mail-jmap",
+        Protocol::Ews => "mail-ews",
         Protocol::Pop3 => "mail-pop3",
         _ => "mail",
     }

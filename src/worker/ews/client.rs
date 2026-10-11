@@ -116,6 +116,44 @@ impl Client {
         }
     }
 
+    /// Whether the server takes the 2013 schema, which flags and previews
+    /// need.
+    pub fn has_2013(&self) -> bool {
+        matches!(self.version, ExchangeServerVersion::Exchange2013 | ExchangeServerVersion::Exchange2013_SP1)
+    }
+
+    /// Run an operation written out by hand, for what the `ews` crate cannot
+    /// say (FindItem's sort order): `body` is the operation's element, and
+    /// the reply is read as `Op`'s.
+    pub async fn call_xml<Op: Operation>(&mut self, body: &str) -> Result<Messages<Op>, EwsError> {
+        let mut busy = 0;
+        loop {
+            let version = format!("{:?}", self.version);
+            let document = format!(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\
+                 <soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" \
+                 xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\" \
+                 xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\">\
+                 <soap:Header><t:RequestServerVersion Version=\"{version}\"/></soap:Header>\
+                 <soap:Body>{body}</soap:Body></soap:Envelope>"
+            );
+            tracing::debug!(target: "hylki::ews", "> {}", <Op as Operation>::NAME);
+            let r = match self.conn.post(document.as_bytes()).await {
+                Err(HttpError::Status(503, body)) => Err(EwsError::Fault(Some(ResponseCode::ErrorServerBusy), body)),
+                Err(e) => Err(e.into()),
+                Ok(reply) => parse_reply::<Op>(&reply),
+            };
+            match r {
+                Err(e) if busy < BUSY_RETRIES && wait_asked(&e).is_some() => {
+                    let ms = wait_asked(&e).unwrap_or(1000).min(BUSY_WAIT_CAP_MS);
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                    busy += 1;
+                }
+                r => return r,
+            }
+        }
+    }
+
     async fn call_once<Op: Operation>(&mut self, op: &Op) -> Result<Messages<Op>, EwsError> {
         let envelope = Envelope { headers: vec![Header::RequestServerVersion { version: self.version }], body: op };
         let document = envelope.as_xml_document().map_err(|e| EwsError::Parse(e.to_string()))?;
@@ -144,7 +182,7 @@ pub fn parse_reply<Op: Operation>(reply: &[u8]) -> Result<Messages<Op>, EwsError
         Ok(envelope) => Ok(envelope.body.into_response_messages()),
         Err(ews::Error::RequestFault(fault)) => {
             let detail = fault.detail.as_ref();
-            let code = detail.and_then(|d| d.response_code.clone());
+            let code = detail.and_then(|d| d.response_code);
             let busy = detail.and_then(|d| match &d.message_xml {
                 Some(MessageXml::ServerBusy(b)) => Some(b.back_off_milliseconds),
                 _ => None,
@@ -177,6 +215,36 @@ fn wait_asked(e: &EwsError) -> Option<u64> {
 mod tests {
     use super::*;
     use ews::get_folder::GetFolder;
+
+    /// Replies recorded from gromox (temp/ews-rig), whose SOAP prefix is
+    /// upper case and whose times carry nanoseconds: every one reads.
+    #[test]
+    fn recorded_replies_read() {
+        use ews::{
+            create_item::CreateItem, find_item::FindItem, get_item::GetItem, move_item::MoveItem,
+            sync_folder_hierarchy::SyncFolderHierarchy, update_item::UpdateItem,
+        };
+        macro_rules! fixture {
+            ($name:literal) => {
+                include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/worker/ews/fixtures/", $name, ".xml"))
+            };
+        }
+        let ok = |n: usize, what: &str| assert!(n > 0, "{what}: no response messages");
+        let folders = parse_reply::<GetFolder>(fixture!("02-GetFolder-wellknown")).unwrap();
+        ok(folders.len(), "GetFolder");
+        let hierarchy = parse_reply::<SyncFolderHierarchy>(fixture!("04-SyncFolderHierarchy-initial")).unwrap();
+        ok(hierarchy.len(), "SyncFolderHierarchy");
+        let found = parse_reply::<FindItem>(fixture!("05-FindItem-inbox")).unwrap();
+        ok(found.len(), "FindItem");
+        let mime = parse_reply::<GetItem>(fixture!("08-GetItem-mime-attachment")).unwrap();
+        let ResponseClass::Success(m) = &mime[0] else { panic!("{mime:?}") };
+        assert!(m.items.inner[0].inner_message().mime_content.is_some());
+        let full = parse_reply::<GetItem>(fixture!("09-GetItem-default-nonascii")).unwrap();
+        ok(full.len(), "GetItem");
+        ok(parse_reply::<UpdateItem>(fixture!("11-UpdateItem-IsRead")).unwrap().len(), "UpdateItem");
+        ok(parse_reply::<CreateItem>(fixture!("15-CreateItem-SaveOnly-draft")).unwrap().len(), "CreateItem");
+        ok(parse_reply::<MoveItem>(fixture!("16-MoveItem-draft-to-Projects")).unwrap().len(), "MoveItem");
+    }
 
     #[test]
     fn a_busy_fault_says_how_long_to_wait() {

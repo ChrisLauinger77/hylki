@@ -1684,6 +1684,12 @@ msgstr ""
 "Adja meg a Stalwart kiszolgáló címét. A levelek olvasása és küldése JMAP-on "
 "keresztül történik; nincs szükség SMTP beállításokra."
 
+msgid ""
+"For your organization's own Exchange server. Leave the server empty to find "
+"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
+"accounts use the entry below."
+msgstr ""
+
 msgid "Sign in with your browser — no password needed."
 msgstr "Jelentkezzen be a böngészőben — nincs szükség jelszóra."
 
@@ -2433,13 +2439,14 @@ msgstr[1] "{n} nap múlva"
 msgid "API Token"
 msgstr ""
 
-#. A JMAP server is one address, and it sends the mail
-#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Kiszolgáló (kiszolgáló név vagy URL)"
 
 msgid "Port (default 443)"
 msgstr "Végpont (alapértelmezett: 443)"
+
+msgid "EWS address (empty to find it)"
+msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6885,8 +6892,6 @@ msgstr "Kiszolgáló adatai"
 msgid "Filled in for known providers"
 msgstr "Ismert szolgáltatókhoz kitöltve"
 
-#. A JMAP server is one address, and it sends the mail
-#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "IMAP kiszolgáló"
 
@@ -7082,14 +7087,38 @@ msgstr ""
 "{from} helyesnek tűnik, de a cím nem egyezik meg az üzenetben szereplő "
 "névvel."
 
+msgid "This Exchange account has no server address. Add it in its settings."
+msgstr ""
+
+msgid ""
+"Could not find the Exchange server for {email}: {why}. Enter its EWS "
+"address, such as https://mail.example.org/EWS/Exchange.asmx."
+msgstr ""
+
+msgid ""
+"The Exchange server refused the sign-in for {email}. Check the user name and "
+"password in its settings."
+msgstr ""
+
+#, fuzzy
+msgid "unknown folder {path}"
+msgstr "Minden mappa megjelenítése"
+
+#, fuzzy
+msgid "message not found"
+msgstr "Üzenet betűtípusa"
+
+msgid "Could not list folders: {e}"
+msgstr "A mappák nem listázhatók: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Az üzenet nem tölthető be: {e}"
+
 msgid "Syncing…"
 msgstr "Szinkronizálás…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "A levelek nem kérhetők le: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "Az üzenet nem tölthető be: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "A forrás nem tölthető be: {e}"
@@ -7106,17 +7135,37 @@ msgstr "Nem jelölhető levélszemétként: {e}"
 msgid "Could not mark as not spam: {e}"
 msgstr "Nem sikerült levélszemétnek jelölni: {e}"
 
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Nem sikerült {len} üzenetet levélszemétnek jelölni: {e}"
-
 msgid "Could not move messages: {e}"
 msgstr "Az üzenetek nem helyezhetők át: {e}"
+
+#, fuzzy
+msgid "Could not delete messages: {e}"
+msgstr "Az üzenet nem törölhető: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "A mappa nem üríthető ki: {e}"
 
 msgid "Undo failed: {e}"
 msgstr "A visszavonás sikertelen: {e}"
+
+msgid "Folders of an Exchange account can't be changed from Hylki yet."
+msgstr ""
+
+msgid "Sending…"
+msgstr "Küldés…"
+
+#, fuzzy
+msgid "An Exchange account can't receive mail from another account yet"
+msgstr "Egy POP3-fiók nem tud leveleket fogadni egy másik fióktól"
+
+msgid "Attachments can't be removed from an Exchange account's mail yet."
+msgstr ""
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Nem sikerült {len} üzenetet levélszemétnek jelölni: {e}"
 
 msgid "Could not create folder: {e}"
 msgstr "A mappa nem hozható létre: {e}"
@@ -7140,9 +7189,6 @@ msgstr "Minden mappa megjelenítése"
 msgid "Could not reach the server"
 msgstr "Nem sikerült elérni a kiszolgálót"
 
-msgid "Sending…"
-msgstr "Küldés…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Egy Microsoft-fiók nem tud e-maileket fogadni egy másik fióktól"
 
@@ -7152,14 +7198,8 @@ msgstr "A melléklet eltávolítása…"
 msgid "Could not remove the attachment: {e}"
 msgstr "A melléklet eltávolítása nem sikerült: {e}"
 
-msgid "Could not list folders: {e}"
-msgstr "A mappák nem listázhatók: {e}"
-
 msgid "The attachment is no longer in the message on the server"
 msgstr "A melléklet már nem található az üzenetben a kiszolgálón"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""

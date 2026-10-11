@@ -230,3 +230,19 @@ mod tests {
         assert!(request("a&b@x.example").contains("a&amp;b@x.example"));
     }
 }
+
+/// Against a real Autodiscover service, past the DNS step:
+/// `EWS_AUTODISCOVER='https://127.0.0.1:18443/Autodiscover/Autodiscover.xml|alice@ews.test|alice-pass-1'`
+/// cargo test --bin hylki ews::autodiscover::live -- --ignored --nocapture
+#[cfg(test)]
+mod live {
+    #[tokio::test]
+    #[ignore]
+    async fn answers_with_an_ews_address() {
+        let Ok(spec) = std::env::var("EWS_AUTODISCOVER") else { return };
+        let f: Vec<&str> = spec.split('|').collect();
+        let found = super::follow(f[0], f[1], f[1], f[2], Default::default()).await;
+        println!("found: {found:?}");
+        assert!(found.is_some_and(|u| u.contains("/EWS/Exchange.asmx")));
+    }
+}

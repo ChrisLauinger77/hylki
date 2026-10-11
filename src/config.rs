@@ -370,6 +370,11 @@ pub enum Protocol {
     /// session resource is found at `/.well-known/jmap`; sending goes
     /// through the server too, so the SMTP fields are unused.
     Jmap,
+    /// Exchange Web Services (#391): an on-premise Exchange server, signed
+    /// in to with NTLM or Basic. `imap_host` holds the EWS address
+    /// (`https://mail.example.org/EWS/Exchange.asmx`); the server sends and
+    /// files the Sent copy, so the SMTP fields are unused.
+    Ews,
 }
 
 /// How an account's servers are secured, as GNOME Online Accounts records

@@ -108,6 +108,40 @@ the account has `protocol = "jmap"`, the server in `imap_host`, and
 where a password would be. An account made from the JMAP Server entry has
 `jmap_generic = true`.
 
+### Exchange (on-premise)
+
+**Microsoft Exchange (on-premise)** in the Provider list connects to an
+Exchange server an organization runs itself, such as a university's, over
+Exchange Web Services (EWS). Microsoft 365 mailboxes use the Microsoft 365
+entry instead: Microsoft is switching EWS off for them.
+
+- **EWS address:** leave it empty and **Test Connection** looks the server
+  up from the email address with Autodiscover, then fills the address in.
+  When that finds nothing, the usual `https://mail.<domain>/EWS/Exchange.asmx`
+  is tried. An address can also be typed in full.
+- **Username:** `user@domain` or `DOMAIN\user`, as the organization signs
+  in to Outlook; empty means the email address.
+- **Sign-in:** NTLM where the server offers it, otherwise Basic over HTTPS.
+  NTLM carries the TLS channel binding that Exchange 2019 CU14 and later
+  require by default (Extended Protection). Kerberos is not supported yet.
+- **Certificates:** the system's trusted certificates, as for IMAP, and the
+  **Accept a certificate for another name** switch.
+
+Folders come with their roles from the server; Exchange's own Outbox and
+the calendar, contacts and tasks folders are left out. Each folder lists its
+newest 300 messages. Read state, stars (Exchange 2013 and later) and
+categories, which Hylki shows as tags, are the server's own. Sending goes
+through the server, which files the copy in Sent Items. New mail is found by
+polling, at the interval set for checking mail or every two minutes.
+Creating, renaming or deleting folders, removing an attachment from a
+message and moving mail into the account from another one are not supported
+yet.
+
+Tested against grommunio's gromox server with Basic sign-in, and NTLM
+against an independent implementation; a real Exchange server has not been
+tried yet. In `accounts.toml` the account has `protocol = "ews"` and the EWS
+address in `imap_host`.
+
 ### Folder order
 
 An account's main folders (Inbox, Drafts, Sent, Archive, Junk, Trash) come
