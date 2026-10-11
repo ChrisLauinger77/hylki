@@ -399,6 +399,10 @@ msgid "Mail Accounts"
 msgstr "Levelezési fiókok"
 
 #, fuzzy
+msgid "New Smart Folder…"
+msgstr "Új mappa…"
+
+#, fuzzy
 msgid "About Hylki"
 msgstr "Névjegy"
 
@@ -425,6 +429,10 @@ msgstr "Kimenő"
 #, fuzzy
 msgid "Tag"
 msgstr "Címkék"
+
+#, fuzzy
+msgid "Smart Folder"
+msgstr "Mappák rendezése"
 
 #, fuzzy
 msgid ""
@@ -732,6 +740,14 @@ msgstr "Ehhez a fiókhoz nem érhető el Levélszemét mappa"
 
 msgid "No Inbox folder available for this account"
 msgstr "Ehhez a fiókhoz nem érhető el Beérkezett üzenetek mappa"
+
+#, fuzzy
+msgid "Delete “{name}”?"
+msgstr "Kiüríti ezt: „{name}”?"
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "Névjegyek hozzáadásához nem érhető el címjegyzék"
@@ -1709,6 +1725,20 @@ msgstr ""
 msgid "Find Tags…"
 msgstr "Címkék keresése…"
 
+#, fuzzy
+msgid "Smart Folders"
+msgstr "Mappák rendezése"
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+#, fuzzy
+msgid "Add Smart Folder…"
+msgstr "Mappa hozzáadása"
+
 msgid "Search filters"
 msgstr "Keresési szűrők"
 
@@ -2459,6 +2489,107 @@ msgstr "Összes importálása"
 msgid "{n} messages"
 msgstr "{n} db üzenet"
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+#, fuzzy
+msgid "Remove smart folder"
+msgstr "Szűrő eltávolítása"
+
+msgid "Inbox"
+msgstr "Beérkezett üzenetek"
+
+msgid "Starred"
+msgstr "Csillakerülzott"
+
+#, fuzzy
+msgid "Not starred"
+msgstr "Nincs telepítve"
+
+#, fuzzy
+msgid "Unread"
+msgstr "Olvasott/olvasatlan"
+
+#, fuzzy
+msgid "Read"
+msgstr "Olvasás"
+
+#, fuzzy
+msgid "Has attachments"
+msgstr "Nincsenek mellékletek"
+
+msgid "Tagged"
+msgstr ""
+
+#, fuzzy
+msgid "Message preview"
+msgstr "Üzenetforrás"
+
+#, fuzzy
+msgid "Edit Smart Folder"
+msgstr "Mappák rendezése"
+
+#, fuzzy
+msgid "Add Smart Folder"
+msgstr "Mappa hozzáadása"
+
+#, fuzzy
+msgid "All accounts means those in the unified section"
+msgstr "A fióklista az egységesített „Elküldve” sor alatt."
+
+msgid "Folders"
+msgstr "Mappák"
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr "Feltétel eltávolítása"
+
+msgid "Where"
+msgstr "Hol"
+
+msgid "Match"
+msgstr "Egyezés"
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr ""
+"A választható lehetőségeket vessző választja el egymástól; bármelyikük "
+"elfogadható"
+
+msgid "Text to match"
+msgstr "Egyeztetendő szöveg"
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr "Feladó cím, ha nincs megadva „Válaszcím” mező"
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr ""
+
+msgid "Add Condition"
+msgstr "Feltétel hozzáadása"
+
+msgid "Condition matching"
+msgstr "Feltételek összehasonlítása"
+
+msgid "All must match"
+msgstr "Mindennek egyeznie kell"
+
+msgid "Any one may match"
+msgstr "Bármelyik egyezhet"
+
+msgid "Condition {n}"
+msgstr "{n} feltétel"
+
+msgid "Or where"
+msgstr "Vagy ahol"
+
+msgid "And where"
+msgstr "És ahol"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2503,52 +2634,8 @@ msgstr "Szűrő hozzáadása"
 msgid "Name (optional)"
 msgstr "Név (opcionális)"
 
-msgid "Remove condition"
-msgstr "Feltétel eltávolítása"
-
-msgid "Where"
-msgstr "Hol"
-
-msgid "Match"
-msgstr "Egyezés"
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr ""
-"A választható lehetőségeket vessző választja el egymástól; bármelyikük "
-"elfogadható"
-
-msgid "Text to match"
-msgstr "Egyeztetendő szöveg"
-
 msgid "Searched on the server; nothing is downloaded"
 msgstr "Keresés a kiszolgálón; semmi sem töltődött le"
-
-msgid "From address when no Reply-To is set"
-msgstr "Feladó cím, ha nincs megadva „Válaszcím” mező"
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Add Condition"
-msgstr "Feltétel hozzáadása"
-
-msgid "Condition matching"
-msgstr "Feltételek összehasonlítása"
-
-msgid "All must match"
-msgstr "Mindennek egyeznie kell"
-
-msgid "Any one may match"
-msgstr "Bármelyik egyezhet"
-
-msgid "Condition {n}"
-msgstr "{n} feltétel"
-
-msgid "Or where"
-msgstr "Vagy ahol"
-
-msgid "And where"
-msgstr "És ahol"
 
 msgid "Then"
 msgstr "Aztán"
@@ -3982,15 +4069,8 @@ msgstr "Ez az üzenet egy levelezőlistáról származik."
 msgid "Translate"
 msgstr "Fordította"
 
-msgid "Starred"
-msgstr "Csillakerülzott"
-
 msgid "Received"
 msgstr ""
-
-#, fuzzy
-msgid "Has attachments"
-msgstr "Nincsenek mellékletek"
 
 #, fuzzy
 msgid "Click to open this message"
@@ -4756,6 +4836,18 @@ msgstr "Elmented a szűrőt?"
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+"A szűrőszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a módosításokat, "
+"vagy dobja el őket."
+
+#, fuzzy
+msgid "Save the smart folder?"
+msgstr "Elmented a szűrőt?"
+
+#, fuzzy
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "A szűrőszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a módosításokat, "
 "vagy dobja el őket."
@@ -6604,9 +6696,6 @@ msgstr "Mappák megjelenítése vagy elrejtése"
 msgid "Folders ({len})"
 msgstr "Mappák ({len})"
 
-msgid "Folders"
-msgstr "Mappák"
-
 msgid "Sort Folders"
 msgstr "Mappák rendezése"
 
@@ -6625,6 +6714,10 @@ msgstr "Minden mappa megjelenítése"
 msgid "Show each tag"
 msgstr "Minden címke megjelenítése"
 
+#, fuzzy
+msgid "Show each smart folder"
+msgstr "Minden mappa megjelenítése"
+
 msgid "Long-press to expand or collapse"
 msgstr "Hosszú gombnyomással kibontható vagy összecsukható"
 
@@ -6633,6 +6726,14 @@ msgstr "Kuka kiürítése…"
 
 msgid "Empty Junk…"
 msgstr "Levélszemét kiürítése…"
+
+#, fuzzy
+msgid "Edit Smart Folder…"
+msgstr "Szűrő szerkesztése…"
+
+#, fuzzy
+msgid "Delete Smart Folder…"
+msgstr "Mappa törlése…"
 
 msgid "Show or hide filters"
 msgstr "Szűrők megjelenítése vagy elrejtése"
@@ -7148,9 +7249,6 @@ msgid ""
 msgstr ""
 "A POP3 nem tudja módosítani a kiszolgálón található üzenetet, ezért a "
 "melléklet nem került eltávolításra"
-
-msgid "Inbox"
-msgstr "Beérkezett üzenetek"
 
 msgid "Email Client"
 msgstr "E-mail kliens"

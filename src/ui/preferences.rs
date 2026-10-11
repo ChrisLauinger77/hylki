@@ -940,6 +940,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "accounts", title: i18n_noop("Mail Accounts"), icon: "avatar-default-symbolic", accounts: true },
             SidePage { id: "tags", title: i18n_noop("Tags"), icon: "tag-outline-symbolic", accounts: true },
             SidePage { id: "filters", title: i18n_noop("Filters"), icon: "filter-folder-symbolic", accounts: true },
+            SidePage { id: "smart", title: i18n_noop("Smart Folders"), icon: "folder-saved-search-symbolic", accounts: true },
             SidePage { id: "senders", title: i18n_noop("Senders"), icon: "contact-new-symbolic", accounts: true },
             SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "channel-secure-symbolic", accounts: false },
             SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "cloud-symbolic", accounts: false },
@@ -1725,6 +1726,10 @@ impl Preferences {
             "filters" => (
                 i18n("Save the filter?"),
                 i18n("The filter editor is open. Save what you changed, or discard it, before moving on."),
+            ),
+            "smart" => (
+                i18n("Save the smart folder?"),
+                i18n("The smart folder editor is open. Save what you changed, or discard it, before moving on."),
             ),
             "tags" => (
                 i18n("Save the tag?"),

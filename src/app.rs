@@ -368,6 +368,44 @@ const CARRIED_BODY_LIMIT: usize = 64;
 /// One entry on the undo (or redo) stack: the step to apply, and what the
 /// user called the action it belongs to, so the menu can say "Undo Archive"
 /// rather than just "Undo".
+/// Most messages one smart folder (#417) lists per account.
+const SMART_VIEW_LIMIT: usize = 5000;
+
+/// What a smart folder's conditions need besides the message itself, made
+/// on the main thread and taken to the one that reads the index.
+struct SmartContext {
+    /// The tags' keywords, lower case.
+    tags: Vec<String>,
+    contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
+}
+
+impl SmartContext {
+    fn matches(&self, folder: &config::SmartFolder, m: &Message) -> bool {
+        let recipients = [m.to.as_str(), m.cc.as_str()]
+            .into_iter()
+            .filter(|s| !s.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join(", ");
+        folder.matches(&config::SmartInput {
+            text: config::FilterInput {
+                from_addr: &m.from_addr,
+                from_name: &m.from_name,
+                subject: &m.subject,
+                recipients: &recipients,
+                reply_to: &m.reply_to,
+                body: if m.body.is_empty() { &m.preview } else { &m.body },
+                body_hits: &[],
+                contacts: self.contacts.as_deref(),
+            },
+            starred: m.starred,
+            unread: m.unread,
+            attachment: m.has_attachment,
+            keywords: &m.keywords,
+            tags: &self.tags,
+        })
+    }
+}
+
 struct UndoEntry {
     account_id: u32,
     what: String,
@@ -687,6 +725,7 @@ pub struct AppModel {
     /// were added, and whether their list is open.
     favorites: Vec<String>,
     favorites_expanded: bool,
+    smart_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open.
     filtered_expanded_accounts: Vec<String>,
     tags_expanded_accounts: Vec<String>,
@@ -921,6 +960,17 @@ pub struct AppModel {
     /// asked for meanwhile runs when it lands.
     tag_view_loading: bool,
     tag_view_dirty: bool,
+    /// Smart folders (#417): the saved searches, and the one open, by id,
+    /// read and cached the way the tag view is.
+    smart_folders: Vec<config::SmartFolder>,
+    smart_view: Option<String>,
+    smart_view_cache: HashMap<String, Vec<Message>>,
+    smart_view_loading: bool,
+    smart_view_dirty: bool,
+    /// A count of the smart folders' unread mail is waiting to run, or
+    /// running: syncs come in bursts, and one count covers a burst.
+    smart_counts_due: bool,
+    smart_counts_running: bool,
     /// When each account's keywords were last re-synced from the server
     /// (#166), so reopening a tag view within a few seconds does not scan
     /// every folder again.
@@ -1520,6 +1570,7 @@ pub enum AppMsg {
         junk: bool,
         trash: bool,
         favorites: bool,
+        smart: bool,
     },
     /// A tag view's rows, read from the index off the main thread: the
     /// view they answer and, per message, its account and folder path.
@@ -1748,6 +1799,15 @@ pub enum AppMsg {
     /// every tag at once), and the account it is scoped to (an account
     /// section's own Tags row) or `None` for every account.
     TagSelected { keyword: Option<String>, account: Option<u32> },
+    /// A smart folder (#417) was picked, by id.
+    SmartSelected(String),
+    /// A smart folder's rows, read from the index off the main thread.
+    SmartViewLoaded { id: String, rows: Vec<(u32, String, Message)> },
+    /// Count every smart folder's unread mail now (the debounce ran out).
+    CountSmartFolders,
+    SmartCounts(HashMap<String, u32>),
+    /// The smart folders as Settings left them.
+    SetSmartFolders(Vec<config::SmartFolder>),
     /// Put a tag on one message, or take it off (row menu, palette, card).
     SetTag { message: Box<Message>, keyword: String, add: bool },
     /// Put a tag on several messages, or take it off (the list's bulk bar).
@@ -2635,6 +2695,7 @@ impl SimpleComponent for AppModel {
         let junk_expanded = sidebar_state.junk_expanded;
         let trash_expanded = sidebar_state.trash_expanded;
         let favorites_expanded = sidebar_state.favorites_expanded;
+        let smart_expanded = sidebar_state.smart_expanded;
         let favorites = sidebar_state.favorites.clone();
 
         // Load accounts, then reconcile against GNOME Online Accounts: drop any
@@ -2710,6 +2771,7 @@ impl SimpleComponent for AppModel {
                 junk_expanded,
                 trash_expanded,
                 favorites_expanded,
+                smart_expanded,
                 show_attachments,
                 show_contacts,
                 start,
@@ -2738,6 +2800,7 @@ impl SimpleComponent for AppModel {
                 junk_expanded,
                 trash_expanded,
                 favorites_expanded,
+                smart_expanded,
                 show_attachments,
                 show_contacts,
                 start: None,
@@ -3183,6 +3246,7 @@ impl SimpleComponent for AppModel {
             trash_expanded,
             favorites,
             favorites_expanded,
+            smart_expanded,
             filtered_expanded_accounts,
             tags_expanded_accounts,
             rail_dots: prefs.rail_dots,
@@ -3292,6 +3356,13 @@ impl SimpleComponent for AppModel {
             tag_view_cache: HashMap::new(),
             tag_view_loading: false,
             tag_view_dirty: false,
+            smart_folders: config::load_smart_folders(),
+            smart_view: None,
+            smart_view_cache: HashMap::new(),
+            smart_view_loading: false,
+            smart_view_dirty: false,
+            smart_counts_due: false,
+            smart_counts_running: false,
             keyword_sync_at: HashMap::new(),
             tag_provider: crate::ui::DisplayCss::new(),
             // Demo mode gets a cache that never touches disk, seeded with the
@@ -4648,7 +4719,7 @@ impl SimpleComponent for AppModel {
                         });
                     });
                 }
-                // HYLKI_SHOWCASE_UNIFIED=sent|starred|drafts|archive|junk|trash opens that unified
+                // HYLKI_SHOWCASE_UNIFIED=sent|starred|drafts|archive|junk|trash|smart opens that unified
                 // row at 3s, All Inboxes at 6s and the row again at 9s, so the
                 // timing logs show a cold and a warm open.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_UNIFIED") {
@@ -4660,6 +4731,7 @@ impl SimpleComponent for AppModel {
                         "trash" => SidebarInput::UnifiedKindRowSelected(FolderKind::Trash),
                         "filtered" => SidebarInput::UnifiedFilteredSelected,
                         "tags" => SidebarInput::UnifiedTagsSelected,
+                        "smart" => SidebarInput::SmartRowSelected(0),
                         _ => SidebarInput::UnifiedKindRowSelected(FolderKind::Sent),
                     };
                     let sb = model.sidebar.sender().clone();
@@ -5459,6 +5531,7 @@ impl SimpleComponent for AppModel {
                 self.showing_contacts = false;
                 self.unified = false;
                 self.tag_view = None;
+                self.smart_view = None;
                 self.selected = None;
                 self.current = None;
                 self.current_thread.clear();
@@ -5999,8 +6072,9 @@ impl SimpleComponent for AppModel {
                 junk,
                 trash,
                 favorites,
+                smart,
             } => {
-                let now = (all_inboxes, filtered, tags, starred, sent, drafts, archive, junk, trash, favorites);
+                let now = (all_inboxes, filtered, tags, starred, sent, drafts, archive, junk, trash, favorites, smart);
                 let was = (
                     self.unified_expanded,
                     self.filtered_expanded,
@@ -6012,6 +6086,7 @@ impl SimpleComponent for AppModel {
                     self.junk_expanded,
                     self.trash_expanded,
                     self.favorites_expanded,
+                    self.smart_expanded,
                 );
                 if now != was {
                     self.unified_expanded = all_inboxes;
@@ -6024,6 +6099,7 @@ impl SimpleComponent for AppModel {
                     self.junk_expanded = junk;
                     self.trash_expanded = trash;
                     self.favorites_expanded = favorites;
+                    self.smart_expanded = smart;
                     self.save_sidebar_state();
                 }
             }
@@ -6142,6 +6218,29 @@ impl SimpleComponent for AppModel {
                             acc.emit(crate::ui::accounts::AccountsInput::EditFilter(i));
                         }
                     }
+                }
+                CtxAction::NewSmartFolder => {
+                    self.open_settings_window(&sender, true, false);
+                    if let Some(p) = &self.prefs {
+                        p.emit(PrefInput::ShowPageById("smart".to_string()));
+                    }
+                    if let Some(acc) = &self.accounts_win {
+                        acc.emit(crate::ui::accounts::AccountsInput::AddSmartFolder);
+                    }
+                }
+                CtxAction::EditSmartFolder(id) => {
+                    if let Some(i) = self.smart_folders.iter().position(|f| f.id == id) {
+                        self.open_settings_window(&sender, true, false);
+                        if let Some(p) = &self.prefs {
+                            p.emit(PrefInput::ShowPageById("smart".to_string()));
+                        }
+                        if let Some(acc) = &self.accounts_win {
+                            acc.emit(crate::ui::accounts::AccountsInput::EditSmartFolder(i));
+                        }
+                    }
+                }
+                CtxAction::DeleteSmartFolder(id) => {
+                    self.confirm_delete_smart_folder(id, &sender);
                 }
                 CtxAction::EditTag(keyword) => {
                     if let Some(i) = self.tags.iter().position(|t| t.keyword == keyword) {
@@ -9375,6 +9474,7 @@ impl SimpleComponent for AppModel {
                 self.showing_outbox = false;
                 self.unified = false;
                 self.selected = None;
+                self.smart_view = None;
                 self.tag_view = Some((account, keyword));
                 self.current = None;
                 self.current_thread.clear();
@@ -9396,6 +9496,86 @@ impl SimpleComponent for AppModel {
                 self.push_index_complete();
             }
 
+            AppMsg::SmartSelected(id) => {
+                if !self.smart_folders.iter().any(|f| f.id == id) {
+                    return;
+                }
+                self.close_sidebar_peek();
+                self.mirror_selection(crate::ui::sidebar::Sel::Smart(id.clone()));
+                self.leave_gallery();
+                self.showing_contacts = false;
+                self.showing_outbox = false;
+                self.unified = false;
+                self.selected = None;
+                self.tag_view = None;
+                self.smart_view = Some(id);
+                self.current = None;
+                self.current_thread.clear();
+                self.attachments.clear();
+                self.attachments_loading = false;
+                self.sync_attachment_drawer();
+                self.show_message(None, false);
+                self.message_list.emit(MessageListInput::SetSelected(None));
+                self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list.emit(MessageListInput::SetColorize(true));
+                // A folder held to Sent lists what you sent: name the
+                // recipients, as Sent does.
+                let sent = self
+                    .open_smart_folder()
+                    .is_some_and(|f| f.folder == Some(config::SmartFolderKind::Sent));
+                self.message_list.emit(MessageListInput::SetShowRecipient(sent));
+                self.message_list.emit(MessageListInput::SetRestorable(false));
+                self.message_list.emit(MessageListInput::SetInJunk(false));
+                self.message_list.emit(MessageListInput::SetInDrafts(false));
+                self.message_view.emit(MessageViewInput::SetDraftsView(false));
+                self.show_smart_view();
+                self.refresh_smart_view(&sender);
+                self.push_index_complete();
+            }
+
+            AppMsg::SmartViewLoaded { id, rows } => {
+                self.smart_view_loading = false;
+                if let Some(folder) = self.smart_folders.iter().find(|f| f.id == id).cloned() {
+                    let out = self.assemble_smart_view(&folder, rows);
+                    let changed = self.smart_view_cache.get(&id) != Some(&out);
+                    if changed {
+                        self.smart_view_cache.insert(id.clone(), out.clone());
+                    }
+                    if self.smart_view.as_ref() == Some(&id) && changed {
+                        self.message_list.emit(MessageListInput::SetMessages { messages: out });
+                    }
+                }
+                if std::mem::take(&mut self.smart_view_dirty) {
+                    self.refresh_smart_view(&sender);
+                }
+            }
+
+            AppMsg::CountSmartFolders => {
+                self.smart_counts_due = false;
+                self.count_smart_folders(&sender);
+            }
+
+            AppMsg::SmartCounts(counts) => {
+                self.smart_counts_running = false;
+                self.sidebars_emit(SidebarInput::SetSmartUnread(counts));
+            }
+
+            AppMsg::SetSmartFolders(folders) => {
+                config::save_smart_folders(&folders);
+                // What each one keeps may have changed with its conditions.
+                self.smart_view_cache.clear();
+                self.smart_folders = folders;
+                if let Some(acc) = &self.accounts_win {
+                    acc.emit(crate::ui::accounts::AccountsInput::SetSmartFolders(self.smart_folders.clone()));
+                }
+                self.rebuild_sidebar();
+                if self.smart_view.as_ref().is_some_and(|id| self.smart_folders.iter().any(|f| &f.id == id)) {
+                    self.show_smart_view();
+                    self.refresh_smart_view(&sender);
+                }
+                self.schedule_smart_counts(&sender);
+            }
+
             AppMsg::KeywordsSynced { account_id, paths } => {
                 if paths.is_empty() {
                     return;
@@ -9405,6 +9585,9 @@ impl SimpleComponent for AppModel {
                 // re-syncs so its rows' chips follow.
                 if self.tag_view.is_some() {
                     self.refresh_tag_view(&sender);
+                }
+                if self.smart_view.is_some() {
+                    self.refresh_smart_view(&sender);
                 }
                 if let Some(sel) = self.selected.clone() {
                     if sel.account_id == account_id && paths.contains(&sel.path) {
@@ -10602,7 +10785,10 @@ impl SimpleComponent for AppModel {
                     // The index just took this folder's flags: re-read the
                     // tag, off the main thread.
                     self.refresh_tag_view(&sender);
+                } else if self.smart_view.is_some() {
+                    self.refresh_smart_view(&sender);
                 }
+                self.schedule_smart_counts(&sender);
                 // The reader's message was removed by this sync (deleted/moved on
                 // another device). Clear it right away so nothing stale lingers, then
                 // advance to whatever now sits in its place if there is one — the
@@ -11872,6 +12058,7 @@ impl AppModel {
         add(i18n("Show or Hide the Sidebar"), &action, "", || AppMsg::ToggleSidebar);
         add(i18n("Settings"), &action, "Ctrl+,", || AppMsg::OpenPreferences);
         add(i18n("Mail Accounts"), &action, "", || AppMsg::OpenAccounts);
+        add(i18n("New Smart Folder…"), &action, "", || AppMsg::SidebarContext(CtxAction::NewSmartFolder));
         add(i18n("Keyboard Shortcuts"), &action, "Ctrl+?", || AppMsg::ShowShortcuts);
         add(i18n("About Hylki"), &action, "", || AppMsg::OpenAbout);
         {
@@ -11949,6 +12136,11 @@ impl AppModel {
                 tag.clone(),
                 Box::new(move || AppMsg::TagSelected { keyword: Some(keyword.clone()), account: None }),
             );
+        }
+        let smart = i18n("Smart Folder");
+        for f in &self.smart_folders {
+            let id = f.id.clone();
+            go(f.name.clone(), smart.clone(), Box::new(move || AppMsg::SmartSelected(id.clone())));
         }
         out
     }
@@ -12404,6 +12596,7 @@ impl AppModel {
         self.selected = None;
         self.unified = false;
         self.tag_view = None;
+        self.smart_view = None;
         self.unified_slices.clear();
         self.message_cache.clear();
         self.body_cache.clear();
@@ -13367,6 +13560,7 @@ impl AppModel {
             trash_expanded: self.trash_expanded,
             favorites: self.favorites.clone(),
             favorites_expanded: self.favorites_expanded,
+            smart_expanded: self.smart_expanded,
             filtered_expanded_accounts: self.filtered_expanded_accounts.clone(),
             tags_expanded_accounts: self.tags_expanded_accounts.clone(),
         });
@@ -13952,6 +14146,7 @@ impl AppModel {
             tags: self.tags.clone(),
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
+            smart_folders: self.smart_folders.iter().map(|f| (f.id.clone(), f.name.clone())).collect(),
         });
 
         // Keep the list's per-account tint colors in sync, and what its
@@ -14696,6 +14891,7 @@ impl AppModel {
         self.unified_view = view;
         self.unified = true;
         self.tag_view = None;
+        self.smart_view = None;
         self.selected = None;
         if self.seen_counts {
             self.push_unread_counts();
@@ -15070,6 +15266,7 @@ impl AppModel {
         });
         self.unified = false;
         self.tag_view = None;
+        self.smart_view = None;
         self.attachments.clear();
         self.sync_attachment_drawer();
         self.attachments_loading = false;
@@ -18832,6 +19029,222 @@ impl AppModel {
         });
     }
 
+    fn open_smart_folder(&self) -> Option<&config::SmartFolder> {
+        let id = self.smart_view.as_ref()?;
+        self.smart_folders.iter().find(|f| &f.id == id)
+    }
+
+    /// Where a smart folder (#417) looks, per account: the folders it is
+    /// held to (`None` for all) and the ones it leaves out. One account
+    /// when it names one, else every account in the unified section; one
+    /// kind of folder when it names one, else all but Trash and Junk.
+    fn smart_scope(&self, f: &config::SmartFolder) -> Vec<(u32, Option<Vec<String>>, Vec<String>)> {
+        self.accounts
+            .iter()
+            .filter(|a| {
+                if f.account_email.is_empty() {
+                    self.in_unified(a.id)
+                } else {
+                    a.email.eq_ignore_ascii_case(&f.account_email)
+                }
+            })
+            .map(|a| {
+                let folders = self.folders.get(&a.id).map(Vec::as_slice).unwrap_or(&[]);
+                let paths_of = |kinds: &[FolderKind]| -> Vec<String> {
+                    folders.iter().filter(|x| kinds.contains(&x.kind)).map(|x| x.path.clone()).collect()
+                };
+                match f.folder {
+                    Some(k) => (a.id, Some(paths_of(&[k.kind()])), Vec::new()),
+                    None => (a.id, None, paths_of(&[FolderKind::Trash, FolderKind::Junk])),
+                }
+            })
+            .collect()
+    }
+
+    /// What a smart folder's matcher needs from here, to take to a thread:
+    /// the tags' keywords, and the address books when a condition asks.
+    fn smart_context(&self, f: &config::SmartFolder) -> SmartContext {
+        SmartContext {
+            tags: self.tags.iter().map(|t| t.keyword.to_lowercase()).collect(),
+            contacts: if f.needs_contacts() { self.saved_addresses.get() } else { None },
+        }
+    }
+
+    /// Show the open smart folder from its last result at once (a loading
+    /// list if it never ran); [`refresh_smart_view`] brings it up to date.
+    fn show_smart_view(&self) {
+        let Some(id) = self.smart_view.as_ref() else { return };
+        match self.smart_view_cache.get(id) {
+            Some(cached) => {
+                self.message_list.emit(MessageListInput::SetMessages { messages: cached.clone() })
+            }
+            None => self.message_list.emit(MessageListInput::SetLoading),
+        }
+    }
+
+    /// Read the open smart folder's rows from the on-disk index off the main
+    /// thread, answering with [`AppMsg::SmartViewLoaded`]. The demo's mail
+    /// never reaches the database, so its view is matched here from the
+    /// folders loaded so far.
+    fn refresh_smart_view(&mut self, sender: &ComponentSender<Self>) {
+        let Some(folder) = self.open_smart_folder().cloned() else { return };
+        if demo_mode() && self.config.is_empty() {
+            let out = self.assemble_smart_view(&folder, Vec::new());
+            self.smart_view_cache.insert(folder.id.clone(), out.clone());
+            self.message_list.emit(MessageListInput::SetMessages { messages: out });
+            return;
+        }
+        if self.smart_view_loading {
+            self.smart_view_dirty = true;
+            return;
+        }
+        self.smart_view_loading = true;
+        let scope = self.smart_scope(&folder);
+        let ctx = self.smart_context(&folder);
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let mut rows: Vec<(u32, String, Message)> = Vec::new();
+            if let Ok(cache) = crate::cache::Cache::open() {
+                for (account_id, include, exclude) in scope {
+                    let found = cache.smart_scan(
+                        account_id,
+                        include.as_deref(),
+                        &exclude,
+                        folder.prefilter(),
+                        SMART_VIEW_LIMIT,
+                        |m| ctx.matches(&folder, m),
+                    );
+                    rows.extend(found.into_iter().map(|(path, m)| (account_id, path, m)));
+                }
+            }
+            s.input(AppMsg::SmartViewLoaded { id: folder.id, rows });
+        });
+    }
+
+    /// A smart folder from its rows: newest first, Gmail's per-label copies
+    /// of one message as one row, the inbox copy where there is one.
+    fn assemble_smart_view(&self, folder: &config::SmartFolder, rows: Vec<(u32, String, Message)>) -> Vec<Message> {
+        let mut out: Vec<Message> = Vec::new();
+        for (account_id, path, mut m) in rows {
+            let Some(f) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)) else {
+                continue;
+            };
+            m.folder_id = f.id;
+            out.push(m);
+        }
+        if out.is_empty() && demo_mode() && self.config.is_empty() {
+            let ctx = self.smart_context(folder);
+            for (account_id, include, exclude) in self.smart_scope(folder) {
+                for f in self.folders.get(&account_id).into_iter().flatten() {
+                    let looked_in = include.as_ref().is_none_or(|p| p.contains(&f.path)) && !exclude.contains(&f.path);
+                    if !looked_in {
+                        continue;
+                    }
+                    if let Some(messages) = self.message_cache.get(&(account_id, f.id)) {
+                        out.extend(messages.iter().filter(|m| ctx.matches(folder, m)).cloned());
+                    }
+                }
+            }
+        }
+        let inbox_first = |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
+        out.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b))));
+        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+        out.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        out
+    }
+
+    /// Count the smart folders' unread mail a few seconds from now, once for
+    /// however many syncs land meanwhile.
+    fn schedule_smart_counts(&mut self, sender: &ComponentSender<Self>) {
+        if self.smart_folders.is_empty() || self.smart_counts_due {
+            return;
+        }
+        self.smart_counts_due = true;
+        let s = sender.clone();
+        gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::CountSmartFolders));
+    }
+
+    /// Each smart folder's unread mail for its sidebar row, read off the
+    /// main thread: only the unread rows are looked at.
+    fn count_smart_folders(&mut self, sender: &ComponentSender<Self>) {
+        if self.smart_counts_running {
+            // A count in flight answers for what it read; this one comes
+            // after it.
+            self.schedule_smart_counts(sender);
+            return;
+        }
+        let demo = demo_mode() && self.config.is_empty();
+        let jobs: Vec<(config::SmartFolder, Vec<(u32, Option<Vec<String>>, Vec<String>)>, SmartContext)> = self
+            .smart_folders
+            .iter()
+            .map(|f| (f.clone(), self.smart_scope(f), self.smart_context(f)))
+            .collect();
+        if demo {
+            let counts = jobs
+                .iter()
+                .map(|(f, _, _)| {
+                    let n = self.assemble_smart_view(f, Vec::new()).iter().filter(|m| m.unread).count() as u32;
+                    (f.id.clone(), n)
+                })
+                .collect();
+            sender.input(AppMsg::SmartCounts(counts));
+            return;
+        }
+        self.smart_counts_running = true;
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let mut counts: HashMap<String, u32> = HashMap::new();
+            if let Ok(cache) = crate::cache::Cache::open() {
+                for (folder, scope, ctx) in jobs {
+                    let mut pre = folder.prefilter();
+                    // Read mail is never counted, so a folder of read mail
+                    // counts nothing.
+                    if pre.unread == Some(false) {
+                        counts.insert(folder.id, 0);
+                        continue;
+                    }
+                    pre.unread = Some(true);
+                    let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+                    let mut n = 0u32;
+                    for (account_id, include, exclude) in scope {
+                        for (_, m) in cache.smart_scan(account_id, include.as_deref(), &exclude, pre, usize::MAX, |m| {
+                            ctx.matches(&folder, m)
+                        }) {
+                            if m.message_id.is_empty() || seen.insert((account_id, m.message_id)) {
+                                n += 1;
+                            }
+                        }
+                    }
+                    counts.insert(folder.id, n);
+                }
+            }
+            s.input(AppMsg::SmartCounts(counts));
+        });
+    }
+
+    /// Delete a smart folder from the sidebar's menu: it is only a search,
+    /// so nothing else goes with it, but it still asks.
+    fn confirm_delete_smart_folder(&self, id: String, sender: &ComponentSender<Self>) {
+        let Some(folder) = self.smart_folders.iter().find(|f| f.id == id) else { return };
+        let dialog = adw::AlertDialog::new(
+            Some(&i18n_f("Delete “{name}”?", &[("name", &folder.name)])),
+            Some(&i18n("The smart folder goes from the sidebar. The mail it shows stays where it is.")),
+        );
+        dialog.add_response("cancel", &i18n("Cancel"));
+        dialog.add_response("delete", &i18n("Delete"));
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        let s = sender.clone();
+        let rest: Vec<config::SmartFolder> = self.smart_folders.iter().filter(|f| f.id != id).cloned().collect();
+        dialog.connect_response(None, move |_, resp| {
+            if resp == "delete" {
+                s.input(AppMsg::SetSmartFolders(rest.clone()));
+            }
+        });
+        dialog.present(Some(&self.window));
+    }
+
     /// The tag view (#71) from its rows: every message of every account in
     /// scope carrying the tag, newest first. Trash and Junk keep their tags
     /// but stay out; Gmail's per-label copies of one message collapse to one
@@ -19015,6 +19428,8 @@ impl AppModel {
             self.emit_unified();
         } else if self.tag_view.is_some() {
             self.show_tag_view();
+        } else if self.smart_view.is_some() {
+            self.show_smart_view();
         } else if let Some(sel) = self.selected.as_ref() {
             if let Some(msgs) = self.message_cache.get(&(sel.account_id, sel.folder_id)) {
                 self.message_list.emit(MessageListInput::SetMessages { messages: msgs.clone() });
@@ -19305,6 +19720,21 @@ impl AppModel {
                 });
             }
         }
+        // HYLKI_SHOWCASE_EDIT_SMART=<index> likewise opens that smart
+        // folder's editor (#417); an index past the end opens a new one.
+        if let Some(Ok(i)) = std::env::var("HYLKI_SHOWCASE_EDIT_SMART").ok().map(|v| v.parse::<usize>()) {
+            if demo_mode() {
+                let a = accounts.sender().clone();
+                let n = self.smart_folders.len();
+                gtk::glib::timeout_add_seconds_local_once(2, move || {
+                    let _ = a.send(if i < n {
+                        crate::ui::accounts::AccountsInput::EditSmartFolder(i)
+                    } else {
+                        crate::ui::accounts::AccountsInput::AddSmartFolder
+                    });
+                });
+            }
+        }
         self.accounts_win = Some(accounts);
         tracing::debug!("settings window: built in {:?}", t_open.elapsed());
         self.prefs = Some(prefs);
@@ -19342,6 +19772,7 @@ impl AppModel {
                 blacklist: self.blacklist.clone(),
                 filters: self.filters.clone(),
                 tags: self.tags.clone(),
+                smart_folders: self.smart_folders.clone(),
             }
     }
 
@@ -19370,6 +19801,7 @@ impl AppModel {
                 AccountsOutput::SetFilters(rules) => AppMsg::SetFilters(rules),
                 AccountsOutput::ApplyFilters => AppMsg::ApplyFilters(Vec::new()),
                 AccountsOutput::SetTags(tags) => AppMsg::SetTags(tags),
+                AccountsOutput::SetSmartFolders(folders) => AppMsg::SetSmartFolders(folders),
                 AccountsOutput::FindTags => AppMsg::FindTags,
                 AccountsOutput::WantQuota(email) => AppMsg::WantQuota(email),
                 AccountsOutput::WantIdentities(email) => AppMsg::WantIdentities(email),
@@ -22852,6 +23284,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::UnifiedTagsSelected => {
             AppMsg::TagSelected { keyword: None, account: None }
         }
+        SidebarOutput::SmartSelected(id) => AppMsg::SmartSelected(id),
         SidebarOutput::TagSelected { keyword, account } => {
             AppMsg::TagSelected { keyword: Some(keyword), account }
         }
@@ -22880,6 +23313,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
             junk,
             trash,
             favorites,
+            smart,
         } => AppMsg::SidebarSectionsOpen {
             all_inboxes,
             filtered,
@@ -22891,6 +23325,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
             junk,
             trash,
             favorites,
+            smart,
         },
         SidebarOutput::FolderNodeCollapsed { account_id, path, collapsed } => {
             AppMsg::FolderNodeCollapsed { account_id, path, collapsed }

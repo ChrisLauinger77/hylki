@@ -396,6 +396,10 @@ msgid "Mail Accounts"
 msgstr "Почтовые учётные записи"
 
 #, fuzzy
+msgid "New Smart Folder…"
+msgstr "Создать папку…"
+
+#, fuzzy
 msgid "About Hylki"
 msgstr "О программе"
 
@@ -422,6 +426,10 @@ msgstr "Исходящие"
 #, fuzzy
 msgid "Tag"
 msgstr "Теги"
+
+#, fuzzy
+msgid "Smart Folder"
+msgstr "Сортировать папки"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
@@ -739,6 +747,14 @@ msgstr "Для этой учётной записи недоступна пап�
 
 msgid "No Inbox folder available for this account"
 msgstr "Для этой учётной записи недоступна папка «Входящие»"
+
+#, fuzzy
+msgid "Delete “{name}”?"
+msgstr "Очистить «{name}»?"
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "Нет адресной книги для добавления контактов"
@@ -1722,6 +1738,20 @@ msgstr ""
 msgid "Find Tags…"
 msgstr "Найти теги…"
 
+#, fuzzy
+msgid "Smart Folders"
+msgstr "Сортировать папки"
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+#, fuzzy
+msgid "Add Smart Folder…"
+msgstr "Добавить папку"
+
 msgid "Search filters"
 msgstr "Поиск фильтров"
 
@@ -2463,6 +2493,104 @@ msgstr "Импортировать все"
 msgid "{n} messages"
 msgstr "{n} сообщений"
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+#, fuzzy
+msgid "Remove smart folder"
+msgstr "Удалить фильтр"
+
+msgid "Inbox"
+msgstr "Входящие"
+
+msgid "Starred"
+msgstr "Отмеченные"
+
+#, fuzzy
+msgid "Not starred"
+msgstr "Не установлено"
+
+#, fuzzy
+msgid "Unread"
+msgstr "Прочитано/Непрочитано"
+
+#, fuzzy
+msgid "Read"
+msgstr "Чтение"
+
+msgid "Has attachments"
+msgstr "Есть вложения"
+
+msgid "Tagged"
+msgstr ""
+
+#, fuzzy
+msgid "Message preview"
+msgstr "Исходный текст сообщения"
+
+#, fuzzy
+msgid "Edit Smart Folder"
+msgstr "Сортировать папки"
+
+#, fuzzy
+msgid "Add Smart Folder"
+msgstr "Добавить папку"
+
+#, fuzzy
+msgid "All accounts means those in the unified section"
+msgstr "Список учётных записей под общей строкой «Отправленные»."
+
+msgid "Folders"
+msgstr "Папки"
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr "Удалить условие"
+
+msgid "Where"
+msgstr "Где искать"
+
+msgid "Match"
+msgstr "Совпадение"
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr "Запятые разделяют варианты; учитывается любой из них"
+
+msgid "Text to match"
+msgstr "Текст для совпадения"
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr "Адрес отправителя, если не указан адрес для ответа (Reply-To)"
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr ""
+
+msgid "Add Condition"
+msgstr "Добавить условие"
+
+msgid "Condition matching"
+msgstr "Совпадение условий"
+
+msgid "All must match"
+msgstr "Все условия должны совпадать"
+
+msgid "Any one may match"
+msgstr "Любое условие может совпадать"
+
+msgid "Condition {n}"
+msgstr "Условие {n}"
+
+msgid "Or where"
+msgstr "Или где"
+
+msgid "And where"
+msgstr "И где"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2507,50 +2635,8 @@ msgstr "Добавить фильтр"
 msgid "Name (optional)"
 msgstr "Название (необязательно)"
 
-msgid "Remove condition"
-msgstr "Удалить условие"
-
-msgid "Where"
-msgstr "Где искать"
-
-msgid "Match"
-msgstr "Совпадение"
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr "Запятые разделяют варианты; учитывается любой из них"
-
-msgid "Text to match"
-msgstr "Текст для совпадения"
-
 msgid "Searched on the server; nothing is downloaded"
 msgstr "Поиск выполняется на сервере; ничего не скачивается"
-
-msgid "From address when no Reply-To is set"
-msgstr "Адрес отправителя, если не указан адрес для ответа (Reply-To)"
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Add Condition"
-msgstr "Добавить условие"
-
-msgid "Condition matching"
-msgstr "Совпадение условий"
-
-msgid "All must match"
-msgstr "Все условия должны совпадать"
-
-msgid "Any one may match"
-msgstr "Любое условие может совпадать"
-
-msgid "Condition {n}"
-msgstr "Условие {n}"
-
-msgid "Or where"
-msgstr "Или где"
-
-msgid "And where"
-msgstr "И где"
 
 msgid "Then"
 msgstr "Затем"
@@ -3962,14 +4048,8 @@ msgstr "Это сообщение написано на языке «{language}�
 msgid "Translate"
 msgstr "Перевести"
 
-msgid "Starred"
-msgstr "Отмеченные"
-
 msgid "Received"
 msgstr "Получено"
-
-msgid "Has attachments"
-msgstr "Есть вложения"
 
 msgid "Click to open this message"
 msgstr "Нажмите, чтобы открыть это сообщение"
@@ -4728,6 +4808,18 @@ msgstr "Сохранить фильтр?"
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+"Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
+"продолжить."
+
+#, fuzzy
+msgid "Save the smart folder?"
+msgstr "Сохранить фильтр?"
+
+#, fuzzy
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
 "продолжить."
@@ -6551,9 +6643,6 @@ msgstr "Показать или скрыть папки"
 msgid "Folders ({len})"
 msgstr "Папки ({len})"
 
-msgid "Folders"
-msgstr "Папки"
-
 msgid "Sort Folders"
 msgstr "Сортировать папки"
 
@@ -6572,6 +6661,10 @@ msgstr "Показывать каждую папку"
 msgid "Show each tag"
 msgstr "Показывать каждую метку"
 
+#, fuzzy
+msgid "Show each smart folder"
+msgstr "Показывать каждую папку"
+
 msgid "Long-press to expand or collapse"
 msgstr "Долгое нажатие — развернуть или свернуть"
 
@@ -6580,6 +6673,14 @@ msgstr "Очистить корзину…"
 
 msgid "Empty Junk…"
 msgstr "Очистить спам…"
+
+#, fuzzy
+msgid "Edit Smart Folder…"
+msgstr "Редактировать фильтр…"
+
+#, fuzzy
+msgid "Delete Smart Folder…"
+msgstr "Удалить папку…"
 
 msgid "Show or hide filters"
 msgstr "Показать или скрыть фильтры"
@@ -7089,9 +7190,6 @@ msgid ""
 msgstr ""
 "Протокол POP3 не позволяет изменять сообщения на сервере, поэтому вложение "
 "не было удалено"
-
-msgid "Inbox"
-msgstr "Входящие"
 
 msgid "Email Client"
 msgstr "Почтовый клиент"

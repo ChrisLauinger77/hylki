@@ -397,6 +397,10 @@ msgid "Mail Accounts"
 msgstr "Cuentas de correo"
 
 #, fuzzy
+msgid "New Smart Folder…"
+msgstr "Nueva carpeta…"
+
+#, fuzzy
 msgid "About Hylki"
 msgstr "Acerca de"
 
@@ -423,6 +427,10 @@ msgstr "Bandeja de salida"
 #, fuzzy
 msgid "Tag"
 msgstr "Etiquetas"
+
+#, fuzzy
+msgid "Smart Folder"
+msgstr "Ordenar carpetas"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
@@ -735,6 +743,14 @@ msgstr ""
 
 msgid "No Inbox folder available for this account"
 msgstr "No hay ninguna Bandeja de entrada disponible para esta cuenta"
+
+#, fuzzy
+msgid "Delete “{name}”?"
+msgstr "¿Vaciar «{name}»?"
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "No hay ninguna libreta de direcciones disponible para añadir contactos"
@@ -1707,6 +1723,20 @@ msgstr "Buscar en todos los buzones etiquetas creadas por otros clientes"
 msgid "Find Tags…"
 msgstr "Buscar etiquetas…"
 
+#, fuzzy
+msgid "Smart Folders"
+msgstr "Ordenar carpetas"
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+#, fuzzy
+msgid "Add Smart Folder…"
+msgstr "Añadir carpeta"
+
 msgid "Search filters"
 msgstr "Buscar filtros"
 
@@ -2455,6 +2485,104 @@ msgstr "Importar todas"
 msgid "{n} messages"
 msgstr "{n} mensajes"
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+#, fuzzy
+msgid "Remove smart folder"
+msgstr "Eliminar filtro"
+
+msgid "Inbox"
+msgstr "Bandeja de entrada"
+
+msgid "Starred"
+msgstr "Destacados"
+
+#, fuzzy
+msgid "Not starred"
+msgstr "No instalado"
+
+#, fuzzy
+msgid "Unread"
+msgstr "Leído/No leído"
+
+#, fuzzy
+msgid "Read"
+msgstr "Lectura"
+
+msgid "Has attachments"
+msgstr "Tiene archivos adjuntos"
+
+msgid "Tagged"
+msgstr ""
+
+#, fuzzy
+msgid "Message preview"
+msgstr "Código fuente del mensaje"
+
+#, fuzzy
+msgid "Edit Smart Folder"
+msgstr "Ordenar carpetas"
+
+#, fuzzy
+msgid "Add Smart Folder"
+msgstr "Añadir carpeta"
+
+#, fuzzy
+msgid "All accounts means those in the unified section"
+msgstr "La lista de cuentas bajo la fila unificada Enviados."
+
+msgid "Folders"
+msgstr "Carpetas"
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr "Eliminar condición"
+
+msgid "Where"
+msgstr "Dónde"
+
+msgid "Match"
+msgstr "Coincidencia"
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr "Las comas separan alternativas; cualquiera de ellas cuenta"
+
+msgid "Text to match"
+msgstr "Texto que debe coincidir"
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr "Dirección del remitente cuando no se define Reply-To"
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr ""
+
+msgid "Add Condition"
+msgstr "Añadir condición"
+
+msgid "Condition matching"
+msgstr "Coincidencia de condiciones"
+
+msgid "All must match"
+msgstr "Deben coincidir todas"
+
+msgid "Any one may match"
+msgstr "Puede coincidir cualquiera"
+
+msgid "Condition {n}"
+msgstr "Condición {n}"
+
+msgid "Or where"
+msgstr "O donde"
+
+msgid "And where"
+msgstr "Y donde"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2500,50 +2628,8 @@ msgstr "Añadir filtro"
 msgid "Name (optional)"
 msgstr "Nombre (opcional)"
 
-msgid "Remove condition"
-msgstr "Eliminar condición"
-
-msgid "Where"
-msgstr "Dónde"
-
-msgid "Match"
-msgstr "Coincidencia"
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr "Las comas separan alternativas; cualquiera de ellas cuenta"
-
-msgid "Text to match"
-msgstr "Texto que debe coincidir"
-
 msgid "Searched on the server; nothing is downloaded"
 msgstr "Se busca en el servidor; no se descarga nada"
-
-msgid "From address when no Reply-To is set"
-msgstr "Dirección del remitente cuando no se define Reply-To"
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Add Condition"
-msgstr "Añadir condición"
-
-msgid "Condition matching"
-msgstr "Coincidencia de condiciones"
-
-msgid "All must match"
-msgstr "Deben coincidir todas"
-
-msgid "Any one may match"
-msgstr "Puede coincidir cualquiera"
-
-msgid "Condition {n}"
-msgstr "Condición {n}"
-
-msgid "Or where"
-msgstr "O donde"
-
-msgid "And where"
-msgstr "Y donde"
 
 msgid "Then"
 msgstr "Entonces"
@@ -3941,14 +4027,8 @@ msgstr "Este mensaje está en {language}."
 msgid "Translate"
 msgstr "Traducir"
 
-msgid "Starred"
-msgstr "Destacados"
-
 msgid "Received"
 msgstr "Recibido"
-
-msgid "Has attachments"
-msgstr "Tiene archivos adjuntos"
 
 msgid "Click to open this message"
 msgstr "Haz clic para abrir este mensaje"
@@ -4704,6 +4784,18 @@ msgstr "¿Guardar el filtro?"
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+"El editor de filtros está abierto. Guarda los cambios o descártalos antes de "
+"continuar."
+
+#, fuzzy
+msgid "Save the smart folder?"
+msgstr "¿Guardar el filtro?"
+
+#, fuzzy
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "El editor de filtros está abierto. Guarda los cambios o descártalos antes de "
 "continuar."
@@ -6536,9 +6628,6 @@ msgstr "Mostrar u ocultar carpetas"
 msgid "Folders ({len})"
 msgstr "Carpetas ({len})"
 
-msgid "Folders"
-msgstr "Carpetas"
-
 msgid "Sort Folders"
 msgstr "Ordenar carpetas"
 
@@ -6557,6 +6646,10 @@ msgstr "Mostrar cada carpeta"
 msgid "Show each tag"
 msgstr "Mostrar cada etiqueta"
 
+#, fuzzy
+msgid "Show each smart folder"
+msgstr "Mostrar cada carpeta"
+
 msgid "Long-press to expand or collapse"
 msgstr "Mantén pulsado para expandir o contraer"
 
@@ -6565,6 +6658,14 @@ msgstr "Vaciar Papelera…"
 
 msgid "Empty Junk…"
 msgstr "Vaciar Correo no deseado…"
+
+#, fuzzy
+msgid "Edit Smart Folder…"
+msgstr "Editar filtro…"
+
+#, fuzzy
+msgid "Delete Smart Folder…"
+msgstr "Eliminar carpeta…"
 
 msgid "Show or hide filters"
 msgstr "Mostrar u ocultar filtros"
@@ -7077,9 +7178,6 @@ msgid ""
 msgstr ""
 "POP3 no puede modificar un mensaje en el servidor, por lo que el archivo "
 "adjunto no se eliminó"
-
-msgid "Inbox"
-msgstr "Bandeja de entrada"
 
 msgid "Email Client"
 msgstr "Cliente de correo electrónico"

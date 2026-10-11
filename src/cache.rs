@@ -2266,6 +2266,99 @@ impl Cache {
             .unwrap_or(0)
     }
 
+    /// The account's cached messages a smart folder (#417) keeps, newest
+    /// first with the folder each sits in: those in `include` (every folder
+    /// when `None`) and not in `exclude`, past what `pre` rules out, for
+    /// which `keep` says yes. Rows are read one at a time and only the kept
+    /// ones become messages, so a folder over a large index stays cheap to
+    /// hold; reading stops at `limit` kept.
+    pub fn smart_scan(
+        &self,
+        account_id: u32,
+        include: Option<&[String]>,
+        exclude: &[String],
+        pre: crate::config::SmartPrefilter,
+        limit: usize,
+        mut keep: impl FnMut(&Message) -> bool,
+    ) -> Vec<(String, Message)> {
+        use rusqlite::types::Value;
+        let mut args: Vec<Value> = vec![Value::Integer(account_id.into())];
+        let list = |paths: &[String], args: &mut Vec<Value>| -> String {
+            let marks: Vec<String> = paths
+                .iter()
+                .map(|p| {
+                    args.push(Value::Text(p.clone()));
+                    format!("?{}", args.len())
+                })
+                .collect();
+            marks.join(",")
+        };
+        let mut sql = format!(
+            "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
+                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due \
+             FROM messages WHERE account_id = ?1"
+        );
+        if let Some(paths) = include {
+            if paths.is_empty() {
+                return Vec::new();
+            }
+            sql.push_str(&format!(" AND folder_path IN ({})", list(paths, &mut args)));
+        }
+        if !exclude.is_empty() {
+            sql.push_str(&format!(" AND folder_path NOT IN ({})", list(exclude, &mut args)));
+        }
+        for (col, want) in [("starred", pre.starred), ("unread", pre.unread), ("has_attachment", pre.attachment)] {
+            if let Some(want) = want {
+                sql.push_str(&format!(" AND {col} = {}", i32::from(want)));
+            }
+        }
+        sql.push_str(" ORDER BY ts DESC");
+        let mut run = || -> rusqlite::Result<Vec<(String, Message)>> {
+            let mut stmt = self.conn.prepare(&sql)?;
+            let mut rows = stmt.query(rusqlite::params_from_iter(args.iter()))?;
+            let mut out = Vec::new();
+            while let Some(row) = rows.next()? {
+                let uid: u32 = row.get(1)?;
+                let mut m = Message {
+                    id: uid,
+                    account_id,
+                    folder_id: 0, // filled in by the caller, which knows the ids
+                    uid,
+                    from_name: row.get(2)?,
+                    from_addr: row.get(3)?,
+                    reply_to: row.get(15)?,
+                    to: row.get(10)?,
+                    cc: row.get(11)?,
+                    subject: row.get(4)?,
+                    preview: row.get(14)?,
+                    body: String::new(),
+                    date: row.get(5)?,
+                    timestamp: row.get(6)?,
+                    unread: row.get(7)?,
+                    starred: row.get(8)?,
+                    keywords: split_keywords(row.get(16)?),
+                    has_attachment: row.get(9)?,
+                    message_id: row.get(12)?,
+                    references: row.get(13)?,
+                    importance: crate::models::Importance::from_i64(row.get(17)?),
+                    due: row.get(18)?,
+                };
+                m.scrub_nuls();
+                if keep(&m) {
+                    out.push((row.get::<_, String>(0)?, m));
+                    if out.len() >= limit {
+                        break;
+                    }
+                }
+            }
+            Ok(out)
+        };
+        run().unwrap_or_else(|e| {
+            tracing::warn!("cache smart_scan failed: {e}");
+            Vec::new()
+        })
+    }
+
     /// Every cached message of the account carrying `keyword` — on the server
     /// or locally — newest first, with the folder each sits in. Backs the
     /// sidebar's tag views (#71); the caller maps paths to folder ids and
@@ -2426,6 +2519,37 @@ fn kind_from_i64(v: i64) -> FolderKind {
 
 #[cfg(test)]
 mod tests {
+
+    /// A smart folder's scan (#417) keeps to the folders asked for, lets the
+    /// prefilter and the matcher narrow it, newest first, up to the limit.
+    #[test]
+    fn smart_scan_reads_only_what_it_is_asked_for() {
+        let c = Cache::in_memory().unwrap();
+        for (path, uid, ts, starred, subject) in [
+            ("INBOX", 1u32, 100i64, 1, "invoice one"),
+            ("INBOX", 2, 300, 0, "invoice two"),
+            ("Sent", 3, 200, 1, "invoice sent"),
+            ("Trash", 4, 400, 1, "invoice gone"),
+        ] {
+            c.conn.execute(
+                "INSERT INTO messages (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_) \
+                 VALUES (1, ?1, ?2, '', '', ?3, '', ?4, 1, ?5, 0, '', '', '', '')",
+                params![path, uid, subject, ts, starred],
+            ).unwrap();
+        }
+        let uids = |v: Vec<(String, Message)>| v.into_iter().map(|(_, m)| m.uid).collect::<Vec<_>>();
+        let none = crate::config::SmartPrefilter::default();
+        let trash = vec!["Trash".to_string()];
+        assert_eq!(uids(c.smart_scan(1, None, &trash, none, 10, |_| true)), [2, 3, 1]);
+        let sent = vec!["Sent".to_string()];
+        assert_eq!(uids(c.smart_scan(1, Some(&sent), &[], none, 10, |_| true)), [3]);
+        let starred = crate::config::SmartPrefilter { starred: Some(true), ..none };
+        assert_eq!(uids(c.smart_scan(1, None, &trash, starred, 10, |_| true)), [3, 1]);
+        assert_eq!(uids(c.smart_scan(1, None, &trash, none, 10, |m| m.subject.ends_with("one"))), [1]);
+        assert_eq!(uids(c.smart_scan(1, None, &[], none, 2, |_| true)), [4, 2]);
+        assert!(c.smart_scan(1, Some(&[]), &[], none, 10, |_| true).is_empty());
+        assert!(c.smart_scan(2, None, &[], none, 10, |_| true).is_empty());
+    }
 
     /// Removing downloaded mail keeps the index, and an age limit only takes
     /// what is older than it (#394).

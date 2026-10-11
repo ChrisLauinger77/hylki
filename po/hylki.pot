@@ -364,6 +364,9 @@ msgstr ""
 msgid "Mail Accounts"
 msgstr ""
 
+msgid "New Smart Folder…"
+msgstr ""
+
 msgid "About Hylki"
 msgstr ""
 
@@ -386,6 +389,9 @@ msgid "Outbox"
 msgstr ""
 
 msgid "Tag"
+msgstr ""
+
+msgid "Smart Folder"
 msgstr ""
 
 msgid ""
@@ -660,6 +666,13 @@ msgid "No Junk folder available for this account"
 msgstr ""
 
 msgid "No Inbox folder available for this account"
+msgstr ""
+
+msgid "Delete “{name}”?"
+msgstr ""
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
 msgstr ""
 
 msgid "No address book available to add contacts"
@@ -1555,6 +1568,18 @@ msgstr ""
 msgid "Find Tags…"
 msgstr ""
 
+msgid "Smart Folders"
+msgstr ""
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+msgid "Add Smart Folder…"
+msgstr ""
+
 msgid "Search filters"
 msgstr ""
 
@@ -2213,6 +2238,96 @@ msgstr ""
 msgid "{n} messages"
 msgstr ""
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+msgid "Remove smart folder"
+msgstr ""
+
+msgid "Inbox"
+msgstr ""
+
+msgid "Starred"
+msgstr ""
+
+msgid "Not starred"
+msgstr ""
+
+msgid "Unread"
+msgstr ""
+
+msgid "Read"
+msgstr ""
+
+msgid "Has attachments"
+msgstr ""
+
+msgid "Tagged"
+msgstr ""
+
+msgid "Message preview"
+msgstr ""
+
+msgid "Edit Smart Folder"
+msgstr ""
+
+msgid "Add Smart Folder"
+msgstr ""
+
+msgid "All accounts means those in the unified section"
+msgstr ""
+
+msgid "Folders"
+msgstr ""
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr ""
+
+msgid "Where"
+msgstr ""
+
+msgid "Match"
+msgstr ""
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr ""
+
+msgid "Text to match"
+msgstr ""
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr ""
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr ""
+
+msgid "Add Condition"
+msgstr ""
+
+msgid "Condition matching"
+msgstr ""
+
+msgid "All must match"
+msgstr ""
+
+msgid "Any one may match"
+msgstr ""
+
+msgid "Condition {n}"
+msgstr ""
+
+msgid "Or where"
+msgstr ""
+
+msgid "And where"
+msgstr ""
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2253,49 +2368,7 @@ msgstr ""
 msgid "Name (optional)"
 msgstr ""
 
-msgid "Remove condition"
-msgstr ""
-
-msgid "Where"
-msgstr ""
-
-msgid "Match"
-msgstr ""
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr ""
-
-msgid "Text to match"
-msgstr ""
-
 msgid "Searched on the server; nothing is downloaded"
-msgstr ""
-
-msgid "From address when no Reply-To is set"
-msgstr ""
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Add Condition"
-msgstr ""
-
-msgid "Condition matching"
-msgstr ""
-
-msgid "All must match"
-msgstr ""
-
-msgid "Any one may match"
-msgstr ""
-
-msgid "Condition {n}"
-msgstr ""
-
-msgid "Or where"
-msgstr ""
-
-msgid "And where"
 msgstr ""
 
 msgid "Then"
@@ -3561,13 +3634,7 @@ msgstr ""
 msgid "Translate"
 msgstr ""
 
-msgid "Starred"
-msgstr ""
-
 msgid "Received"
-msgstr ""
-
-msgid "Has attachments"
 msgstr ""
 
 msgid "Click to open this message"
@@ -4269,6 +4336,14 @@ msgstr ""
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+
+msgid "Save the smart folder?"
+msgstr ""
+
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 
 msgid "Save the tag?"
@@ -5797,9 +5872,6 @@ msgstr ""
 msgid "Folders ({len})"
 msgstr ""
 
-msgid "Folders"
-msgstr ""
-
 msgid "Sort Folders"
 msgstr ""
 
@@ -5818,6 +5890,9 @@ msgstr ""
 msgid "Show each tag"
 msgstr ""
 
+msgid "Show each smart folder"
+msgstr ""
+
 msgid "Long-press to expand or collapse"
 msgstr ""
 
@@ -5825,6 +5900,12 @@ msgid "Empty Trash…"
 msgstr ""
 
 msgid "Empty Junk…"
+msgstr ""
+
+msgid "Edit Smart Folder…"
+msgstr ""
+
+msgid "Delete Smart Folder…"
 msgstr ""
 
 msgid "Show or hide filters"
@@ -6291,9 +6372,6 @@ msgstr ""
 
 msgid ""
 "POP3 cannot change a message on the server, so the attachment was not removed"
-msgstr ""
-
-msgid "Inbox"
 msgstr ""
 
 msgid "Email Client"

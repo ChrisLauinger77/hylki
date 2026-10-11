@@ -380,6 +380,10 @@ msgstr "Mostra o amaga la barra lateral"
 msgid "Mail Accounts"
 msgstr "Comptes de correu"
 
+#, fuzzy
+msgid "New Smart Folder…"
+msgstr "Carpeta nova…"
+
 msgid "About Hylki"
 msgstr "Quant a l'Hylki"
 
@@ -403,6 +407,10 @@ msgstr "Bústia de sortida"
 
 msgid "Tag"
 msgstr "Etiqueta"
+
+#, fuzzy
+msgid "Smart Folder"
+msgstr "Ordena les carpetes"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
@@ -706,6 +714,14 @@ msgstr "No hi ha cap carpeta de brossa disponible per a aquest compte"
 
 msgid "No Inbox folder available for this account"
 msgstr "No hi ha cap bústia d'entrada disponible per a aquest compte"
+
+#, fuzzy
+msgid "Delete “{name}”?"
+msgstr "Vols buidar «{name}»?"
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "No hi ha cap llibreta d'adreces disponible per afegir contactes"
@@ -1672,6 +1688,20 @@ msgstr ""
 msgid "Find Tags…"
 msgstr "Troba etiquetes…"
 
+#, fuzzy
+msgid "Smart Folders"
+msgstr "Ordena les carpetes"
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+#, fuzzy
+msgid "Add Smart Folder…"
+msgstr "Afegeix una carpeta"
+
 msgid "Search filters"
 msgstr "Cerca filtres"
 
@@ -2415,6 +2445,104 @@ msgstr "Importa-ho tot"
 msgid "{n} messages"
 msgstr "{n} missatges"
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+#, fuzzy
+msgid "Remove smart folder"
+msgstr "Elimina el filtre"
+
+msgid "Inbox"
+msgstr "Bústia d'entrada"
+
+msgid "Starred"
+msgstr "Destacats"
+
+#, fuzzy
+msgid "Not starred"
+msgstr "No instal·lat"
+
+#, fuzzy
+msgid "Unread"
+msgstr "Llegit/No llegit"
+
+#, fuzzy
+msgid "Read"
+msgstr "Lectura"
+
+msgid "Has attachments"
+msgstr "Té adjunts"
+
+msgid "Tagged"
+msgstr ""
+
+#, fuzzy
+msgid "Message preview"
+msgstr "Codi font del missatge"
+
+#, fuzzy
+msgid "Edit Smart Folder"
+msgstr "Ordena les carpetes"
+
+#, fuzzy
+msgid "Add Smart Folder"
+msgstr "Afegeix una carpeta"
+
+#, fuzzy
+msgid "All accounts means those in the unified section"
+msgstr "La llista de comptes sota la fila unificada d'enviats."
+
+msgid "Folders"
+msgstr "Carpetes"
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr "Elimina la condició"
+
+msgid "Where"
+msgstr "On"
+
+msgid "Match"
+msgstr "Coincidència"
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr "Les comes separen alternatives; qualsevol d'elles compta"
+
+msgid "Text to match"
+msgstr "Text a fer coincidir"
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr "Adreça del remitent quan no s'ha definit cap Reply-To"
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr "Cerca a les llibretes d'adreces del sistema i a la llibreta de l'Hylki"
+
+msgid "Add Condition"
+msgstr "Afegeix una condició"
+
+msgid "Condition matching"
+msgstr "Coincidència de condicions"
+
+msgid "All must match"
+msgstr "Totes han de coincidir"
+
+msgid "Any one may match"
+msgstr "Qualsevol pot coincidir"
+
+msgid "Condition {n}"
+msgstr "Condició {n}"
+
+msgid "Or where"
+msgstr "O bé on"
+
+msgid "And where"
+msgstr "I on"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2460,50 +2588,8 @@ msgstr "Afegeix un filtre"
 msgid "Name (optional)"
 msgstr "Nom (opcional)"
 
-msgid "Remove condition"
-msgstr "Elimina la condició"
-
-msgid "Where"
-msgstr "On"
-
-msgid "Match"
-msgstr "Coincidència"
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr "Les comes separen alternatives; qualsevol d'elles compta"
-
-msgid "Text to match"
-msgstr "Text a fer coincidir"
-
 msgid "Searched on the server; nothing is downloaded"
 msgstr "Es cerca al servidor; no es baixa res"
-
-msgid "From address when no Reply-To is set"
-msgstr "Adreça del remitent quan no s'ha definit cap Reply-To"
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr "Cerca a les llibretes d'adreces del sistema i a la llibreta de l'Hylki"
-
-msgid "Add Condition"
-msgstr "Afegeix una condició"
-
-msgid "Condition matching"
-msgstr "Coincidència de condicions"
-
-msgid "All must match"
-msgstr "Totes han de coincidir"
-
-msgid "Any one may match"
-msgstr "Qualsevol pot coincidir"
-
-msgid "Condition {n}"
-msgstr "Condició {n}"
-
-msgid "Or where"
-msgstr "O bé on"
-
-msgid "And where"
-msgstr "I on"
 
 msgid "Then"
 msgstr "Llavors"
@@ -3899,14 +3985,8 @@ msgstr "Aquest missatge és en {language}."
 msgid "Translate"
 msgstr "Tradueix"
 
-msgid "Starred"
-msgstr "Destacats"
-
 msgid "Received"
 msgstr "Rebut"
-
-msgid "Has attachments"
-msgstr "Té adjunts"
 
 msgid "Click to open this message"
 msgstr "Fes clic per obrir aquest missatge"
@@ -4661,6 +4741,18 @@ msgstr "Vols desar el filtre?"
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+"L'editor de filtres és obert. Desa el que has canviat, o descarta-ho, abans "
+"de continuar."
+
+#, fuzzy
+msgid "Save the smart folder?"
+msgstr "Vols desar el filtre?"
+
+#, fuzzy
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "L'editor de filtres és obert. Desa el que has canviat, o descarta-ho, abans "
 "de continuar."
@@ -6499,9 +6591,6 @@ msgstr "Mostra o amaga les carpetes"
 msgid "Folders ({len})"
 msgstr "Carpetes ({len})"
 
-msgid "Folders"
-msgstr "Carpetes"
-
 msgid "Sort Folders"
 msgstr "Ordena les carpetes"
 
@@ -6520,6 +6609,10 @@ msgstr "Mostra cada carpeta"
 msgid "Show each tag"
 msgstr "Mostra cada etiqueta"
 
+#, fuzzy
+msgid "Show each smart folder"
+msgstr "Mostra cada carpeta"
+
 msgid "Long-press to expand or collapse"
 msgstr "Mantén premut per expandir o replegar"
 
@@ -6528,6 +6621,14 @@ msgstr "Buida la paperera…"
 
 msgid "Empty Junk…"
 msgstr "Buida la brossa…"
+
+#, fuzzy
+msgid "Edit Smart Folder…"
+msgstr "Edita el filtre…"
+
+#, fuzzy
+msgid "Delete Smart Folder…"
+msgstr "Suprimeix la carpeta…"
 
 msgid "Show or hide filters"
 msgstr "Mostra o amaga els filtres"
@@ -7035,9 +7136,6 @@ msgid ""
 msgstr ""
 "El POP3 no pot modificar un missatge al servidor, així que l'adjunt no s'ha "
 "eliminat"
-
-msgid "Inbox"
-msgstr "Bústia d'entrada"
 
 msgid "Email Client"
 msgstr "Client de correu"

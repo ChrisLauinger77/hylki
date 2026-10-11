@@ -399,6 +399,10 @@ msgid "Mail Accounts"
 msgstr "Λογαριασμοί αλληλογραφίας"
 
 #, fuzzy
+msgid "New Smart Folder…"
+msgstr "Νέος φάκελος…"
+
+#, fuzzy
 msgid "About Hylki"
 msgstr "Σχετικά"
 
@@ -425,6 +429,10 @@ msgstr "Εξερχόμενα"
 #, fuzzy
 msgid "Tag"
 msgstr "Ετικέτες"
+
+#, fuzzy
+msgid "Smart Folder"
+msgstr "Ταξινόμηση φακέλων"
 
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
@@ -739,6 +747,14 @@ msgstr "Δεν υπάρχει φάκελος Ανεπιθύμητων για α�
 
 msgid "No Inbox folder available for this account"
 msgstr "Δεν υπάρχει φάκελος Εισερχομένων για αυτόν τον λογαριασμό"
+
+#, fuzzy
+msgid "Delete “{name}”?"
+msgstr "Άδειασμα του «{name}»;"
+
+msgid ""
+"The smart folder goes from the sidebar. The mail it shows stays where it is."
+msgstr ""
 
 msgid "No address book available to add contacts"
 msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων για προσθήκη επαφών"
@@ -1724,6 +1740,20 @@ msgstr ""
 msgid "Find Tags…"
 msgstr "Εύρεση ετικετών…"
 
+#, fuzzy
+msgid "Smart Folders"
+msgstr "Ταξινόμηση φακέλων"
+
+msgid ""
+"A smart folder lists the messages that match its conditions, from every "
+"folder or one kind of folder, in one account or all of them. It searches the "
+"mail on this computer and appears in the sidebar under the unified rows."
+msgstr ""
+
+#, fuzzy
+msgid "Add Smart Folder…"
+msgstr "Προσθήκη φακέλου"
+
 msgid "Search filters"
 msgstr "Αναζήτηση φίλτρων"
 
@@ -2485,6 +2515,104 @@ msgstr "Εισαγωγή όλων"
 msgid "{n} messages"
 msgstr "{n} μηνύματα"
 
+msgid "All but Trash and Junk"
+msgstr ""
+
+#, fuzzy
+msgid "Remove smart folder"
+msgstr "Αφαίρεση φίλτρου"
+
+msgid "Inbox"
+msgstr "Εισερχόμενα"
+
+msgid "Starred"
+msgstr "Με αστέρι"
+
+#, fuzzy
+msgid "Not starred"
+msgstr "Δεν είναι εγκατεστημένο"
+
+#, fuzzy
+msgid "Unread"
+msgstr "Αναγνωσμένο/Μη αναγνωσμένο"
+
+#, fuzzy
+msgid "Read"
+msgstr "Ανάγνωση"
+
+msgid "Has attachments"
+msgstr "Έχει συνημμένα"
+
+msgid "Tagged"
+msgstr ""
+
+#, fuzzy
+msgid "Message preview"
+msgstr "Πηγαίος κώδικας μηνύματος"
+
+#, fuzzy
+msgid "Edit Smart Folder"
+msgstr "Ταξινόμηση φακέλων"
+
+#, fuzzy
+msgid "Add Smart Folder"
+msgstr "Προσθήκη φακέλου"
+
+#, fuzzy
+msgid "All accounts means those in the unified section"
+msgstr "Η λίστα λογαριασμών κάτω από την ενοποιημένη σειρά Απεσταλμένα."
+
+msgid "Folders"
+msgstr "Φάκελοι"
+
+msgid "Any tag"
+msgstr ""
+
+msgid "Remove condition"
+msgstr "Αφαίρεση συνθήκης"
+
+msgid "Where"
+msgstr "Πού"
+
+msgid "Match"
+msgstr "Αντιστοίχιση"
+
+msgid "Commas separate alternatives; any one of them counts"
+msgstr "Τα κόμματα διαχωρίζουν τις εναλλακτικές· αρκεί οποιαδήποτε από αυτές"
+
+msgid "Text to match"
+msgstr "Κείμενο προς αντιστοίχιση"
+
+msgid "The preview each message has in the list"
+msgstr ""
+
+msgid "From address when no Reply-To is set"
+msgstr "Διεύθυνση αποστολέα όταν δεν έχει οριστεί Reply-To"
+
+msgid "Looks in the system address books and the Hylki book"
+msgstr ""
+
+msgid "Add Condition"
+msgstr "Προσθήκη συνθήκης"
+
+msgid "Condition matching"
+msgstr "Αντιστοίχιση συνθηκών"
+
+msgid "All must match"
+msgstr "Πρέπει να ισχύουν όλες"
+
+msgid "Any one may match"
+msgstr "Μπορεί να ισχύει οποιαδήποτε"
+
+msgid "Condition {n}"
+msgstr "Συνθήκη {n}"
+
+msgid "Or where"
+msgstr "Ή όπου"
+
+msgid "And where"
+msgstr "Και όπου"
+
 msgid ""
 "Press this key on a message to add or remove the tag (with single-key "
 "shortcuts on)"
@@ -2530,50 +2658,8 @@ msgstr "Προσθήκη φίλτρου"
 msgid "Name (optional)"
 msgstr "Όνομα (προαιρετικό)"
 
-msgid "Remove condition"
-msgstr "Αφαίρεση συνθήκης"
-
-msgid "Where"
-msgstr "Πού"
-
-msgid "Match"
-msgstr "Αντιστοίχιση"
-
-msgid "Commas separate alternatives; any one of them counts"
-msgstr "Τα κόμματα διαχωρίζουν τις εναλλακτικές· αρκεί οποιαδήποτε από αυτές"
-
-msgid "Text to match"
-msgstr "Κείμενο προς αντιστοίχιση"
-
 msgid "Searched on the server; nothing is downloaded"
 msgstr "Η αναζήτηση γίνεται στον διακομιστή· δεν γίνεται λήψη τίποτα"
-
-msgid "From address when no Reply-To is set"
-msgstr "Διεύθυνση αποστολέα όταν δεν έχει οριστεί Reply-To"
-
-msgid "Looks in the system address books and the Hylki book"
-msgstr ""
-
-msgid "Add Condition"
-msgstr "Προσθήκη συνθήκης"
-
-msgid "Condition matching"
-msgstr "Αντιστοίχιση συνθηκών"
-
-msgid "All must match"
-msgstr "Πρέπει να ισχύουν όλες"
-
-msgid "Any one may match"
-msgstr "Μπορεί να ισχύει οποιαδήποτε"
-
-msgid "Condition {n}"
-msgstr "Συνθήκη {n}"
-
-msgid "Or where"
-msgstr "Ή όπου"
-
-msgid "And where"
-msgstr "Και όπου"
 
 msgid "Then"
 msgstr "Τότε"
@@ -3992,14 +4078,8 @@ msgstr "Αυτό το μήνυμα είναι στα {language}."
 msgid "Translate"
 msgstr "Μετάφραση"
 
-msgid "Starred"
-msgstr "Με αστέρι"
-
 msgid "Received"
 msgstr "Ελήφθη"
-
-msgid "Has attachments"
-msgstr "Έχει συνημμένα"
 
 msgid "Click to open this message"
 msgstr "Κάντε κλικ για να ανοίξετε αυτό το μήνυμα"
@@ -4760,6 +4840,18 @@ msgstr "Αποθήκευση του φίλτρου;"
 msgid ""
 "The filter editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+"Το πρόγραμμα επεξεργασίας φίλτρου είναι ανοικτό. Αποθηκεύστε τις αλλαγές σας "
+"ή απορρίψτε τις πριν συνεχίσετε."
+
+#, fuzzy
+msgid "Save the smart folder?"
+msgstr "Αποθήκευση του φίλτρου;"
+
+#, fuzzy
+msgid ""
+"The smart folder editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "Το πρόγραμμα επεξεργασίας φίλτρου είναι ανοικτό. Αποθηκεύστε τις αλλαγές σας "
 "ή απορρίψτε τις πριν συνεχίσετε."
@@ -6612,9 +6704,6 @@ msgstr "Εμφάνιση ή απόκρυψη φακέλων"
 msgid "Folders ({len})"
 msgstr "Φάκελοι ({len})"
 
-msgid "Folders"
-msgstr "Φάκελοι"
-
 msgid "Sort Folders"
 msgstr "Ταξινόμηση φακέλων"
 
@@ -6633,6 +6722,10 @@ msgstr "Εμφάνιση κάθε φακέλου"
 msgid "Show each tag"
 msgstr "Εμφάνιση κάθε ετικέτας"
 
+#, fuzzy
+msgid "Show each smart folder"
+msgstr "Εμφάνιση κάθε φακέλου"
+
 msgid "Long-press to expand or collapse"
 msgstr "Παρατεταμένο πάτημα για ανάπτυξη ή σύμπτυξη"
 
@@ -6641,6 +6734,14 @@ msgstr "Άδειασμα κάδου…"
 
 msgid "Empty Junk…"
 msgstr "Άδειασμα ανεπιθύμητων…"
+
+#, fuzzy
+msgid "Edit Smart Folder…"
+msgstr "Επεξεργασία φίλτρου…"
+
+#, fuzzy
+msgid "Delete Smart Folder…"
+msgstr "Διαγραφή φακέλου…"
 
 msgid "Show or hide filters"
 msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
@@ -7165,9 +7266,6 @@ msgid ""
 msgstr ""
 "Το POP3 δεν μπορεί να τροποποιήσει ένα μήνυμα στον διακομιστή, επομένως το "
 "συνημμένο δεν αφαιρέθηκε."
-
-msgid "Inbox"
-msgstr "Εισερχόμενα"
 
 msgid "Email Client"
 msgstr "Πρόγραμμα-πελάτης email"
