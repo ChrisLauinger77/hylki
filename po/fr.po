@@ -2797,7 +2797,8 @@ msgstr "Copier"
 msgid "Command Palette"
 msgstr "Palette de commandes"
 
-msgid "Type an action, a folder or a tag"
+#, fuzzy
+msgid "Type an action, a folder or a tag, or > for actions only"
 msgstr "Saisissez une action, un dossier ou un tag"
 
 msgid "Cloud Storage"

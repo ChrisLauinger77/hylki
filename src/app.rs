@@ -11837,6 +11837,7 @@ impl AppModel {
                 title,
                 detail: detail.to_string(),
                 key: key.to_string(),
+                action: true,
                 run: Box::new(move || {
                     let _ = s.send(msg());
                 }),
@@ -11881,6 +11882,7 @@ impl AppModel {
                 title: if focus.enabled { i18n("Turn Focus Mode On") } else { i18n("Turn Focus Mode Off") },
                 detail: action.clone(),
                 key: "Ctrl+Shift+F".into(),
+                action: true,
                 run: Box::new(move || {
                     let _ = s.send(AppMsg::Pref(PrefOutput::SetFocusMode(focus)));
                 }),
@@ -11894,6 +11896,7 @@ impl AppModel {
                 title,
                 detail,
                 key: String::new(),
+                action: false,
                 run: Box::new(move || {
                     let _ = s.send(msg());
                 }),

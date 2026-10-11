@@ -18,12 +18,34 @@ pub struct Entry {
     pub detail: String,
     /// The shortcut that does the same, shown beside it; empty for none.
     pub key: String,
+    /// Something to do rather than somewhere to go: what a query starting
+    /// with `>` keeps.
+    pub action: bool,
     pub run: Box<dyn Fn()>,
 }
 
-/// Whether every word of `query` is somewhere in `text`, both lower case.
-fn matches(text: &str, query: &[String]) -> bool {
-    query.iter().all(|w| text.contains(w.as_str()))
+/// What was typed: the words, and whether a leading `>` asked for actions
+/// only, the way an editor's palette tells commands from places.
+#[derive(Default)]
+struct Query {
+    words: Vec<String>,
+    actions_only: bool,
+}
+
+impl Query {
+    fn parse(typed: &str) -> Self {
+        let typed = typed.trim_start().to_lowercase();
+        let (actions_only, rest) = match typed.strip_prefix('>') {
+            Some(rest) => (true, rest),
+            None => (false, typed.as_str()),
+        };
+        Query { words: rest.split_whitespace().map(str::to_string).collect(), actions_only }
+    }
+
+    /// Whether an entry, `text` being its lower-case title and detail, stays.
+    fn keeps(&self, text: &str, action: bool) -> bool {
+        (action || !self.actions_only) && self.words.iter().all(|w| text.contains(w.as_str()))
+    }
 }
 
 /// Open the palette over `parent` with `entries`, in the order given.
@@ -35,14 +57,14 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>) {
         .build();
 
     let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some(i18n("Type an action, a folder or a tag").as_str()));
+    search.set_placeholder_text(Some(i18n("Type an action, a folder or a tag, or > for actions only").as_str()));
     search.set_hexpand(true);
 
     let list = gtk::ListBox::new();
     list.add_css_class("boxed-list");
     list.set_selection_mode(gtk::SelectionMode::Single);
-    let haystacks: Vec<String> =
-        entries.iter().map(|e| format!("{} {}", e.title, e.detail).to_lowercase()).collect();
+    let haystacks: Vec<(String, bool)> =
+        entries.iter().map(|e| (format!("{} {}", e.title, e.detail).to_lowercase(), e.action)).collect();
     for e in &entries {
         let row = adw::ActionRow::builder()
             .title(gtk::glib::markup_escape_text(&e.title))
@@ -58,10 +80,13 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>) {
         list.append(&row);
     }
 
-    let query: Rc<RefCell<Vec<String>>> = Rc::default();
+    let query: Rc<RefCell<Query>> = Rc::default();
     {
         let query = query.clone();
-        list.set_filter_func(move |row| matches(&haystacks[row.index() as usize], &query.borrow()));
+        list.set_filter_func(move |row| {
+            let (text, action) = &haystacks[row.index() as usize];
+            query.borrow().keeps(text, *action)
+        });
     }
 
     let scroller = gtk::ScrolledWindow::builder()
@@ -101,7 +126,7 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>) {
         let list = list.clone();
         let query = query.clone();
         search.connect_search_changed(move |entry| {
-            *query.borrow_mut() = entry.text().to_lowercase().split_whitespace().map(str::to_string).collect();
+            *query.borrow_mut() = Query::parse(&entry.text());
             list.invalidate_filter();
             match shown(&list).first() {
                 Some(first) => list.select_row(Some(first)),
@@ -172,14 +197,24 @@ pub fn show(parent: &impl IsA<gtk::Widget>, entries: Vec<Entry>) {
 
 #[cfg(test)]
 mod tests {
-    use super::matches;
+    use super::Query;
 
     #[test]
     fn every_word_has_to_match() {
-        let q = |s: &str| s.split_whitespace().map(str::to_string).collect::<Vec<_>>();
-        assert!(matches("archive action", &q("arch")));
-        assert!(matches("inbox work · inbox", &q("work in")));
-        assert!(!matches("inbox work · inbox", &q("work sent")));
-        assert!(matches("anything", &q("")));
+        let q = Query::parse;
+        assert!(q("arch").keeps("archive action", true));
+        assert!(q("work in").keeps("inbox work · inbox", false));
+        assert!(!q("work sent").keeps("inbox work · inbox", false));
+        assert!(q("").keeps("anything", false));
+    }
+
+    #[test]
+    fn a_leading_angle_bracket_keeps_actions_only() {
+        let q = Query::parse;
+        assert!(q(">").keeps("archive action", true));
+        assert!(!q(">").keeps("inbox work · inbox", false));
+        assert!(q(" > arch").keeps("archive action", true));
+        assert!(!q(">in").keeps("inbox work · inbox", false));
+        assert!(q(">in").keeps("print action", true));
     }
 }
