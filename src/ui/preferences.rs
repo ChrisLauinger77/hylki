@@ -47,6 +47,8 @@ pub struct PrefInit {
     pub single_message_card: bool,
     /// The Light / Dark Mode switch is shown in the reader header (PR #386).
     pub theme_switch: bool,
+    /// Icons come from the desktop's icon theme, not Hylki's own.
+    pub desktop_icons: bool,
     /// The Reader View switch is shown in the reader header.
     pub reader_switch: bool,
     /// What Reader View does when a message is opened.
@@ -1289,6 +1291,7 @@ pub enum PrefOutput {
     SetSingleMessageCard(bool),
     SetReaderSwitch(bool),
     SetThemeSwitch(bool),
+    SetDesktopIcons(bool),
     SetReaderDefault(crate::config::ReaderDefault),
     SetReaderZoom(u32),
     SetCardAttachments(bool),
@@ -2282,6 +2285,15 @@ impl Component for Preferences {
                                         set_title: &i18n("App icon"),
                                         set_activatable: false,
                                         set_focusable: false,
+                                    },
+
+                                    #[name = "desktop_icons_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Use the desktop's icons"),
+                                        set_subtitle: &i18n("Draw icons from the desktop's icon theme instead of Hylki's own, so the app may look different on another desktop."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetDesktopIcons(row.is_active()));
+                                        },
                                     },
 
                                     #[name = "settings_open_row"]
@@ -4406,6 +4418,7 @@ impl Component for Preferences {
         widgets.single_message_card_row.set_active(init.single_message_card);
         widgets.reader_switch_row.set_active(init.reader_switch);
         widgets.theme_switch_row.set_active(init.theme_switch);
+        widgets.desktop_icons_row.set_active(init.desktop_icons);
         widgets.reader_default_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Remember the last choice"),
             &i18n("Reader View on"),

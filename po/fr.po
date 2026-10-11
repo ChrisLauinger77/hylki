@@ -4709,6 +4709,14 @@ msgstr ""
 msgid "Theme"
 msgstr "Thème"
 
+msgid "Use the desktop's icons"
+msgstr ""
+
+msgid ""
+"Draw icons from the desktop's icon theme instead of Hylki's own, so the app "
+"may look different on another desktop."
+msgstr ""
+
 msgid "This window opens to"
 msgstr "Ouverture de la fenêtre sur"
 

@@ -5,8 +5,8 @@
 - **Changed: Hylki's icons look the same on every desktop.** Every icon is
   drawn from copies built into the app, including those GTK and libadwaita
   draw for their own buttons, arrows and checkmarks; the desktop's icon theme
-  no longer replaces any of them. This reverses #260, which let an icon
-  theme restyle them.
+  no longer replaces any of them. **Settings → Appearance → Use the
+  desktop's icons** draws them from the icon theme again, as since #260.
 - **Added: a refresh button for GNOME Online Accounts.** In **Settings →
   Accounts**, beside **Add Account…**, it looks for accounts added in GNOME
   Settings since the list was made.

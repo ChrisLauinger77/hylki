@@ -950,6 +950,8 @@ pub struct AppModel {
     reader_switch: bool,
     /// The Light / Dark Mode switch is shown in the reader header (PR #386).
     theme_switch: bool,
+    /// Icons come from the desktop's icon theme, not Hylki's own (Settings).
+    desktop_icons: bool,
     /// What Reader View does when a message is opened (Settings).
     reader_default: config::ReaderDefault,
     /// Each conversation message lists its own attachments (#213).
@@ -2569,7 +2571,7 @@ impl SimpleComponent for AppModel {
         // Every setting in privacy.toml, read once.
         let prefs = config::load_privacy();
         relm4::set_global_css(include_str!("styles.css"));
-        register_icons();
+        register_icons(prefs.desktop_icons);
         // Before install_scheme_css and before the reader exists: both read
         // the theme's colors back, and both listen for the light/dark flip
         // that swaps a theme's two palettes — GTK runs those handlers in
@@ -3300,6 +3302,7 @@ impl SimpleComponent for AppModel {
             zoom_default: config::load_reader_zoom(),
             reader_switch: prefs.reader_switch,
             theme_switch: prefs.theme_switch,
+            desktop_icons: prefs.desktop_icons,
             reader_default: prefs.reader_default,
             card_attachments: prefs.card_attachments,
             drawer_enabled: prefs.attachment_drawer,
@@ -8228,6 +8231,11 @@ impl SimpleComponent for AppModel {
                     }
                 }
             }
+            AppMsg::Pref(PrefOutput::SetDesktopIcons(on)) => {
+                if pref!(self.desktop_icons = on) {
+                    apply_icon_theme(on);
+                }
+            }
             AppMsg::Pref(PrefOutput::SetReaderDefault(policy)) => {
                 if pref!(self.reader_default = policy) {
                     // Focus Mode's Reader View outranks it while on.
@@ -11579,6 +11587,7 @@ impl AppModel {
             reader_mode: self.reader_mode,
             reader_switch: self.reader_switch,
             theme_switch: self.theme_switch,
+            desktop_icons: self.desktop_icons,
             reader_default: self.reader_default,
             reader_zoom: self.zoom_default,
             card_attachments: self.card_attachments,
@@ -19022,6 +19031,7 @@ impl AppModel {
             single_message_card: self.single_message_card,
             reader_switch: self.reader_switch,
             theme_switch: self.theme_switch,
+            desktop_icons: self.desktop_icons,
             reader_default: self.reader_default,
             reader_zoom: self.zoom_default,
             card_attachments: self.card_attachments,
@@ -22854,13 +22864,11 @@ const ICON_RESOURCE: &str = "/co/hyprlab/Hylki/icons";
 /// every one GTK and libadwaita draw for their own widgets, as found on the
 /// build machine. Icons once followed the user's theme (#260); a theme that
 /// restyled some of them made the app look different from one distribution
-/// to the next, so none of them do any more.
-fn register_icons() {
-    // Set by the app, the name outranks the desktop's setting, now and
-    // whenever it changes: GTK would otherwise switch the theme back to it.
-    if let Some(settings) = gtk::Settings::default() {
-        settings.set_gtk_icon_theme_name(Some(ICON_THEME));
-    }
+/// to the next, so by default none of them do. `desktop` (Settings →
+/// Appearance) gives the desktop's theme back, the bundle filling in what it
+/// lacks.
+fn register_icons(desktop: bool) {
+    apply_icon_theme(desktop);
     if let Some(display) = gtk::gdk::Display::default() {
         let theme = gtk::IconTheme::for_display(&display);
         // Ahead of GTK's and libadwaita's own copies, so their widgets take
@@ -22886,6 +22894,20 @@ fn register_icons() {
         }
     }
     gtk::Window::set_default_icon_name(crate::APP_ID);
+}
+
+/// Draw icons from Hylki's own theme, or from the desktop's. Applies at once:
+/// GTK redraws every icon when the name changes.
+fn apply_icon_theme(desktop: bool) {
+    let Some(settings) = gtk::Settings::default() else { return };
+    if desktop {
+        // Back to whatever the desktop says, now and when it changes.
+        settings.reset_property("gtk-icon-theme-name");
+    } else {
+        // Set by the app, the name outranks the desktop's setting, now and
+        // whenever it changes: GTK would otherwise switch the theme back to it.
+        settings.set_gtk_icon_theme_name(Some(ICON_THEME));
+    }
 }
 
 /// One message being moved to another account (#265): copied out of its

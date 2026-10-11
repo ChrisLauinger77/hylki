@@ -1124,6 +1124,15 @@ or the classic icon. An icon set on the launcher some other way, with a menu
 editor or by editing its `.desktop` file, is left alone when Hylki starts;
 Settings says so above the gallery, and picking an icon there replaces it.
 
+### Icons
+
+Hylki draws its icons, and those of the buttons, arrows and checkmarks GTK
+draws for it, from copies built into the app, so it looks the same on every
+desktop whatever icon theme is set. **Settings → Appearance → Use the
+desktop's icons** draws them from the desktop's icon theme instead, with
+Hylki's copies standing in for any icon the theme lacks. It applies at once
+and is stored as `desktop_icons` in `privacy.toml`.
+
 ### New and seen unread mail
 
 A folder's unread count is in the accent color. With **Settings → Sidebar →
