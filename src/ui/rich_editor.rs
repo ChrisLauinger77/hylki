@@ -1609,7 +1609,14 @@ fn build_toolbar(
     group.add_css_class("format-bar");
     group.set_hexpand(true);
     let end = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    let cluster = || gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    // Each group of tools wraps too, so a composer narrower than a group
+    // still takes its buttons one by one rather than growing past its pane.
+    let cluster = || {
+        let c = adw::WrapBox::new();
+        c.set_child_spacing(2);
+        c.set_line_spacing(2);
+        c
+    };
 
     // Paragraph style and font, each a menu whose label follows the caret.
     let styles = cluster();
@@ -1689,7 +1696,7 @@ fn build_toolbar(
     styles.append(&size);
 
     // (icon, tooltip, execCommand snippet).
-    let simple = |cluster: &gtk::Box, commands: &[(&str, &str, &str)]| {
+    let simple = |cluster: &adw::WrapBox, commands: &[(&str, &str, &str)]| {
         for (icon, tip, cmd) in commands {
             let btn = bar_button(icon, tip);
             // Weak: the format-state handler the view's content manager
@@ -1817,7 +1824,12 @@ fn build_toolbar(
     // their end, and slide back into it. Settings → Composing → Formatting
     // toolbar says how a new message starts; the chevron changes it for
     // this one.
-    let extras = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    // A wrapping box, so in a narrow composer the groups take further rows
+    // one by one rather than holding the toolbar, and the window, wider
+    // than the pane.
+    let extras = adw::WrapBox::new();
+    extras.set_child_spacing(10);
+    extras.set_line_spacing(2);
     for e in [&styles, &colors, &indents, &media] {
         extras.append(e);
     }
