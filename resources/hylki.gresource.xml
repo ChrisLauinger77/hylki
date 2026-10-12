@@ -215,5 +215,7 @@
     <file>icons/scalable/actions/zoom-in-symbolic.svg</file>
     <file>icons/scalable/actions/zoom-original-symbolic.svg</file>
     <file>icons/scalable/actions/zoom-out-symbolic.svg</file>
+    <file>icons/scalable/apps/co.hyprlab.Hylki.Beta.svg</file>
+    <file>icons/scalable/apps/co.hyprlab.Hylki.svg</file>
   </gresource>
 </gresources>
