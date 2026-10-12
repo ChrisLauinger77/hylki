@@ -1609,11 +1609,16 @@ fn build_toolbar(
     group.set_child_spacing(10);
     group.set_line_spacing(2);
     group.set_hexpand(true);
-    // The end box expands too, so it stays at the right when the commands
-    // are hidden (a source format); the group still gets its natural width
-    // first.
+    // The end box expands only while the commands are hidden (a source
+    // format), to stay at the right; beside them it takes its own width and
+    // leaves the rest to the commands, whose wrapped rows need it more than
+    // the space beside the end box's single row did.
     let end = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    end.set_hexpand(true);
+    end.set_hexpand(false);
+    {
+        let end = end.clone();
+        group.connect_visible_notify(move |g| end.set_hexpand(!g.is_visible()));
+    }
     end.set_halign(gtk::Align::End);
     end.set_valign(gtk::Align::Start);
     let cluster = || gtk::Box::new(gtk::Orientation::Horizontal, 2);
@@ -1882,10 +1887,13 @@ fn build_toolbar(
     reveal.set_visible(expanded);
     reveal.set_transition_duration(250);
     more.connect_toggled(show_more);
-    // The chevron rides in one piece with the tools it shows: on a row of
-    // their own the tools would fill it, and a chevron wrapped apart from
-    // them would sit alone on a third row.
-    let ride = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    // The chevron rides with the tools it shows, wrapping under them only
+    // when the row truly has no room. A wrapping box of its own keeps the
+    // toolbar's narrowest width that of the tools alone: a plain box would
+    // add the chevron to it and push a narrow composer past its pane.
+    let ride = adw::WrapBox::new();
+    ride.set_child_spacing(10);
+    ride.set_line_spacing(2);
     ride.append(&reveal);
     ride.append(&more);
     group.append(&breaker);
