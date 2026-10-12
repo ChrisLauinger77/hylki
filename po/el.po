@@ -4562,11 +4562,11 @@ msgstr "Ημερομηνία"
 msgid "Clear all"
 msgstr "Εκκαθάριση όλων"
 
-msgid "Collapse status bar"
-msgstr "Σύμπτυξη γραμμής κατάστασης"
-
 msgid "Export log"
 msgstr "Εξαγωγή αρχείου καταγραφής"
+
+msgid "Collapse status bar"
+msgstr "Σύμπτυξη γραμμής κατάστασης"
 
 msgid "Status bar ({n})"
 msgstr "Γραμμή κατάστασης ({n})"
@@ -6302,6 +6302,13 @@ msgid ""
 "opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Γραμμή κατάστασης ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Λειτουργία κονσόλας"
 
@@ -6496,6 +6503,14 @@ msgstr ""
 
 msgid "30 days"
 msgstr ""
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Σύνταξη στο κύριο παράθυρο"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Σύνταξη στο κύριο παράθυρο"
 
 msgid "When displayed"
 msgstr "Κατά την εμφάνιση"

@@ -1571,6 +1571,10 @@ pub(crate) struct PrivacyFile {
     /// the status bar. Off by default.
     #[serde(default)]
     pub(crate) console_mode: bool,
+    /// The status bar at the top of the window rather than its foot (#433).
+    /// Off by default, for everyone: the key is new in 1.44.
+    #[serde(default)]
+    pub(crate) status_bar_top: bool,
     /// Read-marking policy (#100).
     #[serde(default)]
     pub(crate) read_mark: ReadMark,
@@ -1684,6 +1688,7 @@ impl Default for PrivacyFile {
             tags_placement: SectionPlacement::default(),
             chevrons_left: default_chevrons_left(),
             console_mode: false,
+            status_bar_top: false,
             read_mark: ReadMark::default(),
             files_action: FilesAction::default(),
             files_large: FilesLarge::default(),

@@ -143,6 +143,7 @@ pub struct PrefInit {
     pub start_view: crate::config::StartView,
     pub folder_sort: crate::config::FolderSort,
     pub console_mode: bool,
+    pub status_bar_top: bool,
     pub read_mark: crate::config::ReadMark,
     pub sidebar_hover_expand: bool,
     pub remember_sidebar: bool,
@@ -1341,6 +1342,7 @@ pub enum PrefOutput {
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
     SetConsoleMode(bool),
+    SetStatusBarTop(bool),
     SetReadMark(crate::config::ReadMark),
     ExportSettings,
     ExportLog,
@@ -3804,6 +3806,15 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "status_bar_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Status bar"),
+                                        set_subtitle: &i18n("Where the bar with errors and the console opens"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetStatusBarTop(row.selected() == 1));
+                                        },
+                                    },
+
                                     #[name = "console_mode_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Console mode"),
@@ -4407,6 +4418,10 @@ impl Component for Preferences {
             KEEP_DOWNLOADS_DAYS.iter().position(|d| *d == init.keep_downloads_days).unwrap_or(0) as u32,
         );
         widgets.console_mode_row.set_active(init.console_mode);
+        widgets
+            .status_bar_row
+            .set_model(Some(&gtk::StringList::new(&[&i18n("Bottom of the window"), &i18n("Top of the window")])));
+        widgets.status_bar_row.set_selected(u32::from(init.status_bar_top));
         widgets.read_mark_row.set_model(Some(&gtk::StringList::new(&[
             i18n("When displayed").as_str(),
             i18n("After two seconds").as_str(),

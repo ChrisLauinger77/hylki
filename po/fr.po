@@ -4524,11 +4524,11 @@ msgstr "Date"
 msgid "Clear all"
 msgstr "Tout effacer"
 
-msgid "Collapse status bar"
-msgstr "Réduire la barre d'état"
-
 msgid "Export log"
 msgstr "Exporter le journal"
+
+msgid "Collapse status bar"
+msgstr "Réduire la barre d'état"
 
 msgid "Status bar ({n})"
 msgstr "Barre d'état ({n})"
@@ -6269,6 +6269,13 @@ msgstr ""
 "o pour ouvrir, e pour archiver, # pour supprimer, g puis une lettre pour "
 "aller à un dossier."
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Barre d'état ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Mode console"
 
@@ -6459,6 +6466,14 @@ msgstr "90 jours"
 
 msgid "30 days"
 msgstr "30 jours"
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Rédiger dans la fenêtre principale"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Rédiger dans la fenêtre principale"
 
 msgid "When displayed"
 msgstr "Lors de l'affichage"

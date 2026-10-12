@@ -4080,10 +4080,10 @@ msgstr ""
 msgid "Clear all"
 msgstr ""
 
-msgid "Collapse status bar"
+msgid "Export log"
 msgstr ""
 
-msgid "Export log"
+msgid "Collapse status bar"
 msgstr ""
 
 msgid "Status bar ({n})"
@@ -5485,6 +5485,12 @@ msgid ""
 "opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
+msgid "Status bar"
+msgstr ""
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr ""
 
@@ -5645,6 +5651,12 @@ msgid "90 days"
 msgstr ""
 
 msgid "30 days"
+msgstr ""
+
+msgid "Bottom of the window"
+msgstr ""
+
+msgid "Top of the window"
 msgstr ""
 
 msgid "When displayed"

@@ -4444,11 +4444,11 @@ msgstr "Data:"
 msgid "Clear all"
 msgstr "Cancella tutto"
 
-msgid "Collapse status bar"
-msgstr "Comprimi barra di stato"
-
 msgid "Export log"
 msgstr "Esporta log"
+
+msgid "Collapse status bar"
+msgstr "Comprimi barra di stato"
 
 msgid "Status bar ({n})"
 msgstr "Barra di stato ({n})"
@@ -6172,6 +6172,13 @@ msgstr ""
 "Scorciatoie a tasto singolo come Gmail: j/k si spostano senza aprire, o "
 "apre, e archivia, # elimina, g poi una lettera va a una cartella."
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Barra di stato ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Modalità console"
 
@@ -6361,6 +6368,14 @@ msgstr "90 giorni"
 
 msgid "30 days"
 msgstr "30 giorni"
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Componi nella finestra principale"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Componi nella finestra principale"
 
 msgid "When displayed"
 msgstr "Quando mostrato"

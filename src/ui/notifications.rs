@@ -111,6 +111,22 @@ pub struct NotificationCenter {
     console_view: Option<gtk::TextView>,
     console_scroll: Option<gtk::ScrolledWindow>,
     console_grain: Option<gtk::DrawingArea>,
+    /// Whether the bar sits at the top of the window rather than its foot
+    /// (Settings, #433); shared with the console grip's drag.
+    top: std::rc::Rc<std::cell::Cell<bool>>,
+    /// What [`NotificationCenter::place`] puts in order for either end.
+    layout: Option<Layout>,
+}
+
+/// The parts of the bar whose order follows the end of the window it is at:
+/// the bar nearest the window's edge, the cards and the console opening
+/// away from it, and the console's grip on its far side.
+struct Layout {
+    root: gtk::Revealer,
+    area: gtk::Box,
+    bar: gtk::WindowHandle,
+    console_box: gtk::Box,
+    grip: gtk::Box,
 }
 
 #[derive(Debug)]
@@ -135,6 +151,8 @@ pub enum NotifyInput {
     ExportLog,
     /// Settings: whether console mode is offered (button + menu).
     SetConsoleEnabled(bool),
+    /// Settings: the bar at the top of the window (`true`) or its foot.
+    SetAtTop(bool),
     /// Console tick: pull new log lines (and reschedule while open).
     PollConsole,
     /// Second stage of ShowConsole: slide the console open once the bar
@@ -162,14 +180,16 @@ impl SimpleComponent for NotificationCenter {
     type Output = NotifyOutput;
 
     view! {
-        // At the window's foot, so the bar coming up never moves what is
-        // being read or written (#433); the cards and the console open
-        // upward from it.
+        // At the window's foot by default, so the bar coming up never moves
+        // what is being read or written (#433); the cards and the console
+        // open away from the window's edge. Settings can put it at the top.
         gtk::Revealer {
-            set_transition_type: gtk::RevealerTransitionType::SlideUp,
+            #[watch]
+            set_transition_type: model.slide(),
             #[watch]
             set_reveal_child: model.transient_visible || model.panel_open,
 
+            #[name = "area"]
             gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
                 #[watch]
@@ -178,7 +198,8 @@ impl SimpleComponent for NotificationCenter {
                 // Only the cards section expands; an empty panel stays at bar
                 // height (just shows the status / "Status bar (0)" row).
                 gtk::Revealer {
-                    set_transition_type: gtk::RevealerTransitionType::SlideUp,
+                    #[watch]
+                    set_transition_type: model.slide(),
                     #[watch]
                     set_reveal_child: model.panel_open
                         && !model.console_open
@@ -199,18 +220,20 @@ impl SimpleComponent for NotificationCenter {
                 },
 
                 // Console mode: the dracula terminal, expanding the bar
-                // further up. Selectable text; a CSS-scanline + drawn-grain
+                // further. Selectable text; a CSS-scanline + drawn-grain
                 // overlay gives it the old-CRT cast.
                 gtk::Revealer {
-                    set_transition_type: gtk::RevealerTransitionType::SlideUp,
+                    #[watch]
+                    set_transition_type: model.slide(),
                     set_transition_duration: 350,
                     #[watch]
                     set_reveal_child: model.console_open,
 
+                    #[name = "console_box"]
                     gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
 
-                        // Drag grip: pull the console taller, upward (160px floor).
+                        // Drag grip: pull the console taller (160px floor).
                         #[name = "console_grip"]
                         gtk::Box {
                             add_css_class: "console-grip",
@@ -262,6 +285,7 @@ impl SimpleComponent for NotificationCenter {
 
                 // A WindowHandle so the bar can drag the window, like a title bar.
                 // Interactive children (the buttons) still receive their clicks.
+                #[name = "bar"]
                 gtk::WindowHandle {
                     gtk::Box {
                         add_css_class: "notify-bar",
@@ -288,23 +312,6 @@ impl SimpleComponent for NotificationCenter {
                             connect_clicked => NotifyInput::ClearAll,
                         },
 
-                        gtk::Button {
-                            #[watch]
-                            set_icon_name: if model.panel_open { "pan-down-symbolic" } else { "pan-up-symbolic" },
-                            set_tooltip_text: Some(i18n("Collapse status bar").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::TogglePanel,
-                        },
-
-                        // Console mode (far right): the verbose live log.
-                        gtk::Button {
-                            #[watch]
-                            set_visible: model.console_enabled,
-                            set_icon_name: "code-symbolic",
-                            set_tooltip_text: Some(i18n("Console").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::ShowConsole,
-                        },
                         // While the console is open: save its log to a file.
                         gtk::Button {
                             #[watch]
@@ -313,6 +320,23 @@ impl SimpleComponent for NotificationCenter {
                             set_tooltip_text: Some(i18n("Export log").as_str()),
                             add_css_class: "flat",
                             connect_clicked => NotifyInput::ExportLog,
+                        },
+                        // Console mode: the verbose live log.
+                        gtk::Button {
+                            #[watch]
+                            set_visible: model.console_enabled,
+                            set_icon_name: "code-symbolic",
+                            set_tooltip_text: Some(i18n("Console").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::ShowConsole,
+                        },
+                        // The bar's own toggle, always last.
+                        gtk::Button {
+                            #[watch]
+                            set_icon_name: model.chevron(),
+                            set_tooltip_text: Some(i18n("Collapse status bar").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::TogglePanel,
                         },
                     },
                 },
@@ -355,6 +379,8 @@ impl SimpleComponent for NotificationCenter {
             console_view: None,
             console_scroll: None,
             console_grain: None,
+            top: std::rc::Rc::default(),
+            layout: None,
         };
 
         let cards_box = model.cards.widget();
@@ -363,6 +389,13 @@ impl SimpleComponent for NotificationCenter {
         model.console_scroll = Some(widgets.console_scroll.clone());
         model.console_grain = Some(widgets.console_grain.clone());
         widgets.console_grain.set_draw_func(draw_crt_grain);
+        model.layout = Some(Layout {
+            root: root.clone(),
+            area: widgets.area.clone(),
+            bar: widgets.bar.clone(),
+            console_box: widgets.console_box.clone(),
+            grip: widgets.console_grip.clone(),
+        });
         {
             // Dragging the grip resizes the console; 160px stays the floor.
             // The pointer is tracked in ROOT coordinates: the grip itself
@@ -371,6 +404,7 @@ impl SimpleComponent for NotificationCenter {
             // demanding more height than the window can give (which flashes
             // as the layout fights itself).
             let drag = gtk::GestureDrag::new();
+            let top = model.top.clone();
             let sw = widgets.console_scroll.clone();
             let grip = widgets.console_grip.clone();
             let start = std::rc::Rc::new(std::cell::Cell::new((160i32, 0f32)));
@@ -404,8 +438,10 @@ impl SimpleComponent for NotificationCenter {
                     .map(|r| r.height() - 340)
                     .unwrap_or(i32::MAX)
                     .max(160);
-                // The grip sits above the console: dragging up makes it taller.
-                let h = (start_h - (now - start_y) as i32).clamp(160, ceiling);
+                // The grip sits on the console's far side from the bar:
+                // below it with the bar at the top, above it at the foot.
+                let moved = (now - start_y) as i32;
+                let h = (start_h + if top.get() { moved } else { -moved }).clamp(160, ceiling);
                 sw.set_min_content_height(h);
                 sw.set_max_content_height(h);
             });
@@ -425,6 +461,45 @@ impl SimpleComponent for NotificationCenter {
 }
 
 impl NotificationCenter {
+    /// How the bar and its panels slide: away from the window's edge.
+    fn slide(&self) -> gtk::RevealerTransitionType {
+        if self.top.get() {
+            gtk::RevealerTransitionType::SlideDown
+        } else {
+            gtk::RevealerTransitionType::SlideUp
+        }
+    }
+
+    /// The bar's toggle points where the panel opens, or back where it folds.
+    fn chevron(&self) -> &'static str {
+        match (self.top.get(), self.panel_open) {
+            (true, true) | (false, false) => "pan-up-symbolic",
+            (true, false) | (false, true) => "pan-down-symbolic",
+        }
+    }
+
+    /// Put the bar at its end of the window, and its parts in order for it.
+    fn place(&self) {
+        let Some(l) = &self.layout else { return };
+        let top = self.top.get();
+        let none = None::<&gtk::Widget>;
+        if top {
+            l.area.reorder_child_after(&l.bar, none);
+            l.console_box.reorder_child_after(&l.grip, l.console_box.last_child().as_ref());
+        } else {
+            l.area.reorder_child_after(&l.bar, l.area.last_child().as_ref());
+            l.console_box.reorder_child_after(&l.grip, none);
+        }
+        // The window's column: first child at the top, last at the foot.
+        if let Some(column) = l.root.parent().and_downcast::<gtk::Box>() {
+            if top {
+                column.reorder_child_after(&l.root, none);
+            } else if let Some(last) = column.last_child().filter(|w| w != l.root.upcast_ref::<gtk::Widget>()) {
+                column.reorder_child_after(&l.root, Some(&last));
+            }
+        }
+    }
+
     fn handle(&mut self, msg: NotifyInput, sender: &ComponentSender<Self>) {
         match msg {
             NotifyInput::Push {
@@ -545,6 +620,10 @@ impl NotificationCenter {
                 }
             }
 
+            NotifyInput::SetAtTop(on) => {
+                self.top.set(on);
+                self.place();
+            }
             NotifyInput::SetConsoleEnabled(on) => {
                 self.console_enabled = on;
                 if !on {

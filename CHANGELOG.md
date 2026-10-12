@@ -27,7 +27,11 @@
 - **Changed: the status bar sits at the bottom of the window** (#433,
   reported by 3v1n0). At the top, an error coming in pushed the whole window
   down under the pointer; at the foot nothing moves, and its list of
-  messages and the console open upward.
+  messages and the console open upward. It moves there for everyone;
+  **Settings → System → Status bar** puts it back at the top. Its buttons
+  read Export log, the console, then the bar's own toggle.
+- **Fixed: the composer's chevron sat alone on a third row** in a narrow
+  composer with every formatting tool shown. It now stays beside the tools.
 - **Fixed: the settings search listed every OpenPGP key** (#432, reported
   by 3v1n0). A keyring with many people's keys buried the settings under
   them; keys are no longer search results.

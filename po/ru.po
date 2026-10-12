@@ -4534,11 +4534,11 @@ msgstr "Дата"
 msgid "Clear all"
 msgstr "Очистить всё"
 
-msgid "Collapse status bar"
-msgstr "Свернуть строку состояния"
-
 msgid "Export log"
 msgstr "Экспортировать журнал"
+
+msgid "Collapse status bar"
+msgstr "Свернуть строку состояния"
 
 msgid "Status bar ({n})"
 msgstr "Строка состояния ({n})"
@@ -6246,6 +6246,13 @@ msgid ""
 "opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Строка состояния ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Режим консоли"
 
@@ -6435,6 +6442,14 @@ msgstr ""
 
 msgid "30 days"
 msgstr ""
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Создание писем в основном окне"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Создание писем в основном окне"
 
 msgid "When displayed"
 msgstr "При отображении"

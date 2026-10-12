@@ -941,6 +941,8 @@ pub struct AppModel {
     folder_sort: config::FolderSort,
     /// Console mode offered in the status bar (Settings → System & Appearance).
     console_mode: bool,
+    /// The status bar at the top of the window, not its foot (#433).
+    status_bar_top: bool,
     /// Read-marking policy (#100).
     read_mark: config::ReadMark,
     /// Mail filter rules (#47), applied to inbox syncs.
@@ -3360,6 +3362,7 @@ impl SimpleComponent for AppModel {
             start_view,
             folder_sort: prefs.folder_sort,
             console_mode: prefs.console_mode,
+            status_bar_top: prefs.status_bar_top,
             read_mark: prefs.read_mark,
             // The demo (no accounts of its own) ships with tags and filter
             // rules, so its sidebar shows the Tags and Filtered Folders
@@ -5452,6 +5455,7 @@ impl SimpleComponent for AppModel {
         model
             .notifications
             .emit(NotifyInput::SetConsoleEnabled(model.console_mode));
+        model.notifications.emit(NotifyInput::SetAtTop(model.status_bar_top));
         // Screenshot/dev hook: open the status bar console shortly after
         // launch (pref permitting) so captures can show it.
         // HYLKI_SHOWCASE_ABOUT=1 opens the About window a beat after
@@ -10067,6 +10071,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetStatusBarTop(top)) => {
+                if pref!(self.status_bar_top = top) {
+                    self.notifications.emit(NotifyInput::SetAtTop(top));
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetConsoleMode(on)) => {
                 if pref!(self.console_mode = on) {
                     self.notifications.emit(NotifyInput::SetConsoleEnabled(on));
@@ -11992,6 +12002,7 @@ impl AppModel {
             tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
             console_mode: self.console_mode,
+            status_bar_top: self.status_bar_top,
             read_mark: self.read_mark,
             files_action: self.files_prefs.action,
             files_large: self.files_prefs.large,
@@ -19862,6 +19873,7 @@ impl AppModel {
             start_view: self.start_view,
             folder_sort: self.folder_sort,
             console_mode: self.console_mode,
+            status_bar_top: self.status_bar_top,
             read_mark: self.read_mark,
             settings_open_accounts: self.settings_open_accounts,
             sidebar_hover_expand: self.sidebar_hover_expand,

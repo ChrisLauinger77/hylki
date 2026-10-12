@@ -4586,11 +4586,11 @@ msgstr ""
 msgid "Clear all"
 msgstr "Alles löschen"
 
-msgid "Collapse status bar"
-msgstr "Statusleiste einklappen"
-
 msgid "Export log"
 msgstr "Protokoll exportieren"
+
+msgid "Collapse status bar"
+msgstr "Statusleiste einklappen"
 
 msgid "Status bar ({n})"
 msgstr "Statusleiste ({n})"
@@ -6291,6 +6291,13 @@ msgid ""
 "opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Statusleiste ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Konsolenmodus"
 
@@ -6485,6 +6492,14 @@ msgstr ""
 
 msgid "30 days"
 msgstr ""
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Im Hauptfenster verfassen"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Im Hauptfenster verfassen"
 
 msgid "When displayed"
 msgstr "Wenn angezeigt"

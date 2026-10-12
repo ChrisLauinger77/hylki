@@ -4560,11 +4560,11 @@ msgstr ""
 msgid "Clear all"
 msgstr "Összes törlése"
 
-msgid "Collapse status bar"
-msgstr "Állapotsáv összecsukása"
-
 msgid "Export log"
 msgstr "Napló exportálása"
+
+msgid "Collapse status bar"
+msgstr "Állapotsáv összecsukása"
 
 msgid "Status bar ({n})"
 msgstr "Állapotsáv ({n})"
@@ -6276,6 +6276,13 @@ msgid ""
 "opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Állapotsáv ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Konzol mód"
 
@@ -6470,6 +6477,14 @@ msgstr ""
 
 msgid "30 days"
 msgstr ""
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Levélírás a főablakban"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Levélírás a főablakban"
 
 msgid "When displayed"
 msgstr "Megjelenítés ideje"

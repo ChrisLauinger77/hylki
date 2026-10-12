@@ -755,7 +755,8 @@ plain text leaves them out. **Settings → Composing → Formatting toolbar**
 says whether a new message starts with these tools shown (Always expanded)
 or hidden behind the chevron (Always collapsed, the default); the chevron
 changes it for the message at hand. When the composer is narrow, the
-toolbar wraps onto a second row.
+toolbar wraps onto a second row, the chevron staying beside the tools it
+shows.
 
 ### Spell checking
 
@@ -1301,6 +1302,15 @@ played while Do Not Disturb is on; the Flatpak cannot see Do Not Disturb, which 
 desktop does not share with sandboxed apps. The desktop may play a sound of
 its own for the notification as well; GNOME Settings → Notifications → Hylki →
 Sound Alerts turns that one off.
+
+### The status bar
+
+Errors, and the console when **Settings → System → Console mode** is on, open
+in a bar at the bottom of the window. **Settings → System → Status bar** puts
+it at the top instead. <kbd>Ctrl+Shift+S</kbd>, or a long press on Refresh,
+shows or hides it. Its buttons are, from the left, **Export log** (while the
+console is open), the console, and the bar's own toggle. Stored as
+`status_bar_top` in `privacy.toml`.
 
 ## Privacy
 

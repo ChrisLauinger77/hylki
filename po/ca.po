@@ -4430,11 +4430,11 @@ msgstr "Data:"
 msgid "Clear all"
 msgstr "Neteja-ho tot"
 
-msgid "Collapse status bar"
-msgstr "Replega la barra d'estat"
-
 msgid "Export log"
 msgstr "Exporta el registre"
+
+msgid "Collapse status bar"
+msgstr "Replega la barra d'estat"
 
 msgid "Status bar ({n})"
 msgstr "Barra d'estat ({n})"
@@ -6152,6 +6152,13 @@ msgstr ""
 "Dreceres d'una sola tecla com les té el Gmail: j/k es mouen sense obrir, o "
 "obre, e arxiva, # suprimeix, g i després una lletra va a una carpeta."
 
+#, fuzzy
+msgid "Status bar"
+msgstr "Barra d'estat ({n})"
+
+msgid "Where the bar with errors and the console opens"
+msgstr ""
+
 msgid "Console mode"
 msgstr "Mode de consola"
 
@@ -6342,6 +6349,14 @@ msgstr "90 dies"
 
 msgid "30 days"
 msgstr "30 dies"
+
+#, fuzzy
+msgid "Bottom of the window"
+msgstr "Redacta a la finestra principal"
+
+#, fuzzy
+msgid "Top of the window"
+msgstr "Redacta a la finestra principal"
 
 msgid "When displayed"
 msgstr "Quan es mostra"
