@@ -1151,6 +1151,22 @@ impl Cache {
         run().unwrap_or_default()
     }
 
+    /// Each cached message's UID with its timestamp, for a folder: what a
+    /// Graph or JMAP listing is reconciled against (#429), since a row newer
+    /// than the listing itself must not be taken for one deleted.
+    pub fn cached_uid_times(&self, account_id: u32, folder_path: &str) -> std::collections::HashMap<u32, i64> {
+        let run = || -> rusqlite::Result<std::collections::HashMap<u32, i64>> {
+            let mut stmt = self.conn.prepare(
+                "SELECT uid, ts FROM messages WHERE account_id = ?1 AND folder_path = ?2",
+            )?;
+            let rows = stmt.query_map(params![account_id, folder_path], |row| {
+                Ok((row.get::<_, u32>(0)?, row.get::<_, i64>(1)?))
+            })?;
+            rows.collect()
+        };
+        run().unwrap_or_default()
+    }
+
     /// The rows of the account's messages that are one of `ids` or name one
     /// of them in their References: what both conversation lookups match on.
     ///
