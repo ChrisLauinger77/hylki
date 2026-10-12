@@ -72,6 +72,9 @@
   deleting, removing attachments, sending, drafts and the automatic
   emptying of Junk and Trash work. New mail arrives by push through a
   streaming subscription, with polling as the fallback.
+- **Fixed: an open account could fold up in the sidebar by itself**, at the
+  next change to the folder list (tagging on Gmail makes one). Opening an
+  account to show a folder picked inside it was recorded twice and undone.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.

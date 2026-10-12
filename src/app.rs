@@ -1297,7 +1297,8 @@ pub enum AppMsg {
     /// Gallery "Go to Message" — open the attachment's source message.
     OpenAttachmentMessage { account_id: u32, folder_path: String, uid: u32 },
     FolderSelected { account_id: u32, folder_id: u32, name: String, path: String },
-    ToggleCollapse(u32),
+    /// An account section opened or folded in the sidebar.
+    AccountFolded { id: u32, folded: bool },
     /// A sidebar folder-tree node was collapsed/expanded (#51) — persist it.
     FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
     /// A run of sibling folders was put in a new order in the sidebar.
@@ -5839,16 +5840,19 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::ToggleCollapse(account_id) => {
-                // The sidebar already animated the toggle locally; just record
-                // the new state (a rebuild here would interrupt the animation).
-                if let Some(email) = self.email_of(account_id) {
-                    if let Some(pos) = self.collapsed.iter().position(|e| *e == email) {
-                        self.collapsed.remove(pos);
-                    } else {
-                        self.collapsed.push(email);
+            AppMsg::AccountFolded { id, folded } => {
+                // The sidebar already animated it; just record the state (a
+                // rebuild here would interrupt the animation).
+                if let Some(email) = self.email_of(id) {
+                    let was = self.collapsed.contains(&email);
+                    if was != folded {
+                        if folded {
+                            self.collapsed.push(email);
+                        } else {
+                            self.collapsed.retain(|e| *e != email);
+                        }
+                        self.save_sidebar_state();
                     }
-                    self.save_sidebar_state();
                 }
             }
 
@@ -23376,7 +23380,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::FolderSelected { account_id, folder_id, name, path } => {
             AppMsg::FolderSelected { account_id, folder_id, name, path }
         }
-        SidebarOutput::ToggleCollapse(id) => AppMsg::ToggleCollapse(id),
+        SidebarOutput::AccountFolded { id, folded } => AppMsg::AccountFolded { id, folded },
         SidebarOutput::ToggleCustomFolders(id) => AppMsg::ToggleCustomFolders(id),
         SidebarOutput::CollapsedChanged(collapsed) => AppMsg::SidebarCollapsed(collapsed),
         SidebarOutput::SectionsOpen {

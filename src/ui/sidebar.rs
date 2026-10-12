@@ -683,7 +683,11 @@ pub enum SidebarOutput {
         name: String,
         path: String,
     },
-    ToggleCollapse(u32),
+    /// An account's section was opened or folded, by the user or to show a
+    /// folder picked inside it: the state it is now in, not a toggle, since
+    /// both sidebars (the pane and the peek) report the same reveal and two
+    /// toggles cancelled out (the account then folded at the next rebuild).
+    AccountFolded { id: u32, folded: bool },
     /// The user toggled the collapsible custom-folders section for an account.
     ToggleCustomFolders(u32),
     /// The user toggled icon-only mode; `true` means collapsed.
@@ -1787,7 +1791,7 @@ impl Sidebar {
                         label.set_visible(!expanded && n > 0);
                     }
                     if !rail_only {
-                        let _ = sender.output(SidebarOutput::ToggleCollapse(id));
+                        let _ = sender.output(SidebarOutput::AccountFolded { id, folded: !expanded });
                     }
                 }
             }
@@ -4705,7 +4709,7 @@ impl Sidebar {
             label.set_visible(false);
         }
         if !self.collapsed {
-            let _ = sender.output(SidebarOutput::ToggleCollapse(id));
+            let _ = sender.output(SidebarOutput::AccountFolded { id, folded: false });
         }
     }
 
