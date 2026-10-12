@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Changed: the status bar sits at the bottom of the window** (#433,
+  reported by 3v1n0). At the top, an error coming in pushed the whole window
+  down under the pointer; at the foot nothing moves, and its list of
+  messages and the console open upward.
 - **Fixed: the settings search listed every OpenPGP key** (#432, reported
   by 3v1n0). A keyring with many people's keys buried the settings under
   them; keys are no longer search results.

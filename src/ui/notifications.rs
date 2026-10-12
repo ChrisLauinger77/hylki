@@ -162,8 +162,11 @@ impl SimpleComponent for NotificationCenter {
     type Output = NotifyOutput;
 
     view! {
+        // At the window's foot, so the bar coming up never moves what is
+        // being read or written (#433); the cards and the console open
+        // upward from it.
         gtk::Revealer {
-            set_transition_type: gtk::RevealerTransitionType::SlideDown,
+            set_transition_type: gtk::RevealerTransitionType::SlideUp,
             #[watch]
             set_reveal_child: model.transient_visible || model.panel_open,
 
@@ -172,67 +175,10 @@ impl SimpleComponent for NotificationCenter {
                 #[watch]
                 set_css_classes: &model.area_classes(),
 
-                // A WindowHandle so the bar can drag the window, like a title bar.
-                // Interactive children (the buttons) still receive their clicks.
-                gtk::WindowHandle {
-                    gtk::Box {
-                        add_css_class: "notify-bar",
-                        set_spacing: 8,
-
-                        gtk::Image {
-                            #[watch]
-                            set_icon_name: Some(model.bar_icon()),
-                        },
-
-                        gtk::Label {
-                            #[watch]
-                            set_label: &model.bar_label(),
-                            set_hexpand: true,
-                            set_halign: gtk::Align::Start,
-                            set_ellipsize: gtk::pango::EllipsizeMode::End,
-                        },
-
-                        gtk::Button {
-                            #[watch]
-                            set_visible: model.panel_open && !model.ids.is_empty(),
-                            set_label: &i18n("Clear all"),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::ClearAll,
-                        },
-
-                        gtk::Button {
-                            #[watch]
-                            set_icon_name: if model.panel_open { "pan-up-symbolic" } else { "pan-down-symbolic" },
-                            set_tooltip_text: Some(i18n("Collapse status bar").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::TogglePanel,
-                        },
-
-                        // Console mode (far right): the verbose live log.
-                        gtk::Button {
-                            #[watch]
-                            set_visible: model.console_enabled,
-                            set_icon_name: "code-symbolic",
-                            set_tooltip_text: Some(i18n("Console").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::ShowConsole,
-                        },
-                        // While the console is open: save its log to a file.
-                        gtk::Button {
-                            #[watch]
-                            set_visible: model.console_enabled && model.console_open,
-                            set_icon_name: "document-save-symbolic",
-                            set_tooltip_text: Some(i18n("Export log").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => NotifyInput::ExportLog,
-                        },
-                    },
-                },
-
                 // Only the cards section expands; an empty panel stays at bar
                 // height (just shows the status / "Status bar (0)" row).
                 gtk::Revealer {
-                    set_transition_type: gtk::RevealerTransitionType::SlideDown,
+                    set_transition_type: gtk::RevealerTransitionType::SlideUp,
                     #[watch]
                     set_reveal_child: model.panel_open
                         && !model.console_open
@@ -253,16 +199,31 @@ impl SimpleComponent for NotificationCenter {
                 },
 
                 // Console mode: the dracula terminal, expanding the bar
-                // further down. Selectable text; a CSS-scanline + drawn-grain
+                // further up. Selectable text; a CSS-scanline + drawn-grain
                 // overlay gives it the old-CRT cast.
                 gtk::Revealer {
-                    set_transition_type: gtk::RevealerTransitionType::SlideDown,
+                    set_transition_type: gtk::RevealerTransitionType::SlideUp,
                     set_transition_duration: 350,
                     #[watch]
                     set_reveal_child: model.console_open,
 
                     gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
+
+                        // Drag grip: pull the console taller, upward (160px floor).
+                        #[name = "console_grip"]
+                        gtk::Box {
+                            add_css_class: "console-grip",
+                            set_cursor_from_name: Some("ns-resize"),
+                            set_halign: gtk::Align::Fill,
+
+                            gtk::Box {
+                                add_css_class: "console-grip-bar",
+                                set_halign: gtk::Align::Center,
+                                set_valign: gtk::Align::Center,
+                                set_hexpand: true,
+                            },
+                        },
 
                         gtk::Overlay {
                             #[name = "console_scroll"]
@@ -296,20 +257,62 @@ impl SimpleComponent for NotificationCenter {
                                 set_can_target: false,
                             },
                         },
+                    },
+                },
 
-                        // Drag grip: pull the console taller (160px floor).
-                        #[name = "console_grip"]
-                        gtk::Box {
-                            add_css_class: "console-grip",
-                            set_cursor_from_name: Some("ns-resize"),
-                            set_halign: gtk::Align::Fill,
+                // A WindowHandle so the bar can drag the window, like a title bar.
+                // Interactive children (the buttons) still receive their clicks.
+                gtk::WindowHandle {
+                    gtk::Box {
+                        add_css_class: "notify-bar",
+                        set_spacing: 8,
 
-                            gtk::Box {
-                                add_css_class: "console-grip-bar",
-                                set_halign: gtk::Align::Center,
-                                set_valign: gtk::Align::Center,
-                                set_hexpand: true,
-                            },
+                        gtk::Image {
+                            #[watch]
+                            set_icon_name: Some(model.bar_icon()),
+                        },
+
+                        gtk::Label {
+                            #[watch]
+                            set_label: &model.bar_label(),
+                            set_hexpand: true,
+                            set_halign: gtk::Align::Start,
+                            set_ellipsize: gtk::pango::EllipsizeMode::End,
+                        },
+
+                        gtk::Button {
+                            #[watch]
+                            set_visible: model.panel_open && !model.ids.is_empty(),
+                            set_label: &i18n("Clear all"),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::ClearAll,
+                        },
+
+                        gtk::Button {
+                            #[watch]
+                            set_icon_name: if model.panel_open { "pan-down-symbolic" } else { "pan-up-symbolic" },
+                            set_tooltip_text: Some(i18n("Collapse status bar").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::TogglePanel,
+                        },
+
+                        // Console mode (far right): the verbose live log.
+                        gtk::Button {
+                            #[watch]
+                            set_visible: model.console_enabled,
+                            set_icon_name: "code-symbolic",
+                            set_tooltip_text: Some(i18n("Console").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::ShowConsole,
+                        },
+                        // While the console is open: save its log to a file.
+                        gtk::Button {
+                            #[watch]
+                            set_visible: model.console_enabled && model.console_open,
+                            set_icon_name: "document-save-symbolic",
+                            set_tooltip_text: Some(i18n("Export log").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => NotifyInput::ExportLog,
                         },
                     },
                 },
@@ -401,7 +404,8 @@ impl SimpleComponent for NotificationCenter {
                     .map(|r| r.height() - 340)
                     .unwrap_or(i32::MAX)
                     .max(160);
-                let h = (start_h + (now - start_y) as i32).clamp(160, ceiling);
+                // The grip sits above the console: dragging up makes it taller.
+                let h = (start_h - (now - start_y) as i32).clamp(160, ceiling);
                 sw.set_min_content_height(h);
                 sw.set_max_content_height(h);
             });

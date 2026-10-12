@@ -1430,7 +1430,7 @@ headerbar.compose-toolbar button.image-button {
 }
 
 .notify-cards {
-  padding: 4px 12px 14px 12px;
+  padding: 14px 12px 4px 12px;
 }
 
 /* Toast-like cards floating on the colored bar. Fixed amber with dark text

@@ -1987,8 +1987,6 @@ impl SimpleComponent for AppModel {
                 set_child = &gtk::Box {
                 set_orientation: gtk::Orientation::Vertical,
 
-                append: model.notifications.widget(),
-
                 // The peek panel's split view: permanently collapsed, so
                 // showing its sidebar slides the expanded panel in from the
                 // window's left edge over the rail and the panes — with
@@ -2631,6 +2629,9 @@ impl SimpleComponent for AppModel {
                     },
                     },
                 },
+
+                // The status bar sits at the foot of the window (#433).
+                append: model.notifications.widget(),
                 },
 
                 // ======== Full-window attachment lightbox ========
