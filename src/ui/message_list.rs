@@ -874,6 +874,12 @@ pub enum MessageListInput {
     MoveCursor(i32),
     /// Open the row the cursor is on in the reader (Gmail's o, #392).
     OpenCursor,
+    /// A click in the list: the keyboard cursor's outline goes, since the
+    /// pointer, not j or k, says where the user is now.
+    ClearCursor,
+    /// Open the next (or previous) conversation, from the one open, while
+    /// the keyboard stays in the reader (Gmail's j/k there, #392).
+    StepConversation(i32),
     /// Select every row shown (Gmail's * a).
     SelectAllShown,
     /// The addresses you send from, for leaving your own replies out of a
@@ -1076,6 +1082,9 @@ pub enum MessageListOutput {
     /// Every selected message, whenever that changes — the reader outlines the
     /// matching cards.
     SelectionKeys(Vec<(u32, u32)>),
+    /// Gmail's o or Enter opened a row (#392); `already_open` when it was
+    /// the one already in the reader, so no new selection follows.
+    OpenedByKey { already_open: bool },
     /// The header-bar count changed — app.rs shows it.
     CountChanged(String),
     /// A row was double-clicked: open it in its own window. `thread` is the
@@ -2130,6 +2139,7 @@ impl SimpleComponent for MessageList {
                     .map(|&p| p as i64)
                     .unwrap_or(if delta > 0 { -1 } else { self.shown.len() as i64 });
                 let next = (current + delta as i64).clamp(0, self.shown.len() as i64 - 1) as usize;
+                self.shared.set_cursor(None);
                 self.shared.selection.select_item(next as u32, true);
                 self.focus_row(next);
             }
@@ -2144,20 +2154,42 @@ impl SimpleComponent for MessageList {
                 }
                 // From the row the keyboard is on, else the open one, else
                 // the top or the bottom.
-                let current = self
-                    .cursor_position()
-                    .or_else(|| self.selected_positions().first().copied())
-                    .map(|p| p as i64)
-                    .unwrap_or(if delta > 0 { -1 } else { self.shown.len() as i64 });
-                let next = (current + delta as i64).clamp(0, self.shown.len() as i64 - 1) as usize;
+                let from = self.cursor_position().or_else(|| self.selected_positions().first().copied());
+                let next = self.conversation_step(from, delta);
                 self.focus_row(next);
+                // Drawn by the row itself: the list's focus ring is off, and
+                // the window's focus-visible flag is not reliably set by a key
+                // a shortcut handler consumed.
+                self.shared.set_cursor(self.shown.get(next).map(|m| (m.account_id, m.id)));
             }
             MessageListInput::OpenCursor => {
                 let Some(pos) = self.cursor_position().or_else(|| self.selected_positions().first().copied()) else {
                     return;
                 };
+                self.shared.set_cursor(None);
+                let already_open = self.selected_positions() == [pos];
                 self.shared.selection.select_item(pos as u32, true);
                 self.focus_row(pos);
+                let _ = sender.output(MessageListOutput::OpenedByKey { already_open });
+            }
+            MessageListInput::ClearCursor => self.shared.set_cursor(None),
+            MessageListInput::StepConversation(delta) => {
+                if self.shown.is_empty() {
+                    return;
+                }
+                if delta != 0 {
+                    self.nav_direction = delta.signum();
+                }
+                let from = self.selected_positions().first().copied();
+                let next = self.conversation_step(from, delta);
+                if from == Some(next) {
+                    return;
+                }
+                self.shared.set_cursor(None);
+                // Selecting opens it; the keyboard stays where it is, in the
+                // reader, so the next j or k goes on from there.
+                self.shared.selection.select_item(next as u32, true);
+                self.list_view.scroll_to(next as u32, gtk::ListScrollFlags::NONE, None);
             }
             MessageListInput::SelectAllShown => {
                 if !self.shown.is_empty() {
@@ -2197,6 +2229,7 @@ impl SimpleComponent for MessageList {
                 // from what you were reading), so it's allowed to scroll.
                 if !self.shown.is_empty() {
                     let pos = self.selected_positions().first().copied().unwrap_or(0);
+                    self.shared.set_cursor(None);
                     self.focus_row(pos);
                 }
             }
@@ -4038,6 +4071,16 @@ impl MessageList {
             }
         });
         list.add_controller(key);
+        // Watched in the capture phase and never claimed, so the row still
+        // gets the click.
+        let click = gtk::GestureClick::new();
+        click.set_button(0);
+        click.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let s = input.clone();
+        click.connect_pressed(move |_, _, _, _| {
+            let _ = s.send(MessageListInput::ClearCursor);
+        });
+        list.add_controller(click);
     }
 
     /// Ask for a rebuild at the end of the current main-loop pass, folding
@@ -4197,6 +4240,48 @@ impl MessageList {
             self.list_view.scroll_to(idx as u32, gtk::ListScrollFlags::FOCUS, None);
             self.list_view.grab_focus();
         }
+    }
+
+    /// The row `delta` conversations away from `from`, clamped to the list:
+    /// the replies of a conversation opened out in the list are stepped
+    /// over, as Gmail's j and k move between conversations (#392). From no
+    /// row, the first step lands on the top or the bottom one.
+    fn conversation_step(&self, from: Option<usize>, delta: i32) -> usize {
+        let last = self.shown.len().saturating_sub(1);
+        let is_child = |p: usize| self.shared.model.row(p).is_some_and(|r| r.meta.is_child);
+        let Some(mut pos) = from.filter(|&p| p <= last) else {
+            let mut p = if delta > 0 { 0 } else { last };
+            while p > 0 && is_child(p) {
+                p -= 1;
+            }
+            return p;
+        };
+        for _ in 0..delta.unsigned_abs() {
+            let mut p = pos;
+            loop {
+                if delta > 0 {
+                    if p == last {
+                        break;
+                    }
+                    p += 1;
+                } else {
+                    if p == 0 {
+                        break;
+                    }
+                    p -= 1;
+                }
+                if !is_child(p) {
+                    break;
+                }
+            }
+            if is_child(p) {
+                // Only replies past here: stay on the conversation already
+                // reached.
+                break;
+            }
+            pos = p;
+        }
+        pos
     }
 
     /// Where deletion advances to, once the row at `idx` is gone: the row now

@@ -1139,6 +1139,9 @@ pub struct AppModel {
     /// opposed to the ones the reader brought in from Sent or another
     /// folder: what archiving the conversation moves (#392).
     listed_thread: Vec<(u32, u32)>,
+    /// The next message opened takes the keyboard into the reader (Gmail's
+    /// o and Enter, #392).
+    reader_focus_pending: bool,
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
@@ -1372,6 +1375,9 @@ pub enum AppMsg {
     /// The message list has no selection to show (e.g. the last message was
     /// removed), so the reader should clear.
     ClearReader,
+    /// Gmail's o or Enter opened a row (#392): the keyboard goes to the
+    /// reader, now if the row was already the one open, else once it opens.
+    OpenedByKey { already_open: bool },
     /// Double-click: open the message in its own standalone window.
     OpenMessageWindow { message: Message, thread: Vec<Message> },
     /// A popped-out message window was closed (remove it from the map).
@@ -2856,6 +2862,7 @@ impl SimpleComponent for AppModel {
                         AppMsg::ListMoveTo { messages, offer_whole, x, y }
                     }
                     MessageListOutput::SelectionCleared => AppMsg::ClearReader,
+                    MessageListOutput::OpenedByKey { already_open } => AppMsg::OpenedByKey { already_open },
                     MessageListOutput::SearchActive(active) => AppMsg::SearchActive(active),
                     MessageListOutput::SortChanged(key) => AppMsg::ListSortChanged(key),
                     MessageListOutput::ColumnWidths(widths) => AppMsg::ListColumnWidths(widths),
@@ -3192,6 +3199,7 @@ impl SimpleComponent for AppModel {
             popouts: HashMap::new(),
             current_thread: Vec::new(),
             listed_thread: Vec::new(),
+            reader_focus_pending: false,
             list_selection: Vec::new(),
             list_heard: Vec::new(),
             undo_stack: Vec::new(),
@@ -6414,6 +6422,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::OpenedByKey { already_open } => {
+                if already_open {
+                    self.message_view.emit(MessageViewInput::FocusBody);
+                } else {
+                    self.reader_focus_pending = true;
+                }
+            }
             AppMsg::ClearReader => {
                 self.current = None;
                 self.current_thread.clear();
@@ -6474,8 +6489,19 @@ impl SimpleComponent for AppModel {
                 // Selecting a draft opens it in the compose editor, in the
                 // reading pane where the message would otherwise show.
                 if self.is_drafts_folder(m.account_id, m.folder_id) {
+                    self.reader_focus_pending = false;
                     self.open_draft(m, true, HandOffFiles::default(), &sender);
                     return;
+                }
+                // Opened with Gmail's o or Enter: the keyboard follows it into
+                // the reader, as Gmail's conversation view takes it, so j and
+                // k go on to the next conversation and u or Esc come back
+                // (#392). Once the reader has been handed the message.
+                if std::mem::take(&mut self.reader_focus_pending) {
+                    let view = self.message_view.sender().clone();
+                    gtk::glib::idle_add_local_once(move || {
+                        view.emit(MessageViewInput::FocusBody);
+                    });
                 }
                 self.attachments.clear();
                 self.attachments_loading = false;
@@ -9868,11 +9894,7 @@ impl SimpleComponent for AppModel {
             AppMsg::OpenListSearch => {
                 // Ctrl+F routes by focus (#102/#103): in the reader it finds
                 // within the message, everywhere else it searches the list.
-                let reader = self.message_view.widget().clone().upcast::<gtk::Widget>();
-                let reader_focused =
-                    gtk::prelude::GtkWindowExt::focus(&self.window)
-                        .is_some_and(|f| f == reader || f.is_ancestor(&reader));
-                if reader_focused && self.current.is_some() {
+                if self.reader_has_focus() && self.current.is_some() {
                     self.message_view.emit(MessageViewInput::OpenFind);
                 } else {
                     self.message_list.emit(MessageListInput::FocusSearch);
@@ -11991,7 +12013,15 @@ impl AppModel {
             // The open message's own view, not the reader's first page,
             // which is the "No message selected" one and takes no focus.
             Shortcut::OpenMessage => self.message_view.emit(MessageViewInput::FocusBody),
-            Shortcut::MoveCursor(delta) => self.message_list.emit(MessageListInput::MoveCursor(delta)),
+            Shortcut::MoveCursor(delta) => {
+                // In the reader, Gmail's j and k open the next or previous
+                // conversation; in the list they only move the cursor (#392).
+                if self.current.is_some() && self.reader_has_focus() {
+                    self.message_list.emit(MessageListInput::StepConversation(delta));
+                } else {
+                    self.message_list.emit(MessageListInput::MoveCursor(delta));
+                }
+            }
             Shortcut::OpenCursor => self.message_list.emit(MessageListInput::OpenCursor),
             Shortcut::MarkRead(read) => {
                 let mut targets = self.multi_selection();
@@ -12262,6 +12292,13 @@ impl AppModel {
             // pressing "next" almost certainly meant.
             self.message_list.emit(MessageListInput::MoveSelection(delta));
         }
+    }
+
+    /// Whether the keyboard is in the reader: its message, or anything else
+    /// inside the reading pane.
+    fn reader_has_focus(&self) -> bool {
+        let reader = self.message_view.widget().clone().upcast::<gtk::Widget>();
+        gtk::prelude::GtkWindowExt::focus(&self.window).is_some_and(|f| f == reader || f.is_ancestor(&reader))
     }
 
     /// Open the keyboard-shortcut reference, or close it if it is already up:

@@ -648,6 +648,8 @@ pub struct RowShared {
     pub thread_drag: RefCell<ThreadDragKeys>,
     /// Every row widget the view has made, by its list item.
     rows: RefCell<HashMap<usize, Rc<Row>>>,
+    /// The row Gmail's j/k cursor is on (#392), drawn with its own outline.
+    cursor: Cell<Option<(u32, u32)>>,
     /// The row whose palette is open: one at a time.
     open_palette: RefCell<Weak<Row>>,
     /// Conversations shown on rows whose size nobody has asked about yet.
@@ -675,6 +677,7 @@ impl RowShared {
             view: glib::WeakRef::new(),
             thread_drag: RefCell::new(HashMap::new()),
             rows: RefCell::new(HashMap::new()),
+            cursor: Cell::new(None),
             open_palette: RefCell::new(Weak::new()),
             wanted: RefCell::new(Vec::new()),
             wanted_queued: Cell::new(false),
@@ -689,6 +692,16 @@ impl RowShared {
     /// The row showing the list's position `pos`, if it is on screen.
     pub fn row_at(&self, pos: usize) -> Option<Rc<Row>> {
         self.bound_rows().into_iter().find(|r| r.position() == Some(pos))
+    }
+
+    /// Put the keyboard cursor on the row showing `key`, or take it away.
+    pub fn set_cursor(&self, key: Option<(u32, u32)>) {
+        if self.cursor.replace(key) == key {
+            return;
+        }
+        for row in self.bound_rows() {
+            row.sync_host_classes();
+        }
     }
 
     /// Fill every row on screen again (the look changed).
@@ -2032,6 +2045,9 @@ impl Row {
     fn sync_host_classes(&self) {
         let Some(data) = self.data() else { return };
         // The first tag (in tag order) the message carries tints its row.
+        let cursor = self
+            .shared()
+            .is_some_and(|shared| shared.cursor.get() == Some((data.msg.account_id, data.msg.id)));
         let tint = self.shared().and_then(|shared| {
             let tags = shared.tags.borrow();
             let tag = data.msg.pills(&tags).into_iter().find_map(|p| match p {
@@ -2062,6 +2078,9 @@ impl Row {
         }
         if st.dragging {
             v.push("dragging");
+        }
+        if cursor {
+            v.push("kbd-cursor");
         }
         drop(st);
         self.w.host.set_css_classes(&v);

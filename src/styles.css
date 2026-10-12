@@ -823,6 +823,22 @@ flowbox.attach-flow > flowboxchild {
   background-color: alpha(@accent_bg_color, 0.5);
 }
 
+/* Gmail's j/k cursor (#392): an accent outline inside the pill, while the
+   list has the keyboard. It is a class the list sets for j and k and takes
+   off at a click, not a focus ring, so a click never draws it. On the
+   selected row, whose pill is already the accent, it is white. */
+.message-list:focus-within > row > .message-item.kbd-cursor:not(.swiping) .message-row {
+  box-shadow: inset 0 0 0 2px alpha(@accent_color, 0.85);
+}
+
+.message-list:focus-within > row:not(:selected) > .message-item.kbd-cursor:not(.swiping) .message-row {
+  background-color: alpha(@accent_bg_color, 0.1);
+}
+
+.message-list:focus-within > row:selected > .message-item.kbd-cursor:not(.swiping) .message-row {
+  box-shadow: inset 0 0 0 2px alpha(white, 0.8);
+}
+
 .message-row {
   /* The pill: inset from the list edges, rounded like the thread cards.
      Vertical padding is symmetric — the Actions Palette floats in an overlay
