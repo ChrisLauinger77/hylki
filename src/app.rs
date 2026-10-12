@@ -1135,6 +1135,10 @@ pub struct AppModel {
     /// The conversation currently shown in the reader (newest first), with bodies
     /// filled in as they arrive. More than one entry = conversation/thread mode.
     current_thread: Vec<Message>,
+    /// The members of the open conversation the list itself holds, as
+    /// opposed to the ones the reader brought in from Sent or another
+    /// folder: what archiving the conversation moves (#392).
+    listed_thread: Vec<(u32, u32)>,
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
@@ -3187,6 +3191,7 @@ impl SimpleComponent for AppModel {
             },
             popouts: HashMap::new(),
             current_thread: Vec::new(),
+            listed_thread: Vec::new(),
             list_selection: Vec::new(),
             list_heard: Vec::new(),
             undo_stack: Vec::new(),
@@ -6412,6 +6417,7 @@ impl SimpleComponent for AppModel {
             AppMsg::ClearReader => {
                 self.current = None;
                 self.current_thread.clear();
+                self.listed_thread.clear();
                 self.attachments.clear();
                 self.attachments_loading = false;
                 self.sync_attachment_drawer();
@@ -6509,6 +6515,11 @@ impl SimpleComponent for AppModel {
                     current.body = body;
                 }
                 self.current = Some(current.clone());
+                self.listed_thread = if thread.is_empty() {
+                    vec![(m.account_id, m.id)]
+                } else {
+                    thread.iter().map(|t| (t.account_id, t.id)).collect()
+                };
                 // A new selection: whatever the last one was waiting for no
                 // longer holds this one back.
                 self.thread_related_pending = false;
@@ -6686,6 +6697,9 @@ impl SimpleComponent for AppModel {
                 let mut conv: Vec<Message> = existing.clone();
                 for tm in &thread {
                     let k = (tm.account_id, tm.id);
+                    if !self.listed_thread.contains(&k) {
+                        self.listed_thread.push(k);
+                    }
                     if conv.iter().any(|e| (e.account_id, e.id) == k) {
                         continue;
                     }
@@ -6861,6 +6875,15 @@ impl SimpleComponent for AppModel {
                 if self.list_selection.len() > 1 {
                     self.message_list.emit(MessageListInput::Bulk(BulkAction::Archive));
                     return;
+                }
+                // An open conversation's row stands for all of it, as it does
+                // for Delete; a picked card is that message alone (#392).
+                if self.acts_on_conversation(false) {
+                    let conversation = self.conversation_to_archive();
+                    if conversation.len() > 1 {
+                        self.apply_bulk_move(BulkAction::Archive, conversation);
+                        return;
+                    }
                 }
                 if let Some(m) = self.reply_target() {
                     self.move_to(m, FolderKind::Archive);
@@ -11972,8 +11995,15 @@ impl AppModel {
             Shortcut::OpenCursor => self.message_list.emit(MessageListInput::OpenCursor),
             Shortcut::MarkRead(read) => {
                 let mut targets = self.multi_selection();
+                if targets.is_empty() && self.acts_on_conversation(self.gmail_keys.get()) {
+                    // The whole conversation, as Gmail marks it (#392).
+                    targets = if read { self.current_thread.clone() } else { self.conversation_to_mark_unread() };
+                }
                 if targets.is_empty() {
                     targets.extend(self.reply_target());
+                }
+                if !read {
+                    self.hold_unread(&targets);
                 }
                 targets.retain(|m| m.unread == read);
                 if !targets.is_empty() {
@@ -12004,7 +12034,25 @@ impl AppModel {
             Shortcut::Reply => sender.input(AppMsg::Reply),
             Shortcut::ReplyAll => sender.input(AppMsg::ReplyAll),
             Shortcut::Forward => sender.input(AppMsg::Forward),
-            Shortcut::Archive => sender.input(AppMsg::Archive),
+            Shortcut::Archive => {
+                // Gmail's e archives the conversation even with one of its
+                // cards stepped to (#392); the toolbar's Archive, and the
+                // classic keys, leave a picked card on its own.
+                if self.gmail_keys.get() && self.acts_on_conversation(true) {
+                    let conversation = self.conversation_to_archive();
+                    if !conversation.is_empty() {
+                        self.apply_bulk_move(BulkAction::Archive, conversation);
+                        return;
+                    }
+                }
+                sender.input(AppMsg::Archive);
+            }
+            Shortcut::MarkUnreadFrom => self.mark_unread_from(),
+            Shortcut::FoldAll(folded) => {
+                if self.current_thread.len() > 1 {
+                    self.message_view.emit(MessageViewInput::FoldAll(folded));
+                }
+            }
             Shortcut::Delete => sender.input(AppMsg::Delete),
             Shortcut::Spam => sender.input(AppMsg::MarkSpam),
             Shortcut::Star => sender.input(AppMsg::ToggleStar),
@@ -13559,6 +13607,82 @@ impl AppModel {
                 .current
                 .as_ref()
                 .is_some_and(|c| c.account_id == m.account_id && c.id == m.id)
+    }
+
+    /// Whether an action from the keyboard or the toolbar means the whole
+    /// open conversation (#392): one is open, nothing of several is selected,
+    /// and, unless `cards_too`, no card of it has been picked. Gmail's keys
+    /// pass `cards_too`: there a card stepped to with n or p is only where
+    /// the reader is, and e or Shift+I still act on the conversation.
+    fn acts_on_conversation(&self, cards_too: bool) -> bool {
+        self.current_thread.len() > 1
+            && self.list_selection.len() <= 1
+            && (cards_too || !self.selection_from_cards)
+    }
+
+    /// What archiving the open conversation moves: the members its row
+    /// stands for in the list. A reply the reader brought in from Sent, or
+    /// an older part filed elsewhere, stays where it is.
+    fn conversation_to_archive(&self) -> Vec<Message> {
+        self.current_thread
+            .iter()
+            .filter(|m| self.listed_thread.contains(&(m.account_id, m.id)))
+            .cloned()
+            .collect()
+    }
+
+    /// What marking the open conversation unread marks: every member but the
+    /// ones in Sent or Drafts. The user's own messages were never unread,
+    /// and marking them so would light Sent's badge.
+    fn conversation_to_mark_unread(&self) -> Vec<Message> {
+        self.current_thread
+            .iter()
+            .filter(|m| !matches!(self.folder_kind(m.account_id, m.folder_id), Some(FolderKind::Sent | FolderKind::Drafts)))
+            .cloned()
+            .collect()
+    }
+
+    /// Gmail's `_` (#392): mark unread from the message being read onward,
+    /// that message and the later ones of its conversation. The message is
+    /// the picked card, or with none picked the conversation's newest, which
+    /// is where Gmail's own cursor sits in an open conversation.
+    fn mark_unread_from(&mut self) {
+        if self.list_selection.len() > 1 {
+            let targets = self.multi_selection();
+            self.user_set_flags(read_label(false), &targets, FlagKind::Read, false);
+            return;
+        }
+        if self.current_thread.len() <= 1 {
+            if let Some(m) = self.reply_target() {
+                self.user_set_flags(read_label(false), &[m], FlagKind::Read, false);
+            }
+            return;
+        }
+        let order = |m: &Message| (m.timestamp, m.uid);
+        let start = (if self.selection_from_cards { self.reply_target() } else { None })
+            .or_else(|| self.current_thread.iter().max_by_key(|m| order(m)).cloned());
+        let Some(start) = start else { return };
+        let from = order(&start);
+        let mut targets: Vec<Message> = self
+            .conversation_to_mark_unread()
+            .into_iter()
+            .filter(|m| order(m) >= from && (m.account_id, m.id) != (start.account_id, start.id))
+            .collect();
+        // The message asked about is marked whatever folder it is in.
+        targets.insert(0, start);
+        self.hold_unread(&targets);
+        self.user_set_flags(read_label(false), &targets, FlagKind::Read, false);
+    }
+
+    /// Keep the reader from marking these read again as they sit in view.
+    /// The ones being marked unread are told by `set_read`; one that was
+    /// unread already is not, and would be read a moment later (#392).
+    fn hold_unread(&self, targets: &[Message]) {
+        for m in targets.iter().filter(|m| m.unread) {
+            if self.current_thread.iter().any(|t| (t.account_id, t.id) == (m.account_id, m.id)) {
+                self.message_view.emit(MessageViewInput::SuppressAutoRead { account_id: m.account_id, id: m.id });
+            }
+        }
     }
 
     /// Whether the reader toolbar's star shows lit: the target message's own
@@ -22383,8 +22507,14 @@ pub enum Shortcut {
     MoveCursor(i32),
     /// Gmail's o: open the row the cursor is on.
     OpenCursor,
-    /// Gmail's Shift+I (read) and Shift+U or _ (unread).
+    /// Gmail's Shift+I (read) and Shift+U (unread): the whole conversation
+    /// when one is open.
     MarkRead(bool),
+    /// Gmail's _: unread from the message being read onward.
+    MarkUnreadFrom,
+    /// Gmail's ; (expand, `false`) and : (collapse, `true`): every message
+    /// of the open conversation.
+    FoldAll(bool),
     /// Gmail's z.
     Undo,
     /// Gmail's v: the Move To picker.
@@ -22429,8 +22559,11 @@ fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
         Key::c => Shortcut::Compose,
         Key::slash => Shortcut::Search,
         Key::question => Shortcut::Shortcuts,
-        Key::U | Key::underscore => Shortcut::MarkRead(false),
+        Key::U => Shortcut::MarkRead(false),
+        Key::underscore => Shortcut::MarkUnreadFrom,
         Key::I => Shortcut::MarkRead(true),
+        Key::semicolon => Shortcut::FoldAll(false),
+        Key::colon => Shortcut::FoldAll(true),
         Key::z => Shortcut::Undo,
         Key::v => Shortcut::MoveTo,
         Key::l => Shortcut::Label,
@@ -25284,7 +25417,9 @@ mod tests {
         assert_eq!(gmail_shortcut_for(Key::numbersign, true), Some(Shortcut::Delete));
         assert_eq!(gmail_shortcut_for(Key::a, false), Some(Shortcut::ReplyAll));
         assert_eq!(gmail_shortcut_for(Key::U, true), Some(Shortcut::MarkRead(false)));
-        assert_eq!(gmail_shortcut_for(Key::underscore, true), Some(Shortcut::MarkRead(false)));
+        assert_eq!(gmail_shortcut_for(Key::underscore, true), Some(Shortcut::MarkUnreadFrom));
+        assert_eq!(gmail_shortcut_for(Key::semicolon, false), Some(Shortcut::FoldAll(false)));
+        assert_eq!(gmail_shortcut_for(Key::colon, true), Some(Shortcut::FoldAll(true)));
         assert_eq!(gmail_shortcut_for(Key::I, true), Some(Shortcut::MarkRead(true)));
         assert_eq!(gmail_shortcut_for(Key::n, false), Some(Shortcut::NextInThread));
         assert_eq!(gmail_shortcut_for(Key::_3, false), Some(Shortcut::Tag(3)));
