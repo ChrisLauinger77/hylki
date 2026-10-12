@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Italian translation** (#430 by Jimmy), complete but for the new filter menu entry.
 - **Catalan translation** brought up to date (PR #422 by jolupa).
 - **Fixed: right-click menus did nothing on X11** (#427, by Fabio Rotondo).
   Releasing the right button took the menu's hold on the pointer away, so
