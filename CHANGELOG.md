@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- **Added: group the message list by date** (#435, suggested by rhuhxx).
+  **Settings → Message List → Group by date** puts Today, Yesterday, Last 7
+  days, Last 14 days and Older headings over a list sorted by date. A
+  conversation stays under one heading with its replies.
+- **Fixed: Microsoft 365 and JMAP folders showed only their newest 300
+  messages** (#429, reported by Dandiccf). The newest 300 still come first;
+  the rest of the folder is indexed in the background, as on IMAP, and mail
+  deleted elsewhere leaves the list. A refresh no longer drops the older
+  mail already listed.
+- **Added: replies follow a plain-text original** (#436, suggested by
+  3v1n0). With **Settings → Composing → Reply in the original's format**
+  on, a reply or forward of mail sent as plain text opens in plain text.
+  Mail with an HTML part starts in the format chosen in **Write messages
+  in**. Quoting plain-text mail also keeps its indents and line ends.
+- **Added: the app icon's unread count can count only new mail** (#431,
+  suggested by 3v1n0). **Settings → System → Unread count on the app icon**
+  is now Off, All unread inbox mail (the default, as before) or New since
+  last in front: the inbox mail that arrived while Hylki was behind other
+  windows and is still unread, cleared when Hylki comes to the front.
+- **Fixed: LDAP directories set up in Evolution were never searched** (#307,
+  reported by 3v1n0). Hylki gave up before Evolution Data Server had signed
+  in with the password Evolution stored; it now waits for that sign-in, and
+  notices a directory switched on in Evolution without a restart. The
+  Contacts search asks the directories too and lists matches under **In
+  Directories**, with **Add to Contacts**. A directory that cannot be asked
+  says why once in the status bar and in its row in Settings.
 - **Fixed: Gmail keys acted on one message of a conversation** (#392,
   reported by 3v1n0).
   **Shift+I**, **Shift+U** and **e** now mark or archive the whole

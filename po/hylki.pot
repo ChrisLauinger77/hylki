@@ -1210,6 +1210,11 @@ msgstr ""
 msgid "Evolution Data Server is not available"
 msgstr ""
 
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+
 msgid "The directory did not accept the password."
 msgstr ""
 
@@ -1236,6 +1241,9 @@ msgid "Could not reach {server}. Check the server's name and the network."
 msgstr ""
 
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+msgstr ""
+
+msgid "{name} did not answer: {error}"
 msgstr ""
 
 msgid "A contact needs a name or an email address"
@@ -3344,6 +3352,9 @@ msgstr ""
 msgid "Last name"
 msgstr ""
 
+msgid "In Directories"
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr ""
 
@@ -3375,6 +3386,9 @@ msgstr ""
 
 #. ---- note ----
 msgid "Note"
+msgstr ""
+
+msgid "Directory"
 msgstr ""
 
 msgid "Address Book"
@@ -3428,8 +3442,8 @@ msgstr ""
 
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 
 msgid "Add Directory…"
@@ -3452,9 +3466,6 @@ msgid ""
 msgstr ""
 
 msgid "Connected to {name}"
-msgstr ""
-
-msgid "{name} did not answer: {error}"
 msgstr ""
 
 msgid "The server took too long to answer."
@@ -3641,6 +3652,21 @@ msgid "Search all folders"
 msgstr ""
 
 msgid "Search this folder"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Yesterday"
+msgstr ""
+
+msgid "Last 7 days"
+msgstr ""
+
+msgid "Last 14 days"
+msgstr ""
+
+msgid "Older"
 msgstr ""
 
 msgid "Due"
@@ -4279,6 +4305,12 @@ msgid "App icon"
 msgstr ""
 
 msgid "Symbolic"
+msgstr ""
+
+msgid "All unread inbox mail"
+msgstr ""
+
+msgid "New since last in front"
 msgstr ""
 
 msgid "Follow system"
@@ -4933,6 +4965,14 @@ msgid ""
 "being downloaded."
 msgstr ""
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 msgid "Tint tagged messages"
 msgstr ""
 
@@ -5300,6 +5340,14 @@ msgid ""
 "formatting. The composer's format button switches any one message."
 msgstr ""
 
+msgid "Reply in the original's format"
+msgstr ""
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr ""
 
@@ -5464,9 +5512,9 @@ msgid "Unread count on the app icon"
 msgstr ""
 
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 
 msgid "Single-key shortcuts"

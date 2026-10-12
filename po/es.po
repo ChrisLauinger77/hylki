@@ -1337,6 +1337,13 @@ msgstr "{date} a las {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Evolution Data Server no está disponible"
 
+#, fuzzy
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+"El directorio necesita una contraseña. Añádela en Ajustes → Directorios LDAP."
+
 msgid "The directory did not accept the password."
 msgstr "El directorio no aceptó la contraseña."
 
@@ -1367,6 +1374,9 @@ msgstr ""
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "El directorio necesita una contraseña. Añádela en Ajustes → Directorios LDAP."
+
+msgid "{name} did not answer: {error}"
+msgstr "{name} no respondió: {error}"
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3730,6 +3740,10 @@ msgstr "Nombre"
 msgid "Last name"
 msgstr "Apellidos"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "Directorios LDAP"
+
 msgid "Delete Contact?"
 msgstr "¿Eliminar contacto?"
 
@@ -3763,6 +3777,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Añadir directorio"
 
 #, fuzzy
 msgid "Address Book"
@@ -3817,10 +3835,11 @@ msgstr "Directorios LDAP"
 msgid "LDAP directories"
 msgstr "Directorios LDAP"
 
+#, fuzzy
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 "El redactor busca destinatarios en estos directorios mientras escribes una "
 "dirección. Los gestiona Evolution Data Server, por lo que los directorios "
@@ -3852,9 +3871,6 @@ msgstr ""
 
 msgid "Connected to {name}"
 msgstr "Conectado a {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr "{name} no respondió: {error}"
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4051,6 +4067,24 @@ msgstr "Buscar carpetas"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Buscar carpetas"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "ayer"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Apellidos"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Carpeta"
 
 msgid "Due"
 msgstr "Vence"
@@ -4735,6 +4769,13 @@ msgstr "Icono de la aplicación"
 
 msgid "Symbolic"
 msgstr "Simbólico"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Contar correo sin leer"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Seguir el sistema"
@@ -5518,6 +5559,14 @@ msgstr ""
 "Cuánto contenido de cada mensaje mostrar bajo su asunto. Desactivarlo "
 "también evita que se descarguen las vistas previas."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "Se etiquetó {n} mensaje"
@@ -5989,6 +6038,15 @@ msgstr ""
 "formato se envía sin formato. El botón de formato del redactor permite "
 "cambiarlo para cada mensaje."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Responder con los archivos"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Firma en las respuestas"
 
@@ -6200,10 +6258,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Contador de no leídos en el icono de la aplicación"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "El número de mensajes sin leer de las bandejas de entrada en el icono de "
 "Hylki del dock o gestor de tareas. KDE Plasma lo muestra; GNOME necesita una "

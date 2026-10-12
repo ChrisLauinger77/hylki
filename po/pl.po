@@ -1368,6 +1368,11 @@ msgstr "{date} o {time}"
 msgid "Evolution Data Server is not available"
 msgstr ""
 
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+
 msgid "The directory did not accept the password."
 msgstr ""
 
@@ -1396,6 +1401,9 @@ msgid "Could not reach {server}. Check the server's name and the network."
 msgstr ""
 
 msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+msgstr ""
+
+msgid "{name} did not answer: {error}"
 msgstr ""
 
 msgid "A contact needs a name or an email address"
@@ -3799,6 +3807,10 @@ msgstr "Imię"
 msgid "Last name"
 msgstr "Nazwisko"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "Dodaj filtr"
+
 msgid "Delete Contact?"
 msgstr "Czy usunąć kontakt?"
 
@@ -3832,6 +3844,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Dodaj filtr"
 
 #, fuzzy
 msgid "Address Book"
@@ -3888,8 +3904,8 @@ msgstr ""
 
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 
 #, fuzzy
@@ -3915,9 +3931,6 @@ msgstr ""
 #, fuzzy
 msgid "Connected to {name}"
 msgstr "Przenieś do katalogu {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr ""
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4132,6 +4145,24 @@ msgstr "Wyszukaj katalogi"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Wyszukaj katalogi"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "wczoraj"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Nazwisko"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Katalog"
 
 msgid "Due"
 msgstr ""
@@ -4837,6 +4868,13 @@ msgstr "Ikona aplikacji"
 
 msgid "Symbolic"
 msgstr "Symboliczna"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Liczenie nieprzeczytanej poczty"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Zgodnie z systemem"
@@ -5618,6 +5656,14 @@ msgstr ""
 "Ile treści każdej wiadomości wyświetlać pod tematem. Wyłączenie podglądu "
 "wstrzymuje też jego pobieranie."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "Oznaczono etykietą {n} wiadomość"
@@ -6070,6 +6116,15 @@ msgstr ""
 "poczta; zwykły tekst jest wysyłany bez formatowania. Przycisk formatu w "
 "oknie tworzenia wiadomości zmienia format pojedynczej wiadomości."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Odpowiedz z plikami"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Podpis w odpowiedziach"
 
@@ -6280,10 +6335,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Licznik nieprzeczytanych na ikonie aplikacji"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "Liczba nieprzeczytanych wiadomości w skrzynkach odbiorczych na ikonie "
 "aplikacji Hylki w doku lub menedżerze zadań. Środowisko KDE Plasma ją "

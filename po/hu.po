@@ -1339,6 +1339,14 @@ msgstr "{date} {time} órakor"
 msgid "Evolution Data Server is not available"
 msgstr "Az Evolution Data Server nem érhető el"
 
+#, fuzzy
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+"A könyvtár jelszót igényel. Adja hozzá a Beállítások → LDAP könyvtárak "
+"menüpontban."
+
 msgid "The directory did not accept the password."
 msgstr "A könyvtár nem fogadta el a jelszót."
 
@@ -1370,6 +1378,9 @@ msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "A könyvtár jelszót igényel. Adja hozzá a Beállítások → LDAP könyvtárak "
 "menüpontban."
+
+msgid "{name} did not answer: {error}"
+msgstr "{name} nem válaszolt: {error}"
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3761,6 +3772,10 @@ msgstr "Keresztnév"
 msgid "Last name"
 msgstr "Vezetéknév"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "LDAP Mappák"
+
 msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"
 
@@ -3794,6 +3809,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Könyvtár hozzáadása"
 
 #, fuzzy
 msgid "Address Book"
@@ -3848,10 +3867,11 @@ msgstr "LDAP Mappák"
 msgid "LDAP directories"
 msgstr "LDAP mappák"
 
+#, fuzzy
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 "A program a cím beírása közben ezekben a címjegyzékekben keresi meg a "
 "címzetteket. Ezeket az Evolution Data Server tárolja, így az Evolution-ban "
@@ -3883,9 +3903,6 @@ msgstr ""
 
 msgid "Connected to {name}"
 msgstr "Kapcsolódva erre: {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr "{name} nem válaszolt: {error}"
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4089,6 +4106,24 @@ msgstr "Keresés a mappákban"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Keresés a mappákban"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "tegnap"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Vezetéknév"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Mappa"
 
 msgid "Due"
 msgstr ""
@@ -4784,6 +4819,13 @@ msgstr "Alkalmazásikon"
 
 msgid "Symbolic"
 msgstr "Szimbolikus"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Olvasatlan levelek számolása"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Rendszer követése"
@@ -5570,6 +5612,14 @@ msgstr ""
 "Az egyes üzenetekből a tárgy alatt megjelenő mennyiség. Kikapcsolva az "
 "előnézetek letöltése is leáll."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "{n} db üzenet címkézve"
@@ -6031,6 +6081,15 @@ msgstr ""
 "Az üzenetíró ablak formázás gombja bármelyik üzenet formátumát "
 "megváltoztatja."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Válasz ezekkel a fájlokkal"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Aláírás a válaszokban"
 
@@ -6247,10 +6306,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Az alkalmazás ikonján megjelenő olvasatlan üzenetek száma"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "A beérkezett üzenetek közül az olvasatlanok száma Hylki ikonján a dokkban "
 "vagy a feladatkezelőben. A KDE Plasma ezt megjeleníti; a GNOME esetében "

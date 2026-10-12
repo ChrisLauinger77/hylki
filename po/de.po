@@ -1352,6 +1352,14 @@ msgstr "{date} um {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Evolution Data Server ist nicht verfügbar"
 
+#, fuzzy
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+"Für das Verzeichnis ist ein Passwort erforderlich. Fügen Sie es unter "
+"Einstellungen → LDAP-Verzeichnisse hinzu."
+
 msgid "The directory did not accept the password."
 msgstr "Das Verzeichnis hat das Passwort nicht akzeptiert."
 
@@ -1383,6 +1391,9 @@ msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "Für das Verzeichnis ist ein Passwort erforderlich. Fügen Sie es unter "
 "Einstellungen → LDAP-Verzeichnisse hinzu."
+
+msgid "{name} did not answer: {error}"
+msgstr "{name} hat nicht geantwortet: {error}"
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3786,6 +3797,10 @@ msgstr "Vorname"
 msgid "Last name"
 msgstr "Nachname"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "LDAP-Verzeichnisse"
+
 msgid "Delete Contact?"
 msgstr "Kontakt löschen?"
 
@@ -3819,6 +3834,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Verzeichnis hinzufügen"
 
 #, fuzzy
 msgid "Address Book"
@@ -3873,10 +3892,11 @@ msgstr "LDAP-Verzeichnisse"
 msgid "LDAP directories"
 msgstr "LDAP-Verzeichnisse"
 
+#, fuzzy
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 "Der Komponist sucht während der Eingabe einer Adresse in diesen "
 "Verzeichnissen nach Empfängern. Diese werden vom Evolution Data Server "
@@ -3909,9 +3929,6 @@ msgstr ""
 
 msgid "Connected to {name}"
 msgstr "Verbunden mit {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr "{name} hat nicht geantwortet: {error}"
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4113,6 +4130,24 @@ msgstr "Ordner durchsuchen"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Ordner durchsuchen"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "Gestern"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Nachname"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Ordner"
 
 msgid "Due"
 msgstr ""
@@ -4812,6 +4847,13 @@ msgstr "App-Symbol"
 
 msgid "Symbolic"
 msgstr "Symbolisch"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Ungelesene Nachrichten zählen"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Systemeinstellung verwenden"
@@ -5589,6 +5631,14 @@ msgstr ""
 "Wie viel von jeder Nachricht unter ihrem Betreff angezeigt werden soll. "
 "Ausgeschaltet werden auch Vorschauen, die heruntergeladen werden."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "{n} Nachricht mit Tag versehen"
@@ -6049,6 +6099,15 @@ msgstr ""
 "gesendet; Klartext wird ohne Formatierung gesendet. Der Format-Button des "
 "Komponisten schaltet eine beliebige Nachricht um."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Antworten mit den Dateien"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Signatur in Antworten"
 
@@ -6263,10 +6322,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Anzahl ungelesener Nachrichten auf dem App-Symbol"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "Die Anzahl ungelesener Nachrichten im Posteingang auf dem Hylki-Symbol im "
 "Dock oder in der Fensterleiste. KDE Plasma zeigt sie direkt an; unter GNOME "

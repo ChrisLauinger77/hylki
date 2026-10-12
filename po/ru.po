@@ -1353,6 +1353,14 @@ msgstr "{date} в {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Сервис Evolution Data Server недоступен"
 
+#, fuzzy
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+"Для доступа к каталогу требуется пароль. Добавьте его в меню Параметры → "
+"Каталоги LDAP."
+
 msgid "The directory did not accept the password."
 msgstr "Каталог не принял пароль."
 
@@ -1384,6 +1392,9 @@ msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "Для доступа к каталогу требуется пароль. Добавьте его в меню Параметры → "
 "Каталоги LDAP."
+
+msgid "{name} did not answer: {error}"
+msgstr "Сервер {name} не ответил: {error}"
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3742,6 +3753,10 @@ msgstr "Имя"
 msgid "Last name"
 msgstr "Фамилия"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "Каталоги LDAP"
+
 msgid "Delete Contact?"
 msgstr "Удалить контакт?"
 
@@ -3775,6 +3790,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Добавить каталог"
 
 #, fuzzy
 msgid "Address Book"
@@ -3829,10 +3848,11 @@ msgstr "Каталоги LDAP"
 msgid "LDAP directories"
 msgstr "Каталоги LDAP"
 
+#, fuzzy
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 "Редактор ищет получателей в этих каталогах по мере ввода адреса. Они "
 "управляются службой Evolution Data Server, поэтому настроенный в Evolution "
@@ -3863,9 +3883,6 @@ msgstr ""
 
 msgid "Connected to {name}"
 msgstr "Подключено к {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr "Сервер {name} не ответил: {error}"
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4074,6 +4091,24 @@ msgstr "Папки поиска"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Папки поиска"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "вчера"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Фамилия"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Папка"
 
 msgid "Due"
 msgstr "Срок"
@@ -4759,6 +4794,13 @@ msgstr "Иконка приложения"
 
 msgid "Symbolic"
 msgstr "Символическая"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Учитывать непрочитанную почту"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Как в системе"
@@ -5537,6 +5579,14 @@ msgstr ""
 "Количество строк текста письма, отображаемых под его темой. При отключении "
 "загрузка предпросмотров также прекращается."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "Метка добавлена к {n} письму"
@@ -6003,6 +6053,15 @@ msgstr ""
 "письмо; обычный текст отправляется без форматирования. Кнопка формата в "
 "редакторе позволяет переключить режим для отдельного сообщения."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Ответить с прикреплением файлов"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Подпись в ответах"
 
@@ -6217,10 +6276,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Счётчик непрочитанных на значке приложения"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "Количество непрочитанных сообщений во «Входящих» на значке Hylki в доке или "
 "панели задач. В KDE Plasma поддерживается по умолчанию; для GNOME требуется "

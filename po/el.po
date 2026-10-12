@@ -1340,6 +1340,14 @@ msgstr "{date} στις {time}"
 msgid "Evolution Data Server is not available"
 msgstr "Ο Evolution Data Server δεν είναι διαθέσιμος"
 
+#, fuzzy
+msgid ""
+"The directory cannot be searched without signing in. Add a sign-in in "
+"Settings → LDAP Directories."
+msgstr ""
+"Ο κατάλογος απαιτεί κωδικό πρόσβασης. Προσθέστε τον στις Ρυθμίσεις → "
+"Κατάλογοι LDAP."
+
 msgid "The directory did not accept the password."
 msgstr "Ο κατάλογος δεν αποδέχθηκε τον κωδικό πρόσβασης."
 
@@ -1371,6 +1379,9 @@ msgid "The directory needs a password. Add it in Settings → LDAP Directories."
 msgstr ""
 "Ο κατάλογος απαιτεί κωδικό πρόσβασης. Προσθέστε τον στις Ρυθμίσεις → "
 "Κατάλογοι LDAP."
+
+msgid "{name} did not answer: {error}"
+msgstr "Το {name} δεν αποκρίθηκε: {error}"
 
 msgid "A contact needs a name or an email address"
 msgstr ""
@@ -3780,6 +3791,10 @@ msgstr "Όνομα"
 msgid "Last name"
 msgstr "Επώνυμο"
 
+#, fuzzy
+msgid "In Directories"
+msgstr "Κατάλογοι LDAP"
+
 msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
 
@@ -3813,6 +3828,10 @@ msgstr ""
 #. ---- note ----
 msgid "Note"
 msgstr ""
+
+#, fuzzy
+msgid "Directory"
+msgstr "Προσθήκη καταλόγου"
 
 #, fuzzy
 msgid "Address Book"
@@ -3867,10 +3886,11 @@ msgstr "Κατάλογοι LDAP"
 msgid "LDAP directories"
 msgstr "Κατάλογοι LDAP"
 
+#, fuzzy
 msgid ""
 "The composer looks up recipients in these directories as you type an "
-"address. They are kept by Evolution Data Server, so a directory set up in "
-"Evolution is listed here too."
+"address, and a search in Contacts looks in them too. They are kept by "
+"Evolution Data Server, so a directory set up in Evolution is listed here too."
 msgstr ""
 "Ο συντάκτης αναζητά παραλήπτες σε αυτούς τους καταλόγους καθώς "
 "πληκτρολογείτε μια διεύθυνση. Τους διαχειρίζεται ο Evolution Data Server, "
@@ -3902,9 +3922,6 @@ msgstr ""
 
 msgid "Connected to {name}"
 msgstr "Συνδέθηκε με το {name}"
-
-msgid "{name} did not answer: {error}"
-msgstr "Το {name} δεν αποκρίθηκε: {error}"
 
 msgid "The server took too long to answer."
 msgstr ""
@@ -4104,6 +4121,24 @@ msgstr "Αναζήτηση φακέλων"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Αναζήτηση φακέλων"
+
+msgid "Today"
+msgstr ""
+
+#, fuzzy
+msgid "Yesterday"
+msgstr "χθες"
+
+#, fuzzy
+msgid "Last 7 days"
+msgstr "Επώνυμο"
+
+msgid "Last 14 days"
+msgstr ""
+
+#, fuzzy
+msgid "Older"
+msgstr "Φάκελος"
 
 msgid "Due"
 msgstr "Λήξη"
@@ -4789,6 +4824,13 @@ msgstr "Εικονίδιο εφαρμογής"
 
 msgid "Symbolic"
 msgstr "Συμβολικό"
+
+#, fuzzy
+msgid "All unread inbox mail"
+msgstr "Καταμέτρηση μη αναγνωσμένων μηνυμάτων"
+
+msgid "New since last in front"
+msgstr ""
 
 msgid "Follow system"
 msgstr "Ακολούθηση συστήματος"
@@ -5582,6 +5624,14 @@ msgstr ""
 "Πόσο από κάθε μήνυμα θα εμφανίζεται κάτω από το θέμα του. Η απενεργοποίηση "
 "σταματά επίσης τη λήψη προεπισκοπήσεων."
 
+msgid "Group by date"
+msgstr ""
+
+msgid ""
+"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
+"Last 14 days and Older."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "Προστέθηκε ετικέτα σε {n} μήνυμα"
@@ -6056,6 +6106,15 @@ msgstr ""
 "μηνύματα· το απλό κείμενο αποστέλλεται χωρίς μορφοποίηση. Το κουμπί μορφής "
 "της σύνταξης αλλάζει οποιοδήποτε μεμονωμένο μήνυμα."
 
+#, fuzzy
+msgid "Reply in the original's format"
+msgstr "Απάντηση με τα αρχεία"
+
+msgid ""
+"Replies to and forwards of mail sent as plain text are written in plain "
+"text. Other mail starts in the format above."
+msgstr ""
+
 msgid "Signature in replies"
 msgstr "Υπογραφή στις απαντήσεις"
 
@@ -6273,10 +6332,11 @@ msgstr ""
 msgid "Unread count on the app icon"
 msgstr "Καταμέτρηση μη αναγνωσμένων στο εικονίδιο της εφαρμογής"
 
+#, fuzzy
 msgid ""
-"The number of unread inbox messages on Hylki's icon in the dock or task "
-"manager. KDE Plasma shows it; GNOME needs a dock extension such as Dash to "
-"Dock."
+"A number on Hylki's icon in the dock or task manager: every unread inbox "
+"message, or only those that arrived while Hylki was not in front. KDE Plasma "
+"shows it; GNOME needs a dock extension such as Dash to Dock."
 msgstr ""
 "Ο αριθμός των μη αναγνωσμένων μηνυμάτων στα Εισερχόμενα, πάνω στο εικονίδιο "
 "του Hylki στο dock ή στη διαχείριση εργασιών. Το KDE Plasma τον εμφανίζει· "
