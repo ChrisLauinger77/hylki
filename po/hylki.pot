@@ -6282,24 +6282,6 @@ msgstr ""
 msgid "Undo failed: {e}"
 msgstr ""
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr ""
-
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr ""
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr ""
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr ""
-
 msgid "Could not create folder: {e}"
 msgstr ""
 
@@ -6315,6 +6297,24 @@ msgstr ""
 msgid "Could not delete folder: {e}"
 msgstr ""
 
+msgid "Sending…"
+msgstr ""
+
+msgid "Removing the attachment…"
+msgstr ""
+
+msgid "The attachment is no longer in the message on the server"
+msgstr ""
+
+msgid "Could not remove the attachment: {e}"
+msgstr ""
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr ""
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr ""
+
 msgid "unknown folder"
 msgstr ""
 
@@ -6322,15 +6322,6 @@ msgid "Could not reach the server"
 msgstr ""
 
 msgid "A Microsoft account can't receive mail from another account"
-msgstr ""
-
-msgid "Removing the attachment…"
-msgstr ""
-
-msgid "Could not remove the attachment: {e}"
-msgstr ""
-
-msgid "The attachment is no longer in the message on the server"
 msgstr ""
 
 msgid "IMAP connection stopped making progress"

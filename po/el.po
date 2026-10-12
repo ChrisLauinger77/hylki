@@ -7159,27 +7159,6 @@ msgstr "Δεν ήταν δυνατό το άδειασμα του φακέλου
 msgid "Undo failed: {e}"
 msgstr "Η αναίρεση απέτυχε: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Αποστολή…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr ""
-"Ένας λογαριασμός POP3 δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
-"λογαριασμό"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Δεν ήταν δυνατή η σήμανση {len} μηνυμάτων ως επιθυμητών: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "Δεν ήταν δυνατή η δημιουργία φακέλου: {e}"
 
@@ -7195,6 +7174,24 @@ msgstr "Δεν ήταν δυνατή η διαγραφή φακέλου: άγν�
 msgid "Could not delete folder: {e}"
 msgstr "Δεν ήταν δυνατή η διαγραφή φακέλου: {e}"
 
+msgid "Sending…"
+msgstr "Αποστολή…"
+
+msgid "Removing the attachment…"
+msgstr "Αφαίρεση του συνημμένου…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Το συνημμένο δεν υπάρχει πλέον στο μήνυμα στον διακομιστή"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Δεν ήταν δυνατή η αφαίρεση του συνημμένου: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Δεν ήταν δυνατή η σήμανση {len} μηνυμάτων ως επιθυμητών: {e}"
+
 msgid "unknown folder"
 msgstr "άγνωστος φάκελος"
 
@@ -7205,15 +7202,6 @@ msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ένας λογαριασμός Microsoft δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
 "λογαριασμό"
-
-msgid "Removing the attachment…"
-msgstr "Αφαίρεση του συνημμένου…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Δεν ήταν δυνατή η αφαίρεση του συνημμένου: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Το συνημμένο δεν υπάρχει πλέον στο μήνυμα στον διακομιστή"
 
 msgid "IMAP connection stopped making progress"
 msgstr "Η σύνδεση IMAP σταμάτησε να προχωρά"
@@ -7505,6 +7493,12 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr ""
+#~ "Ένας λογαριασμός POP3 δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
+#~ "λογαριασμό"
 
 #, fuzzy
 #~ msgid "Import contacts…"

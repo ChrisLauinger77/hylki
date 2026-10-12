@@ -7118,25 +7118,6 @@ msgstr "Impossible de vider le dossier : {e}"
 msgid "Undo failed: {e}"
 msgstr "L'annulation a échoué : {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Envoi en cours…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Un compte POP3 ne peut pas recevoir de courrier d'un autre compte"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Impossible d'envoyer « {subject} » : {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Impossible de marquer {len} messages comme non indésirables : {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "Impossible de créer le dossier : {e}"
 
@@ -7152,6 +7133,24 @@ msgstr "Impossible de supprimer le dossier : dossier inconnu"
 msgid "Could not delete folder: {e}"
 msgstr "Impossible de supprimer le dossier : {e}"
 
+msgid "Sending…"
+msgstr "Envoi en cours…"
+
+msgid "Removing the attachment…"
+msgstr "Suppression de la pièce jointe…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "La pièce jointe ne se trouve plus dans le message sur le serveur"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Impossible de supprimer la pièce jointe : {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Impossible d'envoyer « {subject} » : {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Impossible de marquer {len} messages comme non indésirables : {e}"
+
 msgid "unknown folder"
 msgstr "dossier inconnu"
 
@@ -7160,15 +7159,6 @@ msgstr "Impossible de joindre le serveur"
 
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte Microsoft ne peut pas recevoir de courrier d'un autre compte"
-
-msgid "Removing the attachment…"
-msgstr "Suppression de la pièce jointe…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Impossible de supprimer la pièce jointe : {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "La pièce jointe ne se trouve plus dans le message sur le serveur"
 
 msgid "IMAP connection stopped making progress"
 msgstr "La connexion IMAP ne progresse plus"
@@ -7456,6 +7446,10 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr "Un compte POP3 ne peut pas recevoir de courrier d'un autre compte"
 
 #~ msgid ""
 #~ "Shows this message dark or light, whatever the message theme. Other "

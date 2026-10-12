@@ -14,7 +14,7 @@ use crate::config::AccountConfig;
 use crate::i18n::{i18n, i18n_f};
 use crate::models::{Account, Folder, FolderKind, Message};
 use crate::worker::{
-    accent_for, body_cacheable, build_draft, build_email, chip_count_of, delete_queued,
+    accent_for, auto_empty_due, auto_empty_roles, cache_rewritten, role_folder_path, body_cacheable, build_draft, build_email, chip_count_of, delete_queued,
     draft_message_id, draft_not_saved, drop_superseded_outbox, emit_outbox, extract_attachments, hash_uid,
     parse_recipients, related_from_cache, render_raw, restore_msgid_case, saving_text, schedule_send, send_failed,
     strip_refused, thread_summaries_with_members, MailRequest, OutgoingMessage, WorkerEvent,
@@ -30,9 +30,12 @@ struct State {
     /// The Drafts and Inbox folders' (id, path).
     drafts: Option<(u32, String)>,
     inbox: Option<(u32, String)>,
+    junk: Option<String>,
     /// Manual Special Folders assignments (#82) and hidden folders (#239).
     roles: std::collections::BTreeMap<String, String>,
     hidden: Vec<String>,
+    /// When Junk and Trash were last emptied of old mail (#140).
+    last_auto_empty: Option<std::time::Instant>,
 }
 
 /// The connection an account's settings describe: its EWS address, held
@@ -110,6 +113,7 @@ impl State {
             list.iter().find(|f| f.folder.kind == FolderKind::Drafts).map(|f| (f.folder.id, f.folder.path.clone()));
         self.inbox =
             list.iter().find(|f| f.folder.kind == FolderKind::Inbox).map(|f| (f.folder.id, f.folder.path.clone()));
+        self.junk = list.iter().find(|f| f.folder.kind == FolderKind::Junk).map(|f| f.folder.path.clone());
     }
 
     fn chip_count(&self, folder_id: u32, messages: &[Message]) -> u32 {
@@ -254,6 +258,48 @@ impl State {
         Ok(())
     }
 
+    /// Report messages as junk or as wanted, which teaches the server's
+    /// filter and moves them; a server without the operation (gromox,
+    /// Exchange 2010) has them moved to `dest` plainly.
+    async fn junk(&mut self, path: &str, uids: &[u32], dest: &str, junk: bool, cache: Option<&Cache>) -> Result<(), EwsError> {
+        // The operation moves to Junk Email or back to the Inbox: for any
+        // other destination (a folder assigned the role by hand), a move.
+        let standard = if junk {
+            self.junk.as_deref() == Some(dest)
+        } else {
+            self.inbox.as_ref().is_some_and(|(_, p)| p == dest)
+        };
+        if !standard {
+            return self.move_uids(path, uids, dest, cache).await;
+        }
+        let found = self.resolve_all(path, uids, cache).await;
+        if found.is_empty() {
+            return Ok(());
+        }
+        let items: Vec<ItemRef> = found.iter().map(|(_, i)| i.clone()).collect();
+        let moved = match ops::mark_as_junk(&mut self.client, &items, junk).await {
+            Ok(moved) => moved,
+            Err(e) => {
+                tracing::info!("ews: MarkAsJunk refused ({e}), moving instead");
+                vec![None; items.len()]
+            }
+        };
+        let mut left = Vec::new();
+        for ((uid, _), new) in found.iter().zip(moved.into_iter().chain(std::iter::repeat(None))) {
+            match new {
+                Some(new) => {
+                    self.items.remove(uid);
+                    self.items.insert(hash_uid(&new.id), new);
+                    if let Some(c) = cache {
+                        c.delete_message(self.account_id, path, *uid);
+                    }
+                }
+                None => left.push(*uid),
+            }
+        }
+        if left.is_empty() { Ok(()) } else { self.move_uids(path, &left, dest, cache).await }
+    }
+
     async fn purge(&mut self, path: &str, uids: &[u32], cache: Option<&Cache>) -> Result<(), EwsError> {
         let found = self.resolve_all(path, uids, cache).await;
         let items: Vec<ItemRef> = found.iter().map(|(_, i)| i.clone()).collect();
@@ -344,8 +390,10 @@ pub(in crate::worker) async fn run_ews(
         items: HashMap::new(),
         drafts: None,
         inbox: None,
+        junk: None,
         roles: account.folder_roles.clone(),
         hidden: account.hidden_folders.clone(),
+        last_auto_empty: None,
     };
     match state.refresh_folders(cache, false).await {
         Ok(folders) => emit(WorkerEvent::Folders(folders)),
@@ -374,6 +422,54 @@ pub(in crate::worker) async fn run_ews(
             }
         };
         handle(req, &mut state, &account, cache, &emit).await;
+    }
+}
+
+/// List the folders again after a change to them, and hand the list on.
+async fn refresh_and_emit(state: &mut State, account: &AccountConfig, cache: Option<&Cache>, emit: &impl Fn(WorkerEvent)) {
+    match state.refresh_folders(cache, false).await {
+        Ok(folders) => emit(WorkerEvent::Folders(folders)),
+        Err(e) => report(&e, account, |e| i18n_f("Could not list folders: {e}", &[("e", e)]), emit),
+    }
+}
+
+/// Junk and Trash emptied of mail older than the account's settings ask
+/// (#140), at most so often.
+async fn auto_empty(state: &mut State, account: &AccountConfig, cache: Option<&Cache>, emit: &impl Fn(WorkerEvent)) {
+    if !auto_empty_due(account, &mut state.last_auto_empty) {
+        return;
+    }
+    let folders = cache.map(|c| c.load_folders(state.account_id)).unwrap_or_default();
+    let mut purged = false;
+    for (kind, role, days) in auto_empty_roles(account) {
+        let Some(path) = role_folder_path(account, &folders, kind, role) else { continue };
+        let Ok(folder) = state.folder_ews_id(&path, cache).await else { continue };
+        let before = crate::datefmt::now() - i64::from(days) * 86_400;
+        let old = match ops::items_before(&mut state.client, &folder, before, 500).await {
+            Ok(old) => old,
+            Err(e) => {
+                tracing::warn!("auto-empty: could not list {path}: {e}");
+                continue;
+            }
+        };
+        if old.is_empty() {
+            continue;
+        }
+        match ops::delete_items(&mut state.client, &old, true).await {
+            Ok(()) => {
+                tracing::info!("auto-empty: deleted {} message(s) older than {days} days from {path}", old.len());
+                if let Some(c) = cache {
+                    for item in &old {
+                        c.delete_message(state.account_id, &path, hash_uid(&item.id));
+                    }
+                }
+                purged = true;
+            }
+            Err(e) => tracing::warn!("auto-empty: could not delete from {path}: {e}"),
+        }
+    }
+    if purged {
+        refresh_counts(state, cache, emit).await;
     }
 }
 
@@ -447,9 +543,21 @@ async fn handle(
         MailRequest::Locate { message_id } => emit(WorkerEvent::Located { message_id, hit: None }),
         MailRequest::Quota => emit(WorkerEvent::Quota(None)),
         MailRequest::FindKeywords => {
-            // Categories ride on the messages; the ones in use are what the
+            // Categories ride on the messages: the ones in use are those the
             // cache has seen.
-            emit(WorkerEvent::KeywordsFound(Vec::new()));
+            let found = cache
+                .map(|c| c.keyword_counts(account_id))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(keyword, count)| crate::models::KeywordFinding {
+                    name: Some(keyword.clone()),
+                    keyword,
+                    color: None,
+                    count,
+                    folders: Vec::new(),
+                })
+                .collect();
+            emit(WorkerEvent::KeywordsFound(found));
         }
         MailRequest::RefreshKeywords { .. } => {
             // Categories come with each listing, so listing is the sync.
@@ -584,17 +692,17 @@ async fn handle(
             }
         }
         MailRequest::MarkSpam { path, uid, dest } => {
-            if let Err(e) = state.move_uids(&path, &[uid], &dest, cache).await {
+            if let Err(e) = state.junk(&path, &[uid], &dest, true, cache).await {
                 report(&e, account, |e| i18n_f("Could not mark as spam: {e}", &[("e", e)]), emit);
             }
         }
         MailRequest::MarkHam { path, uid, dest } => {
-            if let Err(e) = state.move_uids(&path, &[uid], &dest, cache).await {
+            if let Err(e) = state.junk(&path, &[uid], &dest, false, cache).await {
                 report(&e, account, |e| i18n_f("Could not mark as not spam: {e}", &[("e", e)]), emit);
             }
         }
         MailRequest::MarkHamMany { path, uids, dest } => {
-            if let Err(e) = state.move_uids(&path, &uids, &dest, cache).await {
+            if let Err(e) = state.junk(&path, &uids, &dest, false, cache).await {
                 report(&e, account, |e| i18n_f("Could not mark as not spam: {e}", &[("e", e)]), emit);
             }
             emit(WorkerEvent::BulkComplete);
@@ -651,8 +759,54 @@ async fn handle(
             emit(WorkerEvent::BulkComplete);
         }
 
-        MailRequest::CreateFolder { .. } | MailRequest::RenameFolder { .. } | MailRequest::DeleteFolder { .. } => {
-            emit(WorkerEvent::error(i18n("Folders of an Exchange account can't be changed from Hylki yet.")));
+        MailRequest::CreateFolder { path } => {
+            let (parent, name) = match path.rsplit_once('/') {
+                Some((parent, leaf)) => (state.folders.get(parent).map(|(_, id)| id.clone()), leaf.to_string()),
+                None => (None, path.clone()),
+            };
+            match ops::create_folder(&mut state.client, parent.as_deref(), &name).await {
+                Ok(_) => refresh_and_emit(state, account, cache, emit).await,
+                Err(e) => report(&e, account, |e| i18n_f("Could not create folder: {e}", &[("e", e)]), emit),
+            }
+        }
+        MailRequest::RenameFolder { old_path, new_path } => {
+            let Some((_, id)) = state.folders.get(&old_path).cloned() else {
+                emit(WorkerEvent::error(i18n("Could not rename folder: unknown folder")));
+                return;
+            };
+            let parent_of = |p: &str| p.rsplit_once('/').map(|(parent, _)| parent.to_string());
+            let leaf = |p: &str| p.rsplit('/').next().unwrap_or(p).to_string();
+            let r = async {
+                // A new parent is a move; a new last part, a rename.
+                if parent_of(&old_path) != parent_of(&new_path) {
+                    let dest = match parent_of(&new_path) {
+                        Some(p) => Some(state.folder_ews_id(&p, cache).await?),
+                        None => None,
+                    };
+                    ops::move_folder(&mut state.client, &id, dest.as_deref()).await?;
+                }
+                if leaf(&old_path) != leaf(&new_path) {
+                    ops::rename_folder(&mut state.client, &id, &leaf(&new_path)).await?;
+                }
+                Ok::<(), EwsError>(())
+            }
+            .await;
+            match r {
+                Ok(()) => refresh_and_emit(state, account, cache, emit).await,
+                Err(e) => report(&e, account, |e| i18n_f("Could not rename folder: {e}", &[("e", e)]), emit),
+            }
+        }
+        MailRequest::DeleteFolder { path, trash: _ } => {
+            // Exchange moves the folder, contents and all, into Deleted
+            // Items itself.
+            let Some((_, id)) = state.folders.get(&path).cloned() else {
+                emit(WorkerEvent::error(i18n("Could not delete folder: unknown folder")));
+                return;
+            };
+            match ops::delete_folder(&mut state.client, &id).await {
+                Ok(()) => refresh_and_emit(state, account, cache, emit).await,
+                Err(e) => report(&e, account, |e| i18n_f("Could not delete folder: {e}", &[("e", e)]), emit),
+            }
         }
         MailRequest::SetHiddenFolders { paths } => {
             state.hidden = paths;
@@ -740,7 +894,10 @@ async fn handle(
         MailRequest::DeleteOutbox { id } => delete_queued(cache, account_id, id, emit),
         MailRequest::FlushOutbox { id } => flush_outbox(state, cache, id, emit).await,
 
-        MailRequest::RefreshUnread => refresh_counts(state, cache, emit).await,
+        MailRequest::RefreshUnread => {
+            refresh_counts(state, cache, emit).await;
+            auto_empty(state, account, cache, emit).await;
+        }
         MailRequest::Reconnect => match state.refresh_folders(cache, false).await {
             Ok(folders) => emit(WorkerEvent::Folders(folders)),
             Err(e) => report(&e, account, |e| i18n_f("Could not list folders: {e}", &[("e", e)]), emit),
@@ -750,17 +907,56 @@ async fn handle(
             let raw = state.fetch_raw(&path, uid, cache).await;
             emit(WorkerEvent::RawExported { token, raw });
         }
-        MailRequest::ImportRaw { token, .. } => emit(WorkerEvent::RawImported {
-            token,
-            result: Err(i18n("An Exchange account can't receive mail from another account yet")),
-        }),
-        MailRequest::DeleteAttachment { message_id, name, size, .. } => strip_refused(
-            emit,
-            i18n("Attachments can't be removed from an Exchange account's mail yet."),
-            message_id,
-            name,
-            size,
-        ),
+        MailRequest::ImportRaw { token, path, raw, seen, flagged } => {
+            // A message moved in from another account, filed as received
+            // mail with its read state and star.
+            let r: Result<(), EwsError> = async {
+                let folder = state.folder_ews_id(&path, cache).await?;
+                let item = ops::import_mime(&mut state.client, &raw, &folder, seen).await?;
+                if let (true, Some(item)) = (flagged, item) {
+                    ops::update(&mut state.client, &[item], Change::Flagged(true)).await?;
+                }
+                Ok(())
+            }
+            .await;
+            emit(WorkerEvent::RawImported { token, result: r.map_err(|e| say(&e, account)) });
+        }
+        MailRequest::DeleteAttachment { message_id, path, uid, name, size } => {
+            emit(WorkerEvent::Status(i18n("Removing the attachment…")));
+            let r: Result<(), String> = async {
+                let item = state.resolve(&path, uid, cache).await.ok_or_else(|| i18n("message not found"))?;
+                let listed = ops::attachments_of(&mut state.client, &item).await.map_err(|e| say(&e, account))?;
+                // The namesake nearest in size, the way the other backends
+                // pick between two of one name.
+                let id = listed
+                    .into_iter()
+                    .filter(|(_, n, _)| *n == name)
+                    .min_by_key(|(_, _, s)| s.abs_diff(size))
+                    .map(|(id, _, _)| id)
+                    .ok_or_else(|| i18n("The attachment is no longer in the message on the server"))?;
+                ops::delete_attachment(&mut state.client, &id).await.map_err(|e| say(&e, account))
+            }
+            .await;
+            emit(WorkerEvent::Status(String::new()));
+            match r {
+                Ok(()) => {
+                    // The message keeps its id: only what the cache holds of
+                    // it changes.
+                    if let Some(c) = cache {
+                        c.delete_body(account_id, &path, uid);
+                        match state.fetch_raw(&path, uid, cache).await {
+                            Ok(raw) => cache_rewritten(c, account_id, &path, uid, &raw),
+                            Err(_) => {
+                                c.save_attachments(account_id, &path, uid, &[]);
+                                c.save_attachment_meta(account_id, &path, uid, &[]);
+                            }
+                        }
+                    }
+                    emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size });
+                }
+                Err(e) => strip_refused(emit, i18n_f("Could not remove the attachment: {e}", &[("e", &e)]), message_id, name, size),
+            }
+        }
     }
 }
 

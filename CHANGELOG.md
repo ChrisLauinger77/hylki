@@ -65,9 +65,10 @@
   johanneskoester). **Microsoft Exchange (on-premise)** in the Provider list
   connects over Exchange Web Services, finding the server from the email
   address with Autodiscover, and signs in with NTLM, the TLS channel binding
-  included, or Basic over HTTPS. Folders, reading, read state, stars,
-  categories, moving, deleting, sending and drafts work; creating or
-  renaming folders does not yet.
+  included, or Basic over HTTPS. Folders and their management, reading,
+  read state, stars, categories, spam reports, moving in either direction,
+  deleting, removing attachments, sending, drafts and the automatic
+  emptying of Junk and Trash work. New mail is polled for.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.

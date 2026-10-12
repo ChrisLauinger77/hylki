@@ -128,14 +128,17 @@ entry instead: Microsoft is switching EWS off for them.
   **Accept a certificate for another name** switch.
 
 Folders come with their roles from the server; Exchange's own Outbox and
-the calendar, contacts and tasks folders are left out. Each folder lists its
-newest 300 messages. Read state, stars (Exchange 2013 and later) and
-categories, which Hylki shows as tags, are the server's own. Sending goes
-through the server, which files the copy in Sent Items. New mail is found by
-polling, at the interval set for checking mail or every two minutes.
-Creating, renaming or deleting folders, removing an attachment from a
-message and moving mail into the account from another one are not supported
-yet.
+the calendar, contacts and tasks folders are left out. Folders can be made,
+renamed, moved and deleted, a deleted one going to Deleted Items with its
+contents. Each folder lists its newest 300 messages. Read state, stars
+(Exchange 2013 and later) and categories, which Hylki shows as tags and
+**Find Tags** lists, are the server's own. Mark as Spam and Not Spam report
+the message to the server's filter, which moves it. Sending goes through
+the server, which files the copy in Sent Items. An attachment can be removed
+from a message, mail can be moved in from another account, and Junk and
+Trash are emptied of old mail as the account's settings say. New mail is
+found by polling, at the interval set for checking mail or every two
+minutes.
 
 Tested against grommunio's gromox server with Basic sign-in, and NTLM
 against an independent implementation; a real Exchange server has not been

@@ -7148,25 +7148,6 @@ msgstr "A mappa nem üríthető ki: {e}"
 msgid "Undo failed: {e}"
 msgstr "A visszavonás sikertelen: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Küldés…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Egy POP3-fiók nem tud leveleket fogadni egy másik fióktól"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Nem sikerült {len} üzenetet levélszemétnek jelölni: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "A mappa nem hozható létre: {e}"
 
@@ -7182,6 +7163,24 @@ msgstr "A mappa nem törölhető: ismeretlen mappa"
 msgid "Could not delete folder: {e}"
 msgstr "A mappa nem törölhető: {e}"
 
+msgid "Sending…"
+msgstr "Küldés…"
+
+msgid "Removing the attachment…"
+msgstr "A melléklet eltávolítása…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "A melléklet már nem található az üzenetben a kiszolgálón"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "A melléklet eltávolítása nem sikerült: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "A(z) „{subject}” továbbra sem küldhető el: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Nem sikerült {len} üzenetet levélszemétnek jelölni: {e}"
+
 #, fuzzy
 msgid "unknown folder"
 msgstr "Minden mappa megjelenítése"
@@ -7191,15 +7190,6 @@ msgstr "Nem sikerült elérni a kiszolgálót"
 
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Egy Microsoft-fiók nem tud e-maileket fogadni egy másik fióktól"
-
-msgid "Removing the attachment…"
-msgstr "A melléklet eltávolítása…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "A melléklet eltávolítása nem sikerült: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "A melléklet már nem található az üzenetben a kiszolgálón"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""
@@ -7488,6 +7478,10 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr "Egy POP3-fiók nem tud leveleket fogadni egy másik fióktól"
 
 #, fuzzy
 #~ msgid "Import contacts…"

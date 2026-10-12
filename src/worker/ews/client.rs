@@ -154,6 +154,32 @@ impl Client {
         }
     }
 
+    /// Run an operation the `ews` crate has no types for at all
+    /// (DeleteAttachment): the reply comes back as text, an error response
+    /// message or a fault turned into the error.
+    pub async fn call_raw(&mut self, body: &str) -> Result<String, EwsError> {
+        let version = format!("{:?}", self.version);
+        let document = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\
+             <soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" \
+             xmlns:t=\"http://schemas.microsoft.com/exchange/services/2006/types\" \
+             xmlns:m=\"http://schemas.microsoft.com/exchange/services/2006/messages\">\
+             <soap:Header><t:RequestServerVersion Version=\"{version}\"/></soap:Header>\
+             <soap:Body>{body}</soap:Body></soap:Envelope>"
+        );
+        let reply = String::from_utf8_lossy(&self.conn.post(document.as_bytes()).await?).into_owned();
+        let text_of = |tag: &str| -> Option<String> {
+            let start = reply.find(&format!("{tag}>"))? + tag.len() + 1;
+            let end = reply[start..].find('<')? + start;
+            Some(reply[start..end].trim().to_string())
+        };
+        if reply.contains("ResponseClass=\"Error\"") || reply.contains(":Fault>") {
+            let text = text_of("MessageText").or_else(|| text_of("faultstring")).unwrap_or_else(|| "error".into());
+            return Err(EwsError::Fault(None, text));
+        }
+        Ok(reply)
+    }
+
     async fn call_once<Op: Operation>(&mut self, op: &Op) -> Result<Messages<Op>, EwsError> {
         let envelope = Envelope { headers: vec![Header::RequestServerVersion { version: self.version }], body: op };
         let document = envelope.as_xml_document().map_err(|e| EwsError::Parse(e.to_string()))?;

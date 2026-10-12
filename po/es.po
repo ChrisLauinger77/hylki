@@ -7077,25 +7077,6 @@ msgstr "No se pudo vaciar la carpeta: {e}"
 msgid "Undo failed: {e}"
 msgstr "No se pudo deshacer: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Enviando…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Una cuenta POP3 no puede recibir correo de otra cuenta"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Todavía no se pudo enviar «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "No se pudieron marcar {len} mensajes como correo legítimo: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "No se pudo crear la carpeta: {e}"
 
@@ -7111,6 +7092,24 @@ msgstr "No se pudo eliminar la carpeta: carpeta desconocida"
 msgid "Could not delete folder: {e}"
 msgstr "No se pudo eliminar la carpeta: {e}"
 
+msgid "Sending…"
+msgstr "Enviando…"
+
+msgid "Removing the attachment…"
+msgstr "Eliminando el archivo adjunto…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "El archivo adjunto ya no está en el mensaje del servidor"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "No se pudo eliminar el archivo adjunto: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Todavía no se pudo enviar «{subject}»: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "No se pudieron marcar {len} mensajes como correo legítimo: {e}"
+
 msgid "unknown folder"
 msgstr "carpeta desconocida"
 
@@ -7119,15 +7118,6 @@ msgstr "No se pudo contactar con el servidor"
 
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Una cuenta de Microsoft no puede recibir correo de otra cuenta"
-
-msgid "Removing the attachment…"
-msgstr "Eliminando el archivo adjunto…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "No se pudo eliminar el archivo adjunto: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "El archivo adjunto ya no está en el mensaje del servidor"
 
 msgid "IMAP connection stopped making progress"
 msgstr "La conexión IMAP ha dejado de avanzar"
@@ -7412,6 +7402,10 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr "Una cuenta POP3 no puede recibir correo de otra cuenta"
 
 #, fuzzy
 #~ msgid "Import contacts…"

@@ -7179,25 +7179,6 @@ msgstr "Nie udało się opróżnić katalogu: {e}"
 msgid "Undo failed: {e}"
 msgstr "Nie udało się cofnąć: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Wysyłanie…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Konto POP3 nie może przyjmować poczty z innego konta"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Nie udało się usunąć oznaczenia spamu z wiadomości ({len}): {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "Nie udało się utworzyć katalogu: {e}"
 
@@ -7213,6 +7194,24 @@ msgstr "Nie udało się usunąć katalogu: nieznany katalog"
 msgid "Could not delete folder: {e}"
 msgstr "Nie udało się usunąć katalogu: {e}"
 
+msgid "Sending…"
+msgstr "Wysyłanie…"
+
+msgid "Removing the attachment…"
+msgstr "Usuwanie załącznika…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Załącznika nie ma już w wiadomości na serwerze"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Nie udało się usunąć załącznika: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Nie udało się usunąć oznaczenia spamu z wiadomości ({len}): {e}"
+
 #, fuzzy
 msgid "unknown folder"
 msgstr "Wyświetl poszczególne katalogi"
@@ -7222,15 +7221,6 @@ msgstr "Nie udało się połączyć z serwerem"
 
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
-
-msgid "Removing the attachment…"
-msgstr "Usuwanie załącznika…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Nie udało się usunąć załącznika: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Załącznika nie ma już w wiadomości na serwerze"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""
@@ -7517,6 +7507,10 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr "Konto POP3 nie może przyjmować poczty z innego konta"
 
 #, fuzzy
 #~ msgid "Import contacts…"

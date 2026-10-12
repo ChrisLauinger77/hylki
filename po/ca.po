@@ -7036,25 +7036,6 @@ msgstr "No s'ha pogut buidar la carpeta: {e}"
 msgid "Undo failed: {e}"
 msgstr "Desfer ha fallat: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "S'està enviant…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Un compte POP3 no pot rebre correu d'un altre compte"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Encara no s'ha pogut enviar «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "No s'han pogut marcar {len} missatges com a no brossa: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "No s'ha pogut crear la carpeta: {e}"
 
@@ -7070,6 +7051,24 @@ msgstr "No s'ha pogut suprimir la carpeta: carpeta desconeguda"
 msgid "Could not delete folder: {e}"
 msgstr "No s'ha pogut suprimir la carpeta: {e}"
 
+msgid "Sending…"
+msgstr "S'està enviant…"
+
+msgid "Removing the attachment…"
+msgstr "S'està eliminant l'adjunt…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "L'adjunt ja no és al missatge del servidor"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "No s'ha pogut eliminar l'adjunt: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Encara no s'ha pogut enviar «{subject}»: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "No s'han pogut marcar {len} missatges com a no brossa: {e}"
+
 msgid "unknown folder"
 msgstr "carpeta desconeguda"
 
@@ -7078,15 +7077,6 @@ msgstr "No s'ha pogut contactar amb el servidor"
 
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte de Microsoft no pot rebre correu d'un altre compte"
-
-msgid "Removing the attachment…"
-msgstr "S'està eliminant l'adjunt…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "No s'ha pogut eliminar l'adjunt: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "L'adjunt ja no és al missatge del servidor"
 
 msgid "IMAP connection stopped making progress"
 msgstr "La connexió IMAP ha deixat de progressar"
@@ -7370,6 +7360,10 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr "Un compte POP3 no pot rebre correu d'un altre compte"
 
 #~ msgid ""
 #~ "Shows this message dark or light, whatever the message theme. Other "

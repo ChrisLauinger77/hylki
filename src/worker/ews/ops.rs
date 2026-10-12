@@ -599,6 +599,189 @@ fn mime_message(mime: &[u8], bcc: &[String]) -> ews::Message {
     }
 }
 
+/// A new mail folder, under `parent` (its EWS id) or at the top; its id.
+pub async fn create_folder(c: &mut Client, parent: Option<&str>, name: &str) -> Result<String, EwsError> {
+    let op = ews::create_folder::CreateFolder {
+        parent_folder_id: match parent {
+            Some(id) => BaseFolderId::new_folder(id),
+            None => BaseFolderId::new_distinguished("msgfolderroot"),
+        },
+        folders: vec![mail_folder(name)],
+    };
+    let r = c.call_one(&op).await?;
+    r.folders.inner.first().and_then(folder_id_of).ok_or_else(|| EwsError::Parse("the new folder has no id".into()))
+}
+
+fn mail_folder(name: &str) -> EwsFolderItem {
+    EwsFolderItem::Folder {
+        folder_id: None,
+        parent_folder_id: None,
+        folder_class: Some("IPF.Note".into()),
+        display_name: Some(name.to_string()),
+        total_count: None,
+        child_folder_count: None,
+        extended_property: None,
+        unread_count: None,
+    }
+}
+
+/// Give a folder another name, where it is.
+pub async fn rename_folder(c: &mut Client, id: &str, name: &str) -> Result<(), EwsError> {
+    use ews::update_folder::{FolderChange, FolderChanges, UpdateFolder, Updates as FolderUpdates};
+    let op = UpdateFolder {
+        folder_changes: FolderChanges {
+            folder_change: FolderChange {
+                folder_id: BaseFolderId::new_folder(id),
+                updates: FolderUpdates::SetFolderField {
+                    field_URI: field("folder:DisplayName"),
+                    folder: EwsFolderItem::Folder {
+                        folder_id: None,
+                        parent_folder_id: None,
+                        folder_class: None,
+                        display_name: Some(name.to_string()),
+                        total_count: None,
+                        child_folder_count: None,
+                        extended_property: None,
+                        unread_count: None,
+                    },
+                },
+            },
+        },
+    };
+    c.call_one(&op).await.map(|_| ())
+}
+
+/// Move a folder under another (`None` for the top level).
+pub async fn move_folder(c: &mut Client, id: &str, parent: Option<&str>) -> Result<(), EwsError> {
+    let op = ews::move_folder::MoveFolder {
+        inner: ews::CopyMoveFolderData {
+            to_folder_id: match parent {
+                Some(p) => BaseFolderId::new_folder(p),
+                None => BaseFolderId::new_distinguished("msgfolderroot"),
+            },
+            folder_ids: vec![BaseFolderId::new_folder(id)],
+        },
+    };
+    c.call_one(&op).await.map(|_| ())
+}
+
+/// Delete a folder: into Deleted Items, contents and all, as Outlook does.
+pub async fn delete_folder(c: &mut Client, id: &str) -> Result<(), EwsError> {
+    let op = ews::delete_folder::DeleteFolder {
+        delete_type: DeleteType::MoveToDeletedItems,
+        folder_ids: vec![BaseFolderId::new_folder(id)],
+    };
+    c.call_one(&op).await.map(|_| ())
+}
+
+/// A message's attachments: (attachment id, name, size).
+pub async fn attachments_of(c: &mut Client, item: &ItemRef) -> Result<Vec<(String, String, u64)>, EwsError> {
+    let op = GetItem {
+        item_shape: ItemShape {
+            base_shape: BaseShape::IdOnly,
+            include_mime_content: None,
+            additional_properties: Some(vec![field("item:Attachments")]),
+        },
+        item_ids: vec![item.base()],
+    };
+    let r = c.call_one(&op).await?;
+    let m = r.items.inner.into_iter().next().map(RealItem::into_inner_message).unwrap_or_default();
+    Ok(m.attachments
+        .map(|a| a.inner)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| match a {
+            ews::Attachment::FileAttachment { attachment_id, name, size, .. }
+            | ews::Attachment::ItemAttachment { attachment_id, name, size, .. } => {
+                (attachment_id.id, name, size.unwrap_or(0) as u64)
+            }
+        })
+        .collect())
+}
+
+/// Remove one attachment from its message; the message keeps its id.
+pub async fn delete_attachment(c: &mut Client, attachment_id: &str) -> Result<(), EwsError> {
+    let body = format!(
+        "<m:DeleteAttachment><m:AttachmentIds><t:AttachmentId Id=\"{}\"/></m:AttachmentIds></m:DeleteAttachment>",
+        xml_attr(attachment_id)
+    );
+    c.call_raw(&body).await.map(|_| ())
+}
+
+/// Put a whole message, received elsewhere, into a folder: as received
+/// mail, not a draft (the MAPI message flags say read or unread and, by
+/// leaving out "unsent", that it was sent).
+pub async fn import_mime(c: &mut Client, mime: &[u8], folder: &str, seen: bool) -> Result<Option<ItemRef>, EwsError> {
+    let mut message = mime_message(mime, &[]);
+    message.extended_property = Some(vec![ews::ExtendedProperty {
+        extended_field_URI: ews::ExtendedFieldURI {
+            distinguished_property_set_id: None,
+            property_set_id: None,
+            property_tag: Some("0x0E07".into()),
+            property_name: None,
+            property_id: None,
+            property_type: Some(ews::PropertyType::Integer),
+        },
+        value: if seen { "1".into() } else { "0".into() },
+    }]);
+    let op = CreateItem {
+        message_disposition: Some(MessageDisposition::SaveOnly),
+        saved_item_folder_id: Some(BaseFolderId::new_folder(folder)),
+        items: vec![RealItem::Message(message)],
+    };
+    let r = fail_first(c.call(&op).await?)?;
+    let item = r
+        .into_iter()
+        .next()
+        .and_then(|r| r.items.inner.into_iter().next())
+        .and_then(|i| i.into_inner_message().item_id)
+        .map(|id| ItemRef { id: id.id, change_key: id.change_key });
+    // Not every server reads the read state from the flags (gromox takes
+    // every new item as read): set it as well.
+    if let Some(item) = &item {
+        update(c, std::slice::from_ref(item), Change::Read(seen)).await?;
+    }
+    Ok(item)
+}
+
+/// Report items as junk or as wanted, so the server's filter learns, and
+/// move them (to Junk Email, or back to the Inbox); their new ids.
+pub async fn mark_as_junk(c: &mut Client, items: &[ItemRef], junk: bool) -> Result<Vec<Option<ItemRef>>, EwsError> {
+    let op = ews::mark_as_junk::MarkAsJunk { is_junk: junk, move_item: true, item_ids: items.iter().map(ItemRef::base).collect() };
+    Ok(c.call(&op)
+        .await?
+        .into_iter()
+        .map(|r| match r {
+            ResponseClass::Success(m) | ResponseClass::Warning(m) => {
+                Some(ItemRef { id: m.moved_item_id.id, change_key: m.moved_item_id.change_key })
+            }
+            ResponseClass::Error(_) => None,
+        })
+        .collect())
+}
+
+/// Items in a folder received before `before` (Unix seconds), at most `cap`.
+pub async fn items_before(c: &mut Client, folder: &str, before: i64, cap: usize) -> Result<Vec<ItemRef>, EwsError> {
+    let at = chrono::DateTime::from_timestamp(before, 0).unwrap_or_default().format("%Y-%m-%dT%H:%M:%SZ");
+    let body = format!(
+        "<m:FindItem Traversal=\"Shallow\">\
+         <m:ItemShape><t:BaseShape>IdOnly</t:BaseShape></m:ItemShape>\
+         <m:IndexedPageItemView MaxEntriesReturned=\"{cap}\" Offset=\"0\" BasePoint=\"Beginning\"/>\
+         <m:Restriction><t:IsLessThan><t:FieldURI FieldURI=\"item:DateTimeReceived\"/>\
+         <t:FieldURIOrConstant><t:Constant Value=\"{at}\"/></t:FieldURIOrConstant></t:IsLessThan></m:Restriction>\
+         <m:ParentFolderIds><t:FolderId Id=\"{}\"/></m:ParentFolderIds>\
+         </m:FindItem>",
+        xml_attr(folder)
+    );
+    let found = fail_first(c.call_xml::<FindItem>(&body).await?)?;
+    Ok(found
+        .into_iter()
+        .flat_map(|r| r.root_folder.items.inner)
+        .filter_map(|i| i.into_inner_message().item_id)
+        .map(|id| ItemRef { id: id.id, change_key: id.change_key })
+        .collect())
+}
+
 fn xml_attr(s: &str) -> String {
     s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;").replace('>', "&gt;")
 }
@@ -680,6 +863,58 @@ mod live {
         update(&mut c, &[first.1.clone()], Change::Categories(vec!["Hylki".into()])).await.unwrap();
         update(&mut c, &[first.1.clone()], Change::Categories(first.0.keywords.clone())).await.unwrap();
         println!("flags round trip ok");
+    }
+
+    /// Folders made, renamed, moved and deleted; an attachment removed; a
+    /// message imported; junk reported; old mail found. Changes the
+    /// mailbox: reset the rig afterwards.
+    #[tokio::test]
+    #[ignore]
+    async fn stage_two_round_trip() {
+        let Ok(spec) = std::env::var("EWS_LIVE") else { return };
+        let f: Vec<&str> = spec.split('|').collect();
+        let conn = Connection::new(Endpoint::parse(f[0]).unwrap(), TlsOptions::default(), f[1], f[2]);
+        let mut c = Client::new(conn);
+        let folders = list_folders(&mut c, 1, &Default::default()).await.unwrap();
+        let projects = folders.iter().find(|f| f.folder.path == "Projects").unwrap().ews_id.clone();
+        let top = create_folder(&mut c, None, "Hylki Test").await.unwrap();
+        let child = create_folder(&mut c, Some(&top), "Child").await.unwrap();
+        rename_folder(&mut c, &child, "Renamed").await.unwrap();
+        move_folder(&mut c, &child, Some(&projects)).await.unwrap();
+        let after = list_folders(&mut c, 1, &Default::default()).await.unwrap();
+        let paths: Vec<&str> = after.iter().map(|f| f.folder.path.as_str()).collect();
+        println!("folders now: {paths:?}");
+        assert!(paths.contains(&"Hylki Test") && paths.contains(&"Projects/Renamed"));
+        delete_folder(&mut c, &child).await.unwrap();
+        delete_folder(&mut c, &top).await.unwrap();
+        println!("folder ops ok");
+
+        let inbox = folders.iter().find(|f| f.folder.kind == FolderKind::Inbox).unwrap();
+        let listed = list_items(&mut c, &inbox.ews_id, 50).await.unwrap();
+        let refs: Vec<ItemRef> = listed.iter().map(|l| l.item.clone()).collect();
+        let summaries = get_summaries(&mut c, &refs, 1, 1).await.unwrap();
+        let (_, with) = summaries.iter().find(|(m, _)| m.has_attachment).unwrap();
+        let atts = attachments_of(&mut c, with).await.unwrap();
+        println!("attachments: {atts:?}");
+        match delete_attachment(&mut c, &atts[0].0).await {
+            Ok(()) => println!("attachment deleted; left: {:?}", attachments_of(&mut c, with).await.unwrap()),
+            Err(e) => println!("DeleteAttachment refused: {e}"),
+        }
+
+        let mime = b"From: carol@example.org\r\nTo: alice@ews.test\r\nSubject: Imported\r\nMessage-ID: <imported-1@hylki.test>\r\nContent-Type: text/plain\r\n\r\nMoved in.\r\n";
+        let imported = import_mime(&mut c, mime, &projects, false).await.unwrap().expect("an id");
+        let got = get_summaries(&mut c, &[imported.clone()], 1, 2).await.unwrap();
+        println!("imported: unread={} subject={}", got[0].0.unread, got[0].0.subject);
+        assert!(got[0].0.unread);
+        match mark_as_junk(&mut c, &[imported.clone()], true).await {
+            Ok(moved) => println!("MarkAsJunk moved: {moved:?}"),
+            Err(e) => println!("MarkAsJunk refused: {e}"),
+        }
+        let old = items_before(&mut c, &inbox.ews_id, crate::datefmt::now(), 50).await.unwrap();
+        println!("inbox items before now: {}", old.len());
+        assert!(!old.is_empty());
+        let none = items_before(&mut c, &inbox.ews_id, 0, 50).await.unwrap();
+        assert!(none.is_empty());
     }
 
     /// Sends to the second account, saves a draft, moves it and deletes it.

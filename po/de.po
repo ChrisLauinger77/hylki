@@ -7159,25 +7159,6 @@ msgstr "Konnte den Ordner nicht leeren: {e}"
 msgid "Undo failed: {e}"
 msgstr "Rückgängig fehlgeschlagen: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Wird gesendet…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Ein POP3-Konto kann keine E-Mails von einem anderen Konto übernehmen"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "„{subject}“ konnte immer noch nicht gesendet werden: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "{len} Nachrichten konnten nicht als „Kein Spam“ markiert werden: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "Ordner konnte nicht erstellt werden: {e}"
 
@@ -7193,6 +7174,24 @@ msgstr "Ordner konnte nicht gelöscht werden: unbekannter Ordner"
 msgid "Could not delete folder: {e}"
 msgstr "Ordner konnte nicht gelöscht werden: {e}"
 
+msgid "Sending…"
+msgstr "Wird gesendet…"
+
+msgid "Removing the attachment…"
+msgstr "Anhang wird entfernt…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Der Anhang ist nicht mehr in der Nachricht auf dem Server vorhanden"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Anhang konnte nicht entfernt werden: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "„{subject}“ konnte immer noch nicht gesendet werden: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "{len} Nachrichten konnten nicht als „Kein Spam“ markiert werden: {e}"
+
 #, fuzzy
 msgid "unknown folder"
 msgstr "Jeden Ordner anzeigen"
@@ -7203,15 +7202,6 @@ msgstr "Server konnte nicht erreicht werden"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ein Microsoft-Konto kann keine E-Mails von einem anderen Konto übernehmen"
-
-msgid "Removing the attachment…"
-msgstr "Anhang wird entfernt…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Anhang konnte nicht entfernt werden: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Der Anhang ist nicht mehr in der Nachricht auf dem Server vorhanden"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""
@@ -7502,6 +7492,11 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr ""
+#~ "Ein POP3-Konto kann keine E-Mails von einem anderen Konto übernehmen"
 
 #, fuzzy
 #~ msgid "Import contacts…"

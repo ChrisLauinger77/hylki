@@ -7086,25 +7086,6 @@ msgstr "Не удалось очистить папку: {e}"
 msgid "Undo failed: {e}"
 msgstr "Не удалось отменить действие: {e}"
 
-msgid "Folders of an Exchange account can't be changed from Hylki yet."
-msgstr ""
-
-msgid "Sending…"
-msgstr "Отправка…"
-
-#, fuzzy
-msgid "An Exchange account can't receive mail from another account yet"
-msgstr "Учётная запись POP3 не может получать почту из другой учётной записи"
-
-msgid "Attachments can't be removed from an Exchange account's mail yet."
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Не удалось отметить {len} сообщений как не спам: {e}"
-
 msgid "Could not create folder: {e}"
 msgstr "Не удалось создать папку: {e}"
 
@@ -7120,6 +7101,24 @@ msgstr "Не удалось удалить папку: неизвестная п
 msgid "Could not delete folder: {e}"
 msgstr "Не удалось удалить папку: {e}"
 
+msgid "Sending…"
+msgstr "Отправка…"
+
+msgid "Removing the attachment…"
+msgstr "Удаление вложения…"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Вложение больше не содержится в сообщении на сервере"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Не удалось удалить вложение: {e}"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Всё ещё не удаётся отправить «{subject}»: {e}"
+
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Не удалось отметить {len} сообщений как не спам: {e}"
+
 msgid "unknown folder"
 msgstr "неизвестная папка"
 
@@ -7129,15 +7128,6 @@ msgstr "Не удалось связаться с сервером"
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Учётная запись Microsoft не может получать почту из другой учётной записи"
-
-msgid "Removing the attachment…"
-msgstr "Удаление вложения…"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Не удалось удалить вложение: {e}"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Вложение больше не содержится в сообщении на сервере"
 
 msgid "IMAP connection stopped making progress"
 msgstr "Соединение IMAP перестало отвечать"
@@ -7425,6 +7415,11 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "An Exchange account can't receive mail from another account yet"
+#~ msgstr ""
+#~ "Учётная запись POP3 не может получать почту из другой учётной записи"
 
 #, fuzzy
 #~ msgid "Import contacts…"

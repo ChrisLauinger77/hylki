@@ -17786,7 +17786,7 @@ impl AppModel {
             return true;
         }
         self.config.get(account_id.saturating_sub(1) as usize).is_some_and(|c| {
-            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
+            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap | config::Protocol::Ews)
         })
     }
 
