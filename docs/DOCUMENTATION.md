@@ -1188,6 +1188,16 @@ to its usual width, and **Restore Defaults** puts every column back. When
 the list is too narrow for the widths set, the name columns give way in
 proportion and the dates keep theirs.
 
+**Settings → Message List → Group by date** divides the list under
+headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14 days** and
+**Older**, counted in calendar days on this computer's clock. The headings
+show only while the list is sorted by date, newest or oldest first, and move
+on at midnight. A conversation goes under the heading of the message that
+places it in the sort, the newest for newest first and the oldest for oldest
+first, and its replies stay with it when it is opened out. The headings work
+in both layouts and in search results, and are not rows: the keyboard,
+selection and swipes pass them by. It is off unless switched on.
+
 **Settings → Message List → Tint tagged messages** washes the row of a
 tagged message with its tag's color, in both layouts. A message with more
 than one tag takes the color of the one listed first in **Settings → Tags**.
