@@ -24714,10 +24714,10 @@ fn hard_wrap_plain_regions(html: &str) -> String {
             (Some(open), Some(close)) if open <= close => format!(
                 "{}{}{}",
                 &html[..open],
-                html[open..close].replace('\n', "<br>"),
+                breaks(&html[open..close]),
                 &html[close..]
             ),
-            _ => html.replace('\n', "<br>"),
+            _ => breaks(html),
         };
     }
     // A message of mixed parts (`wrap_fragment`): only its text parts are
@@ -24729,11 +24729,18 @@ fn hard_wrap_plain_regions(html: &str) -> String {
         let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else { break };
         let Some(close) = rest[open..].find("</div>").map(|i| open + i) else { break };
         out.push_str(&rest[..open]);
-        out.push_str(&rest[open..close].replace('\n', "<br>"));
+        out.push_str(&breaks(&rest[open..close]));
         rest = &rest[close..];
     }
     out.push_str(rest);
     out
+}
+
+/// A plain-text region's line ends as `<br>`. Mail arrives with CRLF, and a
+/// carriage return left in front of the `<br>` is read back as a second
+/// line break, under the `pre-wrap` the quote keeps.
+fn breaks(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "<br>")
 }
 
 /// Does this document set `white-space: pre-wrap` on `body` itself?
@@ -24798,8 +24805,11 @@ fn quote_block_html(attribution: &str, inner_html: &str) -> String {
 /// forward, from plain text so no scripts/remote content leak into the editor.
 fn quote_block(attribution: &str, text: &str) -> String {
     let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
+    // Under `pre-wrap`, as a plain-text part from the server is quoted
+    // (#436): its spaces are part of the text, and a plain-text reply
+    // sends them back as they were.
     format!(
-        "<p class=\"vireo-quote-attr\">{}</p><blockquote>{}</blockquote>",
+        "<p class=\"vireo-quote-attr\">{}</p><blockquote><div style=\"white-space:pre-wrap\">{}</div></blockquote>",
         esc(attribution),
         esc(text)
     )
@@ -25281,6 +25291,19 @@ mod tests {
         assert!(quoted.contains("One<br>Two"), "{quoted}");
         assert!(quoted.contains("<b>Three</b>"), "{quoted}");
         assert!(!quoted.contains("<br>\n<b>"), "{quoted}");
+    }
+
+    #[test]
+    fn quoted_plain_text_keeps_its_spaces_and_one_break_per_line() {
+        // CRLF mail: a carriage return left before the <br> read back as a
+        // second break under the quote's pre-wrap. The indent stays, and so
+        // does the escaped-text path's.
+        let body = crate::worker::extract_body(b"Content-Type: text/plain\r\n\r\nHi,\r\n  indented\r\n");
+        let quoted = super::quoted_original("hdr", &body);
+        assert!(quoted.contains("Hi,<br>  indented"), "{quoted}");
+        assert!(!quoted.contains(['\r', '\n']), "{quoted}");
+        let raw = super::quoted_original("hdr", "Hi,\n  indented");
+        assert!(raw.contains("<div style=\"white-space:pre-wrap\">Hi,<br>  indented</div>"), "{raw}");
     }
 
     #[test]

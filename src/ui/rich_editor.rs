@@ -2642,7 +2642,9 @@ const PASTE_SCRIPT: &str = r#"<script>
     if(tag === 'img') return node.getAttribute('alt') || '';
     if(tag === 'style' || tag === 'script') return '';
     var s = '';
-    var inPre = pre || tag === 'pre';
+    /* A quoted plain-text part keeps its spaces under an inline pre-wrap
+       (#436), as <pre> does. */
+    var inPre = pre || tag === 'pre' || /^(pre|break-spaces)/.test(node.style.whiteSpace || '');
     for(var i = 0; i < node.childNodes.length; i++) s += hylkiTxt(node.childNodes[i], inPre);
     if(tag === 'a'){
       var h = node.getAttribute('href') || '';
@@ -2667,8 +2669,10 @@ const PASTE_SCRIPT: &str = r#"<script>
       .replace(/\n{3,}/g, '\n\n')
       .replace(/^\n+|\n+$/g, '');
   }
+  /* What is sent has spaces where the editor keeps no-break spaces to
+     show them: a run of them typed, or the indents of a plain-text quote. */
   window.__hylkiBodyText = function(){
-    return tidyTxt(hylkiTxt(document.body, false));
+    return tidyTxt(hylkiTxt(document.body, false).replace(/\u00a0/g, ' '));
   };
   /* Plain text (#424) shows the message as it is sent: the document is
      flattened to the text above, the signature and the "wrote:" line
@@ -2680,10 +2684,29 @@ const PASTE_SCRIPT: &str = r#"<script>
     nodes.forEach(function(n){ d.appendChild(n.cloneNode(true)); });
     return tidyTxt(hylkiTxt(d, false));
   }
+  /* A line's indent, its runs of spaces and its tabs (to the next stop of
+     eight) as no-break spaces: in a block that wraps they would collapse
+     to one, on screen and in the text read back to send (#436). */
+  function keepSpaces(line){
+    var out = '', col = 0;
+    for(var i = 0; i < line.length; i++){
+      var c = line.charAt(i);
+      if(c === '\t'){
+        var n = 8 - col % 8;
+        for(var k = 0; k < n; k++) out += '\u00a0';
+        col += n;
+        continue;
+      }
+      if(c === ' ' && (i === 0 || /[ \t\u00a0]/.test(line.charAt(i - 1)))) c = '\u00a0';
+      out += c;
+      col++;
+    }
+    return out;
+  }
   function plainBlock(tag, cls, text){
     var e = document.createElement(tag);
     if(cls) e.className = cls;
-    e.innerHTML = text ? text.split('\n').map(esc).join('<br>') : '<br>';
+    e.innerHTML = text ? text.split('\n').map(function(l){ return esc(keepSpaces(l)); }).join('<br>') : '<br>';
     return e;
   }
   function markOf(n){
