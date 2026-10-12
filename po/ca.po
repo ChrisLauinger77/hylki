@@ -1647,12 +1647,6 @@ msgstr ""
 "Introdueix l'adreça del teu servidor JMAP, o l'URL del seu recurs de sessió. "
 "El correu es llegeix i s'envia per JMAP; no cal cap paràmetre SMTP."
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr "Inicia sessió amb el navegador — no cal contrasenya."
 
@@ -2401,14 +2395,13 @@ msgstr[1] "Després de {n} dies"
 msgid "API Token"
 msgstr "Token d'API"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Servidor (nom d'amfitrió o URL)"
 
 msgid "Port (default 443)"
 msgstr "Port (per defecte 443)"
-
-msgid "EWS address (empty to find it)"
-msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6796,6 +6789,8 @@ msgstr "Dades del servidor"
 msgid "Filled in for known providers"
 msgstr "Omplert per a proveïdors coneguts"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Servidor IMAP"
 
@@ -6986,38 +6981,14 @@ msgid ""
 msgstr ""
 "{from} és correcte, però l'adreçament no coincideix amb el nom del missatge."
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-#, fuzzy
-msgid "unknown folder {path}"
-msgstr "carpeta desconeguda"
-
-#, fuzzy
-msgid "message not found"
-msgstr "Font dels missatges"
-
-msgid "Could not list folders: {e}"
-msgstr "No s'han pogut llistar les carpetes: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "No s'ha pogut carregar el missatge: {e}"
-
 msgid "Syncing…"
 msgstr "S'està sincronitzant…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "No s'ha pogut obtenir el correu: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "No s'ha pogut carregar el missatge: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "No s'ha pogut carregar el codi font: {e}"
@@ -7034,12 +7005,11 @@ msgstr "No s'ha pogut marcar com a brossa: {e}"
 msgid "Could not mark as not spam: {e}"
 msgstr "No s'ha pogut marcar com a no brossa: {e}"
 
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "No s'han pogut marcar {len} missatges com a no brossa: {e}"
+
 msgid "Could not move messages: {e}"
 msgstr "No s'han pogut moure els missatges: {e}"
-
-#, fuzzy
-msgid "Could not delete messages: {e}"
-msgstr "No s'ha pogut suprimir el missatge: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "No s'ha pogut buidar la carpeta: {e}"
@@ -7062,32 +7032,32 @@ msgstr "No s'ha pogut suprimir la carpeta: carpeta desconeguda"
 msgid "Could not delete folder: {e}"
 msgstr "No s'ha pogut suprimir la carpeta: {e}"
 
-msgid "Sending…"
-msgstr "S'està enviant…"
-
-msgid "Removing the attachment…"
-msgstr "S'està eliminant l'adjunt…"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "L'adjunt ja no és al missatge del servidor"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "No s'ha pogut eliminar l'adjunt: {e}"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Encara no s'ha pogut enviar «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "No s'han pogut marcar {len} missatges com a no brossa: {e}"
-
 msgid "unknown folder"
 msgstr "carpeta desconeguda"
 
 msgid "Could not reach the server"
 msgstr "No s'ha pogut contactar amb el servidor"
 
+msgid "Sending…"
+msgstr "S'està enviant…"
+
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte de Microsoft no pot rebre correu d'un altre compte"
+
+msgid "Removing the attachment…"
+msgstr "S'està eliminant l'adjunt…"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "No s'ha pogut eliminar l'adjunt: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "No s'han pogut llistar les carpetes: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "L'adjunt ja no és al missatge del servidor"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Encara no s'ha pogut enviar «{subject}»: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr "La connexió IMAP ha deixat de progressar"
@@ -7371,6 +7341,18 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "unknown folder {path}"
+#~ msgstr "carpeta desconeguda"
+
+#, fuzzy
+#~ msgid "message not found"
+#~ msgstr "Font dels missatges"
+
+#, fuzzy
+#~ msgid "Could not delete messages: {e}"
+#~ msgstr "No s'ha pogut suprimir el missatge: {e}"
 
 #, fuzzy
 #~ msgid "An Exchange account can't receive mail from another account yet"

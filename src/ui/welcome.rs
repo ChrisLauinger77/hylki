@@ -965,9 +965,6 @@ impl Component for Welcome {
                 if let Some(p) = wizard_provider(sel) {
                     let (ih, ip, sh, sp) = p.wizard_servers();
                     let jmap = p.wizard_protocol() == Protocol::Jmap;
-                    // An Exchange server is one EWS address, found from the
-                    // email address when left empty (#391).
-                    let ews = p.wizard_protocol() == Protocol::Ews;
                     if !ih.is_empty() {
                         widgets.host_row.set_text(ih);
                         widgets.port_row.set_text(&ip.to_string());
@@ -982,20 +979,10 @@ impl Component for Welcome {
                     }
                     // A JMAP server is one address, and it sends the mail
                     // itself: no SMTP rows.
-                    widgets.host_row.set_title(&if ews {
-                        i18n("EWS address (empty to find it)")
-                    } else if jmap {
-                        i18n("Server (host name or URL)")
-                    } else {
-                        i18n("IMAP server")
-                    });
+                    widgets.host_row.set_title(&if jmap { i18n("Server (host name or URL)") } else { i18n("IMAP server") });
                     widgets.port_row.set_title(&if jmap { i18n("Port") } else { i18n("IMAP port") });
-                    widgets.port_row.set_visible(!ews);
-                    widgets.smtp_row.set_visible(!jmap && !ews);
-                    widgets.smtp_port_row.set_visible(!jmap && !ews);
-                    if ews {
-                        widgets.server_exp.set_expanded(false);
-                    }
+                    widgets.smtp_row.set_visible(!jmap);
+                    widgets.smtp_port_row.set_visible(!jmap);
                     // Fastmail over JMAP takes an API token, not the password (#356).
                     widgets
                         .pass_row
@@ -1017,12 +1004,12 @@ impl Component for Welcome {
                 let mut host = widgets.host_row.text().trim().to_string();
                 // A JMAP server's address is the user's to give; imap.<domain>
                 // is the convention only for IMAP.
-                if host.is_empty() && !domain.is_empty() && !matches!(protocol, Protocol::Jmap | Protocol::Ews) {
+                if host.is_empty() && !domain.is_empty() && protocol != Protocol::Jmap {
                     host = format!("imap.{domain}");
                     widgets.host_row.set_text(&host);
                 }
                 let mut smtp = widgets.smtp_row.text().trim().to_string();
-                if smtp.is_empty() && !domain.is_empty() && !matches!(protocol, Protocol::Jmap | Protocol::Ews) {
+                if smtp.is_empty() && !domain.is_empty() && protocol != Protocol::Jmap {
                     smtp = format!("smtp.{domain}");
                     widgets.smtp_row.set_text(&smtp);
                 }
@@ -1030,7 +1017,7 @@ impl Component for Welcome {
                     self.sign_in_and_add(widgets, &sender, email, host, smtp);
                     return;
                 }
-                if email.is_empty() || password.is_empty() || (host.is_empty() && protocol != Protocol::Ews) {
+                if email.is_empty() || password.is_empty() || host.is_empty() {
                     widgets.status_lbl.set_css_classes(&["welcome-hint", "error"]);
                     widgets
                         .status_lbl
@@ -1042,12 +1029,7 @@ impl Component for Welcome {
                     email: email.clone(),
                     protocol,
                     imap_host: host,
-                    imap_port: widgets
-                        .port_row
-                        .text()
-                        .trim()
-                        .parse()
-                        .unwrap_or(if matches!(protocol, Protocol::Jmap | Protocol::Ews) { 443 } else { 993 }),
+                    imap_port: widgets.port_row.text().trim().parse().unwrap_or(if protocol == Protocol::Jmap { 443 } else { 993 }),
                     smtp_host: smtp,
                     smtp_port: widgets.smtp_port_row.text().trim().parse().unwrap_or(587),
                     username: email,
@@ -1070,7 +1052,6 @@ impl Component for Welcome {
                             .unwrap_or_else(|_| ConnTest {
                                 incoming: Err("test could not run".into()),
                                 smtp: Err("test could not run".into()),
-                                ews_url: None,
                             })
                     };
                     WelcomeCmd::Tested { account: Box::new(account), result: test, seq }
@@ -1135,7 +1116,7 @@ impl Component for Welcome {
         _root: &Self::Root,
     ) {
         match message {
-            WelcomeCmd::Tested { mut account, result, seq } => {
+            WelcomeCmd::Tested { account, result, seq } => {
                 if seq != self.test_seq {
                     // A newer test was started (the user corrected a field and
                     // clicked again); this stale verdict no longer matters.
@@ -1146,10 +1127,6 @@ impl Component for Welcome {
                 let email = account.email.clone();
                 match (&result.incoming, &result.smtp) {
                     (Ok(_), Ok(_)) => {
-                        // The EWS address Autodiscover found is the one kept.
-                        if let Some(url) = &result.ews_url {
-                            account.imap_host = url.clone();
-                        }
                         self.added.push(account.email.clone());
                         widgets.status_lbl.set_css_classes(&["welcome-hint", "success"]);
                         widgets.status_lbl.set_text(&i18n_f("✓ {email} — connected and added", &[("email", &(email).to_string())]));

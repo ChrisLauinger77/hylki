@@ -2375,24 +2375,6 @@ impl Cache {
     /// How many cached messages of the account carry `keyword` (server or
     /// local), for the tag finder's report where the server itself gives no
     /// count (Microsoft 365 categories).
-    /// Every keyword the account's cached messages carry, with how many
-    /// carry it: the tag finder's answer where the server keeps no list of
-    /// its own (Exchange's categories, #391).
-    pub fn keyword_counts(&self, account_id: u32) -> Vec<(String, usize)> {
-        let run = || -> rusqlite::Result<Vec<(String, usize)>> {
-            let mut stmt = self.conn.prepare("SELECT keywords FROM messages WHERE account_id = ?1 AND keywords <> ''")?;
-            let rows = stmt.query_map(params![account_id], |r| r.get::<_, String>(0))?;
-            let mut counts: std::collections::BTreeMap<String, usize> = Default::default();
-            for row in rows {
-                for k in split_keywords(row?) {
-                    *counts.entry(k).or_default() += 1;
-                }
-            }
-            Ok(counts.into_iter().collect())
-        };
-        run().unwrap_or_default()
-    }
-
     pub fn count_with_keyword(&self, account_id: u32, keyword: &str) -> usize {
         let needle = format!(" {} ", keyword.to_ascii_lowercase());
         let sql = format!(

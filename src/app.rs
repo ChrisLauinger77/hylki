@@ -4561,9 +4561,7 @@ impl SimpleComponent for AppModel {
             }
         }
         // Timers leave room for the WebViews to load and settle between steps.
-        // HYLKI_SHOWCASE_LIVE=1 captures real accounts too, in a sandboxed
-        // test run of a backend (the EWS rig, #391).
-        if demo_mode() || std::env::var_os("HYLKI_SHOWCASE_LIVE").is_some() {
+        if demo_mode() {
             if let Some(shot) = std::env::var("HYLKI_SHOWCASE").ok() {
                 // HYLKI_SHOWCASE_STAGE=0 skips the staging (capture-only, for
                 // testing arbitrary states); HYLKI_SHOWCASE_DELAY overrides the
@@ -14194,7 +14192,7 @@ impl AppModel {
             .filter(|a| {
                 self.config
                     .get(a.id.saturating_sub(1) as usize)
-                    .is_some_and(|c| matches!(c.protocol, config::Protocol::Graph | config::Protocol::Ews))
+                    .is_some_and(|c| c.protocol == config::Protocol::Graph)
             })
             .map(|a| a.id)
             .collect();
@@ -17804,7 +17802,7 @@ impl AppModel {
             return true;
         }
         self.config.get(account_id.saturating_sub(1) as usize).is_some_and(|c| {
-            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap | config::Protocol::Ews)
+            c.enabled && matches!(c.protocol, config::Protocol::Imap | config::Protocol::Jmap)
         })
     }
 

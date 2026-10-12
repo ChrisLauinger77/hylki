@@ -1540,12 +1540,6 @@ msgid ""
 "is read and sent over JMAP; no SMTP settings are needed."
 msgstr ""
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr ""
 
@@ -2194,13 +2188,12 @@ msgstr[1] ""
 msgid "API Token"
 msgstr ""
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr ""
 
 msgid "Port (default 443)"
-msgstr ""
-
-msgid "EWS address (empty to find it)"
 msgstr ""
 
 msgid "Google (Gmail)"
@@ -6060,6 +6053,8 @@ msgstr ""
 msgid "Filled in for known providers"
 msgstr ""
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr ""
 
@@ -6233,35 +6228,13 @@ msgid ""
 "{from} checks out, but the addressing doesn't match the name on the message."
 msgstr ""
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-msgid "unknown folder {path}"
-msgstr ""
-
-msgid "message not found"
-msgstr ""
-
-msgid "Could not list folders: {e}"
-msgstr ""
-
-msgid "Could not load message: {e}"
-msgstr ""
-
 msgid "Syncing…"
 msgstr ""
 
 msgid "Could not fetch mail: {e}"
+msgstr ""
+
+msgid "Could not load message: {e}"
 msgstr ""
 
 msgid "Could not load source: {e}"
@@ -6279,10 +6252,10 @@ msgstr ""
 msgid "Could not mark as not spam: {e}"
 msgstr ""
 
-msgid "Could not move messages: {e}"
+msgid "Could not mark {len} messages as not spam: {e}"
 msgstr ""
 
-msgid "Could not delete messages: {e}"
+msgid "Could not move messages: {e}"
 msgstr ""
 
 msgid "Could not empty the folder: {e}"
@@ -6306,31 +6279,31 @@ msgstr ""
 msgid "Could not delete folder: {e}"
 msgstr ""
 
-msgid "Sending…"
-msgstr ""
-
-msgid "Removing the attachment…"
-msgstr ""
-
-msgid "The attachment is no longer in the message on the server"
-msgstr ""
-
-msgid "Could not remove the attachment: {e}"
-msgstr ""
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr ""
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr ""
-
 msgid "unknown folder"
 msgstr ""
 
 msgid "Could not reach the server"
 msgstr ""
 
+msgid "Sending…"
+msgstr ""
+
 msgid "A Microsoft account can't receive mail from another account"
+msgstr ""
+
+msgid "Removing the attachment…"
+msgstr ""
+
+msgid "Could not remove the attachment: {e}"
+msgstr ""
+
+msgid "Could not list folders: {e}"
+msgstr ""
+
+msgid "The attachment is no longer in the message on the server"
+msgstr ""
+
+msgid "Still could not send “{subject}”: {e}"
 msgstr ""
 
 msgid "IMAP connection stopped making progress"

@@ -75,8 +75,7 @@ pub fn image_or(id: &str, px: i32, fallback: &str) -> gtk::Image {
 /// The accounts that belong to no provider are marked by how they connect,
 /// in a colored tile with the protocol's name: "mail" (IMAP on a server the
 /// app does not recognise), "mail-pop3" (the same over POP3), "mail-jmap"
-/// (a JMAP server other than Fastmail or Stalwart), "mail-ews" (an Exchange
-/// server, #391) and "mail-oauth" (custom OAuth).
+/// (a JMAP server other than Fastmail or Stalwart) and "mail-oauth" (custom OAuth).
 /// Words rather than the envelopes these once were, which said nothing a
 /// glance could tell apart and had little contrast in either scheme (#277).
 fn protocol_pill(id: &str, px: i32) -> Option<gtk::Label> {
@@ -84,7 +83,6 @@ fn protocol_pill(id: &str, px: i32) -> Option<gtk::Label> {
         "mail" => ("IMAP", "imap"),
         "mail-pop3" => ("POP3", "pop3"),
         "mail-jmap" => ("JMAP", "jmap"),
-        "mail-ews" => ("EWS", "ews"),
         "mail-oauth" => ("OAuth", "oauth"),
         _ => return None,
     };

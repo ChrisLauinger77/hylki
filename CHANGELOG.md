@@ -65,15 +65,10 @@
   erenoglu). A message classified with Microsoft Purview, or with Outlook's
   older Sensitivity setting, shows its label as a pill beside the sender's
   name. Hylki shows the label only; it does not apply its rules or set one.
-- **Added: on-premise Exchange servers** (#391, requested by
-  johanneskoester). **Microsoft Exchange (on-premise)** in the Provider list
-  connects over Exchange Web Services, finding the server from the email
-  address with Autodiscover, and signs in with NTLM, the TLS channel binding
-  included, or Basic over HTTPS. Folders and their management, reading,
-  read state, stars, categories, spam reports, moving in either direction,
-  deleting, removing attachments, sending, drafts and the automatic
-  emptying of Junk and Trash work. New mail arrives by push through a
-  streaming subscription, with polling as the fallback.
+- **Removed: on-premise Exchange servers** (#391), added in
+  1.44.0-beta.5. Hylki will not support Exchange Web Services. An account
+  added with it now reads as an IMAP account that cannot connect, and can be
+  removed in **Settings → Accounts**.
 - **Fixed: an open account could fold up in the sidebar by itself**, at the
   next change to the folder list (tagging on Gmail makes one). Opening an
   account to show a folder picked inside it was recorded twice and undone.

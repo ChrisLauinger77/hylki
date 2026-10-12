@@ -1682,12 +1682,6 @@ msgstr ""
 "El correo se recibe y se envía mediante JMAP; no es necesario configurar "
 "SMTP."
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr "Inicia sesión con el navegador; no se necesita contraseña."
 
@@ -2433,14 +2427,13 @@ msgstr[1] "Después de {n} días"
 msgid "API Token"
 msgstr "Token de API"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Servidor (nombre de host o URL)"
 
 msgid "Port (default 443)"
 msgstr "Puerto (predeterminado: 443)"
-
-msgid "EWS address (empty to find it)"
-msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6833,6 +6826,8 @@ msgstr "Datos del servidor"
 msgid "Filled in for known providers"
 msgstr "Se completa automáticamente para proveedores conocidos"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Servidor IMAP"
 
@@ -7027,38 +7022,14 @@ msgstr ""
 "Se ha verificado {from}, pero las direcciones no coinciden con el nombre que "
 "aparece en el mensaje."
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-#, fuzzy
-msgid "unknown folder {path}"
-msgstr "carpeta desconocida"
-
-#, fuzzy
-msgid "message not found"
-msgstr "Fuente de los mensajes"
-
-msgid "Could not list folders: {e}"
-msgstr "No se pudieron listar las carpetas: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "No se pudo cargar el mensaje: {e}"
-
 msgid "Syncing…"
 msgstr "Sincronizando…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "No se pudo obtener el correo: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "No se pudo cargar el mensaje: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "No se pudo cargar el código fuente: {e}"
@@ -7075,12 +7046,11 @@ msgstr "No se pudo marcar como correo no deseado: {e}"
 msgid "Could not mark as not spam: {e}"
 msgstr "No se pudo marcar como correo legítimo: {e}"
 
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "No se pudieron marcar {len} mensajes como correo legítimo: {e}"
+
 msgid "Could not move messages: {e}"
 msgstr "No se pudieron mover los mensajes: {e}"
-
-#, fuzzy
-msgid "Could not delete messages: {e}"
-msgstr "No se pudo eliminar el mensaje: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "No se pudo vaciar la carpeta: {e}"
@@ -7103,32 +7073,32 @@ msgstr "No se pudo eliminar la carpeta: carpeta desconocida"
 msgid "Could not delete folder: {e}"
 msgstr "No se pudo eliminar la carpeta: {e}"
 
-msgid "Sending…"
-msgstr "Enviando…"
-
-msgid "Removing the attachment…"
-msgstr "Eliminando el archivo adjunto…"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "El archivo adjunto ya no está en el mensaje del servidor"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "No se pudo eliminar el archivo adjunto: {e}"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Todavía no se pudo enviar «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "No se pudieron marcar {len} mensajes como correo legítimo: {e}"
-
 msgid "unknown folder"
 msgstr "carpeta desconocida"
 
 msgid "Could not reach the server"
 msgstr "No se pudo contactar con el servidor"
 
+msgid "Sending…"
+msgstr "Enviando…"
+
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Una cuenta de Microsoft no puede recibir correo de otra cuenta"
+
+msgid "Removing the attachment…"
+msgstr "Eliminando el archivo adjunto…"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "No se pudo eliminar el archivo adjunto: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "No se pudieron listar las carpetas: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "El archivo adjunto ya no está en el mensaje del servidor"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Todavía no se pudo enviar «{subject}»: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr "La conexión IMAP ha dejado de avanzar"
@@ -7413,6 +7383,18 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "unknown folder {path}"
+#~ msgstr "carpeta desconocida"
+
+#, fuzzy
+#~ msgid "message not found"
+#~ msgstr "Fuente de los mensajes"
+
+#, fuzzy
+#~ msgid "Could not delete messages: {e}"
+#~ msgstr "No se pudo eliminar el mensaje: {e}"
 
 #, fuzzy
 #~ msgid "An Exchange account can't receive mail from another account yet"

@@ -329,11 +329,6 @@ headerbar.rail-header {
   color: #ffffff;
 }
 
-.protocol-pill.ews {
-  background-color: #0f6cbd;
-  color: #ffffff;
-}
-
 .protocol-pill.oauth {
   background-color: #fec11e;
   color: #241f31;

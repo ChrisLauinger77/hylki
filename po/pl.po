@@ -1722,12 +1722,6 @@ msgstr ""
 "Wprowadź adres serwera Stalwart. Poczta jest odbierana i wysyłana przez "
 "JMAP; ustawienia SMTP nie są potrzebne."
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr "Zaloguj się w przeglądarce – hasło nie jest potrzebne."
 
@@ -2479,14 +2473,13 @@ msgstr[2] "Po {n} dniach"
 msgid "API Token"
 msgstr ""
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Serwer (nazwa hosta lub adres URL)"
 
 msgid "Port (default 443)"
 msgstr "Port (domyślnie 443)"
-
-msgid "EWS address (empty to find it)"
-msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6939,6 +6932,8 @@ msgstr "Dane serwera"
 msgid "Filled in for known providers"
 msgstr "Wypełniane automatycznie dla znanych dostawców"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Serwer IMAP"
 
@@ -7129,38 +7124,14 @@ msgstr ""
 "Domena {from} jest zweryfikowana, ale adresy nie pasują do nazwy w "
 "wiadomości."
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-#, fuzzy
-msgid "unknown folder {path}"
-msgstr "Wyświetl poszczególne katalogi"
-
-#, fuzzy
-msgid "message not found"
-msgstr "Czcionka wiadomości"
-
-msgid "Could not list folders: {e}"
-msgstr "Nie udało się pobrać listy katalogów: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "Nie udało się wczytać wiadomości: {e}"
-
 msgid "Syncing…"
 msgstr "Synchronizowanie…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Nie udało się pobrać poczty: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Nie udało się wczytać wiadomości: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Nie udało się wczytać źródła: {e}"
@@ -7177,12 +7148,11 @@ msgstr "Nie udało się oznaczyć jako spam: {e}"
 msgid "Could not mark as not spam: {e}"
 msgstr "Nie udało się usunąć oznaczenia spamu: {e}"
 
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Nie udało się usunąć oznaczenia spamu z wiadomości ({len}): {e}"
+
 msgid "Could not move messages: {e}"
 msgstr "Nie udało się przenieść wiadomości: {e}"
-
-#, fuzzy
-msgid "Could not delete messages: {e}"
-msgstr "Nie udało się usunąć wiadomości: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "Nie udało się opróżnić katalogu: {e}"
@@ -7205,24 +7175,6 @@ msgstr "Nie udało się usunąć katalogu: nieznany katalog"
 msgid "Could not delete folder: {e}"
 msgstr "Nie udało się usunąć katalogu: {e}"
 
-msgid "Sending…"
-msgstr "Wysyłanie…"
-
-msgid "Removing the attachment…"
-msgstr "Usuwanie załącznika…"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Załącznika nie ma już w wiadomości na serwerze"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Nie udało się usunąć załącznika: {e}"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Nie udało się usunąć oznaczenia spamu z wiadomości ({len}): {e}"
-
 #, fuzzy
 msgid "unknown folder"
 msgstr "Wyświetl poszczególne katalogi"
@@ -7230,8 +7182,26 @@ msgstr "Wyświetl poszczególne katalogi"
 msgid "Could not reach the server"
 msgstr "Nie udało się połączyć z serwerem"
 
+msgid "Sending…"
+msgstr "Wysyłanie…"
+
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
+
+msgid "Removing the attachment…"
+msgstr "Usuwanie załącznika…"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Nie udało się usunąć załącznika: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Nie udało się pobrać listy katalogów: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Załącznika nie ma już w wiadomości na serwerze"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Nadal nie udało się wysłać wiadomości „{subject}”: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""
@@ -7518,6 +7488,18 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "unknown folder {path}"
+#~ msgstr "Wyświetl poszczególne katalogi"
+
+#, fuzzy
+#~ msgid "message not found"
+#~ msgstr "Czcionka wiadomości"
+
+#, fuzzy
+#~ msgid "Could not delete messages: {e}"
+#~ msgstr "Nie udało się usunąć wiadomości: {e}"
 
 #, fuzzy
 #~ msgid "An Exchange account can't receive mail from another account yet"

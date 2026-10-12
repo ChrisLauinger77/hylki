@@ -29,7 +29,6 @@ use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, M
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 /// The JMAP path (#245), a child module so it shares this file's helpers.
-mod ews;
 mod graph;
 mod imap_io;
 mod jmap;
@@ -1055,9 +1054,6 @@ async fn run(
         }
         Some(account) if account.protocol == crate::config::Protocol::Jmap => {
             jmap::run_jmap(account_id, account, rx, emit).await
-        }
-        Some(account) if account.protocol == crate::config::Protocol::Ews => {
-            ews::run_ews(account_id, account, rx, emit).await
         }
         Some(account) => run_imap(account_id, account, rx, emit).await,
         None => run_mock(account_id, rx, emit).await,
@@ -6498,9 +6494,6 @@ pub struct ConnTest {
     /// Incoming server (IMAP or POP3, per the account's protocol).
     pub incoming: Result<(), String>,
     pub smtp: Result<(), String>,
-    /// The EWS address Autodiscover found (#391), when the test was made
-    /// without one: the setup fills it in.
-    pub ews_url: Option<String>,
 }
 
 /// Test that the account's servers accept the given credentials (no mail sent).
@@ -6508,22 +6501,16 @@ pub async fn test_connection(account: &AccountConfig) -> ConnTest {
     let incoming = match account.protocol {
         crate::config::Protocol::Pop3 => test_pop3(account).await,
         crate::config::Protocol::Jmap => jmap::test_jmap(account).await,
-        crate::config::Protocol::Ews => {
-            return match ews::test_ews(account).await {
-                Ok(url) => ConnTest { incoming: Ok(()), smtp: Ok(()), ews_url: url },
-                Err(e) => ConnTest { incoming: Err(e), smtp: Ok(()), ews_url: None },
-            };
-        }
         _ => test_imap(account).await,
     };
-    // A JMAP or Exchange account sends through the server itself: there is
-    // no SMTP to test, and the Accounts window leaves that line out.
-    let smtp = if matches!(account.protocol, crate::config::Protocol::Jmap | crate::config::Protocol::Ews) {
+    // A JMAP account sends through the server itself: there is no SMTP to
+    // test, and the Accounts window leaves that line out.
+    let smtp = if account.protocol == crate::config::Protocol::Jmap {
         Ok(())
     } else {
         test_smtp(account).await
     };
-    ConnTest { incoming, smtp, ews_url: None }
+    ConnTest { incoming, smtp }
 }
 
 async fn test_pop3(account: &AccountConfig) -> Result<(), String> {
@@ -6542,7 +6529,6 @@ pub fn test_connection_blocking(account: AccountConfig) -> ConnTest {
         Err(e) => ConnTest {
             incoming: Err(e.to_string()),
             smtp: Err(e.to_string()),
-            ews_url: None,
         },
     }
 }

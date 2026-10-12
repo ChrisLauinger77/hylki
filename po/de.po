@@ -1716,12 +1716,6 @@ msgstr ""
 "Geben Sie die Adresse Ihres Stalwart-Servers ein. Mail wird gelesen und über "
 "JMAP gesendet; es sind keine SMTP-Einstellungen erforderlich."
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr "Melden Sie sich mit Ihrem Browser an - kein Passwort erforderlich."
 
@@ -2470,14 +2464,13 @@ msgstr[1] "Nach {n} Tagen"
 msgid "API Token"
 msgstr ""
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Server (Hostname oder URL)"
 
 msgid "Port (default 443)"
 msgstr "Port (Standard 443)"
-
-msgid "EWS address (empty to find it)"
-msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6918,6 +6911,8 @@ msgstr "Angaben zum Server"
 msgid "Filled in for known providers"
 msgstr "Ausgefüllt für bekannte Anbieter"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "IMAP-Server"
 
@@ -7109,38 +7104,14 @@ msgstr ""
 "{from} wurde bestätigt, aber die Adressangaben passen nicht zum Namen in der "
 "Nachricht."
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-#, fuzzy
-msgid "unknown folder {path}"
-msgstr "Jeden Ordner anzeigen"
-
-#, fuzzy
-msgid "message not found"
-msgstr "Schriftart der Nachricht"
-
-msgid "Could not list folders: {e}"
-msgstr "Ordner konnten nicht aufgelistet werden: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "Nachricht konnte nicht geladen werden: {e}"
-
 msgid "Syncing…"
 msgstr "Wird synchronisiert…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Konnte keine Post abrufen: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Nachricht konnte nicht geladen werden: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Quelltext konnte nicht geladen werden: {e}"
@@ -7157,12 +7128,11 @@ msgstr "Konnte nicht als Spam markiert werden: {e}"
 msgid "Could not mark as not spam: {e}"
 msgstr "Markierung als „Kein Spam“ fehlgeschlagen: {e}"
 
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "{len} Nachrichten konnten nicht als „Kein Spam“ markiert werden: {e}"
+
 msgid "Could not move messages: {e}"
 msgstr "Nachrichten konnten nicht verschoben werden: {e}"
-
-#, fuzzy
-msgid "Could not delete messages: {e}"
-msgstr "Nachricht konnte nicht gelöscht werden: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "Konnte den Ordner nicht leeren: {e}"
@@ -7185,24 +7155,6 @@ msgstr "Ordner konnte nicht gelöscht werden: unbekannter Ordner"
 msgid "Could not delete folder: {e}"
 msgstr "Ordner konnte nicht gelöscht werden: {e}"
 
-msgid "Sending…"
-msgstr "Wird gesendet…"
-
-msgid "Removing the attachment…"
-msgstr "Anhang wird entfernt…"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Der Anhang ist nicht mehr in der Nachricht auf dem Server vorhanden"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Anhang konnte nicht entfernt werden: {e}"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "„{subject}“ konnte immer noch nicht gesendet werden: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "{len} Nachrichten konnten nicht als „Kein Spam“ markiert werden: {e}"
-
 #, fuzzy
 msgid "unknown folder"
 msgstr "Jeden Ordner anzeigen"
@@ -7210,9 +7162,27 @@ msgstr "Jeden Ordner anzeigen"
 msgid "Could not reach the server"
 msgstr "Server konnte nicht erreicht werden"
 
+msgid "Sending…"
+msgstr "Wird gesendet…"
+
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ein Microsoft-Konto kann keine E-Mails von einem anderen Konto übernehmen"
+
+msgid "Removing the attachment…"
+msgstr "Anhang wird entfernt…"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Anhang konnte nicht entfernt werden: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Ordner konnten nicht aufgelistet werden: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Der Anhang ist nicht mehr in der Nachricht auf dem Server vorhanden"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "„{subject}“ konnte immer noch nicht gesendet werden: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr ""
@@ -7503,6 +7473,18 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "unknown folder {path}"
+#~ msgstr "Jeden Ordner anzeigen"
+
+#, fuzzy
+#~ msgid "message not found"
+#~ msgstr "Schriftart der Nachricht"
+
+#, fuzzy
+#~ msgid "Could not delete messages: {e}"
+#~ msgstr "Nachricht konnte nicht gelöscht werden: {e}"
 
 #, fuzzy
 #~ msgid "An Exchange account can't receive mail from another account yet"

@@ -4,13 +4,10 @@ The full list. The [README](../README.md) carries a shorter one.
 
 ## Accounts
 
-- **Multiple accounts:** IMAP, POP3, JMAP and Exchange, each on its own background
+- **Multiple accounts:** IMAP, POP3 and JMAP, each on its own background
   worker, with a unified *Inboxes* view across all of them.
 - **JMAP:** a Stalwart or Fastmail mailbox over the JSON mail protocol,
   including push. See [Configuration](DOCUMENTATION.md#jmap-stalwart-fastmail).
-- **Exchange (on-premise):** an organization's own Exchange server over
-  EWS, found from the email address, signed in with NTLM or Basic. See
-  [Exchange (on-premise)](DOCUMENTATION.md#exchange-on-premise).
 - **OAuth 2.0 sign-in:** Microsoft with Hylki's own app (no GNOME Online
   Accounts needed), Google through GNOME Online Accounts, and custom
   providers over XOAUTH2. See [Configuration](DOCUMENTATION.md#oauth-google--microsoft).

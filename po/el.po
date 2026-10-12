@@ -1694,12 +1694,6 @@ msgstr ""
 "συνεδρίας του. Η αλληλογραφία διαβάζεται και αποστέλλεται μέσω JMAP· δεν "
 "απαιτούνται ρυθμίσεις SMTP."
 
-msgid ""
-"For your organization's own Exchange server. Leave the server empty to find "
-"it from your address. Sign in as user@domain or DOMAIN\\user. Microsoft 365 "
-"accounts use the entry below."
-msgstr ""
-
 msgid "Sign in with your browser — no password needed."
 msgstr ""
 "Συνδεθείτε μέσω του προγράμματος περιήγησής σας — δεν απαιτείται κωδικός "
@@ -2462,14 +2456,13 @@ msgstr[1] "Μετά από {n} ημέρες"
 msgid "API Token"
 msgstr "Διακριτικό API"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "Server (host name or URL)"
 msgstr "Διακομιστής (όνομα κεντρικού υπολογιστή ή URL)"
 
 msgid "Port (default 443)"
 msgstr "Θύρα (προεπιλογή 443)"
-
-msgid "EWS address (empty to find it)"
-msgstr ""
 
 msgid "Google (Gmail)"
 msgstr "Google (Gmail)"
@@ -6911,6 +6904,8 @@ msgstr "Στοιχεία διακομιστή"
 msgid "Filled in for known providers"
 msgstr "Συμπληρώνονται για γνωστούς παρόχους"
 
+#. A JMAP server is one address, and it sends the mail
+#. itself: no SMTP rows.
 msgid "IMAP server"
 msgstr "Διακομιστής IMAP"
 
@@ -7109,38 +7104,14 @@ msgstr ""
 "Το {from} είναι έγκυρο, αλλά οι διευθύνσεις δεν ταιριάζουν με το όνομα στο "
 "μήνυμα."
 
-msgid "This Exchange account has no server address. Add it in its settings."
-msgstr ""
-
-msgid ""
-"Could not find the Exchange server for {email}: {why}. Enter its EWS "
-"address, such as https://mail.example.org/EWS/Exchange.asmx."
-msgstr ""
-
-msgid ""
-"The Exchange server refused the sign-in for {email}. Check the user name and "
-"password in its settings."
-msgstr ""
-
-#, fuzzy
-msgid "unknown folder {path}"
-msgstr "άγνωστος φάκελος"
-
-#, fuzzy
-msgid "message not found"
-msgstr "Γραμματοσειρά μηνυμάτων"
-
-msgid "Could not list folders: {e}"
-msgstr "Δεν ήταν δυνατή η εμφάνιση των φακέλων: {e}"
-
-msgid "Could not load message: {e}"
-msgstr "Δεν ήταν δυνατή η φόρτωση του μηνύματος: {e}"
-
 msgid "Syncing…"
 msgstr "Συγχρονισμός…"
 
 msgid "Could not fetch mail: {e}"
 msgstr "Δεν ήταν δυνατή η ανάκτηση αλληλογραφίας: {e}"
+
+msgid "Could not load message: {e}"
+msgstr "Δεν ήταν δυνατή η φόρτωση του μηνύματος: {e}"
 
 msgid "Could not load source: {e}"
 msgstr "Δεν ήταν δυνατή η φόρτωση του πηγαίου κώδικα: {e}"
@@ -7157,12 +7128,11 @@ msgstr "Δεν ήταν δυνατή η σήμανση ως ανεπιθύμητ
 msgid "Could not mark as not spam: {e}"
 msgstr "Δεν ήταν δυνατή η σήμανση ως επιθυμητού: {e}"
 
+msgid "Could not mark {len} messages as not spam: {e}"
+msgstr "Δεν ήταν δυνατή η σήμανση {len} μηνυμάτων ως επιθυμητών: {e}"
+
 msgid "Could not move messages: {e}"
 msgstr "Δεν ήταν δυνατή η μετακίνηση μηνυμάτων: {e}"
-
-#, fuzzy
-msgid "Could not delete messages: {e}"
-msgstr "Δεν ήταν δυνατή η διαγραφή του μηνύματος: {e}"
 
 msgid "Could not empty the folder: {e}"
 msgstr "Δεν ήταν δυνατό το άδειασμα του φακέλου: {e}"
@@ -7185,34 +7155,34 @@ msgstr "Δεν ήταν δυνατή η διαγραφή φακέλου: άγν�
 msgid "Could not delete folder: {e}"
 msgstr "Δεν ήταν δυνατή η διαγραφή φακέλου: {e}"
 
-msgid "Sending…"
-msgstr "Αποστολή…"
-
-msgid "Removing the attachment…"
-msgstr "Αφαίρεση του συνημμένου…"
-
-msgid "The attachment is no longer in the message on the server"
-msgstr "Το συνημμένο δεν υπάρχει πλέον στο μήνυμα στον διακομιστή"
-
-msgid "Could not remove the attachment: {e}"
-msgstr "Δεν ήταν δυνατή η αφαίρεση του συνημμένου: {e}"
-
-msgid "Still could not send “{subject}”: {e}"
-msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
-
-msgid "Could not mark {len} messages as not spam: {e}"
-msgstr "Δεν ήταν δυνατή η σήμανση {len} μηνυμάτων ως επιθυμητών: {e}"
-
 msgid "unknown folder"
 msgstr "άγνωστος φάκελος"
 
 msgid "Could not reach the server"
 msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
 
+msgid "Sending…"
+msgstr "Αποστολή…"
+
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ένας λογαριασμός Microsoft δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
 "λογαριασμό"
+
+msgid "Removing the attachment…"
+msgstr "Αφαίρεση του συνημμένου…"
+
+msgid "Could not remove the attachment: {e}"
+msgstr "Δεν ήταν δυνατή η αφαίρεση του συνημμένου: {e}"
+
+msgid "Could not list folders: {e}"
+msgstr "Δεν ήταν δυνατή η εμφάνιση των φακέλων: {e}"
+
+msgid "The attachment is no longer in the message on the server"
+msgstr "Το συνημμένο δεν υπάρχει πλέον στο μήνυμα στον διακομιστή"
+
+msgid "Still could not send “{subject}”: {e}"
+msgstr "Εξακολουθεί να μην είναι δυνατή η αποστολή του «{subject}»: {e}"
 
 msgid "IMAP connection stopped making progress"
 msgstr "Η σύνδεση IMAP σταμάτησε να προχωρά"
@@ -7504,6 +7474,18 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "unknown folder {path}"
+#~ msgstr "άγνωστος φάκελος"
+
+#, fuzzy
+#~ msgid "message not found"
+#~ msgstr "Γραμματοσειρά μηνυμάτων"
+
+#, fuzzy
+#~ msgid "Could not delete messages: {e}"
+#~ msgstr "Δεν ήταν δυνατή η διαγραφή του μηνύματος: {e}"
 
 #, fuzzy
 #~ msgid "An Exchange account can't receive mail from another account yet"

@@ -353,6 +353,20 @@ pub fn sound_when_focused() -> bool {
 /// Service name used for keyring entries; password items are keyed by email.
 const KEYRING_SERVICE: &str = "co.hyprlab.Hylki";
 
+/// A protocol this build does not know reads as IMAP: an account written by
+/// another version (the EWS accounts of 1.44.0-beta.5) then shows up unable
+/// to connect, where it can be removed, instead of failing the whole file and
+/// with it every account.
+fn known_protocol<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Protocol, D::Error> {
+    let name = String::deserialize(d)?;
+    Ok(Protocol::deserialize(serde::de::value::StrDeserializer::<serde::de::value::Error>::new(&name)).unwrap_or_else(
+        |_| {
+            tracing::warn!("unknown account protocol {name:?}, read as IMAP");
+            Protocol::Imap
+        },
+    ))
+}
+
 /// Incoming-mail protocol for an account.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -370,11 +384,6 @@ pub enum Protocol {
     /// session resource is found at `/.well-known/jmap`; sending goes
     /// through the server too, so the SMTP fields are unused.
     Jmap,
-    /// Exchange Web Services (#391): an on-premise Exchange server, signed
-    /// in to with NTLM or Basic. `imap_host` holds the EWS address
-    /// (`https://mail.example.org/EWS/Exchange.asmx`); the server sends and
-    /// files the Sent copy, so the SMTP fields are unused.
-    Ews,
 }
 
 /// How an account's servers are secured, as GNOME Online Accounts records
@@ -408,7 +417,7 @@ pub struct AccountConfig {
     pub name: String,
     pub email: String,
     /// Incoming-mail protocol (IMAP, POP3, Graph or JMAP).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "known_protocol")]
     pub protocol: Protocol,
     /// Incoming server host (IMAP, POP3 or JMAP, per `protocol`; a JMAP
     /// account may give a URL with its scheme).
@@ -4386,6 +4395,20 @@ pub fn save_contacts_pane_width(width: i32) {
 #[cfg(test)]
 mod tests {
     use super::{decode_gallery_folder, encode_gallery_folder, ConfigFile, ListColumn, PrivacyFile, StateFile};
+
+    /// An account with a protocol this build does not know (an EWS account
+    /// from 1.44.0-beta.5) leaves the others readable.
+    #[test]
+    fn an_unknown_protocol_keeps_the_file_readable() {
+        let account = |email: &str, protocol: &str| {
+            format!("[[accounts]]\nname = \"\"\nemail = \"{email}\"\nimap_host = \"\"\nusername = \"\"\nprotocol = \"{protocol}\"\n")
+        };
+        let text = account("a@x", "ews") + &account("b@x", "jmap");
+        let cfg: ConfigFile = toml::from_str(&text).expect("parses");
+        assert_eq!(cfg.accounts.len(), 2);
+        assert_eq!(cfg.accounts[0].protocol, super::Protocol::Imap);
+        assert_eq!(cfg.accounts[1].protocol, super::Protocol::Jmap);
+    }
 
     /// #367: a sidebar file from before Favorites has none, and the list
     /// starts open; the entries come back in the order they were added.
