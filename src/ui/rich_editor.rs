@@ -2,6 +2,7 @@
 //! formatting toolbar. JavaScript runs only in this (our own) document, to drive
 //! editing commands. Used for the compose body and the account signature.
 
+use super::tool_flow::ToolFlow;
 use adw::prelude::*;
 use webkit6::prelude::WebViewExt;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
@@ -16,7 +17,7 @@ pub struct RichEditor {
     webview: webkit6::WebView,
     /// The formatting commands, hidden while a message is composed as plain
     /// text (#180) or as source — the row they sit in stays either way.
-    toolbar_commands: adw::WrapBox,
+    toolbar_commands: ToolFlow,
     /// The far end of that row, where a host puts controls of its own (the
     /// composer's format chooser and preview toggle).
     toolbar_end: gtk::Box,
@@ -879,7 +880,7 @@ impl RichEditor {
     /// end — a chooser that vanished with the buttons would be the one
     /// control needed to get them back.
     pub fn set_formatting_visible(&self, on: bool) {
-        self.toolbar_commands.set_visible(on);
+        self.toolbar_commands.set_tools_shown(on);
     }
 
     /// The far end of the formatting row, for a host's own controls.
@@ -1598,29 +1599,16 @@ fn build_toolbar(
     anchor: &gtk::Stack,
     attach_cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
     expanded: bool,
-) -> (gtk::Box, adw::WrapBox, gtk::Box, ToolbarState) {
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    bar.add_css_class("toolbar");
-    bar.add_css_class("format-bar");
-    // The formatting commands sit in a group of their own, so a host can
+) -> (ToolFlow, ToolFlow, gtk::Box, ToolbarState) {
+    // The formatting commands flow and wrap across the bar, and a host can
     // hide them (a message written as source has no use for them) while the
-    // row itself stays — the format chooser lives at its far end.
-    let group = adw::WrapBox::new();
-    group.set_child_spacing(10);
-    group.set_line_spacing(2);
+    // bar itself stays: the format chooser holds its top right corner, and
+    // only the first row stops short of it.
+    let group = ToolFlow::new();
+    group.add_css_class("toolbar");
+    group.add_css_class("format-bar");
     group.set_hexpand(true);
-    // The end box expands only while the commands are hidden (a source
-    // format), to stay at the right; beside them it takes its own width and
-    // leaves the rest to the commands, whose wrapped rows need it more than
-    // the space beside the end box's single row did.
     let end = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-    end.set_hexpand(false);
-    {
-        let end = end.clone();
-        group.connect_visible_notify(move |g| end.set_hexpand(!g.is_visible()));
-    }
-    end.set_halign(gtk::Align::End);
-    end.set_valign(gtk::Align::Start);
     let cluster = || gtk::Box::new(gtk::Orientation::Horizontal, 2);
 
     // Paragraph style and font, each a menu whose label follows the caret.
@@ -1867,8 +1855,7 @@ fn build_toolbar(
             // The room left on the row after Clear formatting, against what
             // the tools and the chevron need.
             let gap = 10.0;
-            let row_end = tail.compute_bounds(&group).map_or(0.0, |r| r.x() + r.width());
-            let spare = group.width() as f32 - row_end - gap;
+            let spare = group.room_after(tail.upcast_ref()).unwrap_or(0) as f32;
             let need = extras.measure(gtk::Orientation::Horizontal, -1).1 as f32 + gap + b.width() as f32;
             if reveal.transition_duration() > 0 && group.width() > 0 && need > spare {
                 breaker.set_size_request((spare - 1.0).max(0.0) as i32, -1);
@@ -1924,9 +1911,8 @@ fn build_toolbar(
         });
     }
 
-    bar.append(&group);
-    bar.append(&end);
-    (bar, group, end, ToolbarState { toggles, style, font, size })
+    group.set_end(&end);
+    (group.clone(), group, end, ToolbarState { toggles, style, font, size })
 }
 
 /// Choose pictures to put in the message at the caret (#358), the way a

@@ -33,6 +33,7 @@ pub mod print_preview;
 pub mod rich_editor;
 pub mod sidebar;
 pub mod theme_picker;
+pub mod tool_flow;
 pub mod web_signin;
 pub mod welcome;
 
