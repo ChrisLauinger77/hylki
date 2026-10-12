@@ -475,6 +475,10 @@ msgstr "Modifier le modèle"
 msgid "Add Sender to Contacts"
 msgstr "Ajouter l'expéditeur aux contacts"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Imprimer le message…"
+
 msgid "Block Remote Content"
 msgstr "Bloquer le contenu distant"
 

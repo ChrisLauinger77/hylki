@@ -493,6 +493,10 @@ msgstr "Επεξεργασία προτύπου"
 msgid "Add Sender to Contacts"
 msgstr "Προσθήκη αποστολέα στις επαφές"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Εκτύπωση μηνύματος…"
+
 msgid "Block Remote Content"
 msgstr "Αποκλεισμός απομακρυσμένου περιεχομένου"
 

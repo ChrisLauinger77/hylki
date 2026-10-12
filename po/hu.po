@@ -493,6 +493,10 @@ msgstr "Címke szerkesztése"
 msgid "Add Sender to Contacts"
 msgstr "Feladó hozzáadása a névjegyekhez"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Nyomtatás…"
+
 msgid "Block Remote Content"
 msgstr "Távoli képek blokkolása"
 

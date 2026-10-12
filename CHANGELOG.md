@@ -6,6 +6,10 @@
   Releasing the right button took the menu's hold on the pointer away, so
   every entry only closed the menu. On X11 the menu now opens once the button
   is up; Wayland is unchanged.
+- **Added: Create Filter from Message…** (#428, by Fabio Rotondo). The
+  entry in the message list's and the reader's right-click menus opens the
+  filter editor on a new rule with the sender's address and the subject,
+  without a leading "Re:" or "Fwd:", already filled in.
 - **Changed: Hylki's icons look the same on every desktop.** Every icon is
   drawn from copies built into the app, including those GTK and libadwaita
   draw for their own buttons, arrows and checkmarks; the desktop's icon theme

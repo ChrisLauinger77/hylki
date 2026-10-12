@@ -490,6 +490,10 @@ msgstr "Редактировать шаблон"
 msgid "Add Sender to Contacts"
 msgstr "Добавить отправителя в контакты"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Печать сообщения…"
+
 msgid "Block Remote Content"
 msgstr "Блокировать удалённый контент"
 

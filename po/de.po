@@ -496,6 +496,10 @@ msgstr "Tag bearbeiten"
 msgid "Add Sender to Contacts"
 msgstr "Absender zu Kontakten hinzufügen"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Nachricht drucken…"
+
 msgid "Block Remote Content"
 msgstr "Externe Inhalte blockieren"
 

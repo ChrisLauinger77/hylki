@@ -491,6 +491,10 @@ msgstr "Editar plantilla"
 msgid "Add Sender to Contacts"
 msgstr "Añadir remitente a Contactos"
 
+#, fuzzy
+msgid "Create Filter from Message…"
+msgstr "Imprimir mensaje…"
+
 msgid "Block Remote Content"
 msgstr "Bloquear contenido remoto"
 
