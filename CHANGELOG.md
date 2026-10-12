@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Fixed: the settings search listed every OpenPGP key** (#432, reported
+  by 3v1n0). A keyring with many people's keys buried the settings under
+  them; keys are no longer search results.
 - **Italian translation** (#430 by Jimmy), complete but for the new filter menu entry.
 - **Catalan translation** brought up to date (PR #422 by jolupa).
 - **Fixed: right-click menus did nothing on X11** (#427, by Fabio Rotondo).

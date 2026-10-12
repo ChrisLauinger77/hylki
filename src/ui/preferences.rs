@@ -1626,8 +1626,16 @@ fn search_hit(page: &'static str, title: &str, subtitle: &str, place: &str, widg
     }
 }
 
+/// The class that keeps a row, and what it holds, out of the settings search.
+pub const NOT_SEARCHED: &str = "settings-not-searched";
+
 /// Walk a page for its groups and rows; `place` is where they sit so far.
 fn index_widget(page: &'static str, w: &gtk::Widget, place: &str, out: &mut Vec<SearchHit>) {
+    // Rows that list the user's data (OpenPGP keys) are not settings, and a
+    // keyring of other people's keys would bury the real results (#432).
+    if w.has_css_class(NOT_SEARCHED) {
+        return;
+    }
     let mut place = place.to_string();
     if let Some(group) = w.downcast_ref::<adw::PreferencesGroup>() {
         let title = group.title();
