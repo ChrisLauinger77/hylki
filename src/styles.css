@@ -787,6 +787,32 @@ flowbox.attach-flow > flowboxchild {
   outline: none;
 }
 
+/* The date headings of a list grouped by date (#435): no ground of their
+   own, the text lined up with the rows' (the pill's 6px inset plus its
+   padding), air above to part one day from the last. */
+.message-list > header {
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+}
+
+.list-day-heading {
+  margin: 14px 16px 4px 16px;
+}
+
+.message-list > header:first-child .list-day-heading {
+  margin-top: 8px;
+}
+
+.message-list.single-line .list-day-heading {
+  margin: 10px 14px 2px 14px;
+}
+
+.message-list.single-line > header:first-child .list-day-heading {
+  margin-top: 6px;
+}
+
 /* Every state tint lives on the inner .message-row as an inset rounded pill
    — matching the thread member cards — never on the full-width row, so
    highlights stop touching the list edges and crossing the separators. */

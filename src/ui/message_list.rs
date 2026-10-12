@@ -10,7 +10,7 @@ use relm4::prelude::*;
 use crate::models::{Message, ThreadSummary};
 use crate::ui::context_menu::{show_context_menu_popover, MenuEntry};
 use crate::i18n::i18n;
-use crate::ui::message_row::{RowData, RowMeta, RowShared};
+use crate::ui::message_row::{DaySection, RowData, RowMeta, RowShared};
 pub use crate::ui::message_row::{tag_menu_entries, RowAction};
 
 /// The message-list pane's floor: exactly what a conversation-member card
@@ -473,6 +473,25 @@ fn after_next_paint(clock: &gtk::gdk::FrameClock, f: impl FnOnce() + 'static) {
     glib::timeout_add_local_once(std::time::Duration::from_millis(100), once);
 }
 
+/// Keep `adj` at the very top for a moment (#435). A `scroll_to` the first
+/// row lines that row up with the top once the view is laid out, which
+/// leaves the date heading above the row out of sight. Only a move no
+/// further than that heading is undone, and only briefly, so a scroll of the
+/// user's own goes on. It is undone after the layout, not during it: the
+/// view does not follow a move made while it is being laid out.
+fn hold_top(adj: &gtk::Adjustment, shared: &Rc<RowShared>) {
+    let shared = Rc::downgrade(shared);
+    let id = adj.connect_value_changed(move |adj| {
+        let heading = shared.upgrade().and_then(|s| s.first_heading_height()).map_or(f64::MAX, f64::from);
+        if adj.value() > 0.0 && adj.value() <= heading + 1.0 {
+            let adj = adj.clone();
+            glib::idle_add_local_once(move || adj.set_value(0.0));
+        }
+    });
+    let adj = adj.clone();
+    glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || adj.disconnect(id));
+}
+
 /// Where [`compute_thread_keys`] files a message: its account, folder and id.
 /// The id alone is a UID, which only means something inside one folder, and a
 /// search over every folder holds the same UID many times; keyed without the
@@ -705,6 +724,11 @@ pub struct MessageList {
     graph_in_view: bool,
     /// The sort runs the other way: a heading clicked twice (#334).
     sort_reversed: bool,
+    /// Headings divide a list sorted by date into Today, Yesterday and so
+    /// on (#435), and whether the view draws them now: only a date sort
+    /// has them.
+    group_by_date: bool,
+    day_headings: bool,
     /// Show the column headings over a single-line list (#334).
     headings: bool,
     headings_bar: gtk::Box,
@@ -909,6 +933,8 @@ pub enum MessageListInput {
     SetColumns(Vec<crate::config::ListColumn>),
     /// Show the column headings over a single-line list, or not (#334).
     SetHeadings(bool),
+    /// Divide a list sorted by date under Today, Yesterday and so on (#435).
+    SetGroupByDate(bool),
     /// A column's heading was clicked: sort by it, or the other way (#334).
     SortByColumn(crate::config::ListColumn),
     /// A heading's edge was dragged to `width`, or double-clicked (`None`:
@@ -1491,6 +1517,8 @@ impl SimpleComponent for MessageList {
             graph_accounts: std::collections::HashSet::new(),
             graph_in_view: false,
             sort_reversed: false,
+            group_by_date: crate::config::load_privacy().list_group_by_date,
+            day_headings: false,
             headings: false,
             headings_bar: gtk::Box::new(gtk::Orientation::Horizontal, 8),
             widths: std::collections::HashMap::new(),
@@ -1838,6 +1866,12 @@ impl SimpleComponent for MessageList {
             MessageListInput::SetSingleLine(on) => {
                 if self.single_line != on {
                     self.single_line = on;
+                    // The date headings line up with a single line's text.
+                    if on {
+                        self.list_view.add_css_class("single-line");
+                    } else {
+                        self.list_view.remove_css_class("single-line");
+                    }
                     self.sync_look();
                 }
             }
@@ -2190,6 +2224,7 @@ impl SimpleComponent for MessageList {
                 // reader, so the next j or k goes on from there.
                 self.shared.selection.select_item(next as u32, true);
                 self.list_view.scroll_to(next as u32, gtk::ListScrollFlags::NONE, None);
+                self.reveal_first_heading(next);
             }
             MessageListInput::SelectAllShown => {
                 if !self.shown.is_empty() {
@@ -2364,6 +2399,12 @@ impl SimpleComponent for MessageList {
             MessageListInput::SetHeadings(on) => {
                 self.headings = on;
                 self.sync_headings();
+            }
+            MessageListInput::SetGroupByDate(on) => {
+                if self.group_by_date != on {
+                    self.group_by_date = on;
+                    self.queue_rebuild(true);
+                }
             }
             MessageListInput::SortByColumn(column) => {
                 let Some(order) = column_sort(column, self.show_recipient) else { return };
@@ -3208,6 +3249,7 @@ impl MessageList {
         // past the old size yet: move the view's own anchor too.
         if self.shared.model.len() > 0 {
             self.list_view.scroll_to(0, gtk::ListScrollFlags::NONE, None);
+            self.reveal_first_heading(0);
         }
     }
 
@@ -3520,6 +3562,7 @@ impl MessageList {
         // The head survives the toggle (only its replies are put in), so its
         // own chevron can rotate open in place.
         self.shared.model.update_row(head_pos, |d| d.meta.expanded = true);
+        let section = self.shared.model.row(head_pos).map(|r| r.section).unwrap_or_default();
         let n = children.len();
         let rows: Vec<Rc<RowData>> = children
             .iter()
@@ -3528,6 +3571,7 @@ impl MessageList {
                 Rc::new(RowData {
                     msg: m.clone(),
                     meta: RowMeta { is_child: true, is_last: i + 1 == n, revealed: true, appear: true, ..Default::default() },
+                    section,
                 })
             })
             .collect();
@@ -3911,6 +3955,13 @@ impl MessageList {
             .map(|r| r.slot())
             .collect();
 
+        // Under which date heading each conversation goes (#435): by the
+        // message that put it where it is in the sort, the newest for
+        // Newest First and the oldest for Oldest First, so a heading's rows
+        // always run together.
+        let by_date = self.group_by_date && matches!(sort, SortOrder::DateNewest | SortOrder::DateOldest);
+        let day_starts = by_date.then(|| crate::datefmt::day_starts(crate::datefmt::now()));
+
         // Flatten back into display order, recording per-row thread metadata.
         let mut shown: Vec<Rc<Message>> = Vec::new();
         let mut rows: Vec<Rc<RowData>> = Vec::new();
@@ -3922,6 +3973,7 @@ impl MessageList {
         let mut any_expanded = false;
         for key in &order {
             let mut msgs = groups.remove(key).unwrap();
+            let section = day_starts.as_ref().map_or(DaySection::None, |d| DaySection::of(msgs[0].timestamp, d));
             // A conversation reads like a transcript: the message that started it
             // is the row on screen, and its replies descend beneath it to the
             // newest. Where the *thread* sits among the other rows is still the
@@ -3945,7 +3997,7 @@ impl MessageList {
             let mut it = members.into_iter();
             let head = it.next().unwrap();
             shown.push(head.clone());
-            rows.push(Rc::new(RowData { msg: head, meta }));
+            rows.push(Rc::new(RowData { msg: head, meta, section }));
             if expanded {
                 any_expanded = true;
                 let closing = self.collapsing_threads.contains_key(key);
@@ -3963,6 +4015,7 @@ impl MessageList {
                             appear: appearing.contains(&slot),
                             ..Default::default()
                         },
+                        section,
                     }));
                 }
             }
@@ -4020,6 +4073,15 @@ impl MessageList {
         let stale = self.look_stale.take();
         if !self.shared.model.replace(rows, stale) && stale {
             self.shared.refresh_all();
+        }
+        // The headings come and go with the rows already in their sections,
+        // so the view never asks for a section of rows built without them.
+        if by_date != self.day_headings {
+            self.day_headings = by_date;
+            let factory = by_date.then(|| crate::ui::message_row::header_factory(&self.shared));
+            self.list_view.set_header_factory(factory.as_ref());
+        } else if by_date {
+            self.shared.refresh_headers();
         }
         self.select_current();
 
@@ -4238,7 +4300,17 @@ impl MessageList {
     fn focus_row(&self, idx: usize) {
         if idx < self.shown.len() {
             self.list_view.scroll_to(idx as u32, gtk::ListScrollFlags::FOCUS, None);
+            self.reveal_first_heading(idx);
             self.list_view.grab_focus();
+        }
+    }
+
+    /// A `scroll_to` the first row lines it up with the top, leaving the
+    /// date heading over it out of sight (#435): the list goes back to its
+    /// very top once laid out.
+    fn reveal_first_heading(&self, idx: usize) {
+        if let (0, true, Some(s)) = (idx, self.day_headings, &self.scroller) {
+            hold_top(&s.vadjustment(), &self.shared);
         }
     }
 
@@ -4348,8 +4420,9 @@ mod tests {
         column_sort, compute_thread_keys, correspondents, heads_its_row, message_cmp, SortOrder, latest_elsewhere, nested_members, reader_conversation,
         row_for_reader_key, thread_slot, unasked_threads,
     };
-    use crate::ui::message_row::{row_edits, swap_wanted, swipe_progress_px, RowEdit, SWIPE_ARM, SWIPE_MAX};
+    use crate::ui::message_row::{row_edits, swap_wanted, swipe_progress_px, DaySection, RowData, RowEdit, SWIPE_ARM, SWIPE_MAX};
     use crate::models::Message;
+    use std::rc::Rc;
 
     /// Apply `row_edits` to `old` the way the model applies them, then add
     /// the rest of `new`, and return the result alongside the number of rows
@@ -4848,5 +4921,61 @@ mod tests {
         assert_eq!(row((1, 9)), Some(1));
         // And one from neither is no row at all.
         assert_eq!(row((1, 42)), None);
+    }
+
+    /// #435: each day falls under its heading, the boundaries at midnight,
+    /// and mail dated ahead of the clock under Today.
+    #[test]
+    fn mail_falls_under_its_days_heading() {
+        let day = 86_400;
+        let today = 100 * day;
+        let starts = [today, today - day, today - 6 * day, today - 13 * day];
+        let of = |ts| DaySection::of(ts, &starts);
+        assert_eq!(of(today + 5 * day), DaySection::Today);
+        assert_eq!(of(today), DaySection::Today);
+        assert_eq!(of(today - 1), DaySection::Yesterday);
+        assert_eq!(of(today - day), DaySection::Yesterday);
+        assert_eq!(of(today - day - 1), DaySection::LastWeek);
+        assert_eq!(of(today - 6 * day), DaySection::LastWeek);
+        assert_eq!(of(today - 6 * day - 1), DaySection::LastFortnight);
+        assert_eq!(of(today - 13 * day), DaySection::LastFortnight);
+        assert_eq!(of(today - 13 * day - 1), DaySection::Older);
+        assert_eq!(of(0), DaySection::Older);
+    }
+
+    /// The local midnights run back a day, a week and a fortnight, and the
+    /// first is the start of the day `now` is in.
+    #[test]
+    fn the_days_start_at_local_midnight() {
+        let now = crate::datefmt::now();
+        let [today, yesterday, week, fortnight] = crate::datefmt::day_starts(now);
+        assert!(today <= now && now - today < 25 * 3600);
+        assert_eq!(crate::datefmt::day_key(today), crate::datefmt::day_key(now));
+        assert_ne!(crate::datefmt::day_key(today - 1), crate::datefmt::day_key(today));
+        for (later, earlier, days) in [(today, yesterday, 1), (today, week, 6), (today, fortnight, 13)] {
+            let gap = later - earlier;
+            assert!((gap - days * 86_400).abs() <= 3600, "{days} days back is {gap}s");
+        }
+    }
+
+    /// A section is a run of rows under one heading, so the view's question
+    /// about any row is a search among a handful of starts.
+    #[test]
+    fn sections_are_the_runs_of_one_heading() {
+        use crate::ui::message_row::section_starts;
+        let row = |id: u32, section| Rc::new(RowData { msg: Rc::new(msg(id, "", "")), meta: Default::default(), section });
+        assert_eq!(section_starts(&[]), vec![0]);
+        let plain: Vec<_> = (0..5).map(|i| row(i, DaySection::None)).collect();
+        assert_eq!(section_starts(&plain), vec![0]);
+        let days = [
+            DaySection::Today,
+            DaySection::Today,
+            DaySection::Yesterday,
+            DaySection::Older,
+            DaySection::Older,
+            DaySection::Older,
+        ];
+        let rows: Vec<_> = days.iter().enumerate().map(|(i, s)| row(i as u32, *s)).collect();
+        assert_eq!(section_starts(&rows), vec![0, 2, 3]);
     }
 }

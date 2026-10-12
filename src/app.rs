@@ -820,6 +820,8 @@ pub struct AppModel {
     list_columns: Vec<config::ListColumn>,
     /// Headings over them, which sort the list when clicked (#334).
     list_headings: bool,
+    /// Date headings over a list sorted by date (#435).
+    list_group_by_date: bool,
     /// The widths columns were dragged to by their headings (#334).
     list_column_widths: std::collections::HashMap<config::ListColumn, i32>,
     /// The list pane is wide enough for one line per message, which
@@ -3321,6 +3323,7 @@ impl SimpleComponent for AppModel {
             list_layout: config::load_list_layout(),
             list_columns: config::load_list_columns(),
             list_headings: config::load_privacy().list_headings,
+            list_group_by_date: config::load_privacy().list_group_by_date,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
             shortcuts_win: None,
@@ -7987,6 +7990,11 @@ impl SimpleComponent for AppModel {
                     self.message_list.emit(MessageListInput::SetHeadings(on));
                 }
             }
+            AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
+                if pref!(self.list_group_by_date = on) {
+                    self.message_list.emit(MessageListInput::SetGroupByDate(on));
+                }
+            }
             AppMsg::Pref(PrefOutput::SetListColumns(columns)) => {
                 if pref!(self.list_columns = columns.clone()) {
                     self.message_list.emit(MessageListInput::SetColumns(columns));
@@ -12020,6 +12028,7 @@ impl AppModel {
             list_layout: self.list_layout,
             list_columns: config::ListColumn::to_keys(&self.list_columns),
             list_headings: self.list_headings,
+            list_group_by_date: self.list_group_by_date,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
@@ -19985,6 +19994,7 @@ impl AppModel {
             list_layout: self.list_layout,
             list_columns: self.list_columns.clone(),
             list_headings: self.list_headings,
+            list_group_by_date: self.list_group_by_date,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
             keep_downloads_days: self.keep_downloads_days,

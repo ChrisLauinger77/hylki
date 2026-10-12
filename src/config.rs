@@ -1484,6 +1484,10 @@ pub(crate) struct PrivacyFile {
     /// Headings over those columns, which sort the list when clicked.
     #[serde(default)]
     pub(crate) list_headings: bool,
+    /// A list sorted by date is divided under Today, Yesterday, Last 7 days,
+    /// Last 14 days and Older (#435). Off by default.
+    #[serde(default)]
+    pub(crate) list_group_by_date: bool,
     /// The widths columns were dragged to, in pixels, by column name.
     #[serde(default)]
     pub(crate) list_column_widths: std::collections::BTreeMap<String, i32>,
@@ -1786,6 +1790,7 @@ impl Default for PrivacyFile {
             list_layout: ListLayout::Cards,
             list_columns: default_list_columns(),
             list_headings: false,
+            list_group_by_date: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
             gmail_keys: false,

@@ -163,6 +163,7 @@ pub struct PrefInit {
     pub list_layout: crate::config::ListLayout,
     pub list_columns: Vec<crate::config::ListColumn>,
     pub list_headings: bool,
+    pub list_group_by_date: bool,
     pub single_key_shortcuts: bool,
     pub gmail_keys: bool,
     pub keep_downloads_days: u32,
@@ -1378,6 +1379,8 @@ pub enum PrefOutput {
     /// The single-line list's columns, in order (#334).
     SetListColumns(Vec<crate::config::ListColumn>),
     SetListHeadings(bool),
+    /// Date headings over a list sorted by date (#435).
+    SetGroupByDate(bool),
     /// Every column back to its own width (#334).
     ResetColumnWidths,
     SetSingleKey(bool),
@@ -2958,6 +2961,16 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "group_by_date_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Group by date"),
+                                        set_subtitle: &i18n("Headings divide a list sorted by date into Today, \
+                                                       Yesterday, Last 7 days, Last 14 days and Older."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetGroupByDate(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "tag_row_tint_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Tint tagged messages"),
@@ -4311,6 +4324,7 @@ impl Component for Preferences {
         ])));
         no_truncate(&widgets.list_layout_row);
         widgets.list_headings_row.set_active(init.list_headings);
+        widgets.group_by_date_row.set_active(init.list_group_by_date);
         widgets.list_layout_row.set_selected(match init.list_layout {
             crate::config::ListLayout::Cards => 0,
             crate::config::ListLayout::SingleLine => 1,

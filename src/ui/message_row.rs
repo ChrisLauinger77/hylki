@@ -165,11 +165,59 @@ pub struct RowMeta {
     pub group: Option<(u32, String)>,
 }
 
+/// The date heading a row sits under while the list is grouped by date
+/// (#435). `None` everywhere when it is not: one section, and no heading.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DaySection {
+    #[default]
+    None,
+    Today,
+    Yesterday,
+    LastWeek,
+    LastFortnight,
+    Older,
+}
+
+impl DaySection {
+    /// The section `ts` falls in, given the local midnights that start
+    /// today, yesterday, the last 7 days and the last 14 days
+    /// (`crate::datefmt::day_starts`). Mail dated ahead of the clock counts
+    /// as today's.
+    pub fn of(ts: i64, starts: &[i64; 4]) -> Self {
+        let [today, yesterday, week, fortnight] = *starts;
+        if ts >= today {
+            DaySection::Today
+        } else if ts >= yesterday {
+            DaySection::Yesterday
+        } else if ts >= week {
+            DaySection::LastWeek
+        } else if ts >= fortnight {
+            DaySection::LastFortnight
+        } else {
+            DaySection::Older
+        }
+    }
+
+    pub fn label(self) -> String {
+        match self {
+            DaySection::None => String::new(),
+            DaySection::Today => i18n("Today"),
+            DaySection::Yesterday => i18n("Yesterday"),
+            DaySection::LastWeek => i18n("Last 7 days"),
+            DaySection::LastFortnight => i18n("Last 14 days"),
+            DaySection::Older => i18n("Older"),
+        }
+    }
+}
+
 /// One row's worth of the list: the message and what the row says about it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RowData {
     pub msg: Rc<Message>,
     pub meta: RowMeta,
+    /// The date heading it sits under (#435): a conversation's replies share
+    /// their head's.
+    pub section: DaySection,
 }
 
 impl RowData {
@@ -251,13 +299,14 @@ glib::wrapper! {
     /// Every row of the list, in order, as `RowData`. Items for the view are
     /// made on demand and shared while alive, keyed by the message's slot, so
     /// the same message keeps the same item (and the same bound row) across
-    /// a rebuild.
+    /// a rebuild. Its sections are the runs of rows under one date heading
+    /// (#435).
     pub struct MessageModel(ObjectSubclass<model_imp::MessageModel>)
-        @implements gtk::gio::ListModel;
+        @implements gtk::gio::ListModel, gtk::SectionModel;
 }
 
 mod model_imp {
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
     use std::rc::Rc;
 
@@ -270,13 +319,25 @@ mod model_imp {
     pub struct MessageModel {
         pub rows: RefCell<Vec<Rc<super::RowData>>>,
         pub items: RefCell<HashMap<super::Slot, glib::WeakRef<super::RowItem>>>,
+        /// Where each section starts, worked out again from `rows` the first
+        /// time the view asks after they change: a handful of runs, so the
+        /// view's question is a short search however long the list.
+        sections: RefCell<Vec<u32>>,
+        sections_stale: Cell<bool>,
+    }
+
+    impl MessageModel {
+        /// `rows` changed: the sections are worked out again when next asked.
+        pub fn touch(&self) {
+            self.sections_stale.set(true);
+        }
     }
 
     #[glib::object_subclass]
     impl ObjectSubclass for MessageModel {
         const NAME: &'static str = "HylkiMessageModel";
         type Type = super::MessageModel;
-        type Interfaces = (gio::ListModel,);
+        type Interfaces = (gio::ListModel, gtk::SectionModel);
     }
 
     impl ObjectImpl for MessageModel {}
@@ -305,6 +366,33 @@ mod model_imp {
             Some(item.upcast())
         }
     }
+
+    impl SectionModelImpl for MessageModel {
+        fn section(&self, position: u32) -> (u32, u32) {
+            let rows = self.rows.borrow();
+            let n = rows.len() as u32;
+            if position >= n {
+                return (n, u32::MAX);
+            }
+            if self.sections_stale.replace(false) || self.sections.borrow().is_empty() {
+                *self.sections.borrow_mut() = super::section_starts(&rows);
+            }
+            let starts = self.sections.borrow();
+            let i = starts.partition_point(|&s| s <= position);
+            (starts[i - 1], starts.get(i).copied().unwrap_or(n))
+        }
+    }
+}
+
+/// The first row of each run of rows under one heading: 0 first.
+pub(crate) fn section_starts(rows: &[Rc<RowData>]) -> Vec<u32> {
+    let mut starts = vec![0];
+    for (i, pair) in rows.windows(2).enumerate() {
+        if pair[0].section != pair[1].section {
+            starts.push(i as u32 + 1);
+        }
+    }
+    starts
 }
 
 /// One step of turning the rows on screen into a new list, in row order.
@@ -440,12 +528,14 @@ impl MessageModel {
                     .rows
                     .borrow_mut()
                     .splice(start..start + *removed, std::mem::take(added));
+                self.imp().touch();
                 self.items_changed(start as u32, *removed as u32, n as u32);
             }
             *removed = 0;
             n
         };
         let mut in_run = false;
+        let mut moved_section = false;
         for edit in edits {
             match edit {
                 RowEdit::Keep => {
@@ -453,7 +543,7 @@ impl MessageModel {
                         pos = start + flush(start, &mut removed, &mut added);
                         in_run = false;
                     }
-                    self.set_row(pos, new[i].clone());
+                    moved_section |= self.put_row(pos, new[i].clone());
                     pos += 1;
                     i += 1;
                 }
@@ -483,25 +573,53 @@ impl MessageModel {
         removed = left;
         flush(pos, &mut removed, &mut added);
         self.imp().items.borrow_mut().retain(|_, w| w.upgrade().is_some());
+        if moved_section {
+            self.resection();
+        }
         false
     }
 
     /// New data for the row at `pos`, showing the same message.
     pub fn set_row(&self, pos: usize, data: Rc<RowData>) {
+        if self.put_row(pos, data) {
+            self.resection();
+        }
+    }
+
+    /// `set_row`, leaving the view to be told of a row that moved to another
+    /// heading: what it returns.
+    fn put_row(&self, pos: usize, data: Rc<RowData>) -> bool {
         let slot = data.slot();
+        let moved;
         {
             let mut rows = self.imp().rows.borrow_mut();
-            let Some(row) = rows.get_mut(pos) else { return };
+            let Some(row) = rows.get_mut(pos) else { return false };
             // A rebuild makes new data for every row; one that says the same
             // as before is not drawn again (#330).
             if Rc::ptr_eq(row, &data) || **row == *data {
-                return;
+                return false;
             }
+            moved = row.section != data.section;
             *row = data.clone();
+        }
+        if moved {
+            self.imp().touch();
         }
         let live = self.imp().items.borrow().get(&slot).and_then(|w| w.upgrade());
         if let Some(item) = live {
             item.set_data(data);
+        }
+        moved
+    }
+
+    /// Rows changed heading in place, which no `items-changed` says: the
+    /// view asks for every section again. Rare (the day turning over, the
+    /// setting, another sort), and the view only looks again at the
+    /// headings it holds.
+    fn resection(&self) {
+        let n = self.len() as u32;
+        if n > 0 {
+            self.sections_changed(0, n);
         }
     }
 
@@ -514,6 +632,8 @@ impl MessageModel {
     fn swap(&self, new: Vec<Rc<RowData>>, stale: bool) {
         let imp = self.imp();
         let old = imp.rows.replace(new.clone());
+        imp.touch();
+        let moved_section = old.iter().zip(&new).any(|(was, now)| was.section != now.section);
         let held = imp.items.take();
         let mut moved = Vec::new();
         {
@@ -542,6 +662,9 @@ impl MessageModel {
         } else if new.len() > old.len() {
             self.items_changed(kept, 0, new.len() as u32 - kept);
         }
+        if moved_section {
+            self.resection();
+        }
     }
 
     /// Change the row at `pos` in place.
@@ -555,6 +678,7 @@ impl MessageModel {
     pub fn splice(&self, pos: usize, removed: usize, added: Vec<Rc<RowData>>) {
         let n = added.len();
         self.imp().rows.borrow_mut().splice(pos..pos + removed, added);
+        self.imp().touch();
         self.items_changed(pos as u32, removed as u32, n as u32);
     }
 }
@@ -655,6 +779,8 @@ pub struct RowShared {
     /// Conversations shown on rows whose size nobody has asked about yet.
     wanted: RefCell<Vec<(u32, String)>>,
     wanted_queued: Cell<bool>,
+    /// The date headings the view has made (#435).
+    headers: RefCell<Vec<glib::WeakRef<gtk::ListHeader>>>,
 }
 
 impl RowShared {
@@ -681,7 +807,32 @@ impl RowShared {
             open_palette: RefCell::new(Weak::new()),
             wanted: RefCell::new(Vec::new()),
             wanted_queued: Cell::new(false),
+            headers: RefCell::new(Vec::new()),
         })
+    }
+
+    /// How tall the heading over the first row is drawn, once it is.
+    pub fn first_heading_height(&self) -> Option<i32> {
+        self.headers
+            .borrow()
+            .iter()
+            .filter_map(|h| h.upgrade())
+            .find(|h| h.start() == 0 && h.item().is_some())
+            .and_then(|h| h.child())
+            .and_then(|label| label.parent())
+            .map(|widget| widget.measure(gtk::Orientation::Vertical, -1).1)
+            .filter(|&h| h > 0)
+    }
+
+    /// Name every date heading on screen again. A heading is bound to the
+    /// first row of its section, which can stay the first row while the
+    /// section becomes another (the day turning over): the view does not
+    /// bind it again for that.
+    pub fn refresh_headers(&self) {
+        self.headers.borrow_mut().retain(|h| h.upgrade().is_some());
+        for header in self.headers.borrow().iter().filter_map(|h| h.upgrade()) {
+            fill_header(&header);
+        }
     }
 
     /// The rows showing a message right now.
@@ -791,6 +942,41 @@ pub fn factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
         });
     }
     factory
+}
+
+/// The view's factory for the date headings (#435): a dim heading over each
+/// section, not a row, so it is never selected or focused.
+pub fn header_factory(shared: &Rc<RowShared>) -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    let weak = Rc::downgrade(shared);
+    factory.connect_setup(move |_, obj| {
+        let Some(header) = obj.downcast_ref::<gtk::ListHeader>() else { return };
+        let label = gtk::Label::new(None);
+        label.set_xalign(0.0);
+        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        label.add_css_class("heading");
+        label.add_css_class("dim-label");
+        label.add_css_class("list-day-heading");
+        header.set_child(Some(&label));
+        if let Some(shared) = weak.upgrade() {
+            shared.headers.borrow_mut().push(header.downgrade());
+        }
+    });
+    factory.connect_bind(|_, obj| {
+        if let Some(header) = obj.downcast_ref::<gtk::ListHeader>() {
+            fill_header(header);
+        }
+    });
+    factory
+}
+
+/// A heading names the section of the row it stands over.
+fn fill_header(header: &gtk::ListHeader) {
+    let Some(label) = header.child().and_downcast::<gtk::Label>() else { return };
+    let text = header.item().and_downcast::<RowItem>().map(|i| i.data().section.label()).unwrap_or_default();
+    if label.label() != text {
+        label.set_label(&text);
+    }
 }
 
 // ─── Faces ─────────────────────────────────────────────────────────────────
