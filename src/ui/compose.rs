@@ -1806,6 +1806,19 @@ impl Component for Compose {
             ComposeInput::SetNarrow(narrow) => {
                 self.narrow = narrow;
                 self.dress_format_buttons();
+                // Folded, the header is as narrow as it gets: the pane goes
+                // no narrower, so a small window stops shrinking rather than
+                // cutting Send off at its edge. Unfolded, the floor drops
+                // back, or the pane could never get narrow enough to fold.
+                let (root, header) = (root.clone(), widgets.header.clone());
+                gtk::glib::idle_add_local_once(move || {
+                    let floor = if narrow {
+                        header.measure(gtk::Orientation::Horizontal, -1).0.max(COMPOSE_MIN_WIDTH)
+                    } else {
+                        COMPOSE_MIN_WIDTH
+                    };
+                    root.set_size_request(floor, 200);
+                });
             }
 
             ComposeInput::OverflowMenu => {
