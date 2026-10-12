@@ -5805,10 +5805,16 @@ pub(crate) fn folder_depth(folder: &Folder, all: &[&Folder]) -> usize {
         .count()
 }
 
-/// The icon a folder row wears when a filter rule files into it: the
-/// filter-folder glyph in the account's color, in place in the hierarchy.
+/// The icon a folder row in an account wears: the filter-folder glyph in
+/// the account's color where a filter rule files into it, a tag for a Gmail
+/// label, otherwise its kind's own.
 fn filter_icon(section: &SectionData, folder: &Folder) -> FolderGlyph {
     if !section.filtered.iter().any(|f| f.id == folder.id) {
+        // A Gmail account's own folders are labels (#374): a tag, not a
+        // folder.
+        if section.gmail && folder.kind == FolderKind::Custom {
+            return FolderGlyph::Icon(gtk::Image::from_icon_name("tag-symbolic"));
+        }
         return FolderGlyph::Plain;
     }
     if folder.kind == FolderKind::Custom {
