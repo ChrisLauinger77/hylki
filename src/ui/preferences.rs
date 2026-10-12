@@ -5,7 +5,9 @@
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::config::{AppTheme, ClockStyle, DateStyle, MessageTheme, ReaderToolbar, ToolbarItem, ToolbarSide, TrayIcon};
+use crate::config::{
+    AppTheme, ClockStyle, DateStyle, LauncherBadge, MessageTheme, ReaderToolbar, ToolbarItem, ToolbarSide, TrayIcon,
+};
 use crate::ui::chip_flow::ChipFlow;
 use std::rc::Rc;
 use crate::i18n::{i18n, i18n_f, i18n_noop};
@@ -167,7 +169,7 @@ pub struct PrefInit {
     pub tray: bool,
     pub tray_icon: TrayIcon,
     pub tray_mail: bool,
-    pub launcher_count: bool,
+    pub launcher_badge: LauncherBadge,
     /// The chosen app icon (an `app_icon::catalog` id).
     pub app_icon: String,
     /// The accounts panel (built by the AccountsWindow component), shown
@@ -192,6 +194,13 @@ pub struct PrefInit {
 const TRAY_ICONS: &[(&str, TrayIcon)] = &[
     (i18n_noop("App icon"), TrayIcon::Hylki),
     (i18n_noop("Symbolic"), TrayIcon::Symbolic),
+];
+
+/// The launcher badge's choices (#431), in the order the row lists them.
+const LAUNCHER_BADGES: &[(&str, LauncherBadge)] = &[
+    (i18n_noop("Off"), LauncherBadge::Off),
+    (i18n_noop("All unread inbox mail"), LauncherBadge::AllUnread),
+    (i18n_noop("New since last in front"), LauncherBadge::NewSinceFront),
 ];
 
 const APP_THEMES: &[(&str, AppTheme)] = &[
@@ -1217,6 +1226,7 @@ pub enum PrefInput {
     ExportLog,
     ImportSettings,
     ChangeTrayIcon(u32),
+    ChangeLauncherBadge(u32),
     ChangeMessageTheme(u32),
     ChangeComposeFormat(u32),
     ChangeReplyPosition(u32),
@@ -1377,7 +1387,7 @@ pub enum PrefOutput {
     SetTray(bool),
     SetTrayIcon(TrayIcon),
     SetTrayMail(bool),
-    SetLauncherCount(bool),
+    SetLauncherBadge(LauncherBadge),
     SetAppIcon(String),
     SetPaletteCollapse(u64),
     SetCardPaletteCollapse(u64),
@@ -3774,14 +3784,16 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "launcher_count_row"]
-                                    adw::SwitchRow {
+                                    #[name = "launcher_badge_row"]
+                                    adw::ComboRow {
                                         set_title: &i18n("Unread count on the app icon"),
-                                        set_subtitle: &i18n("The number of unread inbox messages on Hylki's \
-                                                       icon in the dock or task manager. KDE Plasma shows it; \
-                                                       GNOME needs a dock extension such as Dash to Dock."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetLauncherCount(row.is_active()));
+                                        set_subtitle: &i18n("A number on Hylki's icon in the dock or task \
+                                                       manager: every unread inbox message, or only those \
+                                                       that arrived while Hylki was not in front. KDE Plasma \
+                                                       shows it; GNOME needs a dock extension such as Dash \
+                                                       to Dock."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeLauncherBadge(row.selected()));
                                         },
                                     },
 
@@ -4141,6 +4153,7 @@ impl Component for Preferences {
             &widgets.text_scale_row,
             &widgets.settings_open_row,
             &widgets.tray_icon_row,
+            &widgets.launcher_badge_row,
             &widgets.date_style_row,
             &widgets.clock_style_row,
             &widgets.language_row,
@@ -4384,7 +4397,16 @@ impl Component for Preferences {
             .unwrap_or(0);
         widgets.tray_icon_row.set_selected(tray_icon_sel as u32);
         widgets.tray_mail_row.set_active(init.tray_mail);
-        widgets.launcher_count_row.set_active(init.launcher_count);
+        let badge_labels: Vec<String> = LAUNCHER_BADGES.iter().map(|(l, _)| i18n(l)).collect();
+        let badge_labels: Vec<&str> = badge_labels.iter().map(String::as_str).collect();
+        widgets
+            .launcher_badge_row
+            .set_model(Some(&gtk::StringList::new(&badge_labels)));
+        let badge_sel = LAUNCHER_BADGES
+            .iter()
+            .position(|(_, b)| *b == init.launcher_badge)
+            .unwrap_or(1);
+        widgets.launcher_badge_row.set_selected(badge_sel as u32);
         // The icon choice and the menu's mail list only mean anything with
         // a tray icon shown.
         widgets.tray_icon_row.set_sensitive(init.tray);
@@ -5529,6 +5551,13 @@ impl Component for Preferences {
                     .map(|(_, t)| *t)
                     .unwrap_or_default();
                 let _ = sender.output(PrefOutput::SetTrayIcon(icon));
+            }
+            PrefInput::ChangeLauncherBadge(index) => {
+                let badge = LAUNCHER_BADGES
+                    .get(index as usize)
+                    .map(|(_, b)| *b)
+                    .unwrap_or_default();
+                let _ = sender.output(PrefOutput::SetLauncherBadge(badge));
             }
             PrefInput::ChangeListLayout(index) => {
                 let layout = match index {

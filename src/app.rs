@@ -838,8 +838,10 @@ pub struct AppModel {
     tray_enabled: bool,
     tray_icon: config::TrayIcon,
     tray_mail: bool,
-    /// The unread count on the launcher icon (#271).
-    launcher_count: bool,
+    /// What the launcher icon's badge counts (#271, #431).
+    launcher_badge: config::LauncherBadge,
+    /// Inbox mail that arrived while the window was not in front (#431).
+    arrivals: crate::launcher_badge::Arrivals,
     /// The chosen app icon (an `app_icon::catalog` id); the tray draws it.
     app_icon: String,
     /// A restart is on its way (Restart Now clicked, settle timer running).
@@ -1863,6 +1865,8 @@ pub enum AppMsg {
     SystemResumed,
     /// The dock may have dropped the launcher badge; send it again.
     LauncherCountLost,
+    /// The main window became the active one.
+    WindowInFront,
     /// The network came back after being down: the same reconnect as a wake.
     NetworkBack,
     /// Open the settings window on the user's preferred view (the menu entry).
@@ -2663,6 +2667,7 @@ impl SimpleComponent for AppModel {
     ) -> ComponentParts<Self> {
         // Every setting in privacy.toml, read once.
         let prefs = config::load_privacy();
+        let launcher_badge = prefs.launcher_badge();
         relm4::set_global_css(include_str!("styles.css"));
         register_icons(prefs.desktop_icons);
         // Before install_scheme_css and before the reader exists: both read
@@ -3321,7 +3326,8 @@ impl SimpleComponent for AppModel {
             tray_enabled: prefs.tray,
             tray_icon: prefs.tray_icon,
             tray_mail: prefs.tray_mail,
-            launcher_count: prefs.launcher_count,
+            launcher_badge,
+            arrivals: Default::default(),
             app_icon: crate::app_icon::init_on_startup(),
             restart_pending: false,
             tray: None,
@@ -3920,8 +3926,9 @@ impl SimpleComponent for AppModel {
                 if w.is_active() {
                     crate::notify::withdraw_compose_ready();
                     // Focus comes back after an unlock, when the dock has
-                    // just been rebuilt without the badge.
-                    fsender.input(AppMsg::LauncherCountLost);
+                    // just been rebuilt without the badge; and the mail
+                    // that arrived meanwhile has now been seen (#431).
+                    fsender.input(AppMsg::WindowInFront);
                 }
             });
 
@@ -7861,8 +7868,8 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Pref(PrefOutput::SetLauncherCount(on)) => {
-                if pref!(self.launcher_count = on) {
+            AppMsg::Pref(PrefOutput::SetLauncherBadge(badge)) => {
+                if pref!(self.launcher_badge = badge) {
                     self.push_launcher_count();
                 }
             }
@@ -10223,6 +10230,11 @@ impl SimpleComponent for AppModel {
 
             AppMsg::LauncherCountLost => self.resend_launcher_count(),
 
+            AppMsg::WindowInFront => {
+                self.arrivals.clear();
+                self.resend_launcher_count();
+            }
+
             AppMsg::OpenSettings => {
                 // The "opens to" preference decides the first open of the
                 // session; after that the window returns to where it was.
@@ -10797,6 +10809,24 @@ impl SimpleComponent for AppModel {
                 // rebuild of a large (or merged) list is not free, and it
                 // used to happen several times over per visit.
                 let unchanged = self.message_cache.get(&(account_id, folder_id)) == Some(&messages);
+                // What the badge counts when it counts arrivals (#431): the
+                // same new inbox mail as the notification above, whatever
+                // the notification settings, and only what is still in the
+                // inbox, as the badge's other choice counts.
+                if !self.window.is_active()
+                    && self.inbox_of(account_id).is_some_and(|f| f.id == folder_id)
+                {
+                    let old: Option<HashSet<u32>> = self
+                        .message_cache
+                        .get(&(account_id, folder_id))
+                        .map(|old| old.iter().map(|m| m.uid).collect());
+                    self.arrivals.note(
+                        account_id,
+                        folder_id,
+                        old.as_ref(),
+                        messages.iter().map(|m| (m.uid, m.unread)),
+                    );
+                }
                 // The notified mail was read somewhere else, on the phone or
                 // in another client: the notification goes too (#333).
                 if let Some((f, mid)) = crate::notify::posted_for(account_id) {
@@ -11979,7 +12009,8 @@ impl AppModel {
             tray: self.tray_enabled,
             tray_icon: self.tray_icon,
             tray_mail: self.tray_mail,
-            launcher_count: self.launcher_count,
+            launcher_count: self.launcher_badge != config::LauncherBadge::Off,
+            launcher_badge: Some(self.launcher_badge),
             show_remote_banner: self.show_remote_banner,
             show_spoof_banner: self.show_spoof_banner,
             sidebar_hover_expand: self.sidebar_hover_expand,
@@ -14082,9 +14113,21 @@ impl AppModel {
     }
 
     /// The launcher icon's badge (#271): the same inboxes total as the tray
-    /// icon's dot, or nothing when Settings has it off.
+    /// icon's dot, only the inbox mail that came in while the window was
+    /// behind (#431), or nothing, as Settings has it.
     fn push_launcher_count(&self) {
-        let count = if self.launcher_count { self.inboxes_unread() } else { 0 };
+        let count = match self.launcher_badge {
+            config::LauncherBadge::Off => 0,
+            config::LauncherBadge::AllUnread => self.inboxes_unread(),
+            config::LauncherBadge::NewSinceFront => self.arrivals.count(|a, f| {
+                self.message_cache
+                    .get(&(a, f))
+                    .into_iter()
+                    .flatten()
+                    .filter(|m| m.unread)
+                    .map(|m| m.uid)
+            }),
+        };
         crate::launcher_badge::set_count(count);
     }
 
@@ -19919,7 +19962,7 @@ impl AppModel {
             tray: self.tray_enabled,
             tray_icon: self.tray_icon,
             tray_mail: self.tray_mail,
-            launcher_count: self.launcher_count,
+            launcher_badge: self.launcher_badge,
             app_icon: self.app_icon.clone(),
             accounts_panel: accounts.widget().clone().upcast::<gtk::Widget>(),
             accounts_sender: accounts.sender().clone(),

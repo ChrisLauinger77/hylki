@@ -1514,9 +1514,14 @@ pub(crate) struct PrivacyFile {
     #[serde(default = "default_on")]
     pub(crate) tray_mail: bool,
     /// Whether the launcher icon in a dock or task manager shows the unread
-    /// count (#271).
+    /// count (#271). Kept written so a version that predates
+    /// `launcher_badge` still shows a badge when this one does.
     #[serde(default = "default_on")]
     pub(crate) launcher_count: bool,
+    /// What that count counts (#431). Absent on installs that predate the
+    /// choice, where `launcher_count` above says whether there is one.
+    #[serde(default)]
+    pub(crate) launcher_badge: Option<LauncherBadge>,
     /// Whether to say anything at all when remote content is blocked. Off hides
     /// the banner; it never changes what is blocked, only whether you're told.
     #[serde(default = "default_on")]
@@ -1785,6 +1790,7 @@ impl Default for PrivacyFile {
             tray_icon: TrayIcon::default(),
             tray_mail: true,
             launcher_count: true,
+            launcher_badge: None,
             print: PrintOptions::default(),
         }
     }
@@ -3262,6 +3268,32 @@ pub enum SignaturePosition {
 
 
 
+/// What the number on the launcher icon counts (#431).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LauncherBadge {
+    /// No badge.
+    Off,
+    /// Every unread message in the inboxes, as the tray icon's dot.
+    #[default]
+    AllUnread,
+    /// Inbox mail that arrived while the main window was not in front and
+    /// is still unread; back to none each time the window comes forward.
+    NewSinceFront,
+}
+
+impl PrivacyFile {
+    /// The launcher badge choice, falling back to the on/off switch it
+    /// replaced.
+    pub(crate) fn launcher_badge(&self) -> LauncherBadge {
+        self.launcher_badge.unwrap_or(if self.launcher_count {
+            LauncherBadge::AllUnread
+        } else {
+            LauncherBadge::Off
+        })
+    }
+}
+
 /// What new messages start out as, falling back to the plain-text
 /// switch this setting replaced (#180).
 pub fn load_compose_format() -> ComposeFormat {
@@ -4462,6 +4494,21 @@ mod tests {
         assert_eq!(cfg.accounts.len(), 2);
         assert_eq!(cfg.accounts[0].protocol, super::Protocol::Imap);
         assert_eq!(cfg.accounts[1].protocol, super::Protocol::Jmap);
+    }
+
+    /// #431: a file from before the badge choice keeps what its switch
+    /// said, and the choice, once made, wins over the switch.
+    #[test]
+    fn launcher_badge_follows_the_old_switch() {
+        use super::LauncherBadge::*;
+        let read = |text: &str| toml::from_str::<PrivacyFile>(text).unwrap().launcher_badge();
+        assert_eq!(read(""), AllUnread);
+        assert_eq!(read("launcher_count = true"), AllUnread);
+        assert_eq!(read("launcher_count = false"), Off);
+        assert_eq!(read("launcher_count = true\nlauncher_badge = \"new_since_front\""), NewSinceFront);
+        assert_eq!(read("launcher_count = true\nlauncher_badge = \"off\""), Off);
+        let saved = PrivacyFile { launcher_count: true, launcher_badge: Some(NewSinceFront), ..Default::default() };
+        assert_eq!(read(&toml::to_string(&saved).unwrap()), NewSinceFront);
     }
 
     /// #367: a sidebar file from before Favorites has none, and the list

@@ -1213,11 +1213,26 @@ unread when the setting was turned on counts as seen. The marks are kept in
 
 ### Unread count on the app icon
 
-Hylki puts the number of unread inbox messages on its icon in the dock or
-task manager, the same count as the tray icon's dot. KDE Plasma's task
-manager shows it, and so do the Dash to Dock and Dash to Panel extensions
-for GNOME; GNOME's own dash has no badges. **Settings → System → Unread count
-on the app icon** turns it off. Stored as `launcher_count` in `privacy.toml`.
+Hylki puts a number on its icon in the dock or task manager. KDE Plasma's
+task manager shows it, and so do the Dash to Dock and Dash to Panel
+extensions for GNOME; GNOME's own dash has no badges. **Settings → System →
+Unread count on the app icon** chooses what it counts:
+
+- **All unread inbox mail**, the default: every unread message in every
+  account's inbox, the same count as the tray icon's dot.
+- **New since last in front**: only the inbox mail that arrived while the
+  main window was not the active window, and is still unread. It is the mail
+  a new-mail notification is raised for, less what a filter filed out of the
+  inbox, whether or not notifications are on. Reading or deleting one of those messages, from a
+  notification's buttons or on another device, takes it off the count, and
+  the count goes back to none as soon as the main window is in front. It
+  starts from none each time Hylki starts. The tray icon's dot still counts
+  every unread inbox message.
+- **Off**: no number.
+
+Stored as `launcher_badge` (`off`, `all_unread` or `new_since_front`) in
+`privacy.toml`; `launcher_count`, the on/off switch it replaced, is still
+written for older versions and read when `launcher_badge` is absent.
 
 ### Renderer
 
