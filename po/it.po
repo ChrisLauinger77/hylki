@@ -1122,6 +1122,10 @@ msgstr "Esci completamente da Hylki"
 msgid "Command palette: search actions, folders and tags"
 msgstr "Palette comandi: cerca azioni, cartelle ed etichette"
 
+#, fuzzy
+msgid "Command palette, actions only"
+msgstr "Palette comandi: cerca azioni, cartelle ed etichette"
+
 msgid "This list"
 msgstr "Questo elenco"
 

@@ -1595,8 +1595,9 @@ pub enum AppMsg {
     Shortcut(Shortcut),
     /// Show the keyboard-shortcut reference.
     ShowShortcuts,
-    /// Ctrl+K: search what the app can do and where it can go (#399).
-    CommandPalette,
+    /// Ctrl+K: search what the app can do and where it can go (#399);
+    /// Ctrl+Shift+K opens it on the actions only (`true`).
+    CommandPalette(bool),
     /// Print the message in the reader (issue #16).
     PrintMessage,
     /// Render it to a PDF and open that, to see what will come out.
@@ -7845,8 +7846,9 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ShowShortcuts => self.show_shortcuts(),
-            AppMsg::CommandPalette => {
+            AppMsg::CommandPalette(actions) => {
                 let entries = self.command_palette_entries(&sender);
+                let typed = if actions { ">" } else { "" };
                 // Over the window it was asked from: a composer of its own
                 // window would otherwise hide it behind.
                 let tops = gtk::Window::toplevels();
@@ -7855,8 +7857,8 @@ impl SimpleComponent for AppModel {
                     .filter_map(|o| o.downcast::<gtk::Window>().ok())
                     .find(|w| w.is_active() && w.is_visible());
                 match active {
-                    Some(w) => crate::ui::command_palette::show(&w, entries),
-                    None => crate::ui::command_palette::show(&self.window, entries),
+                    Some(w) => crate::ui::command_palette::show(&w, entries, typed),
+                    None => crate::ui::command_palette::show(&self.window, entries, typed),
                 }
             }
 
@@ -22488,7 +22490,8 @@ fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
 
 /// Ctrl+K opens the command palette (#399) wherever the keyboard is, a
 /// composer included: in the capture phase, ahead of a focused editor that
-/// keeps the other Ctrl keys for its text.
+/// keeps the other Ctrl keys for its text. Ctrl+Shift+K opens it with `>`
+/// typed, on the actions only.
 fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -22496,7 +22499,8 @@ fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
     keys.connect_key_pressed(move |keys, keyval, _, state| {
         use gtk::gdk::ModifierType as M;
         let mods = state & (M::CONTROL_MASK | M::SHIFT_MASK | M::ALT_MASK | M::SUPER_MASK);
-        if mods == M::CONTROL_MASK && matches!(keyval, gtk::gdk::Key::k | gtk::gdk::Key::K) {
+        let ctrl = mods == M::CONTROL_MASK || mods == M::CONTROL_MASK | M::SHIFT_MASK;
+        if ctrl && matches!(keyval, gtk::gdk::Key::k | gtk::gdk::Key::K) {
             // Not over a dialog already up, the palette itself among them.
             let dialog = keys.widget().is_some_and(|w| {
                 w.downcast_ref::<adw::ApplicationWindow>()
@@ -22507,7 +22511,7 @@ fn palette_key(sender: &ComponentSender<AppModel>) -> gtk::EventControllerKey {
             if dialog {
                 return gtk::glib::Propagation::Proceed;
             }
-            let _ = s.send(AppMsg::CommandPalette);
+            let _ = s.send(AppMsg::CommandPalette(mods.contains(M::SHIFT_MASK)));
             return gtk::glib::Propagation::Stop;
         }
         gtk::glib::Propagation::Proceed
@@ -22634,6 +22638,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),
             ("Ctrl+Q", i18n_noop("Quit Hylki entirely")),
             ("Ctrl+K", i18n_noop("Command palette: search actions, folders and tags")),
+            ("Ctrl+Shift+K", i18n_noop("Command palette, actions only")),
             ("?  or  Ctrl+?  or  F1", i18n_noop("This list")),
         ],
     ),

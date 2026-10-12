@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Added: Ctrl+Shift+K opens the command palette on its actions** (#399,
+  suggested by 3v1n0), with `>` already typed.
 - **Changed: the status bar sits at the bottom of the window** (#433,
   reported by 3v1n0). At the top, an error coming in pushed the whole window
   down under the pointer; at the foot nothing moves, and its list of

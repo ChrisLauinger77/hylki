@@ -93,6 +93,7 @@ These work with or without single-key shortcuts too:
 | Key | What it does |
 | --- | --- |
 | <kbd>Ctrl+K</kbd> | Command palette: type to find an action, a folder, a view, a tag or a smart folder, and Enter runs it; start with `>` for actions only |
+| <kbd>Ctrl+Shift+K</kbd> | Command palette with `>` already typed: actions only |
 | <kbd>Delete</kbd> <kbd>Backspace</kbd> | Delete the selected messages, with the list focused |
 | <kbd>Ctrl+F</kbd> | Search the message list |
 | <kbd>Ctrl+P</kbd> | Print the message you are reading |

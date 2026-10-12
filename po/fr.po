@@ -1139,6 +1139,11 @@ msgid "Command palette: search actions, folders and tags"
 msgstr ""
 "Palette de commandes : rechercher des actions, des dossiers et des tags"
 
+#, fuzzy
+msgid "Command palette, actions only"
+msgstr ""
+"Palette de commandes : rechercher des actions, des dossiers et des tags"
+
 msgid "This list"
 msgstr "Cette liste"
 

@@ -1053,6 +1053,9 @@ msgstr ""
 msgid "Command palette: search actions, folders and tags"
 msgstr ""
 
+msgid "Command palette, actions only"
+msgstr ""
+
 msgid "This list"
 msgstr ""
 

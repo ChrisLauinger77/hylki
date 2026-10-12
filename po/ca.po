@@ -1115,6 +1115,10 @@ msgstr "Surt de l'Hylki completament"
 msgid "Command palette: search actions, folders and tags"
 msgstr "Paleta d'ordres: cerca accions, carpetes i etiquetes"
 
+#, fuzzy
+msgid "Command palette, actions only"
+msgstr "Paleta d'ordres: cerca accions, carpetes i etiquetes"
+
 msgid "This list"
 msgstr "Aquesta llista"
 
