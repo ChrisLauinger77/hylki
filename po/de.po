@@ -6772,11 +6772,22 @@ msgstr "Konto entfernen…"
 msgid "Show or hide sub-folders"
 msgstr "Unterordner ein- oder ausblenden"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Tags ein- oder ausblenden"
+
 msgid "Show or hide folders"
 msgstr "Ordner ein- oder ausblenden"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Ordner ({len})"
+
 msgid "Folders ({len})"
 msgstr "Ordner ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Ordner sortieren"

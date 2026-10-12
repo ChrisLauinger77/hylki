@@ -6765,11 +6765,22 @@ msgstr "Αφαίρεση λογαριασμού…"
 msgid "Show or hide sub-folders"
 msgstr "Εμφάνιση ή απόκρυψη υποφακέλων"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Εμφάνιση ή απόκρυψη ετικετών"
+
 msgid "Show or hide folders"
 msgstr "Εμφάνιση ή απόκρυψη φακέλων"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Φάκελοι ({len})"
+
 msgid "Folders ({len})"
 msgstr "Φάκελοι ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Ταξινόμηση φακέλων"

@@ -6721,11 +6721,22 @@ msgstr "Remover conta…"
 msgid "Show or hide sub-folders"
 msgstr "Mostrar ou ocultar subpastas"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Mostrar ou ocultar etiquetas"
+
 msgid "Show or hide folders"
 msgstr "Mostrar ou ocultar pastas"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Pastas ({len})"
+
 msgid "Folders ({len})"
 msgstr "Pastas ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Ordenar pastas"

@@ -5928,10 +5928,19 @@ msgstr ""
 msgid "Show or hide sub-folders"
 msgstr ""
 
+msgid "Show or hide labels"
+msgstr ""
+
 msgid "Show or hide folders"
 msgstr ""
 
+msgid "Labels ({len})"
+msgstr ""
+
 msgid "Folders ({len})"
+msgstr ""
+
+msgid "Labels"
 msgstr ""
 
 msgid "Sort Folders"

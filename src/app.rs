@@ -14114,7 +14114,12 @@ impl AppModel {
                     .filters
                     .iter()
                     .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
+                let gmail = self.config.get(account.id.saturating_sub(1) as usize).is_some_and(|c| {
+                    c.protocol == config::Protocol::Imap
+                        && crate::worker::has_gmail_labels(c, self.folders.get(&account.id).map(Vec::as_slice).unwrap_or(&[]))
+                });
                 Some(SectionData {
+                    gmail,
                     in_unified: self.in_unified(account.id),
                     has_filters,
                     collapsed: self.collapsed.contains(email),

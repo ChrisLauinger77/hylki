@@ -201,6 +201,8 @@ pub struct SectionData {
     /// its folders are left out of every unified row and chip, and only
     /// its own section lists them.
     pub in_unified: bool,
+    /// A Gmail account, whose own folders are labels and say so (#374).
+    pub gmail: bool,
 }
 
 /// Initial state for the sidebar.
@@ -3008,10 +3010,19 @@ impl Sidebar {
                         custom_chevron.set_margin_start(2);
                     }
                     let btn = heading_chevron(&custom_chevron);
-                    btn.set_tooltip_text(Some(i18n("Show or hide folders").as_str()));
+                    btn.set_tooltip_text(Some(
+                        if section.gmail { i18n("Show or hide labels") } else { i18n("Show or hide folders") }.as_str(),
+                    ));
                     hb.append(&btn);
                     folders_chevron = Some(btn);
-                    let lbl = gtk::Label::new(Some(&i18n_f("Folders ({len})", &[("len", &(custom.len()).to_string())])));
+                    // Gmail's own word for them: its folders are labels.
+                    let len = custom.len().to_string();
+                    let heading = if section.gmail {
+                        i18n_f("Labels ({len})", &[("len", &len)])
+                    } else {
+                        i18n_f("Folders ({len})", &[("len", &len)])
+                    };
+                    let lbl = gtk::Label::new(Some(&heading));
                     lbl.set_halign(gtk::Align::Start);
                     lbl.set_hexpand(true);
                     hb.append(&lbl);
@@ -3024,7 +3035,7 @@ impl Sidebar {
                     sender,
                 );
                 if self.collapsed {
-                    folders_toggle.set_tooltip_text(Some(i18n("Folders").as_str()));
+                    folders_toggle.set_tooltip_text(Some(if section.gmail { i18n("Labels") } else { i18n("Folders") }.as_str()));
                 }
                 // Right-click: how this account's folders are sorted.
                 let click = gtk::GestureClick::new();

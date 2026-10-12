@@ -45,7 +45,8 @@
   3v1n0), beside the tags in the message list and the reader. Gmail's own
   labels and the label of the folder being read are left out. A label named
   like a tag counts as the tag in its view, the tag menus and smart
-  folders, and tagging on Gmail sets the label as well as the keyword.
+  folders, and tagging on Gmail sets the label as well as the keyword. A
+  Gmail account's own folders are headed Labels in the sidebar.
 - **Added: the Microsoft 365 organization directory** (#410, requested by
   erenoglu). A Microsoft 365 account signed in within Hylki can suggest
   colleagues as a recipient is typed: **Search the organization directory**

@@ -6689,11 +6689,22 @@ msgstr "Eliminar cuenta…"
 msgid "Show or hide sub-folders"
 msgstr "Mostrar u ocultar subcarpetas"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Mostrar u ocultar etiquetas"
+
 msgid "Show or hide folders"
 msgstr "Mostrar u ocultar carpetas"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Carpetas ({len})"
+
 msgid "Folders ({len})"
 msgstr "Carpetas ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Ordenar carpetas"

@@ -6793,11 +6793,22 @@ msgstr "Usuń konto…"
 msgid "Show or hide sub-folders"
 msgstr "Wyświetl lub ukryj podkatalogi"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Wyświetl lub ukryj etykiety"
+
 msgid "Show or hide folders"
 msgstr "Wyświetl lub ukryj katalogi"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Katalogi ({len})"
+
 msgid "Folders ({len})"
 msgstr "Katalogi ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Sortuj katalogi"

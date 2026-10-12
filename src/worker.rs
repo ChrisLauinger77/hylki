@@ -3038,7 +3038,7 @@ async fn load_bodies_retry(
 
 /// Whether the account is Gmail, where a folder is a label and one message
 /// sits in several of them at once.
-fn has_gmail_labels(account: &AccountConfig, folders: &[Folder]) -> bool {
+pub(crate) fn has_gmail_labels(account: &AccountConfig, folders: &[Folder]) -> bool {
     let host = account.imap_host.to_ascii_lowercase();
     host.ends_with("gmail.com")
         || host.ends_with("googlemail.com")

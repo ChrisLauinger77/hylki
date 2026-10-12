@@ -6704,11 +6704,22 @@ msgstr "Удалить учётную запись…"
 msgid "Show or hide sub-folders"
 msgstr "Показать или скрыть вложенные папки"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Показать или скрыть метки"
+
 msgid "Show or hide folders"
 msgstr "Показать или скрыть папки"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Папки ({len})"
+
 msgid "Folders ({len})"
 msgstr "Папки ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Сортировать папки"

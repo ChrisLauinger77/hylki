@@ -6730,11 +6730,22 @@ msgstr "Supprimer le compte…"
 msgid "Show or hide sub-folders"
 msgstr "Afficher ou masquer les sous-dossiers"
 
+#, fuzzy
+msgid "Show or hide labels"
+msgstr "Afficher ou masquer les tags"
+
 msgid "Show or hide folders"
 msgstr "Afficher ou masquer les dossiers"
 
+#, fuzzy
+msgid "Labels ({len})"
+msgstr "Dossiers ({len})"
+
 msgid "Folders ({len})"
 msgstr "Dossiers ({len})"
+
+msgid "Labels"
+msgstr ""
 
 msgid "Sort Folders"
 msgstr "Trier les dossiers"
