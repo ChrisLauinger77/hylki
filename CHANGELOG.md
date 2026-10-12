@@ -31,7 +31,8 @@
   **Settings → System → Status bar** puts it back at the top. Its buttons
   read Export log, the console, then the bar's own toggle.
 - **Fixed: the composer's chevron sat alone on a third row** in a narrow
-  composer with every formatting tool shown. It now stays beside the tools.
+  composer with every formatting tool shown. It now stays beside the tools
+  wherever the row has room for it.
 - **Fixed: the settings search listed every OpenPGP key** (#432, reported
   by 3v1n0). A keyring with many people's keys buried the settings under
   them; keys are no longer search results.

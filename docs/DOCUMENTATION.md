@@ -756,7 +756,7 @@ says whether a new message starts with these tools shown (Always expanded)
 or hidden behind the chevron (Always collapsed, the default); the chevron
 changes it for the message at hand. When the composer is narrow, the
 toolbar wraps onto a second row, the chevron staying beside the tools it
-shows.
+shows wherever the row has room for it.
 
 ### Spell checking
 
