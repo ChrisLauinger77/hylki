@@ -136,9 +136,12 @@ contents. Each folder lists its newest 300 messages. Read state, stars
 the message to the server's filter, which moves it. Sending goes through
 the server, which files the copy in Sent Items. An attachment can be removed
 from a message, mail can be moved in from another account, and Junk and
-Trash are emptied of old mail as the account's settings say. New mail is
-found by polling, at the interval set for checking mail or every two
-minutes.
+Trash are emptied of old mail as the account's settings say. New mail
+arrives by push when it is on for the account: a streaming subscription on
+a second connection tells Hylki which folders changed, and only those are
+listed again, fetching just the messages new to it. Without push, or while
+the subscription is being restored, the folders are polled at the interval
+set for checking mail or every two minutes.
 
 Tested against grommunio's gromox server with Basic sign-in, and NTLM
 against an independent implementation; a real Exchange server has not been

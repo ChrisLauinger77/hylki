@@ -4027,7 +4027,7 @@ impl AccountsWindow {
             Some(a) if a.goa_id.is_some() => a.protocol,
             _ => form_protocol(widgets),
         };
-        widgets.push_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        widgets.push_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap | Protocol::Ews));
         // The list-mail search is a server search for a header, which
         // Microsoft 365 does not offer and POP3 has no folders for.
         widgets.clean_lists_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));

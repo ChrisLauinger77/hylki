@@ -68,7 +68,8 @@
   included, or Basic over HTTPS. Folders and their management, reading,
   read state, stars, categories, spam reports, moving in either direction,
   deleting, removing attachments, sending, drafts and the automatic
-  emptying of Junk and Trash work. New mail is polled for.
+  emptying of Junk and Trash work. New mail arrives by push through a
+  streaming subscription, with polling as the fallback.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.

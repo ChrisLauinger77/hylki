@@ -9,6 +9,7 @@ mod client;
 mod http;
 mod ntlm;
 mod ops;
+mod push;
 mod run;
 
 pub(super) use run::{run_ews, test_ews};

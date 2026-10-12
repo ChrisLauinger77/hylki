@@ -279,6 +279,69 @@ impl Connection {
         Ok(reply)
     }
 
+    /// POST a request whose reply comes as a stream, handing each piece of
+    /// the body to `on_data` as it arrives, until the server ends it or
+    /// `limit` passes: how streaming notifications are read. The connection
+    /// must already be signed in (a request through [`Connection::post`]
+    /// first does that), since NTLM's handshake needs whole replies.
+    pub async fn post_streaming(
+        &mut self,
+        body: &[u8],
+        limit: std::time::Duration,
+        mut on_data: impl FnMut(&[u8]),
+    ) -> Result<(), HttpError> {
+        let authorization = match self.scheme {
+            Some(Scheme::Basic) => Some(self.basic()),
+            Some(Scheme::Ntlm(_)) if !self.signed_in => return Err(HttpError::Auth(String::new())),
+            None => return Err(HttpError::Auth(String::new())),
+            _ => None,
+        };
+        if !self.sender.as_ref().is_some_and(|s| !s.is_closed()) {
+            return Err(HttpError::Io("not connected".into()));
+        }
+        let req = hyper::Request::post(self.endpoint.path.as_str())
+            .header(hyper::header::HOST, self.endpoint.host_header())
+            .header(hyper::header::CONTENT_TYPE, "text/xml; charset=utf-8")
+            .header(hyper::header::ACCEPT, "text/xml")
+            .header(hyper::header::USER_AGENT, concat!("Hylki/", env!("CARGO_PKG_VERSION")));
+        let req = match authorization {
+            Some(a) => req.header(hyper::header::AUTHORIZATION, a),
+            None => req,
+        }
+        .body(Full::new(Bytes::copy_from_slice(body)))
+        .map_err(|e| HttpError::Io(e.to_string()))?;
+        let read = async {
+            let sender = self.sender.as_mut().expect("checked above");
+            sender.ready().await.map_err(|e| HttpError::Io(e.to_string()))?;
+            let res = sender.send_request(req).await.map_err(|e| HttpError::Io(e.to_string()))?;
+            match res.status().as_u16() {
+                200 => {}
+                401 | 403 => return Err(HttpError::Auth(String::new())),
+                code => return Err(HttpError::Status(code, String::new())),
+            }
+            let mut body = res.into_body();
+            while let Some(frame) = body.frame().await {
+                let frame = frame.map_err(|e| HttpError::Io(e.to_string()))?;
+                if let Some(data) = frame.data_ref() {
+                    on_data(data);
+                }
+            }
+            Ok(())
+        };
+        match tokio::time::timeout(limit, read).await {
+            Ok(r) => {
+                if r.is_err() {
+                    self.drop_connection();
+                }
+                r
+            }
+            Err(_) => {
+                self.drop_connection();
+                Err(HttpError::Timeout)
+            }
+        }
+    }
+
     /// Where a plain GET of the endpoint is redirected, if it is: how
     /// Autodiscover's plain-HTTP address points at the real one.
     pub async fn get_redirect(&mut self) -> Option<String> {

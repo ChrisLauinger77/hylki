@@ -410,6 +410,16 @@ pub(in crate::worker) async fn run_ews(
     poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     poll.tick().await;
 
+    // Push (Settings → "Instant new mail", or the account's own switch): a
+    // streaming subscription on a second connection. While it is up, the
+    // poll only backs it up.
+    let (push_tx, mut push_rx) = tokio::sync::mpsc::unbounded_channel();
+    let push_enabled = account.push.unwrap_or_else(|| crate::config::load_privacy().push);
+    let push_task = match (push_enabled, client_for(&account)) {
+        (true, Ok(client)) => Some(tokio::spawn(super::push::run(client, push_tx))),
+        _ => None,
+    };
+
     loop {
         let req = tokio::select! {
             req = rx.recv() => match req {
@@ -420,9 +430,60 @@ pub(in crate::worker) async fn run_ews(
                 poll_inbox(&mut state, cache, &emit).await;
                 continue;
             }
+            Some(event) = push_rx.recv() => {
+                match event {
+                    super::push::Push::Up => {
+                        poll = tokio::time::interval(Duration::from_secs(PUSHED_POLL_SECS));
+                        poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                        poll.tick().await;
+                    }
+                    super::push::Push::Down => {
+                        poll = tokio::time::interval(Duration::from_secs(poll_secs));
+                        poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+                        poll.tick().await;
+                    }
+                    super::push::Push::Changed(mut changed) => {
+                        // One change is often several events (the item, the
+                        // folder's count): a moment's wait gathers them.
+                        tokio::time::sleep(Duration::from_millis(PUSH_SETTLE_MS)).await;
+                        while let Ok(super::push::Push::Changed(more)) = push_rx.try_recv() {
+                            changed.extend(more);
+                        }
+                        pushed(&mut state, &changed, cache, &emit).await;
+                    }
+                }
+                continue;
+            }
         };
         handle(req, &mut state, &account, cache, &emit).await;
     }
+    if let Some(task) = push_task {
+        task.abort();
+    }
+}
+
+/// How often the poll runs while push is up: a backstop only.
+const PUSHED_POLL_SECS: u64 = 900;
+/// How long a change is given for its sibling events to arrive.
+const PUSH_SETTLE_MS: u64 = 1500;
+
+/// Folders the server said changed: each one Hylki lists is listed again,
+/// and every folder's count follows.
+async fn pushed(state: &mut State, changed: &[String], cache: Option<&Cache>, emit: &impl Fn(WorkerEvent)) {
+    let folders: Vec<(u32, String)> = state
+        .folders
+        .iter()
+        .filter(|(_, (_, id))| changed.iter().any(|c| c == id))
+        .map(|(path, (folder_id, _))| (*folder_id, path.clone()))
+        .collect();
+    if folders.is_empty() {
+        return;
+    }
+    tracing::debug!(target: "hylki::ews", "push: {} folder(s) changed", folders.len());
+    for (folder_id, path) in folders {
+        state.reload(folder_id, &path, cache, emit).await;
+    }
+    refresh_counts(state, cache, emit).await;
 }
 
 /// List the folders again after a change to them, and hand the list on.
