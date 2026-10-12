@@ -46,7 +46,8 @@
   labels and the label of the folder being read are left out. A label named
   like a tag counts as the tag in its view, the tag menus and smart
   folders, and tagging on Gmail sets the label as well as the keyword. A
-  Gmail account's own folders are headed Labels in the sidebar.
+  Gmail account's own folders are headed Labels in the sidebar and wear a
+  tag rather than a folder.
 - **Added: the Microsoft 365 organization directory** (#410, requested by
   erenoglu). A Microsoft 365 account signed in within Hylki can suggest
   colleagues as a recipient is typed: **Search the organization directory**
@@ -76,6 +77,8 @@
 - **Fixed: an open account could fold up in the sidebar by itself**, at the
   next change to the folder list (tagging on Gmail makes one). Opening an
   account to show a folder picked inside it was recorded twice and undone.
+- **Fixed: the main menu button could show a gear** instead of three bars,
+  where a theme or another program had an icon of the same name.
 - **Catalan translation** (PR #415 by jolupa), complete but for this
   release's three icon strings.
 - **Translations:** French (PR #418 by frenchy82) brought up to date.
