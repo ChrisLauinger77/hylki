@@ -1882,9 +1882,14 @@ fn build_toolbar(
     reveal.set_visible(expanded);
     reveal.set_transition_duration(250);
     more.connect_toggled(show_more);
+    // The chevron rides in one piece with the tools it shows: on a row of
+    // their own the tools would fill it, and a chevron wrapped apart from
+    // them would sit alone on a third row.
+    let ride = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    ride.append(&reveal);
+    ride.append(&more);
     group.append(&breaker);
-    group.append(&reveal);
-    group.append(&more);
+    group.append(&ride);
     // HYLKI_SHOWCASE_TOOLBAR_TOGGLE=<ms>: press the chevron that long after
     // the bar is built, so frames of the slide can be captured.
     if let Some(ms) = std::env::var("HYLKI_SHOWCASE_TOOLBAR_TOGGLE").ok().and_then(|v| v.parse::<u64>().ok()) {
