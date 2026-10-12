@@ -24642,6 +24642,43 @@ fn next_after_vanish(
 #[cfg(test)]
 mod tests {
 
+    /// Every icon the code names is in the bundle Hylki draws from: with
+    /// the icon folders on disk out of the search, one missing from it shows
+    /// as a broken image on every system. tools/gen-icon-gresource.sh adds
+    /// any the code has come to name.
+    #[test]
+    fn every_icon_named_in_the_code_is_bundled() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let manifest = std::fs::read_to_string(root.join("resources/hylki.gresource.xml")).unwrap();
+        fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).unwrap().flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    out.push(path);
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(&root.join("src"), &mut files);
+        let mut missing = std::collections::BTreeSet::new();
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap();
+            for (at, _) in text.match_indices("-symbolic\"") {
+                let start = text[..at].rfind('"').map_or(at, |q| q + 1);
+                let name = &text[start..at + "-symbolic".len()];
+                if !name.starts_with('-') && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+                    let entry = format!("icons/scalable/actions/{name}.svg");
+                    if !manifest.contains(&entry) {
+                        missing.insert(name.to_string());
+                    }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "not in the icon bundle, run tools/gen-icon-gresource.sh: {missing:?}");
+    }
+
     /// Saving a new signature or color leaves the account connected (#382);
     /// a server, a name or a new password reconnects it.
     #[test]
