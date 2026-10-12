@@ -819,6 +819,14 @@ Switching format converts what is already in the message, so you can start a
 reply in rich text and finish it in Markdown; the quoted original comes
 across as `>` lines.
 
+**Settings → Composing → Reply in the original's format**, off by default,
+answers plain text in kind. A reply, a reply to all or a forward of a message
+that came as plain text only, the way mailing lists and many of the people on
+them send it, opens in plain text, the original quoted as `>` lines that keep
+its indents. A message with an HTML part is answered in the format chosen in
+**Write messages in**. Drafts, templates and **Edit as New** open as they
+always have, and the format button still switches any one message.
+
 **The Markdown Hylki understands** is the dialect documented at
 [markdownguide.org](https://www.markdownguide.org/): all of the basic
 syntax, and all of the extended syntax:

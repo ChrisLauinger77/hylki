@@ -1067,6 +1067,8 @@ pub struct AppModel {
     print_options: config::PrintOptions,
     /// New messages start as plain text (#180).
     compose_format: crate::config::ComposeFormat,
+    /// Replies and forwards to plain-text mail open in plain text (#436).
+    follow_plain: bool,
     /// Where the split reply opens in the reading pane (#212).
     reply_position: config::ReplyPosition,
     /// Where the signature sits in a reply or forward (#237).
@@ -3445,6 +3447,7 @@ impl SimpleComponent for AppModel {
             toolbar_expanded: prefs.toolbar_expanded,
             print_options: prefs.print,
             compose_format: config::load_compose_format(),
+            follow_plain: prefs.follow_plain,
             reply_position: prefs.reply_position,
             signature_position: prefs.signature_position,
             signature_dashes: prefs.signature_dashes,
@@ -8868,6 +8871,9 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetComposeFormat(format)) => {
                 pref!(self.compose_format = format);
             }
+            AppMsg::Pref(PrefOutput::SetFollowPlain(on)) => {
+                pref!(self.follow_plain = on);
+            }
             AppMsg::Pref(PrefOutput::SetReplyPosition(position)) => {
                 // A split reply already open stays where it is; the next
                 // one opens in the new place.
@@ -12002,6 +12008,7 @@ impl AppModel {
             // Both are written: the boolean is what an older version reads.
             compose_plain: self.compose_format == config::ComposeFormat::Plain,
             compose_format: Some(self.compose_format),
+            follow_plain: self.follow_plain,
             reply_position: self.reply_position,
             signature_position: self.signature_position,
             signature_dashes: self.signature_dashes,
@@ -16323,6 +16330,7 @@ impl AppModel {
             resumed: false,
             no_signature: false,
             template: false,
+            original_plain: false,
         };
         // The Outbox stays the folder on screen: its list is still what's listed,
         // so its toolbar has to stay too. Leaving it would strand the user in a
@@ -16381,6 +16389,7 @@ impl AppModel {
             no_signature: false,
             // A template that failed to save comes back cut loose from it.
             template: false,
+            original_plain: false,
         };
         self.open_compose(account_id, prefill, sender);
     }
@@ -16765,6 +16774,13 @@ impl AppModel {
             })
             .unwrap_or(0);
 
+        // A reply or forward to plain-text mail answers in kind when the
+        // setting says so (#436); anything else starts in the chosen format.
+        let format = if self.follow_plain && prefill.original_plain {
+            config::ComposeFormat::Plain
+        } else {
+            self.compose_format
+        };
         // The user's own addresses go last in the recipient suggestions.
         let own: Vec<(String, String)> = self.config.iter().map(|c| (c.name.clone(), c.email.clone())).collect();
         let id = self.next_compose_id;
@@ -16779,7 +16795,7 @@ impl AppModel {
             can_toggle,
             compact: false,
             decorations: true,
-            format: self.compose_format,
+            format,
             signature_position: self.signature_position,
         };
         (id, init)
@@ -19910,6 +19926,7 @@ impl AppModel {
             plain_monospace: self.plain_monospace,
             plain_font: self.plain_font.clone(),
             compose_format: self.compose_format,
+            follow_plain: self.follow_plain,
             reply_position: self.reply_position,
             signature_position: self.signature_position,
             signature_dashes: self.signature_dashes,
@@ -24409,6 +24426,7 @@ fn reply_prefill(m: &Message) -> ComposePrefill {
         // into one bar, so an answer to an answer lost the shape of the
         // conversation it was answering (#248).
         body_html: quoted_original(&attribution, &m.body),
+        original_plain: body_is_plain_text(&m.body),
         // What makes this a reply rather than a new conversation: In-Reply-To
         // names the parent, References carries the chain it belongs to.
         in_reply_to: m.message_id.clone(),
@@ -24514,6 +24532,7 @@ fn forward_prefill(m: &Message) -> ComposePrefill {
         cc: String::new(),
         subject,
         body_html,
+        original_plain: body_is_plain_text(&m.body),
         ..Default::default()
     }
 }
@@ -24741,6 +24760,46 @@ fn hard_wrap_plain_regions(html: &str) -> String {
 /// line break, under the `pre-wrap` the quote keeps.
 fn breaks(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "<br>")
+}
+
+/// Whether a body, as the worker renders it, came from mail with no HTML
+/// part (#436): text with no markup at all, the worker's `wrap_plain`
+/// document, or its `wrap_fragment` of text parts (with any pictures that
+/// came between them). A sender's HTML is never only these, and a body that
+/// merely uses `<pre>` is still HTML.
+pub(crate) fn body_is_plain_text(body: &str) -> bool {
+    if !body.contains('<') {
+        return !body.trim().is_empty();
+    }
+    let lower = body.to_ascii_lowercase();
+    let Some(open) = lower.find("<body").and_then(|i| lower[i..].find('>').map(|j| i + j + 1)) else {
+        return false;
+    };
+    let close = lower.rfind("</body>").filter(|&c| c >= open).unwrap_or(lower.len());
+    let whole = body_is_pre_wrap(body);
+    let mut text = whole;
+    let mut rest = &lower[open..close];
+    while let Some(at) = rest.find('<') {
+        let Some(end) = rest[at..].find('>').map(|i| at + i) else { return false };
+        let tag = rest[at + 1..end].trim();
+        let ok = match tag.split_whitespace().next().unwrap_or("") {
+            // `linkify`'s links, the one markup inside the text.
+            "a" | "/a" => true,
+            "div" if !whole => {
+                let part = tag.contains("class=\"vireo-plain\"");
+                text |= part;
+                part
+            }
+            "/div" => !whole,
+            "img" => !whole && tag.contains("class=\"vireo-inline\""),
+            _ => false,
+        };
+        if !ok {
+            return false;
+        }
+        rest = &rest[end + 1..];
+    }
+    text
 }
 
 /// Does this document set `white-space: pre-wrap` on `body` itself?
@@ -25291,6 +25350,53 @@ mod tests {
         assert!(quoted.contains("One<br>Two"), "{quoted}");
         assert!(quoted.contains("<b>Three</b>"), "{quoted}");
         assert!(!quoted.contains("<br>\n<b>"), "{quoted}");
+    }
+
+    #[test]
+    fn plain_text_mail_is_told_from_html_mail() {
+        use crate::worker::extract_body;
+        let plain = extract_body(
+            b"Content-Type: text/plain\r\n\r\nHi,\r\n\r\n  indented, see http://example.com/x <here>\r\n",
+        );
+        assert!(super::body_is_plain_text(&plain), "{plain}");
+        // Text and a picture between two text parts, as Apple Mail sends.
+        let mixed = extract_body(
+            b"Content-Type: multipart/mixed; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nOne\r\n\
+              --b\r\nContent-Type: image/png\r\nContent-Disposition: inline\r\nContent-Transfer-Encoding: base64\r\n\r\n\
+              iVBORw0KGgo=\r\n--b\r\nContent-Type: text/plain\r\n\r\nTwo\r\n--b--\r\n",
+        );
+        assert!(super::body_is_plain_text(&mixed), "{mixed}");
+        assert!(super::body_is_plain_text("Raw text the demo keeps"));
+
+        let alternative = extract_body(
+            b"Content-Type: multipart/alternative; boundary=b\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nHi\r\n\
+              --b\r\nContent-Type: text/html\r\n\r\n<p>Hi</p>\r\n--b--\r\n",
+        );
+        assert!(!super::body_is_plain_text(&alternative), "{alternative}");
+        // HTML set in <pre> is still HTML, and so is a pre-wrap body with
+        // markup of its own.
+        assert!(!super::body_is_plain_text("<html><body><pre>text</pre></body></html>"));
+        assert!(!super::body_is_plain_text(
+            "<html><head><style>body{white-space:pre-wrap}</style></head><body><b>Hi</b></body></html>"
+        ));
+        // A text part and an HTML part side by side.
+        let both = "<!doctype html><html><head></head><body><div class=\"vireo-plain\">One</div>\
+            <div><b>Two</b></div></body></html>";
+        assert!(!super::body_is_plain_text(both));
+        assert!(!super::body_is_plain_text(""));
+    }
+
+    #[test]
+    fn a_reply_or_forward_knows_its_original_was_plain_text() {
+        let mut m = msg(1, 1, 10);
+        m.subject = "Hi".into();
+        m.body = crate::worker::extract_body(b"Content-Type: text/plain\r\n\r\nHello\r\n");
+        assert!(super::reply_prefill(&m).original_plain);
+        assert!(super::reply_all_prefill(&m, "me@example.com").original_plain);
+        assert!(super::forward_prefill(&m).original_plain);
+        m.body = "<html><body><p>Hello</p></body></html>".into();
+        assert!(!super::reply_prefill(&m).original_plain);
+        assert!(!super::forward_prefill(&m).original_plain);
     }
 
     #[test]

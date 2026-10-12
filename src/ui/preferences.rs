@@ -119,6 +119,8 @@ pub struct PrefInit {
     pub plain_font: String,
     /// New messages start as plain text (#180).
     pub compose_format: crate::config::ComposeFormat,
+    /// Replies and forwards to plain-text mail are written in plain text (#436).
+    pub follow_plain: bool,
     /// Where the split reply opens in the reading pane (#212).
     pub reply_position: crate::config::ReplyPosition,
     /// Where the signature sits in a reply or forward (#237).
@@ -1398,6 +1400,7 @@ pub enum PrefOutput {
     SetPlainMonospace(bool),
     SetPlainFont(String),
     SetComposeFormat(crate::config::ComposeFormat),
+    SetFollowPlain(bool),
     SetReplyPosition(crate::config::ReplyPosition),
     SetSignaturePosition(crate::config::SignaturePosition),
     SetSignatureDashes(bool),
@@ -3540,6 +3543,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "follow_plain_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Reply in the original's format"),
+                                        set_subtitle: &i18n("Replies to and forwards of mail sent as \
+                                                       plain text are written in plain text. Other \
+                                                       mail starts in the format above."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetFollowPlain(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "signature_position_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Signature in replies"),
@@ -4604,6 +4618,7 @@ impl Component for Preferences {
             crate::config::ComposeFormat::Html => 2,
             crate::config::ComposeFormat::Plain => 3,
         });
+        widgets.follow_plain_row.set_active(init.follow_plain);
         widgets.signature_position_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Above the quoted message"),
             &i18n("Below the quoted message"),

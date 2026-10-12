@@ -1408,6 +1408,11 @@ pub(crate) struct PrivacyFile {
     /// where `compose_plain` above still says which of the two it is.
     #[serde(default)]
     pub(crate) compose_format: Option<ComposeFormat>,
+    /// Whether a reply or forward to mail that had no HTML part is written
+    /// in plain text whatever `compose_format` says (#436). Mailing lists
+    /// and the people on them often write plain text and expect it back.
+    #[serde(default)]
+    pub(crate) follow_plain: bool,
     /// Where the split reply opens in the reading pane (#212).
     #[serde(default)]
     pub(crate) reply_position: ReplyPosition,
@@ -1762,6 +1767,7 @@ impl Default for PrivacyFile {
             toolbar_expanded: false,
             compose_plain: false,
             compose_format: None,
+            follow_plain: false,
             reply_position: ReplyPosition::default(),
             signature_position: SignaturePosition::default(),
             signature_dashes: false,

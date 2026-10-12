@@ -243,6 +243,9 @@ pub struct ComposePrefill {
     /// Editing a template (#360): `draft_origin` is where it is kept, and
     /// saving puts it back there rather than in Drafts.
     pub template: bool,
+    /// The message replied to or forwarded had no HTML part (#436): with
+    /// the setting on, the composer opens in plain text.
+    pub original_plain: bool,
 }
 
 /// Everything the compose pane needs to open.
@@ -1123,6 +1126,14 @@ impl Component for Compose {
                 editor.set_source(SourceKind::Html, &crate::markdown::pretty_html(&content))
             }
             ComposeFormat::Rich | ComposeFormat::Plain => {}
+        }
+        // HYLKI_SHOWCASE_PLAIN_LOG also logs the body a composer opens with
+        // (demo only), to check a reply started in plain text (#436).
+        if std::env::var_os("HYLKI_SHOWCASE_PLAIN_LOG").is_some() && std::env::var_os("HYLKI_DEMO").is_some() {
+            let ed = editor.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+                ed.eval(SHOWCASE_PLAIN_LOG, move |v| tracing::info!("showcase plain: opened {format:?} {v}"));
+            });
         }
         // The format chooser and the preview toggle belong with the other
         // formatting controls, at the far end of the same row: a header
