@@ -395,6 +395,11 @@ msgid "Smart Folder"
 msgstr ""
 
 msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+
+msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
 
@@ -900,7 +905,9 @@ msgstr ""
 msgid "Move around"
 msgstr ""
 
-msgid "Move down or up the list without opening"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
 msgstr ""
 
 msgid "Open the message the cursor is on"
@@ -912,7 +919,22 @@ msgstr ""
 msgid "Next or previous message in the conversation"
 msgstr ""
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+msgid "Expand or collapse every message of the conversation"
+msgstr ""
+
+msgid "Go to Inbox"
+msgstr ""
+
+msgid "Go to Starred"
+msgstr ""
+
+msgid "Go to Sent"
+msgstr ""
+
+msgid "Go to Drafts"
+msgstr ""
+
+msgid "Go to Archive"
 msgstr ""
 
 msgid "Go to Contacts"
@@ -927,16 +949,22 @@ msgstr ""
 msgid "Reply to all"
 msgstr ""
 
+msgid "Archive the conversation"
+msgstr ""
+
 msgid "Mark as spam"
 msgstr ""
 
 msgid "Star or unstar"
 msgstr ""
 
-msgid "Mark as read"
+msgid "Mark the conversation as read"
 msgstr ""
 
-msgid "Mark as unread"
+msgid "Mark the conversation as unread"
+msgstr ""
+
+msgid "Mark as unread from this message on"
 msgstr ""
 
 msgid "Select this row (for a bulk action)"
@@ -3627,6 +3655,9 @@ msgstr ""
 msgid "Low importance"
 msgstr ""
 
+msgid "Mark as read"
+msgstr ""
+
 msgid "Move to…"
 msgstr ""
 
@@ -3634,6 +3665,9 @@ msgid "Not spam"
 msgstr ""
 
 msgid "Add sender to Contacts"
+msgstr ""
+
+msgid "Mark as unread"
 msgstr ""
 
 msgid "Remove star"
@@ -5447,8 +5481,8 @@ msgid "Gmail keys"
 msgstr ""
 
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"

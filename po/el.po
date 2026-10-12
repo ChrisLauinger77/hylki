@@ -434,6 +434,14 @@ msgstr "Ετικέτες"
 msgid "Smart Folder"
 msgstr "Ταξινόμηση φακέλων"
 
+#, fuzzy
+msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Οι συντομεύσεις ενός πλήκτρου είναι απενεργοποιημένες. Ενεργοποιήστε τις από "
+"τις Ρυθμίσεις → Σύστημα."
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -1001,7 +1009,9 @@ msgstr "Όλες οι σημειώσεις έκδοσης στο GitHub"
 msgid "Move around"
 msgstr "Μετακίνηση"
 
-msgid "Move down or up the list without opening"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
 msgstr ""
 
 #, fuzzy
@@ -1015,8 +1025,29 @@ msgstr "Επιστροφή στη λίστα μηνυμάτων"
 msgid "Next or previous message in the conversation"
 msgstr "Προηγούμενο μήνυμα στη συνομιλία"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr ""
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "Προηγούμενο μήνυμα στη συνομιλία"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Μετακίνηση στα Εισερχόμενα"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "Δεν είναι εγκατεστημένο"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Προσθήκη στις επαφές"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Αποθήκευση στα Πρόχειρα"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Αρχειοθέτηση"
 
 #, fuzzy
 msgid "Go to Contacts"
@@ -1031,17 +1062,27 @@ msgstr "Ενέργεια σε μήνυμα"
 msgid "Reply to all"
 msgstr "Απάντηση σε όλους"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "Ολόκληρη συζήτηση"
+
 msgid "Mark as spam"
 msgstr "Σήμανση ως ανεπιθύμητο"
 
 msgid "Star or unstar"
 msgstr "Προσθήκη ή αφαίρεση αστεριού"
 
-msgid "Mark as read"
-msgstr "Σήμανση ως αναγνωσμένο"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "Ολόκληρη συζήτηση"
 
-msgid "Mark as unread"
-msgstr "Σήμανση ως μη αναγνωσμένο"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Προσπάθεια αποστολής αυτού του μηνύματος τώρα"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Επιλογή αυτής της σειράς (για μαζική ενέργεια)"
@@ -4076,6 +4117,9 @@ msgstr "Υψηλή σημασία"
 msgid "Low importance"
 msgstr "Χαμηλή σπουδαιότητα"
 
+msgid "Mark as read"
+msgstr "Σήμανση ως αναγνωσμένο"
+
 msgid "Move to…"
 msgstr "Μετακίνηση σε…"
 
@@ -4084,6 +4128,9 @@ msgstr "Μη ανεπιθύμητο"
 
 msgid "Add sender to Contacts"
 msgstr "Προσθήκη αποστολέα στις Επαφές"
+
+msgid "Mark as unread"
+msgstr "Σήμανση ως μη αναγνωσμένο"
 
 msgid "Remove star"
 msgstr "Αφαίρεση αστεριού"
@@ -6251,8 +6298,8 @@ msgid "Gmail keys"
 msgstr "Διεύθυνση email"
 
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"

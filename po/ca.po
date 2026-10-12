@@ -410,6 +410,14 @@ msgstr "Etiqueta"
 msgid "Smart Folder"
 msgstr ""
 
+#, fuzzy
+msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Les dreceres d'una sola tecla estan desactivades. Activa-les a Paràmetres → "
+"Sistema."
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -959,8 +967,10 @@ msgstr "Notes completes de la versió al GitHub"
 msgid "Move around"
 msgstr "Mou-te"
 
-msgid "Move down or up the list without opening"
-msgstr "Mou-te avall o amunt per la llista sense obrir"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
+msgstr ""
 
 msgid "Open the message the cursor is on"
 msgstr "Obre el missatge on és el cursor"
@@ -971,8 +981,29 @@ msgstr "Torna a la llista de missatges"
 msgid "Next or previous message in the conversation"
 msgstr "Missatge següent o anterior de la conversa"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr "Ves a la bústia d'entrada, destacats, enviats, esborranys o arxiu"
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "Missatge següent o anterior de la conversa"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Mou a la bústia d'entrada"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "Comença"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Ves a contactes"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Desa a esborranys"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Arxiva"
 
 msgid "Go to Contacts"
 msgstr "Ves a contactes"
@@ -986,17 +1017,27 @@ msgstr "Actua sobre un missatge"
 msgid "Reply to all"
 msgstr "Respon a tots"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "Conversa sencera"
+
 msgid "Mark as spam"
 msgstr "Marca com a brossa"
 
 msgid "Star or unstar"
 msgstr "Destaca o treu la destacat"
 
-msgid "Mark as read"
-msgstr "Marca com a llegit"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "Conversa sencera"
 
-msgid "Mark as unread"
-msgstr "Marca com a no llegit"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Marca com a llegit o no llegit"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Intenta enviar aquest missatge ara"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Selecciona aquesta fila (per a una acció massiva)"
@@ -3948,6 +3989,9 @@ msgstr "Importància alta"
 msgid "Low importance"
 msgstr "Importància baixa"
 
+msgid "Mark as read"
+msgstr "Marca com a llegit"
+
 msgid "Move to…"
 msgstr "Mou a…"
 
@@ -3956,6 +4000,9 @@ msgstr "No és brossa"
 
 msgid "Add sender to Contacts"
 msgstr "Afegeix el remitent a contactes"
+
+msgid "Mark as unread"
+msgstr "Marca com a no llegit"
 
 msgid "Remove star"
 msgstr "Treu la destacat"
@@ -6097,9 +6144,10 @@ msgstr ""
 msgid "Gmail keys"
 msgstr "Tecles del Gmail"
 
+#, fuzzy
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 "Dreceres d'una sola tecla com les té el Gmail: j/k es mouen sense obrir, o "
 "obre, e arxiva, # suprimeix, g i després una lletra va a una carpeta."
@@ -7311,6 +7359,12 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Move down or up the list without opening"
+#~ msgstr "Mou-te avall o amunt per la llista sense obrir"
+
+#~ msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+#~ msgstr "Ves a la bústia d'entrada, destacats, enviats, esborranys o arxiu"
 
 #~ msgid "Type an action, a folder or a tag"
 #~ msgstr "Escriu una acció, una carpeta o una etiqueta"

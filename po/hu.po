@@ -436,6 +436,14 @@ msgstr "Mappák rendezése"
 
 #, fuzzy
 msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Az egybillentyűs gyorsbillentyűk ki vannak kapcsolva. Kapcsolja be őket a "
+"Beállítások → Rendszer és megjelenés menüben."
+
+#, fuzzy
+msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
 "Az egybillentyűs gyorsbillentyűk ki vannak kapcsolva. Kapcsolja be őket a "
@@ -992,7 +1000,9 @@ msgstr "A teljes verzióinformáció a GitHub-on"
 msgid "Move around"
 msgstr "Navigáció"
 
-msgid "Move down or up the list without opening"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
 msgstr ""
 
 #, fuzzy
@@ -1006,8 +1016,29 @@ msgstr "Vissza az üzenetlistához"
 msgid "Next or previous message in the conversation"
 msgstr "A beszélgetés előző üzenete"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr ""
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "A beszélgetés előző üzenete"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Áthelyezés a Beérkezett üzenetek közé"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "Nincs telepítve"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Hozzáadás a névjegyekhez"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Mentés a Piszkozatok közé"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Archiválás"
 
 #, fuzzy
 msgid "Go to Contacts"
@@ -1022,17 +1053,27 @@ msgstr "Művelet az üzeneten"
 msgid "Reply to all"
 msgstr "Válasz mindenkinek"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "A teljes beszélgetés"
+
 msgid "Mark as spam"
 msgstr "Megjelölés levélszemétként"
 
 msgid "Star or unstar"
 msgstr "Csillagozás vagy csillag eltávolítása"
 
-msgid "Mark as read"
-msgstr "Megjelölés olvasottként"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "A teljes beszélgetés"
 
-msgid "Mark as unread"
-msgstr "Megjelölés olvasatlanként"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Megjelölés olvasottként vagy olvasatlanként"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Üzenet küldésének megkísérlése most"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Sor kijelölése (csoportos művelethez)"
@@ -4062,6 +4103,9 @@ msgstr ""
 msgid "Low importance"
 msgstr "Kulcs importálva"
 
+msgid "Mark as read"
+msgstr "Megjelölés olvasottként"
+
 msgid "Move to…"
 msgstr "Áthelyezés…"
 
@@ -4070,6 +4114,9 @@ msgstr "Nem levélszemét"
 
 msgid "Add sender to Contacts"
 msgstr "Feladó hozzáadása a névjegyekhez"
+
+msgid "Mark as unread"
+msgstr "Megjelölés olvasatlanként"
 
 msgid "Remove star"
 msgstr "Csillag eltávolítása"
@@ -6225,8 +6272,8 @@ msgid "Gmail keys"
 msgstr "E-mail-cím"
 
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"

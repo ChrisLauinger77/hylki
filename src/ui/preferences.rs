@@ -3796,9 +3796,9 @@ impl Component for Preferences {
                                     #[name = "gmail_keys_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Gmail keys"),
-                                        set_subtitle: &i18n("Single-key shortcuts as Gmail has them: j/k move \
-                                                       without opening, o opens, e archives, # deletes, g then \
-                                                       a letter goes to a folder."),
+                                        set_subtitle: &i18n("Needs single-key shortcuts on. Swaps in the keys \
+                                                       Gmail has: j/k move without opening, o opens, e archives, \
+                                                       # deletes, g then a letter goes to a folder."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetGmailKeys(row.is_active()));
                                         },
@@ -4389,6 +4389,14 @@ impl Component for Preferences {
         tracing::debug!("settings window: prefs tail A (tray) at {:?}", t_init.elapsed());
         widgets.single_key_row.set_active(init.single_key_shortcuts);
         widgets.gmail_keys_row.set_active(init.gmail_keys);
+        // Gmail's keys are a kind of single-key shortcut, so they mean
+        // nothing with those off (#392): the switch keeps its state but
+        // greys out, as the tray's own options do.
+        widgets
+            .single_key_row
+            .bind_property("active", &widgets.gmail_keys_row, "sensitive")
+            .sync_create()
+            .build();
         widgets.keep_downloads_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Always"),
             &i18n("A year"),

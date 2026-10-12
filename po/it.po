@@ -410,6 +410,14 @@ msgstr "Etichetta"
 msgid "Smart Folder"
 msgstr "Cartella smart"
 
+#, fuzzy
+msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Le scorciatoie a tasto singolo sono disattivate. Attivale in Impostazioni → "
+"Sistema."
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -966,8 +974,10 @@ msgstr "Note di rilascio complete su GitHub"
 msgid "Move around"
 msgstr "Naviga"
 
-msgid "Move down or up the list without opening"
-msgstr "Scorri su o giù nell'elenco senza aprire"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
+msgstr ""
 
 msgid "Open the message the cursor is on"
 msgstr "Apri il messaggio su cui si trova il cursore"
@@ -978,8 +988,29 @@ msgstr "Torna all'elenco messaggi"
 msgid "Next or previous message in the conversation"
 msgstr "Messaggio successivo o precedente nella conversazione"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr "Vai a Posta in arrivo, Contrassegnati, Inviati, Bozze o Archivio"
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "Messaggio successivo o precedente nella conversazione"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Sposta in Posta in arrivo"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "Non contrassegnati"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Vai ai Contatti"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Salva nelle bozze"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Archivia"
 
 msgid "Go to Contacts"
 msgstr "Vai ai Contatti"
@@ -993,17 +1024,27 @@ msgstr "Agisci su un messaggio"
 msgid "Reply to all"
 msgstr "Rispondi a tutti"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "Intera conversazione"
+
 msgid "Mark as spam"
 msgstr "Segna come spam"
 
 msgid "Star or unstar"
 msgstr "Aggiungi/rimuovi contrassegno"
 
-msgid "Mark as read"
-msgstr "Segna come letto"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "Intera conversazione"
 
-msgid "Mark as unread"
-msgstr "Segna come non letto"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Segna come letto o non letto"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Prova a inviare questo messaggio ora"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Seleziona questa riga (per un'azione collettiva)"
@@ -3961,6 +4002,9 @@ msgstr "Alta importanza"
 msgid "Low importance"
 msgstr "Bassa importanza"
 
+msgid "Mark as read"
+msgstr "Segna come letto"
+
 msgid "Move to…"
 msgstr "Sposta in…"
 
@@ -3969,6 +4013,9 @@ msgstr "Non è spam"
 
 msgid "Add sender to Contacts"
 msgstr "Aggiungi mittente ai contatti"
+
+msgid "Mark as unread"
+msgstr "Segna come non letto"
 
 msgid "Remove star"
 msgstr "Rimuovi contrassegno"
@@ -6117,9 +6164,10 @@ msgstr ""
 msgid "Gmail keys"
 msgstr "Tasti Gmail"
 
+#, fuzzy
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 "Scorciatoie a tasto singolo come Gmail: j/k si spostano senza aprire, o "
 "apre, e archivia, # elimina, g poi una lettera va a una cartella."
@@ -7333,6 +7381,12 @@ msgstr "La posta in arrivo unificata in modalità chiara"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Move down or up the list without opening"
+#~ msgstr "Scorri su o giù nell'elenco senza aprire"
+
+#~ msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
+#~ msgstr "Vai a Posta in arrivo, Contrassegnati, Inviati, Bozze o Archivio"
 
 #~ msgid ""
 #~ "For your organization's own Exchange server. Leave the server empty to "

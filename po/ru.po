@@ -431,6 +431,14 @@ msgstr "Теги"
 msgid "Smart Folder"
 msgstr "Сортировать папки"
 
+#, fuzzy
+msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Одноклавишные сочетания отключены. Включите их в меню «Параметры» → "
+"«Система»."
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -1013,7 +1021,9 @@ msgstr "Полные примечания к выпуску на GitHub"
 msgid "Move around"
 msgstr "Перемещаться"
 
-msgid "Move down or up the list without opening"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
 msgstr ""
 
 #, fuzzy
@@ -1027,8 +1037,29 @@ msgstr "Вернуться к списку сообщений"
 msgid "Next or previous message in the conversation"
 msgstr "Предыдущее сообщение в беседе"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr ""
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "Предыдущее сообщение в беседе"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Переместить во «Входящие»"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "Не установлено"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Добавить в Контакты"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Сохранить в «Черновики»"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Архив"
 
 #, fuzzy
 msgid "Go to Contacts"
@@ -1043,17 +1074,27 @@ msgstr "Выполнить действие над сообщением"
 msgid "Reply to all"
 msgstr "Ответить всем"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "Всё обсуждение"
+
 msgid "Mark as spam"
 msgstr "Отметить как спам"
 
 msgid "Star or unstar"
 msgstr "Поставить или снять отметку"
 
-msgid "Mark as read"
-msgstr "Отметить как прочитанное"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "Всё обсуждение"
 
-msgid "Mark as unread"
-msgstr "Отметить как непрочитанное"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Отметить прочитанным/непрочитанным"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Попробовать отправить сейчас"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Выбрать эту строку (для массового действия)"
@@ -4048,6 +4089,9 @@ msgstr "Высокая важность"
 msgid "Low importance"
 msgstr "Низкая важность"
 
+msgid "Mark as read"
+msgstr "Отметить как прочитанное"
+
 msgid "Move to…"
 msgstr "Переместить в…"
 
@@ -4056,6 +4100,9 @@ msgstr "Не спам"
 
 msgid "Add sender to Contacts"
 msgstr "Добавить отправителя в «Контакты»"
+
+msgid "Mark as unread"
+msgstr "Отметить как непрочитанное"
 
 msgid "Remove star"
 msgstr "Снять отметку"
@@ -6195,8 +6242,8 @@ msgid "Gmail keys"
 msgstr "Адрес электронной почты"
 
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"

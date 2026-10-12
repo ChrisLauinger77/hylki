@@ -29,27 +29,43 @@ that scroll it (the arrows, Page Up and Down, Space).
 
 ## Gmail keys
 
-**Settings → System → Gmail keys** swaps in Gmail's single keys. The list
-moves under a cursor without opening anything until you ask, and a key
+**Settings → System → Gmail keys** swaps in Gmail's single keys. It needs
+**Single-key shortcuts** on as well, and stays greyed out until they are. The
+list moves under a cursor without opening anything until you ask, and a key
 followed by another goes somewhere.
 
 | Move around | | Act on a message | |
 | --- | --- | --- | --- |
 | <kbd>j</kbd> <kbd>k</kbd> | Move down or up the list without opening | <kbd>r</kbd> | Reply |
-| <kbd>o</kbd> <kbd>Enter</kbd> | Open the message the cursor is on | <kbd>a</kbd> | Reply to all |
-| <kbd>u</kbd> | Back to the message list | <kbd>f</kbd> | Forward |
-| <kbd>n</kbd> <kbd>p</kbd> | Next or previous message in the conversation | <kbd>e</kbd> | Archive |
-| <kbd>g</kbd> <kbd>i</kbd> | Inbox | <kbd>#</kbd> | Delete |
-| <kbd>g</kbd> <kbd>s</kbd> | Starred | <kbd>!</kbd> | Mark as spam |
-| <kbd>g</kbd> <kbd>t</kbd> | Sent | <kbd>s</kbd> | Star or unstar |
-| <kbd>g</kbd> <kbd>d</kbd> | Drafts | <kbd>Shift+I</kbd> | Mark as read |
-| <kbd>g</kbd> <kbd>a</kbd> | Archive | <kbd>Shift+U</kbd> <kbd>_</kbd> | Mark as unread |
+| <kbd>o</kbd> <kbd>Enter</kbd> | Open the conversation the cursor is on | <kbd>a</kbd> | Reply to all |
+| <kbd>u</kbd> <kbd>Esc</kbd> | Back to the message list | <kbd>f</kbd> | Forward |
+| <kbd>n</kbd> <kbd>p</kbd> | Next or previous message in the conversation | <kbd>e</kbd> | Archive the conversation |
+| <kbd>;</kbd> <kbd>:</kbd> | Expand or collapse every message of the conversation | <kbd>#</kbd> | Delete |
+| <kbd>g</kbd> <kbd>i</kbd> | Inbox | <kbd>!</kbd> | Mark as spam |
+| <kbd>g</kbd> <kbd>s</kbd> | Starred | <kbd>s</kbd> | Star or unstar |
+| <kbd>g</kbd> <kbd>t</kbd> | Sent | <kbd>Shift+I</kbd> | Mark the conversation as read |
+| <kbd>g</kbd> <kbd>d</kbd> | Drafts | <kbd>Shift+U</kbd> | Mark the conversation as unread |
+| <kbd>g</kbd> <kbd>a</kbd> | Archive | <kbd>_</kbd> | Mark as unread from this message on |
 | <kbd>g</kbd> <kbd>c</kbd> | Contacts | <kbd>x</kbd> | Select the row the cursor is on |
 | <kbd>/</kbd> | Search | <kbd>*</kbd> <kbd>a</kbd> / <kbd>*</kbd> <kbd>n</kbd> | Select every row, or none |
 | <kbd>c</kbd> | Compose | <kbd>v</kbd> | Move to a folder |
 | <kbd>?</kbd> | This list | <kbd>l</kbd> | Tags |
 | | | <kbd>z</kbd> | Undo |
 | | | <kbd>1</kbd> … <kbd>9</kbd>, <kbd>0</kbd> | Tags by number, as above |
+
+<kbd>j</kbd> and <kbd>k</kbd> step from conversation to conversation, over
+the replies of one opened out in the list, and the row they reach has an
+accent outline. <kbd>o</kbd> or <kbd>Enter</kbd> opens it and takes the
+keyboard into the reader, as Gmail's conversation view does: there
+<kbd>j</kbd> and <kbd>k</kbd> open the next or previous conversation, and
+<kbd>u</kbd> or <kbd>Esc</kbd> go back to the list.
+
+<kbd>e</kbd>, <kbd>Shift+I</kbd> and <kbd>Shift+U</kbd> act on the whole
+conversation that is open, even with one of its messages stepped to with
+<kbd>n</kbd> or <kbd>p</kbd>. Archiving moves the messages the list shows for
+it and leaves your replies in Sent; marking unread leaves Sent and Drafts
+alone. <kbd>_</kbd> marks the message you stepped to unread, and the later
+ones of the conversation; with none stepped to, the newest.
 
 <kbd>Enter</kbd> on a message that is already open opens it in a window of
 its own. A <kbd>g</kbd> or <kbd>*</kbd> waits a second and a half for the key

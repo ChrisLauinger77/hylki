@@ -432,6 +432,14 @@ msgstr "Etiquetas"
 msgid "Smart Folder"
 msgstr "Ordenar carpetas"
 
+#, fuzzy
+msgid ""
+"Single-key shortcuts are switched off, and Gmail keys with them. Turn them "
+"on in Settings → System."
+msgstr ""
+"Los atajos de una sola tecla están desactivados. Actívalos en Ajustes → "
+"Sistema."
+
 msgid ""
 "Single-key shortcuts are switched off. Turn them on in Settings → System."
 msgstr ""
@@ -998,7 +1006,9 @@ msgstr "Notas completas de la versión en GitHub"
 msgid "Move around"
 msgstr "Navegación"
 
-msgid "Move down or up the list without opening"
+msgid ""
+"Move down or up the list without opening; while reading, open the next or "
+"previous conversation"
 msgstr ""
 
 #, fuzzy
@@ -1012,8 +1022,29 @@ msgstr "Volver a la lista de mensajes"
 msgid "Next or previous message in the conversation"
 msgstr "Mensaje anterior de la conversación"
 
-msgid "Go to Inbox, Starred, Sent, Drafts or Archive"
-msgstr ""
+#, fuzzy
+msgid "Expand or collapse every message of the conversation"
+msgstr "Mensaje anterior de la conversación"
+
+#, fuzzy
+msgid "Go to Inbox"
+msgstr "Mover a Bandeja de entrada"
+
+#, fuzzy
+msgid "Go to Starred"
+msgstr "No instalado"
+
+#, fuzzy
+msgid "Go to Sent"
+msgstr "Añadir a Contactos"
+
+#, fuzzy
+msgid "Go to Drafts"
+msgstr "Guardar en Borradores"
+
+#, fuzzy
+msgid "Go to Archive"
+msgstr "Archivar"
 
 #, fuzzy
 msgid "Go to Contacts"
@@ -1028,17 +1059,27 @@ msgstr "Acciones sobre un mensaje"
 msgid "Reply to all"
 msgstr "Responder a todos"
 
+#, fuzzy
+msgid "Archive the conversation"
+msgstr "Conversación completa"
+
 msgid "Mark as spam"
 msgstr "Marcar como spam"
 
 msgid "Star or unstar"
 msgstr "Destacar o quitar destacado"
 
-msgid "Mark as read"
-msgstr "Marcar como leído"
+#, fuzzy
+msgid "Mark the conversation as read"
+msgstr "Conversación completa"
 
-msgid "Mark as unread"
-msgstr "Marcar como no leído"
+#, fuzzy
+msgid "Mark the conversation as unread"
+msgstr "Marcar como leído o no leído"
+
+#, fuzzy
+msgid "Mark as unread from this message on"
+msgstr "Intentar enviar este mensaje ahora"
 
 msgid "Select this row (for a bulk action)"
 msgstr "Seleccionar esta fila (para una acción en lote)"
@@ -4025,6 +4066,9 @@ msgstr "Importancia alta"
 msgid "Low importance"
 msgstr "Importancia baja"
 
+msgid "Mark as read"
+msgstr "Marcar como leído"
+
 msgid "Move to…"
 msgstr "Mover a…"
 
@@ -4033,6 +4077,9 @@ msgstr "No es correo no deseado"
 
 msgid "Add sender to Contacts"
 msgstr "Añadir remitente a Contactos"
+
+msgid "Mark as unread"
+msgstr "Marcar como no leído"
 
 msgid "Remove star"
 msgstr "Quitar destacado"
@@ -6178,8 +6225,8 @@ msgid "Gmail keys"
 msgstr "Dirección de correo electrónico"
 
 msgid ""
-"Single-key shortcuts as Gmail has them: j/k move without opening, o opens, e "
-"archives, # deletes, g then a letter goes to a folder."
+"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
+"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
 msgstr ""
 
 msgid "Console mode"

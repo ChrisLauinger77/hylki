@@ -5202,7 +5202,7 @@ impl SimpleComponent for AppModel {
                             .filter_map(|o| o.downcast::<adw::Window>().ok())
                             .find(|w| w.is_visible() && w.title().is_some_and(|t| t == i18n("Keyboard Shortcuts")))
                         {
-                            w.set_default_size(420, h);
+                            w.set_default_size(w.default_width(), h);
                         }
                     });
                 }
@@ -12316,12 +12316,14 @@ impl AppModel {
 
     /// A plain window listing every keyboard shortcut.
     fn build_shortcuts_window(&self) -> adw::Window {
+        // Wide enough that the longest keys ("Ctrl+B  /  Ctrl+I  /  Ctrl+U")
+        // leave the description room for a line or two (#392).
         let win = adw::Window::builder()
             .transient_for(&self.window)
             .modal(true)
             .title(&i18n("Keyboard Shortcuts"))
-            .default_width(420)
-            .default_height(560)
+            .default_width(600)
+            .default_height(640)
             .build();
 
         let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -12331,9 +12333,12 @@ impl AppModel {
         page.set_margin_end(18);
 
         if !self.single_key.get() {
-            let off = gtk::Label::new(Some(
-                i18n("Single-key shortcuts are switched off. Turn them on in Settings → System.").as_str(),
-            ));
+            let text = if self.gmail_keys.get() {
+                i18n("Single-key shortcuts are switched off, and Gmail keys with them. Turn them on in Settings → System.")
+            } else {
+                i18n("Single-key shortcuts are switched off. Turn them on in Settings → System.")
+            };
+            let off = gtk::Label::new(Some(text.as_str()));
             off.add_css_class("dim-label");
             off.set_wrap(true);
             off.set_xalign(0.0);
@@ -22727,11 +22732,16 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
     (
         i18n_noop("Move around"),
         &[
-            ("j  /  k", i18n_noop("Move down or up the list without opening")),
+            ("j  /  k", i18n_noop("Move down or up the list without opening; while reading, open the next or previous conversation")),
             ("o  or  Enter", i18n_noop("Open the message the cursor is on")),
-            ("u", i18n_noop("Back to the message list")),
+            ("u  or  Esc", i18n_noop("Back to the message list")),
             ("n  /  p", i18n_noop("Next or previous message in the conversation")),
-            ("g  i  /  g  s  /  g  t  /  g  d  /  g  a", i18n_noop("Go to Inbox, Starred, Sent, Drafts or Archive")),
+            (";  /  :", i18n_noop("Expand or collapse every message of the conversation")),
+            ("g  i", i18n_noop("Go to Inbox")),
+            ("g  s", i18n_noop("Go to Starred")),
+            ("g  t", i18n_noop("Go to Sent")),
+            ("g  d", i18n_noop("Go to Drafts")),
+            ("g  a", i18n_noop("Go to Archive")),
             ("g  c", i18n_noop("Go to Contacts")),
             ("/", i18n_noop("Search")),
         ],
@@ -22742,12 +22752,13 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
             ("r", i18n_noop("Reply")),
             ("a", i18n_noop("Reply to all")),
             ("f", i18n_noop("Forward")),
-            ("e", i18n_noop("Archive")),
+            ("e", i18n_noop("Archive the conversation")),
             ("#", i18n_noop("Delete")),
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
-            ("Shift+I", i18n_noop("Mark as read")),
-            ("Shift+U  or  _", i18n_noop("Mark as unread")),
+            ("Shift+I", i18n_noop("Mark the conversation as read")),
+            ("Shift+U", i18n_noop("Mark the conversation as unread")),
+            ("_", i18n_noop("Mark as unread from this message on")),
             ("x", i18n_noop("Select this row (for a bulk action)")),
             ("*  a  /  *  n", i18n_noop("Select every row, or none")),
             ("v", i18n_noop("Move to a folder")),

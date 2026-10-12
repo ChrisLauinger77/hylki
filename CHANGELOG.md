@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Fixed: Gmail keys acted on one message of a conversation** (#392,
+  reported by 3v1n0).
+  **Shift+I**, **Shift+U** and **e** now mark or archive the whole
+  conversation that is open, and the toolbar's Archive takes a
+  conversation's row as Delete does. `_` marks unread from the message
+  being read onward, and `;` and `:` expand and collapse every message.
+  **j** and **k** skip the replies of a conversation opened out in the list
+  and outline the row they reach; **o** takes the keyboard into the reader,
+  where **j** and **k** open the next or previous conversation and **Esc**
+  goes back like **u**. The shortcuts window is wider and lists each go-to
+  key on its own row, and Settings greys out Gmail keys while single-key
+  shortcuts are off.
 - **Fixed: switching the composer to plain text kept the formatting on
   screen** (#424, reported by 3v1n0). Plain text now shows the message as
   it is sent, in the desktop's monospace font: bold and the like go, a
