@@ -3549,6 +3549,16 @@ msgstr "Сначала напишите что-нибудь или выбери�
 msgid "Could not translate"
 msgstr "Не удалось перевести"
 
+#, fuzzy
+msgid "Switch to plain text?"
+msgstr "Вставлять как обычный текст"
+
+msgid "Formatting, images and links are removed."
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "Невозможно отправить с помощью OpenPGP"
 

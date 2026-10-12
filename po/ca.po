@@ -3468,6 +3468,16 @@ msgstr "Escriu alguna cosa primer, o selecciona el text per traduir."
 msgid "Could not translate"
 msgstr "No s'ha pogut traduir"
 
+#, fuzzy
+msgid "Switch to plain text?"
+msgstr "Enganxa com a text pla"
+
+msgid "Formatting, images and links are removed."
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "No es pot enviar amb OpenPGP"
 

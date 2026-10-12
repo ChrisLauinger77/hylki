@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Fixed: switching the composer to plain text kept the formatting on
+  screen** (#424, reported by 3v1n0). Plain text now shows the message as
+  it is sent, in the desktop's monospace font: bold and the like go, a
+  link is followed by its address, a quote becomes `> ` lines, and paste
+  brings in text alone. When the body has formatting, pictures or links,
+  the composer asks first. A composer that opens in plain text starts
+  that way too, and a plain-text signature keeps the space of its `-- `
+  line.
 - **Added: Ctrl+Shift+K opens the command palette on its actions** (#399,
   suggested by 3v1n0), with `>` already typed.
 - **Changed: the status bar sits at the bottom of the window** (#433,
@@ -11,7 +19,8 @@
 - **Fixed: the settings search listed every OpenPGP key** (#432, reported
   by 3v1n0). A keyring with many people's keys buried the settings under
   them; keys are no longer search results.
-- **Italian translation** (#430 by Jimmy), complete but for the new filter menu entry.
+- **Italian translation** (#430 by Jimmy), complete but for the strings
+  added after it was made.
 - **Catalan translation** brought up to date (PR #422 by jolupa).
 - **Fixed: right-click menus did nothing on X11** (#427, by Fabio Rotondo).
   Releasing the right button took the menu's hold on the pointer away, so

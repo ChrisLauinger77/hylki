@@ -505,6 +505,11 @@ pub enum ComposeInput {
     ToggleSign(bool),
     /// Pick what this message is written in.
     SetFormat(ComposeFormat),
+    /// Rich text to plain text would take formatting, pictures or links
+    /// out of the body: ask first (#424).
+    AskPlain,
+    /// Put the message in this format, now that nothing stands in the way.
+    ApplyFormat(ComposeFormat),
     /// The header's format button: the four formats as a menu.
     FormatMenu,
     /// The Translate button (#327): read the quoted message's language
@@ -1106,7 +1111,7 @@ impl Component for Compose {
                 .flat_map(|a| super::rich_editor::remote_image_urls(&a.signature))
                 .collect::<Vec<_>>()
         });
-        let editor = RichEditor::new(&content, remote_images.as_deref());
+        let editor = RichEditor::new(&content, remote_images.as_deref(), format == ComposeFormat::Plain);
         editor.set_formatting_visible(format == ComposeFormat::Rich);
         // A source format starts from the same content, written out as
         // source: a reply's quoted original becomes `> ` lines in Markdown,
@@ -1970,6 +1975,7 @@ impl Component for Compose {
                              for(var i=0;i<cands.length;i++){{var t=cands[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
                              if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}}\
                              if(first)b.insertBefore(p,first);else b.appendChild(p);\
+                             window.__hylkiPlainFix&&window.__hylkiPlainFix();\
                              document.dispatchEvent(new Event('input'));}})()",
                             js_escape(&html)
                         ));
@@ -2580,6 +2586,63 @@ impl Component for Compose {
             }
 
             ComposeInput::SetFormat(to) => {
+                if to == self.format {
+                    break 'handle;
+                }
+                // Plain text shows only what is sent (#424), so moving a
+                // formatted body there drops what it cannot show, and the
+                // way back does not bring it back.
+                if self.format == ComposeFormat::Rich && to == ComposeFormat::Plain {
+                    let s = sender.clone();
+                    self.editor.eval(
+                        "String(!!(window.__hylkiPlainLoses&&window.__hylkiPlainLoses()))",
+                        move |loses| {
+                            s.input(if loses == "true" {
+                                ComposeInput::AskPlain
+                            } else {
+                                ComposeInput::ApplyFormat(ComposeFormat::Plain)
+                            });
+                        },
+                    );
+                    break 'handle;
+                }
+                sender.input(ComposeInput::ApplyFormat(to));
+            }
+
+            ComposeInput::AskPlain => {
+                let dialog = adw::AlertDialog::new(
+                    Some(&i18n("Switch to plain text?")),
+                    Some(&i18n("Formatting, images and links are removed.")),
+                );
+                dialog.add_response("cancel", &i18n("Cancel"));
+                dialog.add_response("switch", &i18n("Switch"));
+                dialog.set_response_appearance("switch", adw::ResponseAppearance::Destructive);
+                dialog.set_default_response(Some("cancel"));
+                dialog.set_close_response("cancel");
+                let s = sender.input_sender().clone();
+                dialog.connect_response(None, move |_, resp| {
+                    if resp == "switch" {
+                        let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
+                    }
+                });
+                dialog.present(Some(root));
+                // HYLKI_SHOWCASE_PLAIN_ANSWER=switch|cancel answers it two
+                // seconds on (demo only), for a check without a pointer.
+                if let (Ok(answer), Some(_)) =
+                    (std::env::var("HYLKI_SHOWCASE_PLAIN_ANSWER"), std::env::var_os("HYLKI_DEMO"))
+                {
+                    tracing::info!("showcase plain: asked before switching");
+                    let (d, s) = (dialog.clone(), sender.input_sender().clone());
+                    gtk::glib::timeout_add_seconds_local_once(2, move || {
+                        d.force_close();
+                        if answer == "switch" {
+                            let _ = s.send(ComposeInput::ApplyFormat(ComposeFormat::Plain));
+                        }
+                    });
+                }
+            }
+
+            ComposeInput::ApplyFormat(to) => {
                 let from = self.format;
                 if to == from {
                     break 'handle;
@@ -2594,15 +2657,13 @@ impl Component for Compose {
                 // A preview of the old format's render would be a lie about
                 // the new one.
                 self.preview_btn.set_active(false);
-                // Rich and plain text share one document — plain text only
-                // decides what is *sent* — so switching between them must
-                // not reload it and throw away the undo history and caret.
-                if from.is_source() || to.is_source() {
-                    let s = sender.clone();
-                    self.read_body_as(from, false, move |body, _| {
-                        s.input(ComposeInput::LoadAs { from, to, body });
-                    });
-                }
+                // Every change reloads the body, plain text included: it
+                // shows the message flattened to what is sent (#424), so it
+                // cannot share the rich document's undo history.
+                let s = sender.clone();
+                self.read_body_as(from, false, move |body, _| {
+                    s.input(ComposeInput::LoadAs { from, to, body });
+                });
             }
 
             ComposeInput::LoadAs { from, to, body } => {
@@ -2612,6 +2673,7 @@ impl Component for Compose {
                     ComposeFormat::Markdown => crate::markdown::to_html(&body),
                     _ => body,
                 };
+                self.editor.set_plain(to == ComposeFormat::Plain);
                 match to {
                     ComposeFormat::Markdown => self.editor.set_source(SourceKind::Markdown, &markdown_body(&html)),
                     ComposeFormat::Html => self
@@ -2620,6 +2682,14 @@ impl Component for Compose {
                     ComposeFormat::Rich | ComposeFormat::Plain => self.editor.set_html(&html),
                 }
                 self.editor.grab_focus();
+                // HYLKI_SHOWCASE_PLAIN_LOG logs the reloaded body, its font
+                // and the text it sends (demo only).
+                if std::env::var_os("HYLKI_SHOWCASE_PLAIN_LOG").is_some() && std::env::var_os("HYLKI_DEMO").is_some() {
+                    let ed = self.editor.clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+                        ed.eval(SHOWCASE_PLAIN_LOG, move |v| tracing::info!("showcase plain: {to:?} {v}"));
+                    });
+                }
             }
 
             ComposeInput::TogglePreview(on) => {
@@ -3061,7 +3131,8 @@ impl Compose {
                 "(function(){{var s=document.querySelector('.vireo-sig');\
                  var h='{}';\
                  if(s){{if(h){{s.outerHTML=h;}}else{{s.remove();}}}}\
-                 else if(h){{{anchor}}}}})()",
+                 else if(h){{{anchor}}}\
+                 window.__hylkiPlainFix&&window.__hylkiPlainFix();}})()",
                 rich_editor::js_escape(&replacement)
             );
             self.editor.run_js(&js);
@@ -3170,6 +3241,7 @@ if(where==='start'){b.insertBefore(sig,b.firstChild);}
 else if(where==='end'){b.appendChild(sig);}
 else if(r){b.insertBefore(sig,spot);var c=document.createRange();c.setStartBefore(sig);c.collapse(true);sel.removeAllRanges();sel.addRange(c);}
 else{@ANCHOR@}
+window.__hylkiPlainFix&&window.__hylkiPlainFix();
 window.__hylkiDirty=true;})()"#
             .replace("@WHERE@", &format!("'{place_js}'"))
             .replace("@ANCHOR@", self.rich_sig_anchor())
@@ -4345,6 +4417,13 @@ pub enum TranslateHow {
     Html,
 }
 
+/// What HYLKI_SHOWCASE_PLAIN_LOG reports about the body (demo only).
+const SHOWCASE_PLAIN_LOG: &str = r#"JSON.stringify({plain:!!window.__hylkiPlain,
+font:document.body?getComputedStyle(document.body).fontFamily:'',
+bold:document.body&&document.body.querySelector('b,strong')?getComputedStyle(document.body.querySelector('b,strong')).fontWeight:'',
+html:document.body?document.body.innerHTML:document.documentElement.outerHTML.slice(0,400),
+text:window.__hylkiBodyText?window.__hylkiBodyText():''})"#;
+
 /// The quoted message's text, for telling which language to offer first:
 /// the reply's quote in the rich document, or the quoted lines of a
 /// Markdown or HTML source.
@@ -4396,7 +4475,7 @@ return JSON.stringify({parts:p,sel:sel});})()"#;
 const TR_RICH_END: &str = r#"(function(h){var b=document.body;if(!b)return;b.setAttribute('contenteditable','true');
 var r=window.__hylkiTr;window.__hylkiTr=null;if(!r)return;b.focus();
 var s=getSelection();s.removeAllRanges();s.addRange(r);
-document.execCommand('insertHTML',false,h);window.__hylkiDirty=true;window.__hylkiTrState='translated';if(!window.__hylkiTrWatch){window.__hylkiTrWatch=true;document.addEventListener('input',function(e){var st=window.__hylkiTrState;if(!st)return;var k=e.inputType||'';if(k==='historyUndo')window.__hylkiTrState=st==='translated'?'original':'';else if(k==='historyRedo')window.__hylkiTrState=st==='original'?'translated':'';else window.__hylkiTrState='';},true);}})(ARG)"#;
+document.execCommand('insertHTML',false,h);window.__hylkiPlainFix&&window.__hylkiPlainFix();window.__hylkiDirty=true;window.__hylkiTrState='translated';if(!window.__hylkiTrWatch){window.__hylkiTrWatch=true;document.addEventListener('input',function(e){var st=window.__hylkiTrState;if(!st)return;var k=e.inputType||'';if(k==='historyUndo')window.__hylkiTrState=st==='translated'?'original':'';else if(k==='historyRedo')window.__hylkiTrState=st==='original'?'translated':'';else window.__hylkiTrState='';},true);}})(ARG)"#;
 
 /// The source field's version of [`TR_RICH_BEGIN`]: the selection, else
 /// the text above the quote (and, in Markdown, its "wrote:" line) and the

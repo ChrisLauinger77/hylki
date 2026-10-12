@@ -29,6 +29,11 @@ pub struct RichEditor {
     /// Which source language the editor currently holds, if it is in source
     /// mode rather than rich mode.
     source: std::rc::Rc<std::cell::Cell<Option<SourceKind>>>,
+    /// Whether the rich document is showing the message as plain text
+    /// (#424): flattened to what is sent, in the monospace font, taking
+    /// only text. Read by every load of the document and by whatever puts
+    /// files or the clipboard into it.
+    plain: std::rc::Rc<std::cell::Cell<bool>>,
     /// Where "Send as Attachment Instead" delivers the lifted image, as a
     /// temp-file path the host adds to its attachment list. Set by the host
     /// via [`RichEditor::connect_send_as_attachment`].
@@ -225,7 +230,8 @@ impl RichEditor {
     /// pictures): opening a reply must not fetch what reading the message
     /// did not (#295). The markup keeps every address, so the recipient
     /// gets the quote whole.
-    pub fn new(initial_html: &str, remote_images: Option<&[String]>) -> Self {
+    pub fn new(initial_html: &str, remote_images: Option<&[String]>, plain: bool) -> Self {
+        let plain = std::rc::Rc::new(std::cell::Cell::new(plain));
         let image_policy: std::rc::Rc<str> = image_policy_meta(remote_images).into();
         // The shared document-viewer context (issue #106): a default-context
         // view would bring up a second web process with browser-sized caches.
@@ -300,7 +306,7 @@ impl RichEditor {
         }
         crate::web_fonts::load_html(
             &webview,
-            &document(initial_html, &webview, &image_policy),
+            &document(initial_html, &webview, &image_policy, plain.get()),
             Some("https://hylki.localhost/editor"),
         );
         // A live theme flip re-grounds the open document (#148): the scheme
@@ -393,6 +399,7 @@ impl RichEditor {
             std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         {
             let (loaded, pending, cb) = (loaded.clone(), pending_files.clone(), attach_cb.clone());
+            let plain = plain.clone();
             webview.connect_load_changed(move |v, ev| match ev {
                 webkit6::LoadEvent::Started => loaded.set(false),
                 webkit6::LoadEvent::Finished => {
@@ -400,7 +407,7 @@ impl RichEditor {
                     let paths = std::mem::take(&mut *pending.borrow_mut());
                     if !paths.is_empty() {
                         let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
-                        deliver_files(v, &files, None, &cb);
+                        deliver_files(v, &files, None, &cb, !plain.get());
                     }
                 }
                 _ => {}
@@ -411,6 +418,7 @@ impl RichEditor {
             std::rc::Rc::new(std::cell::Cell::new(None));
         let menu_attach_cb = attach_cb.clone();
         let menu_history = text_history.clone();
+        let menu_plain = plain.clone();
         let spell_langs_cb: SpellLangsCallback = Default::default();
         let menu_spell_cb = spell_langs_cb.clone();
         webview.connect_context_menu(move |view, menu, hit| {
@@ -515,12 +523,18 @@ impl RichEditor {
                 menu.remove(item);
             }
             let mut at = pos as i32;
+            // Plain text has no formatting to keep, so it offers only the
+            // paste it does.
+            let plain = menu_plain.get();
             for (label, rich) in [(i18n("Paste with Formatting"), true), (i18n("Paste as Plain Text"), false)] {
+                if rich && plain {
+                    continue;
+                }
                 let action =
                     gtk::gio::SimpleAction::new(if rich { "vireo-paste-rich" } else { "vireo-paste-plain" }, None);
                 let v = view.clone();
                 let cb = menu_attach_cb.clone();
-                action.connect_activate(move |_, _| paste_into(&v, rich, &cb));
+                action.connect_activate(move |_, _| paste_into(&v, rich, &cb, plain));
                 menu.insert(&webkit6::ContextMenuItem::from_gaction(&action, &label, None), at);
                 at += 1;
             }
@@ -569,6 +583,7 @@ impl RichEditor {
             let weak = webview.downgrade();
             let cb = attach_cb.clone();
             let src = source.clone();
+            let plain = plain.clone();
             drop.connect_drop(move |_, value, x, y| {
                 let Some(v) = weak.upgrade() else { return false };
                 let Ok(list) = value.get::<gtk::gdk::FileList>() else { return false };
@@ -578,7 +593,7 @@ impl RichEditor {
                 if src.get().is_some() {
                     return attach_all(&list.files(), &cb);
                 }
-                deliver_files(&v, &list.files(), Some((x, y)), &cb)
+                deliver_files(&v, &list.files(), Some((x, y)), &cb, !plain.get())
             });
             webview.add_controller(drop);
         }
@@ -646,6 +661,7 @@ impl RichEditor {
             stack,
             preview: std::rc::Rc::new(std::cell::RefCell::new(None)),
             source: source.clone(),
+            plain,
             attach_cb,
             loaded,
             pending_files,
@@ -707,13 +723,14 @@ impl RichEditor {
         *self.attach_cb.borrow_mut() = Some(Box::new(f));
     }
 
-    /// Replace the editor contents with `content` (HTML), in rich mode.
+    /// Replace the editor contents with `content` (HTML), in rich mode, or
+    /// flattened to plain text when [`RichEditor::set_plain`] says so.
     pub fn set_html(&self, content: &str) {
         self.source.set(None);
         self.show_preview(None);
         crate::web_fonts::load_html(
             &self.webview,
-            &document(content, &self.webview, &self.image_policy),
+            &document(content, &self.webview, &self.image_policy, self.plain.get()),
             Some("https://hylki.localhost/editor"),
         );
     }
@@ -729,6 +746,13 @@ impl RichEditor {
             &source_document(text, &self.webview),
             Some("https://hylki.localhost/editor"),
         );
+    }
+
+    /// Show the message as plain text from the next [`RichEditor::set_html`]
+    /// on: the document flattens itself to the text that is sent, in the
+    /// monospace font, and pastes and drops bring in text alone (#424).
+    pub fn set_plain(&self, on: bool) {
+        self.plain.set(on);
     }
 
     /// The source language the editor is in, or `None` in rich mode.
@@ -829,11 +853,11 @@ impl RichEditor {
             return;
         }
         let files: Vec<_> = paths.iter().map(gtk::gio::File::for_path).collect();
-        deliver_files(&self.webview, &files, None, &self.attach_cb);
+        deliver_files(&self.webview, &files, None, &self.attach_cb, !self.plain.get());
     }
 
     pub fn paste(&self, rich: bool) {
-        paste_into(&self.webview, rich, &self.attach_cb);
+        paste_into(&self.webview, rich, &self.attach_cb, self.plain.get());
     }
 
     /// Whether the body has been edited since it was loaded (async read of a JS
@@ -1112,6 +1136,7 @@ fn paste_into(
     webview: &webkit6::WebView,
     rich: bool,
     cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    plain: bool,
 ) {
     if webview.clipboard().formats().contains_type(gtk::gdk::FileList::static_type()) {
         let v = webview.clone();
@@ -1124,7 +1149,7 @@ fn paste_into(
                 let taken = res
                     .ok()
                     .and_then(|val| val.get::<gtk::gdk::FileList>().ok())
-                    .is_some_and(|list| deliver_files(&v, &list.files(), None, &cb));
+                    .is_some_and(|list| deliver_files(&v, &list.files(), None, &cb, !plain));
                 // Nothing usable on the clipboard after all: the ordinary
                 // paste still owes the user whatever else is on it.
                 if !taken {
@@ -1152,7 +1177,8 @@ fn paste_via_webkit(webview: &webkit6::WebView, rich: bool) {
 /// Images inline, everything else attached. `at` is the drop point in widget
 /// coordinates (which are the document's viewport coordinates), placing the
 /// caret where the picture was let go; a paste keeps the caret it has.
-/// Returns whether any file was taken, so a caller can fall back.
+/// Returns whether any file was taken, so a caller can fall back. With
+/// `inline` off (a message written as plain text) every file is attached.
 ///
 /// Reading and encoding happen here rather than in the document because the
 /// document is never given the file in the first place — see [`paste_into`].
@@ -1161,7 +1187,11 @@ fn deliver_files(
     files: &[gtk::gio::File],
     at: Option<(f64, f64)>,
     cb: &std::rc::Rc<std::cell::RefCell<Option<Box<dyn Fn(std::path::PathBuf)>>>>,
+    inline: bool,
 ) -> bool {
+    if !inline {
+        return attach_all(files, cb);
+    }
     let mut took = false;
     let mut point = at;
     for file in files {
@@ -1910,7 +1940,7 @@ fn pick_pictures(
             .filter_map(|i| list.item(i).and_downcast::<gtk::gio::File>())
             .collect();
         exec(&wv, "window.__hylkiRestore&&window.__hylkiRestore()");
-        deliver_files(&wv, &files, None, &cb);
+        deliver_files(&wv, &files, None, &cb, true);
         wv.grab_focus();
     });
 }
@@ -2616,12 +2646,104 @@ const PASTE_SCRIPT: &str = r#"<script>
     if(/^(p|div|h[1-6]|pre|tr|ul|ol|table|section|article|header|footer)$/.test(tag)) return '\n' + s + '\n';
     return s;
   }
-  window.__hylkiBodyText = function(){
-    return hylkiTxt(document.body, false)
-      .replace(/[ \t]+\n/g, '\n')
+  /* Trailing blanks go, except the one in a signature's "-- " line, which
+     is how a mail client tells the signature from the message. */
+  function tidyTxt(t){
+    return t.replace(/[ \t]+\n/g, function(m, at, all){
+        var start = all.lastIndexOf('\n', at - 1) + 1;
+        return m === ' \n' && at - start === 2 && all.slice(start, at) === '--' ? m : '\n';
+      })
       .replace(/\n{3,}/g, '\n\n')
       .replace(/^\n+|\n+$/g, '');
+  }
+  window.__hylkiBodyText = function(){
+    return tidyTxt(hylkiTxt(document.body, false));
   };
+  /* Plain text (#424) shows the message as it is sent: the document is
+     flattened to the text above, the signature and the "wrote:" line
+     keeping their blocks (and classes) so that changing the From, adding a
+     signature or a cloud link finds them as in rich text. A quote becomes
+     its "> " lines. */
+  function plainTextOf(nodes){
+    var d = document.createElement('div');
+    nodes.forEach(function(n){ d.appendChild(n.cloneNode(true)); });
+    return tidyTxt(hylkiTxt(d, false));
+  }
+  function plainBlock(tag, cls, text){
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    e.innerHTML = text ? text.split('\n').map(esc).join('<br>') : '<br>';
+    return e;
+  }
+  function markOf(n){
+    if(n.nodeType !== 1) return '';
+    if(n.classList.contains('vireo-sig')) return 'vireo-sig';
+    if(n.classList.contains('vireo-quote-attr')) return 'vireo-quote-attr';
+    return '';
+  }
+  /* Whether `el`'s content is text and nothing else: line breaks, blocks
+     with no styling of their own, and (with `quotes`) quotes of the same,
+     which plain text writes as "> " lines. */
+  function plainOk(el, quotes){
+    var keep = quotes ? /^(DIV|P|BR|SPAN|BLOCKQUOTE)$/ : /^(DIV|P|BR|SPAN)$/;
+    var all = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*')));
+    for(var i = 0; i < all.length; i++){
+      var n = all[i];
+      if(n.closest('[data-vireo-ui]')) continue;
+      if(n === document.body) continue;
+      if(!keep.test(n.tagName)) return false;
+      for(var j = 0; j < n.attributes.length; j++){
+        var a = n.attributes[j].name;
+        if(a === 'style'){ if(n.getAttribute('style').trim()) return false; }
+        else if(!/^(class|dir|id|data-.+)$/.test(a)) return false;
+      }
+    }
+    return true;
+  }
+  /* Whether switching to plain text takes anything away: styling,
+     pictures, links, lists. A quote is not lost, only written out. */
+  window.__hylkiPlainLoses = function(){ return !plainOk(document.body, true); };
+  function toPlain(){
+    var b = document.body, segs = [], run = [];
+    var flush = function(){ segs.push(['div', '', plainTextOf(run)]); run = []; };
+    Array.prototype.slice.call(b.childNodes).forEach(function(n){
+      if(n.nodeType === 1 && n.hasAttribute('data-vireo-ui')) return;
+      var mark = markOf(n);
+      if(!mark){ run.push(n); return; }
+      flush();
+      segs.push([n.tagName === 'P' ? 'p' : 'div', mark, plainTextOf([n])]);
+    });
+    flush();
+    var out = document.createDocumentFragment();
+    /* The first block stays even when empty: it is the line a new
+       message or a reply is typed on. */
+    segs.forEach(function(g, i){
+      if(g[2] || i === 0) out.appendChild(plainBlock(g[0], g[1], g[2]));
+    });
+    b.textContent = '';
+    b.appendChild(out);
+  }
+  /* What the composer runs after putting HTML of its own into a plain
+     text body (a signature, a cloud link): any block that is not plain
+     text yet is made so. */
+  window.__hylkiPlainFix = function(){
+    if(!window.__hylkiPlain) return;
+    Array.prototype.slice.call(document.body.children).forEach(function(n){
+      if(n.hasAttribute('data-vireo-ui') || plainOk(n, false)) return;
+      n.replaceWith(plainBlock(n.tagName === 'P' ? 'p' : 'div', markOf(n), plainTextOf([n])));
+    });
+  };
+  if(window.__hylkiPlain){
+    document.addEventListener('DOMContentLoaded', toPlain);
+    /* Bold, italic and underline are WebKit's own keys, not the
+       toolbar's: in plain text they would show what is never sent. */
+    document.addEventListener('keydown', function(e){
+      if((e.ctrlKey || e.metaKey) && !e.altKey && /^[biu]$/i.test(e.key)) e.preventDefault();
+    }, true);
+    document.addEventListener('beforeinput', function(e){
+      if(/^format/.test(e.inputType || '')) e.preventDefault();
+    }, true);
+  }
   /* Sending, and only sending: recut first, then read with the marks taken
      out. A draft is saved through the plain reader above, so quality is
      never lost to a save. */
@@ -2706,6 +2828,15 @@ const PASTE_SCRIPT: &str = r#"<script>
   }
   document.addEventListener('paste', function(e){
     var cd = e.clipboardData; if(!cd) return;
+    /* Plain text takes the clipboard's text and nothing else: no
+       formatting, no picture, no link made of an address. */
+    if(window.__hylkiPlain){
+      window.__hylkiPasteOnce = null;
+      e.preventDefault();
+      var t = cd.getData('text/plain');
+      if(t) document.execCommand('insertHTML', false, esc(t).replace(/\r\n|\r|\n/g, '<br>'));
+      return;
+    }
     /* An image on the clipboard beats any text flavour riding along with it,
        and pastes inline whichever paste mode is set. */
     var its = cd.items || [];
@@ -2738,7 +2869,13 @@ const PASTE_SCRIPT: &str = r#"<script>
 /// the theme's own view background (#148), read through `webview`, so a
 /// custom GNOME theme reaches the editor as it does the reader — `Canvas`
 /// would be WebKit's stock shade whatever the theme says.
-fn document(content: &str, webview: &webkit6::WebView, image_policy: &str) -> String {
+///
+/// With `plain` set the document is the plain-text view (#424): it
+/// flattens what it is given to the text that is sent once it has parsed
+/// it, and shows it in the desktop's monospace font. Every block of the
+/// body is a paragraph there, a line's height above the next, because
+/// that is the empty line the sent text has between them.
+fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain: bool) -> String {
     let dark = adw::StyleManager::default().is_dark();
     let scheme = if dark { "dark" } else { "light" };
     let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
@@ -2746,10 +2883,27 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str) -> St
     let return_paragraph = crate::config::load_privacy().return_paragraph;
     let script = format!(
         "<script>window.__hylkiPasteRich={paste_rich};\
-         window.__hylkiReturnParagraph={return_paragraph};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}{EMOJI_SCRIPT}"
+         window.__hylkiReturnParagraph={return_paragraph};\
+         window.__hylkiPlain={plain};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}{EMOJI_SCRIPT}"
     );
+    let (plain_attr, plain_css) = if plain {
+        let mono = monospace_family();
+        (
+            " data-plain",
+            format!(
+                "html[data-plain] body{{font:13px/1.6 {mono};}}\
+                 html[data-plain] body *{{font:inherit!important;color:inherit;\
+                   background:transparent;text-decoration:none;opacity:1;\
+                   margin:0;padding:0;border:0;}}\
+                 html[data-plain] body>*{{margin:0 0 1.6em;}}\
+                 html[data-plain] body>*:last-child{{margin-bottom:0;}}"
+            ),
+        )
+    } else {
+        ("", String::new())
+    };
     format!(
-        "<!doctype html><html><head><meta charset=\"utf-8\">\
+        "<!doctype html><html{plain_attr}><head><meta charset=\"utf-8\">\
          <meta name=\"color-scheme\" content=\"{scheme}\">{image_policy}\
          <style>\
            :root{{color-scheme:{scheme};}}\
@@ -2783,6 +2937,7 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str) -> St
              color-scheme:light;}}\
            .vireo-sig{{opacity:0.85;}}\
            a{{color:#3584e4;}}\
+           {plain_css}\
          </style>{script}\
          <script>window.__hylkiDirty=false;\
            document.addEventListener('input',function(){{window.__hylkiDirty=true;}},true);\
@@ -2814,7 +2969,7 @@ fn source_document(text: &str, webview: &webkit6::WebView) -> String {
            textarea{{display:block;width:100%;height:100%;box-sizing:border-box;\
              border:0;outline:none;resize:none;padding:18px 20px;\
              background:{ground};color:CanvasText;\
-             font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;\
+             font:13px/1.6 {mono};\
              tab-size:2;}}\
          </style></head><body>\
          <textarea id=\"src\" dir=\"auto\" spellcheck=\"true\" autocapitalize=\"off\" \
@@ -2838,8 +2993,34 @@ fn source_document(text: &str, webview: &webkit6::WebView) -> String {
            t.focus();t.setSelectionRange(0,0);\
          }})();\
          </script>{HISTORY_SCRIPT}{EMOJI_SCRIPT}</body></html>",
-        text = gtk::glib::markup_escape_text(text)
+        text = gtk::glib::markup_escape_text(text),
+        mono = monospace_family(),
     )
+}
+
+/// The desktop's monospace font as a CSS family list, for the plain-text
+/// and source views: the family picked for terminals and code, with the
+/// generic family behind it. Read once, since asking costs a round trip to
+/// the settings portal.
+fn monospace_family() -> String {
+    static FAMILY: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    FAMILY
+        .get_or_init(|| css_monospace_family(&crate::desktop::monospace_font()))
+        .clone()
+}
+
+/// A Pango font description's families, quoted, then `monospace`.
+fn css_monospace_family(desc: &str) -> String {
+    let fd = gtk::pango::FontDescription::from_string(desc);
+    let family = fd.family().map(|f| f.to_string()).unwrap_or_default();
+    let mut families: Vec<String> = family
+        .split(',')
+        .map(str::trim)
+        .filter(|f| !f.is_empty() && !f.eq_ignore_ascii_case("monospace"))
+        .map(|f| format!("\"{}\"", f.replace(['\\', '"', '<', '>', '{', '}', ';'], "")))
+        .collect();
+    families.push("monospace".to_string());
+    families.join(",")
 }
 
 /// The preview document: the message as the recipient would see it, on the
@@ -3195,5 +3376,17 @@ mod body_tests {
             ("<p>Hi</p>".to_string(), "Hi\nthere \u{0} \"quoted\"".to_string())
         );
         assert_eq!(split_body("null"), (String::new(), String::new()));
+    }
+
+    /// The plain-text view's font is the desktop's monospace family, quoted
+    /// so a name with spaces or digits holds, with the generic one behind
+    /// it (#424).
+    #[test]
+    fn plain_text_uses_the_desktop_monospace_family() {
+        assert_eq!(css_monospace_family("Adwaita Mono 11"), "\"Adwaita Mono\",monospace");
+        assert_eq!(css_monospace_family("Source Code Pro Bold 10"), "\"Source Code Pro\",monospace");
+        assert_eq!(css_monospace_family("Monospace 10"), "monospace");
+        assert_eq!(css_monospace_family(""), "monospace");
+        assert_eq!(css_monospace_family("Evil\"}body{x 10"), "\"Evilbodyx\",monospace");
     }
 }

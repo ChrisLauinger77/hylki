@@ -5101,6 +5101,25 @@ impl SimpleComponent for AppModel {
                 // body (a textarea) instead of the rich document, to
                 // `backspace` to trim text rather than type it, or to
                 // `pause` to leave a long gap between two runs of typing.
+                // HYLKI_SHOWCASE_COMPOSE_FORMAT=plain@6,rich@10 switches the
+                // inline composer's format at those moments (#424). Pair
+                // with HYLKI_SHOWCASE_REPLY.
+                if let Ok(steps) = std::env::var("HYLKI_SHOWCASE_COMPOSE_FORMAT") {
+                    for step in steps.split(',') {
+                        let (name, at) = showcase_at(step, 6);
+                        let format = match name {
+                            "rich" => config::ComposeFormat::Rich,
+                            "markdown" => config::ComposeFormat::Markdown,
+                            "html" => config::ComposeFormat::Html,
+                            "plain" => config::ComposeFormat::Plain,
+                            _ => continue,
+                        };
+                        let s = sender.clone();
+                        gtk::glib::timeout_add_seconds_local_once(at, move || {
+                            s.input(AppMsg::ShowcaseComposeFormat(format));
+                        });
+                    }
+                }
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_COMPOSE_UNDO") {
                     let format = match which.as_str() {
                         "markdown" => Some(config::ComposeFormat::Markdown),

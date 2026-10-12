@@ -3538,6 +3538,16 @@ msgstr "Escribe algo primero o selecciona el texto que quieras traducir."
 msgid "Could not translate"
 msgstr "No se pudo traducir"
 
+#, fuzzy
+msgid "Switch to plain text?"
+msgstr "Pegar como texto sin formato"
+
+msgid "Formatting, images and links are removed."
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr "No se puede enviar con OpenPGP"
 

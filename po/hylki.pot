@@ -3178,6 +3178,15 @@ msgstr ""
 msgid "Could not translate"
 msgstr ""
 
+msgid "Switch to plain text?"
+msgstr ""
+
+msgid "Formatting, images and links are removed."
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Cannot send with OpenPGP"
 msgstr ""
 
