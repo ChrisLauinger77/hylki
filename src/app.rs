@@ -2033,7 +2033,10 @@ impl SimpleComponent for AppModel {
                                 },
                             },
                             pack_end = &gtk::MenuButton {
-                                set_icon_name: "open-menu-symbolic",
+                                // Hylki's own copy of the three bars: an icon of
+                                // the GNOME name from a theme or another program
+                                // drew a gear on some systems.
+                                set_icon_name: "hylki-open-menu-symbolic",
                                 set_tooltip_text: Some(i18n("Main Menu").as_str()),
                                 add_css_class: "flat",
                                 set_menu_model: Some(&model.menu),
@@ -2067,7 +2070,7 @@ impl SimpleComponent for AppModel {
                             pack_start: &model.sidebar_refresh,
                             #[name = "sidebar_menu"]
                             pack_end = &gtk::MenuButton {
-                                set_icon_name: "open-menu-symbolic",
+                                set_icon_name: "hylki-open-menu-symbolic",
                                 set_tooltip_text: Some(i18n("Main Menu").as_str()),
                                 add_css_class: "flat",
                                 set_menu_model: Some(&model.menu),
