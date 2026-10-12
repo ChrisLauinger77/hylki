@@ -528,6 +528,13 @@ name, surname or address starts with them, and the answers join the
 suggestions from GNOME Contacts and your mail. Nothing is copied from the
 directory to your machine.
 
+The search in Contacts asks the directories the same way. The people they
+hold are listed after your contacts, under **In Directories**, with the
+directory's name beside each address. Selecting one shows the entry: an
+address starts a message, and **Add to Contacts** copies the person into the
+default address book. A directory switched on in Evolution is searched
+without restarting Hylki.
+
 A directory is an address book in Evolution Data Server, the service GNOME
 Contacts and Evolution keep theirs in. Hylki adds no LDAP client of its own,
 so a directory set up in Evolution is listed here as well, and one added
@@ -547,11 +554,17 @@ here shows in Evolution. Removing one removes it for both.
   `cn=jane,ou=people,dc=example,dc=com`, and its password. Leave both empty
   for a directory that can be searched anonymously. The password is kept in
   the keyring and handed to Evolution Data Server when the directory asks
-  for it.
+  for it. A directory set up in Evolution with its password remembered needs
+  none in Hylki: Evolution Data Server signs in with the one Evolution
+  stored.
 
 Saving checks the connection and says whether the directory answered, or
 why not (a password it refused, a server it could not reach or find, TLS
-that could not start). The check gives up after 30 seconds. The Flatpak
+that could not start). The check gives up after 30 seconds. A directory
+that fails during a search, such as one that needs a password neither
+Hylki nor Evolution has, says why once in the status bar and in its row in
+Settings → LDAP Directories, and is left alone for 30 seconds before it is
+asked again. The Flatpak
 reaches the desktop's Evolution Data Server, which has to be installed on
 the system, as it is with GNOME.
 

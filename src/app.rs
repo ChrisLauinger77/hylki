@@ -1930,6 +1930,8 @@ pub enum AppMsg {
     Unsent { account_id: u32, message: Box<crate::worker::OutgoingMessage> },
     Status { account_id: u32, text: String },
     Error { account_id: u32, text: String, connectivity: bool },
+    /// An LDAP directory could not be asked (#307), said once per failure.
+    DirectoryError(String),
     NotifyCount(usize),
     StatusBarShown(bool),
     ToggleNotifications,
@@ -2990,6 +2992,7 @@ impl SimpleComponent for AppModel {
                         AppMsg::DeleteContact { book_uid, uid }
                     }
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
+                    ContactsPageOutput::DirectoryError(text) => AppMsg::DirectoryError(text),
                     ContactsPageOutput::ShowPhoto { name, data } => {
                         // The lightbox routes by extension — a bare contact
                         // name sent the JPEG down the PDF path, where poppler
@@ -5293,15 +5296,21 @@ impl SimpleComponent for AppModel {
                         }
                     });
                 }
-                // HYLKI_SHOWCASE_CONTACTS=list|new opens Contacts at 3s,
-                // and with "new" its editor for a new contact at 5s.
+                // HYLKI_SHOWCASE_CONTACTS=list|new|search:<text> opens
+                // Contacts at 3s, and with "new" its editor for a new contact
+                // at 5s, or with "search:" types the text into its search
+                // then, so the directories are asked too (#307).
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
+                    let page = model.contacts_page.sender().clone();
                     if which == "new" {
-                        let page = model.contacts_page.sender().clone();
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
                             let _ = page.send(ContactsPageInput::NewContact);
+                        });
+                    } else if let Some(text) = which.strip_prefix("search:").map(str::to_string) {
+                        gtk::glib::timeout_add_seconds_local_once(5, move || {
+                            let _ = page.send(ContactsPageInput::SetSearch(text));
                         });
                     }
                 }
@@ -11505,6 +11514,10 @@ impl SimpleComponent for AppModel {
                 });
             }
 
+            AppMsg::DirectoryError(text) => {
+                self.notifications.emit(NotifyInput::Push { text, error: true, connectivity: false });
+            }
+
             AppMsg::NotifyCount(n) => self.notify_count = n,
             AppMsg::ToggleNotifications => self.notifications.emit(NotifyInput::ToggleBar),
             AppMsg::StatusBarShown(shown) => {
@@ -16795,6 +16808,7 @@ impl AppModel {
                 ComposeOutput::SetSpellcheckLangs(langs) => {
                     AppMsg::Pref(PrefOutput::SetSpellcheckLangs(langs))
                 }
+                ComposeOutput::DirectoryError(text) => AppMsg::DirectoryError(text),
             })
     }
 
