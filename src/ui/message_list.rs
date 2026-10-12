@@ -1000,7 +1000,9 @@ pub enum MessageListInput {
     RowAction { action: RowAction, message: Box<Message> },
     SetStarred { slot: (u32, u32, u32), starred: bool },
     /// A message's keywords changed (a tag put on or taken off, #71).
-    SetKeywords { slot: (u32, u32, u32), keywords: Vec<String> },
+    /// A message's keywords and Gmail labels changed (a tag put on or
+    /// taken off, #374).
+    SetKeywords { slot: (u32, u32, u32), keywords: Vec<String>, labels: Vec<String> },
     /// The tag definitions changed: rows rebuild their chips.
     SetTags(Vec<crate::config::Tag>),
     /// A row's tag menu toggled a tag — passed up to the app.
@@ -2403,8 +2405,14 @@ impl SimpleComponent for MessageList {
                 self.update_message(|m| thread_slot(m) == slot, |m| m.starred = starred);
                 self.refresh_thread_head(slot);
             }
-            MessageListInput::SetKeywords { slot, keywords } => {
-                self.update_message(|m| thread_slot(m) == slot, |m| m.keywords = keywords.clone());
+            MessageListInput::SetKeywords { slot, keywords, labels } => {
+                self.update_message(
+                    |m| thread_slot(m) == slot,
+                    |m| {
+                        m.keywords = keywords.clone();
+                        m.labels = labels.clone();
+                    },
+                );
             }
             MessageListInput::SetTags(tags) => {
                 if *self.shared.tags.borrow() != tags {
@@ -2978,9 +2986,10 @@ impl MessageList {
     fn bulk_tag_entries(&self, sender: &ComponentSender<Self>) -> Vec<MenuEntry> {
         let messages = self.selected_messages();
         let Some(first) = messages.first() else { return Vec::new() };
-        let mut all = first.clone();
-        all.keywords.retain(|k| messages.iter().all(|m| m.has_keyword(k)));
         let tags = self.shared.tags.borrow().clone();
+        let mut all = first.clone();
+        all.keywords = first.tag_keywords(&tags);
+        all.keywords.retain(|k| messages.iter().all(|m| m.tag_keywords(&tags).iter().any(|x| x.eq_ignore_ascii_case(k))));
         let s = sender.clone();
         tag_menu_entries(&tags, &all, move |keyword, add| {
             let _ = s.output(MessageListOutput::SetTagMany { messages: messages.clone(), keyword, add });

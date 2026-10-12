@@ -1195,6 +1195,31 @@ impl Message {
         }
     }
 
+    /// Whether the message carries `tag`: its keyword, or on Gmail a label
+    /// named like it (#374), which is how a tag set in Gmail itself arrives.
+    pub fn has_tag(&self, tag: &crate::config::Tag) -> bool {
+        self.has_keyword(&tag.keyword) || self.labels.iter().any(|l| label_names_tag(l, tag))
+    }
+
+    /// The message's keywords, with the keyword of every tag a Gmail label
+    /// stands for: what the tag checks go by.
+    pub fn tag_keywords(&self, tags: &[crate::config::Tag]) -> Vec<String> {
+        let mut out = self.keywords.clone();
+        for t in tags {
+            if !self.has_keyword(&t.keyword) && self.labels.iter().any(|l| label_names_tag(l, t)) {
+                out.push(t.keyword.clone());
+            }
+        }
+        out
+    }
+
+    /// Take a tag off this copy of the message: its keyword and the labels
+    /// that stand for it.
+    pub fn drop_tag(&mut self, tag: &crate::config::Tag) {
+        self.set_keyword(&tag.keyword, false);
+        self.labels.retain(|l| !label_names_tag(l, tag));
+    }
+
     /// The pills the message wears in the list and the reader; see [`pills`].
     pub fn pills<'a>(&self, tags: &'a [crate::config::Tag]) -> Vec<Pill<'a>> {
         pills(&self.keywords, &self.labels, tags)
@@ -1283,6 +1308,12 @@ pub fn pills<'a>(
         }
     }
     out
+}
+
+/// Whether a Gmail label (as the server writes it, modified UTF-7) stands for
+/// a tag: named like its keyword, or like its name.
+pub fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
+    tag.keyword.eq_ignore_ascii_case(label) || tag.name.eq_ignore_ascii_case(&crate::mutf7::decode(label))
 }
 
 /// A short date for a single line: the time for today, the day and month
@@ -1408,6 +1439,30 @@ mod tests {
         );
         assert!(pills(&[], &[], &tags).is_empty());
         assert_eq!(pills(&[], &["&AAA-".to_string()], &[]), [Pill::Label(" ".into())]);
+    }
+
+    /// #374: a Gmail label named like a tag is the tag, for every check that
+    /// asks; taking the tag off takes those labels too.
+    #[test]
+    fn a_label_named_like_a_tag_is_the_tag() {
+        let tag = |name: &str, keyword: &str| crate::config::Tag {
+            name: name.into(),
+            keyword: keyword.into(),
+            color: "#1c71d8".into(),
+        };
+        let work = tag("Work", "$label2");
+        let ete = tag("Été", "ete");
+        let mut m = crate::backend::MockBackend::new().message(1).expect("a demo message");
+        m.keywords.clear();
+        m.labels = vec!["work".into(), "&AMk-t&AOk-".into(), "Other".into()];
+        assert!(m.has_tag(&work) && m.has_tag(&ete));
+        assert!(!m.has_tag(&tag("Home", "home")));
+        assert_eq!(m.tag_keywords(&[work.clone(), ete.clone()]), ["$label2", "ete"]);
+        m.keywords = vec!["$Label2".into()];
+        assert_eq!(m.tag_keywords(&[work.clone()]), ["$Label2"], "no second copy of a keyword it has");
+        m.drop_tag(&work);
+        assert!(!m.has_tag(&work) && m.keywords.is_empty());
+        assert_eq!(m.labels, ["&AMk-t&AOk-", "Other"]);
     }
 
     /// #334: each priority header's spellings, and normal for anything else.

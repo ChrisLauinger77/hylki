@@ -2045,7 +2045,25 @@ async fn run_imap(
 
             MailRequest::SetKeyword { path, uid, message_id, keyword, add } => {
                 let sess = session.as_mut().unwrap();
-                match store_keyword(sess, &path, uid, &keyword, add).await {
+                let stored = store_keyword(sess, &path, uid, &keyword, add).await;
+                // On Gmail a tag is a label too (#374), so Gmail's own apps
+                // show it; the keyword stays for other IMAP clients.
+                if stored.is_ok() && gmail_labels_wanted(account_id) {
+                    let labels = tag_labels(&keyword, add);
+                    match store_gmail_labels(sess, uid, &labels, add).await {
+                        Ok(()) => {
+                            if let Some(c) = cache.as_ref() {
+                                c.set_gmail_label(account_id, &path, uid, &labels, add);
+                            }
+                            // A new label is a new folder on Gmail.
+                            if add {
+                                folder_refresh_due = true;
+                            }
+                        }
+                        Err(e) => tracing::warn!("[account {account_id}] could not set Gmail label: {e}"),
+                    }
+                }
+                match stored {
                     Ok(true) => {
                         if let Some(c) = cache.as_ref() {
                             c.set_keyword(account_id, &path, uid, &keyword, add);
@@ -6058,6 +6076,40 @@ async fn store_keyword(
         .try_collect()
         .await?;
     Ok(true)
+}
+
+/// The Gmail labels a tag means (#374), as the server writes label names:
+/// the tag's name when it is put on; when it comes off, every label that
+/// stands for it, its name's and its keyword's.
+fn tag_labels(keyword: &str, add: bool) -> Vec<String> {
+    let name = crate::config::load_tags()
+        .into_iter()
+        .find(|t| t.keyword.eq_ignore_ascii_case(keyword))
+        .map(|t| t.name)
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or_else(|| keyword.to_string());
+    let mut out = vec![crate::mutf7::encode(&name)];
+    if !add && !name.eq_ignore_ascii_case(keyword) {
+        out.push(crate::mutf7::encode(keyword));
+    }
+    out
+}
+
+/// Put Gmail labels on a message in the selected folder, or take them off.
+async fn store_gmail_labels(
+    session: &mut ImapSession,
+    uid: u32,
+    labels: &[String],
+    add: bool,
+) -> Result<(), async_imap::error::Error> {
+    let quoted: Vec<String> =
+        labels.iter().map(|l| format!("\"{}\"", l.replace('\\', "\\\\").replace('"', "\\\""))).collect();
+    let op = if add { "+X-GM-LABELS" } else { "-X-GM-LABELS" };
+    let _: Vec<Fetch> = store_uids(session, uid.to_string(), format!("{op} ({})", quoted.join(" ")))
+        .await?
+        .try_collect()
+        .await?;
+    Ok(())
 }
 
 /// Move a message to `dest`, creating (and subscribing to) the destination

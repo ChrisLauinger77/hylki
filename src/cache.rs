@@ -1552,6 +1552,28 @@ impl Cache {
 
     /// Store the Gmail labels read for these uids; returns how many rows
     /// changed.
+    /// Add Gmail labels to one cached message, or take them off (#374): what
+    /// tagging on Gmail changed, before the next sync says it again.
+    pub fn set_gmail_label(&self, account_id: u32, folder_path: &str, uid: u32, labels: &[String], add: bool) {
+        let current: String = self
+            .conn
+            .query_row(
+                "SELECT gmail_labels FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+                params![account_id, folder_path, uid],
+                |r| r.get(0),
+            )
+            .unwrap_or_default();
+        let mut list = split_labels(current);
+        list.retain(|l| !labels.iter().any(|x| x.eq_ignore_ascii_case(l)));
+        if add {
+            list.extend(labels.iter().cloned());
+        }
+        let _ = self.conn.execute(
+            "UPDATE messages SET gmail_labels = ?1 WHERE account_id = ?2 AND folder_path = ?3 AND uid = ?4",
+            params![join_labels(&list), account_id, folder_path, uid],
+        );
+    }
+
     pub fn set_gmail_labels(
         &self,
         account_id: u32,
@@ -2480,19 +2502,24 @@ impl Cache {
     /// Every cached message of the account carrying `keyword` — on the server
     /// or locally — newest first, with the folder each sits in. Backs the
     /// sidebar's tag views (#71); the caller maps paths to folder ids and
-    /// drops the copies Gmail keeps per label.
-    pub fn messages_with_keyword(&self, account_id: u32, keyword: &str) -> Vec<(String, Message)> {
+    /// drops the copies Gmail keeps per label. `name` is the tag's name: on
+    /// Gmail a label named like the tag (or like its keyword) counts as the
+    /// tag too (#374).
+    pub fn messages_with_keyword(&self, account_id: u32, keyword: &str, name: &str) -> Vec<(String, Message)> {
         let needle = format!(" {} ", keyword.to_ascii_lowercase());
+        let label = |s: &str| format!("{sep}{}{sep}", crate::mutf7::encode(s).to_lowercase(), sep = LABEL_SEP);
         let sql = format!(
             "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
                     has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels \
              FROM messages \
-             WHERE account_id = ?1 AND instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0 \
+             WHERE account_id = ?1 AND (instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0 \
+                   OR (gmail_labels <> '' AND (instr(?4 || lower(gmail_labels) || ?4, ?5) > 0 \
+                                               OR instr(?4 || lower(gmail_labels) || ?4, ?6) > 0))) \
              ORDER BY ts DESC LIMIT ?3"
         );
         let run = || -> rusqlite::Result<Vec<(String, Message)>> {
             let mut stmt = self.conn.prepare(&sql)?;
-            let rows = stmt.query_map(params![account_id, needle, TAG_VIEW_LIMIT], |row| {
+            let rows = stmt.query_map(params![account_id, needle, TAG_VIEW_LIMIT, LABEL_SEP.to_string(), label(keyword), label(name)], |row| {
                 let uid: u32 = row.get(1)?;
                 let mut m = Message {
                     id: uid,
@@ -3037,8 +3064,14 @@ mod tests {
         };
         c.upsert_messages(1, "INBOX", std::slice::from_ref(&m));
         assert_eq!(c.load_messages(1, "INBOX", 1), [m.clone()]);
-        let (_, by_keyword) = c.messages_with_keyword(1, "$label1").pop().unwrap();
+        let (_, by_keyword) = c.messages_with_keyword(1, "$label1", "Urgent").pop().unwrap();
         assert_eq!(by_keyword.labels, m.labels);
+        // A label named like a tag finds the message for that tag (#374),
+        // whatever its case, the non-ASCII one included.
+        assert_eq!(c.messages_with_keyword(1, "work-kw", "my label").len(), 1);
+        assert_eq!(c.messages_with_keyword(1, "x", "été").len(), 1);
+        assert_eq!(c.messages_with_keyword(1, "x", "Work").len(), 0, "a nested label is its own name");
+        assert_eq!(c.messages_with_keyword(1, "nothing", "Nothing").len(), 0);
 
         // A label taken off in Gmail comes off here at the next sync.
         m.labels.clear();

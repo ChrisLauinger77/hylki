@@ -265,8 +265,15 @@ lists at most 5,000 messages per account. They are kept in
 On a Gmail account, the labels Gmail has on a message show as pills beside
 its tags, in the message list and the reader. Gmail's own labels, such as
 Inbox, Important and Starred, are left out, as is the label of the folder
-being read. A label with the same name or keyword as a tag shows as that
-tag. Labels are read with each sync of a folder's newest mail; mail synced
+being read. A label with the same name or keyword as a tag is that tag: it
+shows as the tag, the tag's view in the sidebar lists the message, and
+smart folders and the tag menus count it.
+
+Tagging a message on a Gmail account puts a label named like the tag on it,
+so Gmail's own apps show the tag too, and keeps the IMAP keyword other mail
+programs read; taking the tag off removes both. A label Hylki has just made
+appears as a folder after the next folder check, as every Gmail label does.
+Labels are read with each sync of a folder's newest mail; mail synced
 before Hylki read labels gets them once, in the background.
 
 ### Hiding folders

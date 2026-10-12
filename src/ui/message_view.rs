@@ -1157,7 +1157,7 @@ pub enum MessageViewInput {
     SetCardStar { account_id: u32, id: u32, starred: bool },
     /// A message's keywords changed (#71): the card's chips are patched in
     /// place, like the star.
-    SetCardKeywords { account_id: u32, id: u32, keywords: Vec<String> },
+    SetCardKeywords { account_id: u32, id: u32, keywords: Vec<String>, labels: Vec<String> },
     /// The tag definitions changed: re-render with the new names and colors.
     SetTags(Vec<crate::config::Tag>),
     /// Read-marking policy changed (#100).
@@ -3504,23 +3504,19 @@ impl Component for MessageView {
                     }
                 }
             }
-            MessageViewInput::SetCardKeywords { account_id, id, keywords } => {
+            MessageViewInput::SetCardKeywords { account_id, id, keywords, labels } => {
                 for m in self.thread.iter_mut() {
                     if m.account_id == account_id && m.id == id {
                         m.keywords = keywords.clone();
+                        m.labels = labels.clone();
                     }
                 }
                 if let Some(c) = self.current.as_mut() {
                     if c.account_id == account_id && c.id == id {
                         c.keywords = keywords.clone();
+                        c.labels = labels.clone();
                     }
                 }
-                let labels = self
-                    .thread
-                    .iter()
-                    .find(|m| m.account_id == account_id && m.id == id)
-                    .map(|m| m.labels.clone())
-                    .unwrap_or_default();
                 let chips = tag_chips_html(&self.tags, &keywords, &labels);
                 let js = format!(
                     "(function(){{\

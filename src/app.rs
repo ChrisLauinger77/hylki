@@ -376,6 +376,8 @@ const SMART_VIEW_LIMIT: usize = 5000;
 struct SmartContext {
     /// The tags' keywords, lower case.
     tags: Vec<String>,
+    /// The tags themselves, for the Gmail labels that stand for them (#374).
+    tag_list: Vec<config::Tag>,
     contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
 }
 
@@ -400,7 +402,7 @@ impl SmartContext {
             starred: m.starred,
             unread: m.unread,
             attachment: m.has_attachment,
-            keywords: &m.keywords,
+            keywords: &m.tag_keywords(&self.tag_list),
             tags: &self.tags,
         })
     }
@@ -12001,7 +12003,7 @@ impl AppModel {
                     let keywords: Vec<String> = self
                         .tags
                         .iter()
-                        .filter(|t| target.has_keyword(&t.keyword))
+                        .filter(|t| target.has_tag(t))
                         .map(|t| t.keyword.clone())
                         .collect();
                     for keyword in keywords {
@@ -13287,7 +13289,7 @@ impl AppModel {
                 }
                 FlagKind::Star => m.starred != value,
                 FlagKind::Tag(keyword) => {
-                    m.has_keyword(keyword) != value
+                    self.carries_tag(m, keyword) != value
                         && self.outbox_item(m.account_id, m.id).is_none()
                 }
             };
@@ -14217,7 +14219,8 @@ impl AppModel {
         let target = match many.first() {
             Some(first) => {
                 let mut all = first.clone();
-                all.keywords.retain(|k| many.iter().all(|m| m.has_keyword(k)));
+                all.keywords = first.tag_keywords(&self.tags);
+                all.keywords.retain(|k| many.iter().all(|m| self.carries_tag(m, k)));
                 all
             }
             None => self.reply_target()?,
@@ -15251,8 +15254,11 @@ impl AppModel {
                 continue;
             }
             for m in messages.iter_mut().filter(|m| m.uid == *uid) {
-                if m.has_keyword(kw) != *on {
-                    m.set_keyword(kw, *on);
+                if self.carries_tag(m, kw) != *on {
+                    match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(kw)) {
+                        Some(t) if !*on => m.drop_tag(t),
+                        _ => m.set_keyword(kw, *on),
+                    }
                 }
             }
         }
@@ -19021,7 +19027,16 @@ impl AppModel {
         }
         self.tag_view_loading = true;
         let (scope, kw) = key.clone();
-        let keywords = self.tag_view_keywords(&kw);
+        // Each keyword with its tag's name, which a Gmail label goes by.
+        let keywords: Vec<(String, String)> = self
+            .tag_view_keywords(&kw)
+            .into_iter()
+            .map(|k| {
+                let name = self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(&k)).map(|t| t.name.clone());
+                let name = name.unwrap_or_else(|| k.clone());
+                (k, name)
+            })
+            .collect();
         let accounts: Vec<u32> = self
             .accounts
             .iter()
@@ -19033,8 +19048,8 @@ impl AppModel {
             let mut rows: Vec<(u32, String, Message)> = Vec::new();
             if let Ok(cache) = crate::cache::Cache::open() {
                 for account_id in accounts {
-                    for kw in &keywords {
-                        for (path, m) in cache.messages_with_keyword(account_id, kw) {
+                    for (kw, name) in &keywords {
+                        for (path, m) in cache.messages_with_keyword(account_id, kw, name) {
                             rows.push((account_id, path, m));
                         }
                     }
@@ -19081,6 +19096,7 @@ impl AppModel {
     fn smart_context(&self, f: &config::SmartFolder) -> SmartContext {
         SmartContext {
             tags: self.tags.iter().map(|t| t.keyword.to_lowercase()).collect(),
+            tag_list: self.tags.clone(),
             contacts: if f.needs_contacts() { self.saved_addresses.get() } else { None },
         }
     }
@@ -19367,13 +19383,22 @@ impl AppModel {
         targets
     }
 
+    /// Whether a message carries the tag with this keyword: the keyword, or
+    /// a Gmail label standing for the tag (#374).
+    fn carries_tag(&self, m: &Message, keyword: &str) -> bool {
+        match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
+            Some(t) => m.has_tag(t),
+            None => m.has_keyword(keyword),
+        }
+    }
+
     /// Toggle a tag on `targets`: on all of them, or off all of them once
     /// every one carries it (#313).
     fn toggle_tag(&mut self, keyword: String, targets: &[Message]) {
         if targets.is_empty() {
             return;
         }
-        let add = !targets.iter().all(|m| m.has_keyword(&keyword));
+        let add = !targets.iter().all(|m| self.carries_tag(m, &keyword));
         let what = self.tag_label(&keyword, add);
         self.user_set_flags(what, targets, FlagKind::Tag(keyword), add);
     }
@@ -19398,34 +19423,42 @@ impl AppModel {
             add,
         });
         let mut patched = m.clone();
-        patched.set_keyword(keyword, add);
-        let keywords = patched.keywords.clone();
+        // Taking a tag off takes the Gmail labels that stand for it too
+        // (#374), or its pill would stay.
+        match self.tags.iter().find(|t| t.keyword.eq_ignore_ascii_case(keyword)) {
+            Some(t) if !add => patched.drop_tag(t),
+            _ => patched.set_keyword(keyword, add),
+        }
+        let (keywords, labels) = (patched.keywords.clone(), patched.labels.clone());
         let (aid, fid, id) = (m.account_id, m.folder_id, m.id);
         let same = |c: &Message| c.account_id == aid && c.id == id;
+        let patch = |c: &mut Message| {
+            c.keywords = keywords.clone();
+            c.labels = labels.clone();
+        };
         if let Some(msgs) = self.message_cache.get_mut(&(aid, fid)) {
-            for c in msgs.iter_mut().filter(|c| same(c)) {
-                c.keywords = keywords.clone();
-            }
+            msgs.iter_mut().filter(|c| same(c)).for_each(patch);
         }
         if let Some(msgs) = self.unified_slices.get_mut(&(aid, fid)) {
-            for c in msgs.iter_mut().filter(|c| same(c)) {
-                c.keywords = keywords.clone();
-            }
+            msgs.iter_mut().filter(|c| same(c)).for_each(patch);
         }
-        for tm in self.current_thread.iter_mut().filter(|c| same(c)) {
-            tm.keywords = keywords.clone();
-        }
+        self.current_thread.iter_mut().filter(|c| same(c)).for_each(patch);
         if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
-            cur.keywords = keywords.clone();
+            patch(cur);
         }
-        self.message_list.emit(MessageListInput::SetKeywords { slot: (aid, fid, id), keywords: keywords.clone() });
+        self.message_list.emit(MessageListInput::SetKeywords {
+            slot: (aid, fid, id),
+            keywords: keywords.clone(),
+            labels: labels.clone(),
+        });
         self.message_view.emit(MessageViewInput::SetCardKeywords {
             account_id: aid,
             id,
             keywords: keywords.clone(),
+            labels: labels.clone(),
         });
         if let Some(p) = self.popouts.get(&(aid, id)) {
-            p.controller.emit(MessageWindowInput::SetKeywords(keywords));
+            p.controller.emit(MessageWindowInput::SetKeywords(keywords, labels));
         }
         // In this tag's own view an untagged message has no row to keep.
         if !add
@@ -20696,12 +20729,12 @@ impl AppModel {
             if let Some(src) = &src {
                 let wanted: Vec<(String, String)> = matching
                     .iter()
-                    .filter(|r| !r.tag.is_empty() && !m.has_keyword(&r.tag))
+                    .filter(|r| !r.tag.is_empty() && !self.carries_tag(&m, &r.tag))
                     .filter(|r| self.tags.iter().any(|t| t.keyword.eq_ignore_ascii_case(&r.tag)))
                     .map(|r| (r.tag.clone(), r.label()))
                     .collect();
                 for (tag, rule) in wanted {
-                    if m.has_keyword(&tag) {
+                    if self.carries_tag(&m, &tag) {
                         continue; // two rules naming one tag
                     }
                     tagged += 1;

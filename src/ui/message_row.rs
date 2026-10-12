@@ -1100,7 +1100,7 @@ pub fn tag_menu_entries(
 ) -> Vec<MenuEntry> {
     tags.iter()
         .map(|t| {
-            let on = msg.has_keyword(&t.keyword);
+            let on = msg.has_tag(t);
             let keyword = t.keyword.clone();
             let toggle = toggle.clone();
             MenuEntry::new(t.name.clone(), move || toggle(keyword.clone(), !on)).swatch(t.color.clone(), on)
