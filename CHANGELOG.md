@@ -30,9 +30,10 @@
   messages and the console open upward. It moves there for everyone;
   **Settings → System → Status bar** puts it back at the top. Its buttons
   read Export log, the console, then the bar's own toggle.
-- **Fixed: the composer's chevron sat alone on a third row** in a narrow
-  composer with every formatting tool shown. It now stays beside the tools
-  wherever the row has room for it.
+- **Fixed: a narrow composer was cut off at the right.** The formatting
+  tools now wrap onto further rows one by one, the chevron stays beside them
+  wherever the row has room for it, and a small composer window stops
+  shrinking once its folded header is as narrow as it gets.
 - **Fixed: the settings search listed every OpenPGP key** (#432, reported
   by 3v1n0). A keyring with many people's keys buried the settings under
   them; keys are no longer search results.
