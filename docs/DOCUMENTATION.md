@@ -770,7 +770,12 @@ Markdown has no words for them, so switching such a message to Markdown or
 plain text leaves them out. **Settings → Composing → Formatting toolbar**
 says whether a new message starts with these tools shown (Always expanded)
 or hidden behind the chevron (Always collapsed, the default); the chevron
-changes it for the message at hand. When the composer is narrow, the
+changes it for the message at hand. **Settings → Composing → Font** and
+**Font size** set the font and size a rich-text message starts in, and they
+are sent with it, so the recipient sees them too; text given its own font
+or size in the message keeps it. **Other Font…** in the Font list picks any
+installed font. Default, for both, leaves the recipient's own font and size
+in charge. When the composer is narrow, the
 toolbar wraps onto a second row, the chevron staying beside the tools it
 shows wherever the row has room for it.
 

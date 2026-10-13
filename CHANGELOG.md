@@ -15,6 +15,11 @@
   face (#358).
 - **Fixed: the formatting toolbar's menus did not open near the foot of
   the screen** (#358). A menu taller than the room there now scrolls.
+- **Added: a font and size for new messages** (#358, suggested by
+  erenoglu). **Settings → Composing → Font** and **Font size** set what
+  rich-text messages are written in, and they go out with the message.
+  The font list has the composer's fonts, the recent picks and **Other
+  Font…**. Default leaves both to the recipient, as before.
 - **Changed: Delete Draft is in the Save Draft button's menu**, under Save
   as Template, rather than a button of its own in the composer's header.
 - **Added: group the message list by date** (#435, suggested by rhuhxx).
