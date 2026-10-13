@@ -731,18 +731,30 @@ impl Component for Compose {
                                                 sender.input(ComposeInput::SaveAsTemplate);
                                             },
                                         },
+                                        // Only while editing an existing draft: the
+                                        // message is moved to Trash, not saved, and
+                                        // the editor closes.
+                                        gtk::Separator {
+                                            #[watch]
+                                            set_visible: model.draft_origin.is_some(),
+                                        },
+                                        gtk::Button {
+                                            add_css_class: "flat",
+                                            add_css_class: "context-menu-item",
+                                            set_halign: gtk::Align::Fill,
+                                            set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
+                                            #[watch]
+                                            set_visible: model.draft_origin.is_some(),
+                                            #[wrap(Some)]
+                                            set_child = &gtk::Label { set_label: &i18n("Delete Draft"), set_halign: gtk::Align::Start },
+                                            connect_clicked[sender] => move |b| {
+                                                b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
+                                                sender.input(ComposeInput::DeleteDraft);
+                                            },
+                                        },
                                     },
                                 },
                             },
-                        },
-                        // Only while editing an existing draft: the message is
-                        // moved to Trash, not saved, and the editor closes.
-                        pack_start = &gtk::Button {
-                            set_label: &i18n("Delete Draft"),
-                            set_tooltip_text: Some(i18n("Move this draft to Trash").as_str()),
-                            #[watch]
-                            set_visible: model.draft_origin.is_some() && !model.template && !model.narrow,
-                            connect_clicked => ComposeInput::DeleteDraft,
                         },
                         // Send, with Send Later beside it (#145): presets, or a
                         // date and time of your own.
@@ -1837,12 +1849,9 @@ impl Component for Compose {
                     MenuEntry::new(&label, move || s.input(msg()))
                         .icon(&format!("{icon}-symbolic"))
                 };
-                // Save Draft and Save as Template are not here: the Save
-                // Draft button and its arrow stay in the header at any width.
-                let mut drafts = Vec::new();
-                if self.draft_origin.is_some() && !self.template {
-                    drafts.push(entry(i18n("Delete Draft"), "user-trash", || ComposeInput::DeleteDraft));
-                }
+                // Save Draft, Save as Template and Delete Draft are not here:
+                // the Save Draft button and its arrow stay in the header at
+                // any width.
                 let mut attach = vec![entry(i18n("Attach files"), "mail-attachment", || ComposeInput::AttachFiles)];
                 if !self.cloud_accounts.is_empty() {
                     attach.push(
@@ -1882,7 +1891,7 @@ impl Component for Compose {
                     });
                 }
                 let btn = &widgets.overflow_btn;
-                show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![drafts, attach, pgp, host]);
+                show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![attach, pgp, host]);
             }
 
             ComposeInput::CloudAttach => {
