@@ -8,6 +8,15 @@
 - **Changed: the Correspondents column names the newest writer first**
   (#443, suggested by erenoglu), the one the conversation is waiting on,
   rather than whoever opened it.
+- **Added: the Correspondents and Tags headings sort the list** (#443),
+  like every other column heading. Correspondents sorts by the names the
+  column shows; Tags by tag name, untagged mail last.
+- **Changed: the single-line list scrolls sideways** (#443) when its
+  columns are wider than the pane, rather than squeezing the name columns
+  down to nothing, and the headings scroll with it.
+- **Changed: Settings → Message List → Columns shows every column it
+  holds** (#443): the Shown row wraps instead of scrolling, where past six
+  columns the rest were out of sight.
 
 - **Fixed: the composer's font menu went on saying Sans Serif** (#358,
   reported by erenoglu). A font applied to selected text, or chosen for the

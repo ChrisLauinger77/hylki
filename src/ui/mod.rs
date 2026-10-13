@@ -6,7 +6,6 @@ pub mod chip_flow;
 pub mod column_bin;
 pub mod command_palette;
 pub mod fade_label;
-pub mod fade_scroll;
 pub mod cloud_accounts;
 pub mod translation_page;
 pub mod compose;

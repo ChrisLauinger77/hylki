@@ -701,6 +701,9 @@ pub struct RowLook {
     pub columns: Vec<ListColumn>,
     /// The widths columns were dragged to; the rest keep their own.
     pub widths: HashMap<ListColumn, i32>,
+    /// The narrowest a single line goes before the list scrolls sideways
+    /// (#443); -1 for none.
+    pub min_width: i32,
     /// How many lines of the message's text a row shows (0–3).
     pub preview_lines: u32,
     /// Whether the subject line is drawn (Focus Mode can take it away).
@@ -733,6 +736,7 @@ impl Default for RowLook {
             single_line: false,
             columns: ListColumn::DEFAULT.to_vec(),
             widths: HashMap::new(),
+            min_width: -1,
             preview_lines: 1,
             show_subject: true,
             show_palette: true,
@@ -1065,13 +1069,12 @@ fn first_recipient_addr(to: &str) -> Option<String> {
 
 /// Fill `bar` with the single line's column headings (#334), laid out as a
 /// row is so each sits over its column. `sorted` is the column the list is
-/// sorted by and whether it runs downwards; a sortable heading sorts the
-/// list by its column when clicked.
+/// sorted by and whether it runs downwards; a heading sorts the list by its
+/// column when clicked.
 pub fn fill_headings(
     bar: &gtk::Box,
     look: &RowLook,
     sorted: Option<(ListColumn, bool)>,
-    sortable: &dyn Fn(ListColumn) -> bool,
     click: Rc<dyn Fn(ListColumn)>,
     resize: Rc<dyn Fn(ListColumn, Option<i32>, bool)>,
 ) -> HashMap<ListColumn, ColumnBin> {
@@ -1085,6 +1088,8 @@ pub fn fill_headings(
     }
     bar.set_css_classes(&classes);
     bar.set_spacing(8);
+    // As wide as the rows under it, so the two scroll sideways together.
+    bar.set_size_request(look.min_width, -1);
     // The avatar's and the unread dot's places.
     if look.avatars {
         let room = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -1153,13 +1158,11 @@ pub fn fill_headings(
         if arrow.is_some() {
             cell.add_css_class("sorted");
         }
-        if sortable(column) {
-            cell.set_cursor_from_name(Some("pointer"));
-            let click = click.clone();
-            let gesture = gtk::GestureClick::new();
-            gesture.connect_released(move |_, _, _, _| click(column));
-            cell.add_controller(gesture);
-        }
+        cell.set_cursor_from_name(Some("pointer"));
+        let click = click.clone();
+        let gesture = gtk::GestureClick::new();
+        gesture.connect_released(move |_, _, _, _| click(column));
+        cell.add_controller(gesture);
         line.append(&cell);
     }
     bins
@@ -2058,6 +2061,7 @@ impl Row {
             content.push("palette-room");
         }
         w.content.set_css_classes(&content);
+        w.content.set_size_request(if single { look.min_width } else { -1 }, -1);
 
         // The circle.
         w.avatar_revealer.set_visible(look.avatars);

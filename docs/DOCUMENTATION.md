@@ -1161,8 +1161,8 @@ right-click menu, swipes and keyboard shortcuts do the same things.
 
 **Settings → Message List → Columns** chooses what a single line shows and
 in what order: drag a column between **Shown** and **Not shown**, or along
-the row. The subject always stays, and the conversation's size rides at its
-end. The columns are:
+the row. Any number of columns can be shown. The subject always stays, and
+the conversation's size rides at its end. The columns are:
 
 | Column | What it shows |
 | --- | --- |
@@ -1187,15 +1187,17 @@ Defaults** goes back to star, sender, subject, tags, attachment and date.
 **Column headings**, in the same group, names the columns above the list.
 Clicking a heading sorts the list by that column, and clicking it again
 reverses the order; the sorted heading is in the accent color, with an
-arrow. Tags and Correspondents do not sort. The sort menu follows the
-headings.
+arrow. Correspondents sorts by the names the column shows, and Tags by tag
+name with untagged mail last. The sort menu follows the headings.
 
 The name and date columns are resized by dragging the faint line at a
 heading's edge: the right edge of a column left of the subject, the left
 edge of one right of it. A double click on that line puts the column back
 to its usual width, and **Restore Defaults** puts every column back. When
 the list is too narrow for the widths set, the name columns give way in
-proportion and the dates keep theirs.
+proportion and the dates keep theirs. Past that the rows keep their width
+and the list scrolls sideways to the columns beyond its edge, the headings
+with it.
 
 **Settings → Message List → Group by date** divides the list under
 headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14 days** and
