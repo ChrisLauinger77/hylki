@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixed: the composer's font menu went on saying Sans Serif** (#358,
+  reported by erenoglu). A font applied to selected text, or chosen for the
+  next words typed, now shows in the menu at once; the size menu does the
+  same for a size.
+- **Changed: Delete Draft is in the Save Draft button's menu**, under Save
+  as Template, rather than a button of its own in the composer's header.
 - **Added: group the message list by date** (#435, suggested by rhuhxx).
   **Settings → Message List → Group by date** puts Today, Yesterday, Last 7
   days, Last 14 days and Older headings over a list sorted by date. A
