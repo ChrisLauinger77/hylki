@@ -1636,6 +1636,16 @@ fn shown_in_page(w: &gtk::Widget) -> bool {
 
 /// Scroll a found row or group into view and mark it for a moment.
 fn reveal(w: &gtk::Widget) {
+    scroll_to(w);
+    w.add_css_class("settings-search-hit");
+    let w = w.clone();
+    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1600), move || {
+        w.remove_css_class("settings-search-hit");
+    });
+}
+
+/// Scroll a row or group of a page to the top of the view.
+fn scroll_to(w: &gtk::Widget) {
     if let Some(sw) = w.ancestor(gtk::ScrolledWindow::static_type()).and_downcast::<gtk::ScrolledWindow>() {
         // Measured against what the viewport scrolls, not the viewport:
         // the viewport's own coordinates are already scrolled.
@@ -1651,11 +1661,6 @@ fn reveal(w: &gtk::Widget) {
             }
         }
     }
-    w.add_css_class("settings-search-hit");
-    let w = w.clone();
-    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1600), move || {
-        w.remove_css_class("settings-search-hit");
-    });
 }
 
 impl Preferences {
@@ -5625,7 +5630,7 @@ impl Component for Preferences {
                 // Once the page is shown and laid out, which the selection
                 // sets going, can the group be scrolled to.
                 if let Some(group) = self.columns_group.clone() {
-                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || reveal(&group));
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || scroll_to(&group));
                 }
             }
             PrefInput::LeaveEditorPrompt(id) => self.ask_to_leave_editor(&id, &sender),
