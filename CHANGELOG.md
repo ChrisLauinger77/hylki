@@ -11,7 +11,10 @@
   typed, as a size does, however the focus moves. Accepting the font dialog
   with no font selected closed Hylki; it now changes nothing.
 - **Added: the last five fonts picked with Other Font…** are listed at the
-  foot of the composer's font menu (#358).
+  foot of the composer's font menu, and the menu shows each font in its own
+  face (#358).
+- **Fixed: the formatting toolbar's menus did not open near the foot of
+  the screen** (#358). A menu taller than the room there now scrolls.
 - **Changed: Delete Draft is in the Save Draft button's menu**, under Save
   as Template, rather than a button of its own in the composer's header.
 - **Added: group the message list by date** (#435, suggested by rhuhxx).

@@ -751,7 +751,8 @@ rest of what a mail can carry:
   client to pick its own font of each kind; the fonts most mail programs
   offer, such as Arial, Georgia, Verdana and Courier New, each with a
   fallback; or **Other Font…** for any font installed here, followed by its
-  generic kind in case the recipient lacks it. The last five fonts picked
+  generic kind in case the recipient lacks it. Each font in the menu is shown
+  in its own face. The last five fonts picked
   with **Other Font…** are listed at the foot of the menu. With nothing
   selected, the font applies to what is typed next.
 - **Font size:** points from 8 to 36, or Default. With nothing selected, the
