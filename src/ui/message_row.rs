@@ -68,6 +68,9 @@ const THREAD_NODE_REACH: f32 = 8.0;
 const SENDER_COLUMN_PX: i32 = 160;
 const PEOPLE_COLUMN_PX: i32 = 200;
 const ACCOUNT_COLUMN_PX: i32 = 110;
+/// The tags' column on one line (#443): fixed like the names, so a row
+/// without tags puts the columns after it where a row with them does.
+const TAGS_COLUMN_PX: i32 = 90;
 /// The star's and the paperclip's size on a single line.
 const LINE_ICON_PX: i32 = 12;
 
@@ -78,12 +81,13 @@ pub fn default_width(column: ListColumn) -> i32 {
         ListColumn::Sender | ListColumn::Recipients => SENDER_COLUMN_PX,
         ListColumn::Correspondents => PEOPLE_COLUMN_PX,
         ListColumn::Account => ACCOUNT_COLUMN_PX,
+        ListColumn::Tags => TAGS_COLUMN_PX,
         _ => -1,
     }
 }
 
-/// Whether a column's width can be dragged: the ones of text, but not the
-/// subject, which takes the rest, or the tags, as wide as they are.
+/// Whether a column's width can be dragged: the ones of text and the tags,
+/// but not the subject, which takes the rest.
 pub fn resizable(column: ListColumn) -> bool {
     matches!(
         column,
@@ -91,6 +95,7 @@ pub fn resizable(column: ListColumn) -> bool {
             | ListColumn::Recipients
             | ListColumn::Correspondents
             | ListColumn::Account
+            | ListColumn::Tags
             | ListColumn::Due
             | ListColumn::Date
     )
@@ -1139,7 +1144,7 @@ pub fn fill_headings(
                 b.set_hexpand(true);
                 b.upcast()
             }
-            ListColumn::Tags => text(i18n(column.label())).upcast(),
+            ListColumn::Tags => binned(text(i18n(column.label()))),
             ListColumn::Due | ListColumn::Date => {
                 let label = text(if column == ListColumn::Due { i18n("Due") } else { i18n(column.label()) });
                 label.set_width_chars(9);
@@ -1578,6 +1583,7 @@ pub struct RowWidgets {
     importance: gtk::Image,
     account: gtk::Label,
     account_col: ColumnBin,
+    tags_col: ColumnBin,
     due: gtk::Label,
     due_col: ColumnBin,
     /// The bins the sender, the subject and the date move into on one line.
@@ -2119,6 +2125,7 @@ impl Row {
                 (ListColumn::Recipients, &w.recipients_col),
                 (ListColumn::Correspondents, &w.people_col),
                 (ListColumn::Account, &w.account_col),
+                (ListColumn::Tags, &w.tags_col),
                 (ListColumn::Due, &w.due_col),
                 (ListColumn::Date, &w.date_col),
             ] {
@@ -2158,6 +2165,7 @@ impl Row {
         }
         w.subject.set_css_classes(if unread { &["message-subject", "unread"] } else { &["message-subject"] });
         w.tags_box.set_visible(col(ListColumn::Tags));
+        w.tags_col.set_visible(single && col(ListColumn::Tags));
         self.render_tags(msg, &shared, &look);
 
         let preview = meta.preview.as_deref().unwrap_or(&msg.preview);
@@ -2177,7 +2185,9 @@ impl Row {
         w.surface.set_sensitivity(shared.swipe_sensitivity.get());
         if let Some(t) = self.tracker.borrow().as_ref() {
             // A committing row takes no new gestures — it is on its way out.
-            t.set_enabled(shared.swipe_enabled.get() && !self.st.borrow().swipe_committing);
+            // A single line swipes not at all: sideways is how a list wider
+            // than its pane scrolls to its other columns (#443).
+            t.set_enabled(shared.swipe_enabled.get() && !look.single_line && !self.st.borrow().swipe_committing);
         }
         self.sync_palette_buttons();
         self.sync_swipe_strip();
@@ -2585,7 +2595,11 @@ impl Row {
                         w.subject_col.set_child(Some(subject));
                         into(&w.line, &[lock, w.subject_col.upcast_ref(), chip]);
                     }
-                    ListColumn::Tags => into(&w.line, &[tags]),
+                    ListColumn::Tags => {
+                        detach(tags);
+                        w.tags_col.set_child(Some(tags));
+                        into(&w.line, &[w.tags_col.upcast_ref()]);
+                    }
                     ListColumn::Attachment => into(&w.line, &[clip]),
                     ListColumn::Importance => into(&w.line, &[w.importance.upcast_ref()]),
                     ListColumn::Account => into(&w.line, &[w.account_col.upcast_ref()]),
@@ -3344,6 +3358,8 @@ fn build_widgets() -> RowWidgets {
     let name_col = ColumnBin::new(SENDER_COLUMN_PX);
     let subject_col = ColumnBin::new(0);
     let date_col = ColumnBin::new(-1);
+    let tags_col = ColumnBin::new(TAGS_COLUMN_PX);
+    tags_col.set_visible(false);
     // The subject takes whatever room the other columns leave.
     subject_col.set_hexpand(true);
     account.add_css_class("message-account");
@@ -3441,6 +3457,7 @@ fn build_widgets() -> RowWidgets {
         importance,
         account,
         account_col,
+        tags_col,
         due,
         due_col,
         name_col,

@@ -1156,8 +1156,9 @@ their own. **Single line** puts them on one line in columns: the sender's
 circle and name, the subject with the text dimmed after it, then tags, a
 paperclip, the conversation's size and a short date. **Automatic** uses one
 line while the list pane is dragged wider than about 600 pixels and cards
-when it is narrower. On one line the actions palette is not shown; the
-right-click menu, swipes and keyboard shortcuts do the same things.
+when it is narrower. On one line the actions palette is not shown and a
+row does not swipe, as sideways is how the list scrolls to its columns;
+the right-click menu and keyboard shortcuts do the same things.
 
 **Settings → Message List → Columns** chooses what a single line shows and
 in what order: drag a column between **Shown** and **Not shown**, or along
@@ -1190,14 +1191,13 @@ reverses the order; the sorted heading is in the accent color, with an
 arrow. Correspondents sorts by the names the column shows, and Tags by tag
 name with untagged mail last. The sort menu follows the headings.
 
-The name and date columns are resized by dragging the faint line at a
-heading's edge: the right edge of a column left of the subject, the left
-edge of one right of it. A double click on that line puts the column back
-to its usual width, and **Restore Defaults** puts every column back. When
-the list is too narrow for the widths set, the name columns give way in
-proportion and the dates keep theirs. Past that the rows keep their width
-and the list scrolls sideways to the columns beyond its edge, the headings
-with it.
+The name, tags and date columns are resized by dragging a heading's edge,
+where a line shows under the pointer: the right edge of a column left of
+the subject, the left edge of one right of it. A double click there puts
+the column back to its usual width, and **Restore Defaults** puts every
+column back. The columns keep their widths and the subject takes the room
+they leave. When the list is too narrow for them all, it scrolls sideways
+to the columns past its edge, the headings with it.
 
 **Settings → Message List → Group by date** divides the list under
 headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14 days** and

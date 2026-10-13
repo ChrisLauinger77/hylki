@@ -761,8 +761,6 @@ pub struct MessageList {
     headings_bar: gtk::Box,
     /// The widths columns were dragged to by their headings (#334).
     widths: std::collections::HashMap<crate::config::ListColumn, i32>,
-    /// How wide the rows are, for fitting the columns into it.
-    pane_width: i32,
     /// The headings' sized cells, which a drag resizes in place.
     heading_bins: std::cell::RefCell<std::collections::HashMap<crate::config::ListColumn, crate::ui::column_bin::ColumnBin>>,
 }
@@ -977,8 +975,6 @@ pub enum MessageListInput {
     SetColumnWidths(std::collections::HashMap<crate::config::ListColumn, i32>),
     /// Fill the headings again, once a handler that set them going is over.
     RefreshHeadings,
-    /// The rows are this wide now.
-    PaneWidth(i32),
     /// Each account's name for the Account column, and which accounts are
     /// Microsoft 365 ones, for the Due column (#334).
     SetAccountNames {
@@ -1568,7 +1564,6 @@ impl SimpleComponent for MessageList {
             headings: false,
             headings_bar: gtk::Box::new(gtk::Orientation::Horizontal, 8),
             widths: std::collections::HashMap::new(),
-            pane_width: 0,
             heading_bins: Default::default(),
             bulk_tag_btn: gtk::Button::new(),
         };
@@ -1591,14 +1586,6 @@ impl SimpleComponent for MessageList {
             // may have scrolled: put them back in step then.
             let r = rows.clone();
             heads.connect_changed(move |a| a.set_value(r.value()));
-        }
-        {
-            // The rows' width, which the single line's columns fit into: the
-            // view's page across, set as it is allocated.
-            let input = sender.input_sender().clone();
-            widgets.scroller.hadjustment().connect_notify_local(Some("page-size"), move |adj, _| {
-                let _ = input.send(MessageListInput::PaneWidth(adj.page_size() as i32));
-            });
         }
         {
             // Whether the list sits at its bottom, for the spinner that says
@@ -2427,14 +2414,14 @@ impl SimpleComponent for MessageList {
                 // The rows follow every step; the headings are left alone
                 // while their handle is held, as rebuilding them would drop
                 // it mid-drag. It has moved its own heading already.
-                let (fitted, min_width) = self.fitted_widths();
+                let min_width = self.row_min_width();
                 for (c, bin) in self.heading_bins.borrow().iter() {
-                    bin.set_width(fitted.get(c).copied().unwrap_or_else(|| crate::ui::message_row::default_width(*c)));
+                    bin.set_width(self.widths.get(c).copied().unwrap_or_else(|| crate::ui::message_row::default_width(*c)));
                 }
                 self.headings_bar.set_size_request(min_width, -1);
                 {
                     let mut look = self.shared.look.borrow_mut();
-                    look.widths = fitted;
+                    look.widths = self.widths.clone();
                     look.min_width = min_width;
                 }
                 self.shared.refresh_all();
@@ -2453,15 +2440,6 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::RefreshHeadings => self.sync_headings(),
-            MessageListInput::PaneWidth(width) => {
-                if self.pane_width != width {
-                    let before = self.single_line.then(|| self.fitted_widths());
-                    self.pane_width = width;
-                    if before.is_some_and(|b| b != self.fitted_widths()) {
-                        self.sync_look();
-                    }
-                }
-            }
             MessageListInput::SetHeadings(on) => {
                 self.headings = on;
                 self.sync_headings();
@@ -3346,7 +3324,8 @@ impl MessageList {
             look.ringed = if self.colorize { self.account_colors.keys().copied().collect() } else { Default::default() };
             look.face_gen = self.face_gen;
             look.tags_gen = self.tags_gen;
-            (look.widths, look.min_width) = self.fitted_widths();
+            look.widths = self.widths.clone();
+            look.min_width = self.row_min_width();
         }
         // The rows on screen are about to be another view's, filled anyway.
         if self.switched {
@@ -3357,67 +3336,40 @@ impl MessageList {
         self.sync_headings();
     }
 
-    /// The columns' widths as the rows and the headings draw them (#334):
-    /// as set, unless together they leave the subject too little room, when
-    /// the name columns give way in proportion (the dates keep theirs). Fitted here rather than left to each
-    /// row's box, which shares out a shortage by what that row holds (tags,
-    /// a conversation's count), so a heading and its column would part.
-    ///
-    /// A name gives way only so far. Past that the row keeps its width, the
-    /// second value, and the list scrolls sideways to the columns beyond the
-    /// pane (#443).
-    fn fitted_widths(&self) -> (std::collections::HashMap<crate::config::ListColumn, i32>, i32) {
+    /// The narrowest a single line goes (#443): every column at the width
+    /// it was dragged to, or its own, and the subject at a little room. A
+    /// pane narrower than that scrolls sideways to the columns past its
+    /// edge rather than squeezing them, which the rows and the headings
+    /// would each do their own way, so a heading and its column would part.
+    fn row_min_width(&self) -> i32 {
         use crate::config::ListColumn as C;
-        use crate::ui::message_row::{default_width, resizable};
+        use crate::ui::message_row::default_width;
         /// What a date as wide as its text takes, about.
         const DATE_PX: i32 = 64;
-        /// Room kept for the subject, and for tags beside it.
+        /// Room kept for the subject.
         const SUBJECT_PX: i32 = 100;
-        const TAGS_PX: i32 = 60;
-        /// The narrowest a name column is made to fit the pane.
-        const NAME_FLOOR_PX: i32 = 80;
-        let mut widths = self.widths.clone();
         if !self.single_line {
-            return (widths, -1);
+            return -1;
         }
         let columns: Vec<C> =
             self.columns.iter().copied().filter(|c| *c != C::Due || self.graph_in_view).collect();
         // The pill's margins and padding, the unread dot and the spacing.
-        let mut fixed = 12 + 18 + 18 + 8 * columns.len().saturating_sub(1) as i32;
+        let mut width = 12 + 18 + 18 + 8 * columns.len().saturating_sub(1) as i32;
         if self.avatars {
-            fixed += 16 + 8;
+            width += 16 + 8;
         }
-        let mut wanted: Vec<(C, i32)> = Vec::new();
         for c in &columns {
-            match c {
-                C::Star | C::Attachment => fixed += 12,
-                C::Importance => fixed += 16,
-                C::Tags => fixed += TAGS_PX,
-                C::Subject => fixed += SUBJECT_PX,
-                // A date cut short says nothing: the names give way instead.
-                C::Due | C::Date => {
-                    let px = widths.get(c).copied().unwrap_or_else(|| default_width(*c));
-                    fixed += if px > 0 { px } else { DATE_PX };
-                }
-                c if resizable(*c) => {
-                    let px = widths.get(c).copied().unwrap_or_else(|| default_width(*c));
-                    wanted.push((*c, px.max(1)));
-                }
-                _ => {}
-            }
+            width += match c {
+                C::Star | C::Attachment => 12,
+                C::Importance => 16,
+                C::Subject => SUBJECT_PX,
+                c => match self.widths.get(c).copied().unwrap_or_else(|| default_width(*c)) {
+                    px if px > 0 => px,
+                    _ => DATE_PX,
+                },
+            };
         }
-        let sum: i32 = wanted.iter().map(|(_, px)| px).sum();
-        let room = (self.pane_width - fixed).max(0);
-        let mut names = sum;
-        if self.pane_width > 0 && sum > room && sum > 0 {
-            names = 0;
-            for (c, px) in wanted {
-                let fitted = ((px as i64 * room as i64 / sum as i64) as i32).max(px.min(NAME_FLOOR_PX));
-                names += fitted;
-                widths.insert(c, fitted);
-            }
-        }
-        (widths, fixed + names)
+        width
     }
 
     /// Fill the column headings from the look and the sort (#334). Only
