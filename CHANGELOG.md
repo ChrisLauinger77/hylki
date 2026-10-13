@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed: Hylki closed at launch when the session's locale was missing
+  from the Flatpak runtime** (#437, reported by Bohne13). The app now runs
+  in C.UTF-8 in that case, so its reading pane starts.
+
 - **Fixed: the composer's font menu went on saying Sans Serif** (#358,
   reported by erenoglu). A font applied to selected text, or chosen for the
   next words typed, now shows in the menu at once; the size menu does the
