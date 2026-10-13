@@ -820,6 +820,9 @@ pub struct AppModel {
     list_columns: Vec<config::ListColumn>,
     /// Headings over them, which sort the list when clicked (#334).
     list_headings: bool,
+    /// A single line too wide for the pane scrolls rather than fitting its
+    /// columns (#443).
+    list_column_scroll: bool,
     /// Date headings over a list sorted by date (#435).
     list_group_by_date: bool,
     /// The widths columns were dragged to by their headings (#334).
@@ -1494,6 +1497,8 @@ pub enum AppMsg {
     ReaderToolbarMenu { x: f64, y: f64 },
     /// Open Settings on the Appearance page (its Toolbar section).
     CustomizeToolbar,
+    /// Settings, at Message List → Columns (#443).
+    CustomizeColumns,
     /// The window controls were re-measured (decoration layout changed).
     ReaderControlsChanged(i32),
     /// The collapsed header's ⋯ button was clicked — pop its menu.
@@ -2883,6 +2888,7 @@ impl SimpleComponent for AppModel {
                     MessageListOutput::SearchActive(active) => AppMsg::SearchActive(active),
                     MessageListOutput::SortChanged(key) => AppMsg::ListSortChanged(key),
                     MessageListOutput::ColumnWidths(widths) => AppMsg::ListColumnWidths(widths),
+                    MessageListOutput::CustomizeColumns => AppMsg::CustomizeColumns,
                 });
 
         let message_view =
@@ -3327,6 +3333,7 @@ impl SimpleComponent for AppModel {
             list_layout: config::load_list_layout(),
             list_columns: config::load_list_columns(),
             list_headings: config::load_privacy().list_headings,
+            list_column_scroll: config::load_privacy().list_column_scroll,
             list_group_by_date: config::load_privacy().list_group_by_date,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
@@ -3621,6 +3628,7 @@ impl SimpleComponent for AppModel {
         model.push_single_line();
         model.message_list.emit(MessageListInput::SetColumns(model.list_columns.clone()));
         model.message_list.emit(MessageListInput::SetHeadings(model.list_headings));
+        model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
         model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
@@ -7996,6 +8004,11 @@ impl SimpleComponent for AppModel {
                     self.message_list.emit(MessageListInput::SetHeadings(on));
                 }
             }
+            AppMsg::Pref(PrefOutput::SetListColumnScroll(on)) => {
+                if pref!(self.list_column_scroll = on) {
+                    self.message_list.emit(MessageListInput::SetColumnScroll(on));
+                }
+            }
             AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
                 if pref!(self.list_group_by_date = on) {
                     self.message_list.emit(MessageListInput::SetGroupByDate(on));
@@ -8791,6 +8804,12 @@ impl SimpleComponent for AppModel {
                 self.open_settings_window(&sender, false, false);
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::ShowPageById("appearance".to_string()));
+                }
+            }
+            AppMsg::CustomizeColumns => {
+                self.open_settings_window(&sender, false, false);
+                if let Some(p) = &self.prefs {
+                    p.emit(PrefInput::RevealColumns);
                 }
             }
             AppMsg::ShowcaseToolbarGap { zone, index } => {
@@ -12044,6 +12063,7 @@ impl AppModel {
             list_layout: self.list_layout,
             list_columns: config::ListColumn::to_keys(&self.list_columns),
             list_headings: self.list_headings,
+            list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
@@ -20012,6 +20032,7 @@ impl AppModel {
             list_layout: self.list_layout,
             list_columns: self.list_columns.clone(),
             list_headings: self.list_headings,
+            list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),

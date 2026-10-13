@@ -4105,6 +4105,10 @@ msgstr "Δεν υπάρχουν μηνύματα"
 msgid "There's nothing here right now."
 msgstr "Δεν υπάρχει τίποτα εδώ αυτήν τη στιγμή."
 
+#, fuzzy
+msgid "Customize Columns…"
+msgstr "Προσαρμογή γραμμής εργαλείων…"
+
 msgid "Remove Stars"
 msgstr "Αφαίρεση αστεριών"
 
@@ -5731,6 +5735,15 @@ msgid ""
 msgstr ""
 "Ονομάζει τις στήλες πάνω από τη λίστα. Κάντε κλικ σε μία για να ταξινομήσετε "
 "τη λίστα κατά αυτήν και ξανά για να αντιστρέψετε τη σειρά."
+
+#, fuzzy
+msgid "Fit columns to the list"
+msgstr "Αποθέστε μια στήλη εδώ για να την αποκρύψετε"
+
+msgid ""
+"The name and tag columns narrow as the list does. Off, every column keeps "
+"its width and a list too narrow for them scrolls sideways."
+msgstr ""
 
 msgid "Group messages by conversation"
 msgstr "Ομαδοποίηση μηνυμάτων κατά συζήτηση"

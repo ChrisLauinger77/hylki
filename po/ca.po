@@ -3979,6 +3979,10 @@ msgstr "No hi ha missatges"
 msgid "There's nothing here right now."
 msgstr "Ara mateix no hi ha res aquí."
 
+#, fuzzy
+msgid "Customize Columns…"
+msgstr "Personalitza la barra d'eines…"
+
 msgid "Remove Stars"
 msgstr "Treu les destacats"
 
@@ -5590,6 +5594,15 @@ msgid ""
 msgstr ""
 "Anomena les columnes a sobre de la llista. Fes clic en una per ordenar la "
 "llista per ella, i de nou per invertir l'ordre."
+
+#, fuzzy
+msgid "Fit columns to the list"
+msgstr "Deixa anar una columna aquí per amagar-la"
+
+msgid ""
+"The name and tag columns narrow as the list does. Off, every column keeps "
+"its width and a list too narrow for them scrolls sideways."
+msgstr ""
 
 msgid "Group messages by conversation"
 msgstr "Agrupa els missatges per conversa"

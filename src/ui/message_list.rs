@@ -761,6 +761,11 @@ pub struct MessageList {
     headings_bar: gtk::Box,
     /// The widths columns were dragged to by their headings (#334).
     widths: std::collections::HashMap<crate::config::ListColumn, i32>,
+    /// Columns keep their widths and a list too narrow for them scrolls
+    /// sideways; off, the name columns narrow to fit the pane (#443).
+    column_scroll: bool,
+    /// How wide the rows are, for fitting the columns into it.
+    pane_width: i32,
     /// The headings' sized cells, which a drag resizes in place.
     heading_bins: std::cell::RefCell<std::collections::HashMap<crate::config::ListColumn, crate::ui::column_bin::ColumnBin>>,
 }
@@ -975,6 +980,10 @@ pub enum MessageListInput {
     SetColumnWidths(std::collections::HashMap<crate::config::ListColumn, i32>),
     /// Fill the headings again, once a handler that set them going is over.
     RefreshHeadings,
+    /// Scroll a single line wider than the pane, or fit its columns (#443).
+    SetColumnScroll(bool),
+    /// The rows are this wide now.
+    PaneWidth(i32),
     /// Each account's name for the Account column, and which accounts are
     /// Microsoft 365 ones, for the Due column (#334).
     SetAccountNames {
@@ -1185,6 +1194,8 @@ pub enum MessageListOutput {
     SortChanged(&'static str),
     /// A column was resized by its heading (#334): the widths to keep.
     ColumnWidths(std::collections::HashMap<crate::config::ListColumn, i32>),
+    /// Customize Columns… from the headings' right-click menu (#443).
+    CustomizeColumns,
 }
 
 #[relm4::component(pub)]
@@ -1380,6 +1391,7 @@ impl SimpleComponent for MessageList {
 
             // The single line's column headings (#334), filled by
             // `sync_headings`; a click on one sorts by its column.
+            #[name = "headings_area"]
             gtk::Box {
                 add_css_class: "list-headings-bar",
                 #[watch]
@@ -1414,7 +1426,7 @@ impl SimpleComponent for MessageList {
                     // too wide for the pane scrolls to its columns past the
                     // edge (#443), with a bar that says so.
                     #[watch]
-                    set_hscrollbar_policy: if model.single_line { gtk::PolicyType::Automatic } else { gtk::PolicyType::External },
+                    set_hscrollbar_policy: if model.single_line && model.column_scroll { gtk::PolicyType::Automatic } else { gtk::PolicyType::External },
                     // The pane's own floor, now that rows no longer set one: room
                     // for a row's full actions palette (avatar + dot + the reserved
                     // actions line), so opening the palette never needs to clip —
@@ -1564,6 +1576,8 @@ impl SimpleComponent for MessageList {
             headings: false,
             headings_bar: gtk::Box::new(gtk::Orientation::Horizontal, 8),
             widths: std::collections::HashMap::new(),
+            column_scroll: false,
+            pane_width: 0,
             heading_bins: Default::default(),
             bulk_tag_btn: gtk::Button::new(),
         };
@@ -1586,6 +1600,32 @@ impl SimpleComponent for MessageList {
             // may have scrolled: put them back in step then.
             let r = rows.clone();
             heads.connect_changed(move |a| a.set_value(r.value()));
+        }
+        {
+            // A right-click on the headings offers the way to the columns'
+            // settings (#443).
+            let click = gtk::GestureClick::new();
+            click.set_button(3);
+            let area = widgets.headings_area.clone();
+            let s = sender.clone();
+            click.connect_pressed(move |g, _, x, y| {
+                g.set_state(gtk::EventSequenceState::Claimed);
+                let s = s.clone();
+                let entry = crate::ui::context_menu::MenuEntry::new(i18n("Customize Columns…"), move || {
+                    let _ = s.output(MessageListOutput::CustomizeColumns);
+                })
+                .icon("view-list-bullet-symbolic");
+                crate::ui::context_menu::show_context_menu(&area, x, y, vec![vec![entry]]);
+            });
+            widgets.headings_area.add_controller(click);
+        }
+        {
+            // The rows' width, which fitted columns fit into: the view's
+            // page across, set as it is allocated.
+            let input = sender.input_sender().clone();
+            widgets.scroller.hadjustment().connect_notify_local(Some("page-size"), move |adj, _| {
+                let _ = input.send(MessageListInput::PaneWidth(adj.page_size() as i32));
+            });
         }
         {
             // Whether the list sits at its bottom, for the spinner that says
@@ -2415,13 +2455,14 @@ impl SimpleComponent for MessageList {
                 // while their handle is held, as rebuilding them would drop
                 // it mid-drag. It has moved its own heading already.
                 let min_width = self.row_min_width();
+                let fitted = self.fitted_widths();
                 for (c, bin) in self.heading_bins.borrow().iter() {
-                    bin.set_width(self.widths.get(c).copied().unwrap_or_else(|| crate::ui::message_row::default_width(*c)));
+                    bin.set_width(fitted.get(c).copied().unwrap_or_else(|| crate::ui::message_row::default_width(*c)));
                 }
                 self.headings_bar.set_size_request(min_width, -1);
                 {
                     let mut look = self.shared.look.borrow_mut();
-                    look.widths = self.widths.clone();
+                    look.widths = fitted;
                     look.min_width = min_width;
                 }
                 self.shared.refresh_all();
@@ -2440,6 +2481,22 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::RefreshHeadings => self.sync_headings(),
+            MessageListInput::SetColumnScroll(on) => {
+                if self.column_scroll != on {
+                    self.column_scroll = on;
+                    self.sync_look();
+                }
+            }
+            MessageListInput::PaneWidth(width) => {
+                if self.pane_width != width {
+                    let fits = self.single_line && !self.column_scroll;
+                    let before = fits.then(|| self.fitted_widths());
+                    self.pane_width = width;
+                    if before.is_some_and(|b| b != self.fitted_widths()) {
+                        self.sync_look();
+                    }
+                }
+            }
             MessageListInput::SetHeadings(on) => {
                 self.headings = on;
                 self.sync_headings();
@@ -3324,7 +3381,7 @@ impl MessageList {
             look.ringed = if self.colorize { self.account_colors.keys().copied().collect() } else { Default::default() };
             look.face_gen = self.face_gen;
             look.tags_gen = self.tags_gen;
-            look.widths = self.widths.clone();
+            look.widths = self.fitted_widths();
             look.min_width = self.row_min_width();
         }
         // The rows on screen are about to be another view's, filled anyway.
@@ -3336,40 +3393,72 @@ impl MessageList {
         self.sync_headings();
     }
 
-    /// The narrowest a single line goes (#443): every column at the width
-    /// it was dragged to, or its own, and the subject at a little room. A
-    /// pane narrower than that scrolls sideways to the columns past its
-    /// edge rather than squeezing them, which the rows and the headings
-    /// would each do their own way, so a heading and its column would part.
-    fn row_min_width(&self) -> i32 {
+    /// What a single line's columns take, apart from the subject's room:
+    /// the room the fixed ones need (with the pill's own and the spacing),
+    /// and each column whose width can change, at its own or the one it
+    /// was dragged to.
+    fn column_room(&self) -> (i32, Vec<(crate::config::ListColumn, i32)>) {
         use crate::config::ListColumn as C;
-        use crate::ui::message_row::default_width;
+        use crate::ui::message_row::{default_width, resizable};
         /// What a date as wide as its text takes, about.
         const DATE_PX: i32 = 64;
         /// Room kept for the subject.
         const SUBJECT_PX: i32 = 100;
-        if !self.single_line {
-            return -1;
-        }
         let columns: Vec<C> =
             self.columns.iter().copied().filter(|c| *c != C::Due || self.graph_in_view).collect();
         // The pill's margins and padding, the unread dot and the spacing.
-        let mut width = 12 + 18 + 18 + 8 * columns.len().saturating_sub(1) as i32;
+        let mut fixed = 12 + 18 + 18 + 8 * columns.len().saturating_sub(1) as i32;
         if self.avatars {
-            width += 16 + 8;
+            fixed += 16 + 8;
         }
+        let mut names = Vec::new();
         for c in &columns {
-            width += match c {
-                C::Star | C::Attachment => 12,
-                C::Importance => 16,
-                C::Subject => SUBJECT_PX,
-                c => match self.widths.get(c).copied().unwrap_or_else(|| default_width(*c)) {
-                    px if px > 0 => px,
-                    _ => DATE_PX,
-                },
-            };
+            let px = self.widths.get(c).copied().unwrap_or_else(|| default_width(*c));
+            match c {
+                C::Star | C::Attachment => fixed += 12,
+                C::Importance => fixed += 16,
+                C::Subject => fixed += SUBJECT_PX,
+                // A date cut short says nothing: it keeps its width.
+                C::Due | C::Date => fixed += if px > 0 { px } else { DATE_PX },
+                c if resizable(*c) => names.push((*c, px.max(1))),
+                _ => {}
+            }
         }
-        width
+        (fixed, names)
+    }
+
+    /// The narrowest a scrolling single line goes (#443): every column at
+    /// its width and the subject at a little room. A pane narrower than
+    /// that scrolls sideways to the columns past its edge. -1 when the
+    /// columns fit the pane instead.
+    fn row_min_width(&self) -> i32 {
+        if !(self.single_line && self.column_scroll) {
+            return -1;
+        }
+        let (fixed, names) = self.column_room();
+        fixed + names.iter().map(|(_, px)| px).sum::<i32>()
+    }
+
+    /// The columns' widths as the rows and the headings draw them (#334):
+    /// as set, unless the columns fit the pane and together leave the
+    /// subject too little room, when the name and tag columns give way in
+    /// proportion (the dates keep theirs). Fitted here rather than left to
+    /// each row's box, which shares out a shortage by what that row holds,
+    /// so a heading and its column would part.
+    fn fitted_widths(&self) -> std::collections::HashMap<crate::config::ListColumn, i32> {
+        let mut widths = self.widths.clone();
+        if self.column_scroll || !self.single_line || self.pane_width <= 0 {
+            return widths;
+        }
+        let (fixed, names) = self.column_room();
+        let sum: i32 = names.iter().map(|(_, px)| px).sum();
+        let room = (self.pane_width - fixed).max(0);
+        if sum > room && sum > 0 {
+            for (c, px) in names {
+                widths.insert(c, ((px as i64 * room as i64 / sum as i64) as i32).max(40));
+            }
+        }
+        widths
     }
 
     /// Fill the column headings from the look and the sort (#334). Only

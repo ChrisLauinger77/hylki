@@ -1492,6 +1492,11 @@ pub(crate) struct PrivacyFile {
     /// Headings over those columns, which sort the list when clicked.
     #[serde(default)]
     pub(crate) list_headings: bool,
+    /// Columns keep their widths and a single line too wide for the pane
+    /// scrolls sideways (#443). Off, the default and the way it was, the
+    /// name columns narrow to fit.
+    #[serde(default)]
+    pub(crate) list_column_scroll: bool,
     /// A list sorted by date is divided under Today, Yesterday, Last 7 days,
     /// Last 14 days and Older (#435). Off by default.
     #[serde(default)]
@@ -1800,6 +1805,7 @@ impl Default for PrivacyFile {
             list_layout: ListLayout::Cards,
             list_columns: default_list_columns(),
             list_headings: false,
+            list_column_scroll: false,
             list_group_by_date: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,

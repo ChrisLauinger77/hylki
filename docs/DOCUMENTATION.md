@@ -1195,9 +1195,17 @@ The name, tags and date columns are resized by dragging a heading's edge,
 where a line shows under the pointer: the right edge of a column left of
 the subject, the left edge of one right of it. A double click there puts
 the column back to its usual width, and **Restore Defaults** puts every
-column back. The columns keep their widths and the subject takes the room
-they leave. When the list is too narrow for them all, it scrolls sideways
-to the columns past its edge, the headings with it.
+column back.
+
+**Fit columns to the list**, in the same group and on until it is switched
+off, narrows the name and tag columns in proportion when the list is too
+narrow for the widths set; the dates keep theirs. Switched off, every
+column keeps its width, the subject takes the room they leave, and a list
+too narrow for them all scrolls sideways to the columns past its edge, the
+headings with it.
+
+A right-click on the headings offers **Customize Columns…**, which opens
+Settings at **Message List → Columns**.
 
 **Settings → Message List → Group by date** divides the list under
 headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14 days** and

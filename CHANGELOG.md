@@ -11,11 +11,15 @@
 - **Added: the Correspondents and Tags headings sort the list** (#443),
   like every other column heading. Correspondents sorts by the names the
   column shows; Tags by tag name, untagged mail last.
-- **Changed: the single-line list scrolls sideways** (#443) when its
-  columns are wider than the pane, and the headings scroll with it. The
-  columns keep the widths set for them rather than being squeezed to fit,
-  and a single line no longer swipes, which took the sideways scroll;
-  swipe actions are for the card layout.
+- **Added: a single-line list can scroll sideways** (#443). With
+  **Settings → Message List → Columns → Fit columns to the list** switched
+  off, the columns keep the widths set for them and a list too narrow for
+  them scrolls, the headings with it. On, the default, the name and tag
+  columns narrow to fit as before.
+- **Added: Customize Columns… on the column headings' right-click menu**
+  (#443), which opens Settings at Message List → Columns.
+- **Changed: swipe actions are for the card layout** (#443). A single line
+  no longer swipes; sideways is how it scrolls.
 - **Fixed: single-line columns after Tags fell out of line** (#443) on
   rows without tags. Tags is a column of fixed width now, resized from its
   heading like the names.

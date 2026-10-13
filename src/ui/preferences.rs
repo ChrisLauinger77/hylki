@@ -167,6 +167,7 @@ pub struct PrefInit {
     pub list_layout: crate::config::ListLayout,
     pub list_columns: Vec<crate::config::ListColumn>,
     pub list_headings: bool,
+    pub list_column_scroll: bool,
     pub list_group_by_date: bool,
     pub single_key_shortcuts: bool,
     pub gmail_keys: bool,
@@ -381,6 +382,8 @@ pub struct Preferences {
     /// The single-line columns being edited (#334), and their editor.
     list_columns: Vec<crate::config::ListColumn>,
     column_editor: Option<ColumnEditor>,
+    /// Message List → Columns, which the list's headings open to (#443).
+    columns_group: Option<gtk::Widget>,
     /// Whether the list can be on one line at all, which the columns are
     /// for.
     list_single_possible: bool,
@@ -1181,6 +1184,8 @@ pub enum PrefInput {
     LeaveEditorTo(String),
     /// Select a category by id from outside (the app's showcase hook).
     ShowPageById(String),
+    /// Message List, scrolled to its Columns group (#443).
+    RevealColumns,
     /// An accounts-panel editor subpage (account, filter or tag) opened on
     /// the named settings page, or closed — hide/show the shared header so
     /// the editor's own header takes over the window.
@@ -1301,6 +1306,8 @@ pub enum PrefOutput {
     /// The single-line list's columns, in order (#334).
     SetListColumns(Vec<crate::config::ListColumn>),
     SetListHeadings(bool),
+    /// Scroll a single line too wide for the pane, or fit its columns (#443).
+    SetListColumnScroll(bool),
     /// Date headings over a list sorted by date (#435).
     SetGroupByDate(bool),
     /// Every column back to its own width (#334).
@@ -2978,6 +2985,7 @@ impl Component for Preferences {
 
                                 // The single-line list's columns (#334): two
                                 // drop zones of draggable chips, filled in init.
+                                #[name = "columns_group"]
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Columns"),
                                     set_description: Some(
@@ -2996,6 +3004,17 @@ impl Component for Preferences {
                                                        the list by it, and again to reverse the order."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetListHeadings(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "list_fit_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fit columns to the list"),
+                                        set_subtitle: &i18n("The name and tag columns narrow as the list does. \
+                                                       Off, every column keeps its width and a list too narrow \
+                                                       for them scrolls sideways."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetListColumnScroll(!row.is_active()));
                                         },
                                     },
 
@@ -4043,6 +4062,7 @@ impl Component for Preferences {
             toolbar_editor: None,
             list_columns: init.list_columns.clone(),
             column_editor: None,
+            columns_group: None,
             list_single_possible: init.list_layout != crate::config::ListLayout::Cards,
             show_unified: init.show_unified,
             unified_kinds: init.unified_kinds,
@@ -4264,6 +4284,7 @@ impl Component for Preferences {
         ])));
         no_truncate(&widgets.list_layout_row);
         widgets.list_headings_row.set_active(init.list_headings);
+        widgets.list_fit_row.set_active(!init.list_column_scroll);
         widgets.group_by_date_row.set_active(init.list_group_by_date);
         widgets.list_layout_row.set_selected(match init.list_layout {
             crate::config::ListLayout::Cards => 0,
@@ -4888,6 +4909,7 @@ impl Component for Preferences {
         widen_page(widgets.appearance_page.upcast_ref(), 640);
         model.rebuild_toolbar_chips();
         model.column_editor = Some(ColumnEditor::build(&widgets.column_editor_box, &sender));
+        model.columns_group = Some(widgets.columns_group.clone().upcast());
         model.rebuild_column_chips();
         tracing::debug!("settings window: prefs tail E (sidebar rows built) at {:?}", t_init.elapsed());
         model.side_list = Some(widgets.side_list.clone());
@@ -5598,6 +5620,14 @@ impl Component for Preferences {
                 }
             }
             PrefInput::ShowPageById(id) => self.select_row(&id),
+            PrefInput::RevealColumns => {
+                self.select_row("list");
+                // Once the page is shown and laid out, which the selection
+                // sets going, can the group be scrolled to.
+                if let Some(group) = self.columns_group.clone() {
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(200), move || reveal(&group));
+                }
+            }
             PrefInput::LeaveEditorPrompt(id) => self.ask_to_leave_editor(&id, &sender),
             PrefInput::LeaveEditorTo(id) => {
                 // The row the user clicked is already the selected one — the

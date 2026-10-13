@@ -4064,6 +4064,10 @@ msgstr "Aucun message"
 msgid "There's nothing here right now."
 msgstr "Il n'y a rien ici pour le moment."
 
+#, fuzzy
+msgid "Customize Columns…"
+msgstr "Personnaliser la barre d'outils…"
+
 msgid "Remove Stars"
 msgstr "Retirer les étoiles"
 
@@ -5695,6 +5699,15 @@ msgstr ""
 "Nomme les colonnes au-dessus de la liste. Cliquez sur l'une d'elles pour "
 "trier la liste selon cette colonne, et cliquez à nouveau pour inverser "
 "l'ordre."
+
+#, fuzzy
+msgid "Fit columns to the list"
+msgstr "Déposez une colonne ici pour la masquer"
+
+msgid ""
+"The name and tag columns narrow as the list does. Off, every column keeps "
+"its width and a list too narrow for them scrolls sideways."
+msgstr ""
 
 msgid "Group messages by conversation"
 msgstr "Grouper les messages par conversation"
