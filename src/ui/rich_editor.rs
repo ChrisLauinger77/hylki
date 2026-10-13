@@ -904,7 +904,7 @@ impl RichEditor {
     /// go through [`RichEditor::extract`], which never touches the pixels —
     /// a save must not cost quality.
     pub fn extract_for_send(&self, cb: impl FnOnce(String, String) + 'static) {
-        self.read_body("window.__hylkiBodyHtmlForSend()", move |html, text| cb(with_compose_font(html), text));
+        self.read_body("window.__hylkiBodyHtmlForSend()", cb);
     }
 
     /// Read the current body HTML and a plain-text rendering asynchronously.
@@ -1522,11 +1522,18 @@ fn clean_family(css: &str) -> String {
     css.chars().filter(|c| !matches!(c, '"' | '<' | '>' | '{' | '}' | ';' | '\\' | '&') && !c.is_control()).collect::<String>().trim().to_string()
 }
 
+/// The editor's own font, which the signature and the quoted original
+/// keep whatever font new messages are set to.
+const EDITOR_FONT: &str = "14px/1.55 system-ui,sans-serif";
+
 /// The body's `font` shorthand: the font and size set for new messages,
-/// or the interface font at the editor's own 14px.
+/// or the editor's own.
 fn body_font() -> String {
     let prefs = crate::config::load_privacy();
     let family = clean_family(&prefs.compose_font);
+    if family.is_empty() && prefs.compose_font_size == 0 {
+        return EDITOR_FONT.to_string();
+    }
     let family = if family.is_empty() { "system-ui,sans-serif".to_string() } else { family };
     let size = match prefs.compose_font_size {
         0 => "14px".to_string(),
@@ -1535,16 +1542,10 @@ fn body_font() -> String {
     format!("{size}/1.55 {family}")
 }
 
-/// The sent body in the font and size set for new messages. The editor
-/// shows them through its own style sheet, which does not go out with the
-/// message, so they are written around it; with neither set the body is
-/// left to the recipient's own font, as before.
-fn with_compose_font(html: String) -> String {
-    let prefs = crate::config::load_privacy();
-    wrap_font(html, &prefs.compose_font, prefs.compose_font_size)
-}
-
-fn wrap_font(html: String, family: &str, pt: u32) -> String {
+/// The `style` the sent message's own writing is wrapped in, for the font
+/// and size set for new messages: the editor's style sheet does not go out
+/// with the message. Empty with neither set, leaving the recipient's font.
+fn font_style(family: &str, pt: u32) -> String {
     let family = clean_family(family);
     let mut style = String::new();
     if !family.is_empty() {
@@ -1553,10 +1554,7 @@ fn wrap_font(html: String, family: &str, pt: u32) -> String {
     if pt > 0 {
         style.push_str(&format!("font-size:{pt}pt;"));
     }
-    if style.is_empty() {
-        return html;
-    }
-    format!("<div style=\"{style}\">{html}</div>")
+    style
 }
 
 /// Draw a font menu item in the font it names (a CSS family list), so the
@@ -3045,8 +3043,39 @@ const PASTE_SCRIPT: &str = r#"<script>
         n.removeAttribute('data-vireo-fit'); n.removeAttribute('title');
       });
     rsTint();
-    return window.__hylkiBodyHtml();
+    return fontRuns(window.__hylkiBodyHtml());
   };
+  /* The font set for new messages, written around each stretch of what
+     was typed, since the editor's style sheet does not go out with it. The
+     signature and the quoted original (its attribution line and the quote
+     straight after) are left out, as the editor shows them. */
+  function fontRuns(html){
+    var style = window.__hylkiComposeFont;
+    if(!style) return html;
+    var t = document.createElement('template');
+    t.innerHTML = html;
+    var kids = Array.prototype.slice.call(t.content.childNodes);
+    var kept = kids.map(function(n){
+      if(n.nodeType !== 1) return false;
+      if(n.classList.contains('vireo-sig') || n.classList.contains('vireo-quote-attr')) return true;
+      var prev = n.previousElementSibling;
+      return n.tagName === 'BLOCKQUOTE' && !!prev && prev.classList.contains('vireo-quote-attr');
+    });
+    var run = [];
+    function flush(){
+      var typed = run.some(function(n){ return n.nodeType === 1 || /\S/.test(n.nodeValue || ''); });
+      if(typed){
+        var d = document.createElement('div');
+        d.setAttribute('style', style);
+        run[0].parentNode.insertBefore(d, run[0]);
+        run.forEach(function(n){ d.appendChild(n); });
+      }
+      run = [];
+    }
+    kids.forEach(function(n, i){ if(kept[i]) flush(); else run.push(n); });
+    flush();
+    return t.innerHTML;
+  }
   addEventListener('scroll', rsPlace, true);
   addEventListener('resize', rsPlace);
   document.addEventListener('input', rsPlace);
@@ -3173,8 +3202,11 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
     let paste_rich = !crate::config::load_privacy().paste_plain;
     let return_paragraph = crate::config::load_privacy().return_paragraph;
     let body_font = body_font();
+    let prefs = crate::config::load_privacy();
+    let compose_font = js_str(&font_style(&prefs.compose_font, prefs.compose_font_size));
     let script = format!(
         "<script>window.__hylkiPasteRich={paste_rich};\
+         window.__hylkiComposeFont={compose_font};\
          window.__hylkiReturnParagraph={return_paragraph};\
          window.__hylkiPlain={plain};</script>{PASTE_SCRIPT}{HISTORY_SCRIPT}{EMOJI_SCRIPT}"
     );
@@ -3228,6 +3260,10 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
            blockquote.vireo-quote-mail{{background:#ffffff;color:#1e1e1e;\
              color-scheme:light;}}\
            .vireo-sig{{opacity:0.85;}}\
+           /* The font set for new messages is for what is written here:\
+              the signature and the quoted original keep the editor's. */\
+           body>.vireo-sig,body>.vireo-quote-attr,\
+           body>.vireo-quote-attr+blockquote{{font:{EDITOR_FONT};}}\
            a{{color:#3584e4;}}\
            {plain_css}\
          </style>{script}\
@@ -3687,25 +3723,19 @@ mod body_tests {
 mod compose_font_tests {
     use super::*;
 
-    /// The default font and size send nothing, so the recipient's own font
-    /// stays in charge; a chosen one goes out around the body.
+    /// The default font and size add no style, so the recipient's own font
+    /// stays in charge.
     #[test]
-    fn sent_body_carries_the_chosen_font() {
-        assert_eq!(wrap_font("<p>Hi</p>".into(), "", 0), "<p>Hi</p>");
-        assert_eq!(
-            wrap_font("<p>Hi</p>".into(), "Georgia, serif", 12),
-            "<div style=\"font-family:Georgia, serif;font-size:12pt;\"><p>Hi</p></div>"
-        );
-        assert_eq!(wrap_font("x".into(), "", 14), "<div style=\"font-size:14pt;\">x</div>");
+    fn style_carries_the_chosen_font() {
+        assert_eq!(font_style("", 0), "");
+        assert_eq!(font_style("Georgia, serif", 12), "font-family:Georgia, serif;font-size:12pt;");
+        assert_eq!(font_style("", 14), "font-size:14pt;");
     }
 
     /// A hand-edited settings file cannot close the attribute or the rule.
     #[test]
     fn family_cannot_escape_its_style() {
-        assert_eq!(
-            wrap_font("x".into(), "a\"><script>;}", 0),
-            "<div style=\"font-family:ascript;\">x</div>"
-        );
+        assert_eq!(font_style("a\"><script>;}", 0), "font-family:ascript;");
         assert_eq!(first_family("'Comfortaa', sans-serif"), "Comfortaa");
     }
 }
