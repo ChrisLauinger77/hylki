@@ -734,10 +734,6 @@ impl Component for Compose {
                                         // Only while editing an existing draft: the
                                         // message is moved to Trash, not saved, and
                                         // the editor closes.
-                                        gtk::Separator {
-                                            #[watch]
-                                            set_visible: model.draft_origin.is_some(),
-                                        },
                                         gtk::Button {
                                             add_css_class: "flat",
                                             add_css_class: "context-menu-item",
