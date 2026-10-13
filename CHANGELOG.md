@@ -19,7 +19,8 @@
   erenoglu). **Settings → Composing → Font** and **Font size** set what
   rich-text messages are written in, and they go out with the message.
   The font list has the composer's fonts, the recent picks and **Other
-  Font…**. Default leaves both to the recipient, as before.
+  Font…**. They apply to what you write, not to the signature or the
+  quoted message. Default leaves both to the recipient, as before.
 - **Changed: Delete Draft is in the Save Draft button's menu**, under Save
   as Template, rather than a button of its own in the composer's header.
 - **Added: group the message list by date** (#435, suggested by rhuhxx).
