@@ -2257,24 +2257,48 @@ const PASTE_SCRIPT: &str = r#"<script>
     }
     return b;
   }
-  /* The caret's font (#358): the first family of the nearest font set on
-     the way up to the body, or else the generic family the editor's own
-     falls under. */
-  function fontOf(el){
-    for(var e = el; e && e !== document.body && e.nodeType === 1; e = e.parentElement){
-      var f = (e.style && e.style.fontFamily) || (e.tagName === 'FONT' && e.getAttribute('face')) || '';
-      if(f) return f.split(',')[0].replace(/["']/g, '').trim();
+  /* The element the font and size menus describe: the caret's, or with a
+     selection the first selected character's. The anchor would not do: a
+     font applied to a selection leaves it at the end of the text before
+     the new span, and the menu went on naming the old font (#358). */
+  function styledEl(){
+    var sel = getSelection();
+    if(sel.rangeCount && !sel.isCollapsed){
+      var r = sel.getRangeAt(0), root = r.commonAncestorContainer;
+      if(root.nodeType === 3) return root.parentNode;
+      var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for(var t = w.nextNode(); t; t = w.nextNode()){
+        if(!r.intersectsNode(t) || !t.nodeValue.trim()) continue;
+        if(t === r.startContainer && r.startOffset >= t.length) continue;
+        return t.parentNode;
+      }
     }
+    var el = caretBlock();
+    return el && el.nodeType === 1 ? el : document.body;
+  }
+  /* The caret's font (#358): its first family, or the generic family the
+     editor's own falls under. WebKit's own value is asked first: it knows
+     a font chosen with nothing selected, which only the next character
+     typed will carry, and the menu has to show that choice straight away. */
+  function fontOf(el){
     var g = '';
-    try{ g = getComputedStyle(el).fontFamily.toLowerCase(); }catch(_){}
+    try{ g = String(document.queryCommandValue('fontName') || ''); }catch(_){}
+    if(!g){ try{ g = getComputedStyle(el).fontFamily; }catch(_){} }
+    var first = g.split(',')[0].replace(/["']/g, '').trim();
+    if(first && !/^(system-ui|sans-serif|serif|monospace|ui-[a-z-]+|-webkit-[a-z-]+)$/i.test(first)) return first;
+    g = g.toLowerCase();
     if(/mono/.test(g)) return 'monospace';
     if(/(^|,)\s*"?serif/.test(g) || (/serif/.test(g) && !/sans/.test(g))) return 'serif';
     return 'sans-serif';
   }
-  /* The caret's text size in points, the unit the size menu shows. */
+  /* The caret's text size in points, the unit the size menu shows: a size
+     chosen for the next character typed, or the text's own. */
   function sizeOf(el){
+    var want = sizeNext && sizeWant ? sizeWant : '';
     var px = 0;
-    try{ px = parseFloat(getComputedStyle(el).fontSize); }catch(_){}
+    if(/pt$/.test(want)) return String(parseFloat(want));
+    if(want) px = parseFloat(want);
+    else try{ px = parseFloat(getComputedStyle(el).fontSize); }catch(_){}
     // A view not laid out yet reports nonsense; the label keeps what it had.
     return px >= 4 ? String(Math.round(px * 0.75)) : '';
   }
@@ -2287,7 +2311,7 @@ const PASTE_SCRIPT: &str = r#"<script>
       ol = document.queryCommandState('insertOrderedList');
       block = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
     }catch(_){}
-    var at = el && el.nodeType === 1 ? el : document.body;
+    var at = styledEl();
     var s = (q ? 'q' : '') + (ul ? 'u' : '') + (ol ? 'o' : '')
       + '|' + block + '|' + fontOf(at) + '|' + sizeOf(at);
     if(s === lastFmt) return;
@@ -2360,6 +2384,7 @@ const PASTE_SCRIPT: &str = r#"<script>
     sizeWant = sizeValue(pt);
     if(sel.isCollapsed){
       sizeNext = true;
+      fmtState();
       return;
     }
     var before = new Set(document.body.querySelectorAll('font[size="7"]'));
