@@ -444,7 +444,7 @@ impl RichEditor {
                 // lifts it declines non-embedded (remote) images itself,
                 // since the hit test doesn't surface data: URIs to check
                 // against here.
-                let action = gtk::gio::SimpleAction::new("vireo-img-attach", None);
+                let action = gtk::gio::SimpleAction::new("hylki-img-attach", None);
                 let v = view.clone();
                 let cb = menu_attach_cb.clone();
                 action.connect_activate(move |_, _| detach_ctx_image(&v, cb.clone()));
@@ -470,7 +470,7 @@ impl RichEditor {
                     (i18n("Original Size"), "original"),
                 ] {
                     let action =
-                        gtk::gio::SimpleAction::new(&format!("vireo-img-{kind}"), None);
+                        gtk::gio::SimpleAction::new(&format!("hylki-img-{kind}"), None);
                     let v = view.clone();
                     action.connect_activate(move |_, _| {
                         exec(&v, &format!("window.__hylkiSetImageSize('{kind}')"));
@@ -482,7 +482,7 @@ impl RichEditor {
                     at += 1;
                 }
                 {
-                    let action = gtk::gio::SimpleAction::new("vireo-img-fit", None);
+                    let action = gtk::gio::SimpleAction::new("hylki-img-fit", None);
                     let v = view.clone();
                     let hint = js_escape(&i18n(
                         "Will be recompressed to the size shown when this is sent",
@@ -532,7 +532,7 @@ impl RichEditor {
                     continue;
                 }
                 let action =
-                    gtk::gio::SimpleAction::new(if rich { "vireo-paste-rich" } else { "vireo-paste-plain" }, None);
+                    gtk::gio::SimpleAction::new(if rich { "hylki-paste-rich" } else { "hylki-paste-plain" }, None);
                 let v = view.clone();
                 let cb = menu_attach_cb.clone();
                 action.connect_activate(move |_, _| paste_into(&v, rich, &cb, plain));
@@ -548,8 +548,8 @@ impl RichEditor {
             if !hit.context_is_image() {
                 let (can_undo, can_redo) = menu_history.get();
                 for (label, name, redo, on) in [
-                    (i18n("Undo"), "vireo-undo", false, can_undo),
-                    (i18n("Redo"), "vireo-redo", true, can_redo),
+                    (i18n("Undo"), "hylki-undo", false, can_undo),
+                    (i18n("Redo"), "hylki-redo", true, can_redo),
                 ] {
                     let action = gtk::gio::SimpleAction::new(name, None);
                     action.set_enabled(on);
@@ -1042,7 +1042,7 @@ fn fade_in(webview: &webkit6::WebView) {
     anim.set_easing(adw::Easing::EaseOutCubic);
     anim.play();
     unsafe {
-        webview.set_data("vireo-fade-anim", anim);
+        webview.set_data("hylki-fade-anim", anim);
     }
 }
 
@@ -2423,7 +2423,7 @@ const PASTE_SCRIPT: &str = r#"<script>
   var spellT = null, composing = false, spellRange = null;
   var spellHl = (window.Highlight && window.CSS && CSS.highlights)
     ? new Highlight() : null;
-  if(spellHl) CSS.highlights.set('vireo-misspell', spellHl);
+  if(spellHl) CSS.highlights.set('hylki-misspell', spellHl);
   function caretWord(){
     var sel = getSelection();
     if(!sel.rangeCount || !sel.isCollapsed) return null;
@@ -2739,7 +2739,7 @@ const PASTE_SCRIPT: &str = r#"<script>
   });
   /* Resizing a picture. The frame and its corner handles are ordinary
      elements in this contenteditable document — there is nowhere else to
-     put them — so they are marked `data-vireo-ui` and stripped from
+     put them — so they are marked `data-hylki-ui` and stripped from
      everything the document hands back (see `__hylkiBodyHtml`). They are
      also contenteditable=false, so the caret cannot wander into them. */
   var rsBox = null, rsImg = null;
@@ -2750,7 +2750,7 @@ const PASTE_SCRIPT: &str = r#"<script>
   function rsRemove(){ if(rsBox){ rsBox.remove(); rsBox = null; rsImg = null; } }
   function rsTint(){
     if(!rsBox || !rsImg) return;
-    var c = rsImg.hasAttribute('data-vireo-fit') ? RS_RED : RS_BLUE;
+    var c = rsImg.hasAttribute('data-hylki-fit') ? RS_RED : RS_BLUE;
     rsBox.style.outlineColor = c;
     Array.prototype.forEach.call(rsBox.children, function(h){ h.style.background = c; });
   }
@@ -2798,7 +2798,7 @@ const PASTE_SCRIPT: &str = r#"<script>
     rsRemove();
     rsImg = img;
     rsBox = document.createElement('div');
-    rsBox.setAttribute('data-vireo-ui', 'resize');
+    rsBox.setAttribute('data-hylki-ui', 'resize');
     rsBox.setAttribute('contenteditable', 'false');
     rsBox.style.cssText = 'position:absolute;pointer-events:none;z-index:9;'
       + 'outline:1px solid #3584e4;';
@@ -2842,11 +2842,11 @@ const PASTE_SCRIPT: &str = r#"<script>
   window.__hylkiToggleFit = function(hint){
     var img = window.__hylkiCtxImg || rsImg;
     if(!img) return;
-    if(img.hasAttribute('data-vireo-fit')){
-      img.removeAttribute('data-vireo-fit');
+    if(img.hasAttribute('data-hylki-fit')){
+      img.removeAttribute('data-hylki-fit');
       img.removeAttribute('title');
     } else {
-      img.setAttribute('data-vireo-fit', '1');
+      img.setAttribute('data-hylki-fit', '1');
       img.title = hint;
     }
     if(img === rsImg) rsTint(); else rsShow(img);
@@ -2857,7 +2857,7 @@ const PASTE_SCRIPT: &str = r#"<script>
      alone: there are no extra pixels to be had. */
   function rsFlatten(){
     Array.prototype.forEach.call(
-      document.querySelectorAll('img[data-vireo-fit]'), function(im){
+      document.querySelectorAll('img[data-hylki-fit]'), function(im){
         var w = Math.round(im.getBoundingClientRect().width);
         if(!w || !im.naturalWidth || w >= im.naturalWidth) return;
         try{
@@ -2877,7 +2877,7 @@ const PASTE_SCRIPT: &str = r#"<script>
      draft reopened later still shows it and still honours it when sent. */
   window.__hylkiBodyHtml = function(){
     var c = document.body.cloneNode(true);
-    Array.prototype.forEach.call(c.querySelectorAll('[data-vireo-ui]'),
+    Array.prototype.forEach.call(c.querySelectorAll('[data-hylki-ui]'),
       function(n){ n.remove(); });
     return c.innerHTML;
   };
@@ -2891,7 +2891,7 @@ const PASTE_SCRIPT: &str = r#"<script>
       return pre ? v : v.replace(/[ \t\r\n]+/g, ' ');
     }
     if(node.nodeType !== 1) return '';
-    if(node.hasAttribute('data-vireo-ui')) return '';
+    if(node.hasAttribute('data-hylki-ui')) return '';
     var tag = node.tagName.toLowerCase();
     if(tag === 'br') return '\n';
     if(tag === 'img') return node.getAttribute('alt') || '';
@@ -2966,8 +2966,8 @@ const PASTE_SCRIPT: &str = r#"<script>
   }
   function markOf(n){
     if(n.nodeType !== 1) return '';
-    if(n.classList.contains('vireo-sig')) return 'vireo-sig';
-    if(n.classList.contains('vireo-quote-attr')) return 'vireo-quote-attr';
+    if(n.classList.contains('hylki-sig')) return 'hylki-sig';
+    if(n.classList.contains('hylki-quote-attr')) return 'hylki-quote-attr';
     return '';
   }
   /* Whether `el`'s content is text and nothing else: line breaks, blocks
@@ -2978,7 +2978,7 @@ const PASTE_SCRIPT: &str = r#"<script>
     var all = [el].concat(Array.prototype.slice.call(el.querySelectorAll('*')));
     for(var i = 0; i < all.length; i++){
       var n = all[i];
-      if(n.closest('[data-vireo-ui]')) continue;
+      if(n.closest('[data-hylki-ui]')) continue;
       if(n === document.body) continue;
       if(!keep.test(n.tagName)) return false;
       for(var j = 0; j < n.attributes.length; j++){
@@ -2996,7 +2996,7 @@ const PASTE_SCRIPT: &str = r#"<script>
     var b = document.body, segs = [], run = [];
     var flush = function(){ segs.push(['div', '', plainTextOf(run)]); run = []; };
     Array.prototype.slice.call(b.childNodes).forEach(function(n){
-      if(n.nodeType === 1 && n.hasAttribute('data-vireo-ui')) return;
+      if(n.nodeType === 1 && n.hasAttribute('data-hylki-ui')) return;
       var mark = markOf(n);
       if(!mark){ run.push(n); return; }
       flush();
@@ -3018,7 +3018,7 @@ const PASTE_SCRIPT: &str = r#"<script>
   window.__hylkiPlainFix = function(){
     if(!window.__hylkiPlain) return;
     Array.prototype.slice.call(document.body.children).forEach(function(n){
-      if(n.hasAttribute('data-vireo-ui') || plainOk(n, false)) return;
+      if(n.hasAttribute('data-hylki-ui') || plainOk(n, false)) return;
       n.replaceWith(plainBlock(n.tagName === 'P' ? 'p' : 'div', markOf(n), plainTextOf([n])));
     });
   };
@@ -3039,8 +3039,8 @@ const PASTE_SCRIPT: &str = r#"<script>
   window.__hylkiBodyHtmlForSend = function(){
     rsFlatten();
     Array.prototype.forEach.call(
-      document.querySelectorAll('img[data-vireo-fit]'), function(n){
-        n.removeAttribute('data-vireo-fit'); n.removeAttribute('title');
+      document.querySelectorAll('img[data-hylki-fit]'), function(n){
+        n.removeAttribute('data-hylki-fit'); n.removeAttribute('title');
       });
     rsTint();
     return fontRuns(window.__hylkiBodyHtml());
@@ -3057,9 +3057,9 @@ const PASTE_SCRIPT: &str = r#"<script>
     var kids = Array.prototype.slice.call(t.content.childNodes);
     var kept = kids.map(function(n){
       if(n.nodeType !== 1) return false;
-      if(n.classList.contains('vireo-sig') || n.classList.contains('vireo-quote-attr')) return true;
+      if(n.classList.contains('hylki-sig') || n.classList.contains('hylki-quote-attr')) return true;
       var prev = n.previousElementSibling;
-      return n.tagName === 'BLOCKQUOTE' && !!prev && prev.classList.contains('vireo-quote-attr');
+      return n.tagName === 'BLOCKQUOTE' && !!prev && prev.classList.contains('hylki-quote-attr');
     });
     var run = [];
     function flush(){
@@ -3240,10 +3240,10 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
               whatever survives insertHTML. */\
            img{{max-width:100%;height:auto;}}\
            /* A picture armed to be recut when the message is sent. */\
-           img[data-vireo-fit]{{outline:2px dashed #e01b24;outline-offset:2px;}}\
+           img[data-hylki-fit]{{outline:2px dashed #e01b24;outline-offset:2px;}}\
            /* The in-progress word's misspelling mark (Custom Highlight API);\
               the tint backs up engines that skip decorations in highlights. */\
-           ::highlight(vireo-misspell){{\
+           ::highlight(hylki-misspell){{\
              text-decoration:underline wavy #e01b24;\
              background-color:rgba(224,27,36,0.10);}}\
            blockquote{{margin:0;margin-inline-start:8px;padding-inline-start:10px;\
@@ -3254,16 +3254,16 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
            /* A paragraph's space goes below it, so the first line of the\
               message sits where it would in a <div>. */\
            body>p:first-child{{margin-top:0;}}\
-           .vireo-quote-attr{{opacity:0.7;margin:10px 0 4px;}}\
+           .hylki-quote-attr{{opacity:0.7;margin:10px 0 4px;}}\
            /* A quoted message that sets its own colors, on the light\
               ground it was designed for. */\
-           blockquote.vireo-quote-mail{{background:#ffffff;color:#1e1e1e;\
+           blockquote.hylki-quote-mail{{background:#ffffff;color:#1e1e1e;\
              color-scheme:light;}}\
-           .vireo-sig{{opacity:0.85;}}\
+           .hylki-sig{{opacity:0.85;}}\
            /* The font set for new messages is for what is written here:\
               the signature and the quoted original keep the editor's. */\
-           body>.vireo-sig,body>.vireo-quote-attr,\
-           body>.vireo-quote-attr+blockquote{{font:{EDITOR_FONT};}}\
+           body>.hylki-sig,body>.hylki-quote-attr,\
+           body>.hylki-quote-attr+blockquote{{font:{EDITOR_FONT};}}\
            a{{color:#3584e4;}}\
            {plain_css}\
          </style>{script}\

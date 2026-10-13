@@ -16296,7 +16296,7 @@ impl AppModel {
     /// this is a local render — the same one the worker would produce.
     fn show_outbox_message(&mut self, item: &crate::models::OutboxItem) {
         let mut message = item.as_message();
-        message.body = crate::worker::extract_body(&item.raw);
+        message.body = crate::legacy::current_markup(crate::worker::extract_body(&item.raw));
         message.date = crate::models::OutboxItem::waiting_label(item.queued_at);
         self.attachments = crate::worker::extract_attachments_of(&item.raw);
         self.attachments_loading = false;
@@ -24117,6 +24117,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::RefsRepaired { account_id, folder_id }
         }
         WorkerEvent::Body { message_id, path, body } => {
+            let body = crate::legacy::current_markup(body);
             AppMsg::Body { account_id, message_id, path, body }
         }
         WorkerEvent::SenderChecked { path, message_id, check } => {
@@ -24768,11 +24769,11 @@ fn hard_wrap_plain_regions(html: &str) -> String {
         };
     }
     // A message of mixed parts (`wrap_fragment`): only its text parts are
-    // pre-wrap, each one a `.vireo-plain` div the worker writes itself, with
+    // pre-wrap, each one a `.hylki-plain` div the worker writes itself, with
     // nothing but escaped text and links inside it.
     let mut out = String::with_capacity(html.len());
     let mut rest = html;
-    while let Some(at) = rest.find("class=\"vireo-plain\"") {
+    while let Some(at) = rest.find("class=\"hylki-plain\"") {
         let Some(open) = rest[at..].find('>').map(|i| at + i + 1) else { break };
         let Some(close) = rest[open..].find("</div>").map(|i| open + i) else { break };
         out.push_str(&rest[..open]);
@@ -24814,12 +24815,12 @@ pub(crate) fn body_is_plain_text(body: &str) -> bool {
             // `linkify`'s links, the one markup inside the text.
             "a" | "/a" => true,
             "div" if !whole => {
-                let part = tag.contains("class=\"vireo-plain\"");
+                let part = tag.contains("class=\"hylki-plain\"");
                 text |= part;
                 part
             }
             "/div" => !whole,
-            "img" => !whole && tag.contains("class=\"vireo-inline\""),
+            "img" => !whole && tag.contains("class=\"hylki-inline\""),
             _ => false,
         };
         if !ok {
@@ -24874,16 +24875,16 @@ fn trim_empty_blocks(html: &str) -> &str {
 
 /// Like [`quote_block`], but the quoted body is already-sanitized HTML.
 ///
-/// A body that sets its own colors is marked `vireo-quote-mail`: the editor
+/// A body that sets its own colors is marked `hylki-quote-mail`: the editor
 /// lays it on the light ground it was designed for, where a dark composer
 /// would leave its dark text unreadable.
 fn quote_block_html(attribution: &str, inner_html: &str) -> String {
     let esc = |s: &str| gtk::glib::markup_escape_text(s).replace('\n', "<br>");
     let colored = ["color:", "color=\"", "background:"].iter().any(|c| inner_html.contains(c));
     format!(
-        "<p class=\"vireo-quote-attr\">{}</p><blockquote{}>{}</blockquote>",
+        "<p class=\"hylki-quote-attr\">{}</p><blockquote{}>{}</blockquote>",
         esc(attribution),
-        if colored { " class=\"vireo-quote-mail\"" } else { "" },
+        if colored { " class=\"hylki-quote-mail\"" } else { "" },
         inner_html
     )
 }
@@ -24896,7 +24897,7 @@ fn quote_block(attribution: &str, text: &str) -> String {
     // (#436): its spaces are part of the text, and a plain-text reply
     // sends them back as they were.
     format!(
-        "<p class=\"vireo-quote-attr\">{}</p><blockquote><div style=\"white-space:pre-wrap\">{}</div></blockquote>",
+        "<p class=\"hylki-quote-attr\">{}</p><blockquote><div style=\"white-space:pre-wrap\">{}</div></blockquote>",
         esc(attribution),
         esc(text)
     )
@@ -25349,7 +25350,7 @@ mod tests {
         // An answer to an answer: the inner quote has to stay one level in
         // (#248), not be flattened into the outer one.
         let body = "<!doctype html><html><head></head><body><div>yada yada</div>\
-            <p class=\"vireo-quote-attr\">On Monday, Ada wrote:</p>\
+            <p class=\"hylki-quote-attr\">On Monday, Ada wrote:</p>\
             <blockquote><div>tagada</div></blockquote></body></html>";
         let quoted = super::quoted_original("On Tuesday, Bo wrote:", body);
         let inner = quoted.split_once("</p>").expect("attribution line").1;
@@ -25371,8 +25372,8 @@ mod tests {
 
         // The same in a message of several parts, where only the text part
         // is pre-wrap and the HTML part's source newlines are not breaks.
-        let mixed = "<!doctype html><html><head><style>.vireo-plain{white-space:pre-wrap}\
-            </style></head><body><div class=\"vireo-plain\">One\nTwo</div>\
+        let mixed = "<!doctype html><html><head><style>.hylki-plain{white-space:pre-wrap}\
+            </style></head><body><div class=\"hylki-plain\">One\nTwo</div>\
             <div>\n<b>Three</b>\n</div></body></html>";
         let quoted = super::quoted_original("hdr", mixed);
         assert!(quoted.contains("One<br>Two"), "{quoted}");
@@ -25408,7 +25409,7 @@ mod tests {
             "<html><head><style>body{white-space:pre-wrap}</style></head><body><b>Hi</b></body></html>"
         ));
         // A text part and an HTML part side by side.
-        let both = "<!doctype html><html><head></head><body><div class=\"vireo-plain\">One</div>\
+        let both = "<!doctype html><html><head></head><body><div class=\"hylki-plain\">One</div>\
             <div><b>Two</b></div></body></html>";
         assert!(!super::body_is_plain_text(both));
         assert!(!super::body_is_plain_text(""));

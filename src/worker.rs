@@ -10555,7 +10555,7 @@ pub fn extract_body(raw: &[u8]) -> String {
         }
         match &part.body {
             PartType::Text(text) if !text.trim().is_empty() => {
-                inner.push_str("<div class=\"vireo-plain\">");
+                inner.push_str("<div class=\"hylki-plain\">");
                 inner.push_str(&linkify(text));
                 inner.push_str("</div>");
             }
@@ -10574,7 +10574,7 @@ pub fn extract_body(raw: &[u8]) -> String {
                     if let Some(left) = budget.checked_sub(bytes.len()) {
                         budget = left;
                         inner.push_str(&format!(
-                            "<img class=\"vireo-inline\" src=\"data:{mime};base64,{}\">",
+                            "<img class=\"hylki-inline\" src=\"data:{mime};base64,{}\">",
                             crate::oauth::base64_encode(bytes)
                         ));
                     }
@@ -10836,8 +10836,8 @@ fn wrap_fragment(inner: &str) -> String {
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><style>\
          body{{margin:0;font:14px/1.5 system-ui,sans-serif}}\
-         .vireo-plain{{white-space:pre-wrap;word-wrap:break-word}}\
-         .vireo-inline{{display:block;max-width:100%;height:auto;\
+         .hylki-plain{{white-space:pre-wrap;word-wrap:break-word}}\
+         .hylki-inline{{display:block;max-width:100%;height:auto;\
          margin:12px 0;border-radius:6px}}\
          </style></head><body>{inner}</body></html>"
     )

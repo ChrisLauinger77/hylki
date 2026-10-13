@@ -26,7 +26,7 @@ pub enum Field {
 fn sig_html(sig: &str, dashes: bool) -> String {
     let body = rich_editor::signature_to_html(sig);
     let dashes = if dashes { "-- <br>" } else { "" };
-    format!("<div class=\"vireo-sig\"><br>{dashes}{body}</div>")
+    format!("<div class=\"hylki-sig\"><br>{dashes}{body}</div>")
 }
 
 /// A body as Markdown, keeping the empty line a reply opens with above its
@@ -1952,7 +1952,7 @@ impl Component for Compose {
                 self.cloud_busy = self.cloud_busy.saturating_sub(1);
                 match result {
                     Ok(share) => {
-                        let id = format!("vireo-cloud-{}", crate::rng::token(8).unwrap_or_else(|_| share.size.to_string()));
+                        let id = format!("hylki-cloud-{}", crate::rng::token(8).unwrap_or_else(|_| share.size.to_string()));
                         let mut caption = crate::models::human_size(share.size);
                         if let Some(d) = &share.expires {
                             caption.push_str(&format!(", {}", i18n_f("link expires {date}", &[("date", d)])));
@@ -1961,7 +1961,7 @@ impl Component for Compose {
                             caption.push_str(&format!(", {}", i18n("password-protected")));
                         }
                         let html = format!(
-                            "<p id=\"{id}\" data-vireo-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
+                            "<p id=\"{id}\" data-hylki-cloud=\"1\">\u{1F4CE} <a href=\"{url}\">{name}</a> ({caption})</p>",
                             url = html_escape(&share.url),
                             name = html_escape(&share.name),
                             caption = html_escape(&caption),
@@ -1999,7 +1999,7 @@ impl Component for Compose {
                         self.editor.run_js(&format!(
                             "(function(){{var d=document.createElement('div');d.innerHTML='{}';\
                              var p=d.firstChild;var b=document.body;\
-                             var first=null;var cands=b.querySelectorAll('.vireo-sig,.vireo-quote-attr,blockquote');\
+                             var first=null;var cands=b.querySelectorAll('.hylki-sig,.hylki-quote-attr,blockquote');\
                              for(var i=0;i<cands.length;i++){{var t=cands[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
                              if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}}\
                              if(first)b.insertBefore(p,first);else b.appendChild(p);\
@@ -3158,7 +3158,7 @@ impl Compose {
             // above the quoted original or at the end (#237).
             let anchor = self.rich_sig_anchor();
             let js = format!(
-                "(function(){{var s=document.querySelector('.vireo-sig');\
+                "(function(){{var s=document.querySelector('.hylki-sig');\
                  var h='{}';\
                  if(s){{if(h){{s.outerHTML=h;}}else{{s.remove();}}}}\
                  else if(h){{{anchor}}}\
@@ -3179,7 +3179,7 @@ impl Compose {
         match (self.signature_position, kind) {
             (SignaturePosition::BelowQuote, _) => "v=v+n;",
             (SignaturePosition::AboveQuote, SourceKind::Html) => {
-                "var q=v.search(/<p class=\"vireo-quote-attr\"|<blockquote/);\
+                "var q=v.search(/<p class=\"hylki-quote-attr\"|<blockquote/);\
                  if(q<0){v=v+n;}else{v=v.slice(0,q).replace(/\\s*$/,'')+n+v.slice(q);}"
             }
             (SignaturePosition::AboveQuote, SourceKind::Markdown) => {
@@ -3198,7 +3198,7 @@ impl Compose {
         match self.signature_position {
             SignaturePosition::AboveQuote => {
                 "var b=document.body;var q=null;\
-                 var cands=b.querySelectorAll('.vireo-quote-attr,blockquote');\
+                 var cands=b.querySelectorAll('.hylki-quote-attr,blockquote');\
                  for(var i=0;i<cands.length;i++){var t=cands[i];\
                  while(t.parentNode&&t.parentNode!==b)t=t.parentNode;\
                  if(t.parentNode===b&&(!q||(t.compareDocumentPosition(q)&Node.DOCUMENT_POSITION_FOLLOWING)))q=t;}\
@@ -3251,7 +3251,7 @@ t.value=v;if(a>=0){t.selectionStart=t.selectionEnd=a;}window.__hylkiDirty=true;}
         // stands as a block of its own between the two halves; an empty
         // line gives up its place to it.
         let js = r#"(function(){var b=document.body,h=@SIG@,where=@WHERE@;
-var olds=[].filter.call(b.querySelectorAll('.vireo-sig'),function(s){return !s.closest('blockquote');});
+var olds=[].filter.call(b.querySelectorAll('.hylki-sig'),function(s){return !s.closest('blockquote');});
 var sel=window.getSelection(),r=null;
 if(where==='cursor'&&sel.rangeCount){r=sel.getRangeAt(0).cloneRange();r.collapse(false);if(!b.contains(r.startContainer)||r.startContainer===b&&b.childNodes.length===0)r=null;}
 if(r){for(var k=0;k<olds.length;k++){if(olds[k].contains(r.startContainer)){r.setStartBefore(olds[k]);r.collapse(true);}}}
@@ -4461,7 +4461,7 @@ const TR_QUOTE_TEXT: &str = r#"(function(){var t=document.getElementById('src');
 if(t){var v=t.value;var i=v.search(/<blockquote/i);
 if(i>=0)return v.slice(i).replace(/<[^>]*>/g,' ').slice(0,4000);
 return v.split('\n').filter(function(l){return /^\s*>/.test(l);}).map(function(l){return l.replace(/^\s*>+\s?/,'');}).join('\n').slice(0,4000);}
-var q=document.querySelector('blockquote.vireo-quote-mail')||document.querySelector('blockquote');
+var q=document.querySelector('blockquote.hylki-quote-mail')||document.querySelector('blockquote');
 return q?q.innerText.slice(0,4000):'';})()"#;
 
 /// What the rich document asks to have translated: the selection, else
@@ -4474,7 +4474,7 @@ return q?q.innerText.slice(0,4000):'';})()"#;
 const TR_RICH_BEGIN: &str = r#"(function(){var b=document.body;if(!b)return '';
 var s=getSelection(),r=null,sel=false;
 if(s.rangeCount&&!s.isCollapsed&&b.contains(s.anchorNode)){r=s.getRangeAt(0).cloneRange();sel=true;}
-else{var first=null,c=b.querySelectorAll('.vireo-sig,.vireo-quote-attr,blockquote');
+else{var first=null,c=b.querySelectorAll('.hylki-sig,.hylki-quote-attr,blockquote');
 for(var i=0;i<c.length;i++){var t=c[i];while(t.parentNode&&t.parentNode!==b)t=t.parentNode;
 if(t.parentNode===b&&(!first||(t.compareDocumentPosition(first)&Node.DOCUMENT_POSITION_FOLLOWING)))first=t;}
 var kids=[];for(var n=b.firstChild;n&&n!==first;n=n.nextSibling)kids.push(n);
@@ -4513,8 +4513,8 @@ document.execCommand('insertHTML',false,h);window.__hylkiPlainFix&&window.__hylk
 const TR_SOURCE_BEGIN: &str = r#"(function(H){var t=document.getElementById('src');if(!t)return '';
 var v=t.value,a=t.selectionStart,e=t.selectionEnd,sel=e>a;
 if(!sel){a=0;e=v.length;
-var sig=H?v.search(/<div class="vireo-sig"/):v.indexOf('\n-- \n');if(sig>=0)e=Math.min(e,sig);
-var q=H?v.search(/<p class="vireo-quote-attr"|<blockquote/i):v.search(/(^|\n)[ \t]*>/);
+var sig=H?v.search(/<div class="hylki-sig"/):v.indexOf('\n-- \n');if(sig>=0)e=Math.min(e,sig);
+var q=H?v.search(/<p class="hylki-quote-attr"|<blockquote/i):v.search(/(^|\n)[ \t]*>/);
 if(q>=0){if(!H){var pre=v.slice(0,q).replace(/\s+$/,'');var ls=pre.lastIndexOf('\n');
 if(/(wrote|schrieb|a écrit|escribió|Forwarded message)/i.test(pre.slice(ls+1)))q=ls+1;}
 e=Math.min(e,q);}}
@@ -4537,7 +4537,7 @@ mod tests {
 
     #[test]
     fn a_markdown_reply_has_a_line_to_write_on_above_the_quote() {
-        let reply = "<p><br></p><p class=\"vireo-quote-attr\">On Monday, Ann wrote:</p><blockquote><p>Hi</p></blockquote>";
+        let reply = "<p><br></p><p class=\"hylki-quote-attr\">On Monday, Ann wrote:</p><blockquote><p>Hi</p></blockquote>";
         let md = super::markdown_body(reply);
         assert!(md.starts_with("\n\nOn Monday, Ann wrote:"), "{md:?}");
         // A new message stays empty, and written text is left as it is.
@@ -4550,8 +4550,8 @@ mod tests {
 
     #[test]
     fn the_separator_line_follows_the_setting() {
-        assert_eq!(sig_html("Ann", false), "<div class=\"vireo-sig\"><br>Ann</div>");
-        assert_eq!(sig_html("Ann", true), "<div class=\"vireo-sig\"><br>-- <br>Ann</div>");
+        assert_eq!(sig_html("Ann", false), "<div class=\"hylki-sig\"><br>Ann</div>");
+        assert_eq!(sig_html("Ann", true), "<div class=\"hylki-sig\"><br>-- <br>Ann</div>");
         assert!(!sig_source(SourceKind::Markdown, "Ann", false).contains("-- "));
         assert!(sig_source(SourceKind::Markdown, "Ann", true).starts_with("\n\n-- \n"));
         assert_eq!(sig_source(SourceKind::Markdown, "", true), "");
