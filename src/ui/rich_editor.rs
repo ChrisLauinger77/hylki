@@ -1400,10 +1400,16 @@ fn run_restored(webview: &gtk::glib::WeakRef<webkit6::WebView>, js: &str) {
 }
 
 /// A menu of the bar. Opening it keeps the caret, which the popover's own
-/// focus would otherwise cost the document.
+/// focus would otherwise cost the document. Its content scrolls, so that
+/// [`fit_menu`] can keep it to the room there is.
 fn bar_menu(webview: &webkit6::WebView, tip: &str, content: &impl IsA<gtk::Widget>) -> (gtk::MenuButton, gtk::Popover) {
+    let scroller = gtk::ScrolledWindow::new();
+    scroller.set_hscrollbar_policy(gtk::PolicyType::Never);
+    scroller.set_propagate_natural_width(true);
+    scroller.set_propagate_natural_height(true);
+    scroller.set_child(Some(content));
     let popover = gtk::Popover::new();
-    popover.set_child(Some(content));
+    popover.set_child(Some(&scroller));
     popover.add_css_class("menu");
     let weak = webview.downgrade();
     popover.connect_show(move |_| {
@@ -1416,7 +1422,27 @@ fn bar_menu(webview: &webkit6::WebView, tip: &str, content: &impl IsA<gtk::Widge
     btn.set_tooltip_text(Some(i18n(tip).as_str()));
     btn.set_can_focus(false);
     btn.add_css_class("flat");
+    btn.set_create_popup_func(fit_menu);
     (btn, popover)
+}
+
+/// Keep a bar menu to the room above or below its button, whichever is
+/// larger, scrolling past that. A popover taller than the room there is
+/// never opened at all (#358): the font menu, with its recent fonts, did
+/// not open from a composer near the foot of the screen.
+fn fit_menu(btn: &gtk::MenuButton) {
+    let Some(scroller) = btn.popover().and_then(|p| p.child()).and_downcast::<gtk::ScrolledWindow>() else {
+        return;
+    };
+    let Some(root) = btn.root() else { return };
+    let root = root.upcast_ref::<gtk::Widget>();
+    let Some(at) = btn.compute_point(root, &gtk::graphene::Point::new(0.0, 0.0)) else {
+        return;
+    };
+    let above = at.y() as i32;
+    let below = root.height() - above - btn.height();
+    // The popover's arrow, frame and padding, and a margin from the edge.
+    scroller.set_max_content_height((above.max(below) - 40).max(120));
 }
 
 /// The font dialog's pick, or `None` when it is cancelled. Not the
@@ -1784,7 +1810,10 @@ fn build_toolbar(
     let recent_fonts = gtk::Box::new(gtk::Orientation::Vertical, 0);
     {
         let (weak, pop, recent) = (webview.downgrade(), font_pop.downgrade(), recent_fonts.clone());
-        font.set_create_popup_func(move |_| fill_recent_fonts(&recent, &weak, &pop));
+        font.set_create_popup_func(move |btn| {
+            fill_recent_fonts(&recent, &weak, &pop);
+            fit_menu(btn);
+        });
     }
     font_box.append(&recent_fonts);
     font.set_label(&i18n(FONTS[0].2));
