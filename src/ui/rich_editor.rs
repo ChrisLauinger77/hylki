@@ -1489,6 +1489,7 @@ fn fill_recent_fonts(
         let item = gtk::Button::new();
         item.set_child(Some(&text));
         item.add_css_class("flat");
+        item.add_css_class("context-menu-item");
         let (weak, pop) = (webview.clone(), popover.clone());
         item.connect_clicked(move |_| {
             if let Some(p) = pop.upgrade() {
@@ -1513,6 +1514,7 @@ fn menu_items(webview: &webkit6::WebView, popover: &gtk::glib::WeakRef<gtk::Popo
         let item = gtk::Button::new();
         item.set_child(Some(&text));
         item.add_css_class("flat");
+        item.add_css_class("context-menu-item");
         let (weak, pop, js) = (webview.downgrade(), popover.clone(), js.clone());
         item.connect_clicked(move |_| {
             if let Some(p) = pop.upgrade() {
@@ -1716,6 +1718,7 @@ fn build_toolbar(
         })
         .collect();
     let style_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    style_box.add_css_class("context-menu-list");
     let (style, style_pop) = bar_menu(webview, i18n_noop("Paragraph style"), &style_box);
     style_box.append(&menu_items(webview, &style_pop.downgrade(), &style_items));
     style.set_label(&i18n(BLOCK_STYLES[0].1));
@@ -1728,6 +1731,7 @@ fn build_toolbar(
         })
         .collect();
     let font_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    font_box.add_css_class("context-menu-list");
     let (font, font_pop) = bar_menu(webview, i18n_noop("Font"), &font_box);
     font_box.append(&menu_items(webview, &font_pop.downgrade(), &font_items));
     // Any installed font. The recipient may not have it, so the family's
@@ -1737,6 +1741,7 @@ fn build_toolbar(
     other_label.set_xalign(0.0);
     other_font.set_child(Some(&other_label));
     other_font.add_css_class("flat");
+    other_font.add_css_class("context-menu-item");
     {
         let (weak, pop) = (webview.downgrade(), font_pop.downgrade());
         other_font.connect_clicked(move |b| {
@@ -1772,6 +1777,7 @@ fn build_toolbar(
         .chain(SIZES.iter().map(|pt| (pt.to_string(), format!("window.__hylkiSize({pt})"), None)))
         .collect();
     let size_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    size_box.add_css_class("context-menu-list");
     let (size, size_pop) = bar_menu(webview, i18n_noop("Font size"), &size_box);
     size_box.append(&menu_items(webview, &size_pop.downgrade(), &size_items));
     // The editor's own 14px, until the caret reports.
