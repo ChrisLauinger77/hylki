@@ -1464,6 +1464,20 @@ fn font_js(font: &crate::config::RecentFont) -> String {
     format!("window.__hylkiStyled('fontName',{})", js_str(&format!("'{name}', {generic}")))
 }
 
+/// Draw a font menu item in the font it names (a CSS family list), so the
+/// menu shows each font rather than naming it. A font not installed here
+/// shows in the fallback the message itself would get.
+fn preview_font(label: &gtk::Label, family: &str) {
+    let family = family
+        .split(',')
+        .map(|f| f.trim().trim_matches(|c| c == '\'' || c == '"'))
+        .collect::<Vec<_>>()
+        .join(",");
+    let attrs = gtk::pango::AttrList::new();
+    attrs.insert(gtk::pango::AttrString::new_family(&family));
+    label.set_attributes(Some(&attrs));
+}
+
 /// The recent fonts at the foot of the font menu: a divider and one item
 /// per font, the one picked going back to the head of the list.
 fn fill_recent_fonts(
@@ -1483,9 +1497,7 @@ fn fill_recent_fonts(
     for font in fonts {
         let text = gtk::Label::new(Some(&font.name));
         text.set_xalign(0.0);
-        if font.mono {
-            text.add_css_class("monospace");
-        }
+        preview_font(&text, &font.name);
         let item = gtk::Button::new();
         item.set_child(Some(&text));
         item.add_css_class("flat");
@@ -1725,15 +1737,21 @@ fn build_toolbar(
     style.set_always_show_arrow(true);
     let font_items: Vec<(String, String, Option<&str>)> = FONTS
         .iter()
-        .map(|(_, family, label)| {
-            let class = (*family == "monospace").then_some("monospace");
-            (i18n(label), format!("window.__hylkiStyled('fontName',{})", js_str(family)), class)
-        })
+        .map(|(_, family, label)| (i18n(label), format!("window.__hylkiStyled('fontName',{})", js_str(family)), None))
         .collect();
     let font_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
     font_box.add_css_class("context-menu-list");
     let (font, font_pop) = bar_menu(webview, i18n_noop("Font"), &font_box);
-    font_box.append(&menu_items(webview, &font_pop.downgrade(), &font_items));
+    let font_list = menu_items(webview, &font_pop.downgrade(), &font_items);
+    let mut item = font_list.first_child();
+    for (_, family, _) in FONTS {
+        let Some(button) = item else { break };
+        if let Some(label) = button.downcast_ref::<gtk::Button>().and_then(|b| b.child()).and_downcast::<gtk::Label>() {
+            preview_font(&label, family);
+        }
+        item = button.next_sibling();
+    }
+    font_box.append(&font_list);
     // Any installed font. The recipient may not have it, so the family's
     // generic kind follows it.
     let other_font = gtk::Button::new();
@@ -1763,8 +1781,6 @@ fn build_toolbar(
     font_box.append(&other_font);
     // The fonts picked there last (#358), at the foot of the menu, read
     // afresh each time it opens so that every composer offers the same.
-    // Before the popover shows, not from its own show: content changed
-    // there kept it from opening at all.
     let recent_fonts = gtk::Box::new(gtk::Orientation::Vertical, 0);
     {
         let (weak, pop, recent) = (webview.downgrade(), font_pop.downgrade(), recent_fonts.clone());
