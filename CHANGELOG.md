@@ -6,6 +6,12 @@
   reported by erenoglu). A font applied to selected text, or chosen for the
   next words typed, now shows in the menu at once; the size menu does the
   same for a size.
+- **Fixed: a font picked with Other Font… was lost before it was typed**
+  (#358). With nothing selected, the font now holds for the next words
+  typed, as a size does, however the focus moves. Accepting the font dialog
+  with no font selected closed Hylki; it now changes nothing.
+- **Added: the last five fonts picked with Other Font…** are listed at the
+  foot of the composer's font menu (#358).
 - **Changed: Delete Draft is in the Save Draft button's menu**, under Save
   as Template, rather than a button of its own in the composer's header.
 - **Added: group the message list by date** (#435, suggested by rhuhxx).
