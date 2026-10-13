@@ -1169,7 +1169,7 @@ end. The columns are:
 | Star | The star, lit when the message is starred |
 | Sender | Who it is from; in Sent, who it went to |
 | Recipients | Who it went to |
-| Correspondents | Everyone who wrote in the conversation, you as "me" |
+| Correspondents | Everyone who wrote in the conversation, newest first, you as "me" |
 | Subject | The subject, with the start of the text dimmed after it |
 | Tags | The message's tags |
 | Attachment | A paperclip when there are files attached |

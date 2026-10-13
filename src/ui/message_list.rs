@@ -740,12 +740,14 @@ pub struct MessageList {
     heading_bins: std::cell::RefCell<std::collections::HashMap<crate::config::ListColumn, crate::ui::column_bin::ColumnBin>>,
 }
 
-/// The Correspondents column (#334): who wrote in a conversation, oldest
-/// first and each once, you as "me". A conversation only you have written
-/// in, a message in Sent say, names who it went to instead.
+/// The Correspondents column (#334): who wrote in a conversation, newest
+/// first and each once, you as "me". The newest leads because it is who the
+/// conversation waits on, as the row's sender does (#443). A conversation
+/// only you have written in, a message in Sent say, names who it went to
+/// instead.
 fn correspondents(msgs: &[&Message]) -> String {
     let mut sorted = msgs.to_vec();
-    sorted.sort_by_key(|m| m.timestamp);
+    sorted.sort_by_key(|m| std::cmp::Reverse(m.timestamp));
     let mut seen = std::collections::HashSet::new();
     let mut names: Vec<String> = Vec::new();
     let mut others = false;
@@ -763,7 +765,7 @@ fn correspondents(msgs: &[&Message]) -> String {
         }
     }
     if !others {
-        if let Some(newest) = sorted.last() {
+        if let Some(newest) = sorted.first() {
             let to = crate::ui::message_row::recipient_names(&newest.to);
             if !to.is_empty() {
                 return format!("To: {to}");
@@ -4608,8 +4610,8 @@ mod tests {
         assert_eq!(list.iter().map(|m| m.id).collect::<Vec<_>>(), vec![3, 2, 1]);
     }
 
-    /// #334: who wrote, oldest first and each once; who it went to when
-    /// nobody else has written.
+    /// #334: who wrote, each once; who it went to when nobody else has
+    /// written. #443: the newest writer first.
     #[test]
     fn correspondents_name_each_writer_once() {
         let from = |id, name: &str, addr: &str, ts| Message {
@@ -4620,7 +4622,8 @@ mod tests {
             ..msg(id, "", "")
         };
         let (a, b, a2) = (from(1, "Ann", "a@example.com", 10), from(2, "", "b@example.com", 20), from(3, "Ann", "A@example.com", 30));
-        assert_eq!(correspondents(&[&a2, &b, &a]), "Ann, b@example.com");
+        assert_eq!(correspondents(&[&a, &b, &a2]), "Ann, b@example.com");
+        assert_eq!(correspondents(&[&a, &b]), "b@example.com, Ann");
         assert_eq!(correspondents(&[&a]), "Ann");
         assert_eq!(correspondents(&[]), "");
     }
