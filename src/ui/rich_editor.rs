@@ -1419,6 +1419,88 @@ fn bar_menu(webview: &webkit6::WebView, tip: &str, content: &impl IsA<gtk::Widge
     (btn, popover)
 }
 
+/// The font dialog's pick, or `None` when it is cancelled. Not the
+/// binding's own `choose_family`: GTK answers a dialog accepted with no row
+/// selected with no family and no error, which the binding takes for a
+/// family and aborts on (#358).
+fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Option<gtk::pango::FontFamily>) + 'static) {
+    use gtk::glib::translate::{from_glib_full, ToGlibPtr};
+    type Done = Box<dyn FnOnce(Option<gtk::pango::FontFamily>)>;
+    unsafe extern "C" fn finish(
+        source: *mut gtk::glib::gobject_ffi::GObject,
+        result: *mut gtk::gio::ffi::GAsyncResult,
+        data: gtk::glib::ffi::gpointer,
+    ) {
+        let done = unsafe { Box::from_raw(data as *mut Done) };
+        let mut error = std::ptr::null_mut();
+        let family = unsafe {
+            gtk::ffi::gtk_font_dialog_choose_family_finish(source as *mut gtk::ffi::GtkFontDialog, result, &mut error)
+        };
+        if !error.is_null() {
+            unsafe { gtk::glib::ffi::g_error_free(error) };
+        }
+        done((!family.is_null()).then(|| unsafe { from_glib_full(family) }));
+    }
+    let dialog = gtk::FontDialog::new();
+    let data: Box<Done> = Box::new(Box::new(done));
+    // The task GTK makes holds the dialog until `finish` has run.
+    unsafe {
+        gtk::ffi::gtk_font_dialog_choose_family(
+            dialog.to_glib_none().0,
+            parent.to_glib_none().0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            Some(finish),
+            Box::into_raw(data) as gtk::glib::ffi::gpointer,
+        );
+    }
+}
+
+/// The editor command that sets `font`, with the generic family it falls
+/// back to where the recipient does not have it.
+fn font_js(font: &crate::config::RecentFont) -> String {
+    let name: String = font.name.chars().filter(|c| !matches!(c, '\'' | '"' | '\\')).collect();
+    let generic = if font.mono { "monospace" } else { "sans-serif" };
+    format!("window.__hylkiStyled('fontName',{})", js_str(&format!("'{name}', {generic}")))
+}
+
+/// The recent fonts at the foot of the font menu: a divider and one item
+/// per font, the one picked going back to the head of the list.
+fn fill_recent_fonts(
+    list: &gtk::Box,
+    webview: &gtk::glib::WeakRef<webkit6::WebView>,
+    popover: &gtk::glib::WeakRef<gtk::Popover>,
+) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+    let fonts = crate::config::load_recent_fonts();
+    list.set_visible(!fonts.is_empty());
+    if fonts.is_empty() {
+        return;
+    }
+    list.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    for font in fonts {
+        let text = gtk::Label::new(Some(&font.name));
+        text.set_xalign(0.0);
+        if font.mono {
+            text.add_css_class("monospace");
+        }
+        let item = gtk::Button::new();
+        item.set_child(Some(&text));
+        item.add_css_class("flat");
+        let (weak, pop) = (webview.clone(), popover.clone());
+        item.connect_clicked(move |_| {
+            if let Some(p) = pop.upgrade() {
+                p.popdown();
+            }
+            run_restored(&weak, &font_js(&font));
+            crate::config::note_recent_font(font.clone());
+        });
+        list.append(&item);
+    }
+}
+
 /// A list of menu items, each running its command in the editor.
 fn menu_items(webview: &webkit6::WebView, popover: &gtk::glib::WeakRef<gtk::Popover>, items: &[(String, String, Option<&str>)]) -> gtk::Box {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -1663,23 +1745,27 @@ fn build_toolbar(
             }
             let parent = b.root().and_downcast::<gtk::Window>();
             let weak = weak.clone();
-            gtk::FontDialog::new().choose_family(
-                parent.as_ref(),
-                None::<&gtk::pango::FontFamily>,
-                None::<&gtk::gio::Cancellable>,
-                move |res| match res {
-                    Ok(family) => {
-                        let name: String = family.name().chars().filter(|c| !matches!(c, '\'' | '"' | '\\')).collect();
-                        let generic = if family.is_monospace() { "monospace" } else { "sans-serif" };
-                        let value = format!("'{name}', {generic}");
-                        run_restored(&weak, &format!("window.__hylkiStyled('fontName',{})", js_str(&value)));
-                    }
-                    Err(_) => run_restored(&weak, ""),
-                },
-            );
+            choose_family(parent.as_ref(), move |family| match family {
+                Some(family) => {
+                    let font = crate::config::RecentFont { name: family.name().to_string(), mono: family.is_monospace() };
+                    run_restored(&weak, &font_js(&font));
+                    crate::config::note_recent_font(font);
+                }
+                None => run_restored(&weak, ""),
+            });
         });
     }
     font_box.append(&other_font);
+    // The fonts picked there last (#358), at the foot of the menu, read
+    // afresh each time it opens so that every composer offers the same.
+    // Before the popover shows, not from its own show: content changed
+    // there kept it from opening at all.
+    let recent_fonts = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    {
+        let (weak, pop, recent) = (webview.downgrade(), font_pop.downgrade(), recent_fonts.clone());
+        font.set_create_popup_func(move |_| fill_recent_fonts(&recent, &weak, &pop));
+    }
+    font_box.append(&recent_fonts);
     font.set_label(&i18n(FONTS[0].2));
     font.set_always_show_arrow(true);
     let size_items: Vec<(String, String, Option<&str>)> = std::iter::once((i18n("Default"), "window.__hylkiSize(0)".to_string(), None))
@@ -2277,12 +2363,12 @@ const PASTE_SCRIPT: &str = r#"<script>
     return el && el.nodeType === 1 ? el : document.body;
   }
   /* The caret's font (#358): its first family, or the generic family the
-     editor's own falls under. WebKit's own value is asked first: it knows
-     a font chosen with nothing selected, which only the next character
-     typed will carry, and the menu has to show that choice straight away. */
+     editor's own falls under. A font chosen for the next character typed
+     comes first, then WebKit's own value, which the selection's anchor
+     could not stand in for. */
   function fontOf(el){
-    var g = '';
-    try{ g = String(document.queryCommandValue('fontName') || ''); }catch(_){}
+    var g = pending && pending.fontFamily || '';
+    if(!g) try{ g = String(document.queryCommandValue('fontName') || ''); }catch(_){}
     if(!g){ try{ g = getComputedStyle(el).fontFamily; }catch(_){} }
     var first = g.split(',')[0].replace(/["']/g, '').trim();
     if(first && !/^(system-ui|sans-serif|serif|monospace|ui-[a-z-]+|-webkit-[a-z-]+)$/i.test(first)) return first;
@@ -2294,7 +2380,7 @@ const PASTE_SCRIPT: &str = r#"<script>
   /* The caret's text size in points, the unit the size menu shows: a size
      chosen for the next character typed, or the text's own. */
   function sizeOf(el){
-    var want = sizeNext && sizeWant ? sizeWant : '';
+    var want = pending && pending.fontSize || '';
     var px = 0;
     if(/pt$/.test(want)) return String(parseFloat(want));
     if(want) px = parseFloat(want);
@@ -2356,18 +2442,32 @@ const PASTE_SCRIPT: &str = r#"<script>
      keeps; WebKit's own markup is a <font> tag otherwise. Only for these
      commands: Bold and the rest stay the plain tags Markdown maps. */
   window.__hylkiStyled = function(cmd, value){
+    var sel = getSelection();
+    if(cmd === 'fontName' && sel.rangeCount && sel.isCollapsed){
+      pend('fontFamily', value);
+      return;
+    }
     document.execCommand('styleWithCSS', false, true);
     document.execCommand(cmd, false, value);
     document.execCommand('styleWithCSS', false, false);
     fmtState();
   };
+  /* A font or size chosen with nothing selected (#358) is for the next
+     character typed, which opens a span of it, the way the other styles
+     carry on from the caret. Not WebKit's own typing style, which any
+     change of selection drops: picking a font in the font dialog takes the
+     focus away from the document and back. */
+  var pending = null;
+  function pend(prop, value){
+    pending = pending || {};
+    pending[prop] = value;
+    fmtState();
+  }
   /* Font size (#358) in points. WebKit's own command knows only the seven
      <font size> steps, so the text is marked with the largest, which no
      message written here uses, and the mark turns into the size asked for
-     (a <font> other mail kept as it was is left alone). With nothing
-     selected, the next character typed opens a span of that size, the way
-     the other styles carry on from the caret. 0 is the editor's own size. */
-  var sizeWant = null, sizeNext = false;
+     (a <font> other mail kept as it was is left alone). 0 is the editor's
+     own size. */
   function sizeValue(pt){
     return pt ? pt + 'pt' : getComputedStyle(document.body).fontSize;
   }
@@ -2381,10 +2481,9 @@ const PASTE_SCRIPT: &str = r#"<script>
   window.__hylkiSize = function(pt){
     var sel = getSelection();
     if(!sel.rangeCount) return;
-    sizeWant = sizeValue(pt);
+    var sizeWant = sizeValue(pt);
     if(sel.isCollapsed){
-      sizeNext = true;
-      fmtState();
+      pend('fontSize', sizeWant);
       return;
     }
     var before = new Set(document.body.querySelectorAll('font[size="7"]'));
@@ -2399,13 +2498,15 @@ const PASTE_SCRIPT: &str = r#"<script>
     fmtState();
   };
   document.addEventListener('beforeinput', function(e){
-    if(!sizeNext || e.inputType !== 'insertText' || !e.data) return;
-    sizeNext = false;
+    if(!pending || e.inputType !== 'insertText' || !e.data) return;
+    var want = pending;
+    pending = null;
     var sel = getSelection();
     if(!sel.rangeCount || !sel.isCollapsed) return;
     e.preventDefault();
     var span = document.createElement('span');
-    span.style.fontSize = sizeWant;
+    if(want.fontFamily) span.style.fontFamily = want.fontFamily;
+    if(want.fontSize) span.style.fontSize = want.fontSize;
     // A lone space at the end of a line would collapse, and the caret
     // with it out of the span.
     var text = document.createTextNode(e.data === ' ' ? '\u00a0' : e.data);
@@ -2418,10 +2519,16 @@ const PASTE_SCRIPT: &str = r#"<script>
     sel.addRange(r);
     fmtState();
   });
-  /* A size chosen with nothing selected is for the caret where it was. */
-  document.addEventListener('mousedown', function(){ sizeNext = false; });
+  /* A font or size chosen with nothing selected is for the caret where
+     it was. */
+  function unpend(){
+    if(!pending) return;
+    pending = null;
+    fmtState();
+  }
+  document.addEventListener('mousedown', unpend);
   document.addEventListener('keydown', function(e){
-    if(e.key && e.key.indexOf('Arrow') === 0 || e.key === 'Home' || e.key === 'End') sizeNext = false;
+    if(e.key && e.key.indexOf('Arrow') === 0 || e.key === 'Home' || e.key === 'End') unpend();
   });
   /* Indent and outdent (#358). In a list they nest the item under the one
      above, or bring it back out. */

@@ -4133,6 +4133,36 @@ struct StateFile {
     /// (#343), keyed "address␟folder path".
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     unread_seen: std::collections::BTreeMap<String, u32>,
+    /// The fonts last picked with the composer's Other Font… (#358), the
+    /// newest first, for the font menu to offer again.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    recent_fonts: Vec<RecentFont>,
+}
+
+/// A font family picked in the composer (#358), and whether it is
+/// monospaced, which decides the generic family it falls back to.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RecentFont {
+    pub name: String,
+    #[serde(default)]
+    pub mono: bool,
+}
+
+/// How many picked fonts the font menu keeps.
+const RECENT_FONTS: usize = 5;
+
+pub fn load_recent_fonts() -> Vec<RecentFont> {
+    load_state().recent_fonts
+}
+
+/// Put `font` at the head of the recent fonts, once, and keep the newest
+/// few.
+pub fn note_recent_font(font: RecentFont) {
+    update_state(|s| {
+        s.recent_fonts.retain(|f| !f.name.eq_ignore_ascii_case(&font.name));
+        s.recent_fonts.insert(0, font);
+        s.recent_fonts.truncate(RECENT_FONTS);
+    });
 }
 
 fn default_about_height() -> i32 {
