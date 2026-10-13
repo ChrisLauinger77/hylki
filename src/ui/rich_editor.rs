@@ -904,7 +904,7 @@ impl RichEditor {
     /// go through [`RichEditor::extract`], which never touches the pixels —
     /// a save must not cost quality.
     pub fn extract_for_send(&self, cb: impl FnOnce(String, String) + 'static) {
-        self.read_body("window.__hylkiBodyHtmlForSend()", cb);
+        self.read_body("window.__hylkiBodyHtmlForSend()", move |html, text| cb(with_compose_font(html), text));
     }
 
     /// Read the current body HTML and a plain-text rendering asynchronously.
@@ -1359,7 +1359,7 @@ const FONTS: &[(&str, &str, &str)] = &[
 ];
 
 /// The font sizes (#358), in points, the unit mail programs show.
-const SIZES: &[u32] = &[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36];
+pub(crate) const SIZES: &[u32] = &[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36];
 
 /// The color palette (#358): the GNOME palette, a column per hue from light
 /// to dark, then the greys from white to black.
@@ -1449,7 +1449,7 @@ fn fit_menu(btn: &gtk::MenuButton) {
 /// binding's own `choose_family`: GTK answers a dialog accepted with no row
 /// selected with no family and no error, which the binding takes for a
 /// family and aborts on (#358).
-fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Option<gtk::pango::FontFamily>) + 'static) {
+pub(crate) fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Option<gtk::pango::FontFamily>) + 'static) {
     use gtk::glib::translate::{from_glib_full, ToGlibPtr};
     type Done = Box<dyn FnOnce(Option<gtk::pango::FontFamily>)>;
     unsafe extern "C" fn finish(
@@ -1482,18 +1482,87 @@ fn choose_family(parent: Option<&gtk::Window>, done: impl FnOnce(Option<gtk::pan
     }
 }
 
-/// The editor command that sets `font`, with the generic family it falls
-/// back to where the recipient does not have it.
-fn font_js(font: &crate::config::RecentFont) -> String {
+/// `font` as a CSS family list, with the generic family it falls back to
+/// where the recipient does not have it.
+pub(crate) fn recent_font_css(font: &crate::config::RecentFont) -> String {
     let name: String = font.name.chars().filter(|c| !matches!(c, '\'' | '"' | '\\')).collect();
     let generic = if font.mono { "monospace" } else { "sans-serif" };
-    format!("window.__hylkiStyled('fontName',{})", js_str(&format!("'{name}', {generic}")))
+    format!("'{name}', {generic}")
+}
+
+/// The editor command that sets `font`.
+fn font_js(font: &crate::config::RecentFont) -> String {
+    format!("window.__hylkiStyled('fontName',{})", js_str(&recent_font_css(font)))
+}
+
+/// The fonts Settings → Composing offers for new messages, as (CSS family
+/// list, name) pairs: the default, the font menu's own, the recent picks,
+/// and `current` when it is none of those.
+pub(crate) fn compose_font_choices(current: &str) -> Vec<(String, String)> {
+    let mut out = vec![(String::new(), i18n("Default"))];
+    out.extend(FONTS.iter().map(|(_, css, name)| (css.to_string(), i18n(name))));
+    let recent = crate::config::load_recent_fonts();
+    for css in recent.iter().map(recent_font_css).chain((!current.is_empty()).then(|| current.to_string())) {
+        if !out.iter().any(|(c, _)| c.eq_ignore_ascii_case(&css)) {
+            let name = first_family(&css).to_string();
+            out.push((css, name));
+        }
+    }
+    out
+}
+
+/// A CSS family list's first family, unquoted.
+fn first_family(css: &str) -> &str {
+    css.split(',').next().unwrap_or("").trim().trim_matches(|c| c == '\'' || c == '"')
+}
+
+/// A family list from the settings file made safe to write into a style
+/// sheet or a `style` attribute.
+fn clean_family(css: &str) -> String {
+    css.chars().filter(|c| !matches!(c, '"' | '<' | '>' | '{' | '}' | ';' | '\\' | '&') && !c.is_control()).collect::<String>().trim().to_string()
+}
+
+/// The body's `font` shorthand: the font and size set for new messages,
+/// or the interface font at the editor's own 14px.
+fn body_font() -> String {
+    let prefs = crate::config::load_privacy();
+    let family = clean_family(&prefs.compose_font);
+    let family = if family.is_empty() { "system-ui,sans-serif".to_string() } else { family };
+    let size = match prefs.compose_font_size {
+        0 => "14px".to_string(),
+        pt => format!("{pt}pt"),
+    };
+    format!("{size}/1.55 {family}")
+}
+
+/// The sent body in the font and size set for new messages. The editor
+/// shows them through its own style sheet, which does not go out with the
+/// message, so they are written around it; with neither set the body is
+/// left to the recipient's own font, as before.
+fn with_compose_font(html: String) -> String {
+    let prefs = crate::config::load_privacy();
+    wrap_font(html, &prefs.compose_font, prefs.compose_font_size)
+}
+
+fn wrap_font(html: String, family: &str, pt: u32) -> String {
+    let family = clean_family(family);
+    let mut style = String::new();
+    if !family.is_empty() {
+        style.push_str(&format!("font-family:{family};"));
+    }
+    if pt > 0 {
+        style.push_str(&format!("font-size:{pt}pt;"));
+    }
+    if style.is_empty() {
+        return html;
+    }
+    format!("<div style=\"{style}\">{html}</div>")
 }
 
 /// Draw a font menu item in the font it names (a CSS family list), so the
 /// menu shows each font rather than naming it. A font not installed here
 /// shows in the fallback the message itself would get.
-fn preview_font(label: &gtk::Label, family: &str) {
+pub(crate) fn preview_font(label: &gtk::Label, family: &str) {
     let family = family
         .split(',')
         .map(|f| f.trim().trim_matches(|c| c == '\'' || c == '"'))
@@ -1816,7 +1885,8 @@ fn build_toolbar(
         });
     }
     font_box.append(&recent_fonts);
-    font.set_label(&i18n(FONTS[0].2));
+    let prefs = crate::config::load_privacy();
+    font.set_label(&font_label(first_family(&prefs.compose_font)));
     font.set_always_show_arrow(true);
     let size_items: Vec<(String, String, Option<&str>)> = std::iter::once((i18n("Default"), "window.__hylkiSize(0)".to_string(), None))
         .chain(SIZES.iter().map(|pt| (pt.to_string(), format!("window.__hylkiSize({pt})"), None)))
@@ -1825,8 +1895,12 @@ fn build_toolbar(
     size_box.add_css_class("context-menu-list");
     let (size, size_pop) = bar_menu(webview, i18n_noop("Font size"), &size_box);
     size_box.append(&menu_items(webview, &size_pop.downgrade(), &size_items));
-    // The editor's own 14px, until the caret reports.
-    size.set_label("11");
+    // The size new messages start in (the editor's own 14px by default),
+    // until the caret reports.
+    size.set_label(&match prefs.compose_font_size {
+        0 => "11".to_string(),
+        pt => pt.to_string(),
+    });
     size.set_always_show_arrow(true);
     styles.append(&style);
     styles.append(&font);
@@ -3098,6 +3172,7 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
     let (ground, _, _) = crate::ui::message_view::theme_grounds_for(webview, dark);
     let paste_rich = !crate::config::load_privacy().paste_plain;
     let return_paragraph = crate::config::load_privacy().return_paragraph;
+    let body_font = body_font();
     let script = format!(
         "<script>window.__hylkiPasteRich={paste_rich};\
          window.__hylkiReturnParagraph={return_paragraph};\
@@ -3125,7 +3200,7 @@ fn document(content: &str, webview: &webkit6::WebView, image_policy: &str, plain
          <style>\
            :root{{color-scheme:{scheme};}}\
            html,body{{height:100%;box-sizing:border-box;}}\
-           body{{margin:0;padding:20px;font:14px/1.55 system-ui,sans-serif;outline:none;\
+           body{{margin:0;padding:20px;font:{body_font};outline:none;\
              background:{ground};color:CanvasText;}}\
            /* Every image fits the writing width — pasted, dropped, or\
               quoted. The inline style on inserted images serves the\
@@ -3605,5 +3680,32 @@ mod body_tests {
         assert_eq!(css_monospace_family("Monospace 10"), "monospace");
         assert_eq!(css_monospace_family(""), "monospace");
         assert_eq!(css_monospace_family("Evil\"}body{x 10"), "\"Evilbodyx\",monospace");
+    }
+}
+
+#[cfg(test)]
+mod compose_font_tests {
+    use super::*;
+
+    /// The default font and size send nothing, so the recipient's own font
+    /// stays in charge; a chosen one goes out around the body.
+    #[test]
+    fn sent_body_carries_the_chosen_font() {
+        assert_eq!(wrap_font("<p>Hi</p>".into(), "", 0), "<p>Hi</p>");
+        assert_eq!(
+            wrap_font("<p>Hi</p>".into(), "Georgia, serif", 12),
+            "<div style=\"font-family:Georgia, serif;font-size:12pt;\"><p>Hi</p></div>"
+        );
+        assert_eq!(wrap_font("x".into(), "", 14), "<div style=\"font-size:14pt;\">x</div>");
+    }
+
+    /// A hand-edited settings file cannot close the attribute or the rule.
+    #[test]
+    fn family_cannot_escape_its_style() {
+        assert_eq!(
+            wrap_font("x".into(), "a\"><script>;}", 0),
+            "<div style=\"font-family:ascript;\">x</div>"
+        );
+        assert_eq!(first_family("'Comfortaa', sans-serif"), "Comfortaa");
     }
 }

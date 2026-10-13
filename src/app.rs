@@ -1065,6 +1065,10 @@ pub struct AppModel {
     /// Return starts a new paragraph in the composer; off, a new line.
     return_paragraph: bool,
     toolbar_expanded: bool,
+    /// The font and size rich-text messages are written in; empty and 0
+    /// leave them to the recipient.
+    compose_font: String,
+    compose_font_size: u32,
     /// What a printed page carries besides the message (#359).
     print_options: config::PrintOptions,
     /// New messages start as plain text (#180).
@@ -3448,6 +3452,8 @@ impl SimpleComponent for AppModel {
             paste_plain: prefs.paste_plain,
             return_paragraph: prefs.return_paragraph,
             toolbar_expanded: prefs.toolbar_expanded,
+            compose_font: prefs.compose_font,
+            compose_font_size: prefs.compose_font_size,
             print_options: prefs.print,
             compose_format: config::load_compose_format(),
             follow_plain: prefs.follow_plain,
@@ -8721,6 +8727,14 @@ impl SimpleComponent for AppModel {
                 pref!(self.toolbar_expanded = on);
             }
 
+            AppMsg::Pref(PrefOutput::SetComposeFont(font)) => {
+                pref!(self.compose_font = font);
+            }
+
+            AppMsg::Pref(PrefOutput::SetComposeFontSize(pt)) => {
+                pref!(self.compose_font_size = pt);
+            }
+
             AppMsg::Pref(PrefOutput::SetPrintOptions(options)) => {
                 if pref!(self.print_options = options) {
                     crate::ui::print_preview::set_options(options);
@@ -12012,6 +12026,8 @@ impl AppModel {
             paste_plain: self.paste_plain,
             return_paragraph: self.return_paragraph,
             toolbar_expanded: self.toolbar_expanded,
+            compose_font: self.compose_font.clone(),
+            compose_font_size: self.compose_font_size,
             print: self.print_options,
             // Both are written: the boolean is what an older version reads.
             compose_plain: self.compose_format == config::ComposeFormat::Plain,
@@ -19984,6 +20000,8 @@ impl AppModel {
             paste_plain: self.paste_plain,
             return_paragraph: self.return_paragraph,
             toolbar_expanded: self.toolbar_expanded,
+            compose_font: self.compose_font.clone(),
+            compose_font_size: self.compose_font_size,
             print_options: self.print_options,
             spellcheck: self.spellcheck,
             spellcheck_langs: self.spellcheck_langs.clone(),

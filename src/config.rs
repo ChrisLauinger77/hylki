@@ -1398,6 +1398,14 @@ pub(crate) struct PrivacyFile {
     /// rather than behind its chevron, the default.
     #[serde(default)]
     pub(crate) toolbar_expanded: bool,
+    /// The font rich-text messages are written and sent in, as a CSS family
+    /// list. Empty, the editor shows the interface font and the message
+    /// names none, so it reads in the recipient's own.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub(crate) compose_font: String,
+    /// Their text size in points; 0 leaves it to the recipient.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub(crate) compose_font_size: u32,
     /// New messages start as plain text, without formatting (#180). Kept
     /// written so a version that predates `compose_format` still opens its
     /// composer the way this one was left.
@@ -1769,6 +1777,8 @@ impl Default for PrivacyFile {
             paste_plain: true,
             return_paragraph: false,
             toolbar_expanded: false,
+            compose_font: String::new(),
+            compose_font_size: 0,
             compose_plain: false,
             compose_format: None,
             follow_plain: false,

@@ -3444,11 +3444,11 @@ msgstr ""
 msgid "Save as Template"
 msgstr "Beillesztés egyszerű szövegként"
 
-msgid "Delete Draft"
-msgstr "Piszkozat törlése"
-
 msgid "Move this draft to Trash"
 msgstr "Piszkozat áthelyezése a Kukába"
+
+msgid "Delete Draft"
+msgstr "Piszkozat törlése"
 
 msgid "Schedule"
 msgstr "Ütemezés"
@@ -3480,6 +3480,9 @@ msgstr "Titkosítás OpenPGP-vel minden címzett kulcsára"
 msgid "Sign with your OpenPGP key"
 msgstr "Aláírás a saját OpenPGP-kulccsal"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr "Fájlok csatolása"
 
@@ -6081,6 +6084,21 @@ msgstr ""
 "Az üzenetíró ablak formázás gombja bármelyik üzenet formátumát "
 "megváltoztatja."
 
+msgid "Font"
+msgstr ""
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Text méret"
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 #, fuzzy
 msgid "Reply in the original's format"
 msgstr "Válasz ezekkel a fájlokkal"
@@ -6671,6 +6689,9 @@ msgstr "Megváltozik"
 msgid "Custom File"
 msgstr "Egyéni fájl"
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr "Üzenet nyomtatása"
 
@@ -6764,16 +6785,6 @@ msgstr "Egyéni szín…"
 
 msgid "Paragraph style"
 msgstr ""
-
-msgid "Font"
-msgstr ""
-
-msgid "Other Font…"
-msgstr ""
-
-#, fuzzy
-msgid "Font size"
-msgstr "Text méret"
 
 msgid "Bold"
 msgstr "Félkövér"

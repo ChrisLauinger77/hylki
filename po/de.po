@@ -3469,11 +3469,11 @@ msgstr ""
 msgid "Save as Template"
 msgstr "Als reinen Text einfügen"
 
-msgid "Delete Draft"
-msgstr "Entwurf löschen"
-
 msgid "Move this draft to Trash"
 msgstr "Diesen Entwurf in den Papierkorb verschieben"
+
+msgid "Delete Draft"
+msgstr "Entwurf löschen"
 
 msgid "Schedule"
 msgstr "Planen"
@@ -3505,6 +3505,9 @@ msgstr "Mit OpenPGP für jeden Empfängerschlüssel verschlüsseln"
 msgid "Sign with your OpenPGP key"
 msgstr "Mit Ihrem OpenPGP-Schlüssel signieren"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr "Dateien anhängen"
 
@@ -6099,6 +6102,21 @@ msgstr ""
 "gesendet; Klartext wird ohne Formatierung gesendet. Der Format-Button des "
 "Komponisten schaltet eine beliebige Nachricht um."
 
+msgid "Font"
+msgstr ""
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Textgröße"
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 #, fuzzy
 msgid "Reply in the original's format"
 msgstr "Antworten mit den Dateien"
@@ -6686,6 +6704,9 @@ msgstr "Schwung"
 msgid "Custom File"
 msgstr "Eigene Datei"
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr "Nachricht drucken"
 
@@ -6779,16 +6800,6 @@ msgstr "Benutzerdefinierte Farbe…"
 
 msgid "Paragraph style"
 msgstr ""
-
-msgid "Font"
-msgstr ""
-
-msgid "Other Font…"
-msgstr ""
-
-#, fuzzy
-msgid "Font size"
-msgstr "Textgröße"
 
 msgid "Bold"
 msgstr "Fett"

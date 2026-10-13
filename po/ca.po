@@ -3358,11 +3358,11 @@ msgstr "Conserva una còpia a Plantilles per començar missatges nous"
 msgid "Save as Template"
 msgstr "Desa com a plantilla"
 
-msgid "Delete Draft"
-msgstr "Suprimeix l'esborrany"
-
 msgid "Move this draft to Trash"
 msgstr "Mou aquest esborrany a la paperera"
+
+msgid "Delete Draft"
+msgstr "Suprimeix l'esborrany"
 
 msgid "Schedule"
 msgstr "Programa"
@@ -3394,6 +3394,9 @@ msgstr "Xifra amb OpenPGP amb la clau de cada destinatari"
 msgid "Sign with your OpenPGP key"
 msgstr "Signa amb la teva clau OpenPGP"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr "Adjunta fitxers"
 
@@ -5958,6 +5961,20 @@ msgstr ""
 "formatat; el text pla s'envia sense format. El botó de format del redactor "
 "canvia qualsevol missatge."
 
+msgid "Font"
+msgstr "Font"
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+msgid "Font size"
+msgstr ""
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 #, fuzzy
 msgid "Reply in the original's format"
 msgstr "Respon amb els fitxers"
@@ -6543,6 +6560,9 @@ msgstr "Balanceig"
 msgid "Custom File"
 msgstr "Fitxer personalitzat"
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr "Imprimeix el missatge"
 
@@ -6626,15 +6646,6 @@ msgstr ""
 
 msgid "Paragraph style"
 msgstr "Estil de paràgraf"
-
-msgid "Font"
-msgstr "Font"
-
-msgid "Other Font…"
-msgstr ""
-
-msgid "Font size"
-msgstr ""
 
 msgid "Bold"
 msgstr "Negreta"

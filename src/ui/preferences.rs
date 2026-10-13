@@ -102,6 +102,10 @@ pub struct PrefInit {
     pub paste_plain: bool,
     pub return_paragraph: bool,
     pub toolbar_expanded: bool,
+    /// The font rich-text messages are written in, as a CSS family list,
+    /// and its size in points; empty and 0 are the defaults.
+    pub compose_font: String,
+    pub compose_font_size: u32,
     /// Settings → Reading → Printing (#359).
     pub print_options: crate::config::PrintOptions,
     pub spellcheck: bool,
@@ -1333,6 +1337,8 @@ pub enum PrefOutput {
     SetPastePlain(bool),
     SetReturnParagraph(bool),
     SetToolbarExpanded(bool),
+    SetComposeFont(String),
+    SetComposeFontSize(u32),
     SetSpellcheck(bool),
     SetSpellcheckLangs(String),
     SetFetchInterval(u64),
@@ -3556,6 +3562,24 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    // Filled and connected in init: the
+                                    // list grows with the fonts picked
+                                    // through Other Font….
+                                    #[name = "compose_font_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Font"),
+                                        set_subtitle: &i18n("The font rich-text messages are \
+                                                       written and sent in. Default leaves \
+                                                       it to the recipient's own font."),
+                                    },
+
+                                    #[name = "compose_size_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Font size"),
+                                        set_subtitle: &i18n("The size, in points, rich-text \
+                                                       messages are written and sent in."),
+                                    },
+
                                     #[name = "follow_plain_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Reply in the original's format"),
@@ -4632,6 +4656,22 @@ impl Component for Preferences {
             crate::config::ComposeFormat::Html => 2,
             crate::config::ComposeFormat::Plain => 3,
         });
+        compose_font_setup(&widgets.compose_font_row, &init.compose_font, sender.clone());
+        {
+            let row = &widgets.compose_size_row;
+            let sizes = crate::ui::rich_editor::SIZES;
+            let names: Vec<String> = std::iter::once(i18n("Default"))
+                .chain(sizes.iter().map(|pt| pt.to_string()))
+                .collect();
+            row.set_model(Some(&gtk::StringList::new(&names.iter().map(String::as_str).collect::<Vec<_>>())));
+            let at = sizes.iter().position(|pt| *pt == init.compose_font_size).map_or(0, |i| i + 1);
+            row.set_selected(at as u32);
+            let sender = sender.clone();
+            row.connect_selected_notify(move |row| {
+                let pt = row.selected().checked_sub(1).and_then(|i| sizes.get(i as usize)).copied().unwrap_or(0);
+                let _ = sender.output(PrefOutput::SetComposeFontSize(pt));
+            });
+        }
         widgets.follow_plain_row.set_active(init.follow_plain);
         widgets.signature_position_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Above the quoted message"),
@@ -5879,4 +5919,89 @@ fn sound_index(sound: &str) -> u32 {
         .iter()
         .position(|n| *n == sound)
         .unwrap_or(if sound == crate::config::CUSTOM_SOUND { crate::config::BUILTIN_SOUNDS.len() } else { 0 }) as u32
+}
+
+/// Settings → Composing → Font: the default, the composer's own fonts and
+/// the recent picks, each drawn in its own face, then Other Font…, which
+/// opens the font chooser and adds what it picks to the list (#358).
+fn compose_font_setup(row: &adw::ComboRow, current: &str, sender: ComponentSender<Preferences>) {
+    use std::cell::{Cell, RefCell};
+    struct State {
+        /// The CSS family list of each entry; Other Font… has none.
+        choices: RefCell<Vec<String>>,
+        /// The font in use, which the row goes back to when the chooser is
+        /// cancelled.
+        chosen: RefCell<String>,
+        /// Set while the list is rebuilt, which selects as it goes.
+        filling: Cell<bool>,
+    }
+    fn fill(row: &adw::ComboRow, state: &State) {
+        let chosen = state.chosen.borrow().clone();
+        let choices = crate::ui::rich_editor::compose_font_choices(&chosen);
+        let mut names: Vec<String> = choices.iter().map(|(_, name)| name.clone()).collect();
+        names.push(i18n("Other Font…"));
+        let at = choices.iter().position(|(css, _)| *css == chosen).unwrap_or(0);
+        *state.choices.borrow_mut() = choices.into_iter().map(|(css, _)| css).collect();
+        state.filling.set(true);
+        row.set_model(Some(&gtk::StringList::new(&names.iter().map(String::as_str).collect::<Vec<_>>())));
+        row.set_selected(at as u32);
+        state.filling.set(false);
+    }
+    let state = Rc::new(State {
+        choices: RefCell::new(Vec::new()),
+        chosen: RefCell::new(current.to_string()),
+        filling: Cell::new(false),
+    });
+
+    let list = gtk::SignalListItemFactory::new();
+    list.connect_setup(|_, item| {
+        if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
+            let label = gtk::Label::new(None);
+            label.set_xalign(0.0);
+            item.set_child(Some(&label));
+        }
+    });
+    {
+        let state = state.clone();
+        list.connect_bind(move |_, item| {
+            let Some(item) = item.downcast_ref::<gtk::ListItem>() else { return };
+            let Some(label) = item.child().and_downcast::<gtk::Label>() else { return };
+            let name = item.item().and_downcast::<gtk::StringObject>().map(|s| s.string());
+            label.set_label(name.as_deref().unwrap_or(""));
+            label.set_attributes(None);
+            if let Some(css) = state.choices.borrow().get(item.position() as usize).filter(|css| !css.is_empty()) {
+                crate::ui::rich_editor::preview_font(&label, css);
+            }
+        });
+    }
+    row.set_list_factory(Some(&list));
+    fill(row, &state);
+
+    row.connect_selected_notify(move |row| {
+        if state.filling.get() {
+            return;
+        }
+        let picked = state.choices.borrow().get(row.selected() as usize).cloned();
+        if let Some(css) = picked {
+            *state.chosen.borrow_mut() = css.clone();
+            let _ = sender.output(PrefOutput::SetComposeFont(css));
+            return;
+        }
+        // Other Font…: the row goes back to the font in use until the
+        // chooser answers. Rebuilt on idle, not from inside its own signal.
+        let (row, state, sender) = (row.clone(), state.clone(), sender.clone());
+        gtk::glib::idle_add_local_once(move || {
+            fill(&row, &state);
+            let parent = row.root().and_downcast::<gtk::Window>();
+            crate::ui::rich_editor::choose_family(parent.as_ref(), move |family| {
+                let Some(family) = family else { return };
+                let font = crate::config::RecentFont { name: family.name().to_string(), mono: family.is_monospace() };
+                let css = crate::ui::rich_editor::recent_font_css(&font);
+                crate::config::note_recent_font(font);
+                *state.chosen.borrow_mut() = css.clone();
+                fill(&row, &state);
+                let _ = sender.output(PrefOutput::SetComposeFont(css));
+            });
+        });
+    });
 }

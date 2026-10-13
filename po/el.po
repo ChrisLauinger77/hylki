@@ -3470,11 +3470,11 @@ msgstr ""
 msgid "Save as Template"
 msgstr "Αποθήκευση ως πρότυπο"
 
-msgid "Delete Draft"
-msgstr "Διαγραφή προχείρου"
-
 msgid "Move this draft to Trash"
 msgstr "Μετακίνηση αυτού του προχείρου στον Κάδο"
+
+msgid "Delete Draft"
+msgstr "Διαγραφή προχείρου"
 
 msgid "Schedule"
 msgstr "Προγραμματισμός"
@@ -3506,6 +3506,9 @@ msgstr "Κρυπτογράφηση με OpenPGP για το κλειδί κάθ�
 msgid "Sign with your OpenPGP key"
 msgstr "Υπογραφή με το κλειδί OpenPGP σας"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr "Επισύναψη αρχείων"
 
@@ -6106,6 +6109,21 @@ msgstr ""
 "μηνύματα· το απλό κείμενο αποστέλλεται χωρίς μορφοποίηση. Το κουμπί μορφής "
 "της σύνταξης αλλάζει οποιοδήποτε μεμονωμένο μήνυμα."
 
+msgid "Font"
+msgstr "Γραμματοσειρά"
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Μέγεθος κειμένου"
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 #, fuzzy
 msgid "Reply in the original's format"
 msgstr "Απάντηση με τα αρχεία"
@@ -6695,6 +6713,9 @@ msgstr "Αιώρα"
 msgid "Custom File"
 msgstr "Προσαρμοσμένο αρχείο"
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr "Εκτύπωση μηνύματος"
 
@@ -6779,16 +6800,6 @@ msgstr "Προσαρμοσμένο χρώμα…"
 
 msgid "Paragraph style"
 msgstr "Στυλ παραγράφου"
-
-msgid "Font"
-msgstr "Γραμματοσειρά"
-
-msgid "Other Font…"
-msgstr ""
-
-#, fuzzy
-msgid "Font size"
-msgstr "Μέγεθος κειμένου"
 
 msgid "Bold"
 msgstr "Έντονα"

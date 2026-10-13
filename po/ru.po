@@ -3436,11 +3436,11 @@ msgstr "Сохранять копию в «Шаблонах» для созда�
 msgid "Save as Template"
 msgstr "Сохранить как шаблон"
 
-msgid "Delete Draft"
-msgstr "Удалить черновик"
-
 msgid "Move this draft to Trash"
 msgstr "Переместить этот черновик в «Корзину»"
+
+msgid "Delete Draft"
+msgstr "Удалить черновик"
 
 msgid "Schedule"
 msgstr "Запланировать"
@@ -3472,6 +3472,9 @@ msgstr "Зашифровать с помощью OpenPGP для каждого �
 msgid "Sign with your OpenPGP key"
 msgstr "Подписать вашим ключом OpenPGP"
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr "Прикрепить файлы"
 
@@ -6053,6 +6056,21 @@ msgstr ""
 "письмо; обычный текст отправляется без форматирования. Кнопка формата в "
 "редакторе позволяет переключить режим для отдельного сообщения."
 
+msgid "Font"
+msgstr "Шрифт"
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+#, fuzzy
+msgid "Font size"
+msgstr "Размер текста"
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 #, fuzzy
 msgid "Reply in the original's format"
 msgstr "Ответить с прикреплением файлов"
@@ -6634,6 +6652,9 @@ msgstr "Свинг"
 msgid "Custom File"
 msgstr "Другой файл"
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr "Печать сообщения"
 
@@ -6718,16 +6739,6 @@ msgstr "Другой цвет…"
 
 msgid "Paragraph style"
 msgstr "Стиль абзаца"
-
-msgid "Font"
-msgstr "Шрифт"
-
-msgid "Other Font…"
-msgstr ""
-
-#, fuzzy
-msgid "Font size"
-msgstr "Размер текста"
 
 msgid "Bold"
 msgstr "Полужирный"

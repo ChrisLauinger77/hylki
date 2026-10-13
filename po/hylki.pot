@@ -3056,10 +3056,10 @@ msgstr ""
 msgid "Save as Template"
 msgstr ""
 
-msgid "Delete Draft"
+msgid "Move this draft to Trash"
 msgstr ""
 
-msgid "Move this draft to Trash"
+msgid "Delete Draft"
 msgstr ""
 
 msgid "Schedule"
@@ -3092,6 +3092,9 @@ msgstr ""
 msgid "Sign with your OpenPGP key"
 msgstr ""
 
+#. Save Draft, Save as Template and Delete Draft are not here:
+#. the Save Draft button and its arrow stay in the header at
+#. any width.
 msgid "Attach files"
 msgstr ""
 
@@ -5340,6 +5343,20 @@ msgid ""
 "formatting. The composer's format button switches any one message."
 msgstr ""
 
+msgid "Font"
+msgstr ""
+
+msgid ""
+"The font rich-text messages are written and sent in. Default leaves it to "
+"the recipient's own font."
+msgstr ""
+
+msgid "Font size"
+msgstr ""
+
+msgid "The size, in points, rich-text messages are written and sent in."
+msgstr ""
+
 msgid "Reply in the original's format"
 msgstr ""
 
@@ -5830,6 +5847,9 @@ msgstr ""
 msgid "Custom File"
 msgstr ""
 
+msgid "Other Font…"
+msgstr ""
+
 msgid "Print Message"
 msgstr ""
 
@@ -5912,15 +5932,6 @@ msgid "Custom…"
 msgstr ""
 
 msgid "Paragraph style"
-msgstr ""
-
-msgid "Font"
-msgstr ""
-
-msgid "Other Font…"
-msgstr ""
-
-msgid "Font size"
 msgstr ""
 
 msgid "Bold"
