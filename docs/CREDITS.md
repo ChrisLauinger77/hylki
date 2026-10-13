@@ -184,8 +184,6 @@ Adding or updating one is the easiest way in: see [po/README.md](../po/README.md
 
 - [**bennypowers**](https://github.com/bennypowers): the Gentoo ebuild, in
   [his overlay](https://github.com/bennypowers/gentoo-overlay).
-- [**tbaumann**](https://github.com/tbaumann): the Nix flake, in
-  [his fork](https://github.com/tbaumann/hylki).
 
 ## Third-party work
 
