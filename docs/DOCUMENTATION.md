@@ -572,8 +572,9 @@ the system, as it is with GNOME.
 
 A Microsoft 365 account signed in within Hylki can suggest people from the
 organization's directory as a recipient is typed, alongside LDAP
-directories. Turn on **Search the organization directory** in the account's
-settings. Microsoft then asks to approve access to the directory (the
+directories. Turn on **Search the organization directory** under Microsoft
+365 in the account's settings, where the account's other Microsoft Graph
+switches are too. Microsoft then asks to approve access to the directory (the
 People.Read and User.ReadBasic.All permissions). Where an organization lets
 only administrators approve apps, an administrator approves Hylki once, at
 the link shown. Accounts added through GNOME Online Accounts cannot use it,
@@ -1330,7 +1331,7 @@ Outlook's older Sensitivity setting (Personal, Private, Confidential) shows
 the same way.
 
 For a Microsoft 365 account signed in within Hylki, **Show sensitivity label
-names** in the account's settings names those labels from the
+names**, under Microsoft 365 in the account's settings, names those labels from the
 organization's own list, with the label's color on the tag icon and the
 organization's description of the label in the pill's tooltip. Turning it
 on asks Microsoft to approve reading the labels (the

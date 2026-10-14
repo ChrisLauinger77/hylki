@@ -2224,8 +2224,15 @@ msgid ""
 msgstr ""
 
 #, fuzzy
+msgid "Microsoft 365"
+msgstr "Microsoft 365 / Outlook"
+
+#, fuzzy
 msgid "Search the organization directory"
 msgstr "Czy zapisać filtr?"
+
+msgid "Suggest people from your organization as you type a recipient."
+msgstr ""
 
 #, fuzzy
 msgid "Suggest only from this account"
@@ -2237,6 +2244,11 @@ msgid ""
 msgstr ""
 
 msgid "Show sensitivity label names"
+msgstr ""
+
+msgid ""
+"Name a message's label from your organization's list when the message gives "
+"only its ID."
 msgstr ""
 
 msgid "Folder Order"
@@ -2541,20 +2553,14 @@ msgid "Use this account in Hylki"
 msgstr "Używaj tego konta w aplikacji Hylki"
 
 msgid ""
-"Only for an account signed in within Hylki. To use it, add this account with "
-"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Only for an account signed in within Hylki. To use these, add this account "
+"with Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
 "Accounts."
 msgstr ""
 
 msgid ""
-"Suggest people from your organization as you type a recipient. Turning this "
-"on asks Microsoft for access to the directory; some organizations need an "
-"administrator to approve it."
-msgstr ""
-
-msgid ""
-"Name a message's label from your organization's list when the message gives "
-"only its ID. Turning this on asks Microsoft for access to the labels."
+"Turning one of these on asks Microsoft for access; some organizations need "
+"an administrator to approve it."
 msgstr ""
 
 #, fuzzy

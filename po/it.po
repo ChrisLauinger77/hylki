@@ -2146,8 +2146,15 @@ msgstr ""
 "disiscrizione)più vecchia di questo periodo, a meno che non sia "
 "contrassegnata. Controllato ad ogni sincronizzazione."
 
+#, fuzzy
+msgid "Microsoft 365"
+msgstr "Microsoft 365 / Outlook"
+
 msgid "Search the organization directory"
 msgstr "Cerca nella directory dell'organizzazione"
+
+msgid "Suggest people from your organization as you type a recipient."
+msgstr ""
 
 #, fuzzy
 msgid "Suggest only from this account"
@@ -2160,6 +2167,15 @@ msgstr ""
 
 msgid "Show sensitivity label names"
 msgstr ""
+
+#, fuzzy
+msgid ""
+"Name a message's label from your organization's list when the message gives "
+"only its ID."
+msgstr ""
+"Suggerisci persone della tua organizzazione mentre digiti un destinatario. "
+"Attivando questa opzione si richiede a Microsoft l'accesso alla directory; "
+"alcune organizzazioni richiedono l'approvazione di un amministratore."
 
 msgid "Folder Order"
 msgstr "Ordine cartelle"
@@ -2457,28 +2473,20 @@ msgstr "Posta"
 msgid "Use this account in Hylki"
 msgstr "Usa questo account in Hylki"
 
+#, fuzzy
 msgid ""
-"Only for an account signed in within Hylki. To use it, add this account with "
-"Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
+"Only for an account signed in within Hylki. To use these, add this account "
+"with Microsoft 365 / Outlook as the provider, instead of from GNOME Online "
 "Accounts."
 msgstr ""
 "Solo per un account che ha effettuato l'accesso in Hylki. Per usarlo, "
 "aggiungi questo account con Microsoft 365 / Outlook come provider, invece "
 "che da GNOME Account online."
 
-msgid ""
-"Suggest people from your organization as you type a recipient. Turning this "
-"on asks Microsoft for access to the directory; some organizations need an "
-"administrator to approve it."
-msgstr ""
-"Suggerisci persone della tua organizzazione mentre digiti un destinatario. "
-"Attivando questa opzione si richiede a Microsoft l'accesso alla directory; "
-"alcune organizzazioni richiedono l'approvazione di un amministratore."
-
 #, fuzzy
 msgid ""
-"Name a message's label from your organization's list when the message gives "
-"only its ID. Turning this on asks Microsoft for access to the labels."
+"Turning one of these on asks Microsoft for access; some organizations need "
+"an administrator to approve it."
 msgstr ""
 "Suggerisci persone della tua organizzazione mentre digiti un destinatario. "
 "Attivando questa opzione si richiede a Microsoft l'accesso alla directory; "

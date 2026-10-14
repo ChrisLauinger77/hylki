@@ -8,6 +8,9 @@
   settings, Hylki reads the organization's labels through Microsoft Graph
   and shows the label's name, its color on the tag icon and the
   organization's description in the tooltip.
+- **Changed: a Microsoft 365 account's Graph switches are together**, in a
+  Microsoft 365 group of its settings: the directory search, suggesting only
+  from the account, and the sensitivity label names.
 
 - **Fixed: keys pressed while a conversation loaded were lost** (#392,
   reported by 3v1n0). Opening a conversation from the keyboard gave the
