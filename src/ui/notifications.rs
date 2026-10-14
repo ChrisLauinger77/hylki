@@ -108,7 +108,9 @@ pub struct NotificationCenter {
     /// Newest console_log sequence already rendered.
     console_seq: u64,
     console_buf: gtk::TextBuffer,
-    console_view: Option<gtk::TextView>,
+    /// Whether the console sticks to its newest line: true until the user
+    /// scrolls up to read, true again once they scroll back to the bottom.
+    console_follow: std::rc::Rc<std::cell::Cell<bool>>,
     console_scroll: Option<gtk::ScrolledWindow>,
     console_grain: Option<gtk::DrawingArea>,
     /// Whether the bar sits at the top of the window rather than its foot
@@ -255,7 +257,6 @@ impl SimpleComponent for NotificationCenter {
                                 set_max_content_height: 160,
                                 set_hscrollbar_policy: gtk::PolicyType::Never,
 
-                                #[name = "console_view"]
                                 gtk::TextView {
                                     set_buffer: Some(&console_buf),
                                     add_css_class: "console-view",
@@ -356,9 +357,6 @@ impl SimpleComponent for NotificationCenter {
             });
 
         let console_buf = gtk::TextBuffer::new(None);
-        // Right-gravity end mark: stays at the end through inserts, giving
-        // the follow-scroll a stable target.
-        console_buf.create_mark(Some("end"), &console_buf.end_iter(), false);
 
         let mut model = NotificationCenter {
             cards,
@@ -376,7 +374,7 @@ impl SimpleComponent for NotificationCenter {
             console_opened_bar: false,
             console_seq: 0,
             console_buf: console_buf.clone(),
-            console_view: None,
+            console_follow: std::rc::Rc::new(std::cell::Cell::new(true)),
             console_scroll: None,
             console_grain: None,
             top: std::rc::Rc::default(),
@@ -385,10 +383,78 @@ impl SimpleComponent for NotificationCenter {
 
         let cards_box = model.cards.widget();
         let widgets = view_output!();
-        model.console_view = Some(widgets.console_view.clone());
         model.console_scroll = Some(widgets.console_scroll.clone());
         model.console_grain = Some(widgets.console_grain.clone());
         widgets.console_grain.set_draw_func(draw_crt_grain);
+        {
+            // Only the user's own scrolling stops the console following its
+            // newest line. The text view moves the view by itself as it
+            // measures lines (back to the top on its first layout, and when
+            // old lines are cut), so a position read alone can't tell that
+            // apart from the user scrolling up to read.
+            let sw = widgets.console_scroll.clone();
+            let adj = sw.vadjustment();
+            // A button held in the console: what moves the view now is the
+            // user (the scrollbar, a selection drag).
+            let held = std::rc::Rc::new(std::cell::Cell::new(false));
+            let follow = model.console_follow.clone();
+            let h = held.clone();
+            adj.connect_value_changed(move |a| {
+                if a.value() + a.page_size() >= a.upper() - 1.0 {
+                    follow.set(true);
+                } else if h.get() {
+                    follow.set(false);
+                } else if follow.get() {
+                    a.set_value(a.upper() - a.page_size());
+                }
+            });
+            let follow = model.console_follow.clone();
+            adj.connect_changed(move |a| {
+                if follow.get() {
+                    a.set_value(a.upper() - a.page_size());
+                }
+            });
+            let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+            wheel.set_propagation_phase(gtk::PropagationPhase::Capture);
+            let follow = model.console_follow.clone();
+            let a = adj.clone();
+            wheel.connect_scroll(move |_, _, dy| {
+                if dy < 0.0 && a.value() > a.lower() {
+                    follow.set(false);
+                }
+                glib::Propagation::Proceed
+            });
+            sw.add_controller(wheel);
+            let input = gtk::EventControllerLegacy::new();
+            input.set_propagation_phase(gtk::PropagationPhase::Capture);
+            let follow = model.console_follow.clone();
+            input.connect_event(move |_, ev| {
+                use gtk::gdk::{EventType as E, Key};
+                match ev.event_type() {
+                    E::ButtonPress | E::TouchBegin => held.set(true),
+                    E::ButtonRelease | E::TouchEnd | E::TouchCancel => held.set(false),
+                    // Keys are taken one at a time: a key held as the console
+                    // closes never sees its release here.
+                    E::KeyPress => {
+                        let up = ev
+                            .downcast_ref::<gtk::gdk::KeyEvent>()
+                            .is_some_and(|k| {
+                                matches!(
+                                    k.keyval(),
+                                    Key::Up | Key::KP_Up | Key::Page_Up | Key::KP_Page_Up
+                                        | Key::Home | Key::KP_Home
+                                )
+                            });
+                        if up && adj.value() > adj.lower() {
+                            follow.set(false);
+                        }
+                    }
+                    _ => {}
+                }
+                glib::Propagation::Proceed
+            });
+            sw.add_controller(input);
+        }
         model.layout = Some(Layout {
             root: root.clone(),
             area: widgets.area.clone(),
@@ -475,6 +541,17 @@ impl NotificationCenter {
         match (self.top.get(), self.panel_open) {
             (true, true) | (false, false) => "pan-up-symbolic",
             (true, false) | (false, true) => "pan-down-symbolic",
+        }
+    }
+
+    /// Open the console on its newest line, whatever was being read the last
+    /// time. The hidden view keeps its last measurements, so the jump lands
+    /// even when nothing new arrives to resize it.
+    fn follow_console(&self) {
+        self.console_follow.set(true);
+        if let Some(sw) = &self.console_scroll {
+            let adj = sw.vadjustment();
+            adj.set_value(adj.upper() - adj.page_size());
         }
     }
 
@@ -609,6 +686,7 @@ impl NotificationCenter {
                     });
                 } else {
                     self.console_open = true;
+                    self.follow_console();
                     sender.input(NotifyInput::PollConsole);
                 }
             }
@@ -616,6 +694,7 @@ impl NotificationCenter {
             NotifyInput::RevealConsole => {
                 if self.panel_open && !self.console_open {
                     self.console_open = true;
+                    self.follow_console();
                     sender.input(NotifyInput::PollConsole);
                 }
             }
@@ -639,30 +718,23 @@ impl NotificationCenter {
                 let (seq, lines) = crate::console_log::lines_since(self.console_seq);
                 self.console_seq = seq;
                 if !lines.is_empty() {
-                    // Follow the tail only while the user is at the bottom;
-                    // scrolling up to read holds the view still.
-                    let follow = self.console_scroll.as_ref().is_none_or(|sw| {
-                        let adj = sw.vadjustment();
-                        adj.value() + adj.page_size() >= adj.upper() - 24.0
-                    });
+                    // The adjustment's changed handler keeps a following
+                    // view on the newest line as these land.
                     let mut end = self.console_buf.end_iter();
                     for line in &lines {
                         self.console_buf.insert(&mut end, line);
                         self.console_buf.insert(&mut end, "\n");
                     }
                     // Keep the widget buffer bounded like the ring buffer.
+                    // Cutting from the top shifts whatever the user scrolled
+                    // up to read, so that waits until they are back at the
+                    // bottom, within a far looser ceiling.
                     let lc = self.console_buf.line_count();
-                    if lc > 2200 {
+                    let cap = if self.console_follow.get() { 2200 } else { 20_000 };
+                    if lc > cap {
                         let mut start = self.console_buf.start_iter();
                         if let Some(mut cut) = self.console_buf.iter_at_line(lc - 2000) {
                             self.console_buf.delete(&mut start, &mut cut);
-                        }
-                    }
-                    if follow {
-                        if let (Some(view), Some(mark)) =
-                            (&self.console_view, self.console_buf.mark("end"))
-                        {
-                            view.scroll_to_mark(&mark, 0.0, true, 0.0, 1.0);
                         }
                     }
                 }
