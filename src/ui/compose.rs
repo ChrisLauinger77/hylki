@@ -2338,6 +2338,14 @@ impl Component for Compose {
                     // directory alone, no LDAP and no other tenant.
                     let own = self.own_mail.get(&self.from_account);
                     let narrowed = own.is_some();
+                    if let Some(own) = own {
+                        tracing::debug!(
+                            target: "hylki::graph",
+                            "suggestions narrowed to {}: its directory and {} addresses from its mail",
+                            own.account.email,
+                            own.addresses.len()
+                        );
+                    }
                     let graph = match own {
                         Some(own) => std::sync::Arc::new(vec![own.account.clone()]),
                         None => self.graph_directories.clone(),

@@ -63,6 +63,9 @@
   **Search the organization directory** in the account's settings, a message
   written from it is offered the organization's directory and the people in
   its own mail, not GNOME Contacts, LDAP directories or other accounts.
+- **Fixed: a personal Microsoft account asked for an organization list on
+  every pause in the typing** (#410). Microsoft has no such list for it, and
+  its refusal now stops the asking for the session, as a work account's does.
 - **Fixed: single-line columns after Tags fell out of line** (#443) on
   rows without tags. Tags is a column of fixed width now, resized from its
   heading like the names.
