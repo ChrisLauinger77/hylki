@@ -893,6 +893,31 @@ pub enum BulkAction {
     MoveToInbox,
 }
 
+/// Which conversations Gmail's * r, * u, * s and * t select (#392).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckFilter {
+    Read,
+    Unread,
+    Starred,
+    Unstarred,
+}
+
+impl CheckFilter {
+    /// Whether a conversation, all its members given, is one to select. A
+    /// conversation counts as unread, or starred, when any member is, as
+    /// its row shows it.
+    fn matches(self, members: &[Message]) -> bool {
+        let unread = members.iter().any(|m| m.unread);
+        let starred = members.iter().any(|m| m.starred);
+        match self {
+            CheckFilter::Read => !unread,
+            CheckFilter::Unread => unread,
+            CheckFilter::Starred => starred,
+            CheckFilter::Unstarred => !starred,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum MessageListInput {
     /// The header's quick filter (#97): scope the list to unread mail.
@@ -954,6 +979,12 @@ pub enum MessageListInput {
     StepConversation(i32),
     /// Select every row shown (Gmail's * a).
     SelectAllShown,
+    /// Select the conversations shown that match, and only those (Gmail's
+    /// * r, * u, * s and * t).
+    SelectWhere(CheckFilter),
+    /// Which way to go on when the open row leaves the list: down (1) or
+    /// up (-1). Gmail's ] and [ archive and go on that way (#392).
+    SetNavDirection(i32),
     /// The addresses you send from, for leaving your own replies out of a
     /// conversation's nested rows (#388).
     SetOwnAddresses(std::collections::HashSet<String>),
@@ -2393,6 +2424,26 @@ impl SimpleComponent for MessageList {
                     self.selected_id = None;
                     self.shared.selection.select_all();
                     sender.input(MessageListInput::SelectionChanged);
+                }
+            }
+            MessageListInput::SelectWhere(filter) => {
+                let is_child = |p: usize| self.shared.model.row(p).is_some_and(|r| r.meta.is_child);
+                let picked = gtk::Bitset::new_empty();
+                for (pos, m) in self.shown.iter().enumerate() {
+                    if !is_child(pos) && filter.matches(&self.conversation_for(m).0) {
+                        picked.add(pos as u32);
+                    }
+                }
+                // Checked, as with * a; none matching leaves none checked.
+                self.checking = true;
+                self.selected_id = None;
+                let all = gtk::Bitset::new_range(0, self.shown.len() as u32);
+                self.shared.selection.set_selection(&picked, &all);
+                sender.input(MessageListInput::SelectionChanged);
+            }
+            MessageListInput::SetNavDirection(delta) => {
+                if delta != 0 {
+                    self.nav_direction = delta.signum();
                 }
             }
             MessageListInput::ToggleSelection => {

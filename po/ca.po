@@ -1026,6 +1026,14 @@ msgstr "Respon a tots"
 msgid "Archive the conversation"
 msgstr "Conversa sencera"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "Conversa sencera"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "Conversa sencera"
+
 msgid "Mark as spam"
 msgstr "Marca com a brossa"
 
@@ -1051,6 +1059,14 @@ msgstr "Selecciona aquesta fila (per a una acció massiva)"
 msgid "Select every row, or none"
 msgstr "Selecciona totes les files, o cap"
 
+#, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Suprimeix la conversa"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "Missatge següent de la conversa"
+
 msgid "Move to a folder"
 msgstr "Mou a una carpeta"
 
@@ -1061,8 +1077,23 @@ msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Afegeix o treu una etiqueta (les nou primeres, en l'ordre dels paràmetres)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Respon i reenvia a la finestra principal"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Respon i reenvia a la finestra principal"
+
 msgid "Compose"
 msgstr "Redacta"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Redacta a la finestra principal"
+
+msgid "Check for new mail"
+msgstr "Comprova si hi ha correu nou"
 
 msgid "Next message"
 msgstr "Missatge següent"
@@ -5035,9 +5066,6 @@ msgid ""
 msgstr ""
 "La llibreta d'adreces on va un contacte creat a l'Hylki, tret que se "
 "n'esculli una altra en el moment de crear-lo."
-
-msgid "Check for new mail"
-msgstr "Comprova si hi ha correu nou"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "

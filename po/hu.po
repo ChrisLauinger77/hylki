@@ -1062,6 +1062,14 @@ msgstr "Válasz mindenkinek"
 msgid "Archive the conversation"
 msgstr "A teljes beszélgetés"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "A teljes beszélgetés"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "A teljes beszélgetés"
+
 msgid "Mark as spam"
 msgstr "Megjelölés levélszemétként"
 
@@ -1088,6 +1096,14 @@ msgid "Select every row, or none"
 msgstr ""
 
 #, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Beszélgetés törlése"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "A beszélgetés következő üzenete"
+
+#, fuzzy
 msgid "Move to a folder"
 msgstr "Mappa áthelyezése"
 
@@ -1100,8 +1116,23 @@ msgstr ""
 "Címke hozzáadása vagy eltávolítása (az első kilenc, a Beállítások "
 "sorrendjében)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Válasz és továbbítás a főablakban"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Válasz és továbbítás a főablakban"
+
 msgid "Compose"
 msgstr "Levélírás"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Levélírás a főablakban"
+
+msgid "Check for new mail"
+msgstr "Új levelek keresése"
 
 msgid "Next message"
 msgstr "Következő üzenet"
@@ -5168,9 +5199,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-msgid "Check for new mail"
-msgstr "Új levelek keresése"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "

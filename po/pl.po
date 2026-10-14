@@ -1095,6 +1095,14 @@ msgstr "Odpowiedz wszystkim"
 msgid "Archive the conversation"
 msgstr "Cała rozmowa"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "Cała rozmowa"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "Cała rozmowa"
+
 msgid "Mark as spam"
 msgstr "Oznacz jako spam"
 
@@ -1121,6 +1129,14 @@ msgid "Select every row, or none"
 msgstr ""
 
 #, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Usuń rozmowę"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "Następna wiadomość w rozmowie"
+
+#, fuzzy
 msgid "Move to a folder"
 msgstr "Przenieś katalog"
 
@@ -1130,8 +1146,23 @@ msgstr ""
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr "Dodaj lub usuń etykietę (pierwsze dziewięć, w kolejności z ustawień)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Odpowiadanie i przekazywanie w oknie głównym"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Odpowiadanie i przekazywanie w oknie głównym"
+
 msgid "Compose"
 msgstr "Napisz nową wiadomość"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Pisanie w oknie głównym"
+
+msgid "Check for new mail"
+msgstr "Sprawdzanie nowej poczty"
 
 msgid "Next message"
 msgstr "Następna wiadomość"
@@ -5220,9 +5251,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-msgid "Check for new mail"
-msgstr "Sprawdzanie nowej poczty"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "

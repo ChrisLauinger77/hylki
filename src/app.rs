@@ -237,7 +237,7 @@ use crate::ui::compose::{
     Compose, ComposeAccount, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill,
 };
 use crate::ui::message_list::{
-    BulkAction, MessageList, MessageListInput, MessageListOutput, RowAction,
+    BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, RowAction,
 };
 use crate::ui::attachments_gallery::{
     AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
@@ -1708,6 +1708,9 @@ pub enum AppMsg {
     Reply,
     ReplyAll,
     Forward,
+    /// A reply, reply to all, forward or new message in a window of its
+    /// own, whatever Settings says (Gmail's Shift+R, Shift+A, Shift+F, d).
+    ComposeInWindow(WindowCompose),
     AddContactAddr(String),
     OpenMailto(String),
     /// Ctrl+C while the reader's view does not hold the keyboard.
@@ -7370,7 +7373,13 @@ impl SimpleComponent for AppModel {
             // first time in a session: the pointer turns busy, and that is
             // drawn before the build starts, so the key or click is seen to
             // have landed (#392). Another press meanwhile is dropped.
-            asked @ (AppMsg::Compose | AppMsg::Reply | AppMsg::ReplyAll | AppMsg::Forward) if !self.compose_now => {
+            asked @ (AppMsg::Compose
+            | AppMsg::Reply
+            | AppMsg::ReplyAll
+            | AppMsg::Forward
+            | AppMsg::ComposeInWindow(_))
+                if !self.compose_now =>
+            {
                 if !std::mem::replace(&mut self.compose_waiting, true) {
                     self.window.set_cursor_from_name(Some("progress"));
                     let s = sender.clone();
@@ -7423,6 +7432,29 @@ impl SimpleComponent for AppModel {
                     self.forward(m, true, &sender);
                 }
             }
+
+            AppMsg::ComposeInWindow(what) => match what {
+                WindowCompose::New => {
+                    let (account, prefill) =
+                        self.new_message_from(self.active_account(), ComposePrefill::default());
+                    self.open_compose(account, prefill, &sender);
+                }
+                WindowCompose::Forward => {
+                    if let Some(m) = self.compose_target() {
+                        self.forward(m, false, &sender);
+                    }
+                }
+                WindowCompose::Reply | WindowCompose::ReplyAll => {
+                    if let Some(m) = self.compose_target() {
+                        let prefill = if what == WindowCompose::Reply {
+                            reply_prefill(&m)
+                        } else {
+                            reply_all_prefill(&m, &self.email_of(m.account_id).unwrap_or_default())
+                        };
+                        self.open_compose(m.account_id, self.reply_context(&m, prefill), &sender);
+                    }
+                }
+            },
 
             AppMsg::AddContactAddr(addr) => {
                 // From an address's right-click menu: only the address is
@@ -12260,6 +12292,21 @@ impl AppModel {
             Shortcut::Label => sender.input(AppMsg::ReaderTagMenu),
             Shortcut::SelectAll => self.message_list.emit(MessageListInput::SelectAllShown),
             Shortcut::SelectNone => self.message_list.emit(MessageListInput::ClearSelection),
+            Shortcut::SelectWhere(filter) => self.message_list.emit(MessageListInput::SelectWhere(filter)),
+            Shortcut::ArchiveAndStep(delta) => {
+                // The list goes on to the neighbour once the conversation's
+                // row leaves it. On Gmail, from a label, archiving leaves the
+                // row where it is, so the step is taken here instead.
+                let stays = self.current.as_ref().is_some_and(|m| self.archives_in_place(m));
+                self.message_list.emit(if stays {
+                    MessageListInput::StepConversation(delta)
+                } else {
+                    MessageListInput::SetNavDirection(delta)
+                });
+                self.run_shortcut(Shortcut::Archive, sender);
+            }
+            Shortcut::InWindow(what) => sender.input(AppMsg::ComposeInWindow(what)),
+            Shortcut::Refresh => sender.input(AppMsg::Refresh),
             Shortcut::GoTo(GoTarget::Contacts) => sender.input(AppMsg::OpenContacts),
             Shortcut::GoTo(GoTarget::Kind(kind)) => {
                 // The merged view when the sidebar lists one, else the
@@ -22903,6 +22950,25 @@ pub enum Shortcut {
     /// Gmail's * then a or n.
     SelectAll,
     SelectNone,
+    /// Gmail's * then r, u, s or t.
+    SelectWhere(CheckFilter),
+    /// Gmail's ] and } (1) and [ and { (-1): archive the conversation and
+    /// open the older or newer one.
+    ArchiveAndStep(i32),
+    /// Gmail's Shift+R, Shift+A, Shift+F and d.
+    InWindow(WindowCompose),
+    /// Gmail's Shift+N.
+    Refresh,
+}
+
+/// What Gmail's window keys write, in a composer window whatever Settings
+/// says about inline composers (#392).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowCompose {
+    Reply,
+    ReplyAll,
+    Forward,
+    New,
 }
 
 impl Shortcut {
@@ -22911,6 +22977,7 @@ impl Shortcut {
         matches!(
             self,
             Shortcut::Archive
+                | Shortcut::ArchiveAndStep(_)
                 | Shortcut::Delete
                 | Shortcut::Spam
                 | Shortcut::Star
@@ -22964,6 +23031,13 @@ fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
         Key::z => Shortcut::Undo,
         Key::v => Shortcut::MoveTo,
         Key::l => Shortcut::Label,
+        Key::bracketright | Key::braceright => Shortcut::ArchiveAndStep(1),
+        Key::bracketleft | Key::braceleft => Shortcut::ArchiveAndStep(-1),
+        Key::R => Shortcut::InWindow(WindowCompose::Reply),
+        Key::A => Shortcut::InWindow(WindowCompose::ReplyAll),
+        Key::F => Shortcut::InWindow(WindowCompose::Forward),
+        Key::d => Shortcut::InWindow(WindowCompose::New),
+        Key::N => Shortcut::Refresh,
         Key::Down => Shortcut::NextMessage,
         Key::Up => Shortcut::PrevMessage,
         _ => return shortcut_for(key, shift).filter(|s| matches!(s, Shortcut::Tag(_) | Shortcut::ClearTags)),
@@ -22983,6 +23057,10 @@ fn gmail_sequence(first: char, key: gtk::gdk::Key) -> Option<Shortcut> {
         ('g', Key::c) => Some(Shortcut::GoTo(GoTarget::Contacts)),
         ('*', Key::a) => Some(Shortcut::SelectAll),
         ('*', Key::n) => Some(Shortcut::SelectNone),
+        ('*', Key::r) => Some(Shortcut::SelectWhere(CheckFilter::Read)),
+        ('*', Key::u) => Some(Shortcut::SelectWhere(CheckFilter::Unread)),
+        ('*', Key::s) => Some(Shortcut::SelectWhere(CheckFilter::Starred)),
+        ('*', Key::t) => Some(Shortcut::SelectWhere(CheckFilter::Unstarred)),
         _ => None,
     }
 }
@@ -23108,6 +23186,8 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
             ("a", i18n_noop("Reply to all")),
             ("f", i18n_noop("Forward")),
             ("e", i18n_noop("Archive the conversation")),
+            ("]  or  }", i18n_noop("Archive the conversation and open the older one")),
+            ("[  or  {", i18n_noop("Archive the conversation and open the newer one")),
             ("#", i18n_noop("Delete")),
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
@@ -23116,11 +23196,17 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
             ("_", i18n_noop("Mark as unread from this message on and close it")),
             ("x", i18n_noop("Select this row without opening it")),
             ("*  a  /  *  n", i18n_noop("Select every row, or none")),
+            ("*  r  /  *  u", i18n_noop("Select the read or the unread conversations")),
+            ("*  s  /  *  t", i18n_noop("Select the starred or the unstarred conversations")),
             ("v", i18n_noop("Move to a folder")),
             ("l", i18n_noop("Tags")),
             ("z", i18n_noop("Undo the last action")),
             ("1 … 9", i18n_noop("Add or remove a tag (the first nine, in Settings order)")),
+            ("Shift+R  /  Shift+A", i18n_noop("Reply, or reply to all, in a window")),
+            ("Shift+F", i18n_noop("Forward in a window")),
             ("c", i18n_noop("Compose")),
+            ("d", i18n_noop("Compose in a window")),
+            ("Shift+N", i18n_noop("Check for new mail")),
         ],
     ),
 ];
@@ -25941,12 +26027,20 @@ mod tests {
         assert_eq!(gmail_shortcut_for(Key::I, true), Some(Shortcut::MarkRead(true)));
         assert_eq!(gmail_shortcut_for(Key::n, false), Some(Shortcut::NextInThread));
         assert_eq!(gmail_shortcut_for(Key::_3, false), Some(Shortcut::Tag(3)));
+        assert_eq!(gmail_shortcut_for(Key::bracketright, false), Some(Shortcut::ArchiveAndStep(1)));
+        assert_eq!(gmail_shortcut_for(Key::braceleft, true), Some(Shortcut::ArchiveAndStep(-1)));
+        assert_eq!(gmail_shortcut_for(Key::R, true), Some(Shortcut::InWindow(WindowCompose::Reply)));
+        assert_eq!(gmail_shortcut_for(Key::N, true), Some(Shortcut::Refresh));
+        // d is Gmail's compose in a window, not Hylki's delete.
+        assert_eq!(gmail_shortcut_for(Key::d, false), Some(Shortcut::InWindow(WindowCompose::New)));
         // Hylki's own keys that Gmail does not have stay off.
-        assert_eq!(gmail_shortcut_for(Key::d, false), None);
         assert_eq!(gmail_shortcut_for(Key::w, false), None);
+        assert_eq!(gmail_shortcut_for(Key::h, false), None);
         assert_eq!(gmail_sequence('g', Key::i), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Inbox))));
         assert_eq!(gmail_sequence('g', Key::t), Some(Shortcut::GoTo(GoTarget::Kind(FolderKind::Sent))));
         assert_eq!(gmail_sequence('*', Key::a), Some(Shortcut::SelectAll));
+        assert_eq!(gmail_sequence('*', Key::u), Some(Shortcut::SelectWhere(CheckFilter::Unread)));
+        assert_eq!(gmail_sequence('*', Key::t), Some(Shortcut::SelectWhere(CheckFilter::Unstarred)));
         assert_eq!(gmail_sequence('g', Key::q), None);
         // The reader keeps what scrolls it, and only that.
         assert!(reader_keeps(Key::space) && reader_keeps(Key::Down));

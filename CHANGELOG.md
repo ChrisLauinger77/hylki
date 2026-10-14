@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: more of Gmail's keys** (#392, reported by 3v1n0). With Gmail keys
+  on, `]` and `}` archive the conversation and open the older one, `[` and
+  `{` the newer one; `* r`, `* u`, `* s` and `* t` select the read, unread,
+  starred or unstarred conversations; **Shift+R**, **Shift+A**, **Shift+F**
+  and **d** reply, reply to all, forward or write in a composer window; and
+  **Shift+N** checks for new mail.
+
 - **Added: sensitivity labels by name** (#411, reported by erenoglu). A
   Purview label that a message carries only as an ID showed as **Labeled**.
   With **Show sensitivity label names** on in a Microsoft 365 account's

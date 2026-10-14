@@ -955,6 +955,12 @@ msgstr ""
 msgid "Archive the conversation"
 msgstr ""
 
+msgid "Archive the conversation and open the older one"
+msgstr ""
+
+msgid "Archive the conversation and open the newer one"
+msgstr ""
+
 msgid "Mark as spam"
 msgstr ""
 
@@ -976,6 +982,12 @@ msgstr ""
 msgid "Select every row, or none"
 msgstr ""
 
+msgid "Select the read or the unread conversations"
+msgstr ""
+
+msgid "Select the starred or the unstarred conversations"
+msgstr ""
+
 msgid "Move to a folder"
 msgstr ""
 
@@ -985,7 +997,19 @@ msgstr ""
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 
+msgid "Reply, or reply to all, in a window"
+msgstr ""
+
+msgid "Forward in a window"
+msgstr ""
+
 msgid "Compose"
+msgstr ""
+
+msgid "Compose in a window"
+msgstr ""
+
+msgid "Check for new mail"
 msgstr ""
 
 msgid "Next message"
@@ -4609,9 +4633,6 @@ msgstr ""
 msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
-msgstr ""
-
-msgid "Check for new mail"
 msgstr ""
 
 msgid ""

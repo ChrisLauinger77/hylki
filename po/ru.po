@@ -1083,6 +1083,14 @@ msgstr "Ответить всем"
 msgid "Archive the conversation"
 msgstr "Всё обсуждение"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "Всё обсуждение"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "Всё обсуждение"
+
 msgid "Mark as spam"
 msgstr "Отметить как спам"
 
@@ -1109,6 +1117,14 @@ msgid "Select every row, or none"
 msgstr ""
 
 #, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Удалить переписку"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "Следующее сообщение в беседе"
+
+#, fuzzy
 msgid "Move to a folder"
 msgstr "Переместить папку"
 
@@ -1119,8 +1135,23 @@ msgstr "Отменить последнее перемещение или уда
 msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr "Добавить или удалить тег (первые девять — в порядке настроек)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Ответ и пересылка в основном окне"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Ответ и пересылка в основном окне"
+
 msgid "Compose"
 msgstr "Написать"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Создание писем в основном окне"
+
+msgid "Check for new mail"
+msgstr "Проверка новой почты"
 
 msgid "Next message"
 msgstr "Следующее сообщение"
@@ -5142,9 +5173,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-msgid "Check for new mail"
-msgstr "Проверка новой почты"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "

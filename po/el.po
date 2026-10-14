@@ -1071,6 +1071,14 @@ msgstr "Απάντηση σε όλους"
 msgid "Archive the conversation"
 msgstr "Ολόκληρη συζήτηση"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "Ολόκληρη συζήτηση"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "Ολόκληρη συζήτηση"
+
 msgid "Mark as spam"
 msgstr "Σήμανση ως ανεπιθύμητο"
 
@@ -1097,6 +1105,14 @@ msgid "Select every row, or none"
 msgstr ""
 
 #, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Διαγραφή συνομιλίας"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "Επόμενο μήνυμα στη συνομιλία"
+
+#, fuzzy
 msgid "Move to a folder"
 msgstr "Μετακίνηση φακέλου"
 
@@ -1107,8 +1123,23 @@ msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Προσθήκη ή αφαίρεση ετικέτας (οι πρώτες εννέα, με τη σειρά των Ρυθμίσεων)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Απάντηση και προώθηση στο κύριο παράθυρο"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Απάντηση και προώθηση στο κύριο παράθυρο"
+
 msgid "Compose"
 msgstr "Σύνταξη"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Σύνταξη στο κύριο παράθυρο"
+
+msgid "Check for new mail"
+msgstr "Έλεγχος για νέα μηνύματα"
 
 msgid "Next message"
 msgstr "Επόμενο μήνυμα"
@@ -5172,9 +5203,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-msgid "Check for new mail"
-msgstr "Έλεγχος για νέα μηνύματα"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "

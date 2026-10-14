@@ -1033,6 +1033,14 @@ msgstr "Rispondi a tutti"
 msgid "Archive the conversation"
 msgstr "Intera conversazione"
 
+#, fuzzy
+msgid "Archive the conversation and open the older one"
+msgstr "Intera conversazione"
+
+#, fuzzy
+msgid "Archive the conversation and open the newer one"
+msgstr "Intera conversazione"
+
 msgid "Mark as spam"
 msgstr "Segna come spam"
 
@@ -1058,6 +1066,14 @@ msgstr "Seleziona questa riga (per un'azione collettiva)"
 msgid "Select every row, or none"
 msgstr "Seleziona tutte le righe, o nessuna"
 
+#, fuzzy
+msgid "Select the read or the unread conversations"
+msgstr "Elimina conversazione"
+
+#, fuzzy
+msgid "Select the starred or the unstarred conversations"
+msgstr "Messaggio successivo nella conversazione"
+
 msgid "Move to a folder"
 msgstr "Sposta in una cartella"
 
@@ -1068,8 +1084,23 @@ msgid "Add or remove a tag (the first nine, in Settings order)"
 msgstr ""
 "Aggiungi o rimuovi un'etichetta (le prime nove, nell'ordine di Impostazioni)"
 
+#, fuzzy
+msgid "Reply, or reply to all, in a window"
+msgstr "Rispondi e inoltra nella finestra principale"
+
+#, fuzzy
+msgid "Forward in a window"
+msgstr "Rispondi e inoltra nella finestra principale"
+
 msgid "Compose"
 msgstr "Componi"
+
+#, fuzzy
+msgid "Compose in a window"
+msgstr "Componi nella finestra principale"
+
+msgid "Check for new mail"
+msgstr "Controlla nuova posta"
 
 msgid "Next message"
 msgstr "Messaggio successivo"
@@ -5061,9 +5092,6 @@ msgid ""
 msgstr ""
 "La rubrica in cui va un contatto creato in Hylki, a meno che non ne venga "
 "scelta un'altra al momento della creazione."
-
-msgid "Check for new mail"
-msgstr "Controlla nuova posta"
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
