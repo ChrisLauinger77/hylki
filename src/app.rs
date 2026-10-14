@@ -168,9 +168,119 @@ const ATTACHMENT_CACHE_BUDGET: usize = 128 << 20;
 struct ListHeaderWidgets {
     revealers: Vec<gtk::Revealer>,
     overflow: gtk::Revealer,
-    unread: gtk::ToggleButton,
-    starred: gtk::ToggleButton,
+    filter: SortFilterPopover,
     sort: gtk::gio::SimpleAction,
+}
+
+/// The orders the list header offers, by their keys in `SortOrder`. The
+/// column headings can set more (#443); none of these is ticked then.
+const SORT_ORDERS: [(&str, &str); 6] = [
+    (i18n_noop("Date (Newest first)"), "date_newest"),
+    (i18n_noop("Date (Oldest first)"), "date_oldest"),
+    (i18n_noop("Sender (A–Z)"), "sender"),
+    (i18n_noop("Subject (A–Z)"), "subject"),
+    (i18n_noop("Unread first"), "unread"),
+    (i18n_noop("Starred first"), "flagged"),
+];
+
+/// The list header's sort and filter button (#441): the sort orders in one
+/// column of its popover, the quick filters in the other.
+struct SortFilterPopover {
+    button: gtk::MenuButton,
+    filters: Vec<(QuickFilter, gtk::CheckButton)>,
+    clear: gtk::Button,
+}
+
+impl SortFilterPopover {
+    /// The popover stays open as rows are clicked, so an order and several
+    /// filters can be set in one visit.
+    fn new(button: gtk::MenuButton, sort: &gtk::gio::SimpleAction, sender: &relm4::Sender<AppMsg>) -> Self {
+        let column = |title: &str| {
+            let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            col.add_css_class("sort-filter-column");
+            let caption = gtk::Label::new(Some(title));
+            caption.set_xalign(0.0);
+            caption.add_css_class("dim-label");
+            caption.add_css_class("caption-heading");
+            col.append(&caption);
+            col
+        };
+
+        let sort_col = column(&i18n("Sort by"));
+        let mut radios: Vec<(&'static str, gtk::CheckButton)> = Vec::new();
+        for (label, key) in SORT_ORDERS {
+            let radio = gtk::CheckButton::with_label(&i18n(label));
+            if let Some((_, first)) = radios.first() {
+                radio.set_group(Some(first));
+            }
+            let action = sort.clone();
+            radio.connect_toggled(move |r| {
+                let current = action.state().and_then(|v| v.str().map(String::from));
+                if r.is_active() && current.as_deref() != Some(key) {
+                    action.activate(Some(&key.to_variant()));
+                }
+            });
+            sort_col.append(&radio);
+            radios.push((key, radio));
+        }
+        // The headings and the ⋯ menu sort through the same action, so the
+        // radios follow its state wherever the change came from.
+        let show_sort = move |key: Option<String>| {
+            let key = key.unwrap_or_default();
+            match radios.iter().find(|(k, _)| *k == key) {
+                Some((_, r)) => r.set_active(true),
+                None => radios.iter().for_each(|(_, r)| r.set_active(false)),
+            }
+        };
+        show_sort(sort.state().and_then(|v| v.str().map(String::from)));
+        sort.connect_state_notify(move |a| show_sort(a.state().and_then(|v| v.str().map(String::from))));
+
+        let filter_col = column(&i18n("Show only"));
+        let mut filters = Vec::new();
+        for f in QuickFilter::ALL {
+            let check = gtk::CheckButton::with_label(&f.label());
+            let s = sender.clone();
+            check.connect_toggled(move |c| s.emit(AppMsg::SetQuickFilter(f, c.is_active())));
+            filter_col.append(&check);
+            filters.push((f, check));
+        }
+        let clear = gtk::Button::with_label(&i18n("Clear Filters"));
+        clear.add_css_class("flat");
+        clear.set_halign(gtk::Align::Start);
+        clear.set_sensitive(false);
+        let s = sender.clone();
+        clear.connect_clicked(move |_| s.emit(AppMsg::ClearQuickFilters));
+        filter_col.append(&clear);
+
+        let columns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        columns.add_css_class("sort-filter-popover");
+        columns.append(&sort_col);
+        columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
+        columns.append(&filter_col);
+        let popover = gtk::Popover::new();
+        popover.set_child(Some(&columns));
+        button.set_popover(Some(&popover));
+        Self { button, filters, clear }
+    }
+
+    /// Show `filters` on the checks, and tint the button while any is on
+    /// so a narrowed list never passes for an empty folder.
+    fn sync(&self, filters: QuickFilters) {
+        for (f, check) in &self.filters {
+            if check.is_active() != filters.has(*f) {
+                check.set_active(filters.has(*f));
+            }
+        }
+        self.clear.set_sensitive(!filters.is_empty());
+        if filters.is_empty() {
+            self.button.remove_css_class("list-filter-active");
+            self.button.set_tooltip_text(Some(&i18n("Sort and filter messages")));
+        } else {
+            self.button.add_css_class("list-filter-active");
+            let names: Vec<String> = QuickFilter::ALL.iter().filter(|f| filters.has(**f)).map(|f| f.label()).collect();
+            self.button.set_tooltip_text(Some(&i18n_f("Filtered: {names}", &[("names", &names.join(", "))])));
+        }
+    }
 }
 
 struct ReaderToolbarWidgets {
@@ -237,7 +347,7 @@ use crate::ui::compose::{
     Compose, ComposeAccount, ComposeInit, ComposeInput, ComposeOutput, ComposePrefill,
 };
 use crate::ui::message_list::{
-    BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, RowAction,
+    BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, QuickFilter, QuickFilters, RowAction,
 };
 use crate::ui::attachments_gallery::{
     AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
@@ -959,6 +1069,8 @@ pub struct AppModel {
     /// The saved contacts' addresses, for rules on whether a sender is in
     /// Contacts (PR #384).
     saved_addresses: crate::contacts::SavedAddresses,
+    /// The list header's quick filters that are on (#441).
+    quick_filters: QuickFilters,
     /// Tags (#71): a name and color per keyword.
     tags: Vec<config::Tag>,
     /// The tag view, if that is the view — alongside `unified` and
@@ -1809,8 +1921,10 @@ pub enum AppMsg {
     PresentWindow,
     /// Open the status bar straight into console mode (button / burger menu).
     OpenConsole,
-    /// The list header's unread quick filter (#97).
-    SetUnreadFilter(bool),
+    /// Turn one of the list header's quick filters on or off (#97, #441).
+    SetQuickFilter(QuickFilter, bool),
+    /// Turn every quick filter off.
+    ClearQuickFilters,
     /// Reveal (or toggle away) the message list's search bar (#102).
     OpenListSearch,
     /// Open the reader's in-message find bar (#103).
@@ -1818,8 +1932,6 @@ pub enum AppMsg {
     /// Delay-policy read marking (#100): fires a couple of seconds after a
     /// message opened; only applies if it is still the one on screen.
     DeferredMarkRead { message: Box<Message> },
-    /// The list header's starred quick filter.
-    SetStarredFilter(bool),
     /// The list pane is this wide now (a drag of the divider, #334).
     ListPaneWidth(i32),
     /// Write the exported log straight to `path`, no chooser: the
@@ -2240,8 +2352,8 @@ impl SimpleComponent for AppModel {
                                 // message count and the sort menu (moved out of
                                 // the list's own toolbar to reclaim a row).
                                 // pack_end packs right-to-left: sort rightmost.
-                                // Quick filters (#97): unread / starred only.
-                                // Session state, like Mail.app's filter bar.
+                                // Quick filters (#97, #441): session state,
+                                // like Mail.app's filter bar.
                                 // Focus Mode: the ⋯ that stands in for the
                                 // search, filters, count and sort while they
                                 // are folded away. Rightmost, so packed first.
@@ -2259,50 +2371,23 @@ impl SimpleComponent for AppModel {
                                         connect_clicked[sender] => move |_| sender.input(AppMsg::ListOverflowMenu),
                                     },
                                 },
-                                #[name = "lh_unread"]
+                                // The sort orders and every quick filter share
+                                // one popover (#441): a button each would crowd
+                                // the header.
+                                #[name = "lh_filter"]
                                 pack_end = &gtk::Revealer {
                                     set_transition_type: gtk::RevealerTransitionType::SlideLeft,
                                     set_transition_duration: FOCUS_ANIM_MS,
                                     add_css_class: "focus-fade",
-                                    gtk::ToggleButton {
-                                        set_icon_name: "mail-unread-symbolic",
-                                        set_tooltip_text: Some(i18n("Show only unread").as_str()),
+                                    #[name = "list_filter_btn"]
+                                    gtk::MenuButton {
+                                        set_icon_name: "filter-symbolic",
+                                        set_tooltip_text: Some(i18n("Sort and filter messages").as_str()),
                                         set_valign: gtk::Align::Center,
                                         add_css_class: "flat",
-                                        connect_toggled[sender] => move |btn| {
-                                            sender.input(AppMsg::SetUnreadFilter(btn.is_active()));
-                                        },
-                                    },
-                                },
-                                #[name = "lh_starred"]
-                                pack_end = &gtk::Revealer {
-                                    set_transition_type: gtk::RevealerTransitionType::SlideLeft,
-                                    set_transition_duration: FOCUS_ANIM_MS,
-                                    add_css_class: "focus-fade",
-                                    gtk::ToggleButton {
-                                        set_icon_name: "starred-symbolic",
-                                        set_tooltip_text: Some(i18n("Show only starred").as_str()),
-                                        set_valign: gtk::Align::Center,
-                                        add_css_class: "flat",
-                                        connect_toggled[sender] => move |btn| {
-                                            sender.input(AppMsg::SetStarredFilter(btn.is_active()));
-                                        },
                                     },
                                 },
 
-                                #[name = "lh_sort"]
-                                pack_end = &gtk::Revealer {
-                                    set_transition_type: gtk::RevealerTransitionType::SlideLeft,
-                                    set_transition_duration: FOCUS_ANIM_MS,
-                                    add_css_class: "focus-fade",
-                                    #[name = "list_sort_btn"]
-                                    gtk::MenuButton {
-                                        set_icon_name: "view-sort-descending-symbolic",
-                                        set_tooltip_text: Some(i18n("Sort messages").as_str()),
-                                        set_valign: gtk::Align::Center,
-                                        add_css_class: "flat",
-                                    },
-                                },
                                 #[name = "lh_count"]
                                 pack_end = &gtk::Revealer {
                                     set_transition_type: gtk::RevealerTransitionType::SlideLeft,
@@ -3417,6 +3502,7 @@ impl SimpleComponent for AppModel {
             // rules, so its sidebar shows the Tags and Filtered Folders
             // sections; a staged tags.toml / filters.toml still wins.
             saved_addresses: crate::contacts::SavedAddresses::default(),
+            quick_filters: QuickFilters::default(),
             filters: {
                 let filters = config::load_filters();
                 if filters.is_empty() && demo_data { demo_filters() } else { filters }
@@ -5472,32 +5558,16 @@ impl SimpleComponent for AppModel {
                 }
             });
             sort_group.add_action(&sort_action);
-            widgets.list_sort_btn.insert_action_group("sortmenu", Some(&sort_group));
-
-            let menu = gtk::gio::Menu::new();
-            for (label, key) in [
-                (i18n_noop("Date (Newest first)"), "date_newest"),
-                (i18n_noop("Date (Oldest first)"), "date_oldest"),
-                (i18n_noop("Sender (A–Z)"), "sender"),
-                (i18n_noop("Subject (A–Z)"), "subject"),
-                (i18n_noop("Unread first"), "unread"),
-                (i18n_noop("Starred first"), "flagged"),
-            ] {
-                menu.append(Some(&i18n(label)), Some(&format!("sortmenu.order::{key}")));
-            }
-            widgets.list_sort_btn.set_menu_model(Some(&menu));
+            widgets.list_filter_btn.insert_action_group("sortmenu", Some(&sort_group));
 
             let _ = model.list_header_widgets.set(ListHeaderWidgets {
                 revealers: vec![
                     widgets.lh_search.clone(),
-                    widgets.lh_unread.clone(),
-                    widgets.lh_starred.clone(),
-                    widgets.lh_sort.clone(),
+                    widgets.lh_filter.clone(),
                     widgets.lh_count.clone(),
                 ],
                 overflow: widgets.lh_overflow.clone(),
-                unread: widgets.lh_unread.child().and_downcast::<gtk::ToggleButton>().expect("unread toggle"),
-                starred: widgets.lh_starred.child().and_downcast::<gtk::ToggleButton>().expect("starred toggle"),
+                filter: SortFilterPopover::new(widgets.list_filter_btn.clone(), &sort_action, sender.input_sender()),
                 sort: sort_action,
             });
             // Focus Mode's chrome as saved: nothing is mapped yet, so the
@@ -10073,9 +10143,9 @@ impl SimpleComponent for AppModel {
                 self.message_view.emit(MessageViewInput::OpenFind);
             }
 
-            AppMsg::SetUnreadFilter(on) => {
-                self.message_list.emit(MessageListInput::SetUnreadOnly(on));
-            }
+            AppMsg::SetQuickFilter(f, on) => self.set_quick_filters(self.quick_filters.with(f, on)),
+
+            AppMsg::ClearQuickFilters => self.set_quick_filters(QuickFilters::default()),
 
             AppMsg::DeferredMarkRead { message } => {
                 let still_current = self
@@ -10091,10 +10161,6 @@ impl SimpleComponent for AppModel {
                 if pref!(self.read_mark = policy) {
                     self.message_view.emit(MessageViewInput::SetReadMark(policy));
                 }
-            }
-
-            AppMsg::SetStarredFilter(on) => {
-                self.message_list.emit(MessageListInput::SetStarredOnly(on));
             }
 
             AppMsg::Pref(PrefOutput::ExportSettings) => {
@@ -14890,6 +14956,16 @@ impl AppModel {
     /// the ⋯ in its header offers while Focus Mode has them folded away.
     /// The toggles are flipped through their own buttons, so the filtering
     /// happens where it always does.
+    /// Narrow the list to `filters`, and show them on the header's popover.
+    fn set_quick_filters(&mut self, filters: QuickFilters) {
+        self.quick_filters = filters;
+        let contacts = if filters.has(QuickFilter::Contacts) { self.saved_addresses.get() } else { None };
+        self.message_list.emit(MessageListInput::SetQuickFilters { filters, contacts });
+        if let Some(lh) = self.list_header_widgets.get() {
+            lh.filter.sync(filters);
+        }
+    }
+
     fn show_list_overflow_menu(&self, sender: &ComponentSender<Self>) {
         use crate::ui::context_menu::{show_context_menu_with_header, MenuEntry};
         let Some(lh) = self.list_header_widgets.get() else {
@@ -14900,30 +14976,21 @@ impl AppModel {
             let _ = s.send(AppMsg::OpenListSearch);
         })
         .icon("system-search-symbolic");
-        let unread = lh.unread.clone();
-        let unread_on = unread.is_active();
-        let unread_entry = MenuEntry::new(i18n("Show only unread"), move || {
-            unread.set_active(!unread.is_active());
-        })
-        .icon("mail-unread-symbolic")
-        .selected(unread_on);
-        let starred = lh.starred.clone();
-        let starred_on = starred.is_active();
-        let starred_entry = MenuEntry::new(i18n("Show only starred"), move || {
-            starred.set_active(!starred.is_active());
-        })
-        .icon("starred-symbolic")
-        .selected(starred_on);
+        let filters: Vec<MenuEntry> = QuickFilter::ALL
+            .into_iter()
+            .map(|f| {
+                let on = self.quick_filters.has(f);
+                let s = sender.input_sender().clone();
+                MenuEntry::new(f.label(), move || s.emit(AppMsg::SetQuickFilter(f, !on))).icon(f.icon()).selected(on)
+            })
+            .collect();
+        let s = sender.input_sender().clone();
+        let clear = MenuEntry::new(i18n("Clear Filters"), move || s.emit(AppMsg::ClearQuickFilters))
+            .enabled(!self.quick_filters.is_empty());
+        let filter = MenuEntry::submenu(i18n("Filter"), vec![filters, vec![clear]]).icon("filter-symbolic");
         let current = lh.sort.state().and_then(|v| v.str().map(String::from)).unwrap_or_default();
-        let orders: Vec<MenuEntry> = [
-            (i18n_noop("Date (Newest first)"), "date_newest"),
-            (i18n_noop("Date (Oldest first)"), "date_oldest"),
-            (i18n_noop("Sender (A–Z)"), "sender"),
-            (i18n_noop("Subject (A–Z)"), "subject"),
-            (i18n_noop("Unread first"), "unread"),
-            (i18n_noop("Starred first"), "flagged"),
-        ]
-        .into_iter()
+        let orders: Vec<MenuEntry> = SORT_ORDERS
+            .into_iter()
         .map(|(label, key)| {
             let action = lh.sort.clone();
             // The same route the sort menu takes, so the list and the
@@ -14933,7 +15000,7 @@ impl AppModel {
         .collect();
         let sort = MenuEntry::submenu(i18n("Sort"), vec![orders])
             .icon("view-sort-descending-symbolic");
-        let sections = vec![vec![search], vec![unread_entry, starred_entry], vec![sort]];
+        let sections = vec![vec![search], vec![filter, sort]];
         // The message count heads the menu, where the header showed it.
         let header = (!self.list_count.is_empty()).then(|| self.list_count.clone());
         let btn = lh.overflow.clone();

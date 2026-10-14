@@ -14,6 +14,43 @@ msgstr ""
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "Date (Newest first)"
+msgstr "Дата (сначала новые)"
+
+msgid "Date (Oldest first)"
+msgstr "Дата (сначала старые)"
+
+msgid "Sender (A–Z)"
+msgstr "Отправитель (A–Я)"
+
+msgid "Subject (A–Z)"
+msgstr "Тема (А–Я)"
+
+msgid "Unread first"
+msgstr "Сначала непрочитанные"
+
+msgid "Starred first"
+msgstr "Сначала отмеченные"
+
+msgid "Sort by"
+msgstr "Сортировать по"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Только непрочитанные"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Поиск фильтров"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "{n} сообщений"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Отфильтрованные папки"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Обновите или удерживайте для строки состояния"
 
@@ -31,15 +68,6 @@ msgstr "Поиск сообщений (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Поиск, фильтры и сортировка"
-
-msgid "Show only unread"
-msgstr "Только непрочитанные"
-
-msgid "Show only starred"
-msgstr "Только отмеченные"
-
-msgid "Sort messages"
-msgstr "Сортировка сообщений"
 
 msgid "Edit this message"
 msgstr "Редактировать сообщение"
@@ -127,24 +155,6 @@ msgstr "Показать/скрыть боковую панель"
 
 msgid "Keyboard Shortcuts"
 msgstr "Сочетания клавиш"
-
-msgid "Date (Newest first)"
-msgstr "Дата (сначала новые)"
-
-msgid "Date (Oldest first)"
-msgstr "Дата (сначала старые)"
-
-msgid "Sender (A–Z)"
-msgstr "Отправитель (A–Я)"
-
-msgid "Subject (A–Z)"
-msgstr "Тема (А–Я)"
-
-msgid "Unread first"
-msgstr "Сначала непрочитанные"
-
-msgid "Starred first"
-msgstr "Сначала отмеченные"
 
 msgid "Create Folder"
 msgstr "Создать папку"
@@ -486,6 +496,10 @@ msgstr "Переместить во «Входящие»"
 
 msgid "Search Messages…"
 msgstr "Поиск сообщений…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Фильтры"
 
 msgid "Sort"
 msgstr "Сортировать"
@@ -2262,9 +2276,6 @@ msgid ""
 msgstr ""
 "Способ сортировки папок этой учётной записи на боковой панели. Настраивается "
 "также в контекстном меню заголовка «Папки»."
-
-msgid "Sort by"
-msgstr "Сортировать по"
 
 msgid "Special Folders"
 msgstr "Специальные папки"
@@ -4139,6 +4150,25 @@ msgstr "{name} · {current} из {total}"
 msgid "me"
 msgstr "я"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Есть вложения"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Адресная книга"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Нет контактов"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Высокая важность"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Выберите папки для поиска"
 
@@ -4154,8 +4184,16 @@ msgstr "Снять выделение"
 msgid "No Messages"
 msgstr "Нет сообщений"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Нет сообщений"
+
 msgid "There's nothing here right now."
 msgstr "Здесь пока ничего нет."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Новое сообщение из шаблона"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4180,9 +4218,6 @@ msgstr "Папки поиска"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Папки поиска"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7664,6 +7699,12 @@ msgstr "Общие входящие в светлом режиме"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Sort messages"
+#~ msgstr "Сортировка сообщений"
+
+#~ msgid "Show only starred"
+#~ msgstr "Только отмеченные"
+
 #, fuzzy
 #~ msgid "unknown folder {path}"
 #~ msgstr "неизвестная папка"
@@ -7950,6 +7991,3 @@ msgstr "Hyprlab"
 
 #~ msgid "Inside All Inboxes"
 #~ msgstr "Внутри «Все входящие»"
-
-#~ msgid "Filtered Folders"
-#~ msgstr "Отфильтрованные папки"

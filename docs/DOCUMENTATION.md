@@ -1250,6 +1250,27 @@ field above the list all the time, instead of only after the search button,
 <kbd>Esc</kbd> clears it and returns to the list, and it stays where it is.
 It is off unless switched on.
 
+The sort and filter button in the list's header opens a popover of two
+columns. **Sort by** orders the list by date, newest or oldest first, by
+sender or subject, or puts unread or starred mail first. **Show only** holds
+the quick filters:
+
+- **Unread** and **Starred**
+- **Has Attachments**
+- **Addressed to Me**: one of your addresses or aliases is in To or Cc
+- **From Contacts**: the sender is in your Contacts, as for filter rules
+- **High Importance**
+- **Tagged**: the message has a tag or a Gmail label
+- **Today**: it arrived since midnight on this computer's clock
+
+A click turns a filter on or off and leaves the popover open, so an order
+and several filters can be set at once; together the filters show only the
+mail that matches all of them. While any is
+on the button is in the accent color and its tooltip names them. **Clear
+Filters** turns them all off. They apply to whichever folder or search is
+shown, and last until Hylki is closed. In Focus Mode they are under
+**Filter** and **Sort** in the list's ⋯ menu.
+
 Clicking the unread dot on a row marks that message read without selecting
 or opening it. A conversation's dot that is lit only for an unread reply
 does not take the click.

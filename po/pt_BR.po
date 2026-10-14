@@ -17,6 +17,43 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "Date (Newest first)"
+msgstr "Data (mais recentes primeiro)"
+
+msgid "Date (Oldest first)"
+msgstr "Data (mais antigas primeiro)"
+
+msgid "Sender (A–Z)"
+msgstr "Remetente (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Assunto (A–Z)"
+
+msgid "Unread first"
+msgstr "Não lidas primeiro"
+
+msgid "Starred first"
+msgstr "Com estrela primeiro"
+
+msgid "Sort by"
+msgstr "Ordenar por"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Mostrar somente as não lidas"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Pesquisar filtros"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "Mensagens: {n}"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Conta {name} removida"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Atualizar ou pressionar e segurar para mostrar a barra de status"
 
@@ -34,15 +71,6 @@ msgstr "Pesquisar mensagens (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Pesquisar, filtrar e ordenar"
-
-msgid "Show only unread"
-msgstr "Mostrar somente as não lidas"
-
-msgid "Show only starred"
-msgstr "Mostrar somente as que têm estrela"
-
-msgid "Sort messages"
-msgstr "Ordenar mensagens"
 
 msgid "Edit this message"
 msgstr "Editar esta mensagem"
@@ -130,24 +158,6 @@ msgstr "Alternar barra lateral"
 
 msgid "Keyboard Shortcuts"
 msgstr "Atalhos de teclado"
-
-msgid "Date (Newest first)"
-msgstr "Data (mais recentes primeiro)"
-
-msgid "Date (Oldest first)"
-msgstr "Data (mais antigas primeiro)"
-
-msgid "Sender (A–Z)"
-msgstr "Remetente (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Assunto (A–Z)"
-
-msgid "Unread first"
-msgstr "Não lidas primeiro"
-
-msgid "Starred first"
-msgstr "Com estrela primeiro"
 
 msgid "Create Folder"
 msgstr "Criar pasta"
@@ -488,6 +498,10 @@ msgstr "Mover para a Caixa de entrada"
 
 msgid "Search Messages…"
 msgstr "Pesquisar mensagens…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filtros"
 
 msgid "Sort"
 msgstr "Ordenar"
@@ -2255,9 +2269,6 @@ msgstr ""
 "Como as pastas desta conta são ordenadas na barra lateral. Esta opção também "
 "está no menu que aparece ao clicar com o botão direito no cabeçalho Pastas "
 "da conta."
-
-msgid "Sort by"
-msgstr "Ordenar por"
 
 msgid "Special Folders"
 msgstr "Pastas especiais"
@@ -4121,6 +4132,25 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "eu"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Tem anexos"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Catálogo de endereços"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Sem contatos"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Importância alta"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Escolher as pastas a pesquisar"
 
@@ -4136,8 +4166,16 @@ msgstr "Limpar seleção"
 msgid "No Messages"
 msgstr "Sem mensagens"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Sem mensagens"
+
 msgid "There's nothing here right now."
 msgstr "No momento, não existe aqui nada."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Nova mensagem a partir de um modelo"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4162,9 +4200,6 @@ msgstr "Pesquisar pastas"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Pesquisar pastas"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7650,6 +7685,12 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Ordenar mensagens"
+
+#~ msgid "Show only starred"
+#~ msgstr "Mostrar somente as que têm estrela"
 
 #, fuzzy
 #~ msgid "unknown folder {path}"

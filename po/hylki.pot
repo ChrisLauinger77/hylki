@@ -10,6 +10,39 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Date (Newest first)"
+msgstr ""
+
+msgid "Date (Oldest first)"
+msgstr ""
+
+msgid "Sender (A–Z)"
+msgstr ""
+
+msgid "Subject (A–Z)"
+msgstr ""
+
+msgid "Unread first"
+msgstr ""
+
+msgid "Starred first"
+msgstr ""
+
+msgid "Sort by"
+msgstr ""
+
+msgid "Show only"
+msgstr ""
+
+msgid "Clear Filters"
+msgstr ""
+
+msgid "Sort and filter messages"
+msgstr ""
+
+msgid "Filtered: {names}"
+msgstr ""
+
 msgid "Refresh or long-press for Status Bar"
 msgstr ""
 
@@ -26,15 +59,6 @@ msgid "Search messages (Ctrl+F)"
 msgstr ""
 
 msgid "Search, filters and sort"
-msgstr ""
-
-msgid "Show only unread"
-msgstr ""
-
-msgid "Show only starred"
-msgstr ""
-
-msgid "Sort messages"
 msgstr ""
 
 msgid "Edit this message"
@@ -122,24 +146,6 @@ msgid "Toggle sidebar"
 msgstr ""
 
 msgid "Keyboard Shortcuts"
-msgstr ""
-
-msgid "Date (Newest first)"
-msgstr ""
-
-msgid "Date (Oldest first)"
-msgstr ""
-
-msgid "Sender (A–Z)"
-msgstr ""
-
-msgid "Subject (A–Z)"
-msgstr ""
-
-msgid "Unread first"
-msgstr ""
-
-msgid "Starred first"
 msgstr ""
 
 msgid "Create Folder"
@@ -438,6 +444,9 @@ msgid "Move to Inbox"
 msgstr ""
 
 msgid "Search Messages…"
+msgstr ""
+
+msgid "Filter"
 msgstr ""
 
 msgid "Sort"
@@ -2015,9 +2024,6 @@ msgstr ""
 msgid ""
 "How this account's folders are sorted in the sidebar. Also in the right-"
 "click menu of its Folders heading."
-msgstr ""
-
-msgid "Sort by"
 msgstr ""
 
 msgid "Special Folders"
@@ -3689,6 +3695,21 @@ msgstr ""
 msgid "me"
 msgstr ""
 
+msgid "Has Attachments"
+msgstr ""
+
+msgid "Addressed to Me"
+msgstr ""
+
+msgid "From Contacts"
+msgstr ""
+
+msgid "High Importance"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr ""
 
@@ -3704,7 +3725,13 @@ msgstr ""
 msgid "No Messages"
 msgstr ""
 
+msgid "No Matching Messages"
+msgstr ""
+
 msgid "There's nothing here right now."
+msgstr ""
+
+msgid "No message here passes the filters."
 msgstr ""
 
 msgid "Customize Columns…"
@@ -3726,9 +3753,6 @@ msgid "Search all folders"
 msgstr ""
 
 msgid "Search this folder"
-msgstr ""
-
-msgid "Today"
 msgstr ""
 
 msgid "Yesterday"

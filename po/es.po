@@ -14,6 +14,43 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Date (Newest first)"
+msgstr "Fecha (más recientes primero)"
+
+msgid "Date (Oldest first)"
+msgstr "Fecha (más antiguos primero)"
+
+msgid "Sender (A–Z)"
+msgstr "Remitente (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Asunto (A–Z)"
+
+msgid "Unread first"
+msgstr "No leídos primero"
+
+msgid "Starred first"
+msgstr "Destacados primero"
+
+msgid "Sort by"
+msgstr "Ordenar por"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Mostrar solo no leídos"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Buscar filtros"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "{n} mensajes"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "{name} eliminada"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualizar o mantener pulsado para mostrar la barra de estado"
 
@@ -31,15 +68,6 @@ msgstr "Buscar mensajes (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Buscar, filtrar y ordenar"
-
-msgid "Show only unread"
-msgstr "Mostrar solo no leídos"
-
-msgid "Show only starred"
-msgstr "Mostrar solo destacados"
-
-msgid "Sort messages"
-msgstr "Ordenar mensajes"
 
 msgid "Edit this message"
 msgstr "Editar este mensaje"
@@ -127,24 +155,6 @@ msgstr "Mostrar/ocultar barra lateral"
 
 msgid "Keyboard Shortcuts"
 msgstr "Atajos de teclado"
-
-msgid "Date (Newest first)"
-msgstr "Fecha (más recientes primero)"
-
-msgid "Date (Oldest first)"
-msgstr "Fecha (más antiguos primero)"
-
-msgid "Sender (A–Z)"
-msgstr "Remitente (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Asunto (A–Z)"
-
-msgid "Unread first"
-msgstr "No leídos primero"
-
-msgid "Starred first"
-msgstr "Destacados primero"
 
 msgid "Create Folder"
 msgstr "Crear carpeta"
@@ -487,6 +497,10 @@ msgstr "Mover a Bandeja de entrada"
 
 msgid "Search Messages…"
 msgstr "Buscar mensajes…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filtros"
 
 msgid "Sort"
 msgstr "Ordenar"
@@ -2250,9 +2264,6 @@ msgid ""
 msgstr ""
 "Cómo se ordenan las carpetas de esta cuenta en la barra lateral. También "
 "está disponible en el menú contextual del encabezado Carpetas."
-
-msgid "Sort by"
-msgstr "Ordenar por"
 
 msgid "Special Folders"
 msgstr "Carpetas especiales"
@@ -4115,6 +4126,25 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "yo"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Tiene archivos adjuntos"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Libreta de direcciones"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "No hay contactos"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Importancia alta"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Elegir las carpetas en las que buscar"
 
@@ -4130,8 +4160,16 @@ msgstr "Borrar selección"
 msgid "No Messages"
 msgstr "No hay mensajes"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "No hay mensajes"
+
 msgid "There's nothing here right now."
 msgstr "Ahora mismo no hay nada aquí."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Mensaje nuevo a partir de una plantilla"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4156,9 +4194,6 @@ msgstr "Buscar carpetas"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Buscar carpetas"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7647,6 +7682,12 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Ordenar mensajes"
+
+#~ msgid "Show only starred"
+#~ msgstr "Mostrar solo destacados"
 
 #, fuzzy
 #~ msgid "unknown folder {path}"

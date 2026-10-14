@@ -14,6 +14,43 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Date (Newest first)"
+msgstr "Data (més recents primer)"
+
+msgid "Date (Oldest first)"
+msgstr "Data (més antics primer)"
+
+msgid "Sender (A–Z)"
+msgstr "Remitent (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Assumpte (A–Z)"
+
+msgid "Unread first"
+msgstr "No llegits primer"
+
+msgid "Starred first"
+msgstr "Destacats primer"
+
+msgid "Sort by"
+msgstr "Ordena per"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Mostra només els no llegits"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Cerca filtres"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "Missatges de correu"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "S'ha eliminat {name}"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualitza o mantén premut per a la barra d'estat"
 
@@ -31,15 +68,6 @@ msgstr "Cerca missatges (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Cerca, filtres i ordenació"
-
-msgid "Show only unread"
-msgstr "Mostra només els no llegits"
-
-msgid "Show only starred"
-msgstr "Mostra només els destacats"
-
-msgid "Sort messages"
-msgstr "Ordena els missatges"
 
 msgid "Edit this message"
 msgstr "Edita aquest missatge"
@@ -127,24 +155,6 @@ msgstr "Mostra o amaga la barra lateral"
 
 msgid "Keyboard Shortcuts"
 msgstr "Dreceres de teclat"
-
-msgid "Date (Newest first)"
-msgstr "Data (més recents primer)"
-
-msgid "Date (Oldest first)"
-msgstr "Data (més antics primer)"
-
-msgid "Sender (A–Z)"
-msgstr "Remitent (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Assumpte (A–Z)"
-
-msgid "Unread first"
-msgstr "No llegits primer"
-
-msgid "Starred first"
-msgstr "Destacats primer"
 
 msgid "Create Folder"
 msgstr "Crea una carpeta"
@@ -465,6 +475,10 @@ msgstr "Mou a la bústia d'entrada"
 
 msgid "Search Messages…"
 msgstr "Cerca missatges…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filtres"
 
 msgid "Sort"
 msgstr "Ordena"
@@ -2202,9 +2216,6 @@ msgid ""
 msgstr ""
 "Com s'ordenen les carpetes d'aquest compte a la barra lateral. També al menú "
 "contextual de l'encapçalament de les seves carpetes."
-
-msgid "Sort by"
-msgstr "Ordena per"
 
 msgid "Special Folders"
 msgstr "Carpetes especials"
@@ -4043,6 +4054,25 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "jo"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Té adjunts"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Llibreta d'adreces"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "No hi ha contactes"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Importància alta"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Tria quines carpetes cercar"
 
@@ -4058,8 +4088,16 @@ msgstr "Desselecciona-ho tot"
 msgid "No Messages"
 msgstr "No hi ha missatges"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "No hi ha missatges"
+
 msgid "There's nothing here right now."
 msgstr "Ara mateix no hi ha res aquí."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Missatge nou a partir d'una plantilla"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4082,9 +4120,6 @@ msgstr "Cerca a totes les carpetes"
 
 msgid "Search this folder"
 msgstr "Cerca en aquesta carpeta"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7560,6 +7595,12 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Ordena els missatges"
+
+#~ msgid "Show only starred"
+#~ msgstr "Mostra només els destacats"
 
 #~ msgid "Move down or up the list without opening"
 #~ msgstr "Mou-te avall o amunt per la llista sense obrir"

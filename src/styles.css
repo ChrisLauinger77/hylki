@@ -2371,3 +2371,27 @@ textview.console-view text selection {
   background-color: white;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
+
+/* The list header's sort and filter button while any quick filter is on,
+   and its popover's two columns (#441). */
+.list-filter-active {
+  color: @accent_color;
+}
+.sort-filter-column {
+  padding: 6px 4px;
+  min-width: 170px;
+}
+.sort-filter-column > label {
+  margin: 4px 8px 4px 8px;
+}
+.sort-filter-column > checkbutton {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.sort-filter-column > checkbutton:hover {
+  background-color: alpha(currentColor, 0.07);
+}
+.sort-filter-column > button {
+  margin-top: 6px;
+  font-weight: normal;
+}

@@ -731,10 +731,10 @@ pub struct MessageList {
     scroller: Option<gtk::ScrolledWindow>,
     /// Current sort order for the list.
     sort: SortOrder,
-    /// Quick filter (#97): show only unread messages.
-    unread_only: bool,
-    /// Quick filter: show only starred messages.
-    starred_only: bool,
+    /// The header's quick filters (#97, #441).
+    quick: QuickFilters,
+    /// Your contacts' addresses, lower case, while "From Contacts" is on.
+    contact_addresses: Option<std::sync::Arc<std::collections::HashSet<String>>>,
     /// The last count string sent to the header bar, to emit only on change.
     last_count: String,
     /// Group messages into conversation threads (user preference).
@@ -895,6 +895,133 @@ pub enum BulkAction {
     MoveToInbox,
 }
 
+/// One of the message list's quick filters (#97, #441): with it on, the
+/// list shows only the mail that has the property. Together they narrow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuickFilter {
+    Unread,
+    Starred,
+    Attachment,
+    ToMe,
+    Contacts,
+    Important,
+    Tagged,
+    Today,
+}
+
+impl QuickFilter {
+    pub const ALL: [QuickFilter; 8] = [
+        QuickFilter::Unread,
+        QuickFilter::Starred,
+        QuickFilter::Attachment,
+        QuickFilter::ToMe,
+        QuickFilter::Contacts,
+        QuickFilter::Important,
+        QuickFilter::Tagged,
+        QuickFilter::Today,
+    ];
+
+    pub fn label(self) -> String {
+        use crate::i18n::i18n_noop;
+        i18n(match self {
+            QuickFilter::Unread => i18n_noop("Unread"),
+            QuickFilter::Starred => i18n_noop("Starred"),
+            QuickFilter::Attachment => i18n_noop("Has Attachments"),
+            QuickFilter::ToMe => i18n_noop("Addressed to Me"),
+            QuickFilter::Contacts => i18n_noop("From Contacts"),
+            QuickFilter::Important => i18n_noop("High Importance"),
+            QuickFilter::Tagged => i18n_noop("Tagged"),
+            QuickFilter::Today => i18n_noop("Today"),
+        })
+    }
+
+    /// The icon the row, the reader or the sidebar already uses for it.
+    pub fn icon(self) -> &'static str {
+        match self {
+            QuickFilter::Unread => "mail-unread-symbolic",
+            QuickFilter::Starred => "starred-symbolic",
+            QuickFilter::Attachment => "mail-attachment-symbolic",
+            QuickFilter::ToMe => "avatar-default-symbolic",
+            QuickFilter::Contacts => "x-office-address-book-symbolic",
+            QuickFilter::Important => "emblem-important-symbolic",
+            QuickFilter::Tagged => "tag-symbolic",
+            QuickFilter::Today => "x-office-calendar-symbolic",
+        }
+    }
+
+    fn bit(self) -> u16 {
+        1 << self as u16
+    }
+}
+
+/// The quick filters that are on.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct QuickFilters(u16);
+
+impl QuickFilters {
+    pub fn has(self, f: QuickFilter) -> bool {
+        self.0 & f.bit() != 0
+    }
+
+    pub fn with(self, f: QuickFilter, on: bool) -> Self {
+        Self(if on { self.0 | f.bit() } else { self.0 & !f.bit() })
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
+/// What the quick filters need to judge a message, gathered once a pass.
+struct QuickFilterContext {
+    filters: QuickFilters,
+    /// Every address you send from, lower case ("Addressed to Me").
+    own: std::collections::HashSet<String>,
+    /// Your contacts' addresses; none read yet lets nothing through.
+    contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
+    tags: Vec<crate::config::Tag>,
+    /// Local midnight, Unix seconds ("Today").
+    today: i64,
+}
+
+impl QuickFilterContext {
+    fn passes(&self, m: &Message) -> bool {
+        QuickFilter::ALL.iter().filter(|f| self.filters.has(**f)).all(|f| match f {
+            QuickFilter::Unread => m.unread,
+            QuickFilter::Starred => m.starred,
+            QuickFilter::Attachment => m.has_attachment,
+            QuickFilter::ToMe => [m.to.as_str(), m.cc.as_str()]
+                .iter()
+                .flat_map(|list| list.split(','))
+                .any(|part| self.own.contains(&bare_address(part))),
+            QuickFilter::Contacts => {
+                self.contacts.as_ref().is_some_and(|c| c.contains(&m.from_addr.trim().to_lowercase()))
+            }
+            QuickFilter::Important => m.importance == crate::models::Importance::High,
+            QuickFilter::Tagged => !m.pills(&self.tags).is_empty(),
+            QuickFilter::Today => m.timestamp >= self.today,
+        })
+    }
+}
+
+/// `Name <addr>` or a bare `addr`, as the address alone in lower case.
+fn bare_address(part: &str) -> String {
+    let part = part.trim();
+    let addr = match part.rsplit_once('<') {
+        Some((_, rest)) => rest.trim_end_matches('>'),
+        None => part,
+    };
+    addr.trim().to_lowercase()
+}
+
+/// The start of today in local time, Unix seconds.
+fn start_of_today() -> i64 {
+    let Ok(now) = glib::DateTime::now_local() else { return 0 };
+    glib::DateTime::new(&now.timezone(), now.year(), now.month(), now.day_of_month(), 0, 0, 0.0)
+        .map(|d| d.to_unix())
+        .unwrap_or(0)
+}
+
 /// Which conversations Gmail's * r, * u, * s and * t select (#392).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckFilter {
@@ -922,10 +1049,12 @@ impl CheckFilter {
 
 #[derive(Debug)]
 pub enum MessageListInput {
-    /// The header's quick filter (#97): scope the list to unread mail.
-    SetUnreadOnly(bool),
-    /// The header's starred quick filter.
-    SetStarredOnly(bool),
+    /// The header's quick filters (#97, #441), with your contacts'
+    /// addresses when "From Contacts" is among them.
+    SetQuickFilters {
+        filters: QuickFilters,
+        contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
+    },
     SetMessages { messages: Vec<Message> },
     /// Merge more indexed messages into the current list (background backfill),
     /// preserving the current search query and view.
@@ -1523,8 +1652,14 @@ impl SimpleComponent for MessageList {
                 // "No message selected", so the two placeholders match.
                 add_overlay = &adw::StatusPage {
                     set_icon_name: Some("mail-inbox-symbolic"),
-                    set_title: &i18n("No Messages"),
-                    set_description: Some(i18n("There's nothing here right now.").as_str()),
+                    #[watch]
+                    set_title: &(if model.quick.is_empty() { i18n("No Messages") } else { i18n("No Matching Messages") }),
+                    #[watch]
+                    set_description: Some(if model.quick.is_empty() {
+                        i18n("There's nothing here right now.")
+                    } else {
+                        i18n("No message here passes the filters.")
+                    }.as_str()),
                     #[watch]
                     set_visible: model.is_empty_state(),
                 },
@@ -1614,8 +1749,8 @@ impl SimpleComponent for MessageList {
             nested: std::collections::HashMap::new(),
             scroller: None,
             sort: SortOrder::DateNewest,
-            unread_only: false,
-            starred_only: false,
+            quick: QuickFilters::default(),
+            contact_addresses: None,
             last_count: String::new(),
             threading: true,
             thread_expansion: true,
@@ -2479,16 +2614,15 @@ impl SimpleComponent for MessageList {
                 }
             }
 
-            MessageListInput::SetUnreadOnly(on) => {
-                if self.unread_only != on {
-                    self.unread_only = on;
-                    self.rebuild();
-                }
-            }
-
-            MessageListInput::SetStarredOnly(on) => {
-                if self.starred_only != on {
-                    self.starred_only = on;
+            MessageListInput::SetQuickFilters { filters, contacts } => {
+                let contacts_changed = filters.has(QuickFilter::Contacts)
+                    && match (&self.contact_addresses, &contacts) {
+                        (Some(a), Some(b)) => !std::sync::Arc::ptr_eq(a, b),
+                        (a, b) => a.is_some() != b.is_some(),
+                    };
+                self.contact_addresses = contacts;
+                if self.quick != filters || contacts_changed {
+                    self.quick = filters;
                     self.rebuild();
                 }
             }
@@ -4044,10 +4178,15 @@ impl MessageList {
     /// What the search field and the quick filters let through.
     fn filter(&self) -> impl Fn(&Message) -> bool {
         let q = self.query.to_lowercase();
-        let (unread_only, starred_only) = (self.unread_only, self.starred_only);
+        let quick = QuickFilterContext {
+            filters: self.quick,
+            own: if self.quick.has(QuickFilter::ToMe) { self.own_addresses.clone() } else { Default::default() },
+            contacts: self.contact_addresses.clone().filter(|_| self.quick.has(QuickFilter::Contacts)),
+            tags: if self.quick.has(QuickFilter::Tagged) { self.shared.tags.borrow().clone() } else { Vec::new() },
+            today: if self.quick.has(QuickFilter::Today) { start_of_today() } else { 0 },
+        };
         move |m: &Message| {
-            (!unread_only || m.unread)
-                && (!starred_only || m.starred)
+            quick.passes(m)
                 && (q.is_empty()
                     || m.subject.to_lowercase().contains(&q)
                     || m.from_name.to_lowercase().contains(&q)
@@ -4800,7 +4939,7 @@ impl MessageList {
 mod tests {
     use super::{
         column_sort, compute_thread_keys, correspondents, text_key_cmp, heads_its_row, message_cmp, SortOrder, latest_elsewhere, nested_members, reader_conversation,
-        row_for_reader_key, thread_slot, unasked_threads,
+        row_for_reader_key, thread_slot, unasked_threads, QuickFilter, QuickFilterContext, QuickFilters,
     };
     use crate::ui::message_row::{row_edits, swap_wanted, swipe_progress_px, DaySection, RowData, RowEdit, SWIPE_ARM, SWIPE_MAX};
     use crate::models::Message;
@@ -5361,5 +5500,30 @@ mod tests {
         ];
         let rows: Vec<_> = days.iter().enumerate().map(|(i, s)| row(i as u32, *s)).collect();
         assert_eq!(section_starts(&rows), vec![0, 2, 3]);
+    }
+
+    /// #441: the quick filters narrow together, and "Addressed to Me" reads
+    /// both To and Cc in either address form.
+    #[test]
+    fn quick_filters_narrow_together() {
+        let ctx = |filters: QuickFilters| QuickFilterContext {
+            filters,
+            own: ["me@example.com".to_string()].into_iter().collect(),
+            contacts: Some(std::sync::Arc::new(["x@example.com".to_string()].into_iter().collect())),
+            tags: Vec::new(),
+            today: 900,
+        };
+        let mut m = msg(1, "a", "");
+        m.cc = "\"Doe, Jo\" <jo@example.com>, Me <ME@example.com>".into();
+        let all = QuickFilters::default();
+        assert!(ctx(all).passes(&m));
+        assert!(ctx(all.with(QuickFilter::ToMe, true)).passes(&m));
+        assert!(ctx(all.with(QuickFilter::Contacts, true).with(QuickFilter::Today, true)).passes(&m));
+        assert!(!ctx(all.with(QuickFilter::ToMe, true).with(QuickFilter::Unread, true)).passes(&m));
+        m.unread = true;
+        assert!(ctx(all.with(QuickFilter::ToMe, true).with(QuickFilter::Unread, true)).passes(&m));
+        assert!(!ctx(all.with(QuickFilter::Unread, true).with(QuickFilter::Unread, false).with(QuickFilter::Attachment, true)).passes(&m));
+        m.timestamp = 800;
+        assert!(!ctx(all.with(QuickFilter::Today, true)).passes(&m));
     }
 }

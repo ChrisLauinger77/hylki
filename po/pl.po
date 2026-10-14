@@ -15,6 +15,44 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
 "|| n%100>=20) ? 1 : 2);\n"
 
+msgid "Date (Newest first)"
+msgstr "Data (od najnowszych)"
+
+msgid "Date (Oldest first)"
+msgstr "Data (od najstarszych)"
+
+msgid "Sender (A–Z)"
+msgstr "Nadawca (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Temat (A–Z)"
+
+msgid "Unread first"
+msgstr "Najpierw nieprzeczytane"
+
+#, fuzzy
+msgid "Starred first"
+msgstr "Najpierw nieprzeczytane"
+
+msgid "Sort by"
+msgstr "Sortowanie według"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Wyświetl tylko nieprzeczytane"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Wyszukaj filtry"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "wiadomości: {n}"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Usunięto konto {name}"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Odśwież lub przytrzymaj, aby wyświetlić pasek stanu"
 
@@ -32,15 +70,6 @@ msgstr "Przeszukaj wiadomości (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Wyszukiwanie, filtry i sortowanie"
-
-msgid "Show only unread"
-msgstr "Wyświetl tylko nieprzeczytane"
-
-msgid "Show only starred"
-msgstr "Wyświetl tylko oznaczone gwiazdką"
-
-msgid "Sort messages"
-msgstr "Sortuj wiadomości"
 
 msgid "Edit this message"
 msgstr "Modyfikuj tę wiadomość"
@@ -128,25 +157,6 @@ msgstr "Przełącz panel boczny"
 
 msgid "Keyboard Shortcuts"
 msgstr "Skróty klawiszowe"
-
-msgid "Date (Newest first)"
-msgstr "Data (od najnowszych)"
-
-msgid "Date (Oldest first)"
-msgstr "Data (od najstarszych)"
-
-msgid "Sender (A–Z)"
-msgstr "Nadawca (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Temat (A–Z)"
-
-msgid "Unread first"
-msgstr "Najpierw nieprzeczytane"
-
-#, fuzzy
-msgid "Starred first"
-msgstr "Najpierw nieprzeczytane"
 
 msgid "Create Folder"
 msgstr "Utwórz katalog"
@@ -489,6 +499,10 @@ msgstr "Przenieś do skrzynki odbiorczej"
 
 msgid "Search Messages…"
 msgstr "Przeszukaj wiadomości…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filtry"
 
 msgid "Sort"
 msgstr "Sortuj"
@@ -2291,9 +2305,6 @@ msgid ""
 msgstr ""
 "Sposób sortowania katalogów tego konta w panelu bocznym. Dostępny także w "
 "menu kontekstowym nagłówka „Katalogi”."
-
-msgid "Sort by"
-msgstr "Sortowanie według"
 
 msgid "Special Folders"
 msgstr "Katalogi specjalne"
@@ -4193,6 +4204,25 @@ msgstr "{name} · {current} z {total}"
 msgid "me"
 msgstr "Nazwa"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Brak załączników"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Książka adresowa"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Brak kontaktów"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Importuj klucz"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Wybierz katalogi do przeszukania"
 
@@ -4208,8 +4238,16 @@ msgstr "Wyczyść zaznaczenie"
 msgid "No Messages"
 msgstr "Brak wiadomości"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Brak wiadomości"
+
 msgid "There's nothing here right now."
 msgstr "W tej chwili nic tu nie ma."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Najnowsza wiadomość na początku"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4234,9 +4272,6 @@ msgstr "Wyszukaj katalogi"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Wyszukaj katalogi"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7750,6 +7785,12 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Sortuj wiadomości"
+
+#~ msgid "Show only starred"
+#~ msgstr "Wyświetl tylko oznaczone gwiazdką"
 
 #, fuzzy
 #~ msgid "unknown folder {path}"

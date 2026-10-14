@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: more quick filters** (#441). One sort and filter button above
+  the list replaces the sort menu and the unread and starred toggles. Its
+  popover has the sort orders in one column and, in the other, **Unread**,
+  **Starred**, **Has Attachments**, **Addressed to Me**, **From Contacts**,
+  **High Importance**, **Tagged** and **Today**, which combine, with **Clear
+  Filters**. The button turns the accent color while a filter is on.
+
 - **Added: the search field can stay open** (#446, reported by
   samuel-edlmeier). With **Settings → Message List → Keep the search field
   open** on, it shows above the list all the time, and **Esc** clears it

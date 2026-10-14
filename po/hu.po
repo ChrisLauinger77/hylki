@@ -16,6 +16,44 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Gtranslator 51.0\n"
 
+msgid "Date (Newest first)"
+msgstr "Dátum (legújabb elöl)"
+
+msgid "Date (Oldest first)"
+msgstr "Dátum (legrégebbi elöl)"
+
+msgid "Sender (A–Z)"
+msgstr "Feladó (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Tárgy (A–Z)"
+
+msgid "Unread first"
+msgstr "Olvasatlanok elöl"
+
+#, fuzzy
+msgid "Starred first"
+msgstr "Olvasatlanok elöl"
+
+msgid "Sort by"
+msgstr "Rendezés"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Csak olvasatlanok megjelenítése"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Keresési szűrők"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "{n} db üzenet"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Szűrt mappák"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Frissítsen, vagy tartsa hosszan lenyomva az állapotsávhoz"
 
@@ -33,15 +71,6 @@ msgstr "Üzenetek keresése (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Keresés, szűrők és rendezés"
-
-msgid "Show only unread"
-msgstr "Csak olvasatlanok megjelenítése"
-
-msgid "Show only starred"
-msgstr "Csak csillagozottak megjelenítése"
-
-msgid "Sort messages"
-msgstr "Üzenetek rendezése"
 
 msgid "Edit this message"
 msgstr "Üzenet szerkesztése"
@@ -129,25 +158,6 @@ msgstr "Oldalsáv ki/bekapcsolása"
 
 msgid "Keyboard Shortcuts"
 msgstr "Billentyűparancsok"
-
-msgid "Date (Newest first)"
-msgstr "Dátum (legújabb elöl)"
-
-msgid "Date (Oldest first)"
-msgstr "Dátum (legrégebbi elöl)"
-
-msgid "Sender (A–Z)"
-msgstr "Feladó (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Tárgy (A–Z)"
-
-msgid "Unread first"
-msgstr "Olvasatlanok elöl"
-
-#, fuzzy
-msgid "Starred first"
-msgstr "Olvasatlanok elöl"
 
 msgid "Create Folder"
 msgstr "Mappa létrehozása"
@@ -488,6 +498,10 @@ msgstr "Áthelyezés a Beérkezett üzenetek közé"
 
 msgid "Search Messages…"
 msgstr "Üzenetek keresése..."
+
+#, fuzzy
+msgid "Filter"
+msgstr "Szűrők"
 
 msgid "Sort"
 msgstr "Rendezés"
@@ -2256,9 +2270,6 @@ msgid ""
 msgstr ""
 "A fiók mappáinak rendezése az oldalsávban. A Mappák fejléc jobb gombos "
 "menüjében is elérhető."
-
-msgid "Sort by"
-msgstr "Rendezés"
 
 msgid "Special Folders"
 msgstr "Speciális mappák"
@@ -4154,6 +4165,25 @@ msgstr "{name} · {current} / {total}"
 msgid "me"
 msgstr "Név"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Nincsenek mellékletek"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Címjegyzék"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Nincsenek névjegyek"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Kulcs importálása"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Válassza ki a keresendő mappákat"
 
@@ -4169,8 +4199,16 @@ msgstr "Kijelölés törlése"
 msgid "No Messages"
 msgstr "Nincsenek üzenetek"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Nincsenek üzenetek"
+
 msgid "There's nothing here right now."
 msgstr "Itt jelenleg nincs semmi."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Legújabb üzenet elöl"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4195,9 +4233,6 @@ msgstr "Keresés a mappákban"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Keresés a mappákban"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7725,6 +7760,12 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Sort messages"
+#~ msgstr "Üzenetek rendezése"
+
+#~ msgid "Show only starred"
+#~ msgstr "Csak csillagozottak megjelenítése"
+
 #, fuzzy
 #~ msgid "unknown folder {path}"
 #~ msgstr "Minden mappa megjelenítése"
@@ -8086,9 +8127,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Inside All Inboxes"
 #~ msgstr "Az Összes beérkezett között"
-
-#~ msgid "Filtered Folders"
-#~ msgstr "Szűrt mappák"
 
 #~ msgid "Multiple IMAP and POP3 accounts, with a unified All Inboxes view"
 #~ msgstr "Több IMAP- és POP3-fiók egységes Összes beérkezett nézettel"

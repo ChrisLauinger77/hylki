@@ -16,6 +16,43 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: Babel 2.18.0\n"
 
+msgid "Date (Newest first)"
+msgstr "Ημερομηνία (νεότερα πρώτα)"
+
+msgid "Date (Oldest first)"
+msgstr "Ημερομηνία (παλαιότερα πρώτα)"
+
+msgid "Sender (A–Z)"
+msgstr "Αποστολέας (Α–Ω)"
+
+msgid "Subject (A–Z)"
+msgstr "Θέμα (Α–Ω)"
+
+msgid "Unread first"
+msgstr "Μη αναγνωσμένα πρώτα"
+
+msgid "Starred first"
+msgstr "Με τα μηνύματα με αστέρι πρώτα"
+
+msgid "Sort by"
+msgstr "Ταξινόμηση κατά"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Εμφάνιση μόνο μη αναγνωσμένων"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Αναζήτηση φίλτρων"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "{n} μηνύματα"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Αφαιρέθηκε το {name}"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Ανανέωση ή παρατεταμένο πάτημα για τη γραμμή κατάστασης"
 
@@ -33,15 +70,6 @@ msgstr "Αναζήτηση μηνυμάτων (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Αναζήτηση, φίλτρα και ταξινόμηση"
-
-msgid "Show only unread"
-msgstr "Εμφάνιση μόνο μη αναγνωσμένων"
-
-msgid "Show only starred"
-msgstr "Εμφάνιση μόνο μηνυμάτων με αστέρι"
-
-msgid "Sort messages"
-msgstr "Ταξινόμηση μηνυμάτων"
 
 msgid "Edit this message"
 msgstr "Επεξεργασία αυτού του μηνύματος"
@@ -129,24 +157,6 @@ msgstr "Εναλλαγή πλευρικής στήλης"
 
 msgid "Keyboard Shortcuts"
 msgstr "Συντομεύσεις πληκτρολογίου"
-
-msgid "Date (Newest first)"
-msgstr "Ημερομηνία (νεότερα πρώτα)"
-
-msgid "Date (Oldest first)"
-msgstr "Ημερομηνία (παλαιότερα πρώτα)"
-
-msgid "Sender (A–Z)"
-msgstr "Αποστολέας (Α–Ω)"
-
-msgid "Subject (A–Z)"
-msgstr "Θέμα (Α–Ω)"
-
-msgid "Unread first"
-msgstr "Μη αναγνωσμένα πρώτα"
-
-msgid "Starred first"
-msgstr "Με τα μηνύματα με αστέρι πρώτα"
 
 msgid "Create Folder"
 msgstr "Δημιουργία φακέλου"
@@ -489,6 +499,10 @@ msgstr "Μετακίνηση στα Εισερχόμενα"
 
 msgid "Search Messages…"
 msgstr "Αναζήτηση μηνυμάτων…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Φίλτρα"
 
 msgid "Sort"
 msgstr "Ταξινόμηση"
@@ -2276,9 +2290,6 @@ msgid ""
 msgstr ""
 "Πώς ταξινομούνται οι φάκελοι αυτού του λογαριασμού στην πλευρική στήλη. "
 "Επίσης στο μενού δεξιού κλικ της επικεφαλίδας «Φάκελοι»."
-
-msgid "Sort by"
-msgstr "Ταξινόμηση κατά"
 
 msgid "Special Folders"
 msgstr "Ειδικοί φάκελοι"
@@ -4169,6 +4180,25 @@ msgstr "{name} · {current} από {total}"
 msgid "me"
 msgstr "εγώ"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Έχει συνημμένα"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Βιβλίο διευθύνσεων"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Δεν υπάρχουν επαφές"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Υψηλή σημασία"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Επιλέξτε τους φακέλους αναζήτησης"
 
@@ -4184,8 +4214,16 @@ msgstr "Εκκαθάριση επιλογής"
 msgid "No Messages"
 msgstr "Δεν υπάρχουν μηνύματα"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Δεν υπάρχουν μηνύματα"
+
 msgid "There's nothing here right now."
 msgstr "Δεν υπάρχει τίποτα εδώ αυτήν τη στιγμή."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Νέο μήνυμα από πρότυπο"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4210,9 +4248,6 @@ msgstr "Αναζήτηση φακέλων"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Αναζήτηση φακέλων"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7739,6 +7774,12 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Ταξινόμηση μηνυμάτων"
+
+#~ msgid "Show only starred"
+#~ msgstr "Εμφάνιση μόνο μηνυμάτων με αστέρι"
 
 #, fuzzy
 #~ msgid "unknown folder {path}"

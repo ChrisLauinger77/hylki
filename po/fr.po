@@ -16,6 +16,43 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "Date (Newest first)"
+msgstr "Date (récents en premier)"
+
+msgid "Date (Oldest first)"
+msgstr "Date (anciens en premier)"
+
+msgid "Sender (A–Z)"
+msgstr "Expéditeur (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Objet (A–Z)"
+
+msgid "Unread first"
+msgstr "Non lus en premier"
+
+msgid "Starred first"
+msgstr "Favoris en premier"
+
+msgid "Sort by"
+msgstr "Trier par"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Afficher uniquement les non lus"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Filtres de recherche"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "Messages électroniques"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "Dossiers filtrés"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualiser ou appuyer longuement pour la barre d'état"
 
@@ -33,15 +70,6 @@ msgstr "Rechercher des messages (Ctrl+F)"
 
 msgid "Search, filters and sort"
 msgstr "Recherche, filtres et tri"
-
-msgid "Show only unread"
-msgstr "Afficher uniquement les non lus"
-
-msgid "Show only starred"
-msgstr "Afficher uniquement les favoris"
-
-msgid "Sort messages"
-msgstr "Trier les messages"
 
 msgid "Edit this message"
 msgstr "Modifier ce message"
@@ -129,24 +157,6 @@ msgstr "Basculer la barre latérale"
 
 msgid "Keyboard Shortcuts"
 msgstr "Raccourcis clavier"
-
-msgid "Date (Newest first)"
-msgstr "Date (récents en premier)"
-
-msgid "Date (Oldest first)"
-msgstr "Date (anciens en premier)"
-
-msgid "Sender (A–Z)"
-msgstr "Expéditeur (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Objet (A–Z)"
-
-msgid "Unread first"
-msgstr "Non lus en premier"
-
-msgid "Starred first"
-msgstr "Favoris en premier"
 
 msgid "Create Folder"
 msgstr "Créer un dossier"
@@ -471,6 +481,10 @@ msgstr "Déplacer vers la boîte de réception"
 
 msgid "Search Messages…"
 msgstr "Rechercher des messages…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filtres"
 
 msgid "Sort"
 msgstr "Trier"
@@ -2244,9 +2258,6 @@ msgid ""
 msgstr ""
 "Comment les dossiers de ce compte sont triés dans la barre latérale. "
 "Également dans le menu contextuel de son en-tête Dossiers."
-
-msgid "Sort by"
-msgstr "Trier par"
 
 msgid "Special Folders"
 msgstr "Dossiers spéciaux"
@@ -4128,6 +4139,25 @@ msgstr "{name} · {current} sur {total}"
 msgid "me"
 msgstr "moi"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Contient des pièces jointes"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Carnet d'adresses"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Aucun contact"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Importance haute"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Choisir les dossiers dans lesquels rechercher"
 
@@ -4143,8 +4173,16 @@ msgstr "Effacer la sélection"
 msgid "No Messages"
 msgstr "Aucun message"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Aucun message"
+
 msgid "There's nothing here right now."
 msgstr "Il n'y a rien ici pour le moment."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Nouveau message à partir d'un modèle"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4169,9 +4207,6 @@ msgstr "Rechercher des dossiers"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Rechercher des dossiers"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7694,6 +7729,12 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid "Sort messages"
+#~ msgstr "Trier les messages"
+
+#~ msgid "Show only starred"
+#~ msgstr "Afficher uniquement les favoris"
+
 #~ msgid "Move down or up the list without opening"
 #~ msgstr "Descendre ou monter dans la liste sans ouvrir"
 
@@ -8092,9 +8133,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Inside All Inboxes"
 #~ msgstr "Dans toutes les boîtes de réception"
-
-#~ msgid "Filtered Folders"
-#~ msgstr "Dossiers filtrés"
 
 #~ msgid "Multiple IMAP and POP3 accounts, with a unified All Inboxes view"
 #~ msgstr ""

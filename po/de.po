@@ -16,6 +16,44 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 3.9\n"
 
+msgid "Date (Newest first)"
+msgstr "Datum (Neueste zuerst)"
+
+msgid "Date (Oldest first)"
+msgstr "Datum (Ältester zuerst)"
+
+msgid "Sender (A–Z)"
+msgstr "Absender (A–Z)"
+
+msgid "Subject (A–Z)"
+msgstr "Betreff (A–Z)"
+
+msgid "Unread first"
+msgstr "Ungelesen zuerst"
+
+#, fuzzy
+msgid "Starred first"
+msgstr "Ungelesen zuerst"
+
+msgid "Sort by"
+msgstr "Sortieren nach"
+
+#, fuzzy
+msgid "Show only"
+msgstr "Nur ungelesen anzeigen"
+
+#, fuzzy
+msgid "Clear Filters"
+msgstr "Suchfilter"
+
+#, fuzzy
+msgid "Sort and filter messages"
+msgstr "{n} Nachrichten"
+
+#, fuzzy
+msgid "Filtered: {names}"
+msgstr "{name} entfernt"
+
 msgid "Refresh or long-press for Status Bar"
 msgstr "Aktualisieren oder lange drücken, um die Statusleiste anzuzeigen"
 
@@ -33,15 +71,6 @@ msgstr "Nachrichten durchsuchen (Strg+F)"
 
 msgid "Search, filters and sort"
 msgstr "Suchen, Filtern und Sortieren"
-
-msgid "Show only unread"
-msgstr "Nur ungelesen anzeigen"
-
-msgid "Show only starred"
-msgstr "Nur markierte anzeigen"
-
-msgid "Sort messages"
-msgstr "Nachrichten sortieren"
 
 msgid "Edit this message"
 msgstr "Diese Nachricht bearbeiten"
@@ -129,25 +158,6 @@ msgstr "Seitenleiste ein- oder ausblenden"
 
 msgid "Keyboard Shortcuts"
 msgstr "Tastenkombinationen"
-
-msgid "Date (Newest first)"
-msgstr "Datum (Neueste zuerst)"
-
-msgid "Date (Oldest first)"
-msgstr "Datum (Ältester zuerst)"
-
-msgid "Sender (A–Z)"
-msgstr "Absender (A–Z)"
-
-msgid "Subject (A–Z)"
-msgstr "Betreff (A–Z)"
-
-msgid "Unread first"
-msgstr "Ungelesen zuerst"
-
-#, fuzzy
-msgid "Starred first"
-msgstr "Ungelesen zuerst"
 
 msgid "Create Folder"
 msgstr "Ordner erstellen"
@@ -491,6 +501,10 @@ msgstr "In den Posteingang verschieben"
 
 msgid "Search Messages…"
 msgstr "Nachrichten durchsuchen…"
+
+#, fuzzy
+msgid "Filter"
+msgstr "Filter"
 
 msgid "Sort"
 msgstr "Sortieren"
@@ -2286,9 +2300,6 @@ msgid ""
 msgstr ""
 "So werden die Ordner dieses Kontos in der Seitenleiste sortiert. Dies gilt "
 "auch für das Kontextmenü unter der Überschrift „Ordner“."
-
-msgid "Sort by"
-msgstr "Sortieren nach"
 
 msgid "Special Folders"
 msgstr "Spezielle Ordner"
@@ -4178,6 +4189,25 @@ msgstr "{name} · {current} von {total}"
 msgid "me"
 msgstr "Name"
 
+#, fuzzy
+msgid "Has Attachments"
+msgstr "Keine Anhänge"
+
+#, fuzzy
+msgid "Addressed to Me"
+msgstr "Adressbuch"
+
+#, fuzzy
+msgid "From Contacts"
+msgstr "Keine Kontakte"
+
+#, fuzzy
+msgid "High Importance"
+msgstr "Schlüssel importieren"
+
+msgid "Today"
+msgstr ""
+
 msgid "Choose which folders to search"
 msgstr "Wählen Sie aus, welche Ordner gesucht werden sollen"
 
@@ -4193,8 +4223,16 @@ msgstr "Auswahl aufheben"
 msgid "No Messages"
 msgstr "Keine Nachrichten"
 
+#, fuzzy
+msgid "No Matching Messages"
+msgstr "Keine Nachrichten"
+
 msgid "There's nothing here right now."
 msgstr "Im Moment ist hier nichts."
+
+#, fuzzy
+msgid "No message here passes the filters."
+msgstr "Neueste Nachricht zuerst"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -4219,9 +4257,6 @@ msgstr "Ordner durchsuchen"
 #, fuzzy
 msgid "Search this folder"
 msgstr "Ordner durchsuchen"
-
-msgid "Today"
-msgstr ""
 
 #, fuzzy
 msgid "Yesterday"
@@ -7738,6 +7773,12 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort messages"
+#~ msgstr "Nachrichten sortieren"
+
+#~ msgid "Show only starred"
+#~ msgstr "Nur markierte anzeigen"
 
 #, fuzzy
 #~ msgid "unknown folder {path}"

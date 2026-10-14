@@ -48,6 +48,9 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Tags:** IMAP keywords, Graph categories, or a local fallback where the
   server has neither; custom colours, drag to reorder, and number-key
   shortcuts. Gmail's labels show beside them.
+- **Quick filters:** unread, starred, attachments, addressed to you, from
+  your contacts, high importance, tagged and today, combined, in one popover
+  above the list with the sort orders. See [Message list layout](DOCUMENTATION.md#message-list-layout).
 - **Smart folders:** saved searches across accounts and folders, on
   starred, unread, attachments, tags and the filter conditions, with unread
   counts. See [Smart folders](DOCUMENTATION.md#smart-folders).
