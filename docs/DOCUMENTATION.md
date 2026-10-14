@@ -1244,6 +1244,12 @@ tagged message with its tag's color, in both layouts. A message with more
 than one tag takes the color of the one listed first in **Settings → Tags**.
 A selected row keeps the selection color. It is on unless switched off.
 
+**Settings → Message List → Keep the search field open** shows the search
+field above the list all the time, instead of only after the search button,
+<kbd>Ctrl+F</kbd> or <kbd>/</kbd>. One click in it starts a search.
+<kbd>Esc</kbd> clears it and returns to the list, and it stays where it is.
+It is off unless switched on.
+
 Clicking the unread dot on a row marks that message read without selecting
 or opening it. A conversation's dot that is lit only for an unread reply
 does not take the click.

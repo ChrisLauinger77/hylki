@@ -572,6 +572,8 @@ pub struct MessageList {
     /// When the search closed itself (empty entry losing focus): the button
     /// click that caused that blur arrives right after and must not reopen.
     search_closed_at: Option<std::time::Instant>,
+    /// The search toolbar never hides (#446): closing only clears it.
+    search_pinned: bool,
     /// The rows, in order: what the model shows, one message each.
     shown: Vec<Rc<Message>>,
     /// Total messages matching the current filter.
@@ -1025,6 +1027,8 @@ pub enum MessageListInput {
     RefreshHeadings,
     /// Scroll a single line wider than the pane, or fit its columns (#443).
     SetColumnScroll(bool),
+    /// Keep the search toolbar open (#446).
+    SetSearchPinned(bool),
     /// The rows are this wide now.
     PaneWidth(i32),
     /// Each account's name for the Account column, and which accounts are
@@ -1268,7 +1272,7 @@ impl SimpleComponent for MessageList {
                 gtk::Revealer {
                     set_transition_type: gtk::RevealerTransitionType::SlideDown,
                     #[watch]
-                    set_reveal_child: model.search_open,
+                    set_reveal_child: model.search_open || model.search_pinned,
 
                 gtk::Box {
                     set_spacing: 6,
@@ -1558,6 +1562,7 @@ impl SimpleComponent for MessageList {
             search_entry: None,
             search_open: false,
             search_closed_at: None,
+            search_pinned: false,
             shown: Vec::new(),
             total_matches: 0,
             index_complete: true,
@@ -1771,7 +1776,7 @@ impl SimpleComponent for MessageList {
                 self.all.clear();
                 self.drop_threads();
                 self.loaded = false;
-                self.clear_search();
+                self.clear_search(&sender);
                 // Queued: when the folder's list follows in the same pass
                 // (served from cache), the old rows are torn down once, for
                 // the new ones, not first for nothing.
@@ -1785,7 +1790,7 @@ impl SimpleComponent for MessageList {
                 if std::mem::take(&mut self.checking) {
                     let _ = sender.output(MessageListOutput::Checked(None));
                 }
-                self.clear_search();
+                self.clear_search(&sender);
                 self.emitted_thread.clear();
                 // However the new view's list arrives, a rebuild follows, and
                 // the top is scrolled to then, not over the old rows first.
@@ -2511,6 +2516,13 @@ impl SimpleComponent for MessageList {
             }
 
             MessageListInput::FocusSearch => {
+                // A field that is always there has nothing to open or close.
+                if self.search_pinned {
+                    if let Some(entry) = &self.search_entry {
+                        entry.grab_focus();
+                    }
+                    return;
+                }
                 // Toggle (#102): the header button closes an open search too.
                 if self.search_open {
                     sender.input(MessageListInput::CloseSearch);
@@ -2537,9 +2549,25 @@ impl SimpleComponent for MessageList {
             }
 
             MessageListInput::CloseSearch => {
+                if self.search_pinned {
+                    // Esc in the field hands the keyboard back to the list;
+                    // an empty field losing focus has gone somewhere already.
+                    let had_focus = self.search_entry.as_ref().is_some_and(|e| e.has_focus() || e.focus_child().is_some());
+                    if !self.query.is_empty() {
+                        self.clear_search(&sender);
+                        self.rebuild();
+                        self.scroll_top();
+                    }
+                    if had_focus {
+                        self.preserving_scroll(|this| {
+                            this.list_view.grab_focus();
+                        });
+                    }
+                    return;
+                }
                 self.search_open = false;
                 self.search_closed_at = Some(std::time::Instant::now());
-                self.clear_search();
+                self.clear_search(&sender);
                 self.rebuild();
             }
 
@@ -2623,6 +2651,13 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::RefreshHeadings => self.sync_headings(),
+            MessageListInput::SetSearchPinned(on) => {
+                self.search_pinned = on;
+                // Unpinned, it stays only while it holds a search.
+                if !on {
+                    self.search_open = !self.query.is_empty();
+                }
+            }
             MessageListInput::SetColumnScroll(on) => {
                 if self.column_scroll != on {
                     self.column_scroll = on;
@@ -3990,9 +4025,15 @@ impl MessageList {
 
     /// Drop any active search: clear the query and the entry text so a folder
     /// switch doesn't leave a stale term filtering the new folder.
-    fn clear_search(&mut self) {
+    fn clear_search(&mut self, sender: &ComponentSender<Self>) {
         if self.query.is_empty() {
             return;
+        }
+        // The entry's own change arrives with the query already empty, too
+        // late to see the search end: the cross-folder pool and the account
+        // tint were left behind.
+        if self.searching() {
+            let _ = sender.output(MessageListOutput::SearchActive(false));
         }
         self.query.clear();
         if let Some(e) = &self.search_entry {

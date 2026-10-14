@@ -825,6 +825,8 @@ pub struct AppModel {
     list_column_scroll: bool,
     /// Date headings over a list sorted by date (#435).
     list_group_by_date: bool,
+    /// The list's search field stays open (#446).
+    list_search_open: bool,
     /// The widths columns were dragged to by their headings (#334).
     list_column_widths: std::collections::HashMap<config::ListColumn, i32>,
     /// The list pane is wide enough for one line per message, which
@@ -3356,6 +3358,7 @@ impl SimpleComponent for AppModel {
             list_headings: config::load_privacy().list_headings,
             list_column_scroll: config::load_privacy().list_column_scroll,
             list_group_by_date: config::load_privacy().list_group_by_date,
+            list_search_open: config::load_privacy().list_search_open,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
             shortcuts_win: None,
@@ -3650,6 +3653,7 @@ impl SimpleComponent for AppModel {
         model.message_list.emit(MessageListInput::SetColumns(model.list_columns.clone()));
         model.message_list.emit(MessageListInput::SetHeadings(model.list_headings));
         model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
+        model.message_list.emit(MessageListInput::SetSearchPinned(model.list_search_open));
         model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
@@ -8098,6 +8102,11 @@ impl SimpleComponent for AppModel {
                     self.message_list.emit(MessageListInput::SetColumnScroll(on));
                 }
             }
+            AppMsg::Pref(PrefOutput::SetListSearchOpen(on)) => {
+                if pref!(self.list_search_open = on) {
+                    self.message_list.emit(MessageListInput::SetSearchPinned(on));
+                }
+            }
             AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
                 if pref!(self.list_group_by_date = on) {
                     self.message_list.emit(MessageListInput::SetGroupByDate(on));
@@ -12173,6 +12182,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
+            list_search_open: self.list_search_open,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
@@ -20232,6 +20242,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
+            list_search_open: self.list_search_open,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
             keep_downloads_days: self.keep_downloads_days,

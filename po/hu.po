@@ -5721,6 +5721,14 @@ msgid ""
 "Last 14 days and Older."
 msgstr ""
 
+msgid "Keep the search field open"
+msgstr ""
+
+msgid ""
+"Shows the search field above the list at all times, instead of behind the "
+"search button."
+msgstr ""
+
 #, fuzzy
 msgid "Tint tagged messages"
 msgstr "{n} db üzenet címkézve"

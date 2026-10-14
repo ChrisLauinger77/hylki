@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added: the search field can stay open** (#446, reported by
+  samuel-edlmeier). With **Settings → Message List → Keep the search field
+  open** on, it shows above the list all the time, and **Esc** clears it
+  without hiding it.
+- **Fixed: rows stayed tinted by account after a search was cleared.**
+  Clearing a search with **Esc** left a folder's rows tinted as search
+  results are, and clearing it by **Esc** or a folder change kept a copy of
+  every folder's messages in memory, until the next search.
+
 - **Added: more of Gmail's keys** (#392, reported by 3v1n0). With Gmail keys
   on, `]` and `}` archive the conversation and open the older one, `[` and
   `{` the newer one; `* r`, `* u`, `* s` and `* t` select the read, unread,

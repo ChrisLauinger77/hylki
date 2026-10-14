@@ -1512,6 +1512,10 @@ pub(crate) struct PrivacyFile {
     /// Last 14 days and Older (#435). Off by default.
     #[serde(default)]
     pub(crate) list_group_by_date: bool,
+    /// The search field stays above the list instead of hiding behind the
+    /// search button (#446). Off by default.
+    #[serde(default)]
+    pub(crate) list_search_open: bool,
     /// The widths columns were dragged to, in pixels, by column name.
     #[serde(default)]
     pub(crate) list_column_widths: std::collections::BTreeMap<String, i32>,
@@ -1818,6 +1822,7 @@ impl Default for PrivacyFile {
             list_headings: false,
             list_column_scroll: false,
             list_group_by_date: false,
+            list_search_open: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
             gmail_keys: false,
