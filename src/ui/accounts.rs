@@ -1634,6 +1634,13 @@ impl Component for AccountsWindow {
                                         sender.input(AccountsInput::SetGraphDirectory(row.is_active()));
                                     },
                                 },
+                                #[name = "directory_only_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Suggest only from this account"),
+                                    set_subtitle: &i18n("Writing from this account, suggest people from the \
+                                                   directory and from its own mail, not from Contacts, \
+                                                   LDAP directories or other accounts."),
+                                },
                                 #[name = "directory_status"]
                                 gtk::Label {
                                     set_visible: false,
@@ -1868,6 +1875,12 @@ impl Component for AccountsWindow {
         senders_box.set_visible(!model.sender_addrs.is_empty());
         blacklist_box.set_visible(!model.blacklist_addrs.is_empty());
         let widgets = view_output!();
+        // Narrowing to the directory means nothing without it.
+        widgets
+            .graph_directory_row
+            .bind_property("active", &widgets.directory_only_row, "sensitive")
+            .sync_create()
+            .build();
         // Long enough for the hint, short enough that the combo's own value
         // is not what gets shortened instead.
         wrap_subtitle(&widgets.folder_sent_copy_row, 34);
@@ -2181,6 +2194,7 @@ impl Component for AccountsWindow {
                 // On without the scopes would only be refused.
                 self.directory_on = acc.graph_directory && self.directory_granted;
                 widgets.graph_directory_row.set_active(self.directory_on);
+                widgets.directory_only_row.set_active(acc.graph_directory_only);
                 self.close_alias_dialog();
                 self.alias_edits = acc.aliases.clone();
                 self.server_identities.clear();
@@ -4580,6 +4594,7 @@ fn read_account(
             .and_then(|i| crate::config::FolderSort::ALL.get(i as usize).copied()),
         sign_by_default: widgets.sign_default_row.is_active(),
         graph_directory: protocol == Protocol::Graph && widgets.graph_directory_row.is_active(),
+        graph_directory_only: protocol == Protocol::Graph && widgets.directory_only_row.is_active(),
     }
 }
 
@@ -4889,6 +4904,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.folder_sort_row.set_selected(0);
     widgets.sign_default_row.set_active(false);
     widgets.graph_directory_row.set_active(false);
+    widgets.directory_only_row.set_active(false);
     widgets.directory_status.set_visible(false);
     widgets.smtp_user_row.set_text("");
     widgets.smtp_pass_row.set_text("");

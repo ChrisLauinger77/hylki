@@ -602,6 +602,11 @@ pub struct AccountConfig {
     /// be given them.
     #[serde(default, skip_serializing_if = "is_false")]
     pub graph_directory: bool,
+    /// Writing from this account, the suggestions are its directory's and
+    /// its own mail's only (#410): a work account then offers no one from
+    /// GNOME Contacts, an LDAP directory or another account's mail.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub graph_directory_only: bool,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -5264,6 +5269,7 @@ dest_path = "Lists"
             folder_sort: None,
             sign_by_default: false,
             graph_directory: false,
+            graph_directory_only: false,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {

@@ -58,6 +58,11 @@
   (#443), which opens Settings at Message List → Columns.
 - **Changed: swipe actions are for the card layout** (#443). A single line
   no longer swipes; sideways is how it scrolls.
+- **Added: a Microsoft 365 account can suggest only its own people** (#410,
+  suggested by erenoglu). With **Suggest only from this account** on, under
+  **Search the organization directory** in the account's settings, a message
+  written from it is offered the organization's directory and the people in
+  its own mail, not GNOME Contacts, LDAP directories or other accounts.
 - **Fixed: single-line columns after Tags fell out of line** (#443) on
   rows without tags. Tags is a column of fixed width now, resized from its
   heading like the names.

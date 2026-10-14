@@ -1961,6 +1961,14 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr ""
 
+msgid "Suggest only from this account"
+msgstr ""
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr ""
 

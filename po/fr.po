@@ -2178,6 +2178,15 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr "Enregistrer l'annuaire ?"
 
+#, fuzzy
+msgid "Suggest only from this account"
+msgstr "Afficher uniquement ce compte"
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Ordre des dossiers"
 

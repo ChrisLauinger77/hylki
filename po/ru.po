@@ -2196,6 +2196,15 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr "Сохранить каталог?"
 
+#, fuzzy
+msgid "Suggest only from this account"
+msgstr "Показывать только эту учётную запись"
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Порядок папок"
 

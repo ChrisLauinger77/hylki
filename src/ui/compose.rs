@@ -273,6 +273,17 @@ pub struct ComposeInit {
     pub signature_position: SignaturePosition,
 }
 
+/// An account that suggests only from its directory and its own mail
+/// (#410): what its directory is asked with, and the addresses in its mail.
+#[derive(Debug)]
+pub struct OwnOnly {
+    account: crate::config::AccountConfig,
+    addresses: std::collections::HashSet<String>,
+}
+
+/// Those accounts by id, as the From row knows them.
+pub type OwnMail = std::collections::HashMap<u32, OwnOnly>;
+
 pub struct Compose {
     accounts: Vec<ComposeAccount>,
     /// The rich-text (HTML) body editor.
@@ -303,6 +314,12 @@ pub struct Compose {
     /// not: one switched on in Evolution while the composer is open counts
     /// as well (#307), and [`crate::directory::search`] keeps the list.
     graph_directories: std::sync::Arc<Vec<crate::config::AccountConfig>>,
+    /// The accounts that suggest only from their directory and their own
+    /// mail (#410), with the addresses in that mail.
+    own_mail: OwnMail,
+    /// The account the From row has picked, which decides whether
+    /// `own_mail` narrows the suggestions.
+    from_account: u32,
     /// What the directories answered for the recipient being typed.
     directory_matches: Vec<Suggestion>,
     /// Bumped on every keystroke, so a slow directory's answer to an
@@ -587,15 +604,16 @@ pub enum ComposeInput {
     OpenContacts,
     /// The given recipient field changed — refresh autocomplete.
     Suggest(Field),
-    /// The accounts whose organization directory is searched (#410).
-    DirectoriesKnown { graph: Vec<crate::config::AccountConfig> },
+    /// The accounts whose organization directory is searched (#410), and
+    /// the addresses in the mail of those that suggest only their own.
+    DirectoriesKnown { graph: Vec<crate::config::AccountConfig>, own_mail: OwnMail },
     /// The typing paused: ask the directories, unless it went on since.
     DirectoryLookup { field: Field, token: String, generation: u64 },
     /// What the directories answered, and the failures not shown before.
     DirectoryResults { field: Field, token: String, generation: u64, matches: Vec<Suggestion>, errors: Vec<String> },
     /// Addresses just sent to from another composer: into this one's
     /// suggestions at once, without waiting for a reopen.
-    AddSuggestions(Vec<Suggestion>),
+    AddSuggestions { account_id: u32, new: Vec<Suggestion> },
     /// Arrow-key move of the autocomplete highlight (+1 down, -1 up).
     CompletionMove(i32),
     /// Accept the highlighted suggestion into the active field.
@@ -1250,6 +1268,8 @@ impl Component for Compose {
             attach_thumbs: Default::default(),
             suggestions,
             graph_directories: Default::default(),
+            own_mail: Default::default(),
+            from_account: 0,
             directory_matches: Vec::new(),
             directory_generation: 0,
             completion,
@@ -1307,6 +1327,7 @@ impl Component for Compose {
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
         };
+        model.from_account = model.accounts.get(selected).map(|a| a.id).unwrap_or_default();
         let widgets = view_output!();
         if prefill_encrypt && crate::pgp::available() {
             // Through the buttons, so the toggles and the model agree.
@@ -1587,7 +1608,22 @@ impl Component for Compose {
             let s = sender.input_sender().clone();
             std::thread::spawn(move || {
                 let graph = crate::graph_directory::accounts();
-                let _ = s.send(ComposeInput::DirectoriesKnown { graph });
+                // An account's id is its place in the file, from 1.
+                let narrowed: Vec<(u32, crate::config::AccountConfig)> = crate::config::load()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, a)| a.graph_directory_only && crate::graph_directory::usable(a))
+                    .map(|(i, a)| (i as u32 + 1, a))
+                    .collect();
+                let own_mail = match crate::cache::Cache::open() {
+                    Ok(cache) if !narrowed.is_empty() => narrowed
+                        .into_iter()
+                        .map(|(id, account)| (id, OwnOnly { addresses: cache.account_addresses(id), account }))
+                        .collect(),
+                    _ => OwnMail::new(),
+                };
+                let _ = s.send(ComposeInput::DirectoriesKnown { graph, own_mail });
             });
         }
 
@@ -2230,8 +2266,15 @@ impl Component for Compose {
 
             ComposeInput::AccountChanged => {
                 self.follow_account_signing(widgets);
-                // Swap the editor's signature block for the new account's.
                 let idx = widgets.from_row.selected() as usize;
+                // Another account may suggest from elsewhere: what a
+                // directory answered for the last one is not kept.
+                if let Some(id) = self.accounts.get(idx).map(|a| a.id).filter(|id| *id != self.from_account) {
+                    self.from_account = id;
+                    self.directory_generation = self.directory_generation.wrapping_add(1);
+                    self.directory_matches.clear();
+                }
+                // Swap the editor's signature block for the new account's.
                 let new_sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
                 self.signature_btn.set_visible(!new_sig.is_empty());
                 if new_sig == self.current_sig {
@@ -2283,21 +2326,30 @@ impl Component for Compose {
                 self.show_completion(field, row);
             }
 
-            ComposeInput::DirectoriesKnown { graph } => {
+            ComposeInput::DirectoriesKnown { graph, own_mail } => {
                 self.graph_directories = std::sync::Arc::new(graph);
+                self.own_mail = own_mail;
             }
 
             ComposeInput::DirectoryLookup { field, token, generation } => {
                 if generation == self.directory_generation {
                     let s = sender.input_sender().clone();
-                    let graph = self.graph_directories.clone();
+                    // An account that suggests only its own asks its
+                    // directory alone, no LDAP and no other tenant.
+                    let own = self.own_mail.get(&self.from_account);
+                    let narrowed = own.is_some();
+                    let graph = match own {
+                        Some(own) => std::sync::Arc::new(vec![own.account.clone()]),
+                        None => self.graph_directories.clone(),
+                    };
                     std::thread::spawn(move || {
                         // Both at once: the slower decides when the list
                         // grows, not the two one after the other.
                         let (matches, errors) = std::thread::scope(|scope| {
                             let org = (!graph.is_empty())
                                 .then(|| scope.spawn(|| crate::graph_directory::search(&token, &graph)));
-                            let (mut matches, errors) = crate::directory::search(&token);
+                            let (mut matches, errors) =
+                                if narrowed { Default::default() } else { crate::directory::search(&token) };
                             if let Some(found) = org.and_then(|h| h.join().ok()) {
                                 matches.extend(found);
                             }
@@ -2327,9 +2379,12 @@ impl Component for Compose {
                 }
             }
 
-            ComposeInput::AddSuggestions(new) => {
+            ComposeInput::AddSuggestions { account_id, new } => {
                 for n in new {
                     let key = n.email.to_lowercase();
+                    if let Some(own) = self.own_mail.get_mut(&account_id) {
+                        own.addresses.insert(key.clone());
+                    }
                     match self.suggestions.iter_mut().find(|s| s.email.to_lowercase() == key) {
                         Some(s) => {
                             s.score += 1;
@@ -3417,10 +3472,21 @@ window.__hylkiDirty=true;})()"#
 
     /// Suggestions matching `token`, ranked best-first (prefix match, then most
     /// frequently used), capped to a handful.
+    /// The addresses in the From account's mail, when that account
+    /// suggests only from its directory and its own mail (#410).
+    fn narrowed(&self) -> Option<&std::collections::HashSet<String>> {
+        self.own_mail.get(&self.from_account).map(|own| &own.addresses)
+    }
+
     fn ranked_matches(&self, token: &str) -> Vec<Suggestion> {
         let q = token.to_lowercase();
-        let mut matches: Vec<Suggestion> =
-            self.suggestions.iter().filter(|s| s.matches(token)).cloned().collect();
+        let narrowed = self.narrowed();
+        let mut matches: Vec<Suggestion> = self
+            .suggestions
+            .iter()
+            .filter(|s| s.matches(token) && narrowed.is_none_or(|own| own.contains(&s.email.to_lowercase())))
+            .cloned()
+            .collect();
         // A directory matched on attributes the entry may not show (a
         // surname under a display name), so its answers are not filtered
         // again; one already known from Contacts or mail is not repeated.

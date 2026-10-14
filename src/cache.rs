@@ -2286,6 +2286,34 @@ impl Cache {
         out
     }
 
+    /// Every address in one account's mail, lower case: what the composer
+    /// keeps of the history when that account suggests only its own (#410).
+    pub fn account_addresses(&self, account_id: u32) -> std::collections::HashSet<String> {
+        let mut out = std::collections::HashSet::new();
+        let Ok(mut stmt) = self
+            .conn
+            .prepare("SELECT from_addr, recipients, cc FROM messages WHERE account_id = ?1")
+        else {
+            return out;
+        };
+        let rows = stmt.query_map(params![account_id], |r| {
+            Ok((
+                r.get::<_, String>(0).unwrap_or_default(),
+                r.get::<_, String>(1).unwrap_or_default(),
+                r.get::<_, String>(2).unwrap_or_default(),
+            ))
+        });
+        for (from, to, cc) in rows.into_iter().flatten().flatten() {
+            for addr in std::iter::once(from.as_str()).chain(to.split(',')).chain(cc.split(',')) {
+                let addr = addr.trim();
+                if addr.contains('@') {
+                    out.insert(addr.to_lowercase());
+                }
+            }
+        }
+        out
+    }
+
     pub fn mark_folder_read(&self, account_id: u32, folder_path: &str) {
         let _ = self.conn.execute(
             "UPDATE messages SET unread = 0 WHERE account_id = ?1 AND folder_path = ?2",
@@ -2693,6 +2721,28 @@ mod tests {
         assert_eq!(uids(c.smart_scan(1, None, &[], none, 2, |_| true)), [4, 2]);
         assert!(c.smart_scan(1, Some(&[]), &[], none, 10, |_| true).is_empty());
         assert!(c.smart_scan(2, None, &[], none, 10, |_| true).is_empty());
+    }
+
+    /// An account that suggests only its own (#410) gets the addresses in
+    /// its own mail, not another account's.
+    #[test]
+    fn account_addresses_are_one_accounts() {
+        let c = Cache::in_memory().unwrap();
+        for (account, uid, from, to, cc) in [
+            (1u32, 1u32, "Boss@Work.example", "me@work.example, colleague@work.example", ""),
+            (1, 2, "me@work.example", "client@elsewhere.example", "x"),
+            (2, 1, "friend@home.example", "me@home.example", ""),
+        ] {
+            c.conn.execute(
+                "INSERT INTO messages (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_) \
+                 VALUES (?1, 'INBOX', ?2, '', ?3, '', '', 0, 0, 0, 0, ?4, ?5, '', '')",
+                params![account, uid, from, to, cc],
+            ).unwrap();
+        }
+        let mut work: Vec<String> = c.account_addresses(1).into_iter().collect();
+        work.sort();
+        assert_eq!(work, ["boss@work.example", "client@elsewhere.example", "colleague@work.example", "me@work.example"]);
+        assert!(c.account_addresses(3).is_empty());
     }
 
     /// Removing downloaded mail keeps the index, and an age limit only takes

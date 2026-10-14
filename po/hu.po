@@ -2190,6 +2190,15 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr "El akarod menteni a könyvtárat?"
 
+#, fuzzy
+msgid "Suggest only from this account"
+msgstr "Csak ezt a fiókot mutasd"
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Mappák sorrendje"
 

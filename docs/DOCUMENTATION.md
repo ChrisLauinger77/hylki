@@ -580,6 +580,12 @@ the link shown. Accounts added through GNOME Online Accounts cannot use it,
 since GNOME holds their sign-in; add the account in Hylki with the Microsoft
 365 / Outlook provider instead.
 
+With **Suggest only from this account** on as well, a message written from
+that account is offered only the organization's directory and the people in
+the account's own mail. The directory's list includes the account's Outlook
+contacts. GNOME Contacts, LDAP directories and the other accounts' mail are
+left out, so a work account does not offer personal addresses.
+
 ### Translating messages
 
 Settings → Translation sets up a translation service you have an account

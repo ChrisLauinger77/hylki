@@ -2225,6 +2225,15 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr "Czy zapisać filtr?"
 
+#, fuzzy
+msgid "Suggest only from this account"
+msgstr "Wyświetl tylko to konto"
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Kolejność katalogów"
 

@@ -2199,6 +2199,15 @@ msgstr ""
 msgid "Search the organization directory"
 msgstr "Guardar o diretório?"
 
+#, fuzzy
+msgid "Suggest only from this account"
+msgstr "Mostrar apenas esta conta"
+
+msgid ""
+"Writing from this account, suggest people from the directory and from its "
+"own mail, not from Contacts, LDAP directories or other accounts."
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Ordem das pastas"
 

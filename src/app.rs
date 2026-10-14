@@ -9289,10 +9289,10 @@ impl SimpleComponent for AppModel {
                     .collect();
                 if !fresh.is_empty() {
                     for host in &self.composers {
-                        host.controller.emit(ComposeInput::AddSuggestions(fresh.clone()));
+                        host.controller.emit(ComposeInput::AddSuggestions { account_id, new: fresh.clone() });
                     }
                     if let Some(rc) = &self.reader_compose {
-                        rc.controller.emit(ComposeInput::AddSuggestions(fresh.clone()));
+                        rc.controller.emit(ComposeInput::AddSuggestions { account_id, new: fresh.clone() });
                     }
                 }
                 let sent_path = self.sent_copy_path(account_id);
@@ -23378,6 +23378,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         folder_sort: None,
         sign_by_default: false,
         graph_directory: false,
+        graph_directory_only: false,
     };
     vec![
         mk("Jason M.", "jason@hylki.hyprlab.co", "#3584e4", Some("🚀")),
