@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Added: sensitivity labels by name** (#411, reported by erenoglu). A
+  Purview label that a message carries only as an ID showed as **Labeled**.
+  With **Show sensitivity label names** on in a Microsoft 365 account's
+  settings, Hylki reads the organization's labels through Microsoft Graph
+  and shows the label's name, its color on the tag icon and the
+  organization's description in the tooltip.
+
 - **Fixed: keys pressed while a conversation loaded were lost** (#392,
   reported by 3v1n0). Opening a conversation from the keyboard gave the
   reading pane's web view the keyboard while its page was still being

@@ -1375,5 +1375,6 @@ pub(crate) fn blank_account() -> AccountConfig {
         sign_by_default: false,
         graph_directory: false,
         graph_directory_only: false,
+        graph_label_names: false,
     }
 }

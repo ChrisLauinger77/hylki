@@ -1711,8 +1711,10 @@ msgid "The sender marked this message “{label}”."
 msgstr ""
 
 msgid ""
-"The sender's organization labeled this message, without saying the label's "
-"name. Hylki shows the label but does not apply its rules."
+"The sender's organization labeled this message without naming the label in "
+"it. For a Microsoft 365 account, turning on “Show sensitivity label names” "
+"in its settings shows the name. Hylki shows the label but does not apply its "
+"rules."
 msgstr ""
 
 msgid ""
@@ -2199,6 +2201,9 @@ msgid ""
 "own mail, not from Contacts, LDAP directories or other accounts."
 msgstr ""
 
+msgid "Show sensitivity label names"
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Mappák sorrendje"
 
@@ -2336,6 +2341,14 @@ msgstr "Böngésző megnyitása… ott fejezze be a bejelentkezést."
 msgid "Approve access to the directory in the window that opened."
 msgstr "A bejelentkezés nem tárolható a kulcstartón: {e}"
 
+#, fuzzy
+msgid "Opening browser… approve access to the sensitivity labels there."
+msgstr "Böngésző megnyitása… ott fejezze be a bejelentkezést."
+
+#, fuzzy
+msgid "Approve access to the sensitivity labels in the window that opened."
+msgstr "A bejelentkezés nem tárolható a kulcstartón: {e}"
+
 msgid "Signature HTML"
 msgstr "Aláírás HTML kódja"
 
@@ -2379,14 +2392,16 @@ msgstr "✓ Bejelentkezve — a befejezéshez mentse a fiókot"
 msgid "Sign-in failed: {e}"
 msgstr "A bejelentkezés sikertelen: {e}"
 
-#, fuzzy
-msgid "Signed in as {address}, not {email}."
-msgstr "Bejelentkezve mint: {who}. {terms}"
-
 msgid "Access to the directory approved. Save the account to finish."
 msgstr ""
 
 msgid "Access to the directory was not approved: {e}"
+msgstr ""
+
+msgid "Access to the sensitivity labels approved. Save the account to finish."
+msgstr ""
+
+msgid "Access to the sensitivity labels was not approved: {e}"
 msgstr ""
 
 msgid "✓ SMTP: connected"
@@ -2501,6 +2516,15 @@ msgid ""
 "on asks Microsoft for access to the directory; some organizations need an "
 "administrator to approve it."
 msgstr ""
+
+msgid ""
+"Name a message's label from your organization's list when the message gives "
+"only its ID. Turning this on asks Microsoft for access to the labels."
+msgstr ""
+
+#, fuzzy
+msgid "Signed in as {address}, not {email}."
+msgstr "Bejelentkezve mint: {who}. {terms}"
 
 msgid "Never"
 msgstr "Soha"

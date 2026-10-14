@@ -728,6 +728,17 @@ pub(super) async fn run_graph(
     mut rx: mpsc::UnboundedReceiver<MailRequest>,
     emit: impl Fn(WorkerEvent),
 ) {
+    // A label whose name the message leaves out is named from the
+    // organization's list (#411) on its way to the reader, whether the
+    // check was just made or comes from the cache, which keeps the header's.
+    let emit = |mut ev: WorkerEvent| {
+        if let WorkerEvent::SenderChecked { check, .. } = &mut ev {
+            if let Some(label) = check.label.as_mut() {
+                crate::graph_labels::fill(&account, label);
+            }
+        }
+        emit(ev)
+    };
     let cache = Cache::open().map_err(|e| tracing::warn!("cache unavailable: {e}")).ok();
 
     emit(WorkerEvent::Account(Account {

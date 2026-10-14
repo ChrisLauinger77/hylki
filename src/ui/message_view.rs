@@ -277,14 +277,17 @@ impl MessageView {
             None => String::new(),
         };
         // The sensitivity label (#411): read-only, shown as the sender's
-        // organization named it.
+        // organization named it, its icon in the label's color when the
+        // organization's list gave one (a checked `#rrggbb`; empty clears).
         let label = match &check.label {
             Some(l) => format!(
                 "var l=document.querySelector('.hylki-sens[data-key=\"{account_id}:{id}\"]');\
                  if(l){{l.className='hylki-sens on';l.title={title:?};\
+                 l.style.setProperty('--hylki-sens',{color:?});\
                  var t=l.querySelector('.hylki-sens-text');if(t)t.textContent={text:?};}}",
                 title = l.summary(),
                 text = l.short_label(),
+                color = l.color,
             ),
             None => String::new(),
         };
@@ -4929,7 +4932,7 @@ impl MessageView {
                  background:rgba(128,128,128,0.16);cursor:default;}}\
                .hylki-sens.on{{display:inline-flex;}}\
                .hylki-sens svg{{width:1em;height:1em;flex:none;}}\
-               .hylki-sens svg,.hylki-sens svg *{{fill:currentColor;}}\
+               .hylki-sens svg,.hylki-sens svg *{{fill:var(--hylki-sens,currentColor);}}\
                .hylki-sens-text{{overflow:hidden;text-overflow:ellipsis;}}\
                /* The icons alone (Settings, #300): the chip as it was before\
                   it had words, sitting on the name's line like the seal. */\

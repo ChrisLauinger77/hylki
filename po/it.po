@@ -1661,9 +1661,12 @@ msgstr "Riservato"
 msgid "The sender marked this message “{label}”."
 msgstr "Il mittente ha contrassegnato questo messaggio come \"{label}\"."
 
+#, fuzzy
 msgid ""
-"The sender's organization labeled this message, without saying the label's "
-"name. Hylki shows the label but does not apply its rules."
+"The sender's organization labeled this message without naming the label in "
+"it. For a Microsoft 365 account, turning on “Show sensitivity label names” "
+"in its settings shows the name. Hylki shows the label but does not apply its "
+"rules."
 msgstr ""
 "L'organizzazione del mittente ha etichettato questo messaggio, senza "
 "indicare il nome dell'etichetta. Hylki mostra l'etichetta ma non ne applica "
@@ -2155,6 +2158,9 @@ msgid ""
 "own mail, not from Contacts, LDAP directories or other accounts."
 msgstr ""
 
+msgid "Show sensitivity label names"
+msgstr ""
+
 msgid "Folder Order"
 msgstr "Ordine cartelle"
 
@@ -2288,6 +2294,14 @@ msgstr "Apertura del browser… approva l'accesso alla directory lì."
 msgid "Approve access to the directory in the window that opened."
 msgstr "Approva l'accesso alla directory nella finestra che si è aperta."
 
+#, fuzzy
+msgid "Opening browser… approve access to the sensitivity labels there."
+msgstr "Apertura del browser… approva l'accesso alla directory lì."
+
+#, fuzzy
+msgid "Approve access to the sensitivity labels in the window that opened."
+msgstr "Approva l'accesso alla directory nella finestra che si è aperta."
+
 msgid "Signature HTML"
 msgstr "HTML firma"
 
@@ -2329,13 +2343,18 @@ msgstr "✓ Accesso effettuato — salva l'account per terminare"
 msgid "Sign-in failed: {e}"
 msgstr "Accesso non riuscito: {e}"
 
-msgid "Signed in as {address}, not {email}."
-msgstr "Accesso effettuato come {address}, non come {email}."
-
 msgid "Access to the directory approved. Save the account to finish."
 msgstr "Accesso alla directory approvato. Salva l'account per terminare."
 
 msgid "Access to the directory was not approved: {e}"
+msgstr "Accesso alla directory non approvato: {e}"
+
+#, fuzzy
+msgid "Access to the sensitivity labels approved. Save the account to finish."
+msgstr "Accesso alla directory approvato. Salva l'account per terminare."
+
+#, fuzzy
+msgid "Access to the sensitivity labels was not approved: {e}"
 msgstr "Accesso alla directory non approvato: {e}"
 
 msgid "✓ SMTP: connected"
@@ -2455,6 +2474,18 @@ msgstr ""
 "Suggerisci persone della tua organizzazione mentre digiti un destinatario. "
 "Attivando questa opzione si richiede a Microsoft l'accesso alla directory; "
 "alcune organizzazioni richiedono l'approvazione di un amministratore."
+
+#, fuzzy
+msgid ""
+"Name a message's label from your organization's list when the message gives "
+"only its ID. Turning this on asks Microsoft for access to the labels."
+msgstr ""
+"Suggerisci persone della tua organizzazione mentre digiti un destinatario. "
+"Attivando questa opzione si richiede a Microsoft l'accesso alla directory; "
+"alcune organizzazioni richiedono l'approvazione di un amministratore."
+
+msgid "Signed in as {address}, not {email}."
+msgstr "Accesso effettuato come {address}, non come {email}."
 
 msgid "Never"
 msgstr "Mai"

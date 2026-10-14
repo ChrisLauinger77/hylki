@@ -1329,6 +1329,16 @@ leaves the label's name out of the message shows the pill as **Labeled**.
 Outlook's older Sensitivity setting (Personal, Private, Confidential) shows
 the same way.
 
+For a Microsoft 365 account signed in within Hylki, **Show sensitivity label
+names** in the account's settings names those labels from the
+organization's own list, with the label's color on the tag icon and the
+organization's description of the label in the pill's tooltip. Turning it
+on asks Microsoft to approve reading the labels (the
+InformationProtectionPolicy.Read permission). The list is read once a
+session and again after an hour. It holds the labels published to you, so a
+label from another organization stays **Labeled**. As with the directory,
+an account added through GNOME Online Accounts cannot use it.
+
 Hylki only shows the label: it does not apply the rules the organization
 attached to it, and it cannot set a label on a message you write. A message
 protected with encryption is a separate matter the label only names. Mail

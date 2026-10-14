@@ -607,6 +607,12 @@ pub struct AccountConfig {
     /// GNOME Contacts, an LDAP directory or another account's mail.
     #[serde(default, skip_serializing_if = "is_false")]
     pub graph_directory_only: bool,
+    /// A message's sensitivity label whose name the message leaves out is
+    /// named from the organization's list of labels, read through
+    /// Microsoft Graph (#411). Like `graph_directory`, only for an account
+    /// signed in within Hylki, with its scope asked for when turned on.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub graph_label_names: bool,
 }
 
 fn is_zero(v: &u32) -> bool {
@@ -5270,6 +5276,7 @@ dest_path = "Lists"
             sign_by_default: false,
             graph_directory: false,
             graph_directory_only: false,
+            graph_label_names: false,
         };
         acc.aliases = Vec::new();
         let bundle = SettingsBundle {

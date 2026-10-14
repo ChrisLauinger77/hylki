@@ -10970,6 +10970,7 @@ pub(super) fn sample_account() -> AccountConfig {
         sign_by_default: false,
         graph_directory: false,
         graph_directory_only: false,
+        graph_label_names: false,
         push: None,
         name: String::new(),
         email: "me@example.com".into(),
