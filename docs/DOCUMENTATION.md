@@ -709,6 +709,20 @@ or directly under the Inbox. Nothing on a server marks one otherwise, so a
 folder by another name, "Vorlagen" say, is chosen in the account's
 **Special Folders**, under **Templates**.
 
+### Addresses as pills
+
+Each address in To, Cc and Bcc is a pill, with its name when it has one and
+the address under the pointer. A space after a whole address, <kbd>Return</kbd>
+or a comma makes the pill, and the comma is not kept. A space after a name
+does not, so a name can still be typed to find someone in the suggestions.
+Addresses pasted as a list, separated by commas, semicolons or line breaks,
+become a pill each.
+
+<kbd>Backspace</kbd> on an empty field turns the last pill back into text to
+edit, until the next space, <kbd>Return</kbd> or comma. A double click does the
+same for any pill, and its × removes it. A pill that is not an email address
+is red.
+
 ### The From address
 
 The From row lists each account's address and the aliases set up for it.

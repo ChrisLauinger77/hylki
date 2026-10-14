@@ -12,6 +12,7 @@ use crate::i18n::{i18n, i18n_f, i18n_noop};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::drop_zones::{DropChoice, DropContext, DropZones};
 use crate::ui::fade_label::FadeLabel;
+use crate::ui::recipient_row::RecipientRow;
 
 /// Which recipient field a suggestion is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,14 +158,9 @@ fn set_toggle_icon(btn: &gtk::Button, windowed: bool) {
     }
 }
 
-/// Replace the recipient currently being typed (after the last comma) with the
-/// chosen suggestion, leaving a trailing ", " ready for the next recipient.
-fn complete_field(row: &adw::EntryRow, sug: &Suggestion) {
-    let text = row.text().to_string();
-    let prefix_len = text.rfind(',').map(|i| i + 1).unwrap_or(0);
-    let prefix = &text[..prefix_len];
-    row.set_text(&format!("{}{}, ", prefix, sug.display()));
-    row.set_position(-1);
+/// Replace the recipient being typed with the chosen suggestion, as a pill.
+fn complete_field(row: &RecipientRow, sug: &Suggestion) {
+    row.complete(&sug.display());
 }
 
 /// One selectable "from" account in the compose window.
@@ -1000,17 +996,17 @@ impl Component for Compose {
                                 set_visible: false,
                             },
                             #[name = "to_row"]
-                            adw::EntryRow {
+                            RecipientRow {
                                 set_title: &i18n("To"),
                                 set_input_purpose: gtk::InputPurpose::Email,
                             },
                             #[name = "cc_row"]
-                            adw::EntryRow {
+                            RecipientRow {
                                 set_title: &i18n("Cc"),
                                 set_input_purpose: gtk::InputPurpose::Email,
                             },
                             #[name = "bcc_row"]
-                            adw::EntryRow {
+                            RecipientRow {
                                 set_title: &i18n("Bcc"),
                                 set_input_purpose: gtk::InputPurpose::Email,
                             },
@@ -2134,19 +2130,7 @@ impl Component for Compose {
                 };
                 let to_row = widgets.to_row.clone();
                 crate::ui::contacts_browser::present(&win, move |contact| {
-                    let display =
-                        crate::worker::format_recipient(&contact.name, &contact.email);
-                    let cur = to_row.text().to_string();
-                    let trimmed = cur.trim_end();
-                    let sep = if trimmed.is_empty() {
-                        ""
-                    } else if trimmed.ends_with(',') {
-                        " "
-                    } else {
-                        ", "
-                    };
-                    to_row.set_text(&format!("{cur}{sep}{display}, "));
-                    to_row.set_position(-1);
+                    to_row.add_recipient(&crate::worker::format_recipient(&contact.name, &contact.email));
                 });
             }
 
@@ -2379,8 +2363,7 @@ impl Component for Compose {
                     Some(Field::Bcc) => &widgets.bcc_row,
                     None => break 'handle,
                 };
-                let text = row.text().to_string();
-                let token = text.rsplit(',').next().unwrap_or("").trim().to_string();
+                let token = row.typed();
                 if !token.is_empty() {
                     let chosen = self.ranked_matches(&token).into_iter().nth(self.completion_selected);
                     if let Some(sug) = chosen {
@@ -2781,15 +2764,23 @@ impl Component for Compose {
                 // cannot go to is caught here, while it can still be fixed
                 // (#368). Invisible characters pasted along with an address
                 // are taken out first, where the user can see the result.
-                let rows = [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row, &widgets.reply_to_row];
-                for row in rows {
+                for row in [&widgets.to_row, &widgets.cc_row, &widgets.bcc_row] {
                     if let Some(clean) = crate::worker::clean_recipient_field(&row.text()) {
                         row.set_text(&clean);
                     }
                 }
+                if let Some(clean) = crate::worker::clean_recipient_field(&widgets.reply_to_row.text()) {
+                    widgets.reply_to_row.set_text(&clean);
+                }
+                let rows: [(&gtk::Widget, String); 4] = [
+                    (widgets.to_row.upcast_ref(), widgets.to_row.text()),
+                    (widgets.cc_row.upcast_ref(), widgets.cc_row.text()),
+                    (widgets.bcc_row.upcast_ref(), widgets.bcc_row.text()),
+                    (widgets.reply_to_row.upcast_ref(), widgets.reply_to_row.text().to_string()),
+                ];
                 if let Some((row, addr)) = rows
-                    .into_iter()
-                    .find_map(|row| crate::worker::invalid_recipient(&row.text()).map(|addr| (row, addr)))
+                    .iter()
+                    .find_map(|(row, text)| crate::worker::invalid_recipient(text).map(|addr| (row, addr)))
                 {
                     row.add_css_class("error");
                     let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
@@ -3456,10 +3447,8 @@ window.__hylkiDirty=true;})()"#
 
     /// Filter suggestions by the recipient fragment being typed and show them in
     /// a popover under the field; clicking one completes that recipient.
-    fn show_completion(&mut self, field: Field, row: &adw::EntryRow) {
-        let text = row.text().to_string();
-        // The recipient currently being typed is the part after the last comma.
-        let token = text.rsplit(',').next().unwrap_or("").trim().to_string();
+    fn show_completion(&mut self, field: Field, row: &RecipientRow) {
+        let token = row.typed();
         if token.is_empty() {
             self.completion_open.set(false);
             self.completion.popdown();
@@ -3980,14 +3969,14 @@ fn cloud_upload_dialog(
 
 /// The GtkText embedded somewhere inside a composite row — where Pango
 /// attributes (the spell-check underlines) actually live.
-/// The recipient being typed: the part of the field after the last comma.
-fn recipient_token(row: &adw::EntryRow) -> String {
-    row.text().rsplit(',').next().unwrap_or("").trim().to_string()
+/// The recipient being typed, after the field's pills.
+fn recipient_token(row: &RecipientRow) -> String {
+    row.typed()
 }
 
-/// Whether the field has the keyboard. An EntryRow holds its focus in the
+/// Whether the field has the keyboard. The row holds its focus in the
 /// GtkText inside it, so the row's own has_focus() is never true.
-fn recipient_focused(row: &adw::EntryRow) -> bool {
+fn recipient_focused(row: &RecipientRow) -> bool {
     row.root()
         .and_downcast::<gtk::Window>()
         .and_then(|w| gtk::prelude::GtkWindowExt::focus(&w))

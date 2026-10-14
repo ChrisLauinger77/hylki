@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Added: addresses in To, Cc and Bcc are pills.** A space after a whole
+  address, Return or a comma makes one, and the field never ends in a comma.
+  Backspace on an empty field turns the last pill back into text to edit; a
+  double click edits any pill and its × removes it. An address that cannot
+  be sent to shows red.
 - **Fixed: Hylki closed at launch when the session's locale was missing
   from the Flatpak runtime** (#437, reported by Bohne13). The app now runs
   in C.UTF-8 in that case, so its reading pane starts.

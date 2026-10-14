@@ -1615,6 +1615,30 @@ headerbar.compose-toolbar button.image-button {
   min-height: 42px;
 }
 
+/* To, Cc and Bcc hold each address as a pill. */
+.recipient-pill {
+  border-radius: 999px;
+  background-color: alpha(currentColor, 0.1);
+  padding: 0 1px 0 9px;
+  min-height: 20px;
+}
+
+.recipient-pill > button {
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  margin-left: 3px;
+}
+
+.recipient-pill > button image {
+  -gtk-icon-size: 12px;
+}
+
+.recipient-pill.invalid {
+  background-color: alpha(@error_color, 0.14);
+  color: @error_color;
+}
+
 .compose-body {
   font-size: 1.02em;
   line-height: 1.5;

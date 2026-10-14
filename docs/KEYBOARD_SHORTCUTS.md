@@ -93,6 +93,10 @@ writing, the composer keeps them: there <kbd>Ctrl+U</kbd> underlines.
 any of its address rows. It does what the Send button does, so a message with
 no recipient is not sent, and one scheduled for later is queued.
 
+In To, Cc and Bcc, a space after an address, <kbd>Return</kbd> or a comma
+makes it a pill, and <kbd>Backspace</kbd> on an empty field turns the last
+pill back into text. See [Addresses as pills](DOCUMENTATION.md#addresses-as-pills).
+
 In the body, <kbd>Return</kbd> starts a new line and <kbd>Shift+Return</kbd>
 a new paragraph; **Settings → Composing → Return starts a new paragraph**
 swaps them. See [Return and Shift+Return](DOCUMENTATION.md#return-and-shiftreturn).
