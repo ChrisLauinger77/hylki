@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **Fixed: an unread conversation opened with its first message read**
+  (#392, reported by 3v1n0). Opening a conversation marked the message its
+  row is filed under read at once, so after **Shift+U** or `_` that message
+  came back read, and folded. It is now marked as the reader shows it, like
+  every other message of the conversation, and a message read while the
+  conversation is open no longer folds under you.
+- **Fixed: marking several conversations read marked only their first
+  messages** (#392). A conversation's row in a selection stands for all of
+  it, from the keys, the toolbar, the bar above the list and its menu, and
+  archive, delete and spam take the whole conversation too.
+- **Changed: Gmail keys close the conversation** (#392). **u** and **Esc**
+  close it and leave the cursor on its row, as do **Shift+U** and `_` once
+  they have marked it. **n** and **p** start from the first message unread or
+  open, not from the conversation's first.
+- **Changed: Gmail's x selects without opening** (#392). The reading pane
+  counts the selected conversations and the bar above the list acts on them;
+  **o**, **Enter** or a click opens a row and ends the selection. An action
+  key pressed with nothing selected says a selection is needed.
+- **Changed: Archive on Gmail leaves mail under its label** (#392). From a
+  label, Starred, Sent or All Mail, archiving takes the conversation out of
+  the Inbox, as Gmail does, instead of moving it to All Mail, which took the
+  label off.
+
 - **Added: addresses in To, Cc and Bcc are pills.** A space after a whole
   address, Return or a comma makes one, and the field never ends in a comma.
   Backspace on an empty field turns the last pill back into text to edit; a

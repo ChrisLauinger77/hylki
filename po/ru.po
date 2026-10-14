@@ -323,6 +323,10 @@ msgstr "Консоль"
 msgid "About"
 msgstr "О программе"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Удалить переписку"
+
 msgid "Remove Tags"
 msgstr "Удалить теги"
 
@@ -1030,8 +1034,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Открывает сообщение с готовым черновиком пересылки."
 
-msgid "Back to the message list"
-msgstr "Вернуться к списку сообщений"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "Всё обсуждение"
 
 #, fuzzy
 msgid "Next or previous message in the conversation"
@@ -1089,14 +1094,15 @@ msgid "Mark the conversation as read"
 msgstr "Всё обсуждение"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Отметить прочитанным/непрочитанным"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Попробовать отправить сейчас"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Выбрать эту строку (для массового действия)"
 
 msgid "Select every row, or none"
@@ -1125,6 +1131,9 @@ msgstr "Предыдущее сообщение"
 msgid "Open the selected message"
 msgstr "Открыть выбранное сообщение"
 
+msgid "Back to the message list"
+msgstr "Вернуться к списку сообщений"
+
 msgid "Next message in the conversation"
 msgstr "Следующее сообщение в беседе"
 
@@ -1133,6 +1142,9 @@ msgstr "Предыдущее сообщение в беседе"
 
 msgid "Mark read or unread"
 msgstr "Отметить прочитанным/непрочитанным"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Выбрать эту строку (для массового действия)"
 
 msgid "Remove every tag"
 msgstr "Удалить все теги"
@@ -4214,6 +4226,26 @@ msgstr "Это сообщение написано на языке «{language}�
 msgid "Translate"
 msgstr "Перевести"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Подтверждать удаление обсуждения"
+msgstr[1] "Подтверждать удаление обсуждения"
+msgstr[2] "Подтверждать удаление обсуждения"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "Сообщение не выбрано"
+msgstr[1] "Сообщение не выбрано"
+msgstr[2] "Сообщение не выбрано"
+
+msgid "No draft selected"
+msgstr "Сообщение не выбрано"
+
+msgid "No message selected"
+msgstr "Сообщение не выбрано"
+
 msgid "Received"
 msgstr "Получено"
 
@@ -4348,11 +4380,8 @@ msgstr "Пользователь {name} отклонил это приглаше
 msgid "Save…"
 msgstr "Сохранить…"
 
-msgid "No draft selected"
-msgstr "Сообщение не выбрано"
-
-msgid "No message selected"
-msgstr "Сообщение не выбрано"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Выберите черновик из списка, чтобы отредактировать его здесь."

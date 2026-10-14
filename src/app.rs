@@ -1160,6 +1160,9 @@ pub struct AppModel {
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
+    /// How many rows Gmail's x has checked, while it is checking them
+    /// (#392): they are acted on, not opened.
+    checked: Option<usize>,
     /// The list's own selection as it last reported it; `list_selection`
     /// also follows the reader's cards.
     list_heard: Vec<(u32, u32)>,
@@ -1349,6 +1352,8 @@ pub enum AppMsg {
     RefsRepaired { account_id: u32, folder_id: u32 },
     /// The list's selection changed; the reader outlines the matching cards.
     SelectionKeys(Vec<(u32, u32)>),
+    /// Gmail's x checked rows, this many, or stopped checking (#392).
+    ListChecked(Option<usize>),
     /// The reader's selection changed — mirror what the list can represent.
     SelectCards(Vec<(u32, u32)>),
     /// A conversation message was scrolled all the way through — mark it read on
@@ -2500,7 +2505,7 @@ impl SimpleComponent for AppModel {
                                         set_visible: model.toolbar_visible(config::ToolbarItem::Delete),
                                         #[watch]
                                         set_sensitive: model.reply_target().is_some()
-                                            || model.list_selection.len() > 1,
+                                            || model.many_selected(),
                                         connect_clicked[sender] => move |_| sender.input(AppMsg::Delete),
                                     },
                                 },
@@ -2564,7 +2569,7 @@ impl SimpleComponent for AppModel {
                                             set_visible: model.toolbar_visible(config::ToolbarItem::MoveTo),
                                             #[watch]
                                             set_sensitive: model.reply_target().is_some()
-                                                || model.list_selection.len() > 1,
+                                                || model.many_selected(),
                                         },
                                     },
                                 },
@@ -2855,6 +2860,10 @@ impl SimpleComponent for AppModel {
                         AppMsg::MessageSelected { message, thread, solo }
                     }
                     MessageListOutput::SelectionKeys(keys) => AppMsg::SelectionKeys(keys),
+                    MessageListOutput::Checked(count) => AppMsg::ListChecked(count),
+                    MessageListOutput::MoveMessages { account_id, dest, messages } => {
+                        AppMsg::MoveMessagesTo { account_id, dest, messages }
+                    }
                     MessageListOutput::DeleteThread { messages } => {
                         AppMsg::DeleteThread(messages)
                     }
@@ -3225,6 +3234,7 @@ impl SimpleComponent for AppModel {
             listed_thread: Vec::new(),
             reader_focus_pending: false,
             list_selection: Vec::new(),
+            checked: None,
             list_heard: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -6557,7 +6567,12 @@ impl SimpleComponent for AppModel {
                 };
                 let needs_body = cached_body.is_none();
 
-                if m.unread {
+                // A conversation's row is not one message read: its cards are
+                // marked as the reader shows them, the first one included.
+                // Marking that one outright left it read, and folded, every
+                // time an unread conversation was opened again (#392).
+                let conversation = thread.len() > 1;
+                if m.unread && !conversation {
                     match self.read_mark {
                         config::ReadMark::Shown => self.mark_opened_read(&m),
                         config::ReadMark::Delay => {
@@ -6576,7 +6591,9 @@ impl SimpleComponent for AppModel {
                 }
 
                 let mut current = m.clone();
-                current.unread = false;
+                if !conversation {
+                    current.unread = false;
+                }
                 if let Some(body) = cached_body {
                     current.body = body;
                 }
@@ -6623,11 +6640,11 @@ impl SimpleComponent for AppModel {
                     );
                     if let Some(cached) = self.thread_cache.get(&body_key(&m)).cloned() {
                         self.current_thread = cached;
-                        // The message just opened is read, whatever the stored
-                        // copy said when it was put away.
+                        // The row's message as the list has it now, whatever
+                        // the stored copy said when it was put away.
                         for tm in self.current_thread.iter_mut() {
                             if tm.id == m.id && tm.account_id == account_id {
-                                tm.unread = false;
+                                tm.unread = current.unread;
                                 tm.body = current.body.clone();
                             }
                         }
@@ -6644,11 +6661,10 @@ impl SimpleComponent for AppModel {
                         let mut conv: Vec<Message> = Vec::with_capacity(thread.len());
                         for tm in &thread {
                             let mut tm = tm.clone();
-                            // The others keep their real unread state: each is marked
-                            // in the reader until it is scrolled through. Only the one
-                            // just opened is read outright.
+                            // Each keeps its real unread state, the row's own
+                            // message too: the reader marks them as it shows them.
                             if tm.id == m.id && tm.account_id == account_id {
-                                tm.unread = false;
+                                tm.unread = current.unread;
                                 tm.body = current.body.clone();
                             } else if tm.body.is_empty() {
                                 if let Some(b) = self.body_cache.get(&body_key(&tm)) {
@@ -6938,7 +6954,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Archive => {
-                if self.list_selection.len() > 1 {
+                if self.many_selected() {
                     self.message_list.emit(MessageListInput::Bulk(BulkAction::Archive));
                     return;
                 }
@@ -6957,9 +6973,15 @@ impl SimpleComponent for AppModel {
             }
             AppMsg::Delete => {
                 // More than one message selected: the trash button deletes the
-                // whole selection, exactly as the bulk bar's Delete would.
-                if self.list_selection.len() > 1 {
-                    self.message_list.emit(MessageListInput::Bulk(BulkAction::Delete));
+                // whole selection, exactly as the bulk bar's Delete would. One
+                // row checked with Gmail's x is a lone row, whose conversation
+                // asks first as an open one does (#392).
+                if self.many_selected() {
+                    self.message_list.emit(if self.list_selection.len() == 1 {
+                        MessageListInput::ResolveDelete
+                    } else {
+                        MessageListInput::Bulk(BulkAction::Delete)
+                    });
                     return;
                 }
                 // A lone list-row selection over an open conversation may be
@@ -7085,6 +7107,12 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ToggleReadCurrent => {
+                // Rows selected in the list: the list marks every message
+                // of the conversations they stand for (#392).
+                if self.rows_selected() {
+                    self.message_list.emit(MessageListInput::BulkToggleRead);
+                    return;
+                }
                 // Several selected: any unread one makes them all read,
                 // otherwise they all go back to unread (#313).
                 let many = self.multi_selection();
@@ -7484,7 +7512,7 @@ impl SimpleComponent for AppModel {
             AppMsg::MarkSpam => {
                 // In Junk the same button, shortcut and menu entry mean the
                 // reverse (#168); for a selection the list makes that swap.
-                if self.list_selection.len() > 1 {
+                if self.many_selected() {
                     self.message_list.emit(MessageListInput::Bulk(BulkAction::Spam));
                     return;
                 }
@@ -9795,7 +9823,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::MoveToInbox => {
-                if self.list_selection.len() > 1 {
+                if self.many_selected() {
                     self.message_list.emit(MessageListInput::Bulk(BulkAction::MoveToInbox));
                     return;
                 }
@@ -9847,7 +9875,7 @@ impl SimpleComponent for AppModel {
                 // account (the move reports anything from another account);
                 // otherwise the target's. The picker leaves out the folder
                 // the mail already sits in.
-                let (account_id, exclude) = if self.list_selection.len() > 1 {
+                let (account_id, exclude) = if self.many_selected() {
                     (self.list_selection[0].0, None)
                 } else {
                     match self.reply_target() {
@@ -9861,7 +9889,7 @@ impl SimpleComponent for AppModel {
                 }
                 // The reading pane shows a conversation (its row was opened,
                 // not one reply of it): offer to move the whole of it.
-                let conversation = (self.list_selection.len() <= 1
+                let conversation = (!self.many_selected()
                     && self.current_thread.len() > 1)
                     .then_some(self.current_thread.len());
                 // Anchored to the toolbar button, or to the overflow button
@@ -9937,7 +9965,10 @@ impl SimpleComponent for AppModel {
                         .map(|m| (m.account_id, m.folder_id, m.uid, m.id))
                         .collect();
                     self.drop_move(account_id, dest, items);
-                } else if self.list_selection.len() > 1 {
+                } else if self.rows_selected() {
+                    // The list knows the conversations its rows stand for.
+                    self.message_list.emit(MessageListInput::MoveSelectedTo { account_id, dest });
+                } else if self.many_selected() {
                     // The same path a drag onto the sidebar takes: grouped by
                     // source folder, undoable, foreign accounts reported.
                     let items: Vec<(u32, u32, u32, u32)> = self
@@ -11281,6 +11312,19 @@ impl SimpleComponent for AppModel {
                 self.message_view.emit(MessageViewInput::SetSelectedCards(keys));
             }
 
+            AppMsg::ListChecked(count) => {
+                self.checked = count;
+                // Checked rows are not read: whatever was open closes, and
+                // the empty pane counts them.
+                if count.is_some() && self.current.is_some() {
+                    sender.input(AppMsg::ClearReader);
+                }
+                self.message_view.emit(MessageViewInput::SetChecked {
+                    count: count.unwrap_or(0),
+                    conversations: self.threading,
+                });
+            }
+
             AppMsg::SelectCards(keys) => {
                 self.list_selection = keys.clone();
                 self.selection_from_cards = !keys.is_empty();
@@ -11319,6 +11363,9 @@ impl SimpleComponent for AppModel {
                         (m.uid, m.folder_id)
                     });
                 let Some((uid, folder_id)) = target else { return };
+                if let Some(c) = self.current.as_mut().filter(|c| (c.account_id, c.id) == (account_id, id)) {
+                    c.unread = false;
+                }
                 if let Some(path) = self.folder_path(account_id, folder_id) {
                     self.pending_seen
                         .insert((account_id, path.clone(), uid), (true, std::time::Instant::now()));
@@ -12111,11 +12158,30 @@ impl AppModel {
 
     /// Carry out a single-key shortcut.
     fn run_shortcut(&mut self, action: Shortcut, sender: &ComponentSender<Self>) {
+        // Checking rows with none checked: say why the key did nothing
+        // (#392).
+        if self.checked == Some(0) && action.acts_on_selection() {
+            self.notifications.emit(NotifyInput::Push {
+                text: i18n("Select a conversation first."),
+                error: false,
+                connectivity: false,
+            });
+            return;
+        }
         match action {
             Shortcut::NextMessage => self.message_list.emit(MessageListInput::MoveSelection(1)),
             Shortcut::PrevMessage => self.message_list.emit(MessageListInput::MoveSelection(-1)),
             Shortcut::ToggleSelect => self.message_list.emit(MessageListInput::ToggleSelection),
-            Shortcut::BackToList => self.message_list.emit(MessageListInput::FocusList),
+            Shortcut::BackToList => {
+                // Gmail's u and Esc close the conversation, back to the list
+                // with nothing open (#392); the classic keys only move the
+                // keyboard there. A draft being written in the reader stays.
+                if self.gmail_on() && self.reader_compose.is_none() {
+                    self.message_list.emit(MessageListInput::CloseOpen);
+                } else {
+                    self.message_list.emit(MessageListInput::FocusList);
+                }
+            }
             Shortcut::Search => self.message_list.emit(MessageListInput::FocusSearch),
             // The open message's own view, not the reader's first page,
             // which is the "No message selected" one and takes no focus.
@@ -12131,6 +12197,14 @@ impl AppModel {
             }
             Shortcut::OpenCursor => self.message_list.emit(MessageListInput::OpenCursor),
             Shortcut::MarkRead(read) => {
+                if self.rows_selected() {
+                    self.message_list.emit(MessageListInput::Bulk(if read {
+                        BulkAction::MarkRead
+                    } else {
+                        BulkAction::MarkUnread
+                    }));
+                    return;
+                }
                 let mut targets = self.multi_selection();
                 if targets.is_empty() && self.acts_on_conversation(self.gmail_keys.get()) {
                     // The whole conversation, as Gmail marks it (#392).
@@ -12145,6 +12219,11 @@ impl AppModel {
                 targets.retain(|m| m.unread == read);
                 if !targets.is_empty() {
                     self.user_set_flags(read_label(read), &targets, FlagKind::Read, read);
+                }
+                // Gmail's Shift+U puts the conversation back in the list,
+                // unread, rather than leave it open to be read again.
+                if !read {
+                    self.close_after_unread();
                 }
             }
             Shortcut::Undo => sender.input(AppMsg::Undo),
@@ -12184,7 +12263,10 @@ impl AppModel {
                 }
                 sender.input(AppMsg::Archive);
             }
-            Shortcut::MarkUnreadFrom => self.mark_unread_from(),
+            Shortcut::MarkUnreadFrom => {
+                self.mark_unread_from();
+                self.close_after_unread();
+            }
             Shortcut::FoldAll(folded) => {
                 if self.current_thread.len() > 1 {
                     self.message_view.emit(MessageViewInput::FoldAll(folded));
@@ -12194,7 +12276,7 @@ impl AppModel {
             Shortcut::Spam => sender.input(AppMsg::MarkSpam),
             Shortcut::Star => sender.input(AppMsg::ToggleStar),
             Shortcut::ToggleRead => {
-                if self.list_selection.len() > 1 {
+                if self.many_selected() {
                     sender.input(AppMsg::ToggleReadCurrent);
                 } else if let Some(m) = self.current.clone() {
                     let read = m.unread;
@@ -12216,7 +12298,7 @@ impl AppModel {
                 // Every selected message loses them when several are
                 // selected (#313). Re-read the message between removals,
                 // since set_tag patches the copy the next call will read.
-                let targets = if self.list_selection.len() > 1 {
+                let targets = if self.many_selected() {
                     self.multi_selection()
                 } else {
                     self.reply_target().into_iter().collect()
@@ -13580,10 +13662,24 @@ impl AppModel {
         }
     }
 
+    /// Whether actions mean a selection of rows rather than the message
+    /// open: several selected, or any checked with Gmail's x, which opens
+    /// none of them (#392).
+    fn many_selected(&self) -> bool {
+        self.list_selection.len() > 1 || (self.checked.is_some() && !self.list_selection.is_empty())
+    }
+
+    /// The selection is the list's rows, not cards of the open
+    /// conversation: the list resolves it, a conversation's row bringing
+    /// all of it (#392).
+    fn rows_selected(&self) -> bool {
+        self.many_selected() && !self.selection_from_cards
+    }
+
     /// Whether the toolbar's per-message actions have something to act on:
     /// the reply target, or a selection of several (#313).
     fn acts_on_selection(&self) -> bool {
-        self.reply_target().is_some() || self.list_selection.len() > 1
+        self.reply_target().is_some() || self.many_selected()
     }
 
     /// Every message of a selection of more than one, list rows or cards of
@@ -13592,7 +13688,7 @@ impl AppModel {
     /// what an action means. A row the cache no longer holds is left out, as
     /// a move of the selection leaves it out.
     fn multi_selection(&self) -> Vec<Message> {
-        if self.list_selection.len() < 2 {
+        if !self.many_selected() {
             return Vec::new();
         }
         self.list_selection
@@ -13765,7 +13861,7 @@ impl AppModel {
     /// the reader is, and e or Shift+I still act on the conversation.
     fn acts_on_conversation(&self, cards_too: bool) -> bool {
         self.current_thread.len() > 1
-            && self.list_selection.len() <= 1
+            && !self.many_selected()
             && (cards_too || !self.selection_from_cards)
     }
 
@@ -13791,12 +13887,26 @@ impl AppModel {
             .collect()
     }
 
+    /// Whether Gmail's keys are what the keyboard does.
+    fn gmail_on(&self) -> bool {
+        self.gmail_keys.get() && self.single_key.get()
+    }
+
+    /// After Gmail's Shift+U or _ on the open conversation, close it: the
+    /// keyboard goes back to its row, which stays unread (#392). Checked
+    /// rows stay as they are.
+    fn close_after_unread(&self) {
+        if self.gmail_on() && self.current.is_some() && !self.many_selected() && self.reader_compose.is_none() {
+            self.message_list.emit(MessageListInput::CloseOpen);
+        }
+    }
+
     /// Gmail's `_` (#392): mark unread from the message being read onward,
     /// that message and the later ones of its conversation. The message is
     /// the picked card, or with none picked the conversation's newest, which
     /// is where Gmail's own cursor sits in an open conversation.
     fn mark_unread_from(&mut self) {
-        if self.list_selection.len() > 1 {
+        if self.many_selected() {
             let targets = self.multi_selection();
             self.user_set_flags(read_label(false), &targets, FlagKind::Read, false);
             return;
@@ -14433,10 +14543,7 @@ impl AppModel {
                     .filters
                     .iter()
                     .any(|r| r.account_email.eq_ignore_ascii_case(&account.email));
-                let gmail = self.config.get(account.id.saturating_sub(1) as usize).is_some_and(|c| {
-                    c.protocol == config::Protocol::Imap
-                        && crate::worker::has_gmail_labels(c, self.folders.get(&account.id).map(Vec::as_slice).unwrap_or(&[]))
-                });
+                let gmail = self.gmail_labels(account.id);
                 Some(SectionData {
                     gmail,
                     in_unified: self.in_unified(account.id),
@@ -14586,7 +14693,7 @@ impl AppModel {
             // unless Focus Mode folded that group too.
             let mut sections = Vec::new();
             if focus {
-                let many = has_current || self.list_selection.len() > 1;
+                let many = has_current || self.many_selected();
                 sections.push(vec![
                     entry!(i18n("Edit this message"), "document-edit", AppMsg::EditCurrentOutbox, has_current),
                     entry!(i18n("Try to send this message now"), "mail-send", AppMsg::SendCurrentOutbox, has_current),
@@ -14605,7 +14712,7 @@ impl AppModel {
             use config::ToolbarItem as T;
             let target = self.reply_target();
             let acts = target.is_some();
-            let many = acts || self.list_selection.len() > 1;
+            let many = acts || self.many_selected();
             let starred = target.as_ref().is_some_and(|m| m.starred);
             let target_unread = target.as_ref().is_some_and(|m| m.unread);
             let restorable = target.as_ref().is_some_and(|m| {
@@ -18100,6 +18207,10 @@ impl AppModel {
     }
 
     fn move_to(&mut self, m: Message, kind: FolderKind) {
+        if kind == FolderKind::Archive && self.archives_in_place(&m) {
+            self.apply_bulk_move(BulkAction::Archive, vec![m]);
+            return;
+        }
         let Some(dest) = self.folder_path_for(m.account_id, kind) else {
             self.notifications.emit(NotifyInput::Push {
                 text: i18n_f("No {v1} folder available", &[("v1", &(kind_label(kind)).to_string())]),
@@ -20776,6 +20887,18 @@ impl AppModel {
     /// updated once (`RemoveMany`); the spinner clears when every group's worker
     /// reports `BulkComplete`.
     fn apply_bulk_move(&mut self, action: BulkAction, messages: Vec<Message>) {
+        // On Gmail what leaves for the archive from a label is the Inbox
+        // copy; the mail stays where it is being looked at (#392).
+        let messages: Vec<Message> = if action == BulkAction::Archive {
+            let mut seen = HashSet::new();
+            messages
+                .into_iter()
+                .filter_map(|m| if self.archives_in_place(&m) { self.inbox_copy(&m) } else { Some(m) })
+                .filter(|m| seen.insert((m.account_id, m.id)))
+                .collect()
+        } else {
+            messages
+        };
         let kind = match action {
             BulkAction::Archive => FolderKind::Archive,
             BulkAction::Delete => FolderKind::Trash,
@@ -20842,6 +20965,43 @@ impl AppModel {
         self.update_busy_indicator();
         self.message_list.emit(MessageListInput::RemoveMany(removed_ids));
         self.push_unread_counts();
+    }
+
+    /// Whether the account is Gmail, where every folder but the Inbox, Trash
+    /// and Spam is a label.
+    fn gmail_labels(&self, account_id: u32) -> bool {
+        self.config.get(account_id.saturating_sub(1) as usize).is_some_and(|c| {
+            c.protocol == config::Protocol::Imap
+                && crate::worker::has_gmail_labels(c, self.folders.get(&account_id).map(Vec::as_slice).unwrap_or(&[]))
+        })
+    }
+
+    /// Whether archiving `m` takes it out of the Inbox rather than out of
+    /// the folder it is listed in: on Gmail, from a label, Starred, Sent or
+    /// All Mail, as Gmail's own Archive does (#392). Moving it from a label
+    /// to All Mail took the label off and hid it.
+    fn archives_in_place(&self, m: &Message) -> bool {
+        self.gmail_labels(m.account_id)
+            && matches!(
+                self.folder_kind(m.account_id, m.folder_id),
+                Some(FolderKind::Starred | FolderKind::Sent | FolderKind::Archive | FolderKind::Custom)
+            )
+    }
+
+    /// The Inbox's copy of a Gmail message listed under another label, if
+    /// the Inbox holds it.
+    fn inbox_copy(&self, m: &Message) -> Option<Message> {
+        if m.message_id.is_empty() {
+            return None;
+        }
+        let key = (m.account_id, self.inbox_of(m.account_id)?.id);
+        self.message_cache
+            .get(&key)
+            .into_iter()
+            .chain(self.unified_slices.get(&key))
+            .flatten()
+            .find(|x| x.message_id == m.message_id)
+            .cloned()
     }
 
     /// Optimistic local cleanup when a message leaves the current folder: close its
@@ -22705,6 +22865,26 @@ pub enum Shortcut {
     SelectNone,
 }
 
+impl Shortcut {
+    /// Whether the key acts on the selection, so it needs one (#392).
+    fn acts_on_selection(self) -> bool {
+        matches!(
+            self,
+            Shortcut::Archive
+                | Shortcut::Delete
+                | Shortcut::Spam
+                | Shortcut::Star
+                | Shortcut::ToggleRead
+                | Shortcut::MarkRead(_)
+                | Shortcut::MarkUnreadFrom
+                | Shortcut::MoveTo
+                | Shortcut::Label
+                | Shortcut::Tag(_)
+                | Shortcut::ClearTags
+        )
+    }
+}
+
 /// Where Gmail's g sequences go (#392).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GoTarget {
@@ -22869,7 +23049,7 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
         &[
             ("j  /  k", i18n_noop("Move down or up the list without opening; while reading, open the next or previous conversation")),
             ("o  or  Enter", i18n_noop("Open the message the cursor is on")),
-            ("u  or  Esc", i18n_noop("Back to the message list")),
+            ("u  or  Esc", i18n_noop("Close the conversation, back to the list")),
             ("n  /  p", i18n_noop("Next or previous message in the conversation")),
             (";  /  :", i18n_noop("Expand or collapse every message of the conversation")),
             ("g  i", i18n_noop("Go to Inbox")),
@@ -22892,9 +23072,9 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
             ("Shift+I", i18n_noop("Mark the conversation as read")),
-            ("Shift+U", i18n_noop("Mark the conversation as unread")),
-            ("_", i18n_noop("Mark as unread from this message on")),
-            ("x", i18n_noop("Select this row (for a bulk action)")),
+            ("Shift+U", i18n_noop("Mark the conversation as unread and close it")),
+            ("_", i18n_noop("Mark as unread from this message on and close it")),
+            ("x", i18n_noop("Select this row without opening it")),
             ("*  a  /  *  n", i18n_noop("Select every row, or none")),
             ("v", i18n_noop("Move to a folder")),
             ("l", i18n_noop("Tags")),

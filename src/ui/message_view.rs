@@ -87,6 +87,9 @@ pub struct MessageView {
     /// Read-marking policy (#100), stamped on the document for the
     /// viewport observer.
     read_mark: crate::config::ReadMark,
+    /// Rows Gmail's x has checked in the list (#392), and whether they are
+    /// conversations: the empty pane counts them.
+    checked: (usize, bool),
     /// Whether the blocked-content banner is shown at all. It gates only the notice: `blocked`
     /// still governs what is withheld, so hiding it never loads anything.
     show_banner: bool,
@@ -419,6 +422,24 @@ impl MessageView {
                     _ => String::new(),
                 }
             }
+        }
+    }
+
+    /// What the empty pane is titled: how many rows are checked, while
+    /// Gmail's x has some (#392).
+    fn empty_title(&self) -> String {
+        let n = self.checked.0;
+        if n > 0 {
+            let count = n.to_string();
+            if self.checked.1 {
+                ni18n_f("{n} conversation selected", "{n} conversations selected", n as u32, &[("n", &count)])
+            } else {
+                ni18n_f("{n} message selected", "{n} messages selected", n as u32, &[("n", &count)])
+            }
+        } else if self.drafts_view {
+            i18n("No draft selected")
+        } else {
+            i18n("No message selected")
         }
     }
 
@@ -957,6 +978,9 @@ pub enum MessageViewInput {
     /// Expand All (false) or Collapse All (true) from the reading pane's
     /// menu (#326).
     FoldAll(bool),
+    /// How many rows Gmail's x has checked (#392), and whether threading
+    /// makes them conversations.
+    SetChecked { count: usize, conversations: bool },
     /// The view came on screen (#332).
     Mapped,
     /// The OpenPGP chip's words on or off (#300), applied to the open
@@ -1693,11 +1717,19 @@ impl Component for MessageView {
             add_named[Some("empty")] = &adw::StatusPage {
                 // Drafts open in the editor, so the empty pane says so there.
                 #[watch]
-                set_icon_name: Some(if model.drafts_view { "document-edit-symbolic" } else { "hylki-mail-read-symbolic" }),
+                set_icon_name: Some(if model.checked.0 > 0 {
+                    "object-select-symbolic"
+                } else if model.drafts_view {
+                    "document-edit-symbolic"
+                } else {
+                    "hylki-mail-read-symbolic"
+                }),
                 #[watch]
-                set_title: &if model.drafts_view { i18n("No draft selected") } else { i18n("No message selected") },
+                set_title: &model.empty_title(),
                 #[watch]
-                set_description: Some(if model.drafts_view {
+                set_description: Some(if model.checked.0 > 0 {
+                    i18n("The actions above the list apply to all of them.")
+                } else if model.drafts_view {
                     i18n("Choose a draft from the list to edit it here.")
                 } else {
                     i18n("Choose a message from the list to read it here.")
@@ -2090,6 +2122,7 @@ impl Component for MessageView {
             zoom_default: 100,
             reader_default: crate::config::ReaderDefault::Remember,
             read_mark: crate::config::ReadMark::default(),
+            checked: (0, false),
             show_banner: crate::config::load_privacy().show_remote_banner,
             show_spoof_banner: crate::config::load_privacy().show_spoof_banner,
             card_actions_hover: crate::config::load_privacy().card_actions_hover,
@@ -2727,6 +2760,7 @@ impl Component for MessageView {
                     self.render();
                 }
             }
+            MessageViewInput::SetChecked { count, conversations } => self.checked = (count, conversations),
             MessageViewInput::FoldAll(folded) => {
                 for m in &self.thread {
                     self.folds.insert((m.account_id, m.id), folded);
@@ -3236,16 +3270,20 @@ impl Component for MessageView {
                 let from = match self.selected_cards.as_slice() {
                     [key] => order.iter().position(|k| k == key),
                     _ => None,
-                }
-                .or_else(|| {
-                    let c = self.current.as_ref()?;
-                    order.iter().position(|k| *k == (c.account_id, c.id))
-                });
+                };
                 let last = order.len() as i64 - 1;
                 let next = match from {
                     Some(i) => (i as i64 + i64::from(delta)).clamp(0, last) as usize,
-                    None if delta > 0 => 0,
-                    None => last as usize,
+                    // No card picked yet: the first press lands where reading
+                    // starts, the first message unread or open, not one past
+                    // the conversation's first (#392).
+                    None => {
+                        let folded = self.folded_cards();
+                        self.thread
+                            .iter()
+                            .position(|m| m.unread || !folded.contains(&(m.account_id, m.id)))
+                            .unwrap_or(if delta > 0 { 0 } else { last as usize })
+                    }
                 };
                 let key = order[next];
                 if self.folded_cards().contains(&key) {
@@ -3300,6 +3338,13 @@ impl Component for MessageView {
                 // reopened — the viewport observer must not undo it.
                 if self.no_autoread.contains(&(account_id, id)) {
                     return;
+                }
+                // A card read while open stays open: folding the read ones
+                // is for when the conversation is drawn, not under the
+                // reader's eyes the next time the folds are patched.
+                let key = (account_id, id);
+                if !self.folded_cards().contains(&key) {
+                    self.folds.entry(key).or_insert(false);
                 }
                 // Keep the local copy in step so a later re-render doesn't put
                 // the mark back on a message already read.

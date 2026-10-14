@@ -1092,7 +1092,8 @@ folds what you have read, and **All but the newest** folds every message
 except the newest, read or not. The newest always opens, and so does a
 message you move to with `w` or `b`. Right-clicking anywhere in a
 conversation offers **Expand All Messages** and **Collapse All Messages**.
-What you fold or open stays that way while the conversation is on screen.
+What you fold or open stays that way while the conversation is on screen,
+and so does a message read while it is open.
 Printing shows every message in full.
 
 ### A message in its own window

@@ -301,6 +301,9 @@ msgstr ""
 msgid "About"
 msgstr ""
 
+msgid "Select a conversation first."
+msgstr ""
+
 msgid "Remove Tags"
 msgstr ""
 
@@ -913,7 +916,7 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr ""
 
-msgid "Back to the message list"
+msgid "Close the conversation, back to the list"
 msgstr ""
 
 msgid "Next or previous message in the conversation"
@@ -961,13 +964,13 @@ msgstr ""
 msgid "Mark the conversation as read"
 msgstr ""
 
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr ""
 
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr ""
 
-msgid "Select this row (for a bulk action)"
+msgid "Select this row without opening it"
 msgstr ""
 
 msgid "Select every row, or none"
@@ -994,6 +997,9 @@ msgstr ""
 msgid "Open the selected message"
 msgstr ""
 
+msgid "Back to the message list"
+msgstr ""
+
 msgid "Next message in the conversation"
 msgstr ""
 
@@ -1001,6 +1007,9 @@ msgid "Previous message in the conversation"
 msgstr ""
 
 msgid "Mark read or unread"
+msgstr ""
+
+msgid "Select this row (for a bulk action)"
 msgstr ""
 
 msgid "Remove every tag"
@@ -3770,6 +3779,22 @@ msgstr ""
 msgid "Translate"
 msgstr ""
 
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No draft selected"
+msgstr ""
+
+msgid "No message selected"
+msgstr ""
+
 msgid "Received"
 msgstr ""
 
@@ -3901,10 +3926,7 @@ msgstr ""
 msgid "Save…"
 msgstr ""
 
-msgid "No draft selected"
-msgstr ""
-
-msgid "No message selected"
+msgid "The actions above the list apply to all of them."
 msgstr ""
 
 msgid "Choose a draft from the list to edit it here."

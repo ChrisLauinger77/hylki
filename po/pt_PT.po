@@ -325,6 +325,10 @@ msgstr "Consola"
 msgid "About"
 msgstr "Acerca"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Eliminar conversa"
+
 msgid "Remove Tags"
 msgstr "Remover etiquetas"
 
@@ -1019,8 +1023,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Abre a mensagem com um reencaminhamento iniciado."
 
-msgid "Back to the message list"
-msgstr "Voltar à lista de mensagens"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "Conversa completa"
 
 #, fuzzy
 msgid "Next or previous message in the conversation"
@@ -1078,14 +1083,15 @@ msgid "Mark the conversation as read"
 msgstr "Conversa completa"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Marcar como lida ou não lida"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Tentar enviar esta mensagem agora"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Selecionar esta linha (para uma ação em massa)"
 
 msgid "Select every row, or none"
@@ -1115,6 +1121,9 @@ msgstr "Mensagem anterior"
 msgid "Open the selected message"
 msgstr "Abrir a mensagem selecionada"
 
+msgid "Back to the message list"
+msgstr "Voltar à lista de mensagens"
+
 msgid "Next message in the conversation"
 msgstr "Mensagem seguinte na conversa"
 
@@ -1123,6 +1132,9 @@ msgstr "Mensagem anterior na conversa"
 
 msgid "Mark read or unread"
 msgstr "Marcar como lida ou não lida"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Selecionar esta linha (para uma ação em massa)"
 
 msgid "Remove every tag"
 msgstr "Remover todas as etiquetas"
@@ -4220,6 +4232,24 @@ msgstr "Esta mensagem está em {language}."
 msgid "Translate"
 msgstr "Traduzir"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Confirmar a eliminação de conversas"
+msgstr[1] "Confirmar a eliminação de conversas"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "Nenhuma mensagem selecionada"
+msgstr[1] "Nenhuma mensagem selecionada"
+
+msgid "No draft selected"
+msgstr "Nenhum rascunho selecionado"
+
+msgid "No message selected"
+msgstr "Nenhuma mensagem selecionada"
+
 msgid "Received"
 msgstr "Recebida"
 
@@ -4353,11 +4383,8 @@ msgstr "{name} recusou este convite."
 msgid "Save…"
 msgstr "Guardar…"
 
-msgid "No draft selected"
-msgstr "Nenhum rascunho selecionado"
-
-msgid "No message selected"
-msgstr "Nenhuma mensagem selecionada"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Escolha um rascunho da lista para o editar aqui."

@@ -325,6 +325,10 @@ msgstr "Konzol"
 msgid "About"
 msgstr "Névjegy"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Beszélgetés törlése"
+
 msgid "Remove Tags"
 msgstr "Címkék eltávolítása"
 
@@ -1009,8 +1013,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Megnyitja az üzenetet, amelyben már megkezdődött az átirányítás."
 
-msgid "Back to the message list"
-msgstr "Vissza az üzenetlistához"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "A teljes beszélgetés"
 
 #, fuzzy
 msgid "Next or previous message in the conversation"
@@ -1068,14 +1073,15 @@ msgid "Mark the conversation as read"
 msgstr "A teljes beszélgetés"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Megjelölés olvasottként vagy olvasatlanként"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Üzenet küldésének megkísérlése most"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Sor kijelölése (csoportos művelethez)"
 
 msgid "Select every row, or none"
@@ -1106,6 +1112,9 @@ msgstr "Előző üzenet"
 msgid "Open the selected message"
 msgstr "Kijelölt üzenet megnyitása"
 
+msgid "Back to the message list"
+msgstr "Vissza az üzenetlistához"
+
 msgid "Next message in the conversation"
 msgstr "A beszélgetés következő üzenete"
 
@@ -1114,6 +1123,9 @@ msgstr "A beszélgetés előző üzenete"
 
 msgid "Mark read or unread"
 msgstr "Megjelölés olvasottként vagy olvasatlanként"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Sor kijelölése (csoportos művelethez)"
 
 msgid "Remove every tag"
 msgstr "Minden címke eltávolítása"
@@ -4235,6 +4247,24 @@ msgstr "Ez az üzenet egy levelezőlistáról származik."
 msgid "Translate"
 msgstr "Fordította"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Beszélgetés törlésének megerősítése"
+msgstr[1] "Beszélgetés törlésének megerősítése"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "Nincs kijelölt üzenet"
+msgstr[1] "Nincs kijelölt üzenet"
+
+msgid "No draft selected"
+msgstr "Nincs kiválasztott piszkozat"
+
+msgid "No message selected"
+msgstr "Nincs kijelölt üzenet"
+
 msgid "Received"
 msgstr ""
 
@@ -4371,11 +4401,8 @@ msgstr "{name} elutasította ezt a meghívást."
 msgid "Save…"
 msgstr "Mentés…"
 
-msgid "No draft selected"
-msgstr "Nincs kiválasztott piszkozat"
-
-msgid "No message selected"
-msgstr "Nincs kijelölt üzenet"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Válasszon ki egy piszkozatot a listából szerkesztésre."

@@ -661,6 +661,10 @@ pub struct MessageList {
     reader_keys: Vec<(u32, u32)>,
     /// How many rows are currently selected (drives the bulk-action bar).
     selection_count: usize,
+    /// Gmail's x is checking rows for an action rather than opening them
+    /// (#392): a selection of one stays closed too, and the reader says how
+    /// many are selected. Opening a row, or a plain click, ends it.
+    checking: bool,
     /// Which way the user last moved through the list: +1 down, -1 up.
     /// Deleting the viewed message advances in this direction (like Apple
     /// Mail): triaging downward selects the message below the deleted one,
@@ -935,8 +939,16 @@ pub enum MessageListInput {
     /// Open the row the cursor is on in the reader (Gmail's o, #392).
     OpenCursor,
     /// A click in the list: the keyboard cursor's outline goes, since the
-    /// pointer, not j or k, says where the user is now.
-    ClearCursor,
+    /// pointer, not j or k, says where the user is now. A plain click also
+    /// ends Gmail's checking; `extend` is a Ctrl or Shift click, which adds
+    /// to it.
+    PointerPressed { extend: bool },
+    /// File the selected rows into `dest`, a conversation's row with all
+    /// of it (the picker's answer for a selection, #392).
+    MoveSelectedTo { account_id: u32, dest: String },
+    /// Close the open conversation and leave the keyboard on its row
+    /// (Gmail's u and Esc, and after Shift+U or _, #392).
+    CloseOpen,
     /// Open the next (or previous) conversation, from the one open, while
     /// the keyboard stays in the reader (Gmail's j/k there, #392).
     StepConversation(i32),
@@ -1186,6 +1198,11 @@ pub enum MessageListOutput {
     /// The viewed message was removed and no row remains to advance to, so the
     /// reader should clear.
     SelectionCleared,
+    /// The selected rows' messages to file into `dest` (#392).
+    MoveMessages { account_id: u32, dest: String, messages: Vec<Message> },
+    /// How many rows Gmail's x has checked (#392), whenever that changes;
+    /// `None` once checking ends.
+    Checked(Option<usize>),
     /// The search field became active (non-empty) or inactive (empty), so the app
     /// can supply or drop the cross-folder search pool.
     SearchActive(bool),
@@ -1274,7 +1291,7 @@ impl SimpleComponent for MessageList {
             gtk::Revealer {
                 set_transition_type: gtk::RevealerTransitionType::SlideDown,
                 #[watch]
-                set_reveal_child: model.selection_count > 1,
+                set_reveal_child: model.selection_count > 1 || (model.checking && model.selection_count > 0),
 
                 // A revealer sliding *down* still reserves its child's width while
                 // collapsed, so this bar of seven buttons was setting the whole
@@ -1545,6 +1562,7 @@ impl SimpleComponent for MessageList {
             selected_ids: Vec::new(),
             emitted_thread: Vec::new(),
             selection_count: 0,
+            checking: false,
             nav_direction: 1,
             from_reader: 0,
             reader_keys: Vec::new(),
@@ -1733,6 +1751,9 @@ impl SimpleComponent for MessageList {
                 self.switched = true;
                 self.window = LIST_WINDOW;
                 self.late_select = None;
+                if std::mem::take(&mut self.checking) {
+                    let _ = sender.output(MessageListOutput::Checked(None));
+                }
                 self.clear_search();
                 self.emitted_thread.clear();
                 // However the new view's list arrives, a rebuild follows, and
@@ -2178,6 +2199,13 @@ impl SimpleComponent for MessageList {
                     self.late_select = None;
                 }
                 let _ = sender.output(MessageListOutput::SelectionKeys(keys.clone()));
+                if self.checking {
+                    // Checked rows are not opened, one or many (#392).
+                    self.selected_id = None;
+                    let _ = sender.output(MessageListOutput::Checked(Some(keys.len())));
+                    self.selected_ids = keys;
+                    return;
+                }
                 match keys.as_slice() {
                     [] => self.selected_id = None,
                     [key] => {
@@ -2225,17 +2253,21 @@ impl SimpleComponent for MessageList {
                 // The bulk bar's spam button is one button: in Junk it means
                 // the reverse.
                 let action = if self.in_junk && action == BulkAction::Spam { BulkAction::NotSpam } else { action };
-                let messages = self.selected_messages();
+                let rows = self.selected_messages();
                 // Likewise the star: it clears a selection that is starred
                 // throughout, or it could never be taken off again (#313).
                 let action = if action == BulkAction::Flag
-                    && !messages.is_empty()
-                    && messages.iter().all(|m| m.starred)
+                    && !rows.is_empty()
+                    && rows.iter().all(|m| m.starred)
                 {
                     BulkAction::Unflag
                 } else {
                     action
                 };
+                // A conversation's row stands for all of it, as it does for a
+                // lone Delete: marking several read reached only the first
+                // message of each (#392). A star goes on the row's message.
+                let messages = if action == BulkAction::Flag { rows } else { self.selected_conversations() };
                 if !messages.is_empty() {
                     let _ = sender.output(MessageListOutput::Bulk { action, messages });
                 }
@@ -2263,10 +2295,16 @@ impl SimpleComponent for MessageList {
                 let next = (current + delta as i64).clamp(0, self.shown.len() as i64 - 1) as usize;
                 self.shared.set_cursor(None);
                 self.shared.selection.select_item(next as u32, true);
+                self.stop_checking(&sender);
                 self.focus_row(next);
             }
 
-            MessageListInput::SetGmailKeys(on) => self.gmail_keys = on,
+            MessageListInput::SetGmailKeys(on) => {
+                self.gmail_keys = on;
+                if !on {
+                    self.stop_checking(&sender);
+                }
+            }
             MessageListInput::MoveCursor(delta) => {
                 if self.shown.is_empty() {
                     return;
@@ -2289,12 +2327,46 @@ impl SimpleComponent for MessageList {
                     return;
                 };
                 self.shared.set_cursor(None);
-                let already_open = self.selected_positions() == [pos];
+                let already_open = !self.checking && self.selected_positions() == [pos];
                 self.shared.selection.select_item(pos as u32, true);
+                self.stop_checking(&sender);
                 self.focus_row(pos);
                 let _ = sender.output(MessageListOutput::OpenedByKey { already_open });
             }
-            MessageListInput::ClearCursor => self.shared.set_cursor(None),
+            MessageListInput::PointerPressed { extend } => {
+                self.shared.set_cursor(None);
+                if !extend {
+                    self.stop_checking(&sender);
+                }
+            }
+            MessageListInput::MoveSelectedTo { account_id, dest } => {
+                let messages = self.selected_conversations();
+                if !messages.is_empty() {
+                    let _ = sender.output(MessageListOutput::MoveMessages { account_id, dest, messages });
+                }
+            }
+            MessageListInput::CloseOpen => {
+                // Only an open row closes: with rows checked, or none
+                // selected, the keyboard just comes back to the list.
+                let selected = self.selected_positions();
+                let [pos] = selected[..] else {
+                    sender.input(MessageListInput::FocusList);
+                    return;
+                };
+                if self.checking {
+                    sender.input(MessageListInput::FocusList);
+                    return;
+                }
+                self.selected_id = None;
+                self.selected_ids.clear();
+                self.selection_count = 0;
+                self.shared.selection.unselect_all();
+                self.focus_row(pos);
+                // The cursor stays on the row just read, so j, k and o carry
+                // on from there.
+                self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                let _ = sender.output(MessageListOutput::SelectionCleared);
+            }
             MessageListInput::StepConversation(delta) => {
                 if self.shown.is_empty() {
                     return;
@@ -2316,7 +2388,11 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SelectAllShown => {
                 if !self.shown.is_empty() {
+                    // Checked, as Gmail's * a checks them: nothing opens.
+                    self.checking = true;
+                    self.selected_id = None;
                     self.shared.selection.select_all();
+                    sender.input(MessageListInput::SelectionChanged);
                 }
             }
             MessageListInput::ToggleSelection => {
@@ -2325,10 +2401,25 @@ impl SimpleComponent for MessageList {
                     return;
                 };
                 let selection = &self.shared.selection;
-                if selection.is_selected(pos as u32) {
+                if self.gmail_keys && !self.checking {
+                    // Gmail's x checks a conversation without opening it
+                    // (#392): the one open closes, and the checks start
+                    // from this row.
+                    self.checking = true;
+                    self.selected_id = None;
+                    selection.select_item(pos as u32, true);
+                } else if selection.is_selected(pos as u32) {
                     selection.unselect_item(pos as u32);
                 } else {
                     selection.select_item(pos as u32, false);
+                }
+                if self.checking {
+                    // The keyboard stays on the row, for the next j, k or x.
+                    self.focus_row(pos);
+                    self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                    // Told even when GTK's selection did not change, as when
+                    // the row checked is the one that was open.
+                    sender.input(MessageListInput::SelectionChanged);
                 }
             }
 
@@ -2631,6 +2722,11 @@ impl SimpleComponent for MessageList {
                     // No rebuild follows — keep the header count honest.
                     self.total_matches = self.total_matches.saturating_sub(1);
                 }
+                if self.checking {
+                    self.selection_count = self.selected_ids.len();
+                    let _ = sender.output(MessageListOutput::SelectionKeys(self.selected_ids.clone()));
+                    let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
+                }
 
                 if was_viewed {
                     match removed_idx {
@@ -2693,6 +2789,10 @@ impl SimpleComponent for MessageList {
                     self.shared.model.splice(idx, end - idx, Vec::new());
                 }
                 self.selection_count = self.selected_ids.len();
+                if self.checking {
+                    let _ = sender.output(MessageListOutput::SelectionKeys(self.selected_ids.clone()));
+                    let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
+                }
                 // Keep the header count honest; no rebuild follows.
                 self.total_matches = self.total_matches.saturating_sub(shown_before - self.shown.len());
                 if was_viewed {
@@ -2795,6 +2895,7 @@ impl SimpleComponent for MessageList {
                 }
                 self.late_select = None;
                 let asked = key;
+                self.stop_checking(&sender);
                 // A row further down than the window reaches comes on screen.
                 if let Some(at) = self.tail.iter().position(|r| (r.msg.account_id, r.msg.id) == key) {
                     self.grow_window(at + 1);
@@ -3141,6 +3242,21 @@ impl MessageList {
             .collect()
     }
 
+    /// The selected rows' messages, a conversation's row bringing every
+    /// message of it this folder holds, each once.
+    fn selected_conversations(&self) -> Vec<Message> {
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for m in self.selected_messages() {
+            for x in self.conversation_for(&m).0 {
+                if seen.insert((x.account_id, x.id)) {
+                    out.push(x);
+                }
+            }
+        }
+        out
+    }
+
     /// Whether every selected message is starred, so the bulk star takes
     /// the stars off rather than adding them.
     fn selection_all_starred(&self) -> bool {
@@ -3151,7 +3267,29 @@ impl MessageList {
     /// Whether any selected message is unread, so the bulk read toggle
     /// marks the selection read rather than unread.
     fn selection_any_unread(&self) -> bool {
-        self.selected_positions().iter().any(|&p| self.shown.get(p).is_some_and(|m| m.unread))
+        // The rows first: asked on every update, and a row's own message
+        // usually answers it.
+        let positions = self.selected_positions();
+        if positions.iter().any(|&p| self.shown.get(p).is_some_and(|m| m.unread)) {
+            return true;
+        }
+        if !self.threading {
+            return false;
+        }
+        // Then the rest of each conversation a row stands for, as
+        // `selected_conversations` gathers it, without copying any.
+        let threads = self.source_threads();
+        let source = self.active_source();
+        positions.iter().filter_map(|&p| self.shown.get(p)).any(|m| {
+            let key = (m.account_id, m.id);
+            !self.nested.contains_key(&key)
+                && heads_its_row(key, &self.msg_thread, &self.thread_members)
+                && threads
+                    .keys
+                    .get(&thread_slot(m))
+                    .and_then(|k| threads.members.get(k))
+                    .is_some_and(|idx| idx.iter().any(|&i| source.get(i).is_some_and(|x| x.unread)))
+        })
     }
 
     /// One toggle per tag for the whole selection (#313). A tag is ticked
@@ -3213,8 +3351,8 @@ impl MessageList {
                     section.push(item(BulkAction::Spam, &i18n("Mark as Spam"), "mail-mark-junk-symbolic"));
                 }
                 {
-                    // Move To… for the whole selection.
-                    let messages = self.selected_messages();
+                    // Move To… for the whole selection, conversations whole.
+                    let messages = self.selected_conversations();
                     let (wx, wy) = self.window_point(x, y);
                     let s = sender.clone();
                     section.push(
@@ -4277,8 +4415,12 @@ impl MessageList {
         click.set_button(0);
         click.set_propagation_phase(gtk::PropagationPhase::Capture);
         let s = input.clone();
-        click.connect_pressed(move |_, _, _, _| {
-            let _ = s.send(MessageListInput::ClearCursor);
+        click.connect_pressed(move |gesture, _, _, _| {
+            let extend = gesture.current_button() != gtk::gdk::BUTTON_PRIMARY
+                || gesture.current_event_state().intersects(
+                    gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK,
+                );
+            let _ = s.send(MessageListInput::PointerPressed { extend });
         });
         list.add_controller(click);
     }
@@ -4449,6 +4591,16 @@ impl MessageList {
     fn reveal_first_heading(&self, idx: usize) {
         if let (0, true, Some(s)) = (idx, self.day_headings, &self.scroller) {
             hold_top(&s.vadjustment(), &self.shared);
+        }
+    }
+
+    /// End Gmail's checking (#392): the row now selected, if it is one, opens.
+    fn stop_checking(&mut self, sender: &ComponentSender<Self>) {
+        if std::mem::take(&mut self.checking) {
+            let _ = sender.output(MessageListOutput::Checked(None));
+            // Told even when GTK's selection stays as it was: a lone checked
+            // row is selected already, and opening it changes nothing there.
+            sender.input(MessageListInput::SelectionChanged);
         }
     }
 

@@ -326,6 +326,10 @@ msgstr "Κονσόλα"
 msgid "About"
 msgstr "Σχετικά"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Διαγραφή συνομιλίας"
+
 msgid "Remove Tags"
 msgstr "Αφαίρεση ετικετών"
 
@@ -1018,8 +1022,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Ανοίγει το μήνυμα με έτοιμη προώθηση."
 
-msgid "Back to the message list"
-msgstr "Επιστροφή στη λίστα μηνυμάτων"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "Ολόκληρη συζήτηση"
 
 #, fuzzy
 msgid "Next or previous message in the conversation"
@@ -1077,14 +1082,15 @@ msgid "Mark the conversation as read"
 msgstr "Ολόκληρη συζήτηση"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Προσπάθεια αποστολής αυτού του μηνύματος τώρα"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Επιλογή αυτής της σειράς (για μαζική ενέργεια)"
 
 msgid "Select every row, or none"
@@ -1113,6 +1119,9 @@ msgstr "Προηγούμενο μήνυμα"
 msgid "Open the selected message"
 msgstr "Άνοιγμα επιλεγμένου μηνύματος"
 
+msgid "Back to the message list"
+msgstr "Επιστροφή στη λίστα μηνυμάτων"
+
 msgid "Next message in the conversation"
 msgstr "Επόμενο μήνυμα στη συνομιλία"
 
@@ -1121,6 +1130,9 @@ msgstr "Προηγούμενο μήνυμα στη συνομιλία"
 
 msgid "Mark read or unread"
 msgstr "Σήμανση ως αναγνωσμένο ή μη αναγνωσμένο"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Επιλογή αυτής της σειράς (για μαζική ενέργεια)"
 
 msgid "Remove every tag"
 msgstr "Αφαίρεση όλων των ετικετών"
@@ -4244,6 +4256,24 @@ msgstr "Αυτό το μήνυμα είναι στα {language}."
 msgid "Translate"
 msgstr "Μετάφραση"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Επιβεβαίωση διαγραφής συζήτησης"
+msgstr[1] "Επιβεβαίωση διαγραφής συζήτησης"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "Δεν έχει επιλεγεί μήνυμα"
+msgstr[1] "Δεν έχει επιλεγεί μήνυμα"
+
+msgid "No draft selected"
+msgstr "Δεν έχει επιλεγεί πρόχειρο"
+
+msgid "No message selected"
+msgstr "Δεν έχει επιλεγεί μήνυμα"
+
 msgid "Received"
 msgstr "Ελήφθη"
 
@@ -4377,11 +4407,8 @@ msgstr "Ο/Η {name} απέρριψε αυτή την πρόσκληση."
 msgid "Save…"
 msgstr "Αποθήκευση…"
 
-msgid "No draft selected"
-msgstr "Δεν έχει επιλεγεί πρόχειρο"
-
-msgid "No message selected"
-msgstr "Δεν έχει επιλεγεί μήνυμα"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Επιλέξτε ένα πρόχειρο από τη λίστα για να το επεξεργαστείτε εδώ."

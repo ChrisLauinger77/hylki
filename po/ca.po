@@ -317,6 +317,10 @@ msgstr "Consola"
 msgid "About"
 msgstr "Quant a"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Suprimeix la conversa"
+
 msgid "Remove Tags"
 msgstr "Treu les etiquetes"
 
@@ -975,8 +979,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Obre el missatge on és el cursor"
 
-msgid "Back to the message list"
-msgstr "Torna a la llista de missatges"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "Conversa sencera"
 
 msgid "Next or previous message in the conversation"
 msgstr "Missatge següent o anterior de la conversa"
@@ -1032,14 +1037,15 @@ msgid "Mark the conversation as read"
 msgstr "Conversa sencera"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Marca com a llegit o no llegit"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Intenta enviar aquest missatge ara"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Selecciona aquesta fila (per a una acció massiva)"
 
 msgid "Select every row, or none"
@@ -1067,6 +1073,9 @@ msgstr "Missatge anterior"
 msgid "Open the selected message"
 msgstr "Obre el missatge seleccionat"
 
+msgid "Back to the message list"
+msgstr "Torna a la llista de missatges"
+
 msgid "Next message in the conversation"
 msgstr "Missatge següent de la conversa"
 
@@ -1075,6 +1084,9 @@ msgstr "Missatge anterior de la conversa"
 
 msgid "Mark read or unread"
 msgstr "Marca com a llegit o no llegit"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Selecciona aquesta fila (per a una acció massiva)"
 
 msgid "Remove every tag"
 msgstr "Treu totes les etiquetes"
@@ -4115,6 +4127,24 @@ msgstr "Aquest missatge és en {language}."
 msgid "Translate"
 msgstr "Tradueix"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Confirma la supressió de converses"
+msgstr[1] "Confirma la supressió de converses"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "No s'ha seleccionat cap missatge"
+msgstr[1] "No s'ha seleccionat cap missatge"
+
+msgid "No draft selected"
+msgstr "No s'ha seleccionat cap esborrany"
+
+msgid "No message selected"
+msgstr "No s'ha seleccionat cap missatge"
+
 msgid "Received"
 msgstr "Rebut"
 
@@ -4248,11 +4278,8 @@ msgstr "{name} ha rebutjat aquesta invitació."
 msgid "Save…"
 msgstr "Desa…"
 
-msgid "No draft selected"
-msgstr "No s'ha seleccionat cap esborrany"
-
-msgid "No message selected"
-msgstr "No s'ha seleccionat cap missatge"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Tria un esborrany de la llista per editar-lo aquí."

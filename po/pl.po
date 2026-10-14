@@ -326,6 +326,10 @@ msgstr "Konsola"
 msgid "About"
 msgstr "O aplikacji"
 
+#, fuzzy
+msgid "Select a conversation first."
+msgstr "Usuń rozmowę"
+
 msgid "Remove Tags"
 msgstr "Usuń etykiety"
 
@@ -1042,8 +1046,9 @@ msgstr ""
 msgid "Open the message the cursor is on"
 msgstr "Otwiera wiadomość z rozpoczętym przekazywaniem dalej."
 
-msgid "Back to the message list"
-msgstr "Powrót do listy wiadomości"
+#, fuzzy
+msgid "Close the conversation, back to the list"
+msgstr "Cała rozmowa"
 
 #, fuzzy
 msgid "Next or previous message in the conversation"
@@ -1101,14 +1106,15 @@ msgid "Mark the conversation as read"
 msgstr "Cała rozmowa"
 
 #, fuzzy
-msgid "Mark the conversation as unread"
+msgid "Mark the conversation as unread and close it"
 msgstr "Oznacz jako przeczytane lub nieprzeczytane"
 
 #, fuzzy
-msgid "Mark as unread from this message on"
+msgid "Mark as unread from this message on and close it"
 msgstr "Spróbuj teraz wysłać tę wiadomość"
 
-msgid "Select this row (for a bulk action)"
+#, fuzzy
+msgid "Select this row without opening it"
 msgstr "Zaznacz ten wiersz (do działania zbiorczego)"
 
 msgid "Select every row, or none"
@@ -1136,6 +1142,9 @@ msgstr "Poprzednia wiadomość"
 msgid "Open the selected message"
 msgstr "Otwórz zaznaczoną wiadomość"
 
+msgid "Back to the message list"
+msgstr "Powrót do listy wiadomości"
+
 msgid "Next message in the conversation"
 msgstr "Następna wiadomość w rozmowie"
 
@@ -1144,6 +1153,9 @@ msgstr "Poprzednia wiadomość w rozmowie"
 
 msgid "Mark read or unread"
 msgstr "Oznacz jako przeczytane lub nieprzeczytane"
+
+msgid "Select this row (for a bulk action)"
+msgstr "Zaznacz ten wiersz (do działania zbiorczego)"
 
 msgid "Remove every tag"
 msgstr "Usuń wszystkie etykiety"
@@ -4273,6 +4285,26 @@ msgstr "Ta wiadomość pochodzi z listy dyskusyjnej."
 msgid "Translate"
 msgstr "Tłumacze"
 
+#, fuzzy
+msgid "{n} conversation selected"
+msgid_plural "{n} conversations selected"
+msgstr[0] "Potwierdzanie usuwania rozmów"
+msgstr[1] "Potwierdzanie usuwania rozmów"
+msgstr[2] "Potwierdzanie usuwania rozmów"
+
+#, fuzzy
+msgid "{n} message selected"
+msgid_plural "{n} messages selected"
+msgstr[0] "Nie zaznaczono wiadomości"
+msgstr[1] "Nie zaznaczono wiadomości"
+msgstr[2] "Nie zaznaczono wiadomości"
+
+msgid "No draft selected"
+msgstr "Nie zaznaczono szkicu"
+
+msgid "No message selected"
+msgstr "Nie zaznaczono wiadomości"
+
 msgid "Received"
 msgstr ""
 
@@ -4410,11 +4442,8 @@ msgstr "{name}: zaproszenie zostało odrzucone."
 msgid "Save…"
 msgstr "Zapisz…"
 
-msgid "No draft selected"
-msgstr "Nie zaznaczono szkicu"
-
-msgid "No message selected"
-msgstr "Nie zaznaczono wiadomości"
+msgid "The actions above the list apply to all of them."
+msgstr ""
 
 msgid "Choose a draft from the list to edit it here."
 msgstr "Wybierz szkic z listy, aby go tu zmodyfikować."
