@@ -481,7 +481,7 @@ pub struct SourceThreads {
 
 /// Run `f` once, when `clock` has painted its next frame, or after a short
 /// wait for a window that is not drawing.
-fn after_next_paint(clock: &gtk::gdk::FrameClock, f: impl FnOnce() + 'static) {
+pub(crate) fn after_next_paint(clock: &gtk::gdk::FrameClock, f: impl FnOnce() + 'static) {
     let f = Rc::new(std::cell::Cell::new(Some(Box::new(f) as Box<dyn FnOnce()>)));
     let handler = Rc::new(std::cell::Cell::new(None::<glib::SignalHandlerId>));
     let once = {

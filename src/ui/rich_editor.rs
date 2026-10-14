@@ -284,8 +284,32 @@ impl RichEditor {
         // pop. Start the view invisible and fade it in when its load
         // finishes — content arrives as a fade into the settled panel.
         webview.set_opacity(0.0);
-        webview.connect_load_changed(|v, ev| {
+        // Starting the editor's web process takes a moment, longest the
+        // first time: past a glance, a spinner says it is coming (#392).
+        let spinner = gtk::Spinner::new();
+        spinner.set_size_request(32, 32);
+        spinner.set_halign(gtk::Align::Center);
+        spinner.set_valign(gtk::Align::Center);
+        spinner.set_can_target(false);
+        spinner.set_visible(false);
+        let shown = std::rc::Rc::new(std::cell::Cell::new(false));
+        {
+            let (sp, shown) = (spinner.downgrade(), shown.clone());
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+                if let Some(sp) = sp.upgrade().filter(|_| !shown.get()) {
+                    sp.set_visible(true);
+                    sp.start();
+                }
+            });
+        }
+        let sp = spinner.downgrade();
+        webview.connect_load_changed(move |v, ev| {
             if ev == webkit6::LoadEvent::Finished {
+                shown.set(true);
+                if let Some(sp) = sp.upgrade() {
+                    sp.stop();
+                    sp.set_visible(false);
+                }
                 fade_in(v);
                 // Focus given before the document was there reached the
                 // view but no caret: place it now.
@@ -298,10 +322,14 @@ impl RichEditor {
         {
             // Failsafe: whatever happens to the load, the editor must never
             // stay invisible.
-            let v = webview.clone();
+            let (v, sp) = (webview.clone(), spinner.downgrade());
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
                 if v.opacity() < 1.0 {
                     fade_in(&v);
+                }
+                if let Some(sp) = sp.upgrade() {
+                    sp.stop();
+                    sp.set_visible(false);
                 }
             });
         }
@@ -604,7 +632,10 @@ impl RichEditor {
         // rebuilt — which would cost the undo history and the caret.
         let stack = gtk::Stack::new();
         stack.set_vexpand(true);
-        stack.add_named(&webview, Some("edit"));
+        let edit = gtk::Overlay::new();
+        edit.set_child(Some(&webview));
+        edit.add_overlay(&spinner);
+        stack.add_named(&edit, Some("edit"));
 
         let expanded = crate::config::load_privacy().toolbar_expanded;
         let (toolbar, toolbar_commands, toolbar_end, bar_state) = build_toolbar(&webview, &stack, &attach_cb, expanded);

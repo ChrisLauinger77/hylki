@@ -179,6 +179,12 @@ pub struct MessageView {
     under_split: bool,
     find_matches: Option<(u32, u32)>,
     find_entry: Option<gtk::SearchEntry>,
+    /// The page shown while a message loads, and whether it is holding the
+    /// keyboard for the web view meanwhile (#392). A web view whose document
+    /// is being replaced drops the keys it is given, so a shortcut pressed
+    /// then never arrived; this page lets them through.
+    loading_page: Option<gtk::Box>,
+    focus_held: std::cell::Cell<bool>,
     /// When find last closed itself (empty entry blur) — the toolbar click
     /// that caused the blur must not instantly reopen it.
     find_closed_at: Option<std::time::Instant>,
@@ -2039,8 +2045,10 @@ impl Component for MessageView {
                     #[watch]
                     set_visible_child_name: model.body_page(),
 
+                    #[name = "loading_page"]
                     add_named[Some("loading")] = &gtk::Box {
                         add_css_class: "reader-loading",
+                        set_focusable: true,
                         set_orientation: gtk::Orientation::Vertical,
                         set_halign: gtk::Align::Center,
                         set_valign: gtk::Align::Center,
@@ -2152,6 +2160,8 @@ impl Component for MessageView {
             under_split: false,
             find_matches: None,
             find_entry: None,
+            loading_page: None,
+            focus_held: std::cell::Cell::new(false),
             find_closed_at: None,
             webview,
             sender_check: None,
@@ -2561,6 +2571,7 @@ impl Component for MessageView {
         let header_tags = gtk::Box::new(gtk::Orientation::Horizontal, 4);
         let widgets = view_output!();
         model.find_entry = Some(widgets.find_entry.clone());
+        model.loading_page = Some(widgets.loading_page.clone());
         model.account_chip = Some(widgets.account_chip.clone());
         model.cover = Some(widgets.body_stack.clone());
         model.apply_webview_bg(model.effective_dark());
@@ -2575,6 +2586,7 @@ impl Component for MessageView {
 
     fn post_view() {
         self.sync_header_tags(&widgets.header_tags);
+        self.hold_focus_while_loading();
     }
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
@@ -3302,7 +3314,15 @@ impl Component for MessageView {
             }
             MessageViewInput::FocusBody => {
                 if self.current.is_some() {
-                    self.webview.grab_focus();
+                    match &self.loading_page {
+                        Some(page) if self.body_page() == "loading" => {
+                            page.grab_focus();
+                            self.focus_held.set(true);
+                        }
+                        _ => {
+                            self.webview.grab_focus();
+                        }
+                    }
                 }
             }
             MessageViewInput::ComposeTo(addr) => {
@@ -4005,6 +4025,22 @@ impl MessageView {
 
     /// Which body-stack page to show: spinner while fetching, themed cover while
     /// the WebView loads, then the rendered message(s).
+    /// While a document loads, keep the keyboard on the loading page rather
+    /// than in the web view, and give it back once the document is shown.
+    fn hold_focus_while_loading(&self) {
+        let Some(page) = &self.loading_page else { return };
+        let web: &gtk::Widget = self.webview.upcast_ref();
+        let focus = web.root().and_then(|r| r.focus());
+        if self.body_page() == "loading" {
+            if focus.is_some_and(|f| f == *web || f.is_ancestor(web)) {
+                page.grab_focus();
+                self.focus_held.set(true);
+            }
+        } else if self.focus_held.replace(false) && focus.is_some_and(|f| f == *page.upcast_ref::<gtk::Widget>()) {
+            self.webview.grab_focus();
+        }
+    }
+
     fn body_page(&self) -> &'static str {
         // A document that has been handed over but hasn't painted yet is still
         // loading as far as the reader is concerned. Showing the previous

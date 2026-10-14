@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Fixed: keys pressed while a conversation loaded were lost** (#392,
+  reported by 3v1n0). Opening a conversation from the keyboard gave the
+  reading pane's web view the keyboard while its page was still being
+  replaced, and it dropped what it was given, so `#` did nothing. The
+  loading page holds the keyboard until the conversation is shown.
+- **Changed: replying and writing show they have started** (#392). The
+  pointer turns busy as soon as **r**, **a**, **f** or **c** is pressed or
+  the button clicked, before the composer is built, and the editor shows a
+  spinner until it is ready. A second press meanwhile is ignored.
+
 - **Fixed: an unread conversation opened with its first message read**
   (#392, reported by 3v1n0). Opening a conversation marked the message its
   row is filed under read at once, so after **Shift+U** or `_` that message

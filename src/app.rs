@@ -1163,6 +1163,10 @@ pub struct AppModel {
     /// How many rows Gmail's x has checked, while it is checking them
     /// (#392): they are acted on, not opened.
     checked: Option<usize>,
+    /// A composer is waiting for the busy pointer to be drawn, and one is
+    /// being built (see `AppMsg::ComposeNow`).
+    compose_waiting: bool,
+    compose_now: bool,
     /// The list's own selection as it last reported it; `list_selection`
     /// also follows the reader's cards.
     list_heard: Vec<(u32, u32)>,
@@ -1354,6 +1358,8 @@ pub enum AppMsg {
     SelectionKeys(Vec<(u32, u32)>),
     /// Gmail's x checked rows, this many, or stopped checking (#392).
     ListChecked(Option<usize>),
+    /// A composer asked for, built now that the busy pointer is drawn.
+    ComposeNow(Box<AppMsg>),
     /// The reader's selection changed — mirror what the list can represent.
     SelectCards(Vec<(u32, u32)>),
     /// A conversation message was scrolled all the way through — mark it read on
@@ -3235,6 +3241,8 @@ impl SimpleComponent for AppModel {
             reader_focus_pending: false,
             list_selection: Vec::new(),
             checked: None,
+            compose_waiting: false,
+            compose_now: false,
             list_heard: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -7356,6 +7364,27 @@ impl SimpleComponent for AppModel {
                     }
                     None => tracing::warn!("showcase notify: no Inbox message cached for account {account}"),
                 }
+            }
+
+            // Building a composer holds the window a moment, longest the
+            // first time in a session: the pointer turns busy, and that is
+            // drawn before the build starts, so the key or click is seen to
+            // have landed (#392). Another press meanwhile is dropped.
+            asked @ (AppMsg::Compose | AppMsg::Reply | AppMsg::ReplyAll | AppMsg::Forward) if !self.compose_now => {
+                if !std::mem::replace(&mut self.compose_waiting, true) {
+                    self.window.set_cursor_from_name(Some("progress"));
+                    let s = sender.clone();
+                    self.after_paint(move || s.input(AppMsg::ComposeNow(Box::new(asked))));
+                }
+            }
+            AppMsg::ComposeNow(asked) => {
+                self.compose_waiting = false;
+                self.compose_now = true;
+                <Self as SimpleComponent>::update(self, *asked, sender.clone());
+                self.compose_now = false;
+                // Back once the composer's first frame, the slow one, is drawn.
+                let window = self.window.clone();
+                self.after_paint(move || window.set_cursor(None::<&gtk::gdk::Cursor>));
             }
 
             AppMsg::Compose => {
@@ -13885,6 +13914,17 @@ impl AppModel {
             .filter(|m| !matches!(self.folder_kind(m.account_id, m.folder_id), Some(FolderKind::Sent | FolderKind::Drafts)))
             .cloned()
             .collect()
+    }
+
+    /// Run `f` once the window has drawn its next frame.
+    fn after_paint(&self, f: impl FnOnce() + 'static) {
+        match self.window.frame_clock() {
+            Some(clock) => {
+                clock.request_phase(gtk::gdk::FrameClockPhase::PAINT);
+                crate::ui::message_list::after_next_paint(&clock, f);
+            }
+            None => f(),
+        }
     }
 
     /// Whether Gmail's keys are what the keyboard does.
