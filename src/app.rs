@@ -12248,6 +12248,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
+            date_groups_default_applied: true,
             list_search_open: self.list_search_open,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),

@@ -1253,9 +1253,9 @@ headings with it.
 A right-click on the headings offers **Customize Columns…**, which opens
 Settings at **Message List → Columns**.
 
-**Settings → Message List → Group by date** divides the list under
-headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14 days** and
-**Older**, counted in calendar days on this computer's clock. The headings
+**Settings → Message List → Group by date**, on by default, divides the
+list under headings: **Today**, **Yesterday**, **Last 7 days**, **Last 14
+days** and **Older**, counted in calendar days on this computer's clock. The headings
 show only while the list is sorted by date, newest or oldest first, and move
 on at midnight. A conversation goes under the heading of the message that
 places it in the sort, the newest for newest first and the oldest for oldest

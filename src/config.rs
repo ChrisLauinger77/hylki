@@ -1556,9 +1556,16 @@ pub(crate) struct PrivacyFile {
     #[serde(default)]
     pub(crate) list_column_scroll: bool,
     /// A list sorted by date is divided under Today, Yesterday, Last 7 days,
-    /// Last 14 days and Older (#435). Off by default.
-    #[serde(default)]
+    /// Last 14 days and Older (#435). On by default since 1.44, for
+    /// existing installs too (see `date_groups_default_applied`).
+    #[serde(default = "default_on")]
     pub(crate) list_group_by_date: bool,
+    /// Grouping by date was turned on once for an install from before it
+    /// became the default: every save writes every key, so those files
+    /// carry the old `false` without anyone having chosen it. A new
+    /// install starts with this set, so switching grouping off sticks.
+    #[serde(default)]
+    pub(crate) date_groups_default_applied: bool,
     /// The search field stays above the list instead of hiding behind the
     /// search button (#446). Off by default.
     #[serde(default)]
@@ -1868,7 +1875,8 @@ impl Default for PrivacyFile {
             list_columns: default_list_columns(),
             list_headings: false,
             list_column_scroll: false,
-            list_group_by_date: false,
+            list_group_by_date: true,
+            date_groups_default_applied: true,
             list_search_open: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
@@ -1898,18 +1906,33 @@ pub(crate) fn load_privacy() -> PrivacyFile {
         return PrivacyFile::default();
     };
     let mut file = toml::from_str::<PrivacyFile>(&text).unwrap_or_default();
-    // The inset card for a lone message became the default on 2026-08-31
-    // for new installs only: every save writes every key, so an install
-    // from before then stayed on the full-bleed view without ever choosing
-    // it (#153). Apply the default once and remember that it was.
-    if !file.single_card_default_applied {
-        file.single_card_default_applied = true;
-        file.single_message_card = true;
+    if apply_new_defaults(&mut file) {
         if let Ok(toml) = toml::to_string_pretty(&file) {
             let _ = write_private(&path, &toml);
         }
     }
     file
+}
+
+/// Bring a file from before a default changed up to it, once: every save
+/// writes every key, so an older install carries the old value without
+/// anyone having chosen it. Whether anything changed.
+fn apply_new_defaults(file: &mut PrivacyFile) -> bool {
+    let mut changed = false;
+    // The inset card for a lone message became the default on 2026-08-31
+    // (#153).
+    if !file.single_card_default_applied {
+        file.single_card_default_applied = true;
+        file.single_message_card = true;
+        changed = true;
+    }
+    // Grouping the list by date, the default since 1.44 (#435).
+    if !file.date_groups_default_applied {
+        file.date_groups_default_applied = true;
+        file.list_group_by_date = true;
+        changed = true;
+    }
+    changed
 }
 
 
@@ -5275,6 +5298,24 @@ dest_path = "Lists"
         let text = toml::to_string_pretty(&FiltersFile { rules: back.rules.clone() }).unwrap();
         assert!(!text.contains("more"), "{text}");
         assert!(!text.contains("any"), "{text}");
+    }
+
+    /// Grouping by date is on for a new install and for one whose file
+    /// predates it, once; switched off afterwards, it stays off.
+    #[test]
+    fn date_groups_default_reaches_existing_installs_once() {
+        let mut old: PrivacyFile = toml::from_str("list_group_by_date = false\n").unwrap();
+        assert!(apply_new_defaults(&mut old));
+        assert!(old.list_group_by_date);
+        old.list_group_by_date = false;
+        let mut again: PrivacyFile = toml::from_str(&toml::to_string_pretty(&old).unwrap()).unwrap();
+        assert!(!apply_new_defaults(&mut again));
+        assert!(!again.list_group_by_date);
+        let mut fresh = PrivacyFile::default();
+        assert!(fresh.list_group_by_date);
+        fresh.list_group_by_date = false;
+        apply_new_defaults(&mut fresh);
+        assert!(!fresh.list_group_by_date);
     }
 
     /// An account from before #445 has one `signature`, which reads as a

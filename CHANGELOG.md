@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Changed: the list is grouped by date by default** (#435), on installs
+  that had the switch off too, since it was never asked. **Settings →
+  Message List → Group by date** turns it off, and that sticks.
+
 - **Added: several signatures per account** (#445, requested by rhuhxx).
   **Add Signature** in an account's settings starts another; each has a
   name, and **Start messages with this signature** marks the one new
