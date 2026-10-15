@@ -16977,13 +16977,15 @@ impl AppModel {
                     format!("{} <{}>", cfg.name, cfg.email)
                 };
                 let cfg = Some(cfg);
-                let signature = cfg.and_then(|c| c.signature.clone()).unwrap_or_default();
+                let (signatures, default) = cfg.map(|c| c.signature_set()).unwrap_or_default();
+                let signature = default.map(|i| signatures[i].html.clone()).unwrap_or_default();
                 let pgp_key = cfg.and_then(|c| c.pgp_key.clone());
                 let sign_default = cfg.is_some_and(|c| c.sign_by_default);
                 let mut identities = vec![ComposeAccount {
                     id,
                     label,
                     signature: signature.clone(),
+                    signatures: signatures.clone(),
                     email: email.clone(),
                     pgp_key: pgp_key.clone(),
                     sign_default,
@@ -17003,6 +17005,7 @@ impl AppModel {
                         id,
                         label: display.clone(),
                         signature: signature.clone(),
+                        signatures: signatures.clone(),
                         email: addr,
                         pgp_key: pgp_key.clone(),
                         sign_default,
@@ -17025,6 +17028,7 @@ impl AppModel {
                         id,
                         label: display.clone(),
                         signature: signature.clone(),
+                        signatures: signatures.clone(),
                         email: addr.clone(),
                         pgp_key: pgp_key.clone(),
                         sign_default,
@@ -23446,6 +23450,8 @@ fn display_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
     let mut probe = new.clone();
     probe.signature = old.signature.clone();
     probe.signature_html = old.signature_html;
+    probe.signatures = old.signatures.clone();
+    probe.default_signature = old.default_signature;
     probe.color = old.color.clone();
     probe.emoji = old.emoji.clone();
     probe.avatar = old.avatar.clone();
@@ -23519,6 +23525,8 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         gravatar: false,
         signature: None,
         signature_html: false,
+        signatures: Vec::new(),
+        default_signature: None,
         label: None,
         aliases: Vec::new(),
         enabled: true,
@@ -25477,7 +25485,10 @@ mod tests {
     fn display_only_account_edits() {
         let old = super::demo_account_configs().remove(0);
         let mut new = old.clone();
-        new.signature = Some("Jason".into());
+        new.set_signatures(
+            vec![crate::config::NamedSignature { name: "Short".into(), html: "Jason".into() }],
+            None,
+        );
         new.color = Some("#ff0000".into());
         new.in_unified = !old.in_unified;
         // The editor hands the secret back; the same one is no change.

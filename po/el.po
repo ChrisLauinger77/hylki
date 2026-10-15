@@ -1330,6 +1330,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} μη αναγνωσμένο μήνυμα"
 msgstr[1] "{n} μη αναγνωσμένα μηνύματα"
 
+msgid "Signature"
+msgstr "Υπογραφή"
+
 msgid "Custom Order"
 msgstr "Προσαρμοσμένη σειρά"
 
@@ -2205,18 +2208,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Προσθήκη ψευδωνύμου…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Υπογραφή"
 
-msgid "Appended to new messages sent from this account."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
 msgstr ""
-"Προστίθεται στα νέα μηνύματα που αποστέλλονται από αυτόν τον λογαριασμό."
 
-msgid "Edit HTML…"
-msgstr "Επεξεργασία HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Υπογραφή"
 
 msgid "Import File…"
 msgstr "Εισαγωγή αρχείου…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Εισαγωγή υπογραφής"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Έναρξη μηνύματος με το αρχείο συνημμένο"
 
 msgid "Syncing"
 msgstr "Συγχρονισμός"
@@ -2382,6 +2396,13 @@ msgstr ""
 "Ο κωδικός πρόσβασής σας αποθηκεύεται στην κλειδοθήκη του συστήματος (secret-"
 "service), ποτέ ως απλό κείμενο στον δίσκο."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Επεξεργασία HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Ακολούθηση ρυθμίσεων"
 
@@ -2424,20 +2445,6 @@ msgstr "Άνοιγμα προγράμματος περιήγησης… ολοκ
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Ολοκληρώστε τη σύνδεση στο παράθυρο που άνοιξε."
 
-msgid "Signature HTML"
-msgstr "HTML υπογραφής"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Επικολλήστε ή επεξεργαστείτε τον κώδικα HTML της υπογραφής. Τα σενάρια και "
-"τα φύλλα στυλ αφαιρούνται· τα ενσωματωμένα στυλ, οι πίνακες και οι εικόνες "
-"διατηρούνται."
-
-msgid "Apply"
-msgstr "Εφαρμογή"
-
 msgid "Import Signature"
 msgstr "Εισαγωγή υπογραφής"
 
@@ -2449,6 +2456,10 @@ msgstr "Δεν ήταν δυνατή η ανάγνωση του αρχείου"
 
 msgid "OK"
 msgstr "Εντάξει"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Υπογραφή"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Εισαγάγετε αναγνωριστικό πελάτη και συνδεθείτε πριν από την αποθήκευση"
@@ -2484,6 +2495,11 @@ msgstr "✓ SMTP: συνδέθηκε"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Προεπισκόπηση"
 
 msgid "Show"
 msgstr "Εμφάνιση"
@@ -3638,11 +3654,6 @@ msgstr "Απάντηση προς"
 msgid "Writing in {format}"
 msgstr "Σύνταξη σε {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Προεπισκόπηση"
-
 msgid "Show the message as it will be sent"
 msgstr "Εμφάνιση του μηνύματος όπως θα σταλεί"
 
@@ -3692,6 +3703,10 @@ msgstr "Αφαίρεση του {name}"
 
 msgid "Typing"
 msgstr "Πληκτρολόγηση"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Υπογραφή"
 
 #, fuzzy
 msgid "Insert Before the Text"
@@ -7774,6 +7789,32 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Τα νέα μηνύματα, οι απαντήσεις και οι προωθήσεις ξεκινούν με "
+#~ "ενεργοποιημένη την υπογραφή."
+
+#~ msgid "Signature HTML"
+#~ msgstr "HTML υπογραφής"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Επικολλήστε ή επεξεργαστείτε τον κώδικα HTML της υπογραφής. Τα σενάρια "
+#~ "και τα φύλλα στυλ αφαιρούνται· τα ενσωματωμένα στυλ, οι πίνακες και οι "
+#~ "εικόνες διατηρούνται."
+
+#~ msgid "Apply"
+#~ msgstr "Εφαρμογή"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr ""
+#~ "Προστίθεται στα νέα μηνύματα που αποστέλλονται από αυτόν τον λογαριασμό."
 
 #~ msgid "Sort messages"
 #~ msgstr "Ταξινόμηση μηνυμάτων"

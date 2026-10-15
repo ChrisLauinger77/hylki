@@ -1186,6 +1186,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Signature"
+msgstr ""
+
 msgid "Custom Order"
 msgstr ""
 
@@ -1951,16 +1954,24 @@ msgstr ""
 msgid "Add Alias…"
 msgstr ""
 
-msgid "Signature"
+msgid "Signatures"
 msgstr ""
 
-msgid "Appended to new messages sent from this account."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
 msgstr ""
 
-msgid "Edit HTML…"
+msgid "Add Signature"
 msgstr ""
 
 msgid "Import File…"
+msgstr ""
+
+msgid "Delete Signature"
+msgstr ""
+
+msgid "Start messages with this signature"
 msgstr ""
 
 msgid "Syncing"
@@ -2099,6 +2110,12 @@ msgid ""
 "plain text on disk."
 msgstr ""
 
+msgid "Edit HTML"
+msgstr ""
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr ""
 
@@ -2135,17 +2152,6 @@ msgstr ""
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr ""
 
-msgid "Signature HTML"
-msgstr ""
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-
-msgid "Apply"
-msgstr ""
-
 msgid "Import Signature"
 msgstr ""
 
@@ -2156,6 +2162,9 @@ msgid "Could Not Read the File"
 msgstr ""
 
 msgid "OK"
+msgstr ""
+
+msgid "Signature {n}"
 msgstr ""
 
 msgid "Enter a client ID and sign in before saving"
@@ -2188,6 +2197,11 @@ msgid "✓ SMTP: connected"
 msgstr ""
 
 msgid "✗ SMTP: {e}"
+msgstr ""
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
 msgstr ""
 
 msgid "Show"
@@ -3205,11 +3219,6 @@ msgstr ""
 msgid "Writing in {format}"
 msgstr ""
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr ""
-
 msgid "Show the message as it will be sent"
 msgstr ""
 
@@ -3255,6 +3264,9 @@ msgid "Remove {name}"
 msgstr ""
 
 msgid "Typing"
+msgstr ""
+
+msgid "No Signature"
 msgstr ""
 
 msgid "Insert Before the Text"

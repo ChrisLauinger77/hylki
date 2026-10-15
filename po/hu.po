@@ -1325,6 +1325,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} olvasatlan üzenet"
 msgstr[1] "{n} olvasatlan üzenet"
 
+msgid "Signature"
+msgstr "Aláírás"
+
 msgid "Custom Order"
 msgstr "Egyedi sorrend"
 
@@ -2185,17 +2188,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Álnév (alias) hozzáadása…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Aláírás"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Ebből a fiókból elküldött új üzenetekhez csatolva."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "HTML szerkesztése…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Aláírás"
 
 msgid "Import File…"
 msgstr "Fájl importálása…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Aláírás importálása"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Üzenet indítása a melléklet csatolásával"
 
 msgid "Syncing"
 msgstr "Szinkronizálás"
@@ -2360,6 +2375,13 @@ msgstr ""
 "A jelszava a rendszer kulcstartóján (secret-service) tárolódik, soha sem "
 "egyszerű szövegként a lemezen."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "HTML szerkesztése…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Beállítások követése"
 
@@ -2403,20 +2425,6 @@ msgstr "Böngésző megnyitása… ott fejezze be a bejelentkezést."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "A bejelentkezés nem tárolható a kulcstartón: {e}"
 
-msgid "Signature HTML"
-msgstr "Aláírás HTML kódja"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Illessze be vagy szerkessze az aláírás HTML kódját. A parancsfájlok és "
-"stíluslapok eltávolításra kerülnek; a beágyazott stílusok, táblázatok és "
-"képek megmaradnak."
-
-msgid "Apply"
-msgstr "Alkalmazás"
-
 msgid "Import Signature"
 msgstr "Aláírás importálása"
 
@@ -2428,6 +2436,10 @@ msgstr "A fájl nem olvasható"
 
 msgid "OK"
 msgstr "Rendben"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Aláírás"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr ""
@@ -2463,6 +2475,11 @@ msgstr "✓ SMTP: kapcsolódva"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Előnézet"
 
 msgid "Show"
 msgstr "Megjelenítés"
@@ -3612,11 +3629,6 @@ msgstr "Válaszcím"
 msgid "Writing in {format}"
 msgstr "{format} formátumben írás"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Előnézet"
-
 msgid "Show the message as it will be sent"
 msgstr "Az üzenet megjelenítése úgy, ahogyan elküldésre kerül"
 
@@ -3668,6 +3680,10 @@ msgstr "{name} eltávolítása"
 
 msgid "Typing"
 msgstr "Gépelés"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Aláírás"
 
 #, fuzzy
 msgid "Insert Before the Text"
@@ -7759,6 +7775,29 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr "Az új üzenetek, válaszok és továbbítások aláírással kezdődnek."
+
+#~ msgid "Signature HTML"
+#~ msgstr "Aláírás HTML kódja"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Illessze be vagy szerkessze az aláírás HTML kódját. A parancsfájlok és "
+#~ "stíluslapok eltávolításra kerülnek; a beágyazott stílusok, táblázatok és "
+#~ "képek megmaradnak."
+
+#~ msgid "Apply"
+#~ msgstr "Alkalmazás"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Ebből a fiókból elküldött új üzenetekhez csatolva."
 
 #~ msgid "Sort messages"
 #~ msgstr "Üzenetek rendezése"

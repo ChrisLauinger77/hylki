@@ -1286,6 +1286,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} messaggio non letto"
 msgstr[1] "{n} messaggi non letti"
 
+msgid "Signature"
+msgstr "Firma"
+
 msgid "Custom Order"
 msgstr "Ordine personalizzato"
 
@@ -2142,17 +2145,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Aggiungi alias…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Firma"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Aggiunta ai nuovi messaggi inviati da questo account."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "Modifica HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Firma"
 
 msgid "Import File…"
 msgstr "Importa file…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Inserisci firma"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Inizia un messaggio con il file allegato"
 
 msgid "Syncing"
 msgstr "Sincronizzazione"
@@ -2321,6 +2336,13 @@ msgstr ""
 "La tua password è memorizzata nel portachiavi di sistema (secret-service), "
 "mai in testo normale sul disco."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Modifica HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Segui le impostazioni"
 
@@ -2360,19 +2382,6 @@ msgstr "Apertura del browser… approva l'accesso alla directory lì."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Approva l'accesso alla directory nella finestra che si è aperta."
 
-msgid "Signature HTML"
-msgstr "HTML firma"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Incolla o modifica l'HTML della firma. Gli script e i fogli di stile vengono "
-"rimossi; gli stili inline, le tabelle e le immagini vengono mantenuti."
-
-msgid "Apply"
-msgstr "Applica"
-
 msgid "Import Signature"
 msgstr "Importa firma"
 
@@ -2384,6 +2393,10 @@ msgstr "Impossibile leggere il file"
 
 msgid "OK"
 msgstr "OK"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Firma"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Inserisci un ID client e accedi prima di salvare"
@@ -2420,6 +2433,11 @@ msgstr "✓ SMTP: connesso"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Anteprima"
 
 msgid "Show"
 msgstr "Mostra"
@@ -3546,11 +3564,6 @@ msgstr "Rispondi a"
 msgid "Writing in {format}"
 msgstr "Scrittura in {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Anteprima"
-
 msgid "Show the message as it will be sent"
 msgstr "Mostra il messaggio come verrà inviato"
 
@@ -3599,6 +3612,10 @@ msgstr "Rimuovi {name}"
 
 msgid "Typing"
 msgstr "Digitando"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Firma"
 
 msgid "Insert Before the Text"
 msgstr "Inserisci prima del testo"
@@ -7626,6 +7643,30 @@ msgstr "La posta in arrivo unificata in modalità chiara"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "I nuovi messaggi, le risposte e gli inoltri iniziano con la firma attiva."
+
+#~ msgid "Signature HTML"
+#~ msgstr "HTML firma"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Incolla o modifica l'HTML della firma. Gli script e i fogli di stile "
+#~ "vengono rimossi; gli stili inline, le tabelle e le immagini vengono "
+#~ "mantenuti."
+
+#~ msgid "Apply"
+#~ msgstr "Applica"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Aggiunta ai nuovi messaggi inviati da questo account."
 
 #~ msgid "Sort messages"
 #~ msgstr "Ordina messaggi"

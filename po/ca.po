@@ -1279,6 +1279,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} missatge no llegit"
 msgstr[1] "{n} missatges no llegits"
 
+msgid "Signature"
+msgstr "Signatura"
+
 msgid "Custom Order"
 msgstr "Ordre personalitzat"
 
@@ -2131,17 +2134,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Afegeix un àlies…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Signatura"
 
-msgid "Appended to new messages sent from this account."
-msgstr "S'afegeix als missatges nous enviats des d'aquest compte."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "Edita l'HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Signatura"
 
 msgid "Import File…"
 msgstr "Importa un fitxer…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Insereix la signatura"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Comença un missatge amb el fitxer adjunt"
 
 msgid "Syncing"
 msgstr "Sincronització"
@@ -2306,6 +2321,13 @@ msgstr ""
 "La teva contrasenya s'emmagatzema a l'anell de claus del sistema (secret-"
 "service), mai en text pla al disc."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Edita l'HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Segueix els paràmetres"
 
@@ -2346,19 +2368,6 @@ msgstr "S'està obrint el navegador… completa-hi l'inici de sessió."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Completa l'inici de sessió a la finestra que s'ha obert."
 
-msgid "Signature HTML"
-msgstr "HTML de la signatura"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Enganxa o edita l'HTML de la signatura. Els scripts i els fulls d'estil "
-"s'eliminen; els estils en línia, les taules i les imatges es conserven."
-
-msgid "Apply"
-msgstr "Aplica"
-
 msgid "Import Signature"
 msgstr "Importa una signatura"
 
@@ -2370,6 +2379,10 @@ msgstr "No s'ha pogut llegir el fitxer"
 
 msgid "OK"
 msgstr "D'acord"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Signatura"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Introdueix un ID de client i inicia sessió abans de desar"
@@ -2404,6 +2417,11 @@ msgstr "✓ SMTP: connectat"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Previsualitza"
 
 msgid "Show"
 msgstr "Mostra"
@@ -3526,11 +3544,6 @@ msgstr "Respon a"
 msgid "Writing in {format}"
 msgstr "S'està escrivint en {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Previsualitza"
-
 msgid "Show the message as it will be sent"
 msgstr "Mostra el missatge tal com s'enviarà"
 
@@ -3579,6 +3592,10 @@ msgstr "Elimina {name}"
 
 msgid "Typing"
 msgstr "S'està escrivint"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Signatura"
 
 msgid "Insert Before the Text"
 msgstr "Insereix abans del text"
@@ -7595,6 +7612,30 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Els missatges nous, les respostes i els reenviaments comencen amb la "
+#~ "signatura activada."
+
+#~ msgid "Signature HTML"
+#~ msgstr "HTML de la signatura"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Enganxa o edita l'HTML de la signatura. Els scripts i els fulls d'estil "
+#~ "s'eliminen; els estils en línia, les taules i les imatges es conserven."
+
+#~ msgid "Apply"
+#~ msgstr "Aplica"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "S'afegeix als missatges nous enviats des d'aquest compte."
 
 #~ msgid "Sort messages"
 #~ msgstr "Ordena els missatges"

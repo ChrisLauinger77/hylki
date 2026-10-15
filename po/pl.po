@@ -1354,6 +1354,9 @@ msgstr[0] "{n} nieprzeczytana wiadomość"
 msgstr[1] "{n} nieprzeczytane wiadomości"
 msgstr[2] "{n} nieprzeczytanych wiadomości"
 
+msgid "Signature"
+msgstr "Podpis"
+
 msgid "Custom Order"
 msgstr "Własna kolejność"
 
@@ -2218,17 +2221,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Dodaj alias…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Podpis"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Dołączany do nowych wiadomości wysyłanych z tego konta."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "Modyfikuj kod HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Podpis"
 
 msgid "Import File…"
 msgstr "Importuj plik…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Importuj podpis"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Utwórz wiadomość z załączonym plikiem"
 
 msgid "Syncing"
 msgstr "Synchronizacja"
@@ -2397,6 +2412,13 @@ msgstr ""
 "Hasło jest przechowywane w systemowej bazie kluczy (secret-service), nigdy w "
 "postaci zwykłego tekstu na dysku."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Modyfikuj kod HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Zgodnie z ustawieniami"
 
@@ -2440,19 +2462,6 @@ msgstr "Otwieranie przeglądarki… Dokończ w niej logowanie."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Nie udało się zapisać danych logowania w bazie kluczy: {e}"
 
-msgid "Signature HTML"
-msgstr "Kod HTML podpisu"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Wklej lub zmodyfikuj kod HTML podpisu. Skrypty i arkusze stylów zostaną "
-"usunięte; style wbudowane, tabele i obrazy zostaną zachowane."
-
-msgid "Apply"
-msgstr "Zastosuj"
-
 msgid "Import Signature"
 msgstr "Importuj podpis"
 
@@ -2464,6 +2473,10 @@ msgstr "Nie udało się odczytać pliku"
 
 msgid "OK"
 msgstr "OK"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Podpis"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Przed zapisaniem wprowadź identyfikator klienta i zaloguj się"
@@ -2499,6 +2512,11 @@ msgstr "✓ SMTP: połączono"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Podgląd"
 
 msgid "Show"
 msgstr "Wyświetl"
@@ -3647,11 +3665,6 @@ msgstr "Odpowiedź do"
 msgid "Writing in {format}"
 msgstr "Tryb pisania: {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Podgląd"
-
 msgid "Show the message as it will be sent"
 msgstr "Wyświetl wiadomość tak, jak zostanie wysłana"
 
@@ -3702,6 +3715,10 @@ msgstr "Usuń {name}"
 
 msgid "Typing"
 msgstr "Pisanie"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Podpis"
 
 #, fuzzy
 msgid "Insert Before the Text"
@@ -7785,6 +7802,30 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Nowe wiadomości, odpowiedzi i przekazania mają domyślnie włączone "
+#~ "podpisywanie."
+
+#~ msgid "Signature HTML"
+#~ msgstr "Kod HTML podpisu"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Wklej lub zmodyfikuj kod HTML podpisu. Skrypty i arkusze stylów zostaną "
+#~ "usunięte; style wbudowane, tabele i obrazy zostaną zachowane."
+
+#~ msgid "Apply"
+#~ msgstr "Zastosuj"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Dołączany do nowych wiadomości wysyłanych z tego konta."
 
 #~ msgid "Sort messages"
 #~ msgstr "Sortuj wiadomości"

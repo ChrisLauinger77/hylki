@@ -485,12 +485,23 @@ pub struct AccountConfig {
     /// default (the separate Privacy switch covers other people's mail).
     #[serde(default)]
     pub gravatar: bool,
-    /// Composition signature appended to new messages from this account.
+    /// The signature put in new messages from this account: the default
+    /// one of `signatures`, written here too so an older Hylki still finds
+    /// it. A config from before #445 has only this.
     #[serde(default)]
     pub signature: Option<String>,
     /// Whether `signature` is HTML (vs. plain text).
     #[serde(default)]
     pub signature_html: bool,
+    /// Every signature the account has (#445), in the order the composer
+    /// offers them. Read through [`AccountConfig::signature_set`], which
+    /// also covers a config that has only `signature`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signatures: Vec<NamedSignature>,
+    /// Which of `signatures` new messages start with. None: they start
+    /// without one, and the composer's signature button puts one in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_signature: Option<usize>,
     /// How this account is labelled in the UI (e.g. the All Inboxes view).
     /// When unset, the email address is shown.
     #[serde(default)]
@@ -623,6 +634,15 @@ fn is_true(b: &bool) -> bool {
     *b
 }
 
+/// One of an account's signatures (#445), named so the composer can offer
+/// it beside the others.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+pub struct NamedSignature {
+    pub name: String,
+    /// The signature as HTML.
+    pub html: String,
+}
+
 /// A send-as alias (#34): an extra From identity the composer offers. By
 /// default the mail still leaves through the account's own SMTP; an alias may
 /// instead carry its own SMTP transport (host, credentials), so mail sent as
@@ -727,6 +747,33 @@ pub struct OAuthSettings {
 
 
 impl AccountConfig {
+    /// The account's signatures and the one new messages start with. A
+    /// config written before #445 holds a single `signature`, which is
+    /// both.
+    pub fn signature_set(&self) -> (Vec<NamedSignature>, Option<usize>) {
+        if self.signatures.is_empty() {
+            return match self.signature.as_deref().filter(|s| !s.trim().is_empty()) {
+                Some(html) => (
+                    vec![NamedSignature { name: crate::i18n::i18n("Signature"), html: html.to_string() }],
+                    Some(0),
+                ),
+                None => (Vec::new(), None),
+            };
+        }
+        let default = self.default_signature.filter(|i| *i < self.signatures.len());
+        (self.signatures.clone(), default)
+    }
+
+    /// Store `signatures`, with `default` the one new messages start with,
+    /// and keep `signature` in step for an older Hylki.
+    pub fn set_signatures(&mut self, signatures: Vec<NamedSignature>, default: Option<usize>) {
+        let default = default.filter(|i| *i < signatures.len());
+        self.signature = default.map(|i| signatures[i].html.clone());
+        self.signature_html = true;
+        self.default_signature = default;
+        self.signatures = signatures;
+    }
+
     /// The account's UI label: the custom label, or the email address.
     pub fn display_label(&self) -> String {
         match self.label.as_deref() {
@@ -5230,6 +5277,43 @@ dest_path = "Lists"
         assert!(!text.contains("any"), "{text}");
     }
 
+    /// An account from before #445 has one `signature`, which reads as a
+    /// list of one that new messages start with; a list written now keeps
+    /// `signature` on its default for an older Hylki, and no default
+    /// leaves it empty.
+    #[test]
+    fn signatures_read_old_configs_and_write_for_them() {
+        let old: AccountConfig = toml::from_str(
+            "name = \"A\"\nemail = \"a@b.c\"\nimap_host = \"h\"\nusername = \"a\"\n\
+             signature = \"<b>Ada</b>\"\nsignature_html = true\n",
+        )
+        .unwrap();
+        let (list, default) = old.signature_set();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].html, "<b>Ada</b>");
+        assert_eq!(default, Some(0));
+
+        let mut acc = old.clone();
+        let two = vec![
+            NamedSignature { name: "English".into(), html: "Regards".into() },
+            NamedSignature { name: "Deutsch".into(), html: "Grüße".into() },
+        ];
+        acc.set_signatures(two.clone(), Some(1));
+        assert_eq!(acc.signature.as_deref(), Some("Grüße"));
+        let back: AccountConfig = toml::from_str(&toml::to_string(&acc).unwrap()).unwrap();
+        assert_eq!(back.signature_set(), (two.clone(), Some(1)));
+
+        acc.set_signatures(two.clone(), None);
+        assert!(acc.signature.is_none());
+        let text = toml::to_string(&acc).unwrap();
+        assert!(!text.contains("default_signature"), "{text}");
+        let back: AccountConfig = toml::from_str(&text).unwrap();
+        assert_eq!(back.signature_set(), (two, None));
+
+        acc.set_signatures(Vec::new(), None);
+        assert!(!toml::to_string(&acc).unwrap().contains("signatures"));
+    }
+
     #[test]
     fn settings_bundle_roundtrip_parses() {
         // Parse-and-serialize only (no disk, no keyring): the wire format
@@ -5257,6 +5341,8 @@ dest_path = "Lists"
             gravatar: false,
             signature: None,
             signature_html: false,
+            signatures: Vec::new(),
+            default_signature: None,
             label: None,
             aliases: Vec::new(),
             enabled: true,

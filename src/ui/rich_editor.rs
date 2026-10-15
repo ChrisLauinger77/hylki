@@ -915,6 +915,13 @@ impl RichEditor {
     }
 
     /// The far end of the formatting row, for a host's own controls.
+    /// Keep the text area at least `height` pixels tall, whatever the
+    /// toolbar above it takes: a host with a fixed-size slot would
+    /// otherwise lose text to a wrapped or expanded toolbar.
+    pub fn set_text_height(&self, height: i32) {
+        self.stack.set_height_request(height);
+    }
+
     pub fn toolbar_end(&self) -> &gtk::Box {
         &self.toolbar_end
     }

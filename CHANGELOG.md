@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Added: several signatures per account** (#445, requested by rhuhxx).
+  **Add Signature** in an account's settings starts another; each has a
+  name, and **Start messages with this signature** marks the one new
+  messages, replies and forwards open with, or none. With more than one,
+  the composer's signature button lists them by name, with **No
+  Signature**: the one picked replaces the signature in the message.
+- **Changed: a signature's HTML is edited in place.** **Edit HTML** at the
+  end of the signature editor's toolbar shows the source in the editor,
+  and **Preview** turns it back, instead of a separate window. The text
+  area keeps its height when the toolbar is expanded.
+
 - **Added: more quick filters** (#441). One sort and filter button above
   the list replaces the sort menu and the unread and starred toggles. Its
   popover has the sort orders in one column and, in the other, **Unread**,

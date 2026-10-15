@@ -1343,6 +1343,9 @@ msgstr[0] "{n} непрочитанное сообщение"
 msgstr[1] "{n} непрочитанных сообщения"
 msgstr[2] "{n} непрочитанных сообщений"
 
+msgid "Signature"
+msgstr "Подпись"
+
 msgid "Custom Order"
 msgstr "Пользовательский порядок"
 
@@ -2194,17 +2197,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Добавить псевдоним…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Подпись"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Добавляется к новым сообщениям, отправляемым с этой учётной записи."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "Редактировать HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Подпись"
 
 msgid "Import File…"
 msgstr "Импортировать файл…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Импортировать подпись"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Написать письмо с прикреплённым файлом"
 
 msgid "Syncing"
 msgstr "Синхронизация"
@@ -2368,6 +2383,13 @@ msgstr ""
 "Ваш пароль хранится в системной связке ключей (secret-service), а не в "
 "открытом виде на диске."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Редактировать HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Из системных настроек"
 
@@ -2410,19 +2432,6 @@ msgstr "Открытие браузера… завершите вход в нё
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Завершите вход в открывшемся окне."
 
-msgid "Signature HTML"
-msgstr "HTML-код подписи"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Вставьте или отредактируйте HTML-код подписи. Скрипты и таблицы стилей "
-"удаляются; встроенные стили, таблицы и изображения сохраняются."
-
-msgid "Apply"
-msgstr "Применить"
-
 msgid "Import Signature"
 msgstr "Импортировать подпись"
 
@@ -2434,6 +2443,10 @@ msgstr "Не удалось прочитать файл"
 
 msgid "OK"
 msgstr "ОК"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Подпись"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Введите идентификатор клиента и войдите перед сохранением"
@@ -2468,6 +2481,11 @@ msgstr "✓ SMTP: подключено"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Предпросмотр печати"
 
 msgid "Show"
 msgstr "Показать"
@@ -3604,11 +3622,6 @@ msgstr "Адрес для ответа"
 msgid "Writing in {format}"
 msgstr "Формат письма: {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Предпросмотр печати"
-
 msgid "Show the message as it will be sent"
 msgstr "Показать сообщение в том виде, в котором оно будет отправлено"
 
@@ -3658,6 +3671,10 @@ msgstr "Удалить {name}?"
 
 msgid "Typing"
 msgstr "Ввод текста"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Подпись"
 
 #, fuzzy
 msgid "Insert Before the Text"
@@ -7698,6 +7715,30 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Новые сообщения, ответы и пересылаемые письма создаются с включённой "
+#~ "цифровой подписью."
+
+#~ msgid "Signature HTML"
+#~ msgstr "HTML-код подписи"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Вставьте или отредактируйте HTML-код подписи. Скрипты и таблицы стилей "
+#~ "удаляются; встроенные стили, таблицы и изображения сохраняются."
+
+#~ msgid "Apply"
+#~ msgstr "Применить"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Добавляется к новым сообщениям, отправляемым с этой учётной записи."
 
 #~ msgid "Sort messages"
 #~ msgstr "Сортировка сообщений"

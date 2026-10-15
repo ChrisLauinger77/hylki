@@ -1338,6 +1338,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} ungelesene Nachricht"
 msgstr[1] "{n} ungelesene Nachrichten"
 
+msgid "Signature"
+msgstr "Signatur"
+
 msgid "Custom Order"
 msgstr "Benutzerdefinierte Reihenfolge"
 
@@ -2215,17 +2218,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Alias hinzufügen…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Signatur"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Wird an neue Nachrichten dieses Kontos angehängt."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "HTML bearbeiten…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Signatur"
 
 msgid "Import File…"
 msgstr "Datei importieren…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Signatur importieren"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Neue Nachricht mit der Datei als Anhang beginnen"
 
 msgid "Syncing"
 msgstr "Synchronisierung"
@@ -2393,6 +2408,13 @@ msgstr ""
 "Ihr Passwort wird im System-Keyring (Secret-Service) gespeichert, niemals im "
 "Klartext auf der Festplatte."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "HTML bearbeiten…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Einstellungen folgen"
 
@@ -2436,20 +2458,6 @@ msgstr "Browser wird geöffnet… Schließen Sie die Anmeldung dort ab."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Konnte die Anmeldung nicht im Schlüsselring speichern: {e}"
 
-msgid "Signature HTML"
-msgstr "HTML-Signatur"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Fügen Sie das HTML der Signatur ein oder bearbeiten Sie es. Skripte und "
-"Stylesheets werden entfernt; Inline-Styles, Tabellen und Bilder bleiben "
-"erhalten."
-
-msgid "Apply"
-msgstr "Anwenden"
-
 msgid "Import Signature"
 msgstr "Signatur importieren"
 
@@ -2461,6 +2469,10 @@ msgstr "Datei konnte nicht gelesen werden"
 
 msgid "OK"
 msgstr "OK"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Signatur"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Geben Sie eine Client-ID ein und melden Sie sich vor dem Speichern an"
@@ -2496,6 +2508,11 @@ msgstr "✓ SMTP: verbunden"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP: {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Vorschau"
 
 msgid "Show"
 msgstr "Anzeigen"
@@ -3637,11 +3654,6 @@ msgstr "Antwort an"
 msgid "Writing in {format}"
 msgstr "Schreiben in {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Vorschau"
-
 msgid "Show the message as it will be sent"
 msgstr "Zeigen Sie die Nachricht, wie sie gesendet wird"
 
@@ -3692,6 +3704,10 @@ msgstr "{name} entfernen"
 
 msgid "Typing"
 msgstr "Eingabe"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Signatur"
 
 #, fuzzy
 msgid "Insert Before the Text"
@@ -7773,6 +7789,31 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Neue Nachrichten, Antworten und Weiterleitungen werden erst nach der "
+#~ "Anmeldung angezeigt."
+
+#~ msgid "Signature HTML"
+#~ msgstr "HTML-Signatur"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Fügen Sie das HTML der Signatur ein oder bearbeiten Sie es. Skripte und "
+#~ "Stylesheets werden entfernt; Inline-Styles, Tabellen und Bilder bleiben "
+#~ "erhalten."
+
+#~ msgid "Apply"
+#~ msgstr "Anwenden"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Wird an neue Nachrichten dieses Kontos angehängt."
 
 #~ msgid "Sort messages"
 #~ msgstr "Nachrichten sortieren"

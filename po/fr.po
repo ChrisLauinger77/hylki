@@ -1307,6 +1307,9 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} message non lu"
 msgstr[1] "{n} messages non lus"
 
+msgid "Signature"
+msgstr "Signature"
+
 msgid "Custom Order"
 msgstr "Ordre personnalisé"
 
@@ -2172,17 +2175,29 @@ msgstr ""
 msgid "Add Alias…"
 msgstr "Ajouter un alias…"
 
-msgid "Signature"
+#, fuzzy
+msgid "Signatures"
 msgstr "Signature"
 
-msgid "Appended to new messages sent from this account."
-msgstr "Ajoutée aux nouveaux messages envoyés depuis ce compte."
+msgid ""
+"Put in messages sent from this account. With more than one, the composer's "
+"signature button lists them."
+msgstr ""
 
-msgid "Edit HTML…"
-msgstr "Modifier le HTML…"
+#, fuzzy
+msgid "Add Signature"
+msgstr "Signature"
 
 msgid "Import File…"
 msgstr "Importer le fichier…"
+
+#, fuzzy
+msgid "Delete Signature"
+msgstr "Insérer la signature"
+
+#, fuzzy
+msgid "Start messages with this signature"
+msgstr "Rédiger un message avec le fichier joint"
 
 msgid "Syncing"
 msgstr "Synchronisation"
@@ -2350,6 +2365,13 @@ msgstr ""
 "Votre mot de passe est stocké dans le trousseau de clés du système (secret-"
 "service), jamais en texte brut sur le disque."
 
+#, fuzzy
+msgid "Edit HTML"
+msgstr "Modifier le HTML…"
+
+msgid "Edit the signature's HTML source"
+msgstr ""
+
 msgid "Follow Settings"
 msgstr "Suivre les paramètres"
 
@@ -2392,20 +2414,6 @@ msgstr "Ouverture du navigateur… terminez la connexion à partir de là."
 msgid "Approve access to the sensitivity labels in the window that opened."
 msgstr "Terminez la connexion dans la fenêtre qui s'est ouverte."
 
-msgid "Signature HTML"
-msgstr "Signature HTML"
-
-msgid ""
-"Paste or edit the signature's HTML. Scripts and style sheets are removed; "
-"inline styles, tables and images are kept."
-msgstr ""
-"Collez ou modifiez le code HTML de la signature. Les scripts et les feuilles "
-"de style sont supprimés ; les styles en ligne, les tableaux et les images "
-"sont conservés."
-
-msgid "Apply"
-msgstr "Appliquer"
-
 msgid "Import Signature"
 msgstr "Importer la signature"
 
@@ -2417,6 +2425,10 @@ msgstr "Impossible de lire le fichier"
 
 msgid "OK"
 msgstr "OK"
+
+#, fuzzy
+msgid "Signature {n}"
+msgstr "Signature"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Saisissez un ID client et connectez-vous avant d'enregistrer"
@@ -2451,6 +2463,11 @@ msgstr "✓ SMTP : connecté"
 
 msgid "✗ SMTP: {e}"
 msgstr "✗ SMTP : {e}"
+
+#. The one label on the row goes when there is no width for it, the
+#. same trade the header makes when it folds.
+msgid "Preview"
+msgstr "Aperçu"
 
 msgid "Show"
 msgstr "Afficher"
@@ -3596,11 +3613,6 @@ msgstr "Répondre à"
 msgid "Writing in {format}"
 msgstr "Rédaction en {format}"
 
-#. The one label on the row goes when there is no width for it, the
-#. same trade the header makes when it folds.
-msgid "Preview"
-msgstr "Aperçu"
-
 msgid "Show the message as it will be sent"
 msgstr "Afficher le message tel qu'il sera envoyé"
 
@@ -3649,6 +3661,10 @@ msgstr "Supprimer {name}"
 
 msgid "Typing"
 msgstr "Saisie"
+
+#, fuzzy
+msgid "No Signature"
+msgstr "Signature"
 
 msgid "Insert Before the Text"
 msgstr "Insérer avant le texte"
@@ -7728,6 +7744,31 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid ""
+#~ "New messages, replies and forwards. The composer's signature button puts "
+#~ "in any signature by hand."
+#~ msgstr ""
+#~ "Les nouveaux messages, réponses et transferts démarrent avec la signature "
+#~ "activée."
+
+#~ msgid "Signature HTML"
+#~ msgstr "Signature HTML"
+
+#~ msgid ""
+#~ "Paste or edit the signature's HTML. Scripts and style sheets are removed; "
+#~ "inline styles, tables and images are kept."
+#~ msgstr ""
+#~ "Collez ou modifiez le code HTML de la signature. Les scripts et les "
+#~ "feuilles de style sont supprimés ; les styles en ligne, les tableaux et "
+#~ "les images sont conservés."
+
+#~ msgid "Apply"
+#~ msgstr "Appliquer"
+
+#~ msgid "Appended to new messages sent from this account."
+#~ msgstr "Ajoutée aux nouveaux messages envoyés depuis ce compte."
 
 #~ msgid "Sort messages"
 #~ msgstr "Trier les messages"

@@ -637,6 +637,29 @@ sent for translation.
 
 The settings are in `translation.toml`; the key is in the keyring.
 
+### Signatures
+
+An account's signature is written in the **Signatures** group of its
+settings, in the same editor as a message; **Import File…** loads one from
+an HTML or text file. **Edit HTML**, at the end of the editor's toolbar,
+shows the signature as its HTML source to edit in place, and **Preview**
+turns it back into the formatted signature. Scripts and style sheets are
+removed from the source; inline styles, tables and pictures are kept.
+
+**Add Signature** starts another, for writing in another language or a
+shorter one for quick replies. Once there are two, a **Signature** chooser
+picks the one being edited and a **Name** field names it. **Start messages
+with this signature** marks the one new messages, replies and forwards open
+with; with it off for all of them, a message opens without one. A signature
+left empty is not saved.
+
+With more than one, the composer's **Insert Signature** button lists them
+by name, with **No Signature** at the end. The one picked replaces the
+signature in the message, in the same place; with none in the message, it
+goes where a signature goes. Changing **From** to another account puts in
+that account's own signature; an alias of the same account keeps the one
+picked.
+
 ### Where the signature goes
 
 In a reply or forward the account's signature is placed above the quoted
@@ -654,11 +677,12 @@ out when they quote your message; Gmail, Apple Mail and Outlook ignore it.
 **Edit as New** leaves the signature out, since the copied message already
 has one. **Insert Signature**, the button beside Translate at the end of the
 formatting row, puts the From account's signature where the cursor is, on a
-line of its own. Right-click the button for **Insert Before the Text** or
-**Insert After the Text**, the top or the end of the message. A signature
-already in the message moves rather than doubling; one inside a quoted
-message is left alone. The button is there only for an account that has a
-signature.
+line of its own; with several it lists them, as above. Right-click the
+button for **Insert Before the Text** or **Insert After the Text**, the top
+or the end of the message, with the signature last picked or else the
+default. A signature already in the message moves rather than doubling; one
+inside a quoted message is left alone. The button is there only for an
+account that has a signature.
 
 ### Replies and forwards
 

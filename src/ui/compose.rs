@@ -168,8 +168,12 @@ fn complete_field(row: &RecipientRow, sug: &Suggestion) {
 pub struct ComposeAccount {
     pub id: u32,
     pub label: String,
-    /// Signature text appended to the body when this account is selected.
+    /// Signature text appended to the body when this account is selected:
+    /// its default one, or empty when new messages start without.
     pub signature: String,
+    /// Every signature of the account (#445), offered by the signature
+    /// button.
+    pub signatures: Vec<crate::config::NamedSignature>,
     /// The identity's sending address (the account's own, or an alias's).
     pub email: String,
     /// The account's chosen OpenPGP key (fingerprint), if any (#133).
@@ -392,8 +396,8 @@ pub struct Compose {
     /// shown only with a translation service set up.
     translate_btn: gtk::Button,
     /// Insert Signature (#385), beside Translate: Edit as New leaves the
-    /// signature out, and this puts it back by hand. Shown only while the
-    /// From account has one.
+    /// signature out, and this puts it back by hand. With several (#445)
+    /// it lists them. Shown only while the From account has one.
     signature_btn: gtk::Button,
     /// A translation is out: the button waits and the body is locked.
     translating: bool,
@@ -562,6 +566,12 @@ pub enum ComposeInput {
     InsertSignature(SigPlace),
     /// The Insert Signature button was right-clicked.
     SignatureMenu,
+    /// The Insert Signature button was clicked: one signature goes in at
+    /// the caret, several are listed (#445).
+    SignatureClicked,
+    /// One of the From account's signatures (#445), by index, in place of
+    /// the one in the message; `None` takes it out.
+    UseSignature(Option<usize>),
     /// The editor content came back — finish saving the draft, or the copy
     /// kept as a template.
     SaveDraftBody { html: String, text: String, to: String, cc: String, bcc: String, reply_to: String, subject: String, from_account_id: u32, from_alias: Option<String>, as_template: bool },
@@ -1134,7 +1144,8 @@ impl Component for Compose {
         let remote_images = prefill.block_remote_images.then(|| {
             accounts
                 .iter()
-                .flat_map(|a| super::rich_editor::remote_image_urls(&a.signature))
+                .flat_map(|a| a.signatures.iter())
+                .flat_map(|sig| super::rich_editor::remote_image_urls(&sig.html))
                 .collect::<Vec<_>>()
         });
         let editor = RichEditor::new(&content, remote_images.as_deref(), format == ComposeFormat::Plain);
@@ -1213,11 +1224,11 @@ impl Component for Compose {
         signature_btn.set_tooltip_text(Some(i18n("Insert Signature").as_str()));
         signature_btn.add_css_class("flat");
         signature_btn.set_can_focus(false);
-        signature_btn.set_visible(!current_sig.is_empty());
+        signature_btn.set_visible(accounts.get(selected).is_some_and(|a| !a.signatures.is_empty()));
         {
             let s = sender.input_sender().clone();
             signature_btn.connect_clicked(move |_| {
-                let _ = s.send(ComposeInput::InsertSignature(SigPlace::Cursor));
+                let _ = s.send(ComposeInput::SignatureClicked);
             });
             let s = sender.input_sender().clone();
             let right = gtk::GestureClick::new();
@@ -2269,15 +2280,22 @@ impl Component for Compose {
                 let idx = widgets.from_row.selected() as usize;
                 // Another account may suggest from elsewhere: what a
                 // directory answered for the last one is not kept.
+                let account_changed =
+                    self.accounts.get(idx).is_some_and(|a| a.id != self.from_account);
                 if let Some(id) = self.accounts.get(idx).map(|a| a.id).filter(|id| *id != self.from_account) {
                     self.from_account = id;
                     self.directory_generation = self.directory_generation.wrapping_add(1);
                     self.directory_matches.clear();
                 }
                 // Swap the editor's signature block for the new account's.
-                let new_sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
-                self.signature_btn.set_visible(!new_sig.is_empty());
-                if new_sig == self.current_sig {
+                // An alias or another identity of the same account shares
+                // its signatures, so the one picked from them stays.
+                let Some(account) = self.accounts.get(idx) else {
+                    break 'handle;
+                };
+                self.signature_btn.set_visible(!account.signatures.is_empty());
+                let new_sig = account.signature.clone();
+                if !account_changed || new_sig == self.current_sig {
                     break 'handle;
                 }
                 self.put_signature(new_sig);
@@ -2285,8 +2303,51 @@ impl Component for Compose {
 
             ComposeInput::InsertSignature(place) => {
                 let idx = widgets.from_row.selected() as usize;
-                let sig = self.accounts.get(idx).map(|a| a.signature.clone()).unwrap_or_default();
+                let sig = self.accounts.get(idx).map(|a| self.chosen_signature(a)).unwrap_or_default();
                 self.insert_signature(sig, place);
+            }
+
+            ComposeInput::SignatureClicked => {
+                let idx = widgets.from_row.selected() as usize;
+                let Some(account) = self.accounts.get(idx) else {
+                    break 'handle;
+                };
+                if account.signatures.len() < 2 {
+                    sender.input(ComposeInput::InsertSignature(SigPlace::Cursor));
+                    break 'handle;
+                }
+                // The one in the message is drawn as chosen; a body that
+                // started without one (Edit as New, a draft) may still
+                // carry the default's text, which is no harm to show.
+                let list: Vec<MenuEntry> = account
+                    .signatures
+                    .iter()
+                    .enumerate()
+                    .map(|(i, sig)| {
+                        let s = sender.clone();
+                        MenuEntry::new(&sig.name, move || s.input(ComposeInput::UseSignature(Some(i))))
+                            .selected(!self.current_sig.is_empty() && sig.html == self.current_sig)
+                    })
+                    .collect();
+                let s = sender.clone();
+                let none = MenuEntry::new(i18n("No Signature"), move || s.input(ComposeInput::UseSignature(None)))
+                    .selected(self.current_sig.is_empty());
+                let btn = &self.signature_btn;
+                show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![list, vec![none]]);
+            }
+
+            ComposeInput::UseSignature(choice) => {
+                let idx = widgets.from_row.selected() as usize;
+                let sig = match choice {
+                    Some(i) => match self.accounts.get(idx).and_then(|a| a.signatures.get(i)) {
+                        Some(sig) => sig.html.clone(),
+                        None => break 'handle,
+                    },
+                    None => String::new(),
+                };
+                if sig != self.current_sig {
+                    self.put_signature(sig);
+                }
             }
 
             ComposeInput::SignatureMenu => {
@@ -3168,6 +3229,18 @@ impl Compose {
     /// Put Sign where the From account's default has it (#267), until the
     /// user has set it by hand. While encrypting it stays on: encrypted
     /// mail is always signed.
+    /// The signature Insert Signature puts in: the one the message last
+    /// had, if it is one of `account`'s, else its default, else its first.
+    fn chosen_signature(&self, account: &ComposeAccount) -> String {
+        if account.signatures.iter().any(|s| s.html == self.current_sig) {
+            return self.current_sig.clone();
+        }
+        if !account.signature.is_empty() {
+            return account.signature.clone();
+        }
+        account.signatures.first().map(|s| s.html.clone()).unwrap_or_default()
+    }
+
     /// Put `new_sig` in the editor in place of the current signature block,
     /// or where the setting puts a signature when there is none.
     fn put_signature(&mut self, new_sig: String) {
@@ -3212,7 +3285,8 @@ impl Compose {
             // above the quoted original or at the end (#237).
             let anchor = self.rich_sig_anchor();
             let js = format!(
-                "(function(){{var s=document.querySelector('.hylki-sig');\
+                "(function(){{var s=[].filter.call(document.querySelectorAll('.hylki-sig'),\
+                 function(x){{return !x.closest('blockquote');}})[0];\
                  var h='{}';\
                  if(s){{if(h){{s.outerHTML=h;}}else{{s.remove();}}}}\
                  else if(h){{{anchor}}}\

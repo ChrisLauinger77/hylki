@@ -1351,6 +1351,8 @@ pub(crate) fn blank_account() -> AccountConfig {
         gravatar: false,
         signature: None,
         signature_html: false,
+        signatures: Vec::new(),
+        default_signature: None,
         label: None,
         aliases: Vec::new(),
         enabled: true,
