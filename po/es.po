@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hylki\n"
 "Report-Msgid-Bugs-To: https://github.com/hyprlab/hylki/issues\n"
-"PO-Revision-Date: 2026-10-14 17:23+0200\n"
+"PO-Revision-Date: 2026-10-15 20:10+0200\n"
 "Last-Translator: Daniel Miguel <danielmigueltejedor@icloud.com>\n"
 "Language-Team: Spanish\n"
 "Language: es\n"
@@ -36,16 +36,16 @@ msgid "Sort by"
 msgstr "Ordenar por"
 
 msgid "Show only"
-msgstr ""
+msgstr "Mostrar solo"
 
 msgid "Clear Filters"
-msgstr ""
+msgstr "Quitar filtros"
 
 msgid "Sort and filter messages"
-msgstr ""
+msgstr "Ordenar y filtrar mensajes"
 
 msgid "Filtered: {names}"
-msgstr ""
+msgstr "Filtros activos: {names}"
 
 msgid "Refresh or long-press for Status Bar"
 msgstr "Actualizar o mantener pulsado para mostrar la barra de estado"
@@ -477,7 +477,7 @@ msgid "Search Messages…"
 msgstr "Buscar mensajes…"
 
 msgid "Filter"
-msgstr ""
+msgstr "Filtrar"
 
 msgid "Sort"
 msgstr "Ordenar"
@@ -2128,24 +2128,24 @@ msgid "Add Alias…"
 msgstr "Añadir alias…"
 
 msgid "Signatures"
-msgstr ""
+msgstr "Firmas"
 
 msgid ""
 "Put in messages sent from this account. With more than one, the composer's "
 "signature button lists them."
-msgstr ""
+msgstr "Se incluyen en los mensajes enviados desde esta cuenta. Si hay varias, el botón de firmas del editor permite elegir entre ellas."
 
 msgid "Add Signature"
-msgstr ""
+msgstr "Añadir firma"
 
 msgid "Import File…"
 msgstr "Importar archivo…"
 
 msgid "Delete Signature"
-msgstr ""
+msgstr "Eliminar firma"
 
 msgid "Start messages with this signature"
-msgstr ""
+msgstr "Incluir esta firma al iniciar los mensajes"
 
 msgid "Syncing"
 msgstr "Sincronización"
@@ -2316,10 +2316,10 @@ msgstr ""
 "como texto sin cifrar en el disco."
 
 msgid "Edit HTML"
-msgstr ""
+msgstr "Editar HTML"
 
 msgid "Edit the signature's HTML source"
-msgstr ""
+msgstr "Editar el código HTML de la firma"
 
 msgid "Follow Settings"
 msgstr "Seguir Ajustes"
@@ -2376,7 +2376,7 @@ msgid "OK"
 msgstr "Aceptar"
 
 msgid "Signature {n}"
-msgstr ""
+msgstr "Firma {n}"
 
 msgid "Enter a client ID and sign in before saving"
 msgstr "Introduce un ID de cliente e inicia sesión antes de guardar"
@@ -3421,13 +3421,13 @@ msgid "Markdown"
 msgstr "Markdown"
 
 msgid "HTML source"
-msgstr ""
+msgstr "Código fuente HTML"
 
 msgid "Plain text"
 msgstr "Texto sin formato"
 
 msgid "Format as you type; it is sent as HTML"
-msgstr ""
+msgstr "Aplicar formato mientras escribes; se envía como HTML"
 
 msgid "Write Markdown; it is sent as formatted mail"
 msgstr "Escribe en Markdown; se enviará como correo con formato"
@@ -3591,7 +3591,7 @@ msgid "Typing"
 msgstr "Escribiendo"
 
 msgid "No Signature"
-msgstr ""
+msgstr "Sin firma"
 
 msgid "Insert Before the Text"
 msgstr "Insertar antes del texto"
@@ -3805,10 +3805,10 @@ msgid "Delete…"
 msgstr "Eliminar…"
 
 msgid "Type three letters or more to search the directory."
-msgstr ""
+msgstr "Escribe al menos tres letras para buscar en el directorio."
 
 msgid "Nobody in the directory matches."
-msgstr ""
+msgstr "No hay personas en el directorio que coincidan con la búsqueda."
 
 msgid "View photo"
 msgstr "Ver foto"
@@ -4073,13 +4073,11 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "yo"
 
-#, fuzzy
 msgid "All folders (except trash & junk)"
-msgstr "Todas excepto Papelera y Correo no deseado"
+msgstr "Todas las carpetas (excepto Papelera y Correo no deseado)"
 
-#, fuzzy
 msgid "Everywhere"
-msgstr "O donde"
+msgstr "En todas partes"
 
 msgid "This folder"
 msgstr "Esta carpeta"
@@ -4090,28 +4088,28 @@ msgstr "Todas las carpetas"
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
 "Trash or Junk looks there too."
-msgstr ""
+msgstr "Busca en todas las carpetas de todas las cuentas, excepto Papelera y Correo no deseado. Si inicias la búsqueda desde una de esas carpetas, también se buscará en ella."
 
 msgid "Every folder of every account, Trash and Junk included."
-msgstr ""
+msgstr "Busca en todas las carpetas de todas las cuentas, incluidas Papelera y Correo no deseado."
 
 msgid "Only the folder or view the list is showing."
-msgstr ""
+msgstr "Solo en la carpeta o vista que se muestra en la lista."
 
 msgid "What this searches"
-msgstr ""
+msgstr "Ámbito de búsqueda"
 
 msgid "Has Attachments"
-msgstr ""
+msgstr "Con archivos adjuntos"
 
 msgid "Addressed to Me"
-msgstr ""
+msgstr "Dirigidos a mí"
 
 msgid "From Contacts"
-msgstr ""
+msgstr "De mis contactos"
 
 msgid "High Importance"
-msgstr ""
+msgstr "Importancia alta"
 
 msgid "Today"
 msgstr "Hoy"
@@ -4126,13 +4124,13 @@ msgid "No Messages"
 msgstr "No hay mensajes"
 
 msgid "No Matching Messages"
-msgstr ""
+msgstr "No hay mensajes que coincidan"
 
 msgid "There's nothing here right now."
 msgstr "Ahora mismo no hay nada aquí."
 
 msgid "No message here passes the filters."
-msgstr ""
+msgstr "Ningún mensaje cumple los filtros aplicados."
 
 msgid "Customize Columns…"
 msgstr "Personalizar columnas…"
@@ -4149,13 +4147,11 @@ msgstr "Marcar todo como leído"
 msgid "Mark All as Unread"
 msgstr "Marcar todo como no leído"
 
-#, fuzzy
 msgid "Search all folders but Trash and Junk"
-msgstr "Todas excepto Papelera y Correo no deseado"
+msgstr "Buscar en todas las carpetas excepto Papelera y Correo no deseado"
 
-#, fuzzy
 msgid "Search all folders, Trash and Junk too"
-msgstr "Buscar en todas las carpetas"
+msgstr "Buscar en todas las carpetas, incluidas Papelera y Correo no deseado"
 
 msgid "Search this folder"
 msgstr "Buscar en esta carpeta"
@@ -4186,9 +4182,8 @@ msgstr "Importancia alta"
 msgid "Low importance"
 msgstr "Importancia baja"
 
-#, fuzzy
 msgid "In {folder}"
-msgstr "carpeta desconocida"
+msgstr "En {folder}"
 
 msgid "Mark as read"
 msgstr "Marcar como leído"
@@ -5672,12 +5667,12 @@ msgstr ""
 "días, Últimos 14 días y Anteriores."
 
 msgid "Tags and labels under the text"
-msgstr ""
+msgstr "Etiquetas y rótulos debajo del texto"
 
 msgid ""
 "Puts a card's tags and labels on a line of their own under its text, where "
 "they leave the subject its full width."
-msgstr ""
+msgstr "Coloca las etiquetas y los rótulos de cada tarjeta en una línea independiente debajo del texto, para que el asunto disponga de todo el ancho."
 
 msgid "Keep the search field open"
 msgstr "Mantener abierto el campo de búsqueda"
@@ -6168,7 +6163,7 @@ msgid ""
 "you type and sent as HTML. Markdown and HTML source are written as source "
 "and sent as formatted mail; plain text is sent without formatting. The "
 "composer's format button switches any one message."
-msgstr ""
+msgstr "Determina el formato inicial de los mensajes nuevos, las respuestas y los reenvíos. El texto enriquecido se formatea mientras escribes y se envía como HTML. Markdown y el código fuente HTML se escriben como código y se envían con formato; el texto sin formato se envía sin formato. El botón de formato del editor permite cambiarlo para cada mensaje."
 
 msgid "Font"
 msgstr "Fuente"
