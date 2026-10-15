@@ -1310,6 +1310,19 @@ pub fn pills<'a>(
     out
 }
 
+/// Which of the tag palette's colors a Gmail label no tag stands for wears
+/// (#374): worked out from its name, so a label has the same color on every
+/// row, in the reader and from one run to the next. A tag named like the
+/// label is how a user picks the color instead.
+pub fn label_hue(name: &str) -> usize {
+    // FNV-1a: std's hasher makes no promise to stay the same across releases.
+    let hash = name
+        .to_lowercase()
+        .bytes()
+        .fold(0x811c_9dc5_u32, |h, b| (h ^ b as u32).wrapping_mul(0x0100_0193));
+    hash as usize % crate::config::TAG_COLORS.len()
+}
+
 /// Whether a Gmail label (as the server writes it, modified UTF-7) stands for
 /// a tag: named like its keyword, or like its name.
 pub fn label_names_tag(label: &str, tag: &crate::config::Tag) -> bool {
@@ -1439,6 +1452,22 @@ mod tests {
         );
         assert!(pills(&[], &[], &tags).is_empty());
         assert_eq!(pills(&[], &["&AAA-".to_string()], &[]), [Pill::Label(" ".into())]);
+    }
+
+    /// #374: a label's color follows its name, whatever the case, and the
+    /// palette is spread over rather than one color for all.
+    #[test]
+    fn a_label_keeps_one_color() {
+        assert_eq!(label_hue("Clients/Acme"), label_hue("clients/acme"));
+        // Pinned: a label must not change color between releases.
+        assert_eq!(["Work", "Clients", "Newsletters"].map(label_hue), [0, 7, 3]);
+        let hues: std::collections::HashSet<usize> =
+            ["Travel", "Receipts", "Clients", "Family", "Newsletters", "Bills", "School", "Friends"]
+                .iter()
+                .map(|n| label_hue(n))
+                .collect();
+        assert!(hues.len() >= 4, "{hues:?}");
+        assert!(hues.iter().all(|&h| h < crate::config::TAG_COLORS.len()));
     }
 
     /// #374: a Gmail label named like a tag is the tag, for every check that

@@ -981,6 +981,8 @@ pub struct AppModel {
     list_column_scroll: bool,
     /// Date headings over a list sorted by date (#435).
     list_group_by_date: bool,
+    /// A card's pills on a line under its text (#374).
+    list_pills_below: bool,
     /// The list's search field stays open (#446).
     list_search_open: bool,
     /// The widths columns were dragged to by their headings (#334).
@@ -3505,6 +3507,7 @@ impl SimpleComponent for AppModel {
             list_headings: config::load_privacy().list_headings,
             list_column_scroll: config::load_privacy().list_column_scroll,
             list_group_by_date: config::load_privacy().list_group_by_date,
+            list_pills_below: config::load_privacy().list_pills_below,
             list_search_open: config::load_privacy().list_search_open,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
@@ -4831,6 +4834,18 @@ impl SimpleComponent for AppModel {
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
                         let _ = list.send(MessageListInput::MoveSelection(1));
                     });
+                    // HYLKI_SHOWCASE_LIST_SEARCH=<text>[:<scope>] searches the
+                    // list at 4s, the scope by its place in the dropdown.
+                    if let Ok(spec) = std::env::var("HYLKI_SHOWCASE_LIST_SEARCH") {
+                        let (text, scope) = match spec.rsplit_once(':') {
+                            Some((t, s)) => (t.to_string(), s.parse().unwrap_or(0)),
+                            None => (spec, 0),
+                        };
+                        let list = model.message_list.sender().clone();
+                        gtk::glib::timeout_add_seconds_local_once(4, move || {
+                            let _ = list.send(MessageListInput::ShowcaseSearch(text, scope));
+                        });
+                    }
                     // HYLKI_SHOWCASE_PALETTE=N opens row N's actions palette
                     // (so a capture can verify the floating palette's look).
                     if let Some(Ok(idx)) =
@@ -6682,6 +6697,7 @@ impl SimpleComponent for AppModel {
                     // span the whole mailbox.
                     self.message_list.emit(MessageListInput::SetSearchPool(
                         build_search_pool(&self.message_cache),
+                        self.pool_folders(),
                     ));
                     // Results span accounts; tint rows by account (as in the unified
                     // inbox) so their origin is legible.
@@ -6690,7 +6706,7 @@ impl SimpleComponent for AppModel {
                     }
                 } else {
                     self.message_list
-                        .emit(MessageListInput::SetSearchPool(Vec::new()));
+                        .emit(MessageListInput::SetSearchPool(Vec::new(), HashMap::new()));
                     // Restore the tint state the underlying view wants.
                     self.message_list
                         .emit(MessageListInput::SetColorize(self.unified));
@@ -8289,6 +8305,11 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
                 if pref!(self.list_group_by_date = on) {
                     self.message_list.emit(MessageListInput::SetGroupByDate(on));
+                }
+            }
+            AppMsg::Pref(PrefOutput::SetPillsBelow(on)) => {
+                if pref!(self.list_pills_below = on) {
+                    self.message_list.emit(MessageListInput::SetPillsBelow(on));
                 }
             }
             AppMsg::Pref(PrefOutput::SetListColumns(columns)) => {
@@ -12452,6 +12473,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
+            list_pills_below: self.list_pills_below,
             date_groups_default_applied: true,
             list_search_open: self.list_search_open,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
@@ -16679,6 +16701,22 @@ impl AppModel {
         self.folder_kind(account_id, folder_id) == Some(FolderKind::Drafts)
     }
 
+    /// Every folder as a search across folders shows its results (#374):
+    /// the name its pill says, and whether "All folders" leaves it out.
+    fn pool_folders(&self) -> HashMap<(u32, u32), crate::ui::message_list::PoolFolder> {
+        self.folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| (*aid, f)))
+            .map(|(aid, f)| {
+                let folder = crate::ui::message_list::PoolFolder {
+                    name: f.name.clone(),
+                    waste: matches!(f.kind, FolderKind::Trash | FolderKind::Junk),
+                };
+                ((aid, f.id), folder)
+            })
+            .collect()
+    }
+
     /// The kind of a folder by id, if known.
     fn folder_kind(&self, account_id: u32, folder_id: u32) -> Option<FolderKind> {
         self.folders
@@ -20496,6 +20534,13 @@ impl AppModel {
                 ));
             }
         }
+        // The colors a Gmail label no tag stands for can wear (#374).
+        for (hue, color) in crate::config::TAG_COLORS.iter().enumerate() {
+            let text = crate::color::readable_text(color);
+            css.push_str(&format!(
+                ".tag-chip.label-chip.label-hue-{hue} {{ background-color: {color}; color: {text}; }}\n"
+            ));
+        }
         self.tag_provider.load(css);
     }
 
@@ -20819,6 +20864,7 @@ impl AppModel {
             list_headings: self.list_headings,
             list_column_scroll: self.list_column_scroll,
             list_group_by_date: self.list_group_by_date,
+            list_pills_below: self.list_pills_below,
             list_search_open: self.list_search_open,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),

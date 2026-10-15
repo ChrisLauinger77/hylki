@@ -3713,6 +3713,15 @@ msgstr ""
 msgid "me"
 msgstr ""
 
+msgid "All folders"
+msgstr ""
+
+msgid "Everywhere"
+msgstr ""
+
+msgid "This folder"
+msgstr ""
+
 msgid "Has Attachments"
 msgstr ""
 
@@ -3729,12 +3738,6 @@ msgid "Today"
 msgstr ""
 
 msgid "Choose which folders to search"
-msgstr ""
-
-msgid "All folders"
-msgstr ""
-
-msgid "This folder"
 msgstr ""
 
 msgid "Clear selection"
@@ -3767,7 +3770,10 @@ msgstr ""
 msgid "Mark All as Unread"
 msgstr ""
 
-msgid "Search all folders"
+msgid "Search all folders but Trash and Junk"
+msgstr ""
+
+msgid "Search all folders, Trash and Junk too"
 msgstr ""
 
 msgid "Search this folder"
@@ -3795,6 +3801,9 @@ msgid "High importance"
 msgstr ""
 
 msgid "Low importance"
+msgstr ""
+
+msgid "In {folder}"
 msgstr ""
 
 msgid "Mark as read"
@@ -5097,6 +5106,14 @@ msgstr ""
 msgid ""
 "Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
 "Last 14 days and Older."
+msgstr ""
+
+msgid "Tags and labels under the text"
+msgstr ""
+
+msgid ""
+"Puts a card's tags and labels on a line of their own under its text, where "
+"they leave the subject its full width."
 msgstr ""
 
 msgid "Keep the search field open"

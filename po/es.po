@@ -4073,6 +4073,16 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "yo"
 
+msgid "All folders"
+msgstr "Todas las carpetas"
+
+#, fuzzy
+msgid "Everywhere"
+msgstr "O donde"
+
+msgid "This folder"
+msgstr "Esta carpeta"
+
 msgid "Has Attachments"
 msgstr ""
 
@@ -4090,12 +4100,6 @@ msgstr "Hoy"
 
 msgid "Choose which folders to search"
 msgstr "Elegir las carpetas en las que buscar"
-
-msgid "All folders"
-msgstr "Todas las carpetas"
-
-msgid "This folder"
-msgstr "Esta carpeta"
 
 msgid "Clear selection"
 msgstr "Borrar selección"
@@ -4127,7 +4131,12 @@ msgstr "Marcar todo como leído"
 msgid "Mark All as Unread"
 msgstr "Marcar todo como no leído"
 
-msgid "Search all folders"
+#, fuzzy
+msgid "Search all folders but Trash and Junk"
+msgstr "Todas excepto Papelera y Correo no deseado"
+
+#, fuzzy
+msgid "Search all folders, Trash and Junk too"
 msgstr "Buscar en todas las carpetas"
 
 msgid "Search this folder"
@@ -4158,6 +4167,10 @@ msgstr "Importancia alta"
 
 msgid "Low importance"
 msgstr "Importancia baja"
+
+#, fuzzy
+msgid "In {folder}"
+msgstr "carpeta desconocida"
 
 msgid "Mark as read"
 msgstr "Marcar como leído"
@@ -5639,6 +5652,14 @@ msgid ""
 msgstr ""
 "Los encabezados dividen la lista ordenada por fecha en Hoy, Ayer, Últimos 7 "
 "días, Últimos 14 días y Anteriores."
+
+msgid "Tags and labels under the text"
+msgstr ""
+
+msgid ""
+"Puts a card's tags and labels on a line of their own under its text, where "
+"they leave the subject its full width."
+msgstr ""
 
 msgid "Keep the search field open"
 msgstr "Mantener abierto el campo de búsqueda"

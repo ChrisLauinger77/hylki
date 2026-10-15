@@ -4157,6 +4157,16 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "eu"
 
+msgid "All folders"
+msgstr "Todas as pastas"
+
+#, fuzzy
+msgid "Everywhere"
+msgstr "Ou onde"
+
+msgid "This folder"
+msgstr "Esta pasta"
+
 #, fuzzy
 msgid "Has Attachments"
 msgstr "Tem anexos"
@@ -4178,12 +4188,6 @@ msgstr ""
 
 msgid "Choose which folders to search"
 msgstr "Escolher as pastas a pesquisar"
-
-msgid "All folders"
-msgstr "Todas as pastas"
-
-msgid "This folder"
-msgstr "Esta pasta"
 
 msgid "Clear selection"
 msgstr "Limpar seleção"
@@ -4219,7 +4223,11 @@ msgid "Mark All as Unread"
 msgstr "Marcar tudo como não lido"
 
 #, fuzzy
-msgid "Search all folders"
+msgid "Search all folders but Trash and Junk"
+msgstr "Pesquisar pastas"
+
+#, fuzzy
+msgid "Search all folders, Trash and Junk too"
 msgstr "Pesquisar pastas"
 
 #, fuzzy
@@ -4254,6 +4262,10 @@ msgstr "Importância alta"
 
 msgid "Low importance"
 msgstr "Importância baixa"
+
+#, fuzzy
+msgid "In {folder}"
+msgstr "pasta desconhecida"
 
 msgid "Mark as read"
 msgstr "Marcar como lida"
@@ -5733,6 +5745,14 @@ msgstr ""
 msgid ""
 "Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
 "Last 14 days and Older."
+msgstr ""
+
+msgid "Tags and labels under the text"
+msgstr ""
+
+msgid ""
+"Puts a card's tags and labels on a line of their own under its text, where "
+"they leave the subject its full width."
 msgstr ""
 
 msgid "Keep the search field open"

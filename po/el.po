@@ -4108,6 +4108,16 @@ msgstr "{name} · {current} από {total}"
 msgid "me"
 msgstr "εγώ"
 
+msgid "All folders"
+msgstr "Όλοι οι φάκελοι"
+
+#, fuzzy
+msgid "Everywhere"
+msgstr "Ή όπου"
+
+msgid "This folder"
+msgstr "Αυτός ο φάκελος"
+
 msgid "Has Attachments"
 msgstr ""
 
@@ -4125,12 +4135,6 @@ msgstr "Σήμερα"
 
 msgid "Choose which folders to search"
 msgstr "Επιλέξτε τους φακέλους αναζήτησης"
-
-msgid "All folders"
-msgstr "Όλοι οι φάκελοι"
-
-msgid "This folder"
-msgstr "Αυτός ο φάκελος"
 
 msgid "Clear selection"
 msgstr "Εκκαθάριση επιλογής"
@@ -4162,7 +4166,12 @@ msgstr "Σήμανση όλων ως αναγνωσμένων"
 msgid "Mark All as Unread"
 msgstr "Σήμανση όλων ως μη αναγνωσμένων"
 
-msgid "Search all folders"
+#, fuzzy
+msgid "Search all folders but Trash and Junk"
+msgstr "Όλοι εκτός από τον Κάδο και τα Ανεπιθύμητα"
+
+#, fuzzy
+msgid "Search all folders, Trash and Junk too"
 msgstr "Αναζήτηση σε όλους τους φακέλους"
 
 msgid "Search this folder"
@@ -4191,6 +4200,10 @@ msgstr "Υψηλή σημασία"
 
 msgid "Low importance"
 msgstr "Χαμηλή σπουδαιότητα"
+
+#, fuzzy
+msgid "In {folder}"
+msgstr "άγνωστος φάκελος"
 
 msgid "Mark as read"
 msgstr "Σήμανση ως αναγνωσμένο"
@@ -5688,6 +5701,14 @@ msgid ""
 msgstr ""
 "Οι επικεφαλίδες χωρίζουν μια λίστα ταξινομημένη κατά ημερομηνία σε Σήμερα, "
 "Χθες, Τελευταίες 7 ημέρες, Τελευταίες 14 ημέρες και Παλαιότερα."
+
+msgid "Tags and labels under the text"
+msgstr ""
+
+msgid ""
+"Puts a card's tags and labels on a line of their own under its text, where "
+"they leave the subject its full width."
+msgstr ""
 
 msgid "Keep the search field open"
 msgstr ""

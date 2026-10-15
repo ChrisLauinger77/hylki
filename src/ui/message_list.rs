@@ -563,6 +563,8 @@ pub struct MessageList {
     /// is active, so `AllFolders` scope can filter across the whole mailbox. Empty
     /// when not searching.
     search_pool: Vec<Rc<Message>>,
+    /// The pool's folders, by `(account_id, folder_id)`.
+    pool_folders: Rc<std::collections::HashMap<(u32, u32), PoolFolder>>,
     /// Which messages the search field filters over.
     scope: SearchScope,
     /// The search field widget, kept so a folder switch can clear its text.
@@ -762,6 +764,8 @@ pub struct MessageList {
     /// has them.
     group_by_date: bool,
     day_headings: bool,
+    /// A card's pills on a line under its text (#374).
+    pills_below: bool,
     /// Show the column headings over a single-line list (#334).
     headings: bool,
     headings_bar: gtk::Box,
@@ -871,10 +875,35 @@ impl SortOrder {
 /// Which messages the search field filters over.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SearchScope {
-    /// Every folder of every account (the merged `search_pool`).
+    /// Every folder of every account (the merged `search_pool`) but Trash
+    /// and Junk, unless the list is showing one of them (#374).
     AllFolders,
+    /// Every folder of every account, Trash and Junk too.
+    Everywhere,
     /// Only the folder currently shown (the local `all` index).
     ThisFolder,
+}
+
+impl SearchScope {
+    /// In the order the search bar's dropdown lists them.
+    const ALL: [SearchScope; 3] = [SearchScope::AllFolders, SearchScope::Everywhere, SearchScope::ThisFolder];
+
+    fn label(self) -> String {
+        match self {
+            SearchScope::AllFolders => i18n("All folders"),
+            SearchScope::Everywhere => i18n("Everywhere"),
+            SearchScope::ThisFolder => i18n("This folder"),
+        }
+    }
+}
+
+/// A folder of the cross-folder search pool, as its results show it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoolFolder {
+    /// What the result's folder pill says.
+    pub name: String,
+    /// Trash or Junk: left out of an "All folders" search.
+    pub waste: bool,
 }
 
 /// A bulk action applied to every selected message at once.
@@ -1145,6 +1174,8 @@ pub enum MessageListInput {
     SetHeadings(bool),
     /// Divide a list sorted by date under Today, Yesterday and so on (#435).
     SetGroupByDate(bool),
+    /// Put a card's tags and labels on a line under its text (#374).
+    SetPillsBelow(bool),
     /// A column's heading was clicked: sort by it, or the other way (#334).
     SortByColumn(crate::config::ListColumn),
     /// A heading's edge was dragged to `width`, or double-clicked (`None`:
@@ -1180,7 +1211,7 @@ pub enum MessageListInput {
     SetScope(SearchScope),
     /// Replace the cross-folder search pool (all folders, all accounts). Sent by
     /// the app when a search begins; cleared to empty when it ends.
-    SetSearchPool(Vec<Message>),
+    SetSearchPool(Vec<Message>, std::collections::HashMap<(u32, u32), PoolFolder>),
     /// The reader's selection: mirror whichever of these the list has rows for,
     /// so everything that acts on the list's selection acts on the messages the
     /// user pointed at. The reader is already showing them, so this must not
@@ -1218,6 +1249,9 @@ pub enum MessageListInput {
     ReclaimFocus,
     /// Put the cursor in the search field.
     FocusSearch,
+    /// Showcase captures (#374): open the search, pick the scope by its
+    /// place in the dropdown and type the text.
+    ShowcaseSearch(String, u32),
     /// Close and clear the search toolbar (#102): Esc, empty focus-out, or
     /// the header button while open.
     CloseSearch,
@@ -1431,19 +1465,18 @@ impl SimpleComponent for MessageList {
                         },
                     },
 
-                    // Scope picker: 0 = All folders (default), 1 = This folder.
+                    // Scope picker, in `SearchScope::ALL`'s order; All
+                    // folders by default.
                     #[name = "scope_dropdown"]
                     gtk::DropDown {
                         set_valign: gtk::Align::Center,
                         set_tooltip_text: Some(i18n("Choose which folders to search").as_str()),
-                        set_model: Some(&gtk::StringList::new(&[i18n("All folders").as_str(), i18n("This folder").as_str()])),
+                        set_model: Some(&gtk::StringList::new(
+                            &SearchScope::ALL.map(SearchScope::label).iter().map(String::as_str).collect::<Vec<_>>(),
+                        )),
                         set_selected: 0,
                         connect_selected_notify[sender] => move |dd| {
-                            let scope = if dd.selected() == 0 {
-                                SearchScope::AllFolders
-                            } else {
-                                SearchScope::ThisFolder
-                            };
+                            let scope = SearchScope::ALL.get(dd.selected() as usize).copied().unwrap_or(SearchScope::AllFolders);
                             sender.input(MessageListInput::SetScope(scope));
                         },
                     },
@@ -1693,6 +1726,7 @@ impl SimpleComponent for MessageList {
             late_select: None,
             all: Vec::new(),
             search_pool: Vec::new(),
+            pool_folders: Default::default(),
             scope: SearchScope::AllFolders,
             search_entry: None,
             search_open: false,
@@ -1762,6 +1796,7 @@ impl SimpleComponent for MessageList {
             sort_reversed: false,
             group_by_date: crate::config::load_privacy().list_group_by_date,
             day_headings: false,
+            pills_below: crate::config::load_privacy().list_pills_below,
             headings: false,
             headings_bar: gtk::Box::new(gtk::Orientation::Horizontal, 8),
             widths: std::collections::HashMap::new(),
@@ -2288,15 +2323,18 @@ impl SimpleComponent for MessageList {
                     self.scope = scope;
                     // Scope only affects the view while a query is present.
                     if self.searching() {
+                        self.sync_look();
                         self.rebuild();
                         self.scroll_top();
                     }
                 }
             }
-            MessageListInput::SetSearchPool(pool) => {
+            MessageListInput::SetSearchPool(pool, folders) => {
                 self.search_pool = pool.into_iter().map(Rc::new).collect();
+                self.pool_folders = Rc::new(folders);
                 self.drop_threads();
-                if self.searching() && self.scope == SearchScope::AllFolders {
+                self.sync_look();
+                if self.searching() && self.scope != SearchScope::ThisFolder {
                     self.rebuild();
                 }
             }
@@ -2649,6 +2687,15 @@ impl SimpleComponent for MessageList {
                 self.hide_focus_ring();
             }
 
+            MessageListInput::ShowcaseSearch(text, scope) => {
+                self.search_open = true;
+                if let Some(entry) = &self.search_entry {
+                    if let Some(dd) = entry.next_sibling().and_downcast::<gtk::DropDown>() {
+                        dd.set_selected(scope);
+                    }
+                    entry.set_text(&text);
+                }
+            }
             MessageListInput::FocusSearch => {
                 // A field that is always there has nothing to open or close.
                 if self.search_pinned {
@@ -2816,6 +2863,12 @@ impl SimpleComponent for MessageList {
                 if self.group_by_date != on {
                     self.group_by_date = on;
                     self.queue_rebuild(true);
+                }
+            }
+            MessageListInput::SetPillsBelow(on) => {
+                if self.pills_below != on {
+                    self.pills_below = on;
+                    self.sync_look();
                 }
             }
             MessageListInput::SortByColumn(column) => {
@@ -3722,6 +3775,7 @@ impl MessageList {
             look.sender_logos = self.sender_logos;
             look.preview_lines = self.preview_lines;
             look.show_subject = self.show_subject;
+            look.pills_below = self.pills_below;
             // The palette hangs under a card; a single line has no room for
             // it, so actions come from the menu, swipes and keys there.
             look.show_palette = self.list_palette && !self.single_line;
@@ -3739,6 +3793,11 @@ impl MessageList {
             look.ringed = if self.colorize { self.account_colors.keys().copied().collect() } else { Default::default() };
             look.face_gen = self.face_gen;
             look.tags_gen = self.tags_gen;
+            look.folder_pills = Rc::new(if self.searching_pool() {
+                self.pool_folders.iter().map(|(k, f)| (*k, f.name.clone())).collect()
+            } else {
+                Default::default()
+            });
             look.widths = self.fitted_widths();
             look.min_width = self.row_min_width();
         }
@@ -4135,7 +4194,7 @@ impl MessageList {
     }
 
     fn searching_pool(&self) -> bool {
-        self.searching() && self.scope == SearchScope::AllFolders && !self.search_pool.is_empty()
+        self.searching() && self.scope != SearchScope::ThisFolder && !self.search_pool.is_empty()
     }
 
     /// The conversations of `active_source`, from the kept copy while the
@@ -4152,7 +4211,8 @@ impl MessageList {
 
     fn search_placeholder(&self) -> String {
         match self.scope {
-            SearchScope::AllFolders => i18n("Search all folders"),
+            SearchScope::AllFolders => i18n("Search all folders but Trash and Junk"),
+            SearchScope::Everywhere => i18n("Search all folders, Trash and Junk too"),
             SearchScope::ThisFolder => i18n("Search this folder"),
         }
     }
@@ -4185,8 +4245,17 @@ impl MessageList {
             tags: if self.quick.has(QuickFilter::Tagged) { self.shared.tags.borrow().clone() } else { Vec::new() },
             today: if self.quick.has(QuickFilter::Today) { start_of_today() } else { 0 },
         };
+        // An "All folders" search leaves Trash and Junk out, but for the
+        // folder the list is showing (#374).
+        let left_out: std::collections::HashSet<(u32, u32)> = if self.searching_pool() && self.scope == SearchScope::AllFolders {
+            let here: std::collections::HashSet<(u32, u32)> = self.all.iter().map(|m| (m.account_id, m.folder_id)).collect();
+            self.pool_folders.iter().filter(|(k, f)| f.waste && !here.contains(k)).map(|(k, _)| *k).collect()
+        } else {
+            Default::default()
+        };
         move |m: &Message| {
-            quick.passes(m)
+            !left_out.contains(&(m.account_id, m.folder_id))
+                && quick.passes(m)
                 && (q.is_empty()
                     || m.subject.to_lowercase().contains(&q)
                     || m.from_name.to_lowercase().contains(&q)

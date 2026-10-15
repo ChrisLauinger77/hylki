@@ -16,7 +16,7 @@ use gtk::glib;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 
 use crate::config::ListColumn;
-use crate::i18n::i18n;
+use crate::i18n::{i18n, i18n_f};
 use crate::models::{Importance, Message};
 use crate::ui::column_bin::ColumnBin;
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
@@ -713,6 +713,12 @@ pub struct RowLook {
     pub preview_lines: u32,
     /// Whether the subject line is drawn (Focus Mode can take it away).
     pub show_subject: bool,
+    /// A card's pills go on a line of their own under its text (#374).
+    pub pills_below: bool,
+    /// The folder each result of a search across folders is in, by
+    /// `(account_id, folder_id)`, worn as its first pill (#374). Empty
+    /// otherwise.
+    pub folder_pills: Rc<HashMap<(u32, u32), String>>,
     /// Whether rows carry the actions palette at all.
     pub show_palette: bool,
     /// The list shows Junk: the palette's spam button reads "Not Spam".
@@ -744,6 +750,8 @@ impl Default for RowLook {
             min_width: -1,
             preview_lines: 1,
             show_subject: true,
+            pills_below: false,
+            folder_pills: Default::default(),
             show_palette: true,
             in_junk: false,
             in_drafts: false,
@@ -1279,8 +1287,8 @@ fn due_label(due: i64) -> String {
     }
 }
 
-/// A pill as a GTK label: a tag in its color class (from the app's tag
-/// stylesheet), a Gmail label in the neutral one.
+/// A pill as a GTK label: a tag in its color class, a Gmail label in the
+/// palette color its name picks (both from the app's tag stylesheet).
 pub fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
     match pill {
         crate::models::Pill::Tag(t) => {
@@ -1293,6 +1301,7 @@ pub fn pill_label(pill: &crate::models::Pill) -> gtk::Label {
             let chip = gtk::Label::new(Some(name));
             chip.add_css_class("tag-chip");
             chip.add_css_class("label-chip");
+            chip.add_css_class(&format!("label-hue-{}", crate::models::label_hue(name)));
             chip.set_tooltip_text(Some(name));
             chip
         }
@@ -1598,6 +1607,8 @@ pub struct RowWidgets {
     chip_count: gtk::Label,
     chip_caret: gtk::Image,
     subject_line: gtk::Box,
+    /// The card's line for its pills under the text, when they go there.
+    pills_line: gtk::Box,
     subject: gtk::Label,
     tags_box: gtk::Box,
     preview_line: gtk::Box,
@@ -1629,7 +1640,7 @@ struct RowState {
     /// The address and look generation the circle was last looked up for.
     face_for: Option<(String, u64)>,
     /// The keywords, Gmail labels and tag generation the chips were built for.
-    tags_for: Option<(Vec<String>, Vec<String>, u64)>,
+    tags_for: Option<(Vec<String>, Vec<String>, u64, Option<String>)>,
     avatar_shown: bool,
     hovered: bool,
     /// The columns the widgets are laid out in on one line, or `None` for
@@ -2167,6 +2178,17 @@ impl Row {
         w.tags_box.set_visible(col(ListColumn::Tags));
         w.tags_col.set_visible(single && col(ListColumn::Tags));
         self.render_tags(msg, &shared, &look);
+        if !single {
+            let below = look.pills_below;
+            let home = if below { &w.pills_line } else { &w.subject_line };
+            if w.tags_box.parent().as_ref() != Some(home.upcast_ref()) {
+                if let Some(from) = w.tags_box.parent().and_downcast::<gtk::Box>() {
+                    from.remove(&w.tags_box);
+                }
+                home.append(&w.tags_box);
+            }
+            w.pills_line.set_visible(below && look.show_subject && w.tags_box.first_child().is_some());
+        }
 
         let preview = meta.preview.as_deref().unwrap_or(&msg.preview);
         w.preview_line.set_visible(look.preview_lines > 0);
@@ -2290,7 +2312,8 @@ impl Row {
     /// changed: one pill per tag the message carries (#71), then one per
     /// Gmail label no tag stands for (#374).
     fn render_tags(&self, msg: &Message, shared: &RowShared, look: &RowLook) {
-        let want = Some((msg.keywords.clone(), msg.labels.clone(), look.tags_gen));
+        let folder = look.folder_pills.get(&(msg.account_id, msg.folder_id)).cloned();
+        let want = Some((msg.keywords.clone(), msg.labels.clone(), look.tags_gen, folder.clone()));
         if self.st.borrow().tags_for == want {
             return;
         }
@@ -2298,6 +2321,18 @@ impl Row {
         let tags_box = &self.w.tags_box;
         while let Some(child) = tags_box.first_child() {
             tags_box.remove(&child);
+        }
+        // A result of a search across folders says where it is (#374).
+        if let Some(folder) = folder {
+            let chip = gtk::Label::new(Some(&folder));
+            chip.add_css_class("tag-chip");
+            chip.add_css_class("label-chip");
+            chip.add_css_class("folder-chip");
+            chip.set_tooltip_text(Some(&i18n_f("In {folder}", &[("folder", &folder)])));
+            chip.set_valign(gtk::Align::Center);
+            chip.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            chip.set_max_width_chars(14);
+            tags_box.append(&chip);
         }
         for pill in msg.pills(&shared.tags.borrow()) {
             let chip = pill_label(&pill);
@@ -3334,6 +3369,12 @@ fn build_widgets() -> RowWidgets {
     preview_line.append(&preview);
     text.append(&preview_line);
 
+    // The pills' own line, under the text, when the setting puts them
+    // there (#374).
+    let pills_line = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    pills_line.set_visible(false);
+    text.append(&pills_line);
+
     // The single-line layout's row (#334): empty and hidden until a row is
     // laid out that way, when the widgets above move into it.
     let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -3477,6 +3518,7 @@ fn build_widgets() -> RowWidgets {
         chip_count,
         chip_caret,
         subject_line,
+        pills_line,
         subject,
         tags_box,
         preview_line,

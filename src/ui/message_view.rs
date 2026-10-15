@@ -1539,10 +1539,14 @@ fn tag_chips_html(tags: &[crate::config::Tag], keywords: &[String], labels: &[St
                 fg = crate::color::readable_text(&t.color),
                 name = gtk::glib::markup_escape_text(&t.name),
             )),
-            crate::models::Pill::Label(name) => out.push_str(&format!(
-                "<span class=\"hylki-tag hylki-label\" title=\"{name}\">{name}</span>",
-                name = gtk::glib::markup_escape_text(&name),
-            )),
+            crate::models::Pill::Label(name) => {
+                let color = crate::config::TAG_COLORS[crate::models::label_hue(&name)];
+                out.push_str(&format!(
+                    "<span class=\"hylki-tag hylki-label\" style=\"background:{color};color:{fg}\" title=\"{name}\">{name}</span>",
+                    fg = crate::color::readable_text(color),
+                    name = gtk::glib::markup_escape_text(&name),
+                ))
+            }
         }
     }
     out
@@ -4882,7 +4886,7 @@ impl MessageView {
                  100%{{box-shadow:0 0 0 3px rgba(53,132,228,0);}}}}\
                .hylki-tag{{font-size:0.72em;font-weight:700;line-height:1.4;padding:1px 7px;\
                  border-radius:9999px;white-space:nowrap;}}\
-               .hylki-label{{background:rgba(128,128,128,0.2);color:inherit;max-width:16em;\
+               .hylki-label{{max-width:16em;\
                  overflow:hidden;text-overflow:ellipsis;}}\
                .hylki-addr{{opacity:0.55;font-size:0.9em;flex:1 1 0;max-width:max-content;\
                  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:clip;\

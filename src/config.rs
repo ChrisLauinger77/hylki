@@ -1560,6 +1560,10 @@ pub(crate) struct PrivacyFile {
     /// existing installs too (see `date_groups_default_applied`).
     #[serde(default = "default_on")]
     pub(crate) list_group_by_date: bool,
+    /// A card's tags and Gmail labels go on a line of their own under its
+    /// text, instead of at the end of the subject (#374).
+    #[serde(default)]
+    pub(crate) list_pills_below: bool,
     /// Grouping by date was turned on once for an install from before it
     /// became the default: every save writes every key, so those files
     /// carry the old `false` without anyone having chosen it. A new
@@ -1876,6 +1880,7 @@ impl Default for PrivacyFile {
             list_headings: false,
             list_column_scroll: false,
             list_group_by_date: true,
+            list_pills_below: false,
             date_groups_default_applied: true,
             list_search_open: false,
             list_column_widths: Default::default(),

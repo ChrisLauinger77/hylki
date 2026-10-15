@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Added: search results say which folder they are in** (#374, requested
+  by 3v1n0). A search across folders puts a pill with the folder's name on
+  each result.
+- **Changed: "All folders" leaves Trash and Junk out of a search** (#374).
+  **Everywhere**, new in the menu beside the search field, takes them in.
+  Searching while Trash or Junk is open still finds the mail in it.
+- **Added: Gmail labels in colors** (#374). Each label wears one of the tag
+  colors, picked from its name, in the list and the reader. A tag named
+  like the label still sets its color.
+- **Added: Settings → Message List → Tags and labels under the text**
+  (#374). A card's pills go on a line of their own under the message's
+  text, leaving the subject the full width.
+
 - **Changed: a reply sent from the reading pane becomes its card in the
   conversation.** The editor lifts out of the composer and moves to where
   the reply now sits in the conversation, turning into its card on the

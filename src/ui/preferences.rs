@@ -169,6 +169,7 @@ pub struct PrefInit {
     pub list_headings: bool,
     pub list_column_scroll: bool,
     pub list_group_by_date: bool,
+    pub list_pills_below: bool,
     pub list_search_open: bool,
     pub single_key_shortcuts: bool,
     pub gmail_keys: bool,
@@ -1311,6 +1312,8 @@ pub enum PrefOutput {
     SetListColumnScroll(bool),
     /// Date headings over a list sorted by date (#435).
     SetGroupByDate(bool),
+    /// A card's tags and labels on a line under its text (#374).
+    SetPillsBelow(bool),
     /// Keep the list's search field open (#446).
     SetListSearchOpen(bool),
     /// Every column back to its own width (#334).
@@ -2908,6 +2911,17 @@ impl Component for Preferences {
                                         },
                                     },
 
+                                    #[name = "pills_below_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Tags and labels under the text"),
+                                        set_subtitle: &i18n("Puts a card's tags and labels on a line of their own \
+                                                       under its text, where they leave the subject its \
+                                                       full width."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetPillsBelow(row.is_active()));
+                                        },
+                                    },
+
                                     #[name = "list_search_open_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Keep the search field open"),
@@ -4305,6 +4319,7 @@ impl Component for Preferences {
         widgets.list_headings_row.set_active(init.list_headings);
         widgets.list_fit_row.set_active(!init.list_column_scroll);
         widgets.group_by_date_row.set_active(init.list_group_by_date);
+        widgets.pills_below_row.set_active(init.list_pills_below);
         widgets.list_search_open_row.set_active(init.list_search_open);
         widgets.list_layout_row.set_selected(match init.list_layout {
             crate::config::ListLayout::Cards => 0,

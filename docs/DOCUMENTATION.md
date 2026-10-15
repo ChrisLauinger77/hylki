@@ -225,7 +225,8 @@ lists at most 5,000 messages per account. They are kept in
 On a Gmail account, the labels Gmail has on a message show as pills beside
 its tags, in the message list and the reader. Gmail's own labels, such as
 Inbox, Important and Starred, are left out, as is the label of the folder
-being read. A label with the same name or keyword as a tag is that tag: it
+being read. Each label has a color of its own, picked from its name; a tag
+named like the label sets the color instead. A label with the same name or keyword as a tag is that tag: it
 shows as the tag, the tag's view in the sidebar lists the message, and
 smart folders and the tag menus count it.
 
@@ -1274,11 +1275,22 @@ tagged message with its tag's color, in both layouts. A message with more
 than one tag takes the color of the one listed first in **Settings → Tags**.
 A selected row keeps the selection color. It is on unless switched off.
 
+**Settings → Message List → Tags and labels under the text** puts a card's
+tags, Gmail labels and folder pill on a line of their own under the
+message's text, so the subject keeps the row's full width. It is off unless
+switched on; a single-line list keeps them in its Tags column.
+
 **Settings → Message List → Keep the search field open** shows the search
 field above the list all the time, instead of only after the search button,
 <kbd>Ctrl+F</kbd> or <kbd>/</kbd>. One click in it starts a search.
 <kbd>Esc</kbd> clears it and returns to the list, and it stays where it is.
 It is off unless switched on.
+
+The menu beside the search field sets where a search looks. **All folders**,
+the default, searches every folder of every account except Trash and Junk,
+unless the list is showing one of them. **Everywhere** takes in Trash and
+Junk too, and **This folder** only the folder on screen. In the first two,
+each result wears a pill with the name of the folder it is in.
 
 The sort and filter button in the list's header opens a popover of two
 columns. **Sort by** orders the list by date, newest or oldest first, by
