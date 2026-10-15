@@ -89,8 +89,11 @@ puts replies or new messages in the reading pane.
 the conversation that was open. While rows are selected this way, the
 reading pane counts them and the bar above the list acts on them, as do the
 action keys; <kbd>x</kbd> again on a row takes it out. <kbd>o</kbd>,
-<kbd>Enter</kbd> or a click opens a row and ends the selection. An action key
-pressed with none selected says that a selection is needed.
+<kbd>Enter</kbd> or a click opens a row in the reading pane and ends the
+selection; with several rows selected, <kbd>o</kbd> and <kbd>Enter</kbd> do
+nothing. Deleting the selected rows leaves the cursor on the conversation
+above them, or the one below, without opening it. An action key pressed with
+none selected says that a selection is needed.
 
 <kbd>Enter</kbd> on a message that is already open opens it in a window of
 its own. A <kbd>g</kbd> or <kbd>*</kbd> waits a second and a half for the key

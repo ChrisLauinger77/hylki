@@ -862,6 +862,11 @@ impl RowShared {
         self.bound_rows().into_iter().find(|r| r.position() == Some(pos))
     }
 
+    /// The row the keyboard cursor is on, if any.
+    pub fn cursor(&self) -> Option<(u32, u32)> {
+        self.cursor.get()
+    }
+
     /// Put the keyboard cursor on the row showing `key`, or take it away.
     pub fn set_cursor(&self, key: Option<(u32, u32)>) {
         if self.cursor.replace(key) == key {

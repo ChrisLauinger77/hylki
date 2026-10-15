@@ -2604,6 +2604,11 @@ impl SimpleComponent for MessageList {
                 self.shared.set_cursor(self.shown.get(next).map(|m| (m.account_id, m.id)));
             }
             MessageListInput::OpenCursor => {
+                // Several checked are for an action, not for reading: which
+                // one to open is anyone's guess (#392).
+                if self.checking && self.selection_count > 1 {
+                    return;
+                }
                 let Some(pos) = self.cursor_position().or_else(|| self.selected_positions().first().copied()) else {
                     return;
                 };
@@ -3017,8 +3022,9 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::RowActivated(index) => {
                 // With Gmail's keys, Enter on the row the cursor reached opens
-                // it here, as o does; a row already open goes to a window.
-                if self.gmail_keys && !self.shared.selection.is_selected(index as u32) {
+                // it here, as o does, checked or not (#392); a row already
+                // open goes to a window.
+                if self.gmail_keys && (self.checking || !self.shared.selection.is_selected(index as u32)) {
                     sender.input(MessageListInput::OpenCursor);
                     return;
                 }
@@ -3163,7 +3169,17 @@ impl SimpleComponent for MessageList {
                 }
                 // Keep the header count honest; no rebuild follows.
                 self.total_matches = self.total_matches.saturating_sub(shown_before - self.shown.len());
-                if was_viewed {
+                if self.checking {
+                    // Checked rows deleted (#392): the keyboard goes to the
+                    // conversation above them, else the one below, outlined
+                    // but neither checked nor opened.
+                    let cursor_gone = self.shared.cursor().is_some_and(|(_, i)| set.contains(&i));
+                    if let Some(idx) = first_removed.filter(|_| (cursor_gone || had_focus) && !self.shown.is_empty()) {
+                        let pos = if idx > 0 { self.conversation_step(Some(idx), -1) } else { 0 };
+                        self.focus_row(pos);
+                        self.shared.set_cursor(self.shown.get(pos).map(|m| (m.account_id, m.id)));
+                    }
+                } else if was_viewed {
                     match first_removed {
                         Some(idx) if !self.shown.is_empty() => {
                             let next = self.advance_index(idx);

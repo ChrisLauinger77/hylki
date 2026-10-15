@@ -136,8 +136,11 @@
   open, not from the conversation's first.
 - **Changed: Gmail's x selects without opening** (#392). The reading pane
   counts the selected conversations and the bar above the list acts on them;
-  **o**, **Enter** or a click opens a row and ends the selection. An action
-  key pressed with nothing selected says a selection is needed.
+  **o**, **Enter** or a click opens a row and ends the selection, in the
+  reading pane, and with several selected **o** and **Enter** do nothing. An
+  action key pressed with nothing selected says a selection is needed.
+  Deleting the selection leaves the cursor on the conversation above it, or
+  the one below, without opening it.
 - **Changed: Archive on Gmail leaves mail under its label** (#392). From a
   label, Starred, Sent or All Mail, archiving takes the conversation out of
   the Inbox, as Gmail does, instead of moving it to All Mail, which took the
