@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Changed: a reply sent from the reading pane becomes its card in the
+  conversation.** The editor lifts out of the composer and moves to where
+  the reply now sits in the conversation, turning into its card on the
+  way, instead of the composer sliding away and the reply turning up once
+  its copy is read back from Sent. The card stays in the conversation
+  until that copy arrives, and goes again if the server refuses the
+  message.
+- **Changed: animations follow GNOME's own Reduce Animation switch.**
+  GNOME Shell turns animations off in every app while a remote desktop
+  session is connected; Hylki now keeps them unless the switch itself is
+  off. The Flatpak cannot read the switch and goes on as before.
+
 - **Changed: the list is grouped by date by default** (#435), on installs
   that had the switch off too, since it was never asked. **Settings →
   Message List → Group by date** turns it off, and that sticks.

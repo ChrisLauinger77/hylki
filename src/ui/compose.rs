@@ -646,7 +646,9 @@ pub enum ComposeInput {
 
 #[derive(Debug)]
 pub enum ComposeOutput {
-    Send(Box<OutgoingMessage>),
+    /// Send the message. Carries the composer's id, so the app knows which
+    /// pane it came from.
+    Send { id: u32, message: Box<OutgoingMessage> },
     /// Save the message to the Drafts folder (no send).
     SaveDraft(Box<OutgoingMessage>),
     /// Save the message to the Templates folder (#360), replacing the
@@ -3018,7 +3020,7 @@ impl Component for Compose {
                 if self.template {
                     out.draft_origin = None;
                 }
-                let _ = sender.output(ComposeOutput::Send(Box::new(out)));
+                let _ = sender.output(ComposeOutput::Send { id: self.compose_id, message: Box::new(out) });
                 let _ = sender.output(ComposeOutput::Close(self.compose_id));
             }
 

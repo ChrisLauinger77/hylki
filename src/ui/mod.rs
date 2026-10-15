@@ -31,6 +31,7 @@ pub mod preferences;
 pub mod print_preview;
 pub mod recipient_row;
 pub mod rich_editor;
+pub mod send_morph;
 pub mod sidebar;
 pub mod theme_picker;
 pub mod tool_flow;

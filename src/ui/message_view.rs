@@ -156,6 +156,9 @@ pub struct MessageView {
     /// its first card), not flush at the top the way a place the user
     /// scrolled to is restored.
     anchor_gutter: bool,
+    /// The next document goes in without the page crossfade: a sent reply's
+    /// card is arriving, and the app's stage covers the pane while it does.
+    skip_fade: bool,
     /// What each message's frame measured last time it was shown, so reopening a
     /// conversation lays out right away instead of settling into place.
     frame_heights: std::collections::HashMap<(u32, u32), u32>,
@@ -1212,6 +1215,10 @@ pub enum MessageViewInput {
     /// the viewport top and the offset into it — kept so a re-render can put
     /// the reader back where they were.
     ScrollAnchor { account_id: u32, id: u32, offset: u32 },
+    /// A sent reply's card is joining the conversation: the next document
+    /// pins it in view, below the page's top gutter, and goes in without the
+    /// page crossfade.
+    PinArrival { account_id: u32, id: u32 },
     /// The list shows Drafts (or not): the empty pane's wording follows.
     SetDraftsView(bool),
     /// Which folders are Templates folders, as (account, folder) (#360).
@@ -2151,6 +2158,7 @@ impl Component for MessageView {
             autoscroll_lone: false,
             saved_anchor: None,
             anchor_gutter: false,
+            skip_fade: false,
             drafts_view: false,
             template_folders: std::collections::HashSet::new(),
             frame_heights: std::collections::HashMap::new(),
@@ -3679,6 +3687,13 @@ impl Component for MessageView {
                 self.saved_anchor = Some((account_id, id, offset));
                 self.anchor_gutter = false;
             }
+            MessageViewInput::PinArrival { account_id, id } => {
+                self.saved_anchor = Some((account_id, id, 0));
+                self.anchor_gutter = true;
+                // The anchor rides only on a document that keeps its place.
+                self.did_autoscroll = true;
+                self.skip_fade = true;
+            }
             MessageViewInput::SetDraftsView(on) => {
                 self.drafts_view = on;
             }
@@ -3858,7 +3873,7 @@ impl MessageView {
         }
         // Only a page that stays in view dissolves into the next; behind the
         // spinner there is nothing to see.
-        let fade = self.webview_ready && !self.loading;
+        let fade = self.webview_ready && !self.loading && !std::mem::take(&mut self.skip_fade);
         let html = self.document_html(dark);
         // A message painted alone that has since grown into a conversation
         // gets the conversation's open scroll, unless the reader has been

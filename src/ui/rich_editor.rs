@@ -653,6 +653,9 @@ impl RichEditor {
         // Same card treatment as the address fields' boxed-list: shadow and
         // radius from libadwaita, with the WebView clipped to the corners.
         frame.add_css_class("card");
+        // Found by name when a sent reply's editor turns into its card in
+        // the conversation (send_morph.rs).
+        frame.add_css_class("compose-editor-card");
         frame.set_overflow(gtk::Overflow::Hidden);
         frame.set_child(Some(&stack));
 

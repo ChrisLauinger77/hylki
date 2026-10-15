@@ -390,6 +390,34 @@ struct ComposeHost {
     window: adw::Window,
 }
 
+/// A reply on its way from the split pane into its conversation: its card,
+/// the composer it was written in, and the conversation it answers.
+struct MorphPending {
+    message: Message,
+    composer: gtk::Widget,
+    conversation: (u32, u32),
+}
+
+/// The card a reply sent from the split pane has in its conversation until
+/// its copy is read back from Sent (send_morph.rs).
+struct Provisional {
+    message: Message,
+    /// The Message-ID it answers.
+    answers: String,
+}
+
+impl Provisional {
+    /// Whether `m` is this reply's own copy: from the same account, dated
+    /// when this was sent (by this machine's clock either way), and
+    /// answering the same message.
+    fn copied_by(&self, m: &Message) -> bool {
+        m.uid != 0
+            && m.account_id == self.message.account_id
+            && m.timestamp >= self.message.timestamp - 30
+            && m.references.split_whitespace().any(|x| x == self.answers)
+    }
+}
+
 /// The reader's inline reply/forward composer. `window` is `Some` only while the
 /// pane has been promoted to a floating window (else it lives in the reader's
 /// drop-down revealer).
@@ -544,6 +572,9 @@ struct ReaderCompose {
     id: u32,
     controller: Controller<Compose>,
     window: Option<adw::Window>,
+    /// The message a split reply answers, by (account, id): its card in the
+    /// reader is the one the reply was opened from.
+    answering: Option<(u32, u32)>,
 }
 
 /// Files handed in from outside the app (GNOME Files' "Send with Hylki",
@@ -611,6 +642,21 @@ pub struct AppModel {
     composers: Vec<ComposeHost>,
     /// The reader's inline reply/forward composer, if open.
     reader_compose: Option<ReaderCompose>,
+    /// The stage over the reading pane that turns a sent split reply into
+    /// its card in the conversation (send_morph.rs).
+    send_morph: crate::ui::send_morph::SendMorph,
+    /// A reply just sent from the split pane, with the card it gets in the
+    /// conversation and whether it moves there: (composer id, message,
+    /// animated), until that composer closes.
+    arriving: Option<(u32, Message, bool)>,
+    /// A sent reply whose morph is under way, until the pane changes under
+    /// the stage.
+    morph_pending: Option<MorphPending>,
+    /// The app's own input, for the morph's steps that answer later.
+    self_sender: relm4::Sender<AppMsg>,
+    /// The cards standing in for replies sent from here until their copies
+    /// are read back from Sent, by (account, id).
+    provisionals: HashMap<(u32, u32), Provisional>,
     /// Superseded inline composers still finishing a save-if-dirty before closing.
     draining_composers: Vec<(u32, Controller<Compose>)>,
     /// SlideDown revealer under the reader toolbar that hosts the inline pane.
@@ -1808,6 +1854,12 @@ pub enum AppMsg {
     /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
     ShowcaseFolder { kind: FolderKind, account: Option<u32> },
+    /// Showcase only (HYLKI_SHOWCASE_SEND): write `text` in the split
+    /// reply's editor and send it, to watch the send morph.
+    ShowcaseSend(String),
+    /// Showcase only (HYLKI_SHOWCASE_COPY): the sent reply's copy is read
+    /// back, made up from its stand-in card, as a server's would be.
+    ShowcaseCopy,
     /// Showcase only (HYLKI_SHOWCASE_NOTIFY): post the new-mail notification
     /// for the active account's newest Inbox message, focus or not, so the
     /// notification, its buttons and its sound can be tried without
@@ -1875,7 +1927,13 @@ pub enum AppMsg {
     ViewSource,
     /// User clicked "Load attachments" for a message whose attachments weren't
     /// pre-downloaded — fetch them from the server now.
-    SendMessage(Box<OutgoingMessage>),
+    /// A composer sent a message; `from` is that composer's id.
+    SendMessage { from: u32, out: Box<OutgoingMessage> },
+    /// Where the conversation's cards stood when a reply was sent has been
+    /// measured: the pane can change under the send morph's stage.
+    SendMorphMeasured,
+    /// The pane could not be captured for the send morph.
+    SendMorphFailed,
     SaveDraftMessage(Box<OutgoingMessage>),
     /// Save a message to the Templates folder (#360): a composer's Save as
     /// Template, or an edited template saved back.
@@ -3217,6 +3275,11 @@ impl SimpleComponent for AppModel {
             accounts_seed: None,
             composers: Vec::new(),
             reader_compose: None,
+            send_morph: crate::ui::send_morph::SendMorph::new(),
+            arriving: None,
+            morph_pending: None,
+            self_sender: sender.input_sender().clone(),
+            provisionals: HashMap::new(),
             draining_composers: Vec::new(),
             reader_split_top: {
                 let r = gtk::Revealer::new();
@@ -3798,6 +3861,7 @@ impl SimpleComponent for AppModel {
         // The app-wide theme choice must be in force before the first frame.
         apply_app_theme(model.app_theme);
         crate::text_scale::apply(model.text_scale);
+        follow_motion_setting();
         let reader_tag_btn = model.reader_tag_btn.clone();
         let reader_move_btn = model.reader_move_btn.clone();
         let widgets = view_output!();
@@ -3998,6 +4062,8 @@ impl SimpleComponent for AppModel {
             let overlay = gtk::Overlay::new();
             overlay.set_child(Some(split));
             overlay.add_overlay(&model.reader_compose_revealer);
+            // Over everything: the send morph's stage covers the whole pane.
+            overlay.add_overlay(&model.send_morph);
             widgets.reader_bin.set_child(Some(&overlay));
         }
         // The attachments gallery is the content stack's second page. Wrap it in a
@@ -5164,11 +5230,38 @@ impl SimpleComponent for AppModel {
                         });
                     }
                 }
+                // HYLKI_SHOWCASE_SEND=<seconds>[:<text>|:@<file>] writes in the
+                // reply's editor and sends it at that moment, for the send
+                // morph.
+                if let Ok(v) = std::env::var("HYLKI_SHOWCASE_SEND") {
+                    let (at, text) = v.split_once(':').unwrap_or((v.as_str(), "Sounds good, ship it.\nJason"));
+                    let at = at.parse::<f64>().unwrap_or(9.0);
+                    // `@<path>` reads the text from a file.
+                    let text = match text.strip_prefix('@') {
+                        Some(path) => std::fs::read_to_string(path).unwrap_or_default(),
+                        None => text.replace("\\n", "\n"),
+                    };
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
+                        s.input(AppMsg::ShowcaseSend(text));
+                    });
+                }
+                // HYLKI_SHOWCASE_COPY=<seconds> has the sent reply's copy
+                // read back then, so its stand-in card can be seen to give
+                // way to it.
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_COPY").ok().and_then(|v| v.parse::<f64>().ok()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
+                        s.input(AppMsg::ShowcaseCopy);
+                    });
+                }
                 // Two seconds on, it logs where focus landed (#266).
-                if std::env::var("HYLKI_SHOWCASE_REPLY").is_ok() {
+                if let Ok(v) = std::env::var("HYLKI_SHOWCASE_REPLY") {
+                    // A number is the moment, in seconds (4 otherwise).
+                    let at = v.parse::<u32>().unwrap_or(4);
                     let s = sender.clone();
                     let window = root.clone();
-                    gtk::glib::timeout_add_seconds_local_once(4, move || {
+                    gtk::glib::timeout_add_seconds_local_once(at, move || {
                         s.input(AppMsg::Reply);
                         // After the split's slide, which focus waits for.
                         gtk::glib::timeout_add_seconds_local_once(2, move || showcase_log_focus(&window));
@@ -6615,6 +6708,12 @@ impl SimpleComponent for AppModel {
                 // Navigating away releases any inline reply (save-if-dirty, or keep
                 // it as an independent window if it was popped out).
                 self.release_reader_compose();
+                // A sent reply still on its way into the conversation left
+                // behind: the reader shows the new message at once.
+                let elsewhere = self.current.as_ref().is_some_and(|c| (c.account_id, c.id) != (m.account_id, m.id));
+                if elsewhere && self.send_morph.running() {
+                    self.send_morph.finish();
+                }
                 // A queued message reads like any other, straight from the bytes
                 // already on disk — no folder, no UID, nothing to ask the server.
                 if let Some(item) = self.outbox_item(m.account_id, m.id) {
@@ -9374,7 +9473,18 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SendMessage(out) => {
+            AppMsg::SendMessage { from, out } => {
+                // A reply sent from the split pane becomes its own card in
+                // the conversation, instead of sliding away (send_morph.rs):
+                // its card is built now, for the composer's close to carry
+                // the editor to.
+                self.arriving = None;
+                if self.reply_joins(from, &out) {
+                    match self.provisional_message(&out) {
+                        Some(m) => self.arriving = Some((from, m, motion_wanted())),
+                        None => tracing::info!(target: "hylki::morph", "no send morph: the reply's card could not be built"),
+                    }
+                }
                 let account_id = out.from_account_id;
                 // Remember who this went to, now, whatever route it takes
                 // from here (straight out, the Outbox, Send Later): the next
@@ -9528,6 +9638,87 @@ impl SimpleComponent for AppModel {
                     r.controller.emit(ComposeInput::Cancel);
                 }
             }
+            AppMsg::SendMorphMeasured => self.send_morph_swap(),
+            AppMsg::SendMorphFailed => self.send_morph_failed(),
+
+            AppMsg::ShowcaseCopy => {
+                let Some(current) = self.current.clone() else { return };
+                let Some(p) = self.provisionals.values().next() else { return };
+                let mut copy = p.message.clone();
+                copy.uid = 9_999;
+                copy.message_id = "showcase-copy@hylki.local".into();
+                tracing::info!(target: "hylki::morph", "showcase: the copy of {} arrives", p.message.id);
+                self.merge_related(current.account_id, current.id, vec![copy]);
+                self.show_thread();
+                // The window once the copy has painted, beside the morph's
+                // own last frame, to hold the two against each other.
+                if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
+                    let window: gtk::Widget = self.window.clone().upcast();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(1200), move || {
+                        crate::ui::send_morph::capture_next_frame(&window.clone(), move |still| {
+                            if let Some((tex, _)) = still {
+                                let _ = tex.save_to_png(std::path::Path::new(&dir).join("zz-copy.png"));
+                            }
+                        });
+                    });
+                }
+            }
+
+            AppMsg::ShowcaseSend(text) => {
+                // Every frame interval for a second and a half, to compare
+                // the send morph with the slide it replaces.
+                if let Some(clock) = self.window.frame_clock() {
+                    let last = std::rc::Rc::new(std::cell::Cell::new(0i64));
+                    let id = clock.connect_after_paint(move |c| {
+                        let now = c.frame_time();
+                        if last.get() > 0 {
+                            tracing::debug!(target: "hylki::frames", "frame {} ms", (now - last.get()) / 1000);
+                        }
+                        last.set(now);
+                    });
+                    let c2 = clock.clone();
+                    let cell = std::rc::Rc::new(std::cell::Cell::new(Some(id)));
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(2500), move || {
+                        if let Some(id) = cell.take() {
+                            c2.disconnect(id);
+                        }
+                    });
+                }
+                let Some(rc) = self.reader_compose.as_ref().map(|r| &r.controller) else { return };
+                let editor = crate::ui::send_morph::find_widget(rc.widget().upcast_ref(), &|w| {
+                    w.is::<webkit6::WebView>()
+                })
+                .and_downcast::<webkit6::WebView>();
+                let Some(editor) = editor else { return };
+                let js = format!(
+                    "document.body.focus();{}",
+                    text.split('\n')
+                        .map(|l| format!("document.execCommand('insertText',false,{});", serde_json::to_string(l).unwrap_or_default()))
+                        .collect::<Vec<_>>()
+                        .join("document.execCommand('insertParagraph');")
+                );
+                webkit6::prelude::WebViewExt::evaluate_javascript(&editor, &js, None, None, None::<&gtk::gio::Cancellable>, |_| {});
+                let c = rc.sender().clone();
+                gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
+                    c.emit(ComposeInput::Send);
+                });
+                // The whole window every quarter second for six seconds from
+                // Send, to see what the reader does while the message goes.
+                if let Some(dir) = std::env::var_os("HYLKI_MORPH_FRAMES") {
+                    let window: gtk::Widget = self.window.clone().upcast();
+                    for i in 0..24u64 {
+                        let (dir, window) = (dir.clone(), window.clone());
+                        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600 + i * 250), move || {
+                            crate::ui::send_morph::capture_next_frame(&window.clone(), move |still| {
+                                if let Some((tex, _)) = still {
+                                    let _ = tex.save_to_png(std::path::Path::new(&dir).join(format!("win-{:05}.png", i * 250)));
+                                }
+                            });
+                        });
+                    }
+                }
+            }
+
             AppMsg::ComposeClosed(id) => {
                 self.close_compose(id);
                 self.message_list.emit(MessageListInput::ReclaimFocus);
@@ -9572,7 +9763,10 @@ impl SimpleComponent for AppModel {
                 self.reload_related(account_id);
             }
 
-            AppMsg::Unsent { account_id, message } => self.compose_unsent(account_id, *message, &sender),
+            AppMsg::Unsent { account_id, message } => {
+                self.drop_provisional(&message.in_reply_to);
+                self.compose_unsent(account_id, *message, &sender);
+            }
 
             AppMsg::OpenAccounts => self.open_settings_window(&sender, true, false),
 
@@ -17131,7 +17325,7 @@ impl AppModel {
         Compose::builder()
             .launch(init)
             .forward(sender.input_sender(), |out| match out {
-                ComposeOutput::Send(msg) => AppMsg::SendMessage(msg),
+                ComposeOutput::Send { id, message } => AppMsg::SendMessage { from: id, out: message },
                 ComposeOutput::SaveDraft(msg) => AppMsg::SaveDraftMessage(msg),
                 ComposeOutput::SaveTemplate(msg) => AppMsg::SaveTemplateMessage(msg),
                 ComposeOutput::AutoSave { id, message } => AppMsg::AutoSaveDraft { id, message },
@@ -17770,6 +17964,255 @@ impl AppModel {
         anim.play();
     }
 
+    /// Whether a message the composer `from` just sent becomes its own card
+    /// in the conversation: a reply to the conversation on screen, sent now
+    /// from the split pane beside it.
+    fn reply_joins(&self, from: u32, out: &OutgoingMessage) -> bool {
+        let skip = |why: &str| {
+            tracing::info!(target: "hylki::morph", "no send morph: {why}");
+            false
+        };
+        let Some(r) = self.reader_compose.as_ref().filter(|r| r.id == from) else { return false };
+        if r.window.is_some() || self.showing_contacts || self.live_split().is_none() {
+            return skip("not sent from the split beside the reader");
+        }
+        // A message sent later is not in Sent yet; one that starts a
+        // conversation does not join this one.
+        if out.send_at.is_some() {
+            return skip("sent later");
+        }
+        let Some(current) = self.current.as_ref() else { return skip("nothing open in the reader") };
+        // The reply answers a card of the conversation on screen: the one
+        // the split was opened from, or failing that, by its Message-ID.
+        let joins = std::iter::once(current).chain(self.current_thread.iter()).any(|m| {
+            r.answering == Some((m.account_id, m.id))
+                || (!out.in_reply_to.is_empty() && m.message_id == out.in_reply_to)
+        });
+        if !joins {
+            return skip("answers a message not in the conversation on screen");
+        }
+        true
+    }
+
+    /// The card a sent reply has in the conversation until its copy is read
+    /// back from Sent: the same body that copy will have, filed where it
+    /// will be filed.
+    fn provisional_message(&mut self, out: &OutgoingMessage) -> Option<Message> {
+        let account_id = out.from_account_id;
+        let account = self.effective_config().get(account_id.checked_sub(1)? as usize)?;
+        // The body its copy will have; failing that, what was written.
+        let body = worker::sent_body_preview(account, out).unwrap_or_else(|| {
+            tracing::info!(target: "hylki::morph", "the reply's card shows the text as written");
+            worker::wrap_plain(&out.body)
+        });
+        let (from_name, from_addr) = out
+            .from_alias
+            .as_deref()
+            .and_then(|a| worker::parse_recipients(a).into_iter().next())
+            .unwrap_or_else(|| (account.name.clone(), account.email.clone()));
+        let folder_id = self
+            .sent_copy_path(account_id)
+            .and_then(|p| self.folders.get(&account_id)?.iter().find(|f| f.path == p).map(|f| f.id))
+            .or_else(|| self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.id))
+            .or_else(|| self.current.as_ref().map(|m| m.folder_id))?;
+        self.related_id_seq = self.related_id_seq.saturating_sub(1);
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as i64);
+        Some(Message {
+            id: self.related_id_seq,
+            account_id,
+            folder_id,
+            uid: 0,
+            from_name,
+            from_addr,
+            reply_to: out.reply_to.clone(),
+            to: out.to.clone(),
+            cc: out.cc.clone(),
+            subject: out.subject.clone(),
+            preview: out.body.chars().take(200).collect(),
+            body,
+            date: String::new(),
+            timestamp,
+            unread: false,
+            starred: false,
+            keywords: Vec::new(),
+            has_attachment: !out.attachments.is_empty(),
+            message_id: String::new(),
+            references: format!("{} {}", out.references, out.in_reply_to).trim().to_string(),
+            importance: Default::default(),
+            due: 0,
+            labels: Vec::new(),
+        })
+    }
+
+    /// Start turning the sent split reply into its card (send_morph.rs).
+    /// The composer stays on screen until a still of the pane has been
+    /// taken and the conversation's cards measured; then the pane changes
+    /// under the stage ([`Self::send_morph_swap`]). False when there is no
+    /// split to morph from; the composer then slides away as it always has.
+    fn begin_send_morph(&mut self, message: Message, composer: &gtk::Widget) -> bool {
+        use crate::ui::send_morph::{find_widget, Pieces};
+        let Some((slot, _, _)) = self.live_split() else { return false };
+        let reader = self.reader_split_lower.start_child();
+        let view = self.reader_web_view();
+        let editor = find_widget(composer, &|w| w.has_css_class("compose-editor-card"));
+        let (Some(reader), Some(view), Some(editor)) = (reader, view, editor) else {
+            tracing::info!(target: "hylki::morph", "no send morph: the pane's parts were not found");
+            return false;
+        };
+        if self.send_morph.parent().is_none() {
+            return false;
+        }
+        let Some(conversation) = self.current.as_ref().map(|c| (c.account_id, c.id)) else { return false };
+        tracing::info!(target: "hylki::morph", "send morph: starting");
+        self.morph_pending = Some(MorphPending { message, composer: composer.clone(), conversation });
+        let header = self.reader_header.get().map(|h| h.clone().upcast::<gtk::Widget>());
+        let header_shown = header
+            .as_ref()
+            .and_then(|h| h.ancestor(adw::ToolbarView::static_type()))
+            .and_downcast::<adw::ToolbarView>()
+            .is_some_and(|tv| tv.reveals_top_bars());
+        let editor_view = find_widget(&editor, &|w| w.is::<webkit6::WebView>()).and_downcast::<webkit6::WebView>();
+        let pieces = Pieces {
+            root: self.reader_split.clone().upcast(),
+            composer: slot.upcast(),
+            editor,
+            reader,
+            view,
+            header,
+            header_shown,
+            editor_view,
+        };
+        let s = self.self_sender.clone();
+        crate::ui::send_morph::start(&self.send_morph, pieces, move |ok| {
+            s.emit(if ok { AppMsg::SendMorphMeasured } else { AppMsg::SendMorphFailed });
+        });
+        true
+    }
+
+    /// The pane could not be captured for the send morph: the composer
+    /// slides away instead, and the reply joins its conversation plainly.
+    fn send_morph_failed(&mut self) {
+        let Some(pending) = self.morph_pending.take() else { return };
+        // The reply never leaves the pane: the composer goes at once and
+        // the card is in the conversation in the same moment.
+        if self.composer_in_split(&pending.composer) {
+            self.reveal_reader_header_at_once();
+            self.clear_compose_slots();
+        }
+        self.join_conversation(pending.message, pending.conversation, true);
+    }
+
+    /// The pane changes under the send morph's stage: the split goes at
+    /// once, the reader has its header back, and the reply joins the
+    /// conversation pinned in view. Once its card has settled the stage
+    /// carries the editor to it. A morph ended early (another message
+    /// opened, a new reply begun) leaves only the reply joining.
+    fn send_morph_swap(&mut self) {
+        let Some(pending) = self.morph_pending.take() else { return };
+        let morphing = self.send_morph.running();
+        if morphing {
+            self.send_morph.show();
+            self.reveal_reader_header_at_once();
+        }
+        // Only the composer that sent it: a new reply may hold the slot now.
+        if self.composer_in_split(&pending.composer) {
+            if !morphing {
+                self.reveal_reader_header_at_once();
+            }
+            self.clear_compose_slots();
+        }
+        let (account_id, id) = (pending.message.account_id, pending.message.id);
+        let joined = self.join_conversation(pending.message, pending.conversation, true);
+        if !morphing {
+            return;
+        }
+        let root: gtk::Widget = self.reader_split.clone().upcast();
+        match (self.reader_split_lower.start_child(), self.reader_web_view()) {
+            (Some(reader), Some(view)) if joined => {
+                let header = self.reader_header.get().map(|h| h.clone().upcast::<gtk::Widget>());
+                crate::ui::send_morph::await_arrival(&self.send_morph, &root, &reader, &view, header, format!("{account_id}:{id}"));
+            }
+            _ => self.send_morph.abort(),
+        }
+    }
+
+    /// The reader's web view, which shows the conversation.
+    fn reader_web_view(&self) -> Option<webkit6::WebView> {
+        crate::ui::send_morph::find_widget(self.message_view.widget().upcast_ref(), &|w| w.is::<webkit6::WebView>())
+            .and_downcast::<webkit6::WebView>()
+    }
+
+    /// Whether `composer` is still the one in the split slot.
+    fn composer_in_split(&self, composer: &gtk::Widget) -> bool {
+        self.live_split().is_some_and(|(slot, _, _)| composer.is_ancestor(&slot))
+    }
+
+    /// Put a sent reply's card in the conversation it answers, if that is
+    /// the one on screen, pinned in view when `pin`; either way it stands in
+    /// until the copy is read back from Sent. True when it went on screen.
+    fn join_conversation(&mut self, message: Message, conversation: (u32, u32), pin: bool) -> bool {
+        let (account_id, id) = (message.account_id, message.id);
+        let answers = message.references.split_whitespace().last().unwrap_or_default().to_string();
+        self.provisionals.insert((account_id, id), Provisional { message: message.clone(), answers });
+        let Some(current) = self.current.clone().filter(|c| (c.account_id, c.id) == conversation) else {
+            return false;
+        };
+        if self.current_thread.is_empty() {
+            self.current_thread.push(current);
+        }
+        self.current_thread.push(message);
+        // A document is on screen already: the next one replaces it in
+        // place, never behind the spinner.
+        self.thread_painted = true;
+        if pin {
+            self.message_view.emit(MessageViewInput::PinArrival { account_id, id });
+        }
+        self.show_thread();
+        true
+    }
+
+    /// Take a sent reply's stand-in card out of the conversation: its send
+    /// was refused, and the composer is back.
+    fn drop_provisional(&mut self, in_reply_to: &str) {
+        let refused: Vec<(u32, u32)> =
+            self.provisionals.iter().filter(|(_, p)| p.answers == in_reply_to).map(|(k, _)| *k).collect();
+        if refused.is_empty() {
+            return;
+        }
+        for k in &refused {
+            self.provisionals.remove(k);
+        }
+        let before = self.current_thread.len();
+        self.current_thread.retain(|m| !refused.contains(&(m.account_id, m.id)));
+        if self.current_thread.len() != before {
+            self.show_thread();
+        }
+    }
+
+    /// Put the reader's header bar back without its slide: the send morph's
+    /// stage is drawing the pane meanwhile, and needs the header where it
+    /// ends up, now.
+    fn reveal_reader_header_at_once(&self) {
+        self.message_view.emit(MessageViewInput::SetUnderSplit(false));
+        let Some(header) = self.reader_header.get() else { return };
+        header.set_opacity(1.0);
+        let tv = header
+            .ancestor(adw::ToolbarView::static_type())
+            .and_downcast::<adw::ToolbarView>();
+        if let Some(tv) = tv {
+            if !tv.reveals_top_bars() {
+                // libadwaita skips the slide of an unmapped toolbar view and
+                // simply shows the bar; hidden and shown again in one turn,
+                // nothing of it reaches the screen.
+                tv.set_visible(false);
+                tv.set_reveal_top_bars(true);
+                tv.set_visible(true);
+            }
+        }
+    }
+
     /// Slide the reader's header bar in or out of its toolbar view, fading
     /// its icons with it. The toolbar view animates the bar's height (its
     /// reveal-top-bars transition), so the content below slides rather than
@@ -17879,6 +18322,9 @@ impl AppModel {
         sender: &ComponentSender<Self>,
     ) {
         let contextual = focus.is_some();
+        // A sent reply still settling into the conversation lands at once:
+        // the new composer opens over the pane as it really is.
+        self.send_morph.finish();
         // Supersede any composer already in the reader slot first.
         self.release_reader_compose();
         let (id, mut init) = self.build_compose_init(account_id, prefill, false, true);
@@ -18002,7 +18448,7 @@ impl AppModel {
             gtk::glib::idle_add_local_once(move || s.set_reveal_child(true));
             controller.emit(ComposeInput::FocusInitial);
         }
-        self.reader_compose = Some(ReaderCompose { id, controller, window: None });
+        self.reader_compose = Some(ReaderCompose { id, controller, window: None, answering: focus });
         // A fresh composer has nothing to take back yet; the last one's
         // labels must not carry over into its menu.
         self.compose_history = (None, None);
@@ -18097,12 +18543,27 @@ impl AppModel {
                     window.destroy();
                 }
                 None => {
-                    // Cancel/send on either inline composer: slide it out,
-                    // not blink it.
-                    if self.live_split().is_some() {
-                        self.animate_split_close();
-                    } else {
-                        self.animate_cover_close();
+                    // A sent split reply turns into its card; cancel, and
+                    // a send that cannot, slide it out rather than blink it.
+                    match self.arriving.take().filter(|(cid, _, _)| *cid == id) {
+                        Some((_, m, animated)) => {
+                            if !animated {
+                                tracing::info!(target: "hylki::morph", "no send morph: animations are off");
+                            }
+                            if !(animated && self.begin_send_morph(m.clone(), r.controller.widget().upcast_ref())) {
+                                // No morph, but the reply still never
+                                // leaves the pane: the composer goes at once
+                                // and the card is in the conversation.
+                                let conversation = self.current.as_ref().map(|c| (c.account_id, c.id));
+                                self.reveal_reader_header_at_once();
+                                self.clear_compose_slots();
+                                if let Some(conversation) = conversation {
+                                    self.join_conversation(m, conversation, true);
+                                }
+                            }
+                        }
+                        None if self.live_split().is_some() => self.animate_split_close(),
+                        None => self.animate_cover_close(),
                     }
                     self.reader_overflow_btn.set_visible(self.reader_overflow_wanted());
                 }
@@ -18171,19 +18632,56 @@ impl AppModel {
             self.current_thread.clone()
         };
         let messages = dedupe_label_copies(messages, &conv, current.folder_id);
+        // A reply sent from here, read back from Sent, takes over the card
+        // that stood in for it, and that card's id, so the card stays where
+        // it is. Its body, until its own is loaded, is the stand-in's: the
+        // same bytes, built the same way.
+        let mut stood_in: HashMap<(u32, u32, u32), String> = HashMap::new();
+        for r in &messages {
+            let took_over = self.provisionals.iter().find(|(_, p)| p.copied_by(r)).map(|(k, _)| *k);
+            if let Some(key) = took_over {
+                let p = self.provisionals.remove(&key).expect("found above");
+                self.related_ids.insert((r.account_id, r.folder_id, r.uid), key.1);
+                conv.retain(|m| (m.account_id, m.id) != key);
+                stood_in.insert((r.account_id, r.folder_id, r.uid), p.message.body);
+            }
+        }
+        // A copy already in the conversation (listed with it) retires its
+        // stand-in too.
+        let retired: Vec<(u32, u32)> = self
+            .provisionals
+            .iter()
+            .filter(|(k, p)| conv.iter().any(|m| (m.account_id, m.id) != **k && p.copied_by(m)))
+            .map(|(k, _)| *k)
+            .collect();
+        for k in &retired {
+            self.provisionals.remove(k);
+            conv.retain(|m| (m.account_id, m.id) != *k);
+        }
         let mut added = Vec::new();
         for mut r in messages {
             if conv.iter().any(|m| m.folder_id == r.folder_id && m.uid == r.uid) {
                 continue; // already in the conversation, from this folder's own index
             }
+            let body = stood_in.remove(&(r.account_id, r.folder_id, r.uid));
             r.id = self.related_id(&r);
             r.unread = false;
             if let Some(b) = self.body_cache.get(&body_key(&r)) {
                 r.body = b.clone();
+            } else if let Some(b) = body {
+                r.body = b;
             }
             added.push(r);
         }
-        if added.is_empty() {
+        // A reply sent from here whose copy is not back yet keeps its card
+        // in the conversation it answers, however the conversation was put
+        // together again.
+        for (k, p) in &self.provisionals {
+            if !conv.iter().any(|m| (m.account_id, m.id) == *k) && conv.iter().any(|m| m.message_id == p.answers) {
+                added.push(p.message.clone());
+            }
+        }
+        if added.is_empty() && retired.is_empty() {
             return;
         }
         conv.extend(added);
@@ -23616,6 +24114,32 @@ fn read_label(read: bool) -> String {
 fn sender_label(message: &Message) -> String {
     let name = message.from_name.trim();
     if name.is_empty() { message.from_addr.clone() } else { name.to_string() }
+}
+
+/// GNOME Shell turns animations off in every app while a remote desktop
+/// session is on, to spare the connection; that is not the person asking
+/// for less motion. Where the app can read GNOME's own Reduce Animation
+/// switch (through dconf, which the Flatpak has no access to), Hylki's
+/// animations follow that switch instead, now and whenever it changes.
+fn follow_motion_setting() {
+    use gtk::gio;
+    if gio::SettingsBackend::default().type_().name() != "DConfSettingsBackend" {
+        return;
+    }
+    let readable = gio::SettingsSchemaSource::default()
+        .and_then(|s| s.lookup("org.gnome.desktop.interface", true))
+        .is_some_and(|s| s.has_key("enable-animations"));
+    let Some(gtk_settings) = gtk::Settings::default().filter(|_| readable) else { return };
+    // The binding holds the settings object for as long as GTK's lives.
+    gio::Settings::new("org.gnome.desktop.interface")
+        .bind("enable-animations", &gtk_settings, "gtk-enable-animations")
+        .flags(gio::SettingsBindFlags::GET)
+        .build();
+}
+
+/// Whether things on screen should move (see [`follow_motion_setting`]).
+fn motion_wanted() -> bool {
+    gtk::Settings::default().is_some_and(|s| s.is_gtk_enable_animations())
 }
 
 fn demo_mode() -> bool {
