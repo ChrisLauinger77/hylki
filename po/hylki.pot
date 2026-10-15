@@ -3722,6 +3722,17 @@ msgstr ""
 msgid "This folder"
 msgstr ""
 
+msgid ""
+"Every folder of every account, except Trash and Junk. A search started in "
+"Trash or Junk looks there too."
+msgstr ""
+
+msgid "Every folder of every account, Trash and Junk included."
+msgstr ""
+
+msgid "Only the folder or view the list is showing."
+msgstr ""
+
 msgid "Has Attachments"
 msgstr ""
 

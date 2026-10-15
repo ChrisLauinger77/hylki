@@ -2399,6 +2399,18 @@ textview.console-view text selection {
 .sort-filter-column > checkbutton:hover {
   background-color: alpha(currentColor, 0.07);
 }
+/* The search scope's popover (#374): each scope's name over what it
+   searches. */
+.search-scope-popover {
+  padding: 4px;
+}
+.search-scope-popover > checkbutton {
+  padding: 8px;
+  border-radius: 6px;
+}
+.search-scope-popover > checkbutton:hover {
+  background-color: alpha(currentColor, 0.07);
+}
 .sort-filter-column > button {
   margin-top: 6px;
   font-weight: normal;

@@ -6,8 +6,10 @@
   by 3v1n0). A search across folders puts a pill with the folder's name on
   each result.
 - **Changed: "All folders" leaves Trash and Junk out of a search** (#374).
-  **Everywhere**, new in the menu beside the search field, takes them in.
-  Searching while Trash or Junk is open still finds the mail in it.
+  **Everywhere** takes them in. The scope is picked from a popover beside
+  the search field, which says what each choice searches, instead of a
+  drop-down. Searching while Trash or Junk is open still finds the mail in
+  it.
 - **Added: Gmail labels in colors** (#374). Each label wears one of the tag
   colors, picked from its name, in the list and the reader. A tag named
   like the label still sets its color.

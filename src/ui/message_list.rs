@@ -567,6 +567,8 @@ pub struct MessageList {
     pool_folders: Rc<std::collections::HashMap<(u32, u32), PoolFolder>>,
     /// Which messages the search field filters over.
     scope: SearchScope,
+    /// The search scope's button and popover.
+    scope_picker: Option<ScopePicker>,
     /// The search field widget, kept so a folder switch can clear its text.
     search_entry: Option<gtk::SearchEntry>,
     /// The search toolbar is hidden until asked for (#102).
@@ -893,6 +895,85 @@ impl SearchScope {
             SearchScope::AllFolders => i18n("All folders"),
             SearchScope::Everywhere => i18n("Everywhere"),
             SearchScope::ThisFolder => i18n("This folder"),
+        }
+    }
+
+    /// What the scope searches, under its name in the picker.
+    fn description(self) -> String {
+        match self {
+            SearchScope::AllFolders => i18n(
+                "Every folder of every account, except Trash and Junk. A search started in Trash or Junk looks there too.",
+            ),
+            SearchScope::Everywhere => i18n("Every folder of every account, Trash and Junk included."),
+            SearchScope::ThisFolder => i18n("Only the folder or view the list is showing."),
+        }
+    }
+}
+
+/// The search scope's button and popover (#374): each scope by name, with
+/// what it searches under it.
+struct ScopePicker {
+    button: gtk::MenuButton,
+    label: gtk::Label,
+    radios: Vec<(SearchScope, gtk::CheckButton)>,
+}
+
+impl ScopePicker {
+    fn new(button: &gtk::MenuButton, input: &relm4::Sender<MessageListInput>) -> Self {
+        // An ellipsizing label, so the button, not the messages, gives way
+        // first in a narrow list (#29).
+        let label = gtk::Label::new(Some(&SearchScope::AllFolders.label()));
+        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        let face = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        face.append(&label);
+        face.append(&gtk::Image::from_icon_name("pan-down-symbolic"));
+        button.set_child(Some(&face));
+
+        let popover = gtk::Popover::new();
+        let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        list.add_css_class("search-scope-popover");
+        let mut radios: Vec<(SearchScope, gtk::CheckButton)> = Vec::new();
+        for scope in SearchScope::ALL {
+            let title = gtk::Label::new(Some(&scope.label()));
+            title.set_xalign(0.0);
+            title.add_css_class("heading");
+            let about = gtk::Label::new(Some(&scope.description()));
+            about.set_xalign(0.0);
+            about.set_wrap(true);
+            about.set_max_width_chars(34);
+            about.add_css_class("dim-label");
+            about.add_css_class("caption");
+            let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+            text.append(&title);
+            text.append(&about);
+            let radio = gtk::CheckButton::new();
+            radio.set_child(Some(&text));
+            if let Some((_, first)) = radios.first() {
+                radio.set_group(Some(first));
+            }
+            radio.set_active(scope == SearchScope::AllFolders);
+            let input = input.clone();
+            let popover = popover.clone();
+            radio.connect_toggled(move |r| {
+                if r.is_active() {
+                    input.emit(MessageListInput::SetScope(scope));
+                    popover.popdown();
+                }
+            });
+            list.append(&radio);
+            radios.push((scope, radio));
+        }
+        popover.set_child(Some(&list));
+        button.set_popover(Some(&popover));
+        Self { button: button.clone(), label, radios }
+    }
+
+    fn sync(&self, scope: SearchScope) {
+        self.label.set_label(&scope.label());
+        if let Some((_, radio)) = self.radios.iter().find(|(s, _)| *s == scope) {
+            if !radio.is_active() {
+                radio.set_active(true);
+            }
         }
     }
 }
@@ -1465,20 +1546,12 @@ impl SimpleComponent for MessageList {
                         },
                     },
 
-                    // Scope picker, in `SearchScope::ALL`'s order; All
-                    // folders by default.
-                    #[name = "scope_dropdown"]
-                    gtk::DropDown {
+                    // The scope picker; its popover is built in `init`
+                    // (`ScopePicker`).
+                    #[name = "scope_button"]
+                    gtk::MenuButton {
                         set_valign: gtk::Align::Center,
                         set_tooltip_text: Some(i18n("Choose which folders to search").as_str()),
-                        set_model: Some(&gtk::StringList::new(
-                            &SearchScope::ALL.map(SearchScope::label).iter().map(String::as_str).collect::<Vec<_>>(),
-                        )),
-                        set_selected: 0,
-                        connect_selected_notify[sender] => move |dd| {
-                            let scope = SearchScope::ALL.get(dd.selected() as usize).copied().unwrap_or(SearchScope::AllFolders);
-                            sender.input(MessageListInput::SetScope(scope));
-                        },
                     },
                 },
                 },
@@ -1729,6 +1802,7 @@ impl SimpleComponent for MessageList {
             pool_folders: Default::default(),
             scope: SearchScope::AllFolders,
             search_entry: None,
+            scope_picker: None,
             search_open: false,
             search_closed_at: None,
             search_pinned: false,
@@ -1878,33 +1952,7 @@ impl SimpleComponent for MessageList {
         model.sync_look();
         model.search_entry = Some(widgets.search_entry.clone());
 
-        // The scope picker sizes itself to its widest entry ("All folders"), which
-        // made it — not the messages — the narrowest the list could ever be (#29).
-        // An ellipsizing label on the button lets it give way; the drop-down list
-        // keeps its own factory, so the choices are still spelled out in full.
-        let button_factory = gtk::SignalListItemFactory::new();
-        button_factory.connect_setup(|_, item| {
-            let label = gtk::Label::new(None);
-            label.set_xalign(0.0);
-            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            if let Some(item) = item.downcast_ref::<gtk::ListItem>() {
-                item.set_child(Some(&label));
-            }
-        });
-        button_factory.connect_bind(|_, item| {
-            let Some(item) = item.downcast_ref::<gtk::ListItem>() else {
-                return;
-            };
-            let text = item
-                .item()
-                .and_downcast::<gtk::StringObject>()
-                .map(|s| s.string().to_string())
-                .unwrap_or_default();
-            if let Some(label) = item.child().and_downcast::<gtk::Label>() {
-                label.set_label(&text);
-            }
-        });
-        widgets.scope_dropdown.set_factory(Some(&button_factory));
+        model.scope_picker = Some(ScopePicker::new(&widgets.scope_button, sender.input_sender()));
 
         schedule_midnight_refresh(&sender);
 
@@ -2319,6 +2367,9 @@ impl SimpleComponent for MessageList {
                 self.scroll_top();
             }
             MessageListInput::SetScope(scope) => {
+                if let Some(picker) = &self.scope_picker {
+                    picker.sync(scope);
+                }
                 if self.scope != scope {
                     self.scope = scope;
                     // Scope only affects the view while a query is present.
@@ -2689,11 +2740,21 @@ impl SimpleComponent for MessageList {
 
             MessageListInput::ShowcaseSearch(text, scope) => {
                 self.search_open = true;
+                if let Some(scope) = SearchScope::ALL.get(scope as usize) {
+                    sender.input(MessageListInput::SetScope(*scope));
+                }
                 if let Some(entry) = &self.search_entry {
-                    if let Some(dd) = entry.next_sibling().and_downcast::<gtk::DropDown>() {
-                        dd.set_selected(scope);
-                    }
                     entry.set_text(&text);
+                }
+                // HYLKI_SHOWCASE_SCOPE_MENU=<png> opens the scope popover and
+                // captures it.
+                if let (Ok(path), Some(picker)) = (std::env::var("HYLKI_SHOWCASE_SCOPE_MENU"), &self.scope_picker) {
+                    picker.button.popup();
+                    if let Some(popover) = picker.button.popover() {
+                        gtk::glib::timeout_add_seconds_local_once(1, move || {
+                            crate::app::showcase_capture(popover.upcast_ref(), &path);
+                        });
+                    }
                 }
             }
             MessageListInput::FocusSearch => {
