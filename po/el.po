@@ -4108,8 +4108,9 @@ msgstr "{name} · {current} από {total}"
 msgid "me"
 msgstr "εγώ"
 
-msgid "All folders"
-msgstr "Όλοι οι φάκελοι"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Όλοι εκτός από τον Κάδο και τα Ανεπιθύμητα"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4117,6 +4118,9 @@ msgstr "Ή όπου"
 
 msgid "This folder"
 msgstr "Αυτός ο φάκελος"
+
+msgid "All folders"
+msgstr "Όλοι οι φάκελοι"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4127,6 +4131,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 msgid "Has Attachments"

@@ -4101,8 +4101,9 @@ msgstr "{name} · {current} di {total}"
 msgid "me"
 msgstr "io"
 
-msgid "All folders"
-msgstr "Tutte le cartelle"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Tutto tranne Cestino e Posta indesiderata"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4110,6 +4111,9 @@ msgstr "O dove"
 
 msgid "This folder"
 msgstr "Questa cartella"
+
+msgid "All folders"
+msgstr "Tutte le cartelle"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4120,6 +4124,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 #, fuzzy

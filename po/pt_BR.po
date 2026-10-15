@@ -4157,8 +4157,9 @@ msgstr "{name} · {current} de {total}"
 msgid "me"
 msgstr "eu"
 
-msgid "All folders"
-msgstr "Todas as pastas"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Pesquisar pastas"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4166,6 +4167,9 @@ msgstr "Ou onde"
 
 msgid "This folder"
 msgstr "Esta pasta"
+
+msgid "All folders"
+msgstr "Todas as pastas"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4176,6 +4180,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 #, fuzzy

@@ -4189,8 +4189,9 @@ msgstr "{name} · {current} / {total}"
 msgid "me"
 msgstr "Név"
 
-msgid "All folders"
-msgstr "Minden mappa"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Keresés a mappákban"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4198,6 +4199,9 @@ msgstr "Vagy ahol"
 
 msgid "This folder"
 msgstr "Ez a mappa"
+
+msgid "All folders"
+msgstr "Minden mappa"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4208,6 +4212,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 #, fuzzy

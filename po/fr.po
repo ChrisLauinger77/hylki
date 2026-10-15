@@ -4085,8 +4085,9 @@ msgstr "{name} · {current} sur {total}"
 msgid "me"
 msgstr "moi"
 
-msgid "All folders"
-msgstr "Tous les dossiers"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Tous sauf la Corbeille et les Indésirables"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4094,6 +4095,9 @@ msgstr "Ou si"
 
 msgid "This folder"
 msgstr "Ce dossier"
+
+msgid "All folders"
+msgstr "Tous les dossiers"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4104,6 +4108,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 msgid "Has Attachments"

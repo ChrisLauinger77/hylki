@@ -4213,8 +4213,9 @@ msgstr "{name} · {current} von {total}"
 msgid "me"
 msgstr "Name"
 
-msgid "All folders"
-msgstr "Alle Ordner"
+#, fuzzy
+msgid "All folders (except trash & junk)"
+msgstr "Ordner durchsuchen"
 
 #, fuzzy
 msgid "Everywhere"
@@ -4222,6 +4223,9 @@ msgstr "Oder wo"
 
 msgid "This folder"
 msgstr "Dieser Ordner"
+
+msgid "All folders"
+msgstr "Alle Ordner"
 
 msgid ""
 "Every folder of every account, except Trash and Junk. A search started in "
@@ -4232,6 +4236,9 @@ msgid "Every folder of every account, Trash and Junk included."
 msgstr ""
 
 msgid "Only the folder or view the list is showing."
+msgstr ""
+
+msgid "What this searches"
 msgstr ""
 
 #, fuzzy

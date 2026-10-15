@@ -892,13 +892,23 @@ impl SearchScope {
 
     fn label(self) -> String {
         match self {
-            SearchScope::AllFolders => i18n("All folders"),
+            SearchScope::AllFolders => i18n("All folders (except trash & junk)"),
             SearchScope::Everywhere => i18n("Everywhere"),
             SearchScope::ThisFolder => i18n("This folder"),
         }
     }
 
-    /// What the scope searches, under its name in the picker.
+    /// The name on the picker's button, short enough for a narrow list: the
+    /// popover spells the scope out.
+    fn button_label(self) -> String {
+        match self {
+            SearchScope::AllFolders => i18n("All folders"),
+            _ => self.label(),
+        }
+    }
+
+    /// What the scope searches, behind the info button beside its name in
+    /// the picker.
     fn description(self) -> String {
         match self {
             SearchScope::AllFolders => i18n(
@@ -911,18 +921,20 @@ impl SearchScope {
 }
 
 /// The search scope's button and popover (#374): each scope by name, with
-/// what it searches under it.
+/// an info button that tells what it searches.
 struct ScopePicker {
     button: gtk::MenuButton,
     label: gtk::Label,
     radios: Vec<(SearchScope, gtk::CheckButton)>,
+    /// Each scope's info button, in the same order.
+    infos: Vec<gtk::MenuButton>,
 }
 
 impl ScopePicker {
     fn new(button: &gtk::MenuButton, input: &relm4::Sender<MessageListInput>) -> Self {
         // An ellipsizing label, so the button, not the messages, gives way
         // first in a narrow list (#29).
-        let label = gtk::Label::new(Some(&SearchScope::AllFolders.label()));
+        let label = gtk::Label::new(Some(&SearchScope::AllFolders.button_label()));
         label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         let face = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         face.append(&label);
@@ -933,21 +945,30 @@ impl ScopePicker {
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         list.add_css_class("search-scope-popover");
         let mut radios: Vec<(SearchScope, gtk::CheckButton)> = Vec::new();
+        let mut infos = Vec::new();
         for scope in SearchScope::ALL {
-            let title = gtk::Label::new(Some(&scope.label()));
-            title.set_xalign(0.0);
-            title.add_css_class("heading");
+            let radio = gtk::CheckButton::with_label(&scope.label());
+            radio.set_hexpand(true);
+            // Beside the radio, not in it: a click on it must not pick the
+            // scope.
             let about = gtk::Label::new(Some(&scope.description()));
             about.set_xalign(0.0);
             about.set_wrap(true);
             about.set_max_width_chars(34);
-            about.add_css_class("dim-label");
-            about.add_css_class("caption");
-            let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
-            text.append(&title);
-            text.append(&about);
-            let radio = gtk::CheckButton::new();
-            radio.set_child(Some(&text));
+            about.add_css_class("search-scope-about");
+            let about_popover = gtk::Popover::new();
+            about_popover.set_child(Some(&about));
+            let info = gtk::MenuButton::new();
+            info.set_icon_name("info-outline-symbolic");
+            info.set_valign(gtk::Align::Center);
+            info.add_css_class("flat");
+            info.add_css_class("circular");
+            info.set_tooltip_text(Some(&i18n("What this searches")));
+            info.set_popover(Some(&about_popover));
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+            row.append(&radio);
+            row.append(&info);
+            infos.push(info);
             if let Some((_, first)) = radios.first() {
                 radio.set_group(Some(first));
             }
@@ -960,16 +981,16 @@ impl ScopePicker {
                     popover.popdown();
                 }
             });
-            list.append(&radio);
+            list.append(&row);
             radios.push((scope, radio));
         }
         popover.set_child(Some(&list));
         button.set_popover(Some(&popover));
-        Self { button: button.clone(), label, radios }
+        Self { button: button.clone(), label, radios, infos }
     }
 
     fn sync(&self, scope: SearchScope) {
-        self.label.set_label(&scope.label());
+        self.label.set_label(&scope.button_label());
         if let Some((_, radio)) = self.radios.iter().find(|(s, _)| *s == scope) {
             if !radio.is_active() {
                 radio.set_active(true);
@@ -2753,6 +2774,19 @@ impl SimpleComponent for MessageList {
                     if let Some(popover) = picker.button.popover() {
                         gtk::glib::timeout_add_seconds_local_once(1, move || {
                             crate::app::showcase_capture(popover.upcast_ref(), &path);
+                        });
+                    }
+                    // HYLKI_SHOWCASE_SCOPE_INFO=<png> opens the first scope's
+                    // info popover on top and captures that.
+                    if let (Ok(path), Some(info)) = (std::env::var("HYLKI_SHOWCASE_SCOPE_INFO"), picker.infos.first()) {
+                        let info = info.clone();
+                        gtk::glib::timeout_add_seconds_local_once(2, move || {
+                            info.popup();
+                            if let Some(popover) = info.popover() {
+                                gtk::glib::timeout_add_seconds_local_once(1, move || {
+                                    crate::app::showcase_capture(popover.upcast_ref(), &path);
+                                });
+                            }
                         });
                     }
                 }

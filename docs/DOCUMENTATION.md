@@ -1286,10 +1286,10 @@ field above the list all the time, instead of only after the search button,
 <kbd>Esc</kbd> clears it and returns to the list, and it stays where it is.
 It is off unless switched on.
 
-The button beside the search field sets where a search looks; its popover
-says what each choice searches. **All folders**,
-the default, searches every folder of every account except Trash and Junk,
-unless the list is showing one of them. **Everywhere** takes in Trash and
+The button beside the search field sets where a search looks, and the info
+button beside each choice in its popover says what that choice searches.
+**All folders (except trash & junk)**, the default, searches every folder of
+every account except Trash and Junk, unless the list is showing one of them. **Everywhere** takes in Trash and
 Junk too, and **This folder** only the folder on screen. In the first two,
 each result wears a pill with the name of the folder it is in.
 
