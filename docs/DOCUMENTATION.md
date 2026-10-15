@@ -532,7 +532,9 @@ The search in Contacts asks the directories the same way. The people they
 hold are listed after your contacts, under **In Directories**, with the
 directory's name beside each address. Selecting one shows the entry: an
 address starts a message, and **Add to Contacts** copies the person into the
-default address book. A directory switched on in Evolution is searched
+default address book. Each directory is also in the address book list above
+the contacts, by name after the address books: picking it shows only the
+people the search finds there. A directory switched on in Evolution is searched
 without restarting Hylki.
 
 A directory is an address book in Evolution Data Server, the service GNOME
@@ -562,9 +564,12 @@ Saving checks the connection and says whether the directory answered, or
 why not (a password it refused, a server it could not reach or find, TLS
 that could not start). The check gives up after 30 seconds. A directory
 that fails during a search, such as one that needs a password neither
-Hylki nor Evolution has, says why once in the status bar and in its row in
-Settings → LDAP Directories, and is left alone for 30 seconds before it is
-asked again. The Flatpak
+Hylki nor Evolution has, says why under **In Directories** in Contacts, once
+in the status bar of each composer, and in its row in Settings → LDAP
+Directories. It is left alone for 30 seconds before it is asked again. The
+console ([the status bar](#the-status-bar) with **Settings → System → Console
+mode** on) records each directory's answer to a search: how many entries it
+found and how many of them have an address, and **Export log** saves it. The Flatpak
 reaches the desktop's Evolution Data Server, which has to be installed on
 the system, as it is with GNOME.
 

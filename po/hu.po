@@ -3908,6 +3908,12 @@ msgstr "Szerkesztés"
 msgid "Delete…"
 msgstr "Törlés…"
 
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "View photo"
 msgstr "Fénykép megtekintése"
 

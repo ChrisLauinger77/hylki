@@ -329,6 +329,10 @@ pub struct Compose {
     /// Bumped on every keystroke, so a slow directory's answer to an
     /// earlier fragment is dropped.
     directory_generation: u64,
+    /// The directory failures this composer has put in the status bar. A
+    /// directory that keeps failing says so once here, not at every pause
+    /// in the typing, and still once in the next composer (#307).
+    directory_errors_shown: std::collections::HashSet<String>,
     /// Shared autocomplete popover and which field it's currently attached to.
     completion: gtk::Popover,
     completion_field: Option<Field>,
@@ -620,7 +624,13 @@ pub enum ComposeInput {
     /// The typing paused: ask the directories, unless it went on since.
     DirectoryLookup { field: Field, token: String, generation: u64 },
     /// What the directories answered, and the failures not shown before.
-    DirectoryResults { field: Field, token: String, generation: u64, matches: Vec<Suggestion>, errors: Vec<String> },
+    DirectoryResults {
+        field: Field,
+        token: String,
+        generation: u64,
+        matches: Vec<Suggestion>,
+        failed: Vec<crate::directory::DirectoryFailure>,
+    },
     /// Addresses just sent to from another composer: into this one's
     /// suggestions at once, without waiting for a reopen.
     AddSuggestions { account_id: u32, new: Vec<Suggestion> },
@@ -677,7 +687,8 @@ pub enum ComposeOutput {
     /// menu (#365): the whole new setting, saved app-wide like the
     /// Settings switches.
     SetSpellcheckLangs(String),
-    /// A directory could not be asked (#307): for the status bar, once.
+    /// A directory could not be asked (#307): for the status bar, once per
+    /// composer.
     DirectoryError(String),
 }
 
@@ -1285,6 +1296,7 @@ impl Component for Compose {
             from_account: 0,
             directory_matches: Vec::new(),
             directory_generation: 0,
+            directory_errors_shown: std::collections::HashSet::new(),
             completion,
             completion_field: None,
             completion_list: None,
@@ -2416,26 +2428,29 @@ impl Component for Compose {
                     std::thread::spawn(move || {
                         // Both at once: the slower decides when the list
                         // grows, not the two one after the other.
-                        let (matches, errors) = std::thread::scope(|scope| {
+                        let (matches, failed) = std::thread::scope(|scope| {
                             let org = (!graph.is_empty())
                                 .then(|| scope.spawn(|| crate::graph_directory::search(&token, &graph)));
-                            let (mut matches, errors) =
+                            let (mut matches, failed) =
                                 if narrowed { Default::default() } else { crate::directory::search(&token) };
                             if let Some(found) = org.and_then(|h| h.join().ok()) {
                                 matches.extend(found);
                             }
-                            (matches, errors)
+                            (matches, failed)
                         });
-                        let _ = s.send(ComposeInput::DirectoryResults { field, token, generation, matches, errors });
+                        let _ = s.send(ComposeInput::DirectoryResults { field, token, generation, matches, failed });
                     });
                 }
             }
 
-            ComposeInput::DirectoryResults { field, token, generation, matches, errors } => {
+            ComposeInput::DirectoryResults { field, token, generation, matches, failed } => {
                 // A directory that cannot be asked says so once, whatever
                 // came of the typing meanwhile.
-                for e in errors {
-                    let _ = sender.output(ComposeOutput::DirectoryError(e));
+                for f in failed {
+                    let text = f.text();
+                    if self.directory_errors_shown.insert(text.clone()) {
+                        let _ = sender.output(ComposeOutput::DirectoryError(text));
+                    }
                 }
                 let row = match field {
                     Field::To => &widgets.to_row,

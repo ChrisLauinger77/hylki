@@ -3832,6 +3832,12 @@ msgstr "Modifica"
 msgid "Delete…"
 msgstr "Elimina…"
 
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "View photo"
 msgstr "Visualizza foto"
 

@@ -540,10 +540,11 @@ fn enabled() -> Vec<Directory> {
     dirs
 }
 
-/// Whether any directory is switched on. Blocking, but only a registry call
-/// at most every [`LIST_FRESH`].
-pub fn any_enabled() -> bool {
-    !enabled().is_empty()
+/// The directories that are switched on, as (UID, name), for the Contacts
+/// view's address book filter. Blocking, but only a registry call at most
+/// every [`LIST_FRESH`].
+pub fn enabled_names() -> Vec<(String, String)> {
+    enabled().into_iter().map(|d| (d.uid.clone(), d.title())).collect()
 }
 
 /// A directory's last failure, kept until it answers again.
@@ -563,13 +564,10 @@ pub fn last_error(uid: &str) -> Option<String> {
     failures().lock().ok().and_then(|f| f.get(uid).map(|x| x.message.clone()))
 }
 
-/// Keep a directory's failure; answers whether it is news, not the one
-/// already kept, so the same error is shown once and not at every pause.
-fn note_failure(uid: &str, message: &str) -> bool {
-    let Ok(mut f) = failures().lock() else { return false };
-    let news = f.get(uid).is_none_or(|x| x.message != message);
-    f.insert(uid.to_string(), Failure { message: message.to_string(), at: Instant::now() });
-    news
+fn note_failure(uid: &str, message: &str) {
+    if let Ok(mut f) = failures().lock() {
+        f.insert(uid.to_string(), Failure { message: message.to_string(), at: Instant::now() });
+    }
 }
 
 fn note_answer(uid: &str) {
@@ -578,9 +576,10 @@ fn note_answer(uid: &str) {
     }
 }
 
-/// Failed within [`RETRY_AFTER`]: not asked again yet.
-fn resting(uid: &str) -> bool {
-    failures().lock().ok().is_some_and(|f| f.get(uid).is_some_and(|x| x.at.elapsed() < RETRY_AFTER))
+/// Failed within [`RETRY_AFTER`]: not asked again yet. Answers the failure.
+fn resting(uid: &str) -> Option<String> {
+    let f = failures().lock().ok()?;
+    f.get(uid).filter(|x| x.at.elapsed() < RETRY_AFTER).map(|x| x.message.clone())
 }
 
 /// One lookup at a time per directory: a later one waits for the sign-in or
@@ -591,17 +590,43 @@ fn directory_lock(uid: &str) -> Arc<Mutex<()>> {
     locks.entry(uid.to_string()).or_default().clone()
 }
 
+/// A directory that did not answer, and why, worded for the status bar.
+#[derive(Debug, Clone)]
+pub struct DirectoryFailure {
+    pub uid: String,
+    pub name: String,
+    pub message: String,
+}
+
+impl DirectoryFailure {
+    pub fn text(&self) -> String {
+        i18n_f("{name} did not answer: {error}", &[("name", &self.name), ("error", &self.message)])
+    }
+}
+
 /// What the directories that are switched on hold for `typed`: the vCards,
-/// by directory, and the failures not shown before, worded for the status
-/// bar. Blocking: call it off the main thread.
-fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<String>) {
+/// by directory, and the directories that failed. One that failed a moment
+/// ago is not asked again yet but is still among the failures, so whoever
+/// searches learns why nothing came of it, not only the first to ask (#307).
+/// Blocking: call it off the main thread.
+fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>) {
     let typed = typed.trim();
     if typed.chars().count() < MIN_QUERY || typed.len() > 128 {
         return (Vec::new(), Vec::new());
     }
-    let dirs: Vec<Directory> = enabled().into_iter().filter(|d| !resting(&d.uid)).collect();
+    let mut failed = Vec::new();
+    let mut dirs = Vec::new();
+    for dir in enabled() {
+        match resting(&dir.uid) {
+            Some(message) => {
+                tracing::debug!(directory = %dir.title(), "LDAP directory not asked, it failed less than {}s ago: {message}", RETRY_AFTER.as_secs());
+                failed.push(DirectoryFailure { uid: dir.uid.clone(), name: dir.title(), message });
+            }
+            None => dirs.push(dir),
+        }
+    }
     if dirs.is_empty() {
-        return (Vec::new(), Vec::new());
+        return (Vec::new(), failed);
     }
     let q = sexp_str(typed);
     // EDS maps these onto the directory's attributes: cn and sn for the
@@ -611,7 +636,7 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<String>) {
     );
     // Each directory on its own thread: one that is slow to sign in does
     // not hold up the others.
-    let answers: Vec<(Directory, Result<Vec<String>, String>)> = std::thread::scope(|scope| {
+    let answers: Vec<(Directory, Result<Vec<String>, String>, Duration)> = std::thread::scope(|scope| {
         let query = &query;
         let asked: Vec<_> = dirs
             .into_iter()
@@ -619,52 +644,61 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<String>) {
                 scope.spawn(move || {
                     let lock = directory_lock(&dir.uid);
                     let _held = lock.lock().unwrap_or_else(|e| e.into_inner());
+                    let started = Instant::now();
                     // The lookup this one waited behind may have just failed.
-                    if resting(&dir.uid) {
-                        return (dir, Ok(Vec::new()));
+                    if let Some(message) = resting(&dir.uid) {
+                        return (dir, Err(message), started.elapsed());
                     }
                     let answer = query_directory(&dir, query);
-                    (dir, answer)
+                    if let Err(e) = &answer {
+                        note_failure(&dir.uid, e);
+                    }
+                    (dir, answer, started.elapsed())
                 })
             })
             .collect();
         asked.into_iter().filter_map(|h| h.join().ok()).collect()
     });
     let mut found = Vec::new();
-    let mut errors = Vec::new();
-    for (dir, answer) in answers {
+    for (dir, answer, took) in answers {
         match answer {
             Ok(cards) => {
-                tracing::debug!(directory = %dir.title(), count = cards.len(), "LDAP directory answered");
+                tracing::debug!(
+                    directory = %dir.title(),
+                    typed,
+                    entries = cards.len(),
+                    with_address = cards.iter().filter(|c| !suggestions_from_vcard(c).is_empty()).count(),
+                    ms = took.as_millis() as u64,
+                    "LDAP directory answered"
+                );
                 note_answer(&dir.uid);
                 found.push((dir, cards));
             }
             Err(e) => {
-                tracing::warn!(directory = %dir.title(), "LDAP directory lookup failed: {e}");
-                if note_failure(&dir.uid, &e) {
-                    errors.push(i18n_f("{name} did not answer: {error}", &[("name", &dir.title()), ("error", &e)]));
-                }
+                tracing::warn!(directory = %dir.title(), typed, ms = took.as_millis() as u64, "LDAP directory lookup failed: {e}");
+                failed.push(DirectoryFailure { uid: dir.uid.clone(), name: dir.title(), message: e });
             }
         }
     }
-    (found, errors)
+    (found, failed)
 }
 
 /// The people whose name, surname or address starts with `typed`, from
-/// every directory that is switched on, for the composer; and the failures
-/// not shown before. Blocking: call it off the main thread.
-pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<String>) {
-    let (found, errors) = lookup(typed);
+/// every directory that is switched on, for the composer; and the
+/// directories that failed. Blocking: call it off the main thread.
+pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
+    let (found, failed) = lookup(typed);
     let suggestions = found.iter().flat_map(|(_, cards)| cards.iter().flat_map(|c| suggestions_from_vcard(c))).collect();
-    (suggestions, errors)
+    (suggestions, failed)
 }
 
 /// The same people as whole entries, for the Contacts view, at most `limit`
-/// of them, each naming the directory it came from as its book.
-pub fn search_contacts(typed: &str, limit: usize) -> (Vec<crate::contacts::ContactDetails>, Vec<String>) {
-    let (found, errors) = lookup(typed);
+/// from each directory, each naming the directory it came from as its book.
+pub fn search_contacts(typed: &str, limit: usize) -> (Vec<crate::contacts::ContactDetails>, Vec<DirectoryFailure>) {
+    let (found, failed) = lookup(typed);
     let mut out = Vec::new();
     for (dir, cards) in found {
+        let mut entries = Vec::new();
         for card in cards {
             let Some(mut c) = crate::contacts::parse_vcard_fields(&card) else { continue };
             // A directory's photo is carried in the card; nothing on disk is
@@ -675,12 +709,14 @@ pub fn search_contacts(typed: &str, limit: usize) -> (Vec<crate::contacts::Conta
             // Not an entry Hylki can change or delete.
             c.eds_uid = String::new();
             c.raw_vcard = card;
-            out.push(c);
+            entries.push(c);
         }
+        entries.sort_by_key(|c| c.name.to_lowercase());
+        entries.truncate(limit);
+        out.extend(entries);
     }
     out.sort_by_key(|c| c.name.to_lowercase());
-    out.truncate(limit);
-    (out, errors)
+    (out, failed)
 }
 
 /// Check a saved directory answers, signing in as it would for a search.
@@ -788,8 +824,9 @@ mod tests {
     }
 
     /// Search the directories already in EDS, as the composer and Contacts
-    /// do: `LDAP_LIVE_SEARCH=<typed>`, twice, so the second shows a failure
-    /// is not reported again. On the EDS rig only, as for `live`.
+    /// do: `LDAP_LIVE_SEARCH=<typed>`, twice, so the second shows a failed
+    /// directory is not asked again but still reported. On the EDS rig
+    /// only, as for `live`.
     #[test]
     #[ignore]
     fn live_search() {
@@ -802,15 +839,16 @@ mod tests {
                 println!("  suggestion: {} <{}>", s.name, s.email);
             }
             for e in &errors {
-                println!("  error: {e}");
+                println!("  error: {}", e.text());
             }
         }
-        // A failed directory rests, so this one asks only those that answered.
+        // A failed directory rests, so this one asks only those that
+        // answered, and names the one resting.
         let (entries, errors) = search_contacts(&typed, 50);
         for c in &entries {
             println!("  entry: {} {:?} in {}", c.name, c.primary_email(), c.book_name);
         }
-        println!("  contacts errors: {errors:?}");
+        println!("  contacts errors: {:?}", errors.iter().map(DirectoryFailure::text).collect::<Vec<_>>());
         for d in list().unwrap() {
             println!("  {} last error: {:?}", d.title(), last_error(&d.uid));
         }

@@ -33,6 +33,15 @@
   formatting tools, hidden while a message is written as source, still
   took their rows of the toolbar, most with the toolbar expanded.
 
+- **Fixed: an LDAP directory that failed went quiet** (#307, reported by
+  3v1n0). It said why once, in the status bar, and every search after
+  that came back empty with no reason. Contacts now lists the failure under
+  **In Directories** at every search, each composer says it once, and the
+  log records what each directory answered.
+- **Added: LDAP directories in the Contacts address book list** (#307).
+  Each directory switched on is listed by name after the address books;
+  picking it shows the people the search finds in it.
+
 - **Fixed: Reply All put your own address back in Cc** (#448, reported by
   3v1n0, fixed by Christian Dandachi). Only the account's main address was
   left out, and only written exactly as it is in the account, so a send-as

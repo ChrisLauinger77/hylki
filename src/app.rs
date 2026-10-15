@@ -3169,7 +3169,6 @@ impl SimpleComponent for AppModel {
                         AppMsg::DeleteContact { book_uid, uid }
                     }
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
-                    ContactsPageOutput::DirectoryError(text) => AppMsg::DirectoryError(text),
                     ContactsPageOutput::ShowPhoto { name, data } => {
                         // The lightbox routes by extension — a bare contact
                         // name sent the JPEG down the PDF path, where poppler
@@ -5520,10 +5519,11 @@ impl SimpleComponent for AppModel {
                         }
                     });
                 }
-                // HYLKI_SHOWCASE_CONTACTS=list|new|search:<text> opens
+                // HYLKI_SHOWCASE_CONTACTS=list|new|search:<text>[@<n>] opens
                 // Contacts at 3s, and with "new" its editor for a new contact
                 // at 5s, or with "search:" types the text into its search
-                // then, so the directories are asked too (#307).
+                // then, so the directories are asked too (#307), and with
+                // "@<n>" picks entry n of the book filter at 6s.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
@@ -5532,10 +5532,20 @@ impl SimpleComponent for AppModel {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
                             let _ = page.send(ContactsPageInput::NewContact);
                         });
-                    } else if let Some(text) = which.strip_prefix("search:").map(str::to_string) {
+                    } else if let Some(spec) = which.strip_prefix("search:") {
+                        let (text, book) = match spec.rsplit_once('@') {
+                            Some((t, n)) if n.parse::<u32>().is_ok() => (t.to_string(), n.parse::<u32>().ok()),
+                            _ => (spec.to_string(), None),
+                        };
+                        let p = page.clone();
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
-                            let _ = page.send(ContactsPageInput::SetSearch(text));
+                            let _ = p.send(ContactsPageInput::SetSearch(text));
                         });
+                        if let Some(n) = book {
+                            gtk::glib::timeout_add_seconds_local_once(6, move || {
+                                let _ = page.send(ContactsPageInput::PickBook(n));
+                            });
+                        }
                     }
                 }
                 // HYLKI_SHOWCASE_SETTINGS=accounts|prefs opens the Settings

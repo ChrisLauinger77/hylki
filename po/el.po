@@ -3836,6 +3836,12 @@ msgstr "Επεξεργασία"
 msgid "Delete…"
 msgstr "Διαγραφή…"
 
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "View photo"
 msgstr "Προβολή φωτογραφίας"
 
