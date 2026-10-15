@@ -56,6 +56,14 @@
 - **Added: LDAP directories in the Contacts address book list** (#307).
   Each directory switched on is listed by name after the address books;
   picking it shows the people the search finds in it.
+- **Fixed: an LDAP directory found nobody by surname** (#307, reported by
+  3v1n0). Only names and addresses that began with the typed text were
+  asked for, so a surname inside "Name Surname" or name.surname@ was missed
+  unless the server kept it as a surname of its own. Names and addresses
+  now match anywhere, as in Evolution.
+- **Fixed: directory suggestions showed the mail history icon** (#307).
+  Someone in a directory whom you had mailed before was suggested with the
+  clock; a directory's suggestions now carry the address book icon.
 
 - **Fixed: Reply All put your own address back in Cc** (#448, reported by
   3v1n0, fixed by Christian Dandachi). Only the account's main address was

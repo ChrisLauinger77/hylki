@@ -3588,7 +3588,13 @@ window.__hylkiDirty=true;})()"#
             .collect();
         // A directory matched on attributes the entry may not show (a
         // surname under a display name), so its answers are not filtered
-        // again; one already known from Contacts or mail is not repeated.
+        // again; one already known from Contacts or mail is not repeated,
+        // but is marked as in the directory (#307).
+        let in_directory: std::collections::HashSet<String> =
+            self.directory_matches.iter().map(|s| s.email.to_lowercase()).collect();
+        for s in &mut matches {
+            s.from_directory |= in_directory.contains(&s.email.to_lowercase());
+        }
         let known: std::collections::HashSet<String> = matches.iter().map(|s| s.email.to_lowercase()).collect();
         let mut seen = std::collections::HashSet::new();
         matches.extend(
@@ -3647,8 +3653,11 @@ window.__hylkiDirty=true;})()"#
             item.set_margin_end(6);
             item.set_margin_top(3);
             item.set_margin_bottom(3);
-            // Mark where the suggestion came from: address book vs. mail history.
-            let icon = gtk::Image::from_icon_name(if sug.from_contacts {
+            // Mark where the suggestion came from: a directory, the address
+            // book, or mail history.
+            let icon = gtk::Image::from_icon_name(if sug.from_directory {
+                "x-office-address-book-symbolic"
+            } else if sug.from_contacts {
                 "avatar-default-symbolic"
             } else {
                 "document-open-recent-symbolic"

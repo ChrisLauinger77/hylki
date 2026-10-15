@@ -98,6 +98,7 @@ fn suggestion(name: &str, address: &str) -> Option<Suggestion> {
         name: if name.is_empty() { address.to_string() } else { name.to_string() },
         email: address.to_string(),
         from_contacts: true,
+        from_directory: true,
         score: 0,
         own: false,
     })
@@ -372,7 +373,7 @@ mod tests {
     use super::*;
 
     fn s(name: &str, email: &str) -> Suggestion {
-        Suggestion { name: name.into(), email: email.into(), from_contacts: true, score: 0, own: false }
+        Suggestion { name: name.into(), email: email.into(), from_contacts: true, from_directory: true, score: 0, own: false }
     }
 
     #[test]

@@ -9536,6 +9536,7 @@ impl SimpleComponent for AppModel {
                         own: own.contains(&email.to_lowercase()),
                         email,
                         from_contacts: false,
+                        from_directory: false,
                         score: 1,
                     })
                     .collect();

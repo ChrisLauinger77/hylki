@@ -630,9 +630,12 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
     }
     let q = sexp_str(typed);
     // EDS maps these onto the directory's attributes: cn and sn for the
-    // name, mail for the address.
+    // name, mail for the address. Name and address are matched anywhere,
+    // as Evolution's own search does and as Contacts and mail history are
+    // here, so a surname finds "Name Surname" and name.surname@ when the
+    // server keeps no sn of its own (#307).
     let query = format!(
-        "(or (beginswith \"full_name\" {q}) (beginswith \"email\" {q}) (beginswith \"nickname\" {q}) (beginswith \"file_as\" {q}))"
+        "(or (contains \"full_name\" {q}) (contains \"email\" {q}) (beginswith \"full_name\" {q}) (beginswith \"nickname\" {q}) (beginswith \"file_as\" {q}))"
     );
     // Each directory on its own thread: one that is slow to sign in does
     // not hold up the others.
@@ -683,8 +686,8 @@ fn lookup(typed: &str) -> (Vec<(Directory, Vec<String>)>, Vec<DirectoryFailure>)
     (found, failed)
 }
 
-/// The people whose name, surname or address starts with `typed`, from
-/// every directory that is switched on, for the composer; and the
+/// The people whose name or address holds `typed`, or whose surname starts
+/// with it, from every directory that is switched on, for the composer; and the
 /// directories that failed. Blocking: call it off the main thread.
 pub fn search(typed: &str) -> (Vec<Suggestion>, Vec<DirectoryFailure>) {
     let (found, failed) = lookup(typed);
@@ -752,7 +755,7 @@ fn suggestions_from_vcard(card: &str) -> Vec<Suggestion> {
     }
     emails
         .into_iter()
-        .map(|email| Suggestion { name: name.clone(), email, from_contacts: true, score: 0, own: false })
+        .map(|email| Suggestion { name: name.clone(), email, from_contacts: true, from_directory: true, score: 0, own: false })
         .collect()
 }
 
@@ -768,7 +771,7 @@ mod tests {
         assert_eq!(s.len(), 2);
         assert_eq!((s[0].name.as_str(), s[0].email.as_str()), ("Alan Turing", "alan@example.org"));
         assert_eq!(s[1].email, "turing@example.org");
-        assert!(s.iter().all(|s| s.from_contacts));
+        assert!(s.iter().all(|s| s.from_contacts && s.from_directory));
     }
 
     /// Save a directory through a real EDS, check it as Settings does, and
