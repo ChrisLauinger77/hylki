@@ -1,7 +1,16 @@
 # Changelog
 
-## Unreleased
+## 1.44.0 — 2026-10-15
 
+Everything from 1.44.0-beta.1 to 1.44.0-beta.9: Gmail keyboard shortcuts, a
+command palette, smart folders, several signatures per account, a Hylki
+address book, LDAP and Microsoft 365 directories as recipients, Gmail labels
+as colored pills, search results that name their folder, one sort and filter
+button, a list grouped by date, and more formatting in the composer. Italian
+is new; French and Spanish are complete.
+
+- **Translations:** French (PR #465 by frenchy82) and Spanish (PR #467 by
+  Daniel Miguel) are complete.
 - **Added: search results say which folder they are in** (#374, requested
   by 3v1n0). A search across folders puts a pill with the folder's name on
   each result.
