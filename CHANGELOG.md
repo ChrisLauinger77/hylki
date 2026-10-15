@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed: a keyring that asks first was taken for no keyring** (PR #466 by
+  Comodino). Every keyring read gave up after two seconds, so a Secret
+  Service provider that waits on the user, like pass-secret-service
+  decrypting with a security key that wants a tap, was reported as
+  unavailable. Hylki now waits for the answer. Building from source no
+  longer needs the D-Bus headers.
+
 ## 1.44.0 — 2026-10-15
 
 Everything from 1.44.0-beta.1 to 1.44.0-beta.9: Gmail keyboard shortcuts, a

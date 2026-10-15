@@ -118,6 +118,9 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   Italian translation.
 - [**Christian Dandachi**](https://github.com/Dandiccf) ([#458](https://github.com/hyprlab/hylki/pull/458)):
   Reply All leaving out every address of the account.
+- [**Comodino**](https://github.com/llComodino) ([#466](https://github.com/hyprlab/hylki/pull/466)):
+  waiting for a keyring that asks the user first, such as a security key
+  that wants a tap.
 
 
 ## Reports, design and ideas
