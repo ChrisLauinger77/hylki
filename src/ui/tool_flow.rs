@@ -182,7 +182,10 @@ impl ToolFlow {
         let mut out = Vec::new();
         let mut child = self.first_child();
         while let Some(c) = child {
-            if Some(&c) != end.as_ref() && c.should_layout() {
+            // `should_layout` does not look at child-visibility, which is
+            // how the tools are hidden: counted, they kept their rows'
+            // height as empty space above a source editor.
+            if Some(&c) != end.as_ref() && c.should_layout() && c.is_child_visible() {
                 out.push(c.clone());
             }
             child = c.next_sibling();

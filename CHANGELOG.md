@@ -13,6 +13,10 @@
   and **Preview** turns it back, instead of a separate window. The text
   area keeps its height when the toolbar is expanded.
 
+- **Fixed: empty space above a message written as Markdown or HTML.** The
+  formatting tools, hidden while a message is written as source, still
+  took their rows of the toolbar, most with the toolbar expanded.
+
 - **Added: more quick filters** (#441). One sort and filter button above
   the list replaces the sort menu and the unread and starred toggles. Its
   popover has the sort orders in one column and, in the other, **Unread**,
