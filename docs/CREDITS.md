@@ -116,6 +116,8 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   Catalan translation.
 - [**Jimmy**](https://github.com/amivaleo) ([#430](https://github.com/hyprlab/hylki/issues/430)): the
   Italian translation.
+- [**Christian Dandachi**](https://github.com/Dandiccf) ([#458](https://github.com/hyprlab/hylki/pull/458)):
+  Reply All leaving out every address of the account.
 
 
 ## Reports, design and ideas

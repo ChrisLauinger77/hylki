@@ -7262,10 +7262,10 @@ impl SimpleComponent for AppModel {
                         self.open_reply(m.account_id, self.reply_context(&m, reply_prefill(&m)), (m.account_id, m.id), &sender);
                     }
                     RowAction::ReplyAll => {
-                        let self_email = self.email_of(m.account_id).unwrap_or_default();
+                        let own = self.own_identities(m.account_id);
                         self.open_reply(
                             m.account_id,
-                            self.reply_context(&m, reply_all_prefill(&m, &self_email)),
+                            self.reply_context(&m, reply_all_prefill(&m, &own)),
                             (m.account_id, m.id),
                             &sender,
                         );
@@ -7345,10 +7345,10 @@ impl SimpleComponent for AppModel {
                     RowAction::ReplyAll => {
                         let m = self.newest_to_answer(&conversation, m);
                         let m = self.with_cached_body(m);
-                        let self_email = self.email_of(m.account_id).unwrap_or_default();
+                        let own = self.own_identities(m.account_id);
                         self.open_compose(
                             m.account_id,
-                            self.reply_context(&m, reply_all_prefill(&m, &self_email)),
+                            self.reply_context(&m, reply_all_prefill(&m, &own)),
                             &sender,
                         );
                     }
@@ -7590,10 +7590,10 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ReplyAll => {
                 if let Some(m) = self.compose_target() {
-                    let self_email = self.email_of(m.account_id).unwrap_or_default();
+                    let own = self.own_identities(m.account_id);
                     self.open_reply(
                         m.account_id,
-                        self.reply_context(&m, reply_all_prefill(&m, &self_email)),
+                        self.reply_context(&m, reply_all_prefill(&m, &own)),
                         (m.account_id, m.id),
                         &sender,
                     );
@@ -7622,7 +7622,7 @@ impl SimpleComponent for AppModel {
                         let prefill = if what == WindowCompose::Reply {
                             reply_prefill(&m)
                         } else {
-                            reply_all_prefill(&m, &self.email_of(m.account_id).unwrap_or_default())
+                            reply_all_prefill(&m, &self.own_identities(m.account_id))
                         };
                         self.open_compose(m.account_id, self.reply_context(&m, prefill), &sender);
                     }
@@ -14100,10 +14100,7 @@ impl AppModel {
         if thread.len() <= 1 {
             return fallback;
         }
-        let mut own = self.own_identities(fallback.account_id);
-        if own.is_empty() {
-            own.extend(self.email_of(fallback.account_id));
-        }
+        let own = self.own_identities(fallback.account_id);
         let newest = |from_others: bool| {
             thread
                 .iter()
@@ -14326,7 +14323,7 @@ impl AppModel {
     /// aliases (#34). Lower-cased comparison is the caller's job.
     fn own_identities(&self, account_id: u32) -> Vec<String> {
         let Some(cfg) = self.effective_config().get(account_id.saturating_sub(1) as usize) else {
-            return Vec::new();
+            return self.email_of(account_id).into_iter().collect();
         };
         std::iter::once(cfg.email.clone())
             .chain(cfg.aliases.iter().map(|al| config::split_identity(&al.identity).1))
@@ -25416,27 +25413,76 @@ fn thread_chain(m: &Message) -> String {
     chain.join(" ")
 }
 
-/// Reply-all: To = original sender; Cc = every other recipient (original To +
-/// Cc) minus the sender and our own address, de-duplicated.
-fn reply_all_prefill(m: &Message, self_email: &str) -> ComposePrefill {
+/// The address in a recipient as written ("Ana <ana@x.org>" or the bare
+/// address), lowercased.
+fn bare_address(recipient: &str) -> String {
+    let r = recipient.trim();
+    let addr = match (r.rfind('<'), r.rfind('>')) {
+        (Some(a), Some(b)) if a < b => &r[a + 1..b],
+        _ => r,
+    };
+    addr.trim().trim_matches('"').to_lowercase()
+}
+
+/// Whether `recipient` is one of `own` (the account's address and its
+/// send-as aliases), a `+tag` form of one included.
+fn is_own_address(recipient: &str, own: &[String]) -> bool {
+    let addr = bare_address(recipient);
+    if addr.is_empty() {
+        return false;
+    }
+    let untagged = match (addr.split_once('@'), addr.find('+')) {
+        (Some((local, domain)), Some(_)) => format!("{}@{domain}", local.split('+').next().unwrap_or(local)),
+        _ => addr.clone(),
+    };
+    own.iter().map(|o| bare_address(o)).any(|o| !o.is_empty() && (o == addr || o == untagged))
+}
+
+/// Reply-all: To = the original sender (or their Reply-To); Cc = every other
+/// recipient of the original, de-duplicated, without the sender and without
+/// any of `own`, the account's addresses (#448). An answer to a message the
+/// account sent goes to that message's recipients instead, as other mail
+/// programs do: answering yourself is never what Reply All means.
+fn reply_all_prefill(m: &Message, own: &[String]) -> ComposePrefill {
     let mut prefill = reply_prefill(m);
-    let self_l = self_email.to_lowercase();
-    let from_l = m.from_addr.to_lowercase();
-    // Whoever is already in To (the Reply-To address when one exists) must not
-    // be repeated in Cc.
-    let to_l = prefill.to.to_lowercase();
+    let split = |list: &str| -> Vec<String> {
+        list.split(',').map(str::trim).filter(|a| !a.is_empty()).map(str::to_string).collect()
+    };
+    let mut to: Vec<String> = Vec::new();
     let mut cc: Vec<String> = Vec::new();
-    for list in [m.to.as_str(), m.cc.as_str()] {
-        for addr in list.split(',') {
-            let a = addr.trim();
-            let al = a.to_lowercase();
-            if a.is_empty() || al == self_l || al == from_l || to_l.contains(&al) {
-                continue;
-            }
-            if !cc.iter().any(|x| x.eq_ignore_ascii_case(a)) {
-                cc.push(a.to_string());
+    let push = |list: &mut Vec<String>, a: &str, taken: &[String]| {
+        let b = bare_address(a);
+        if !taken.iter().chain(list.iter()).any(|x| bare_address(x) == b) {
+            list.push(a.to_string());
+        }
+    };
+    if is_own_address(&m.from_addr, own) {
+        for a in split(&m.to) {
+            if !is_own_address(&a, own) {
+                push(&mut to, &a, &[]);
             }
         }
+        for a in split(&m.cc) {
+            if !is_own_address(&a, own) {
+                push(&mut cc, &a, &to);
+            }
+        }
+        if !to.is_empty() {
+            prefill.to = to.join(", ");
+        } else if !cc.is_empty() {
+            prefill.to = cc.remove(0);
+        }
+        prefill.cc = cc.join(", ");
+        return prefill;
+    }
+    // Whoever is already in To (the Reply-To address when one exists) must not
+    // be repeated in Cc.
+    let to_now = split(&prefill.to);
+    for a in split(&m.to).into_iter().chain(split(&m.cc)) {
+        if is_own_address(&a, own) || bare_address(&a) == bare_address(&m.from_addr) {
+            continue;
+        }
+        push(&mut cc, &a, &to_now);
     }
     prefill.cc = cc.join(", ");
     prefill
@@ -26364,7 +26410,7 @@ mod tests {
         m.subject = "Hi".into();
         m.body = crate::worker::extract_body(b"Content-Type: text/plain\r\n\r\nHello\r\n");
         assert!(super::reply_prefill(&m).original_plain);
-        assert!(super::reply_all_prefill(&m, "me@example.com").original_plain);
+        assert!(super::reply_all_prefill(&m, &["me@example.com".to_string()]).original_plain);
         assert!(super::forward_prefill(&m).original_plain);
         m.body = "<html><body><p>Hello</p></body></html>".into();
         assert!(!super::reply_prefill(&m).original_plain);
@@ -26837,9 +26883,42 @@ mod tests {
         let r = reply_prefill(&m);
         assert_eq!(r.to, "editor@example.com");
 
-        let ra = reply_all_prefill(&m, "me@example.com");
+        let ra = reply_all_prefill(&m, &["me@example.com".to_string()]);
         assert_eq!(ra.to, "editor@example.com");
         assert_eq!(ra.cc, "other@example.com", "no sender, no self, no repeat of To");
+    }
+
+    /// Reply All leaves out every address of the account (#448): an alias,
+    /// a "Name <address>" form, a +tag form and another spelling alike.
+    #[test]
+    fn reply_all_leaves_out_every_own_address() {
+        let own = vec!["me@example.com".to_string(), "Me Alias <alias@example.org>".to_string()];
+        let mut m = msg(1, 1, 10);
+        m.from_addr = "ada@example.com".into();
+        m.to = "Me <ME@example.com>, alias@example.org, bob@example.com".into();
+        m.cc = "me+lists@example.com, carol@example.com, Bob <bob@example.com>".into();
+        let ra = reply_all_prefill(&m, &own);
+        assert_eq!(ra.to, "ada@example.com");
+        assert_eq!(ra.cc, "bob@example.com, carol@example.com");
+    }
+
+    /// Reply All to a message the account sent answers its recipients, not
+    /// the account itself.
+    #[test]
+    fn reply_all_to_your_own_message_answers_its_recipients() {
+        let own = vec!["me@example.com".to_string()];
+        let mut m = msg(1, 1, 10);
+        m.from_addr = "me@example.com".into();
+        m.to = "ada@example.com, me@example.com".into();
+        m.cc = "bob@example.com".into();
+        let ra = reply_all_prefill(&m, &own);
+        assert_eq!(ra.to, "ada@example.com");
+        assert_eq!(ra.cc, "bob@example.com");
+        // Sent only to Cc: the first of them takes To.
+        m.to = String::new();
+        m.cc = "bob@example.com, carol@example.com".into();
+        let ra = reply_all_prefill(&m, &own);
+        assert_eq!((ra.to.as_str(), ra.cc.as_str()), ("bob@example.com", "carol@example.com"));
     }
 
     /// Without a Reply-To the sender's own address is still the reply target.

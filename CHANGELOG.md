@@ -33,6 +33,13 @@
   formatting tools, hidden while a message is written as source, still
   took their rows of the toolbar, most with the toolbar expanded.
 
+- **Fixed: Reply All put your own address back in Cc** (#448, reported by
+  3v1n0, fixed by Christian Dandachi). Only the account's main address was
+  left out, and only written exactly as it is in the account, so a send-as
+  alias, a "Name <address>" form or a +tag address stayed. Every address of
+  the account is now left out, and Reply All to a message you sent answers
+  its recipients instead of you.
+
 - **Changed: the HTML composing format is called HTML source** (#440,
   reported by erenoglu). It is where a message's HTML is written by hand;
   the WYSIWYG editor is **Rich text**, which is sent as HTML too, and its
