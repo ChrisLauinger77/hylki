@@ -855,11 +855,12 @@ formatting row, which wears the icon of the format it is set to and lists
 the others, the current one in your accent colour:
 
 - **Rich text:** the WYSIWYG editor with its formatting toolbar. The default.
+  It is sent as HTML with a plain-text alternative, not as RTF.
 - **Markdown:** you write Markdown, the recipient gets formatted mail.
-- **HTML:** you write the message's HTML by hand.
+- **HTML source:** you write the message's HTML by hand.
 - **Plain text:** no formatting at all, sent as `text/plain` only.
 
-Markdown and HTML are written as *source*: a monospace field, the formatting
+Markdown and HTML source are written as *source*: a monospace field, the formatting
 buttons gone from the row above it (they would go nowhere), and a **Preview**
 toggle beside the format chooser that swaps the source for the message as it
 will be sent. Nothing

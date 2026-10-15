@@ -3533,13 +3533,15 @@ msgstr "Εμπλουτισμένο κείμενο"
 msgid "Markdown"
 msgstr "Markdown"
 
-msgid "HTML"
-msgstr "HTML"
+#, fuzzy
+msgid "HTML source"
+msgstr "Προβολή πηγαίου κώδικα"
 
 msgid "Plain text"
 msgstr "Απλό κείμενο"
 
-msgid "Format as you type, with the toolbar"
+#, fuzzy
+msgid "Format as you type; it is sent as HTML"
 msgstr "Μορφοποίηση κατά την πληκτρολόγηση, με τη γραμμή εργαλείων"
 
 msgid "Write Markdown; it is sent as formatted mail"
@@ -6264,10 +6266,12 @@ msgstr "Πάντα ανεπτυγμένο"
 msgid "Write messages in"
 msgstr "Σύνταξη μηνυμάτων σε"
 
+#, fuzzy
 msgid ""
-"What new messages, replies and forwards start as. Markdown and HTML are "
-"written as source and sent as formatted mail; plain text is sent without "
-"formatting. The composer's format button switches any one message."
+"What new messages, replies and forwards start as. Rich text is formatted as "
+"you type and sent as HTML. Markdown and HTML source are written as source "
+"and sent as formatted mail; plain text is sent without formatting. The "
+"composer's format button switches any one message."
 msgstr ""
 "Η αρχική μορφή νέων μηνυμάτων, απαντήσεων και προωθήσεων. Το Markdown και το "
 "HTML γράφονται ως πηγαίος κώδικας και αποστέλλονται ως μορφοποιημένα "
@@ -7815,6 +7819,9 @@ msgstr "Hyprlab"
 #~ msgid "Appended to new messages sent from this account."
 #~ msgstr ""
 #~ "Προστίθεται στα νέα μηνύματα που αποστέλλονται από αυτόν τον λογαριασμό."
+
+#~ msgid "HTML"
+#~ msgstr "HTML"
 
 #~ msgid "Sort messages"
 #~ msgstr "Ταξινόμηση μηνυμάτων"

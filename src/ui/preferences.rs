@@ -3506,8 +3506,9 @@ impl Component for Preferences {
                                     adw::ComboRow {
                                         set_title: &i18n("Write messages in"),
                                         set_subtitle: &i18n("What new messages, replies and forwards start \
-                                                       as. Markdown and HTML are written as source and \
-                                                       sent as formatted mail; plain text is sent without \
+                                                       as. Rich text is formatted as you type and sent as \
+                                                       HTML. Markdown and HTML source are written as source \
+                                                       and sent as formatted mail; plain text is sent without \
                                                        formatting. The composer's format button switches \
                                                        any one message."),
                                         connect_selected_notify[sender] => move |row| {
@@ -4602,7 +4603,7 @@ impl Component for Preferences {
         widgets.compose_format_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Rich text"),
             &i18n("Markdown"),
-            &i18n("HTML"),
+            &i18n("HTML source"),
             &i18n("Plain text"),
         ])));
         no_truncate(&widgets.compose_format_row);

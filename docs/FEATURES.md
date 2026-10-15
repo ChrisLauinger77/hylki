@@ -77,7 +77,8 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Four formats:** rich text, Markdown, hand-written HTML, or plain text,
   switched per message from the composer's format button. See
   [Writing in Markdown or HTML](DOCUMENTATION.md#writing-in-markdown-or-html).
-  Rich text has fonts, sizes, any color, headings, lists and pictures.
+  Rich text has fonts, sizes, any color, headings, lists and pictures, and
+  is sent as HTML.
 - **HTML signatures**, several per account, picked by name in the composer,
   with a default sender for new mail. In a reply or forward the signature
   sits above the quoted message, or below it if you prefer.

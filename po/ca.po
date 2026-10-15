@@ -3424,13 +3424,15 @@ msgstr "Text enriquit"
 msgid "Markdown"
 msgstr "Markdown"
 
-msgid "HTML"
-msgstr "HTML"
+#, fuzzy
+msgid "HTML source"
+msgstr "Mostra el codi font"
 
 msgid "Plain text"
 msgstr "Text pla"
 
-msgid "Format as you type, with the toolbar"
+#, fuzzy
+msgid "Format as you type; it is sent as HTML"
 msgstr "Formata mentre escrius, amb la barra d'eines"
 
 msgid "Write Markdown; it is sent as formatted mail"
@@ -6118,10 +6120,12 @@ msgstr "Sempre expandit"
 msgid "Write messages in"
 msgstr "Escriu missatges en"
 
+#, fuzzy
 msgid ""
-"What new messages, replies and forwards start as. Markdown and HTML are "
-"written as source and sent as formatted mail; plain text is sent without "
-"formatting. The composer's format button switches any one message."
+"What new messages, replies and forwards start as. Rich text is formatted as "
+"you type and sent as HTML. Markdown and HTML source are written as source "
+"and sent as formatted mail; plain text is sent without formatting. The "
+"composer's format button switches any one message."
 msgstr ""
 "En què comencen els missatges nous, les respostes i els reenviament. El "
 "Markdown i l'HTML s'escriuen com a codi font i s'envien com a correu "
@@ -7636,6 +7640,9 @@ msgstr "Hyprlab"
 
 #~ msgid "Appended to new messages sent from this account."
 #~ msgstr "S'afegeix als missatges nous enviats des d'aquest compte."
+
+#~ msgid "HTML"
+#~ msgstr "HTML"
 
 #~ msgid "Sort messages"
 #~ msgstr "Ordena els missatges"

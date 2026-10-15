@@ -3099,13 +3099,13 @@ msgstr ""
 msgid "Markdown"
 msgstr ""
 
-msgid "HTML"
+msgid "HTML source"
 msgstr ""
 
 msgid "Plain text"
 msgstr ""
 
-msgid "Format as you type, with the toolbar"
+msgid "Format as you type; it is sent as HTML"
 msgstr ""
 
 msgid "Write Markdown; it is sent as formatted mail"
@@ -5471,9 +5471,10 @@ msgid "Write messages in"
 msgstr ""
 
 msgid ""
-"What new messages, replies and forwards start as. Markdown and HTML are "
-"written as source and sent as formatted mail; plain text is sent without "
-"formatting. The composer's format button switches any one message."
+"What new messages, replies and forwards start as. Rich text is formatted as "
+"you type and sent as HTML. Markdown and HTML source are written as source "
+"and sent as formatted mail; plain text is sent without formatting. The "
+"composer's format button switches any one message."
 msgstr ""
 
 msgid "Font"

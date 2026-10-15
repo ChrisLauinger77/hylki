@@ -3493,13 +3493,15 @@ msgstr "Texte enrichi"
 msgid "Markdown"
 msgstr "Markdown"
 
-msgid "HTML"
-msgstr "HTML"
+#, fuzzy
+msgid "HTML source"
+msgstr "Afficher le code source"
 
 msgid "Plain text"
 msgstr "Texte brut"
 
-msgid "Format as you type, with the toolbar"
+#, fuzzy
+msgid "Format as you type; it is sent as HTML"
 msgstr "Mise en forme au fil de la frappe, avec la barre d'outils"
 
 msgid "Write Markdown; it is sent as formatted mail"
@@ -6230,10 +6232,12 @@ msgstr "Toujours déployée"
 msgid "Write messages in"
 msgstr "Rédiger les messages en"
 
+#, fuzzy
 msgid ""
-"What new messages, replies and forwards start as. Markdown and HTML are "
-"written as source and sent as formatted mail; plain text is sent without "
-"formatting. The composer's format button switches any one message."
+"What new messages, replies and forwards start as. Rich text is formatted as "
+"you type and sent as HTML. Markdown and HTML source are written as source "
+"and sent as formatted mail; plain text is sent without formatting. The "
+"composer's format button switches any one message."
 msgstr ""
 "Ce que sont, au départ, les nouveaux messages, réponses et transferts. "
 "Markdown et HTML sont rédigés sous forme de code source puis envoyés en tant "
@@ -7769,6 +7773,9 @@ msgstr "Hyprlab"
 
 #~ msgid "Appended to new messages sent from this account."
 #~ msgstr "Ajoutée aux nouveaux messages envoyés depuis ce compte."
+
+#~ msgid "HTML"
+#~ msgstr "HTML"
 
 #~ msgid "Sort messages"
 #~ msgstr "Trier les messages"

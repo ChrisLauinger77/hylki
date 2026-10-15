@@ -76,7 +76,7 @@ fn format_label(format: ComposeFormat) -> String {
     match format {
         ComposeFormat::Rich => i18n("Rich text"),
         ComposeFormat::Markdown => i18n("Markdown"),
-        ComposeFormat::Html => i18n("HTML"),
+        ComposeFormat::Html => i18n("HTML source"),
         ComposeFormat::Plain => i18n("Plain text"),
     }
 }
@@ -84,7 +84,7 @@ fn format_label(format: ComposeFormat) -> String {
 /// The one-line explanation under each format in the menu.
 fn format_hint(format: ComposeFormat) -> String {
     match format {
-        ComposeFormat::Rich => i18n("Format as you type, with the toolbar"),
+        ComposeFormat::Rich => i18n("Format as you type; it is sent as HTML"),
         ComposeFormat::Markdown => i18n("Write Markdown; it is sent as formatted mail"),
         ComposeFormat::Html => i18n("Write the message's HTML by hand"),
         ComposeFormat::Plain => i18n("No formatting at all"),

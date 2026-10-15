@@ -21,6 +21,11 @@
   formatting tools, hidden while a message is written as source, still
   took their rows of the toolbar, most with the toolbar expanded.
 
+- **Changed: the HTML composing format is called HTML source** (#440,
+  reported by erenoglu). It is where a message's HTML is written by hand;
+  the WYSIWYG editor is **Rich text**, which is sent as HTML too, and its
+  description in the format menu and in **Settings → Composing** now says so.
+
 - **Added: more quick filters** (#441). One sort and filter button above
   the list replaces the sort menu and the unread and starred toggles. Its
   popover has the sort orders in one column and, in the other, **Unread**,

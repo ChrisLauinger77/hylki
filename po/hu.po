@@ -3506,13 +3506,15 @@ msgstr "Formázott szöveg"
 msgid "Markdown"
 msgstr "Markdown"
 
-msgid "HTML"
-msgstr "HTML"
+#, fuzzy
+msgid "HTML source"
+msgstr "Forrás megtekintése"
 
 msgid "Plain text"
 msgstr "Egyszerű szöveg"
 
-msgid "Format as you type, with the toolbar"
+#, fuzzy
+msgid "Format as you type; it is sent as HTML"
 msgstr "Szerkesztés közbeni formázás, eszköztárral"
 
 msgid "Write Markdown; it is sent as formatted mail"
@@ -6239,10 +6241,12 @@ msgstr "Feladó mindig engedélyezve"
 msgid "Write messages in"
 msgstr "Írj üzeneteket a"
 
+#, fuzzy
 msgid ""
-"What new messages, replies and forwards start as. Markdown and HTML are "
-"written as source and sent as formatted mail; plain text is sent without "
-"formatting. The composer's format button switches any one message."
+"What new messages, replies and forwards start as. Rich text is formatted as "
+"you type and sent as HTML. Markdown and HTML source are written as source "
+"and sent as formatted mail; plain text is sent without formatting. The "
+"composer's format button switches any one message."
 msgstr ""
 "Hogyan jelennek meg az új üzenetek, válaszok és továbbított üzenetek. A "
 "Markdown és a HTML formátumú szövegeket forráskódként írják meg, és "
@@ -7798,6 +7802,9 @@ msgstr "Hyprlab"
 
 #~ msgid "Appended to new messages sent from this account."
 #~ msgstr "Ebből a fiókból elküldött új üzenetekhez csatolva."
+
+#~ msgid "HTML"
+#~ msgstr "HTML"
 
 #~ msgid "Sort messages"
 #~ msgstr "Üzenetek rendezése"
