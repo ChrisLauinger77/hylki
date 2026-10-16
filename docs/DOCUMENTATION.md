@@ -723,7 +723,7 @@ in a notice at the foot of the window. Undo brings it back to the composer
 it was written in: a reply to the split beside its conversation, if that
 conversation is still open, anything else to a window. If it cannot be
 sent, the status bar says why. **Settings →
-Composing → Undo Send** sets the wait to 5, 10, 20 or 30 seconds, or
+Composing → Undo Send** sets the wait to 3, 5, 10, 20 or 30 seconds, or
 **Off** to send at once. Send Later does not wait: a scheduled message can
 be edited or removed in the Outbox until its time.
 

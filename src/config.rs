@@ -3790,7 +3790,7 @@ pub struct RailFold {
 }
 
 /// The delays Settings → Composing offers for Undo Send (#434), in seconds.
-pub(crate) const UNDO_SEND_CHOICES: [u32; 5] = [0, 5, 10, 20, 30];
+pub(crate) const UNDO_SEND_CHOICES: [u32; 6] = [0, 3, 5, 10, 20, 30];
 
 fn default_undo_send_secs() -> u32 {
     5

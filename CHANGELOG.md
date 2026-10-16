@@ -6,7 +6,7 @@
   with Undo in a notice at the foot of the window; Undo brings it back to
   the composer it was written in, a split reply beside its conversation.
   New setting **Settings →
-  Composing → Undo Send**: Off, 5, 10, 20 or 30 seconds, 5 by default.
+  Composing → Undo Send**: Off, 3, 5, 10, 20 or 30 seconds, 5 by default.
   While it waits and while it is being sent, the message is listed in the
   Outbox, where Edit or Delete take it back and Send sends it at once.
   Quitting during the wait keeps it in the Outbox for the next start.

@@ -67,8 +67,8 @@ The full list. The [README](../README.md) carries a shorter one.
 - **Printing:** a message with its sender, recipients and date, page
   numbers and an optional wider margin for hole punching, with an in-app
   preview that also saves straight to PDF.
-- **Undo Send:** a sent message waits five seconds, or up to thirty, with
-  Undo on offer.
+- **Undo Send:** a sent message waits three to thirty seconds, five by
+  default, with Undo on offer.
 - **Outbox:** a send that fails is kept and retried when the connection
   returns, not lost. Queued messages can be edited, sent by hand or discarded.
   A message being sent is listed there too until it has gone.
