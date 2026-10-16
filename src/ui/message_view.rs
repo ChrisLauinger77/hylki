@@ -2628,13 +2628,19 @@ impl Component for MessageView {
                     self.member_checks.clear();
                     self.unsub_state.clear();
                 }
+                // A card taken out of the conversation on screen, deleted or
+                // moved, can leave another message heading it. What remains
+                // is the same document, read on from where it was.
+                let card_left = !same_message
+                    && thread.len() < self.thread.len()
+                    && thread.iter().all(|m| self.thread.iter().any(|t| (t.account_id, t.id) == (m.account_id, m.id)));
                 // What was done to a card (translated, folded) holds while it
                 // stays in the conversation on screen: stepping to another of
                 // its messages must not undo it. The message stepped to opens.
                 let stays = |k: &(u32, u32)| thread.iter().any(|m| (m.account_id, m.id) == *k);
                 self.translations.retain(|k, _| stays(k));
                 self.folds.retain(|k, _| stays(k));
-                if !same_message {
+                if !same_message && !card_left {
                     if let Some(key) = shown.as_ref().map(|s| (s.account_id, s.id)) {
                         if self.thread.iter().any(|m| (m.account_id, m.id) == key) {
                             self.folds.insert(key, false);
@@ -2646,7 +2652,7 @@ impl Component for MessageView {
                 // A fresh open: anything the user marked unread earlier can be
                 // read by scrolling again — and the first render may auto-scroll
                 // to the unread mark again.
-                if !same_message {
+                if !same_message && !card_left {
                     self.no_autoread.clear();
                     self.did_autoscroll = false;
                     self.saved_anchor = None;

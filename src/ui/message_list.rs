@@ -1394,6 +1394,9 @@ pub enum MessageListInput {
     /// UID, since a UID is unique only within its folder.
     SetHasAttachment { account_id: u32, folder_id: u32, uid: u32, has: bool },
     Remove(u32),
+    /// `gone` left the open conversation, which stays open: its row stays,
+    /// now headed by `head`.
+    LeaveConversation { gone: (u32, u32), head: (u32, u32) },
     /// Remove many messages in a single batch (bulk archive/delete/spam), so the
     /// list updates in one render pass instead of one per message.
     RemoveMany(Vec<u32>),
@@ -3125,6 +3128,32 @@ impl SimpleComponent for MessageList {
                         }
                     }
                 }
+            }
+            MessageListInput::LeaveConversation { gone, head } => {
+                // The cache's count of the conversation still holds the
+                // message until the server has moved it, so the badge is
+                // brought down here rather than asked for again.
+                // Its members go by other ids there, so by folder and UID.
+                let slot = self.all.iter().find(|m| (m.account_id, m.id) == gone).map(|m| (m.account_id, m.folder_id, m.uid));
+                if let Some(s) = self.msg_thread.get(&gone).and_then(|k| self.thread_summaries.get_mut(k)) {
+                    s.count = s.count.saturating_sub(1);
+                    s.members.retain(|m| Some((m.account_id, m.folder_id, m.uid)) != slot);
+                }
+                self.all.retain(|m| (m.account_id, m.id) != gone);
+                self.tail.retain(|r| (r.msg.account_id, r.msg.id) != gone);
+                self.emitted_thread.retain(|k| *k != gone);
+                self.drop_threads();
+                // The row is selected under its new head before the rebuild
+                // lights it, so the selection reads as the one already open
+                // and the reader is not loaded again.
+                for k in self.selected_ids.iter_mut().filter(|k| **k == gone) {
+                    *k = head;
+                }
+                self.selected_ids.dedup();
+                if self.selected_id == Some(gone) {
+                    self.selected_id = Some(head);
+                }
+                self.queue_rebuild(true);
             }
             MessageListInput::RemoveMany(ids) => {
                 if ids.is_empty() {

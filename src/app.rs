@@ -4763,6 +4763,28 @@ impl SimpleComponent for AppModel {
                 });
             }
         }
+        // HYLKI_SHOWCASE_CARD_DELETE=<account>:<id>[@<seconds>] deletes that
+        // card of the open conversation at 8 s, as its Delete would. Several
+        // may be given, comma-separated.
+        if let Ok(v) = std::env::var("HYLKI_SHOWCASE_CARD_DELETE") {
+            for item in v.split(',') {
+                let (item, at) = showcase_at(item, 8);
+                let Some((a, id)) = item
+                    .split_once(':')
+                    .and_then(|(a, id)| Some((a.parse::<u32>().ok()?, id.parse::<u32>().ok()?)))
+                else {
+                    continue;
+                };
+                let view = model.message_view.sender().clone();
+                gtk::glib::timeout_add_seconds_local_once(at, move || {
+                    let _ = view.send(MessageViewInput::CardAction {
+                        action: crate::ui::message_list::RowAction::Delete,
+                        account_id: a,
+                        id,
+                    });
+                });
+            }
+        }
         // HYLKI_SHOWCASE_INBOX=<account>[@<seconds>] switches to that
         // account's Inbox at 3 s or the time given (the first account's when
         // it is not a number), real accounts included, for the same probe
@@ -18912,6 +18934,11 @@ impl AppModel {
     /// Erase messages from the server for good (flag `\Deleted` + EXPUNGE),
     /// grouped by source folder so each folder takes a single request.
     fn purge_messages(&mut self, messages: Vec<Message>) {
+        // One card of the open conversation, erased: the rest stays open.
+        let leaving = match messages.as_slice() {
+            [m] => self.leave_conversation(m).map(|head| ((m.account_id, m.id), head)),
+            _ => None,
+        };
         let mut groups: HashMap<(u32, String), Vec<u32>> = HashMap::new();
         let mut removed_ids = Vec::with_capacity(messages.len());
         for m in &messages {
@@ -18932,7 +18959,10 @@ impl AppModel {
             self.send_to(account_id, MailRequest::PurgeMessages { path, uids });
         }
         self.update_busy_indicator();
-        self.message_list.emit(MessageListInput::RemoveMany(removed_ids));
+        self.message_list.emit(match leaving {
+            Some((gone, head)) => MessageListInput::LeaveConversation { gone, head },
+            None => MessageListInput::RemoveMany(removed_ids),
+        });
         self.push_unread_counts();
     }
 
@@ -21780,9 +21810,72 @@ impl AppModel {
     }
 
     fn discard_message(&mut self, m: &Message) {
+        if let Some(head) = self.leave_conversation(m) {
+            // The conversation moved on first, so the message is no longer
+            // the one the reader was opened on and nothing here closes it.
+            self.discard_message_local(m);
+            self.message_list.emit(MessageListInput::LeaveConversation { gone: (m.account_id, m.id), head });
+            self.push_unread_counts();
+            return;
+        }
         self.discard_message_local(m);
         self.message_list.emit(MessageListInput::Remove(m.id));
         self.push_unread_counts();
+    }
+
+    /// One card of the open conversation leaving its folder: the card goes
+    /// and the rest of the conversation stays open. Removing the message as
+    /// a list row closed the whole conversation when it was the one the
+    /// conversation was opened on, and left its card on screen when it was
+    /// not. Returns the message the list's row now stands for, or `None`
+    /// when `m` is no such card or nothing of the folder's would be left.
+    fn leave_conversation(&mut self, m: &Message) -> Option<(u32, u32)> {
+        if self.current_thread.len() < 2 {
+            return None;
+        }
+        let key = (m.account_id, m.id);
+        let pos = self
+            .current_thread
+            .iter()
+            .position(|t| (t.account_id, t.id) == key && t.folder_id == m.folder_id)?;
+        // The list heads a row with its oldest message in the folder, which
+        // is the one the reader is opened on.
+        let head = self
+            .current_thread
+            .iter()
+            .filter(|t| (t.account_id, t.id) != key)
+            .find(|t| self.listed_thread.contains(&(t.account_id, t.id)))?
+            .clone();
+        self.current_thread.remove(pos);
+        self.listed_thread.retain(|k| *k != key);
+        self.list_selection.retain(|k| *k != key);
+        self.list_heard.retain(|k| *k != key);
+        let was_current = self.current.as_ref().is_some_and(|c| (c.account_id, c.id) == key);
+        if was_current {
+            self.thread_key = Some(body_key(&head));
+            self.current = Some(head.clone());
+        }
+        // The card picked in the reader was the one that went: the selection
+        // is the conversation's row again, as when it was opened, so the
+        // toolbar still has a message to act on.
+        if let Some(c) = self.current.as_ref().filter(|_| self.list_selection.is_empty()) {
+            self.list_selection = vec![(c.account_id, c.id)];
+            self.list_heard = self.list_selection.clone();
+            self.selection_from_cards = false;
+            self.message_view.emit(MessageViewInput::SetSelectedCards(self.list_selection.clone()));
+        }
+        if self.current_thread.len() > 1 {
+            self.thread_painted = true;
+            self.show_thread();
+        } else {
+            self.current_thread.clear();
+            self.thread_key = None;
+            let current = self.current.clone();
+            let loading = current.as_ref().is_some_and(|c| c.body.is_empty());
+            self.show_message(current, loading);
+        }
+        self.refresh_thread_attachments();
+        Some((head.account_id, head.id))
     }
 
     /// Whether a sender address matches the blacklist (exact address, or a bare
