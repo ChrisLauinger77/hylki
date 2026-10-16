@@ -6933,6 +6933,10 @@ impl SimpleComponent for AppModel {
                                 tm.body = current.body.clone();
                             }
                         }
+                        // A member whose body came after the conversation was
+                        // put away (one from another folder, say) was stored
+                        // without it, and would say "Loading…" for good.
+                        self.load_missing_thread_bodies(Some((account_id, m.id)));
                         self.thread_painted = true;
                         self.thread_related_pending = false;
                         self.show_thread();
@@ -18919,6 +18923,8 @@ impl AppModel {
             }
         }
         if added.is_empty() && retired.is_empty() {
+            // Missing bodies were asked for when the conversation was shown;
+            // asking again here would fetch one still on its way a second time.
             return;
         }
         conv.extend(added);
@@ -18927,10 +18933,24 @@ impl AppModel {
         // period so they join the first paint instead of causing a second.
         self.thread_opened_at = Some(std::time::Instant::now());
         self.current_thread = conv;
+        self.load_missing_thread_bodies(None);
+    }
+
+    /// Give every member of the conversation on screen that has no body the
+    /// one the app already holds, and ask the workers for the rest. `except`
+    /// is a member whose body is already on its way by another request.
+    fn load_missing_thread_bodies(&mut self, except: Option<(u32, u32)>) {
+        for tm in self.current_thread.iter_mut() {
+            if tm.body.is_empty() {
+                if let Some(b) = self.body_cache.get(&body_key(tm)) {
+                    tm.body = b.clone();
+                }
+            }
+        }
         let to_load: Vec<MissingBody> = self
             .current_thread
             .iter()
-            .filter(|tm| tm.body.is_empty())
+            .filter(|tm| tm.body.is_empty() && except != Some((tm.account_id, tm.id)))
             .filter_map(|tm| self.resolve_folder_path(tm).map(|p| (tm.account_id, tm.id, tm.uid, p)))
             .collect();
         for ((aid, path), items) in batch_bodies_by_folder(to_load) {

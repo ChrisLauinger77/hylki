@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fixed: a message from another folder stayed on "Loading…" in a
+  conversation** (PR #461 by Christian Dandachi). A conversation shown
+  again from memory kept any card whose body had arrived after it was put
+  away empty, though the body was on disk. Such cards are now filled in, or
+  their bodies asked for again, when the conversation is shown.
 - **Shift+Delete deletes permanently** (#471). The selected messages are
   erased from the server instead of going to Trash, from any folder, after
   the same confirmation that deleting in Trash asks for. With single-key
