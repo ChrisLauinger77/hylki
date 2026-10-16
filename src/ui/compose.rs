@@ -206,6 +206,8 @@ pub struct ComposePrefill {
     /// id chain. Both stored bare (no angle brackets).
     pub in_reply_to: String,
     pub references: String,
+    /// For a forward, the forwarded message's Message-ID (#454).
+    pub forwards: String,
     /// When editing an existing draft, its origin (so saving/sending replaces it).
     pub draft_origin: Option<DraftOrigin>,
     /// Start with Encrypt (and so Sign) on: a reply to an encrypted message (#133).
@@ -350,6 +352,7 @@ pub struct Compose {
     /// Threading headers carried from the message being replied to.
     in_reply_to: String,
     references: String,
+    forwards: String,
     /// When editing an existing draft, its origin (replaced on save/send).
     draft_origin: Option<DraftOrigin>,
     /// Editing a template (#360), kept at `draft_origin`: Save puts it back,
@@ -1128,6 +1131,7 @@ impl Component for Compose {
         } = init;
         let in_reply_to = prefill.in_reply_to.clone();
         let references = prefill.references.clone();
+        let forwards = prefill.forwards.clone();
         let draft_origin = prefill.draft_origin.clone();
         let template = prefill.template && draft_origin.is_some();
         let outbox_origin = prefill.outbox_origin;
@@ -1339,6 +1343,7 @@ impl Component for Compose {
             completion_open: std::rc::Rc::new(std::cell::Cell::new(false)),
             in_reply_to,
             references,
+            forwards,
             draft_origin,
             template,
             outbox_origin,
@@ -3157,6 +3162,7 @@ impl Component for Compose {
                     out.outbox_origin = None;
                     out.in_reply_to.clear();
                     out.references.clear();
+                    out.forwards.clear();
                     out.send_at = None;
                     let _ = sender.output(ComposeOutput::SaveTemplate(Box::new(out)));
                     break 'handle;
@@ -3638,6 +3644,7 @@ window.__hylkiDirty=true;})()"#
                 .collect(),
             in_reply_to: self.in_reply_to.clone(),
             references: self.references.clone(),
+            forwards: self.forwards.clone(),
             draft_origin: self.draft_origin.clone(),
             outbox_origin: self.outbox_origin,
             sign: self.sign,

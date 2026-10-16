@@ -354,6 +354,10 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
     let reply_to = graph_addrs(&v["replyTo"]);
     let reply_to =
         if reply_to.eq_ignore_ascii_case(&from_addr) { String::new() } else { reply_to };
+    let last_verb = v["singleValueExtendedProperties"]
+        .as_array()
+        .and_then(|props| props.iter().find(|p| p["id"].as_str().is_some_and(|id| id.eq_ignore_ascii_case(LAST_VERB))))
+        .and_then(|p| p["value"].as_str()?.parse::<u32>().ok());
     let msg = Message {
         id: uid,
         account_id,
@@ -371,6 +375,8 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
         timestamp: ts,
         unread: !v["isRead"].as_bool().unwrap_or(true),
         starred: v["flag"]["flagStatus"].as_str() == Some("flagged"),
+        answered: matches!(last_verb, Some(102 | 103)),
+        forwarded: last_verb == Some(104),
         keywords: v["categories"]
             .as_array()
             .map(|cs| cs.iter().filter_map(|c| c.as_str().map(str::to_string)).collect())
@@ -394,7 +400,15 @@ fn graph_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Opti
 
 const GRAPH_MSG_SELECT: &str = "$select=id,internetMessageId,conversationId,subject,bodyPreview,\
                                 from,replyTo,toRecipients,ccRecipients,receivedDateTime,isRead,\
-                                flag,hasAttachments,categories,importance";
+                                flag,hasAttachments,categories,importance\
+                                &$expand=singleValueExtendedProperties($filter=id%20eq%20'Integer%200x1081')";
+
+/// Exchange keeps no replied or forwarded flag (#454), only the last thing
+/// done to a message, as the MAPI property PidTagLastVerbExecuted: 102 reply,
+/// 103 reply all, 104 forward. Outlook draws its arrow from PidTagIconIndex
+/// (261 replied, 262 forwarded), so both are written.
+const LAST_VERB: &str = "Integer 0x1081";
+const ICON_INDEX: &str = "Integer 0x1080";
 
 /// When a still-open follow-up flag falls due, in Unix seconds, or 0 (#334).
 /// Graph gives a wall-clock time and the zone it is in, which is UTC unless
@@ -1421,6 +1435,11 @@ pub(super) async fn run_graph(
                 match graph_send_message(&account, &message, &emit).await {
                     Ok(()) => {
                         emit(WorkerEvent::Status(String::new()));
+                        graph_mark_answered(
+                            &account, &mut state, cache.as_ref(), account_id,
+                            &message.in_reply_to, &message.forwards, &emit,
+                        )
+                        .await;
                         // If sending an edited draft, remove the obsolete draft.
                         if let Some(o) = message.draft_origin.clone() {
                             if o.account_id == account_id {
@@ -1478,7 +1497,7 @@ pub(super) async fn run_graph(
             MailRequest::DeleteOutbox { id } => delete_queued(cache.as_ref(), account_id, id, &emit),
 
             MailRequest::FlushOutbox { id } => {
-                graph_flush_outbox(cache.as_ref(), account_id, &account, id, &emit).await;
+                graph_flush_outbox(cache.as_ref(), account_id, &account, id, &mut state, &emit).await;
             }
 
             MailRequest::RefreshUnread => {
@@ -2143,11 +2162,37 @@ async fn graph_send_message(
 
 /// The Outbox retry loop for Graph accounts: same queue and bookkeeping as
 /// [`flush_outbox`], with `sendMail` as the transport (Sent copy automatic).
+/// [`super::mark_answered`] for Microsoft 365 (#454): the last verb, and
+/// the icon Outlook draws from it.
+async fn graph_mark_answered(
+    account: &AccountConfig,
+    state: &mut GraphState,
+    cache: Option<&Cache>,
+    account_id: u32,
+    in_reply_to: &str,
+    forwards: &str,
+    emit: &impl Fn(WorkerEvent),
+) {
+    for (path, uid, forwarded) in answered_copies(cache, account_id, in_reply_to, forwards) {
+        let (verb, icon) = if forwarded { ("104", "262") } else { ("102", "261") };
+        let body = serde_json::json!({ "singleValueExtendedProperties": [
+            { "id": LAST_VERB, "value": verb },
+            { "id": ICON_INDEX, "value": icon },
+        ] });
+        graph_patch_message(account, state, &path, uid, body, emit).await;
+        if let Some(c) = cache {
+            c.set_answered(account_id, &path, uid, forwarded);
+        }
+        emit(WorkerEvent::Answered { path, uid, forwarded });
+    }
+}
+
 async fn graph_flush_outbox(
     cache: Option<&Cache>,
     account_id: u32,
     account: &AccountConfig,
     id: Option<u32>,
+    state: &mut GraphState,
     emit: &impl Fn(WorkerEvent),
 ) {
     let Some(cache) = cache else { return };
@@ -2178,6 +2223,8 @@ async fn graph_flush_outbox(
             Ok(_) => {
                 sent_any = true;
                 cache.delete_outbox(item.id);
+                graph_mark_answered(account, state, Some(cache), account_id, &raw_in_reply_to(&item.raw), &item.forwards, emit)
+                    .await;
             }
             Err(e) => {
                 cache.record_outbox_failure(item.id, &e);
@@ -2456,6 +2503,24 @@ mod tests {
     /// #429: missing mail comes in runs, newest first, none longer than a
     /// chunk; a cached row the server has not got is gone, unless it is
     /// newer than the listing.
+    /// Exchange's last verb is the replied or forwarded arrow (#454).
+    #[test]
+    fn the_last_verb_marks_replied_and_forwarded() {
+        let verb = |value: Option<&str>| {
+            let mut v = graph_msg("M1", "2026-09-10T00:00:00Z");
+            if let Some(value) = value {
+                v["singleValueExtendedProperties"] = serde_json::json!([{ "id": "Integer 0x1081", "value": value }]);
+            }
+            let (m, _) = graph_message(&v, 1, 1).unwrap();
+            (m.answered, m.forwarded)
+        };
+        assert_eq!(verb(None), (false, false));
+        assert_eq!(verb(Some("102")), (true, false));
+        assert_eq!(verb(Some("103")), (true, false), "reply all");
+        assert_eq!(verb(Some("104")), (false, true));
+        assert_eq!(verb(Some("0")), (false, false));
+    }
+
     #[test]
     fn the_index_plan_fetches_runs_and_drops_what_went() {
         let server: Vec<(String, String)> =

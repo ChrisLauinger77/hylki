@@ -1335,6 +1335,10 @@ msgstr "Visualizzazione dell'originale."
 msgid "Folder of the original, not the Inbox"
 msgstr "Visualizzazione dell'originale."
 
+#, fuzzy
+msgid "Replied"
+msgstr "Rispondi"
+
 msgid "Sender"
 msgstr "Mittente"
 
@@ -4267,6 +4271,10 @@ msgstr "Scadenza"
 
 msgid "Drag to resize, double-click for the usual width"
 msgstr "Trascina per ridimensionare, doppio clic per la larghezza normale"
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Inoltra"
 
 msgid "High importance"
 msgstr "Alta importanza"

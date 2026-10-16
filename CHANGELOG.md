@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Added: replied and forwarded arrows in the message list** (#454,
+  requested by rhuhxx). A message that was replied to shows a reply arrow
+  beside the sender, one that was forwarded a forward arrow; a
+  conversation's row shows them for its newest message. Sending a reply or
+  a forward marks the original on the server once it has gone, so other
+  clients show it too, and arrows set by other clients show here. A new
+  single-line column, **Replied**, shown by default. IMAP (`\Answered`,
+  `$Forwarded`), JMAP, Microsoft 365 (the last action, as Outlook keeps
+  it) and POP3 (kept in Hylki).
+
 - **Added: replies filed beside the message they answer** (#468,
   requested by flortsch). New setting **Mail Accounts → Edit →
   Special Folders → Save a copy of replies in**: with sent mail (the

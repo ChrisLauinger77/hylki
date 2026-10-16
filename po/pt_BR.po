@@ -1377,6 +1377,10 @@ msgstr "Mostrando o original."
 msgid "Folder of the original, not the Inbox"
 msgstr "Mostrando o original."
 
+#, fuzzy
+msgid "Replied"
+msgstr "Responder"
+
 msgid "Sender"
 msgstr "Remetente"
 
@@ -4326,6 +4330,10 @@ msgid "Drag to resize, double-click for the usual width"
 msgstr ""
 "Arraste para redimensionar; clique duas vezes para restaurar a largura "
 "habitual"
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Encaminhar"
 
 msgid "High importance"
 msgstr "Importância alta"

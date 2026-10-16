@@ -1373,6 +1373,10 @@ msgid "Folder of the original, not the Inbox"
 msgstr "Megjelenítés rámutatáskor"
 
 #, fuzzy
+msgid "Replied"
+msgstr "Válasz"
+
+#, fuzzy
 msgid "Sender"
 msgstr "Feladók"
 
@@ -4355,6 +4359,10 @@ msgstr ""
 
 msgid "Drag to resize, double-click for the usual width"
 msgstr ""
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Továbbítás"
 
 msgid "High importance"
 msgstr ""

@@ -2141,6 +2141,8 @@ pub enum AppMsg {
     /// The worker stored (or failed to store) a read/unread change the app
     /// had applied ahead of it.
     SeenSettled { account_id: u32, path: String, uid: u32 },
+    /// A message was replied to or forwarded, and the server told (#454).
+    Answered { account_id: u32, path: String, uid: u32, forwarded: bool },
     TagSettled { account_id: u32, path: String, uid: u32, keyword: String },
     /// The worker has run (or failed) the move that took these messages
     /// out of `path`: its lists can be believed about them again.
@@ -11293,6 +11295,33 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Answered { account_id, path, uid, forwarded } => {
+                let Some(fid) =
+                    self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id)
+                else {
+                    return;
+                };
+                let same = |c: &Message| c.account_id == account_id && c.folder_id == fid && c.uid == uid;
+                let mark = |c: &mut Message| if forwarded { c.forwarded = true } else { c.answered = true };
+                let mut id = None;
+                for msgs in [self.message_cache.get_mut(&(account_id, fid)), self.unified_slices.get_mut(&(account_id, fid))]
+                    .into_iter()
+                    .flatten()
+                {
+                    for c in msgs.iter_mut().filter(|c| same(c)) {
+                        mark(c);
+                        id = Some(c.id);
+                    }
+                }
+                self.current_thread.iter_mut().filter(|c| same(c)).for_each(mark);
+                if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
+                    mark(cur);
+                }
+                if let Some(id) = id {
+                    self.message_list.emit(MessageListInput::SetAnswered { slot: (account_id, fid, id), forwarded });
+                }
+            }
+
             AppMsg::TagSettled { account_id, path, uid, keyword } => {
                 let soon = std::time::Instant::now() + PENDING_TAG_SETTLED;
                 if let Some((_, until, _)) = self.pending_tags.get_mut(&(account_id, path, uid, keyword.to_lowercase())) {
@@ -17417,6 +17446,7 @@ impl AppModel {
             // already part of (carried in the raw MIME it was built from).
             in_reply_to: String::new(),
             references: String::new(),
+            forwards: item.forwards.clone(),
             draft_origin: None,
             encrypt: false,
             outbox_origin: Some(id),
@@ -18585,6 +18615,8 @@ impl AppModel {
             timestamp,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: !out.attachments.is_empty(),
             message_id: String::new(),
@@ -23182,6 +23214,7 @@ impl AppModel {
             // so the organizer's client files it with the request.
             in_reply_to: message.message_id.clone(),
             references: String::new(),
+            forwards: String::new(),
             draft_origin: None,
             outbox_origin: None,
             sign: false,
@@ -23512,6 +23545,7 @@ impl AppModel {
             // the message it sent. A `mailto:` handle is a fresh message.
             in_reply_to: if info.mailto.is_some() { String::new() } else { message.message_id.clone() },
             references: String::new(),
+            forwards: String::new(),
             draft_origin: None,
             outbox_origin: None,
             sign: false,
@@ -25747,6 +25781,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::FolderUnreadByPath { account_id, path, unread }
         }
         WorkerEvent::SeenSettled { path, uid } => AppMsg::SeenSettled { account_id, path, uid },
+        WorkerEvent::Answered { path, uid, forwarded } => AppMsg::Answered { account_id, path, uid, forwarded },
         WorkerEvent::TagSettled { path, uid, keyword } => AppMsg::TagSettled { account_id, path, uid, keyword },
         WorkerEvent::MovesSettled { path, uids } => AppMsg::MovesSettled { account_id, path, uids },
         WorkerEvent::RawExported { token, raw } => AppMsg::RawExported { token, raw },
@@ -26231,6 +26266,7 @@ fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefill {
         attachments,
         in_reply_to: m.in_reply_to,
         references: m.references,
+        forwards: m.forwards,
         draft_origin: m.draft_origin,
         encrypt: m.encrypt,
         outbox_origin: m.outbox_origin,
@@ -26313,6 +26349,7 @@ fn forward_prefill(m: &Message) -> ComposePrefill {
         subject,
         body_html,
         original_plain: body_is_plain_text(&m.body),
+        forwards: m.message_id.clone(),
         ..Default::default()
     }
 }
@@ -27367,6 +27404,8 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: message_id.to_string(),
@@ -27673,6 +27712,8 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),

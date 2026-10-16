@@ -1390,6 +1390,10 @@ msgstr "Отображается оригинал."
 msgid "Folder of the original, not the Inbox"
 msgstr "Отображается оригинал."
 
+#, fuzzy
+msgid "Replied"
+msgstr "Ответить"
+
 msgid "Sender"
 msgstr "Отправитель"
 
@@ -4343,6 +4347,10 @@ msgid "Drag to resize, double-click for the usual width"
 msgstr ""
 "Потяните, чтобы изменить размер, или дважды нажмите для восстановления "
 "обычной ширины"
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Переслать"
 
 msgid "High importance"
 msgstr "Высокая важность"

@@ -87,6 +87,7 @@ impl Outgoing {
             attempts: 0,
             last_error: String::new(),
             send_at: None,
+            forwards: m.forwards.clone(),
             status: if self.held { i18n("Waiting to send") } else { i18n("Sending…") },
         }
     }

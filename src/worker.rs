@@ -579,6 +579,9 @@ pub struct OutgoingMessage {
     /// including Hylki.
     pub in_reply_to: String,
     pub references: String,
+    /// The Message-ID of the message this forwards, normalized; empty for
+    /// anything else. Marked forwarded once this has gone (#454).
+    pub forwards: String,
     /// When editing an existing draft, the draft being replaced (removed from the
     /// Drafts folder after this message is saved or sent).
     pub draft_origin: Option<crate::models::DraftOrigin>,
@@ -680,6 +683,9 @@ pub enum WorkerEvent {
     /// A `SetSeen` has been stored (or failed): the app stops holding its own
     /// read state for that message over what the server reports.
     SeenSettled { path: String, uid: u32 },
+    /// A message was replied to or forwarded from here, and is marked so
+    /// (#454).
+    Answered { path: String, uid: u32, forwarded: bool },
     /// A `SetKeyword` has been stored (or failed), the same for a tag.
     TagSettled { path: String, uid: u32, keyword: String },
     /// The answer to [`MailRequest::Settle`]: whatever took these messages
@@ -2767,6 +2773,11 @@ async fn run_imap(
                 match send_smtp(&account, &message).await {
                     Ok(raw) => {
                         emit(WorkerEvent::Status(String::new()));
+                        mark_answered(
+                            &mut session, cache.as_ref(), account_id,
+                            &message.in_reply_to, &message.forwards, &emit,
+                        )
+                        .await;
                         // Save a copy to the Sent folder, or beside the
                         // original for a reply (#468); sending still counts
                         // as success even if this part fails.
@@ -4278,7 +4289,7 @@ fn queue_outbox_message(
         .join(", ");
     let preview: String = msg.body.split_whitespace().collect::<Vec<_>>().join(" ");
     let preview: String = preview.chars().take(160).collect();
-    cache
+    let id = cache
         .queue_outbox(
             account_id,
             envelope.from().map(|f| f.to_string()).unwrap_or_default().as_str(),
@@ -4290,8 +4301,11 @@ fn queue_outbox_message(
             sent_path,
             error,
             send_at,
-        )
-        .is_some()
+        );
+    if let Some(id) = id.filter(|_| !msg.forwards.is_empty()) {
+        cache.set_outbox_forwards(id, &msg.forwards);
+    }
+    id.is_some()
 }
 
 /// Quitting while a message waits out the Undo Send delay (#434): queue it
@@ -4367,6 +4381,66 @@ fn pick_queued_sent_copy(
         })
 }
 
+/// The cached copies a sent message answered, in this account (#454): the
+/// one it replies to, found by its In-Reply-To, then the one it forwards,
+/// each with whether it was forwarded.
+pub(crate) fn answered_copies(
+    cache: Option<&Cache>,
+    account_id: u32,
+    in_reply_to: &str,
+    forwards: &str,
+) -> Vec<(String, u32, bool)> {
+    let Some(cache) = cache else { return Vec::new() };
+    [(in_reply_to, false), (forwards, true)]
+        .into_iter()
+        .filter_map(|(ids, forwarded)| Some((first_msgid(ids)?, forwarded)))
+        .flat_map(|(id, forwarded)| {
+            cache
+                .locate_by_message_id(&id)
+                .into_iter()
+                .filter(|(a, _, _)| *a == account_id)
+                .map(move |(_, path, uid)| (path, uid, forwarded))
+        })
+        .collect()
+}
+
+/// The first Message-ID of a header's worth, as the cache keys it.
+fn first_msgid(ids: &str) -> Option<String> {
+    let id = ids.split_whitespace().next()?.trim_start_matches('<').trim_end_matches('>').to_ascii_lowercase();
+    (!id.is_empty()).then_some(id)
+}
+
+/// Mark what a sent message answered (#454): `\Answered` on the original
+/// of a reply, `$Forwarded` on that of a forward. A mailbox that takes no
+/// keywords has nowhere to keep `$Forwarded`, and the arrow then lasts until
+/// the folder syncs. A failure is only logged: the message went, and that
+/// is what the user asked about.
+async fn mark_answered(
+    session: &mut Option<ImapSession>,
+    cache: Option<&Cache>,
+    account_id: u32,
+    in_reply_to: &str,
+    forwards: &str,
+    emit: &impl Fn(WorkerEvent),
+) {
+    for (path, uid, forwarded) in answered_copies(cache, account_id, in_reply_to, forwards) {
+        if let Some(sess) = session.as_mut() {
+            let stored = if forwarded {
+                store_keyword(sess, &path, uid, FORWARDED_KEYWORD, true).await.map(|_| ())
+            } else {
+                store_flag(sess, &path, uid, "\\Answered", true).await
+            };
+            if let Err(e) = stored {
+                tracing::warn!("[account {account_id}] could not mark {path}/{uid} answered: {e}");
+            }
+        }
+        if let Some(c) = cache {
+            c.set_answered(account_id, &path, uid, forwarded);
+        }
+        emit(WorkerEvent::Answered { path, uid, forwarded });
+    }
+}
+
 /// Where the copy of a reply is filed when the account keeps replies
 /// beside what they answer (#468): the folder its original is in now,
 /// found by Message-ID in the cache, so a message moved or deleted while
@@ -4385,15 +4459,7 @@ pub(crate) fn reply_copy_path(
         return None;
     }
     let cache = cache?;
-    let id = in_reply_to
-        .split_whitespace()
-        .next()?
-        .trim_start_matches('<')
-        .trim_end_matches('>')
-        .to_ascii_lowercase();
-    if id.is_empty() {
-        return None;
-    }
+    let id = first_msgid(in_reply_to)?;
     let holding: Vec<String> = cache
         .locate_by_message_id(&id)
         .into_iter()
@@ -4500,6 +4566,8 @@ async fn flush_outbox(
                 sent_any = true;
                 sent += 1;
                 cache.delete_outbox(item.id);
+                mark_answered(session, Some(cache), account_id, &raw_in_reply_to(&item.raw), &item.forwards, emit)
+                    .await;
                 let dest = current_sent_copy_path(
                     account,
                     account_id,
@@ -8641,7 +8709,9 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
     let flags: Vec<Flag> = fetch.flags().collect();
     let unread = !flags.iter().any(|f| matches!(f, Flag::Seen));
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
+    let answered = flags.iter().any(|f| matches!(f, Flag::Answered));
     let keywords = custom_flags(&flags);
+    let forwarded = keywords.iter().any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
 
     let raw = fetch.header().unwrap_or(&[]);
     let parsed = MessageParser::default().parse(raw);
@@ -8723,6 +8793,8 @@ fn summary_from_headers(account_id: u32, fetch: &Fetch, folder_id: u32) -> Messa
         timestamp,
         unread,
         starred,
+        answered,
+        forwarded,
         keywords,
         has_attachment,
         message_id,
@@ -9228,7 +9300,9 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
     let flags: Vec<Flag> = fetch.flags().collect();
     let unread = !flags.iter().any(|f| matches!(f, Flag::Seen));
     let starred = flags.iter().any(|f| matches!(f, Flag::Flagged));
+    let answered = flags.iter().any(|f| matches!(f, Flag::Answered));
     let keywords = custom_flags(&flags);
+    let forwarded = keywords.iter().any(|k| k.eq_ignore_ascii_case(FORWARDED_KEYWORD));
 
     let env = fetch.envelope();
     let (from_name, from_addr) = env
@@ -9290,6 +9364,8 @@ fn build_summary(account_id: u32, fetch: &Fetch, folder_id: u32) -> Message {
         timestamp,
         unread,
         starred,
+        answered,
+        forwarded,
         keywords,
         has_attachment,
         message_id,
@@ -9332,6 +9408,10 @@ fn uid_set(uids: &[u32]) -> String {
     }
     out
 }
+
+/// The keyword RFC 5550 gives a forwarded message; servers and clients
+/// differ in its case.
+pub const FORWARDED_KEYWORD: &str = "$Forwarded";
 
 /// The user-defined keywords among a message's flags, verbatim.
 fn custom_flags(flags: &[Flag]) -> Vec<String> {
@@ -9870,6 +9950,8 @@ pub(crate) fn summary_from_raw(account_id: u32, folder_id: u32, uid: u32, raw: &
         timestamp,
         unread: true,
         starred: false,
+        answered: false,
+        forwarded: false,
         keywords: Vec::new(),
         has_attachment,
         message_id,
@@ -10157,6 +10239,9 @@ async fn run_pop3(
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(_) => {
+                        // Kept in the cache only: POP3 has no flags.
+                        mark_answered(&mut None, cache.as_ref(), account_id, &message.in_reply_to, &message.forwards, &emit)
+                            .await;
                         drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
                         emit(WorkerEvent::SendDone { ticket, sent: true });
@@ -11959,6 +12044,8 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             timestamp: 0,
             unread: true,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: true,
             message_id: String::new(),
@@ -11967,6 +12054,28 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             due: 0,
             labels: Vec::new(),
         }
+    }
+
+    /// A sent message marks what it answers in its own account only, the
+    /// reply's original as replied and the forward's as forwarded (#454).
+    #[test]
+    fn a_sent_message_finds_what_it_answered() {
+        let cache = Cache::in_memory().unwrap();
+        let copy = |account_id: u32, uid: u32, id: &str| Message {
+            account_id,
+            message_id: id.into(),
+            ..flagged_message(uid)
+        };
+        cache.upsert_messages(1, "INBOX", &[copy(1, 1, "a@x"), copy(1, 2, "b@x")]);
+        cache.upsert_messages(1, "Archive", &[copy(1, 7, "a@x")]);
+        cache.upsert_messages(2, "INBOX", &[copy(2, 1, "a@x")]);
+        let mut found = answered_copies(Some(&cache), 1, "<A@x>", "");
+        found.sort();
+        assert_eq!(found, [("Archive".to_string(), 7, false), ("INBOX".to_string(), 1, false)]);
+        assert_eq!(answered_copies(Some(&cache), 1, "", "b@x"), [("INBOX".to_string(), 2, true)]);
+        assert!(answered_copies(Some(&cache), 1, "", "").is_empty());
+        assert!(answered_copies(Some(&cache), 1, "gone@x", "").is_empty());
+        assert!(answered_copies(None, 1, "a@x", "").is_empty());
     }
 
     /// A sync whose recent window came back without some previews must give
@@ -12073,6 +12182,7 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             attachments: Vec::new(),
             in_reply_to: String::new(),
             references: String::new(),
+            forwards: String::new(),
             draft_origin: None,
             outbox_origin: None,
             sign: false,
@@ -12377,6 +12487,7 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             attempts: 1,
             last_error: String::new(),
             send_at: None,
+            forwards: String::new(),
             status: String::new(),
         }
     }
@@ -12747,6 +12858,8 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             timestamp: 1,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: "parent@example.com".into(),
@@ -14638,6 +14751,8 @@ mod gmail_label_tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),

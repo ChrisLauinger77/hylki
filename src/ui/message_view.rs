@@ -8369,6 +8369,8 @@ mod tests {
             timestamp: 0,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),

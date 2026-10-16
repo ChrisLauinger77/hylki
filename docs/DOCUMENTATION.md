@@ -705,6 +705,18 @@ anything reading it did not. The recipient still gets them. In dark mode a
 quoted message that sets its own colors keeps the light ground it was
 designed for.
 
+A message that was replied to shows a reply arrow in the message list, one
+that was forwarded a forward arrow, and one that was both shows both. A
+conversation's row shows them for its newest message in the folder. The
+arrows are kept on the server, so a message answered from another client
+shows them too. Hylki marks a message once the reply or forward has gone,
+so a send that is undone, or still waiting in the Outbox, leaves it as it
+was. IMAP keeps them as the `\Answered` flag and the `$Forwarded` keyword,
+JMAP as `$answered` and `$forwarded`, and POP3 in Hylki only. Microsoft 365
+keeps only the last thing done to a message, as Outlook shows it, so a
+message replied to and then forwarded there shows the forward arrow alone.
+Mail already downloaded shows its arrows once it is fetched again.
+
 ### Replies filed beside the original
 
 A copy of a sent reply goes with the rest of sent mail unless the account
@@ -1261,6 +1273,7 @@ the conversation's size rides at its end. The columns are:
 | Column | What it shows |
 | --- | --- |
 | Star | The star, lit when the message is starred |
+| Replied | An arrow when the message was replied to, another when it was forwarded |
 | Sender | Who it is from; in Sent, who it went to |
 | Recipients | Who it went to |
 | Correspondents | Everyone who wrote in the conversation, newest first, you as "me" |
@@ -1276,7 +1289,8 @@ Importance comes from the `X-Priority`, `Importance` and `Priority`
 headers, or from Microsoft 365. Mail already downloaded shows as normal
 until it is fetched again. Only Microsoft 365 has a due date, so Due Date
 takes room only in a list that holds Microsoft 365 mail. **Restore
-Defaults** goes back to star, sender, subject, tags, attachment and date.
+Defaults** goes back to star, replied, sender, subject, tags, attachment
+and date.
 
 **Column headings**, in the same group, names the columns above the list.
 Clicking a heading sorts the list by that column, and clicking it again

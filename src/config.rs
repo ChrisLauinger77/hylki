@@ -3934,6 +3934,8 @@ pub fn load_list_layout() -> ListLayout {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ListColumn {
     Star,
+    /// Replied to, forwarded, or both (#454).
+    Replied,
     Sender,
     Recipients,
     Correspondents,
@@ -3949,8 +3951,9 @@ pub enum ListColumn {
 }
 
 impl ListColumn {
-    pub const ALL: [ListColumn; 11] = [
+    pub const ALL: [ListColumn; 12] = [
         ListColumn::Star,
+        ListColumn::Replied,
         ListColumn::Sender,
         ListColumn::Recipients,
         ListColumn::Correspondents,
@@ -3964,9 +3967,10 @@ impl ListColumn {
     ];
 
     /// The columns a single line shows until they are changed: the ones it
-    /// had before they could be.
-    pub const DEFAULT: [ListColumn; 6] = [
+    /// had before they could be, and the replied arrows (#454).
+    pub const DEFAULT: [ListColumn; 7] = [
         ListColumn::Star,
+        ListColumn::Replied,
         ListColumn::Sender,
         ListColumn::Subject,
         ListColumn::Tags,
@@ -3978,6 +3982,7 @@ impl ListColumn {
     pub fn key(self) -> &'static str {
         match self {
             ListColumn::Star => "star",
+            ListColumn::Replied => "replied",
             ListColumn::Sender => "sender",
             ListColumn::Recipients => "recipients",
             ListColumn::Correspondents => "correspondents",
@@ -3999,6 +4004,7 @@ impl ListColumn {
     pub fn icon(self) -> &'static str {
         match self {
             ListColumn::Star => "starred-symbolic",
+            ListColumn::Replied => "mail-reply-sender-symbolic",
             ListColumn::Sender => "avatar-default-symbolic",
             ListColumn::Recipients => "mail-send-symbolic",
             ListColumn::Correspondents => "chat-bubbles-text-symbolic",
@@ -4016,6 +4022,7 @@ impl ListColumn {
     pub fn label(self) -> &'static str {
         match self {
             ListColumn::Star => crate::i18n::i18n_noop("Star"),
+            ListColumn::Replied => crate::i18n::i18n_noop("Replied"),
             ListColumn::Sender => crate::i18n::i18n_noop("Sender"),
             ListColumn::Recipients => crate::i18n::i18n_noop("Recipients"),
             ListColumn::Correspondents => crate::i18n::i18n_noop("Correspondents"),

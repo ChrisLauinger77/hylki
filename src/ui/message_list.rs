@@ -65,6 +65,9 @@ fn message_cmp(a: &Message, b: &Message, order: SortOrder) -> std::cmp::Ordering
         }
         SortOrder::Account => a.account_id.cmp(&b.account_id).then(b.timestamp.cmp(&a.timestamp)),
         SortOrder::Attachment => b.has_attachment.cmp(&a.has_attachment).then(b.timestamp.cmp(&a.timestamp)),
+        SortOrder::Replied => {
+            (b.answered, b.forwarded).cmp(&(a.answered, a.forwarded)).then(b.timestamp.cmp(&a.timestamp))
+        }
         SortOrder::Importance => b
             .importance
             .to_i64()
@@ -113,6 +116,7 @@ pub fn column_sort(column: crate::config::ListColumn, show_recipient: bool) -> S
         C::Recipients => SortOrder::Recipients,
         C::Subject => SortOrder::Subject,
         C::Attachment => SortOrder::Attachment,
+        C::Replied => SortOrder::Replied,
         C::Importance => SortOrder::Importance,
         C::Account => SortOrder::Account,
         C::Due => SortOrder::Due,
@@ -833,10 +837,11 @@ pub enum SortOrder {
     Due,
     Correspondents,
     Tags,
+    Replied,
 }
 
 impl SortOrder {
-    const KEYS: [(SortOrder, &'static str); 13] = [
+    const KEYS: [(SortOrder, &'static str); 14] = [
         (SortOrder::DateNewest, "date_newest"),
         (SortOrder::DateOldest, "date_oldest"),
         (SortOrder::Sender, "sender"),
@@ -850,6 +855,7 @@ impl SortOrder {
         (SortOrder::Due, "due"),
         (SortOrder::Correspondents, "correspondents"),
         (SortOrder::Tags, "tags"),
+        (SortOrder::Replied, "replied"),
     ];
 
     pub fn from_key(key: &str) -> Self {
@@ -870,6 +876,7 @@ impl SortOrder {
                 | SortOrder::FlaggedFirst
                 | SortOrder::Attachment
                 | SortOrder::Importance
+                | SortOrder::Replied
         )
     }
 }
@@ -1383,6 +1390,8 @@ pub enum MessageListInput {
     /// A hover-palette action for a specific message (forwarded to the app).
     RowAction { action: RowAction, message: Box<Message> },
     SetStarred { slot: (u32, u32, u32), starred: bool },
+    /// A message was replied to or forwarded (#454).
+    SetAnswered { slot: (u32, u32, u32), forwarded: bool },
     /// A message's keywords changed (a tag put on or taken off, #71).
     /// A message's keywords and Gmail labels changed (a tag put on or
     /// taken off, #374).
@@ -3057,6 +3066,13 @@ impl SimpleComponent for MessageList {
                 self.update_message(|m| thread_slot(m) == slot, |m| m.starred = starred);
                 self.refresh_thread_head(slot);
             }
+            MessageListInput::SetAnswered { slot, forwarded } => {
+                self.update_message(
+                    |m| thread_slot(m) == slot,
+                    |m| if forwarded { m.forwarded = true } else { m.answered = true },
+                );
+                self.refresh_thread_head(slot);
+            }
             MessageListInput::SetKeywords { slot, keywords, labels } => {
                 self.update_message(
                     |m| thread_slot(m) == slot,
@@ -4007,6 +4023,7 @@ impl MessageList {
             let px = self.widths.get(c).copied().unwrap_or_else(|| default_width(*c));
             match c {
                 C::Star | C::Attachment => fixed += 12,
+                C::Replied => fixed += crate::ui::message_row::REPLIED_PX,
                 C::Importance => fixed += 16,
                 C::Subject => fixed += SUBJECT_PX,
                 // A date cut short says nothing: it keeps its width.
@@ -4199,9 +4216,13 @@ impl MessageList {
         };
         let unread = own.iter().any(|m| now(m).unread);
         let starred = own.iter().any(|m| now(m).starred);
+        let newest = own.last().map(now);
+        let (answered, forwarded) = newest.map(|m| (m.answered, m.forwarded)).unwrap_or_default();
         self.shared.model.update_row(idx, |d| {
             d.meta.unread = unread;
             d.meta.starred = starred;
+            d.meta.answered = answered;
+            d.meta.forwarded = forwarded;
         });
     }
 
@@ -4529,6 +4550,7 @@ impl MessageList {
             (None, None, None, None)
         };
         let any_starred = count > 1 && msgs.iter().any(|m| m.starred);
+        let (answered, forwarded) = (count > 1 && newest_here.answered, count > 1 && newest_here.forwarded);
         // The row stays this folder's oldest message, whatever the other
         // folders hold that is older, so what is done to the row is done to
         // mail in this folder. The rest follow in time order.
@@ -4562,6 +4584,8 @@ impl MessageList {
             latest_at,
             unread: any_unread,
             starred: any_starred,
+            answered,
+            forwarded,
             people,
             revealed: true,
             group: self.threading.then(|| key.clone()),
@@ -5357,6 +5381,8 @@ mod tests {
             timestamp: 1000,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: message_id.into(),

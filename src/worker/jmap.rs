@@ -756,6 +756,8 @@ fn jmap_message(v: &serde_json::Value, account_id: u32, folder_id: u32) -> Optio
         timestamp: ts,
         unread: !has("$seen"),
         starred: has("$flagged"),
+        answered: has("$answered"),
+        forwarded: has("$forwarded"),
         keywords: user_keywords,
         has_attachment: v["hasAttachment"].as_bool().unwrap_or(false),
         message_id: jmap_msgids(&v["messageId"]).into_iter().next().unwrap_or_default(),
@@ -1900,6 +1902,26 @@ async fn jmap_index_sent_copy(
 
 /// The Outbox retry loop for JMAP accounts: same queue and bookkeeping as
 /// [`flush_outbox`], with `EmailSubmission` as the transport.
+/// [`super::mark_answered`] for JMAP: `$answered` or `$forwarded` (#454).
+async fn jmap_mark_answered(
+    s: &JmapSession,
+    state: &mut JmapState,
+    cache: Option<&Cache>,
+    account_id: u32,
+    in_reply_to: &str,
+    forwards: &str,
+    emit: &impl Fn(WorkerEvent),
+) {
+    for (path, uid, forwarded) in answered_copies(cache, account_id, in_reply_to, forwards) {
+        let keyword = if forwarded { "keywords/$forwarded" } else { "keywords/$answered" };
+        jmap_patch_message(s, state, &path, uid, serde_json::json!({ keyword: true })).await;
+        if let Some(c) = cache {
+            c.set_answered(account_id, &path, uid, forwarded);
+        }
+        emit(WorkerEvent::Answered { path, uid, forwarded });
+    }
+}
+
 async fn jmap_flush_outbox(
     s: &JmapSession,
     cache: Option<&Cache>,
@@ -1938,6 +1960,8 @@ async fn jmap_flush_outbox(
             Ok(((folder_id, path), email_id)) => {
                 sent_any = true;
                 cache.delete_outbox(item.id);
+                jmap_mark_answered(s, state, Some(cache), account_id, &raw_in_reply_to(&item.raw), &item.forwards, emit)
+                    .await;
                 jmap_index_sent_copy(s, account_id, folder_id, &path, &email_id, Some(cache), state, emit).await;
             }
             Err(e) => {
@@ -2901,6 +2925,11 @@ pub(super) async fn run_jmap(
                 emit(WorkerEvent::Status(String::new()));
                 match sent {
                     Ok(s) => {
+                        jmap_mark_answered(
+                            &s, &mut state, cache.as_ref(), account_id,
+                            &message.in_reply_to, &message.forwards, &emit,
+                        )
+                        .await;
                         if let Some(o) = message.draft_origin.clone() {
                             if o.account_id == account_id {
                                 jmap_drop_draft_origin(&s, account_id, &o, cache.as_ref(), &mut state).await;
@@ -3404,7 +3433,7 @@ mod tests {
             "from": [{ "name": "Ada", "email": "ada@example.org" }],
             "replyTo": [{ "email": "ada@example.org" }],
             "to": [{ "email": "me@example.org" }, { "email": "you@example.org" }],
-            "keywords": { "$seen": true, "$flagged": true, "Work": true, "$Junk": false },
+            "keywords": { "$seen": true, "$flagged": true, "$answered": true, "Work": true, "$Junk": false },
             "hasAttachment": true,
             "messageId": ["<A@x>"], "inReplyTo": ["<B@x>"], "references": ["<C@x>", "<B@x>"],
         });
@@ -3412,6 +3441,7 @@ mod tests {
         assert_eq!((id.as_str(), blob.as_str()), ("M1", "B1"));
         assert_eq!(m.uid, hash_uid("M1"));
         assert!(!m.unread && m.starred && m.has_attachment);
+        assert!(m.answered && !m.forwarded);
         assert_eq!(m.keywords, vec!["Work"]);
         assert_eq!(m.reply_to, "", "a Reply-To equal to From is dropped");
         assert_eq!(m.to, "me@example.org, you@example.org");

@@ -1323,6 +1323,10 @@ msgstr "Εμφάνιση του πρωτοτύπου."
 msgid "Folder of the original, not the Inbox"
 msgstr "Εμφάνιση του πρωτοτύπου."
 
+#, fuzzy
+msgid "Replied"
+msgstr "Απάντηση"
+
 msgid "Sender"
 msgstr "Αποστολέας"
 
@@ -4264,6 +4268,10 @@ msgstr "Λήξη"
 
 msgid "Drag to resize, double-click for the usual width"
 msgstr "Σύρετε για αλλαγή μεγέθους, κάντε διπλό κλικ για το συνηθισμένο πλάτος"
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Προώθηση"
 
 msgid "High importance"
 msgstr "Υψηλή σημασία"

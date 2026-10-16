@@ -1226,6 +1226,9 @@ msgstr ""
 msgid "Folder of the original, not the Inbox"
 msgstr ""
 
+msgid "Replied"
+msgstr ""
+
 msgid "Sender"
 msgstr ""
 
@@ -3852,6 +3855,9 @@ msgid "Due"
 msgstr ""
 
 msgid "Drag to resize, double-click for the usual width"
+msgstr ""
+
+msgid "Forwarded"
 msgstr ""
 
 msgid "High importance"

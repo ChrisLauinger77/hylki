@@ -1307,6 +1307,10 @@ msgstr "S'està mostrant l'original."
 msgid "Folder of the original, not the Inbox"
 msgstr "S'està mostrant l'original."
 
+#, fuzzy
+msgid "Replied"
+msgstr "Respon"
+
 msgid "Sender"
 msgstr "Remitent"
 
@@ -4203,6 +4207,10 @@ msgstr "Venciment"
 
 msgid "Drag to resize, double-click for the usual width"
 msgstr "Arrossega per redimensionar, doble clic per a l'amplada habitual"
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Reenvia"
 
 msgid "High importance"
 msgstr "Importància alta"

@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS messages (
     importance     INTEGER NOT NULL DEFAULT 0,
     due            INTEGER NOT NULL DEFAULT 0,
     gmail_labels   TEXT    NOT NULL DEFAULT '',
+    answered       INTEGER NOT NULL DEFAULT 0,
+    forwarded      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (account_id, folder_path, uid)
 );
 CREATE INDEX IF NOT EXISTS messages_by_message_id ON messages (message_id);
@@ -121,7 +123,8 @@ CREATE TABLE IF NOT EXISTS outbox (
     queued_at   INTEGER NOT NULL,
     attempts    INTEGER NOT NULL DEFAULT 0,
     last_error  TEXT    NOT NULL DEFAULT '',
-    send_at     INTEGER
+    send_at     INTEGER,
+    forwards    TEXT    NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS attachments_checked (
     account_id  INTEGER NOT NULL,
@@ -627,6 +630,8 @@ impl Cache {
         let _ = conn.execute("ALTER TABLE messages ADD COLUMN preview TEXT NOT NULL DEFAULT ''", []);
         // Send Later (#145): when a queued message is due; NULL sends at once.
         let _ = conn.execute("ALTER TABLE outbox ADD COLUMN send_at INTEGER", []);
+        // And the message a queued forward forwards (#454).
+        let _ = conn.execute("ALTER TABLE outbox ADD COLUMN forwards TEXT NOT NULL DEFAULT ''", []);
         // Same in-place treatment for `reply_to` (added later still): existing
         // rows carry an empty value until their folder's recent window
         // re-syncs, and Reply falls back to the sender until then.
@@ -644,6 +649,9 @@ impl Cache {
         // folder's recent window syncs, or the backfill reaches it.
         let _ = conn
             .execute("ALTER TABLE messages ADD COLUMN gmail_labels TEXT NOT NULL DEFAULT ''", []);
+        // And replied and forwarded (#454), the same way.
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN answered INTEGER NOT NULL DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN forwarded INTEGER NOT NULL DEFAULT 0", []);
         // And the OpenPGP verdict (#133) beside the sender check, as JSON;
         // empty for a message that carried none. Kept as a marker: nothing
         // OpenPGP is cached, so a body that was (by the first build of the
@@ -969,7 +977,7 @@ impl Cache {
     pub fn load_messages(&self, account_id: u32, folder_path: &str, folder_id: u32) -> Vec<Message> {
         let run = || -> rusqlite::Result<Vec<Message>> {
             let mut stmt = self.conn.prepare(&format!(
-                "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels
+                "SELECT uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded
                  FROM messages WHERE account_id = ?1 AND folder_path = ?2 ORDER BY uid DESC",
             ))?;
             let rows = stmt.query_map(params![account_id, folder_path], |row| {
@@ -991,6 +999,8 @@ impl Cache {
                     timestamp: row.get(5)?,
                     unread: row.get(6)?,
                     starred: row.get(7)?,
+                    answered: row.get(19)?,
+                    forwarded: row.get(20)?,
                     keywords: split_keywords(row.get(15)?),
                     has_attachment: row.get(8)?,
                     message_id: row.get(11)?,
@@ -1060,13 +1070,13 @@ impl Cache {
             for m in messages {
                 tx.execute(
                     "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels, answered, forwarded)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
                     params![
                         account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
                         m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
                         m.message_id, m.references, m.preview, m.reply_to, m.keywords.join(" "),
-                        m.importance.to_i64(), m.due, join_labels(&m.labels)
+                        m.importance.to_i64(), m.due, join_labels(&m.labels), m.answered, m.forwarded
                     ],
                 )?;
             }
@@ -1102,8 +1112,8 @@ impl Cache {
                 // lost its preview.
                 tx.execute(
                     "INSERT INTO messages
-                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+                     (account_id, folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, has_attachment, recipients, cc, message_id, references_, preview, reply_to, keywords, importance, due, gmail_labels, answered, forwarded)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
                      ON CONFLICT(account_id, folder_path, uid) DO UPDATE SET
                        from_name = excluded.from_name,
                        from_addr = excluded.from_addr,
@@ -1122,12 +1132,14 @@ impl Cache {
                        keywords = excluded.keywords,
                        importance = excluded.importance,
                        due = excluded.due,
-                       gmail_labels = excluded.gmail_labels",
+                       gmail_labels = excluded.gmail_labels,
+                       answered = excluded.answered,
+                       forwarded = excluded.forwarded",
                     params![
                         account_id, folder_path, m.uid, m.from_name, m.from_addr, m.subject,
                         m.date, m.timestamp, m.unread, m.starred, m.has_attachment, m.to, m.cc,
                         m.message_id, m.references, m.preview, m.reply_to, m.keywords.join(" "),
-                        m.importance.to_i64(), m.due, join_labels(&m.labels)
+                        m.importance.to_i64(), m.due, join_labels(&m.labels), m.answered, m.forwarded
                     ],
                 )?;
             }
@@ -1261,7 +1273,7 @@ impl Cache {
             }
             let sql = format!(
                 "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                        has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords}, importance, due, gmail_labels \
+                        has_attachment, recipients, cc, message_id, references_, preview, reply_to, {keywords}, importance, due, gmail_labels, answered, forwarded \
                  FROM messages WHERE rowid IN ({members}) ORDER BY ts DESC LIMIT ?1",
                 keywords = KEYWORDS_COL,
                 members = rowid_list(&members),
@@ -1286,6 +1298,8 @@ impl Cache {
                         timestamp: row.get(6)?,
                         unread: row.get(7)?,
                         starred: row.get(8)?,
+                        answered: row.get(20)?,
+                        forwarded: row.get(21)?,
                         keywords: split_keywords(row.get(16)?),
                         has_attachment: row.get(9)?,
                         message_id: row.get(12)?,
@@ -2182,11 +2196,16 @@ impl Cache {
         Some(self.conn.last_insert_rowid() as u32)
     }
 
+    /// Note the message a queued forward forwards (#454).
+    pub fn set_outbox_forwards(&self, id: u32, forwards: &str) {
+        let _ = self.conn.execute("UPDATE outbox SET forwards = ?1 WHERE id = ?2", params![forwards, id]);
+    }
+
     /// Everything waiting for this account, oldest first (the order it is sent in).
     pub fn outbox_items(&self, account_id: u32) -> Vec<crate::models::OutboxItem> {
         let mut stmt = match self.conn.prepare(
             "SELECT id, account_id, from_addr, rcpts, recipients, subject, preview, raw, \
-             sent_path, queued_at, attempts, last_error, send_at FROM outbox \
+             sent_path, queued_at, attempts, last_error, send_at, forwards FROM outbox \
              WHERE account_id = ?1 ORDER BY queued_at, id",
         ) {
             Ok(s) => s,
@@ -2211,6 +2230,7 @@ impl Cache {
                 attempts: r.get::<_, i64>(10)? as u32,
                 last_error: r.get(11)?,
                 send_at: r.get(12)?,
+                forwards: r.get(13)?,
                 status: String::new(),
             })
         });
@@ -2356,6 +2376,15 @@ impl Cache {
         );
     }
 
+    /// Mark a cached row replied to, or forwarded (#454).
+    pub fn set_answered(&self, account_id: u32, folder_path: &str, uid: u32, forwarded: bool) {
+        let column = if forwarded { "forwarded" } else { "answered" };
+        let _ = self.conn.execute(
+            &format!("UPDATE messages SET {column} = 1 WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3"),
+            params![account_id, folder_path, uid],
+        );
+    }
+
     /// Add or drop a keyword on a cached row (the server copy just changed).
     pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) -> bool {
         let mut current = self.keywords_of(account_id, folder_path, uid);
@@ -2488,7 +2517,7 @@ impl Cache {
         };
         let mut sql = format!(
             "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels \
+                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded \
              FROM messages WHERE account_id = ?1"
         );
         if let Some(paths) = include {
@@ -2529,6 +2558,8 @@ impl Cache {
                     timestamp: row.get(6)?,
                     unread: row.get(7)?,
                     starred: row.get(8)?,
+                    answered: row.get(20)?,
+                    forwarded: row.get(21)?,
                     keywords: split_keywords(row.get(16)?),
                     has_attachment: row.get(9)?,
                     message_id: row.get(12)?,
@@ -2564,7 +2595,7 @@ impl Cache {
         let label = |s: &str| format!("{sep}{}{sep}", crate::mutf7::encode(s).to_lowercase(), sep = LABEL_SEP);
         let sql = format!(
             "SELECT folder_path, uid, from_name, from_addr, subject, date, ts, unread, starred, \
-                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels \
+                    has_attachment, recipients, cc, message_id, references_, preview, reply_to, {KEYWORDS_COL}, importance, due, gmail_labels, answered, forwarded \
              FROM messages \
              WHERE account_id = ?1 AND (instr(' ' || lower({KEYWORDS_COL}) || ' ', ?2) > 0 \
                    OR (gmail_labels <> '' AND (instr(?4 || lower(gmail_labels) || ?4, ?5) > 0 \
@@ -2592,6 +2623,8 @@ impl Cache {
                     timestamp: row.get(6)?,
                     unread: row.get(7)?,
                     starred: row.get(8)?,
+                    answered: row.get(20)?,
+                    forwarded: row.get(21)?,
                     keywords: split_keywords(row.get(16)?),
                     has_attachment: row.get(9)?,
                     message_id: row.get(12)?,
@@ -3096,6 +3129,8 @@ mod tests {
             timestamp: 1,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: Vec::new(),
             has_attachment: false,
             message_id: String::new(),
@@ -3106,6 +3141,65 @@ mod tests {
         };
         c.save_messages(1, "Inbox", std::slice::from_ref(&m));
         assert_eq!(c.load_messages(1, "Inbox", 2), [m]);
+    }
+
+    /// Replied and forwarded come back from the cache, by every query that
+    /// reads a row, and a reply sent from here marks its original (#454).
+    #[test]
+    fn replied_and_forwarded_round_trip_through_the_cache() {
+        let c = Cache::in_memory().unwrap();
+        let m = |uid: u32, answered: bool| Message {
+            id: uid,
+            account_id: 1,
+            folder_id: 1,
+            uid,
+            from_name: "Ada".into(),
+            from_addr: "ada@example.com".into(),
+            reply_to: String::new(),
+            to: String::new(),
+            cc: String::new(),
+            subject: "Hello".into(),
+            preview: String::new(),
+            body: String::new(),
+            date: String::new(),
+            timestamp: uid as i64,
+            unread: false,
+            starred: false,
+            answered,
+            forwarded: false,
+            keywords: vec!["Work".into()],
+            has_attachment: false,
+            message_id: format!("m{uid}@x"),
+            references: String::new(),
+            importance: Default::default(),
+            due: 0,
+            labels: Vec::new(),
+        };
+        c.upsert_messages(1, "INBOX", &[m(1, true), m(2, false)]);
+        let flags = |c: &Cache| -> Vec<(bool, bool)> {
+            c.load_messages(1, "INBOX", 1).iter().map(|m| (m.answered, m.forwarded)).collect()
+        };
+        assert_eq!(flags(&c), [(false, false), (true, false)]);
+        c.set_answered(1, "INBOX", 2, true);
+        c.set_answered(1, "INBOX", 2, false);
+        assert_eq!(flags(&c), [(true, true), (true, false)]);
+        let (_, tagged) = c.messages_with_keyword(1, "Work", "Work").into_iter().find(|(_, m)| m.uid == 2).unwrap();
+        assert!(tagged.answered && tagged.forwarded);
+        // The server's word replaces it at the next sync.
+        c.upsert_messages(1, "INBOX", &[m(2, false)]);
+        assert_eq!(flags(&c), [(false, false), (true, false)]);
+    }
+
+    /// A queued forward remembers what it forwards (#454).
+    #[test]
+    fn a_queued_forward_keeps_its_original() {
+        let c = Cache::in_memory().unwrap();
+        let id = c
+            .queue_outbox(1, "me@x", &["ada@x".into()], "Ada", "Fwd: Hello", "", b"raw", None, "", None)
+            .unwrap();
+        assert_eq!(c.outbox_items(1)[0].forwards, "");
+        c.set_outbox_forwards(id, "m1@x");
+        assert_eq!(c.outbox_items(1)[0].forwards, "m1@x");
     }
 
     /// Gmail labels may hold spaces, so they cannot share the keywords'
@@ -3130,6 +3224,8 @@ mod tests {
             timestamp: 1,
             unread: false,
             starred: false,
+            answered: false,
+            forwarded: false,
             keywords: vec!["$label1".into()],
             has_attachment: false,
             message_id: String::new(),

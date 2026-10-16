@@ -1388,6 +1388,10 @@ msgid "Folder of the original, not the Inbox"
 msgstr "Beim Darüberfahren sichtbar"
 
 #, fuzzy
+msgid "Replied"
+msgstr "Antworten"
+
+#, fuzzy
 msgid "Sender"
 msgstr "Absender"
 
@@ -4380,6 +4384,10 @@ msgstr ""
 
 msgid "Drag to resize, double-click for the usual width"
 msgstr ""
+
+#, fuzzy
+msgid "Forwarded"
+msgstr "Weiterleiten"
 
 msgid "High importance"
 msgstr ""

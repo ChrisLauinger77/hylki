@@ -73,6 +73,8 @@ const ACCOUNT_COLUMN_PX: i32 = 110;
 const TAGS_COLUMN_PX: i32 = 90;
 /// The star's and the paperclip's size on a single line.
 const LINE_ICON_PX: i32 = 12;
+/// The replied column's width: its two arrows and the gap between them.
+pub const REPLIED_PX: i32 = 2 * LINE_ICON_PX + 2;
 
 /// The width a single-line column takes until it is dragged to another
 /// (#334): negative for a date, which is as wide as its text.
@@ -157,6 +159,10 @@ pub struct RowMeta {
     /// Any message of the conversation is unread / starred (heads only).
     pub unread: bool,
     pub starred: bool,
+    /// The newest member here was replied to / forwarded (heads only): the
+    /// row speaks for it, and the arrow says whether it has been answered.
+    pub answered: bool,
+    pub forwarded: bool,
     /// Who took part in the conversation, for the Correspondents column
     /// (#334); worked out only while that column is shown.
     pub people: Option<String>,
@@ -1146,6 +1152,12 @@ pub fn fill_headings(
         };
         let cell: gtk::Widget = match column {
             ListColumn::Star => icon("starred-symbolic", LINE_ICON_PX),
+            ListColumn::Replied => {
+                let both = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+                both.append(&icon("mail-reply-sender-symbolic", LINE_ICON_PX));
+                both.append(&icon("mail-forward-symbolic", LINE_ICON_PX));
+                both.upcast()
+            }
             ListColumn::Attachment => icon("mail-attachment-symbolic", LINE_ICON_PX),
             ListColumn::Importance => icon("emblem-important-symbolic", -1),
             ListColumn::Sender => binned(text(if look.show_recipient { i18n("To") } else { i18n("From") })),
@@ -1605,6 +1617,11 @@ pub struct RowWidgets {
     subject_col: ColumnBin,
     date_col: ColumnBin,
     name: gtk::Label,
+    /// The replied and forwarded arrows (#454), and the box that keeps them
+    /// together.
+    answer: gtk::Box,
+    replied: gtk::Image,
+    forwarded: gtk::Image,
     clip: gtk::Image,
     star: gtk::Image,
     date: gtk::Label,
@@ -2130,6 +2147,15 @@ impl Row {
         let starred = msg.starred || meta.starred;
         w.star.set_visible(if single { col(ListColumn::Star) } else { starred });
         w.star.set_opacity(if starred { 1.0 } else { 0.0 });
+        let (answered, forwarded) =
+            if meta.key.is_some() { (meta.answered, meta.forwarded) } else { (msg.answered, msg.forwarded) };
+        w.answer.set_visible(if single { col(ListColumn::Replied) } else { answered || forwarded });
+        for (arrow, lit) in [(&w.replied, answered), (&w.forwarded, forwarded)] {
+            arrow.set_visible(single || lit);
+            arrow.set_opacity(if lit { 1.0 } else { 0.0 });
+        }
+        w.replied.set_tooltip_text(answered.then(|| i18n("Replied")).as_deref());
+        w.forwarded.set_tooltip_text(forwarded.then(|| i18n("Forwarded")).as_deref());
         if single {
             self.fill_columns(&data, &look, &shared, unread);
         }
@@ -2610,6 +2636,7 @@ impl Row {
         let name: &gtk::Widget = w.name.upcast_ref();
         let subject: &gtk::Widget = w.subject.upcast_ref();
         let star: &gtk::Widget = w.star.upcast_ref();
+        let answer: &gtk::Widget = w.answer.upcast_ref();
         let clip: &gtk::Widget = w.clip.upcast_ref();
         let date: &gtk::Widget = w.date.upcast_ref();
         let chip: &gtk::Widget = w.chip.upcast_ref();
@@ -2623,6 +2650,7 @@ impl Row {
             for c in columns {
                 match c {
                     ListColumn::Star => into(&w.line, &[star]),
+                    ListColumn::Replied => into(&w.line, &[answer]),
                     ListColumn::Sender => {
                         detach(name);
                         w.name_col.set_child(Some(name));
@@ -2661,8 +2689,10 @@ impl Row {
             // Smaller marks on one line, level with its smaller text.
             w.star.set_pixel_size(LINE_ICON_PX);
             w.clip.set_pixel_size(LINE_ICON_PX);
+            w.replied.set_pixel_size(LINE_ICON_PX);
+            w.forwarded.set_pixel_size(LINE_ICON_PX);
         } else {
-            into(&w.top, &[name, clip, star, date, chip]);
+            into(&w.top, &[name, answer, clip, star, date, chip]);
             into(&w.subject_line, &[subject, tags]);
             into(&w.preview_line, &[lock, preview]);
             w.name.set_hexpand(true);
@@ -2671,6 +2701,8 @@ impl Row {
             w.avatar.set_size(38);
             w.star.set_pixel_size(-1);
             w.clip.set_pixel_size(-1);
+            w.replied.set_pixel_size(-1);
+            w.forwarded.set_pixel_size(-1);
         }
         w.text.set_visible(columns.is_none());
         w.line.set_visible(columns.is_some());
@@ -3305,6 +3337,14 @@ fn build_widgets() -> RowWidgets {
     name.set_ellipsize(gtk::pango::EllipsizeMode::End);
     name.add_css_class("message-sender");
     top.append(&name);
+    let answer = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    let replied = gtk::Image::from_icon_name("mail-reply-sender-symbolic");
+    let forwarded = gtk::Image::from_icon_name("mail-forward-symbolic");
+    for arrow in [&replied, &forwarded] {
+        arrow.add_css_class("dim-icon");
+        answer.append(arrow);
+    }
+    top.append(&answer);
     let clip = gtk::Image::from_icon_name("mail-attachment-symbolic");
     clip.add_css_class("dim-icon");
     top.append(&clip);
@@ -3516,6 +3556,9 @@ fn build_widgets() -> RowWidgets {
         top,
         line,
         name,
+        answer,
+        replied,
+        forwarded,
         clip,
         star,
         date,
