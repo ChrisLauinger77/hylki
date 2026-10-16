@@ -359,6 +359,10 @@ msgstr "Cerca al missatge"
 msgid "Delete"
 msgstr "Suprimeix"
 
+#, fuzzy
+msgid "Delete Permanently"
+msgstr "Vols suprimir aquest missatge permanentment?"
+
 msgid "Star or Remove Star"
 msgstr "Destaca o treu la destacat"
 
@@ -636,6 +640,22 @@ msgid ""
 "can’t be undone."
 msgstr ""
 "Ja són a la paperera, així que s'esborraran del servidor. Això no es pot "
+"desfer."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Tots els missatges que conté s'esborraran del servidor. Això no es pot "
+"desfer."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Tots els missatges que conté s'esborraran del servidor. Això no es pot "
 "desfer."
 
 msgid "No {v1} folder available"
@@ -1035,6 +1055,9 @@ msgid "Archive the conversation and open the older one"
 msgstr ""
 
 msgid "Archive the conversation and open the newer one"
+msgstr ""
+
+msgid "Delete permanently, without going to Trash"
 msgstr ""
 
 msgid "Mark as spam"

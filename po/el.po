@@ -366,6 +366,10 @@ msgstr "Εύρεση στο μήνυμα"
 msgid "Delete"
 msgstr "Διαγραφή"
 
+#, fuzzy
+msgid "Delete Permanently"
+msgstr "Οριστική διαγραφή αυτού του μηνύματος;"
+
 msgid "Star or Remove Star"
 msgstr "Προσθήκη ή αφαίρεση αστεριού"
 
@@ -648,6 +652,22 @@ msgid ""
 msgstr ""
 "Βρίσκονται ήδη στον Κάδο, επομένως θα διαγραφούν από τον διακομιστή. Αυτή η "
 "ενέργεια δεν αναιρείται."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Κάθε μήνυμα σε αυτόν θα διαγραφεί από τον διακομιστή. Αυτή η ενέργεια δεν "
+"αναιρείται."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Κάθε μήνυμα σε αυτόν θα διαγραφεί από τον διακομιστή. Αυτή η ενέργεια δεν "
+"αναιρείται."
 
 msgid "No {v1} folder available"
 msgstr "Δεν υπάρχει διαθέσιμος φάκελος {v1}"
@@ -1048,6 +1068,9 @@ msgid "Archive the conversation and open the older one"
 msgstr ""
 
 msgid "Archive the conversation and open the newer one"
+msgstr ""
+
+msgid "Delete permanently, without going to Trash"
 msgstr ""
 
 msgid "Mark as spam"

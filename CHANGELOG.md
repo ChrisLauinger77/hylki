@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Shift+Delete deletes permanently** (#471). The selected messages are
+  erased from the server instead of going to Trash, from any folder, after
+  the same confirmation that deleting in Trash asks for. With single-key
+  shortcuts on, Shift+D does the same, and the command palette lists it as
+  Delete Permanently. On Gmail, where an erase outside Trash only takes a
+  label off, the mail goes to Trash and is erased there.
 - **Fixed: a search of all folders missed mail in folders not yet opened**
   (#472). Only the folders opened since Hylki started were searched, so mail
   archived in Gmail, which lives in All Mail alone, was never found. Every

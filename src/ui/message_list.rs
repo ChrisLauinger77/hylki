@@ -1022,6 +1022,8 @@ pub enum BulkAction {
     /// The reverse of `Spam`, for a selection in Junk (#168).
     NotSpam,
     Delete,
+    /// Erase from the server, skipping Trash (#471). The app asks first.
+    DeleteForever,
     /// Back to the Inbox, for a selection in Trash or Junk (#138).
     MoveToInbox,
 }
@@ -4876,10 +4878,15 @@ impl MessageList {
         });
         // Delete / Backspace on a focused row deletes the selection (single or
         // multi). Scoped to the list, so typing in the search box is unaffected.
+        // Shift+Delete erases it instead, as in Thunderbird (#471).
         let key = gtk::EventControllerKey::new();
         let s = input.clone();
-        key.connect_key_pressed(move |_, keyval, _, _| {
-            if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::BackSpace) {
+        key.connect_key_pressed(move |_, keyval, _, state| {
+            let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+            if shift && matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete) {
+                let _ = s.send(MessageListInput::Bulk(BulkAction::DeleteForever));
+                gtk::glib::Propagation::Stop
+            } else if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::BackSpace) {
                 // ResolveDelete, not a straight Bulk: a lone thread-head row
                 // stands for its whole conversation (confirmed by the app).
                 let _ = s.send(MessageListInput::ResolveDelete);

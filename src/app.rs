@@ -1600,6 +1600,9 @@ pub enum AppMsg {
     ToggleStar,
     Archive,
     Delete,
+    /// Shift+Delete: erase the selection from the server, skipping Trash,
+    /// once the user confirms (#471).
+    DeleteForever,
     /// Erase messages for good (confirmed "Delete permanently" in Trash).
     PurgeMessages(Vec<Message>),
     /// The rest of an open message's conversation, found in other folders.
@@ -4592,6 +4595,17 @@ impl SimpleComponent for AppModel {
                     s.input(AppMsg::Shortcut(Shortcut::BackToList));
                     return gtk::glib::Propagation::Stop;
                 }
+                // Shift+Delete erases the selection, Thunderbird's key (#471),
+                // also without single-key shortcuts. The list catches it first
+                // when it has focus; this is the reader and the rest.
+                if shift
+                    && matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete)
+                    && !focus_is_text(&window)
+                    && !focus_in_compose(&window)
+                {
+                    s.input(shortcut(Shortcut::DeleteForever));
+                    return gtk::glib::Propagation::Stop;
+                }
                 if !enabled.get() || focus_is_text(&window) || focus_in_compose(&window) {
                     return gtk::glib::Propagation::Proceed;
                 }
@@ -5551,7 +5565,8 @@ impl SimpleComponent for AppModel {
                     });
                 }
                 // HYLKI_SHOWCASE_DIALOG=save|discard|cancel answers whatever
-                // message dialog is on screen at 10s.
+                // message dialog is on screen at 10s, captured first beside
+                // the HYLKI_SHOWCASE file.
                 if let Ok(answer) = std::env::var("HYLKI_SHOWCASE_DIALOG") {
                     gtk::glib::timeout_add_seconds_local_once(10, move || {
                         let tops = gtk::Window::toplevels();
@@ -5561,6 +5576,9 @@ impl SimpleComponent for AppModel {
                             .find(|d| d.is_visible());
                         match dialog {
                             Some(d) => {
+                                if let Ok(path) = std::env::var("HYLKI_SHOWCASE") {
+                                    showcase_capture(d.upcast_ref(), &format!("{path}.dialog.png"));
+                                }
                                 // Answering is what a button click emits; the
                                 // click also takes the dialog off screen, so
                                 // hide it (closing would answer a second time).
@@ -7274,6 +7292,28 @@ impl SimpleComponent for AppModel {
                     }
                 }
             }
+            AppMsg::DeleteForever => {
+                // The list resolves its rows as it does for Delete, a
+                // conversation's row bringing all of it, and hands them back
+                // as a bulk action that asks first.
+                if self.many_selected()
+                    || (!self.selection_from_cards
+                        && self.list_selection.len() == 1
+                        && self.current_thread.len() > 1)
+                {
+                    self.message_list.emit(MessageListInput::Bulk(BulkAction::DeleteForever));
+                    return;
+                }
+                if let Some(m) = self.reply_target() {
+                    if self.outbox_item(m.account_id, m.id).is_some() {
+                        self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
+                        self.current = None;
+                        self.show_message(None, false);
+                    } else {
+                        self.confirm_purge(vec![m], &sender);
+                    }
+                }
+            }
 
             AppMsg::Related { account_id, message_id, messages } => {
                 if self
@@ -7502,7 +7542,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Bulk { action, messages } => {
                 if self.showing_outbox {
-                    if matches!(action, BulkAction::Delete) {
+                    if matches!(action, BulkAction::Delete | BulkAction::DeleteForever) {
                         for m in &messages {
                             self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
                         }
@@ -7524,6 +7564,7 @@ impl SimpleComponent for AppModel {
                     BulkAction::Unflag => {
                         self.user_set_flags(star_label(false), &messages, FlagKind::Star, false)
                     }
+                    BulkAction::DeleteForever => self.confirm_purge(messages, &sender),
                     // Archive/Delete/Spam remove every selected row. Doing that one
                     // at a time blocks the UI thread (a render cycle per message) and
                     // trips GTK's "app is not responding" dialog for large selections.
@@ -12746,6 +12787,7 @@ impl AppModel {
                 }
             }
             Shortcut::Delete => sender.input(AppMsg::Delete),
+            Shortcut::DeleteForever => sender.input(AppMsg::DeleteForever),
             Shortcut::Spam => sender.input(AppMsg::MarkSpam),
             Shortcut::Star => sender.input(AppMsg::ToggleStar),
             Shortcut::ToggleRead => {
@@ -12838,6 +12880,7 @@ impl AppModel {
         if self.acts_on_selection() {
             add(i18n("Archive"), &action, "", || AppMsg::Archive);
             add(i18n("Delete"), &action, "Delete", || AppMsg::Delete);
+            add(i18n("Delete Permanently"), &action, "Shift+Delete", || AppMsg::DeleteForever);
             add(i18n("Mark as Spam"), &action, "", || AppMsg::MarkSpam);
             add(i18n("Star or Remove Star"), &action, "", || AppMsg::ToggleStar);
             add(i18n("Mark as Read or Unread"), &action, "", || AppMsg::ToggleReadCurrent);
@@ -19015,12 +19058,17 @@ impl AppModel {
 
     fn confirm_purge(&self, messages: Vec<Message>, sender: &ComponentSender<Self>) {
         let n = messages.len();
+        if n == 0 {
+            return;
+        }
         let heading = ni18n_f("Delete this message permanently?", "Delete {n} messages permanently?", n as u32, &[("n", &n.to_string())]);
-        let body = if n == 1 {
-            i18n("It is already in Trash, so it will be erased from the server. This can’t be undone.")
-        } else {
-            i18n("They are already in Trash, so they will be erased from the server. \
-             This can’t be undone.")
+        let binned = messages.iter().all(|m| self.in_trash(m));
+        let body = match (binned, n == 1) {
+            (true, true) => i18n("It is already in Trash, so it will be erased from the server. This can’t be undone."),
+            (true, false) => i18n("They are already in Trash, so they will be erased from the server. \
+             This can’t be undone."),
+            (false, true) => i18n("It will be erased from the server instead of going to Trash. This can’t be undone."),
+            (false, false) => i18n("They will be erased from the server instead of going to Trash. This can’t be undone."),
         };
         let dialog = adw::MessageDialog::new(Some(&self.window), Some(&heading), Some(&body));
         dialog.add_response("cancel", &i18n("Cancel"));
@@ -21786,7 +21834,8 @@ impl AppModel {
             BulkAction::MarkRead
             | BulkAction::MarkUnread
             | BulkAction::Flag
-            | BulkAction::Unflag => return,
+            | BulkAction::Unflag
+            | BulkAction::DeleteForever => return,
         };
         // (account, source path) → (dest path, uids, the rows for undo).
         // dest is per-account.
@@ -23770,6 +23819,8 @@ pub enum Shortcut {
     Forward,
     Archive,
     Delete,
+    /// Shift+D: erase for good, skipping Trash (#471).
+    DeleteForever,
     Spam,
     Star,
     ToggleRead,
@@ -23833,6 +23884,7 @@ impl Shortcut {
             Shortcut::Archive
                 | Shortcut::ArchiveAndStep(_)
                 | Shortcut::Delete
+                | Shortcut::DeleteForever
                 | Shortcut::Spam
                 | Shortcut::Star
                 | Shortcut::ToggleRead
@@ -23947,6 +23999,7 @@ fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
         Key::f => Shortcut::Forward,
         Key::a => Shortcut::Archive,
         Key::d => Shortcut::Delete,
+        Key::D => Shortcut::DeleteForever,
         Key::exclam => Shortcut::Spam,
         Key::s => Shortcut::Star,
         Key::m => Shortcut::ToggleRead,
@@ -24043,6 +24096,7 @@ const GMAIL_HELP: &[(&str, &[(&str, &str)])] = &[
             ("]  or  }", i18n_noop("Archive the conversation and open the older one")),
             ("[  or  {", i18n_noop("Archive the conversation and open the newer one")),
             ("#", i18n_noop("Delete")),
+            ("Shift+Delete", i18n_noop("Delete permanently, without going to Trash")),
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
             ("Shift+I", i18n_noop("Mark the conversation as read")),
@@ -24087,6 +24141,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("f", i18n_noop("Forward")),
             ("a", i18n_noop("Archive")),
             ("d  or  Delete", i18n_noop("Delete")),
+            ("D  or  Shift+Delete", i18n_noop("Delete permanently, without going to Trash")),
             ("!", i18n_noop("Mark as spam")),
             ("s", i18n_noop("Star or unstar")),
             ("m", i18n_noop("Mark read or unread")),
@@ -27084,6 +27139,7 @@ mod tests {
         assert_eq!(shortcut_for(Key::a, false), Some(Shortcut::Archive));
         assert_eq!(shortcut_for(Key::x, false), Some(Shortcut::ToggleSelect));
         assert_eq!(shortcut_for(Key::d, false), Some(Shortcut::Delete));
+        assert_eq!(shortcut_for(Key::D, true), Some(Shortcut::DeleteForever));
         assert_eq!(shortcut_for(Key::w, false), Some(Shortcut::NextInThread));
         assert_eq!(shortcut_for(Key::b, false), Some(Shortcut::PrevInThread));
         // Arrows do what h/j/k/l do.

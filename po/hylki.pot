@@ -343,6 +343,9 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
+msgid "Delete Permanently"
+msgstr ""
+
 msgid "Star or Remove Star"
 msgstr ""
 
@@ -599,6 +602,16 @@ msgstr ""
 msgid ""
 "They are already in Trash, so they will be erased from the server. This "
 "can’t be undone."
+msgstr ""
+
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
 msgstr ""
 
 msgid "No {v1} folder available"
@@ -968,6 +981,9 @@ msgid "Archive the conversation and open the older one"
 msgstr ""
 
 msgid "Archive the conversation and open the newer one"
+msgstr ""
+
+msgid "Delete permanently, without going to Trash"
 msgstr ""
 
 msgid "Mark as spam"

@@ -364,6 +364,10 @@ msgstr "Trova nel messaggio"
 msgid "Delete"
 msgstr "Elimina"
 
+#, fuzzy
+msgid "Delete Permanently"
+msgstr "Eliminare definitivamente questo messaggio?"
+
 msgid "Star or Remove Star"
 msgstr "Aggiungi/rimuovi contrassegno"
 
@@ -644,6 +648,22 @@ msgid ""
 msgstr ""
 "Sono già nel Cestino, quindi verranno cancellati dal server. Questa azione "
 "non può essere annullata."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Ogni messaggio in essa verrà cancellato dal server. Questa azione non può "
+"essere annullata."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Ogni messaggio in essa verrà cancellato dal server. Questa azione non può "
+"essere annullata."
 
 msgid "No {v1} folder available"
 msgstr "Nessuna cartella {v1} disponibile"
@@ -1054,6 +1074,9 @@ msgstr "Intera conversazione"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "Intera conversazione"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Segna come spam"

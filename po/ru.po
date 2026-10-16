@@ -373,6 +373,10 @@ msgid "Delete"
 msgstr "Удалить"
 
 #, fuzzy
+msgid "Delete Permanently"
+msgstr "Удалить это сообщение безвозвратно?"
+
+#, fuzzy
 msgid "Star or Remove Star"
 msgstr "Снять отметку"
 
@@ -679,6 +683,20 @@ msgid ""
 msgstr ""
 "Они уже находятся в «Корзине», поэтому будут удалены с сервера. Это действие "
 "нельзя отменить."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Все сообщения в нем будут удалены с сервера. Это действие нельзя отменить."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Все сообщения в нем будут удалены с сервера. Это действие нельзя отменить."
 
 msgid "No {v1} folder available"
 msgstr "Нет доступной папки {v1}"
@@ -1104,6 +1122,9 @@ msgstr "Всё обсуждение"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "Всё обсуждение"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Отметить как спам"

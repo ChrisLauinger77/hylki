@@ -377,6 +377,10 @@ msgid "Delete"
 msgstr "Löschen"
 
 #, fuzzy
+msgid "Delete Permanently"
+msgstr "Diese Nachricht endgültig löschen?"
+
+#, fuzzy
 msgid "Star or Remove Star"
 msgstr "Stern entfernen"
 
@@ -686,6 +690,22 @@ msgid ""
 msgstr ""
 "Die Nachrichten sind bereits im Papierkorb und werden daher vom Server "
 "gelöscht. Das kann nicht rückgängig gemacht werden."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Jede Nachricht darin wird vom Server gelöscht. Das kann nicht rückgängig "
+"gemacht werden."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Jede Nachricht darin wird vom Server gelöscht. Das kann nicht rückgängig "
+"gemacht werden."
 
 msgid "No {v1} folder available"
 msgstr "Kein Ordner für {v1} verfügbar"
@@ -1100,6 +1120,9 @@ msgstr "Gesamte Unterhaltung"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "Gesamte Unterhaltung"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Als Spam markieren"

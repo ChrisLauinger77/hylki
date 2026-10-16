@@ -376,6 +376,10 @@ msgid "Delete"
 msgstr "Törlés"
 
 #, fuzzy
+msgid "Delete Permanently"
+msgstr "Véglegesen törli ezt az üzenetet?"
+
+#, fuzzy
 msgid "Star or Remove Star"
 msgstr "Csillag eltávolítása"
 
@@ -674,6 +678,20 @@ msgid ""
 "can’t be undone."
 msgstr ""
 "Már a Kukában vannak, ezért törlődnek a kiszolgálóról. Ez nem vonható vissza."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"A benne lévő összes üzenet törlődik a kiszolgálóról. Ez nem vonható vissza."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"A benne lévő összes üzenet törlődik a kiszolgálóról. Ez nem vonható vissza."
 
 msgid "No {v1} folder available"
 msgstr "Nem érhető el a(z) {v1} mappa"
@@ -1083,6 +1101,9 @@ msgstr "A teljes beszélgetés"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "A teljes beszélgetés"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Megjelölés levélszemétként"

@@ -363,6 +363,10 @@ msgstr "Rechercher dans le message"
 msgid "Delete"
 msgstr "Supprimer"
 
+#, fuzzy
+msgid "Delete Permanently"
+msgstr "Supprimer ce message définitivement ?"
+
 msgid "Star or Remove Star"
 msgstr "Ajouter ou retirer l'étoile"
 
@@ -647,6 +651,22 @@ msgid ""
 msgstr ""
 "Ces messages sont déjà dans la Corbeille, ils seront donc effacés du "
 "serveur. Cette action est irréversible."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Tous les messages qu'il contient seront supprimés du serveur. Cette action "
+"est irréversible."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Tous les messages qu'il contient seront supprimés du serveur. Cette action "
+"est irréversible."
 
 msgid "No {v1} folder available"
 msgstr "Aucun dossier {v1} disponible"
@@ -1047,6 +1067,9 @@ msgstr "Archiver la conversation et ouvrir la plus ancienne"
 
 msgid "Archive the conversation and open the newer one"
 msgstr "Archiver la conversation et ouvrir la plus récente"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Marquer comme indésirable"

@@ -375,6 +375,10 @@ msgid "Delete"
 msgstr "Eliminar"
 
 #, fuzzy
+msgid "Delete Permanently"
+msgstr "Eliminar esta mensagem permanentemente?"
+
+#, fuzzy
 msgid "Star or Remove Star"
 msgstr "Remover estrela"
 
@@ -676,6 +680,22 @@ msgid ""
 msgstr ""
 "Já estão no Lixo, pelo que serão apagadas do servidor. Esta ação não pode "
 "ser anulada."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Todas as mensagens nela contidas serão apagadas do servidor. Esta ação não "
+"pode ser anulada."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Todas as mensagens nela contidas serão apagadas do servidor. Esta ação não "
+"pode ser anulada."
 
 msgid "No {v1} folder available"
 msgstr "Não está disponível nenhuma pasta {v1}"
@@ -1093,6 +1113,9 @@ msgstr "Conversa completa"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "Conversa completa"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Marcar como lixo eletrónico"

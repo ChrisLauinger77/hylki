@@ -377,6 +377,10 @@ msgid "Delete"
 msgstr "Usuń"
 
 #, fuzzy
+msgid "Delete Permanently"
+msgstr "Czy trwale usunąć tę wiadomość?"
+
+#, fuzzy
 msgid "Star or Remove Star"
 msgstr "Usuń gwiazdkę"
 
@@ -686,6 +690,22 @@ msgid ""
 "can’t be undone."
 msgstr ""
 "Wiadomości są już w koszu, więc zostaną trwale usunięte z serwera. Tej "
+"czynności nie można cofnąć."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Wszystkie wiadomości z tego katalogu zostaną trwale usunięte z serwera. Tej "
+"czynności nie można cofnąć."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Wszystkie wiadomości z tego katalogu zostaną trwale usunięte z serwera. Tej "
 "czynności nie można cofnąć."
 
 msgid "No {v1} folder available"
@@ -1116,6 +1136,9 @@ msgstr "Cała rozmowa"
 #, fuzzy
 msgid "Archive the conversation and open the newer one"
 msgstr "Cała rozmowa"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Oznacz jako spam"

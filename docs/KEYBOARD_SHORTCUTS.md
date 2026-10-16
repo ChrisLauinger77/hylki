@@ -21,6 +21,7 @@ this list in the app; the same key closes it again.
 | <kbd>?</kbd> | This list | <kbd>x</kbd> | Select the row (for a bulk action) |
 | | | <kbd>1</kbd> … <kbd>9</kbd> | Add or remove a tag (the first nine, in Settings order) |
 | | | <kbd>0</kbd> | Remove every tag |
+| | | <kbd>D</kbd> | Delete permanently, without going to Trash |
 
 <kbd>w</kbd> and <kbd>b</kbd> step through the cards of the conversation you
 are reading, opening a folded one; outside a conversation they move along the
@@ -145,6 +146,7 @@ These work with or without single-key shortcuts too:
 | <kbd>Ctrl+K</kbd> | Command palette: type to find an action, a folder, a view, a tag or a smart folder, and Enter runs it; start with `>` for actions only |
 | <kbd>Ctrl+Shift+K</kbd> | Command palette with `>` already typed: actions only |
 | <kbd>Delete</kbd> <kbd>Backspace</kbd> | Delete the selected messages, with the list focused |
+| <kbd>Shift+Delete</kbd> | Delete the selected messages permanently, without going to Trash, after asking |
 | <kbd>Ctrl+F</kbd> | Search the message list |
 | <kbd>Ctrl+P</kbd> | Print the message you are reading |
 | <kbd>Ctrl+Shift+P</kbd> | Preview it as a PDF first |

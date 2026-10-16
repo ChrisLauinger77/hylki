@@ -365,6 +365,10 @@ msgstr "Buscar en el mensaje"
 msgid "Delete"
 msgstr "Eliminar"
 
+#, fuzzy
+msgid "Delete Permanently"
+msgstr "¿Eliminar este mensaje permanentemente?"
+
 msgid "Star or Remove Star"
 msgstr "Añadir o quitar la estrella"
 
@@ -645,6 +649,22 @@ msgid ""
 msgstr ""
 "Ya están en la Papelera, por lo que se eliminarán del servidor. Esta acción "
 "no se puede deshacer."
+
+#, fuzzy
+msgid ""
+"It will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Todos los mensajes que contiene se eliminarán del servidor. Esta acción no "
+"se puede deshacer."
+
+#, fuzzy
+msgid ""
+"They will be erased from the server instead of going to Trash. This can’t be "
+"undone."
+msgstr ""
+"Todos los mensajes que contiene se eliminarán del servidor. Esta acción no "
+"se puede deshacer."
 
 msgid "No {v1} folder available"
 msgstr "No hay ninguna carpeta {v1} disponible"
@@ -1047,6 +1067,9 @@ msgstr "Archivar la conversación y abrir la anterior"
 
 msgid "Archive the conversation and open the newer one"
 msgstr "Archivar la conversación y abrir la más reciente"
+
+msgid "Delete permanently, without going to Trash"
+msgstr ""
 
 msgid "Mark as spam"
 msgstr "Marcar como spam"

@@ -2587,9 +2587,19 @@ async fn run_imap(
 
             MailRequest::PurgeMessages { path, uids } => {
                 let sess = session.as_mut().unwrap();
-                match purge_messages(sess, &path, &uids).await {
+                // Gmail only takes a label off mail expunged outside Trash,
+                // so the mail would sit on in All Mail (#471).
+                let trash = gmail_trash(cache.as_ref(), account_id, &account).filter(|t| *t != path);
+                let result = match &trash {
+                    Some(trash) => gmail_erase(sess, &path, &uids, trash).await,
+                    None => purge_messages(sess, &path, &uids).await,
+                };
+                match result {
                     Ok(()) => {
                         if let Some(c) = cache.as_ref() {
+                            if let Some(trash) = &trash {
+                                c.drop_label_copies(account_id, &path, &uids, trash);
+                            }
                             for uid in &uids {
                                 c.delete_message(account_id, &path, *uid);
                             }
@@ -5594,6 +5604,114 @@ async fn purge_messages(
     let set = uid_set(uids);
     sel(session, path).await?;
     flag_deleted_and_expunge(session, &set).await
+}
+
+/// A Gmail account's Trash, where an erase has to happen: expunged from
+/// any other folder, Gmail mail only loses that label. `None` elsewhere.
+fn gmail_trash(cache: Option<&Cache>, account_id: u32, account: &AccountConfig) -> Option<String> {
+    let folders = cache?.load_folders(account_id);
+    if !has_gmail_labels(account, &folders) {
+        return None;
+    }
+    folders.into_iter().find(|f| f.kind == FolderKind::Trash).map(|f| f.path)
+}
+
+/// Erase Gmail mail from outside Trash, the way Gmail's own "Delete
+/// forever" goes: into Trash, then expunged there. The move gives the mail
+/// new UIDs, so it is found again in Trash by `X-GM-MSGID`, which stays the
+/// same under every label. A server that does not know the item (a mailbox
+/// that only looks like Gmail by its folder names) erases where it is.
+async fn gmail_erase(
+    session: &mut ImapSession,
+    path: &str,
+    uids: &[u32],
+    trash: &str,
+) -> Result<(), async_imap::error::Error> {
+    if uids.is_empty() {
+        return Ok(());
+    }
+    sel(session, path).await?;
+    let Some(ids) = fetch_gmail_msgids(session, uids).await? else {
+        return flag_deleted_and_expunge(session, &uid_set(uids)).await;
+    };
+    for chunk in uids.chunks(300) {
+        uid_move(session, &uid_set(chunk), trash).await?;
+    }
+    sel(session, trash).await?;
+    let mut binned = std::collections::HashSet::new();
+    for chunk in ids.chunks(100) {
+        binned.extend(search_uids(session, gmail_msgid_query(chunk)).await?);
+    }
+    if binned.is_empty() {
+        return Ok(());
+    }
+    let binned: Vec<u32> = binned.into_iter().collect();
+    flag_deleted_and_expunge(session, &uid_set(&binned)).await
+}
+
+/// `X-GM-MSGID a`, or `OR X-GM-MSGID a OR X-GM-MSGID b X-GM-MSGID c` for
+/// several: IMAP's OR takes two keys.
+fn gmail_msgid_query(ids: &[u64]) -> String {
+    let mut q = "OR ".repeat(ids.len().saturating_sub(1));
+    q.push_str(&ids.iter().map(|id| format!("X-GM-MSGID {id}")).collect::<Vec<_>>().join(" "));
+    q
+}
+
+/// The `X-GM-MSGID` of each message at `uids` in the selected folder, or
+/// `None` when the server answers `BAD` (it is not Gmail). Run raw for the
+/// same reason as [`fetch_gmail_labels`].
+async fn fetch_gmail_msgids<T>(
+    session: &mut Session<T>,
+    uids: &[u32],
+) -> Result<Option<Vec<u64>>, async_imap::error::Error>
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + std::fmt::Debug + Send,
+{
+    use async_imap::imap_proto::{AttributeValue, Response, Status};
+    let cmd = format!("UID FETCH {} (UID X-GM-MSGID)", uid_set(uids));
+    wire(&cmd);
+    let id = session.run_command(&cmd).await?;
+    let mut out = Vec::new();
+    loop {
+        let reply = match session.read_response().await {
+            Some(Ok(reply)) => reply,
+            Some(Err(e)) => {
+                let r: Result<(), _> = Err(async_imap::error::Error::Io(e));
+                wired(&cmd, &r);
+                return Err(r.unwrap_err());
+            }
+            None => {
+                wired::<()>(&cmd, &Err(async_imap::error::Error::ConnectionLost));
+                return Err(async_imap::error::Error::ConnectionLost);
+            }
+        };
+        match reply.parsed() {
+            Response::Fetch(_, attrs) => {
+                out.extend(attrs.iter().find_map(|a| match a {
+                    AttributeValue::GmailMsgId(id) => Some(*id),
+                    _ => None,
+                }));
+            }
+            Response::Done { tag, status, information, .. } if *tag == id => {
+                let why = information.as_deref().unwrap_or("");
+                return match status {
+                    Status::Ok => {
+                        tracing::debug!(target: "hylki::imap", "< OK ({})", cmd_head(&cmd));
+                        Ok(Some(out))
+                    }
+                    Status::Bad => {
+                        tracing::warn!(target: "hylki::imap", "< BAD {why} ({cmd})");
+                        Ok(None)
+                    }
+                    _ => {
+                        tracing::warn!(target: "hylki::imap", "< {status:?} {why} ({cmd})");
+                        Err(async_imap::error::Error::No(why.to_string()))
+                    }
+                };
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Flag a UID set `\Deleted` and expunge it: `UID EXPUNGE` where the server
@@ -14115,6 +14233,35 @@ mod gmail_label_tests {
             due: 0,
             labels: labels.iter().map(|l| l.to_string()).collect(),
         }
+    }
+
+    /// Each message's X-GM-MSGID is read past the server's other news, and
+    /// a server that is not Gmail says so with BAD (#471).
+    #[tokio::test]
+    async fn gmail_msgids_are_read_or_refused() {
+        for (reply, want) in [
+            (
+                "* 3 FETCH (UID 7 X-GM-MSGID 1278455344230334865)\r\n\
+                 * 12 EXISTS\r\n\
+                 * 4 FETCH (UID 8 X-GM-MSGID 42)\r\n\
+                 {tag} OK Success\r\n",
+                Some(vec![1278455344230334865, 42]),
+            ),
+            ("{tag} BAD Unknown fetch item\r\n", None),
+        ] {
+            let (mut client, mut server) = session().await;
+            let task = tokio::spawn(async move { fetch_gmail_msgids(&mut client, &[7, 8]).await });
+            let tag = command(&mut server, "UID FETCH 7:8 (UID X-GM-MSGID)").await;
+            server.get_mut().write_all(reply.replace("{tag}", &tag).as_bytes()).await.unwrap();
+            let got = tokio::time::timeout(Duration::from_secs(5), task).await.expect("the read finished").unwrap();
+            assert_eq!(got.expect("read"), want);
+        }
+    }
+
+    #[test]
+    fn gmail_msgid_search_pairs_its_keys() {
+        assert_eq!(gmail_msgid_query(&[1]), "X-GM-MSGID 1");
+        assert_eq!(gmail_msgid_query(&[1, 2, 3]), "OR OR X-GM-MSGID 1 X-GM-MSGID 2 X-GM-MSGID 3");
     }
 
     /// Read the labels for UIDs 7, 8 and 9 against a server that answers
