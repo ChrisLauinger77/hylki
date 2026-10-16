@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed: a zoomed attachment sat inside the lightbox's frame.** A click
+  that zooms an image or PDF in the lightbox now hides the title bar, the
+  arrows, the bottom bar and the padding around them, so the zoomed
+  document fills the window. A second click or Escape brings them back.
 - **Fixed: a keyring that asks first was taken for no keyring** (PR #466 by
   Comodino). Every keyring read gave up after two seconds, so a Secret
   Service provider that waits on the user, like pass-secret-service

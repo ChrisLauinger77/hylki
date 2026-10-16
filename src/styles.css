@@ -1798,6 +1798,9 @@ headerbar.compose-toolbar button.image-button {
   background: alpha(black, 0.82);
   padding: 10px 16px 16px 16px;
 }
+.gallery-lightbox.zoomed {
+  padding: 0;
+}
 .gallery-lightbox-bar {
   padding: 6px 2px;
   color: white;
