@@ -3132,12 +3132,37 @@ impl SimpleComponent for MessageList {
             MessageListInput::LeaveConversation { gone, head } => {
                 // The cache's count of the conversation still holds the
                 // message until the server has moved it, so the badge is
-                // brought down here rather than asked for again.
-                // Its members go by other ids there, so by folder and UID.
+                // brought down here rather than asked for again. A reply
+                // filed in another folder is no row of this list: the
+                // conversation is found by its row.
+                let group = [gone, head]
+                    .iter()
+                    .find_map(|k| self.msg_thread.get(k))
+                    .cloned()
+                    .or_else(|| {
+                        self.groups
+                            .iter()
+                            .find(|(_, ms)| ms.iter().any(|m| (m.account_id, m.id) == head))
+                            .map(|(k, _)| k.clone())
+                    });
+                // A message of this folder goes by another id there, so by
+                // folder and UID; one filed elsewhere by the id the reader
+                // gave it.
                 let slot = self.all.iter().find(|m| (m.account_id, m.id) == gone).map(|m| (m.account_id, m.folder_id, m.uid));
-                if let Some(s) = self.msg_thread.get(&gone).and_then(|k| self.thread_summaries.get_mut(k)) {
-                    s.count = s.count.saturating_sub(1);
-                    s.members.retain(|m| Some((m.account_id, m.folder_id, m.uid)) != slot);
+                if let Some(s) = group.and_then(|k| self.thread_summaries.get_mut(&k)) {
+                    let before = s.members.len();
+                    s.members.retain(|m| (m.account_id, m.id) != gone && Some((m.account_id, m.folder_id, m.uid)) != slot);
+                    if s.members.len() < before {
+                        s.count = s.count.saturating_sub(before - s.members.len());
+                        // The row may have been quoting it as the newest.
+                        s.latest = s.members.iter().max_by_key(|m| m.timestamp).map(|m| crate::models::ThreadLatest {
+                            from_name: m.from_name.clone(),
+                            from_addr: m.from_addr.clone(),
+                            preview: m.preview.clone(),
+                            timestamp: m.timestamp,
+                            date: m.date.clone(),
+                        });
+                    }
                 }
                 self.all.retain(|m| (m.account_id, m.id) != gone);
                 self.tail.retain(|r| (r.msg.account_id, r.msg.id) != gone);
