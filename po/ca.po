@@ -4433,9 +4433,10 @@ msgstr "Coincidència següent"
 msgid "Close find"
 msgstr "Tanca la cerca"
 
+#, fuzzy
 msgid ""
-"Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it "
-"back to the default from Settings."
+"Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a "
+"click here, or Ctrl+0, puts it back to the default from Settings."
 msgstr ""
 "Zoom del missatge. Ctrl+ i Ctrl- el canvien; un clic aquí, o Ctrl+0, el "
 "torna al valor per defecte dels paràmetres."

@@ -61,6 +61,9 @@ pub struct RichEditor {
     /// The Content-Security-Policy `<meta>` every document this editor loads
     /// carries, or empty when any picture may load. See [`RichEditor::new`].
     image_policy: std::rc::Rc<str>,
+    /// The page zoom set by [`RichEditor::set_zoom`], kept for a preview
+    /// built after it.
+    zoom: std::rc::Rc<std::cell::Cell<f64>>,
 }
 
 /// What a source-mode editor is holding. Rich text is the absence of
@@ -705,6 +708,7 @@ impl RichEditor {
             spell_langs_cb,
             _theme_handler: std::rc::Rc::new(ThemeHandlerGuard(Some(theme_handler))),
             image_policy,
+            zoom: std::rc::Rc::new(std::cell::Cell::new(1.0)),
         }
     }
 
@@ -828,6 +832,7 @@ impl RichEditor {
                     .settings(&settings)
                     .build();
                 crate::memory_report::register_web_view(&v, "editor preview");
+                v.set_zoom_level(self.zoom.get());
                 v.set_background_color(&gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 0.0));
                 self.stack.add_named(&v, Some("preview"));
                 *self.preview.borrow_mut() = Some(v.clone());
@@ -915,6 +920,17 @@ impl RichEditor {
     /// control needed to get them back.
     pub fn set_formatting_visible(&self, on: bool) {
         self.toolbar_commands.set_tools_shown(on);
+    }
+
+    /// Show the text, and the preview, at `percent` of its size. Page zoom
+    /// rather than a font size, so nothing about it reaches the message.
+    pub fn set_zoom(&self, percent: u32) {
+        let z = f64::from(percent) / 100.0;
+        self.zoom.set(z);
+        self.webview.set_zoom_level(z);
+        if let Some(v) = self.preview.borrow().as_ref() {
+            v.set_zoom_level(z);
+        }
     }
 
     /// The far end of the formatting row, for a host's own controls.

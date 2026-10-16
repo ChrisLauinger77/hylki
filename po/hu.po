@@ -4597,9 +4597,10 @@ msgstr "Következő találat"
 msgid "Close find"
 msgstr "Keresés bezárása"
 
+#, fuzzy
 msgid ""
-"Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it "
-"back to the default from Settings."
+"Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a "
+"click here, or Ctrl+0, puts it back to the default from Settings."
 msgstr ""
 "Üzenet nagyítása. A Ctrl+ és a Ctrl- billentyűkkel állítható be; ha ide "
 "kattintasz, vagy a Ctrl+0 billentyűkombinációt nyomod meg, az üzenet "

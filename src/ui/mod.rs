@@ -94,3 +94,45 @@ impl DisplayCss {
         }
     }
 }
+
+/// Ctrl + scroll wheel as zoom, the way browsers have it: `step` gets 1 for
+/// a step in (wheel up) and -1 for a step out. Without Ctrl, or while
+/// `zooms` says no, the scroll goes on to the page. Capture phase, so a
+/// WebView underneath never scrolls the same notch it zooms.
+///
+/// A touchpad reports pixels in small bites, so those add up to a step
+/// rather than each being one: otherwise a short swipe ran the whole scale.
+pub fn ctrl_scroll_zoom(
+    zooms: impl Fn() -> bool + 'static,
+    step: impl Fn(i8) + 'static,
+) -> gtk::EventControllerScroll {
+    use gtk::prelude::*;
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let pending = std::rc::Rc::new(std::cell::Cell::new(0.0f64));
+    let p = pending.clone();
+    scroll.connect_scroll_begin(move |_| p.set(0.0));
+    scroll.connect_scroll(move |c, _, dy| {
+        if !c.current_event_state().contains(gtk::gdk::ModifierType::CONTROL_MASK) || !zooms() {
+            pending.set(0.0);
+            return gtk::glib::Propagation::Proceed;
+        }
+        let per_step = match c.unit() {
+            gtk::gdk::ScrollUnit::Wheel => 1.0,
+            _ => 40.0,
+        };
+        let mut sum = pending.get();
+        // Turning back starts afresh rather than first undoing what was owed.
+        if sum * dy < 0.0 {
+            sum = 0.0;
+        }
+        sum += dy;
+        while sum.abs() >= per_step {
+            step(if sum < 0.0 { 1 } else { -1 });
+            sum -= per_step.copysign(sum);
+        }
+        pending.set(sum);
+        gtk::glib::Propagation::Stop
+    });
+    scroll
+}

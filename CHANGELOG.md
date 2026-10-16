@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The composer zooms in Markdown, HTML and plain text.** Ctrl+ and Ctrl-
+  scale the text of the body and its preview, Ctrl+0 puts it back to 100%,
+  and the next composer opens at the same size until Hylki is next started.
+  The message that is sent is unchanged. Rich text keeps its size, since
+  there the size on screen is the size that is sent.
+- **Ctrl and the scroll wheel zoom.** Over a message, it steps the reader's
+  zoom as Ctrl+ and Ctrl- do; over the composer's body, the composer's.
 - **Fixed: a photo in a message body ran off the side of its card.** An
   image the message gives no size to, like a photo sent from a phone, was
   shown at its full pixel width, and the card widened to hold it. It is now

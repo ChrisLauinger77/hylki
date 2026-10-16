@@ -4499,9 +4499,10 @@ msgstr "Corrispondenza successiva"
 msgid "Close find"
 msgstr "Chiudi ricerca"
 
+#, fuzzy
 msgid ""
-"Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it "
-"back to the default from Settings."
+"Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a "
+"click here, or Ctrl+0, puts it back to the default from Settings."
 msgstr ""
 "Zoom del messaggio. Ctrl+ e Ctrl- lo cambiano; un clic qui, o Ctrl+0, lo "
 "riporta al valore predefinito dalle Impostazioni."

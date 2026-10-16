@@ -91,6 +91,11 @@ fn format_hint(format: ComposeFormat) -> String {
     }
 }
 
+/// The zoom of the body in Markdown, HTML and plain text, in percent: the
+/// session's, so the next composer opens at the size the last one was left
+/// at. Rich text stays at 100, where what is on screen is what is sent.
+static ZOOM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(100);
+
 /// The narrowest the compose pane goes (its `adw::BreakpointBin` floor).
 const COMPOSE_MIN_WIDTH: i32 = 360;
 /// Fallback fold threshold when the toolbar could not be measured at init.
@@ -393,6 +398,10 @@ pub struct Compose {
     /// formatting toolbar and sends no HTML part (#180); Markdown and HTML
     /// are written as source and converted on the way out.
     format: ComposeFormat,
+    /// Whether the body zooms (Ctrl+ / Ctrl- / Ctrl+0, Ctrl + the scroll
+    /// wheel): every format but rich text. Shared with the key and scroll
+    /// handlers, which have no model to ask.
+    zoomable: std::rc::Rc<std::cell::Cell<bool>>,
     /// The format chooser and preview toggle, which live at the end of the
     /// editor's formatting row rather than in the header.
     format_btn: gtk::Button,
@@ -651,6 +660,9 @@ pub enum ComposeInput {
     /// Ctrl+Z / Ctrl+Shift+Z (#200): step the composer's history back or
     /// forward — the body's text and the attachments, in one order.
     History { redo: bool },
+    /// Zoom the body one step in (1) or out (-1), or back to 100% (0).
+    /// Nothing in rich text.
+    Zoom(i8),
     /// The body's text history changed: WebKit gained or lost a step. The
     /// flag is whether it now has anything to take back.
     BodyHistory(bool),
@@ -1171,6 +1183,20 @@ impl Component for Compose {
         });
         let editor = RichEditor::new(&content, remote_images.as_deref(), format == ComposeFormat::Plain);
         editor.set_formatting_visible(format == ComposeFormat::Rich);
+        let zoomable = std::rc::Rc::new(std::cell::Cell::new(format != ComposeFormat::Rich));
+        if zoomable.get() {
+            editor.set_zoom(ZOOM.load(std::sync::atomic::Ordering::Relaxed));
+        }
+        {
+            let z = zoomable.clone();
+            let s = sender.input_sender().clone();
+            editor.widget.add_controller(super::ctrl_scroll_zoom(
+                move || z.get(),
+                move |step| {
+                    let _ = s.send(ComposeInput::Zoom(step));
+                },
+            ));
+        }
         // A source format starts from the same content, written out as
         // source: a reply's quoted original becomes `> ` lines in Markdown,
         // or the HTML it already was.
@@ -1334,6 +1360,7 @@ impl Component for Compose {
             sign_touched: false,
             sign_expected: None,
             format,
+            zoomable: zoomable.clone(),
             format_btn,
             translate_btn,
             signature_btn,
@@ -1734,6 +1761,7 @@ impl Component for Compose {
         let s = sender.clone();
         let open = model.completion_open.clone();
         let editor = model.editor.clone();
+        let zoomable = model.zoomable.clone();
         // Weak: the root owns this controller, so a strong root here would
         // be a cycle that kept a closed composer's whole widget tree alive,
         // its editor's WebKitWebProcess included (#221).
@@ -1767,6 +1795,17 @@ impl Component for Compose {
             {
                 editor.paste(!crate::config::load_privacy().paste_plain);
                 return Propagation::Stop;
+            }
+            // Ctrl+ / Ctrl- / Ctrl+0 zoom the body, as they zoom the reader,
+            // in the formats whose size is not part of the message. This
+            // is a composer window's; inline, the main window's own keys
+            // get there first and pass them on (app.rs).
+            if let Some(step) = zoom_key(keyval, state) {
+                if zoomable.get() {
+                    s.input(ComposeInput::Zoom(step));
+                    return Propagation::Stop;
+                }
+                return Propagation::Proceed;
             }
             // Ctrl+Enter sends (#238), as it does in Gmail, Apple Mail and
             // Thunderbird. Ahead of the suggestion list's own Enter, so a
@@ -2262,6 +2301,21 @@ impl Component for Compose {
                     self.rebuild_attachments(&widgets.attach_box, &sender);
                     self.report_history(&sender);
                 }
+            }
+
+            ComposeInput::Zoom(step) => {
+                if !self.zoomable.get() {
+                    break 'handle;
+                }
+                use crate::config::READER_ZOOM_STEPS as STEPS;
+                let now = ZOOM.load(std::sync::atomic::Ordering::Relaxed);
+                let at = STEPS.iter().position(|&z| z == now).unwrap_or(5) as i32;
+                let zoom = match step {
+                    0 => 100,
+                    s => STEPS[(at + i32::from(s.signum())).clamp(0, STEPS.len() as i32 - 1) as usize],
+                };
+                ZOOM.store(zoom, std::sync::atomic::Ordering::Relaxed);
+                self.editor.set_zoom(zoom);
             }
 
             ComposeInput::History { redo } => {
@@ -2820,6 +2874,8 @@ impl Component for Compose {
                 }
                 self.format = to;
                 self.editor.set_formatting_visible(to == ComposeFormat::Rich);
+                self.zoomable.set(to != ComposeFormat::Rich);
+                self.editor.set_zoom(if self.zoomable.get() { ZOOM.load(std::sync::atomic::Ordering::Relaxed) } else { 100 });
                 if let Some(zones) = &self.drop_zones {
                     zones.set_allow_inline(to == ComposeFormat::Rich);
                 }
@@ -3235,6 +3291,11 @@ fn same_from(a: &str, b: &str) -> bool {
 }
 
 impl Compose {
+    /// Whether the body zooms in its present format; see [`ComposeInput::Zoom`].
+    pub fn zooms(&self) -> bool {
+        self.zoomable.get()
+    }
+
     /// The From to put on the wire: the picked identity's (`None` for the
     /// account's own), or the one typed in (#347), which has to hold one
     /// address.
@@ -4307,6 +4368,25 @@ fn pick_send_time(parent: Option<&gtk::Window>, current: Option<i64>, sender: re
         }
     });
     dialog.present();
+}
+
+/// Ctrl+ (or Ctrl+=, for layouts where + needs Shift), Ctrl- and Ctrl+0,
+/// keypad included, as the zoom step they ask for: the reader's keys.
+fn zoom_key(keyval: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> Option<i8> {
+    use gtk::gdk::Key;
+    if !state.contains(gtk::gdk::ModifierType::CONTROL_MASK) || state.contains(gtk::gdk::ModifierType::ALT_MASK) {
+        return None;
+    }
+    // By value, as the suggestion keys are.
+    if [Key::plus, Key::equal, Key::KP_Add].contains(&keyval) {
+        Some(1)
+    } else if [Key::minus, Key::KP_Subtract].contains(&keyval) {
+        Some(-1)
+    } else if [Key::_0, Key::KP_0].contains(&keyval) {
+        Some(0)
+    } else {
+        None
+    }
 }
 
 /// Whether keyboard focus is in a one-line text field of the composer — an

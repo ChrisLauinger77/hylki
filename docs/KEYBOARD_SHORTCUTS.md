@@ -172,12 +172,20 @@ again. <kbd>Esc</kbd> closes it too, wherever the focus is in the window,
 including after you have picked a result.
 
 <kbd>Ctrl++</kbd> and <kbd>Ctrl+-</kbd> zoom the message in the reading pane
-in and out, with or without Reader View; <kbd>Ctrl+0</kbd> puts it back to
+in and out, with or without Reader View, and so does <kbd>Ctrl</kbd> with the
+scroll wheel over the message; <kbd>Ctrl+0</kbd> puts it back to
 the default. Only the message scales, not the header or the toolbar; a chip
 beside the Reader View switch shows the percentage while it is away from
 the default, and a click on it goes back there.
 The zoom stays as set from message to message until Hylki is next started,
 which begins at the default from **Settings → Reading → Default zoom**.
+
+The same keys, and <kbd>Ctrl</kbd> with the scroll wheel over the body, zoom
+the composer's text while it is written in Markdown, HTML source or plain
+text; <kbd>Ctrl+0</kbd> puts it back to 100%. Only the screen changes, not
+the message that is sent, and the next composer opens at the same size until
+Hylki is next started. Rich text does not zoom, because there the size on
+screen is the size that is sent; the keys go on to the message instead.
 
 Keys never fire while you are typing: whatever has focus gets first refusal, so
 "archive" typed into the search box searches for it.

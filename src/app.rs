@@ -1703,6 +1703,9 @@ pub enum AppMsg {
     /// Message zoom (Ctrl+ / Ctrl- / Ctrl+0): a step up, a step down, or
     /// back to the default, for this session.
     ZoomMessage(i8),
+    /// The zoom keys in the main window: the inline composer's while it has
+    /// the focus and its format zooms, else the message's.
+    ZoomKey(i8),
     /// Settings → Reading: the zoom every launch starts at.
     SetZoomDefault(u32),
     /// Settings: show the Reader View switch in the reader header.
@@ -3092,7 +3095,7 @@ impl SimpleComponent for AppModel {
                     MessageViewOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                     MessageViewOutput::Notice(text) => AppMsg::Notice(text),
                     MessageViewOutput::ReaderMode(on) => AppMsg::SetReaderMode(on),
-                    MessageViewOutput::ZoomReset => AppMsg::ZoomMessage(0),
+                    MessageViewOutput::Zoom(step) => AppMsg::ZoomMessage(step),
                     MessageViewOutput::Unsubscribe { message, info } => {
                         AppMsg::Unsubscribe { message, info }
                     }
@@ -4392,7 +4395,7 @@ impl SimpleComponent for AppModel {
             ] {
                 let action = gtk::gio::SimpleAction::new(name, None);
                 let s = sender.clone();
-                action.connect_activate(move |_, _| s.input(AppMsg::ZoomMessage(step)));
+                action.connect_activate(move |_, _| s.input(AppMsg::ZoomKey(step)));
                 app.add_action(&action);
                 gtk::prelude::GtkApplicationExt::set_accels_for_action(&app, &format!("app.{name}"), keys);
             }
@@ -8772,6 +8775,18 @@ impl SimpleComponent for AppModel {
                     });
                 } else if members.contains(&key) {
                     self.message_list.emit(MessageListInput::SelectAndLoad(now));
+                }
+            }
+            AppMsg::ZoomKey(step) => {
+                // The keys are the application's, so they reach the main
+                // window before the composer in it could take them.
+                let compose = self
+                    .reader_compose
+                    .as_ref()
+                    .filter(|r| r.window.is_none() && focus_in_compose(&self.window) && r.controller.model().zooms());
+                match compose {
+                    Some(r) => r.controller.emit(ComposeInput::Zoom(step)),
+                    None => sender.input(AppMsg::ZoomMessage(step)),
                 }
             }
             AppMsg::ZoomMessage(step) => {
@@ -16577,7 +16592,7 @@ impl AppModel {
                 MessageWindowOutput::AllowSender(addr) => AppMsg::AllowSender(addr),
                 MessageWindowOutput::ReloadBody(m) => AppMsg::ReloadBody(m),
                 MessageWindowOutput::Notice(text) => AppMsg::Notice(text),
-                MessageWindowOutput::ZoomReset => AppMsg::ZoomMessage(0),
+                MessageWindowOutput::Zoom(step) => AppMsg::ZoomMessage(step),
                 MessageWindowOutput::Unsubscribe { message, info } => {
                     AppMsg::Unsubscribe { message, info }
                 }

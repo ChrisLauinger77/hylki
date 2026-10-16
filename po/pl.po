@@ -4640,9 +4640,10 @@ msgstr "Następny wynik"
 msgid "Close find"
 msgstr "Zamknij wyszukiwanie"
 
+#, fuzzy
 msgid ""
-"Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it "
-"back to the default from Settings."
+"Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a "
+"click here, or Ctrl+0, puts it back to the default from Settings."
 msgstr ""
 "Powiększenie wiadomości. Można je zmienić za pomocą Ctrl+ i Ctrl-; "
 "kliknięcie tutaj lub Ctrl+0 przywraca wartość domyślną z ustawień."

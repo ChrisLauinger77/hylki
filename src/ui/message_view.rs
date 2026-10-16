@@ -1290,8 +1290,10 @@ pub enum MessageViewOutput {
     /// The subject block's Reader View toggle was flipped; the app saves the
     /// preference and pushes it back (`SetReaderMode`) to every reader.
     ReaderMode(bool),
-    /// The zoom chip was clicked: back to the default from Settings.
-    ZoomReset,
+    /// Message zoom one step in (1) or out (-1), from Ctrl + the scroll
+    /// wheel over the body, or back to the default from Settings (0), from
+    /// a click on the zoom chip.
+    Zoom(i8),
     /// A card's Unsubscribe button: leave the list this message came from,
     /// by the handles its headers offered.
     Unsubscribe { message: Box<Message>, info: Box<crate::models::Unsubscribe> },
@@ -1942,10 +1944,10 @@ impl Component for MessageView {
                             add_css_class: "caption",
                             add_css_class: "hylki-zoom-chip",
                             set_cursor_from_name: Some("pointer"),
-                            set_tooltip_text: Some(i18n("Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it back to the default from Settings.").as_str()),
+                            set_tooltip_text: Some(i18n("Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a click here, or Ctrl+0, puts it back to the default from Settings.").as_str()),
                             add_controller = gtk::GestureClick {
                                 connect_released[sender] => move |_, _, _, _| {
-                                    let _ = sender.output(MessageViewOutput::ZoomReset);
+                                    let _ = sender.output(MessageViewOutput::Zoom(0));
                                 },
                             },
                         },
@@ -2594,6 +2596,13 @@ impl Component for MessageView {
         body_overlay.set_child(Some(&model.webview));
         body_overlay.add_overlay(&model.page_fade.cover);
         body_overlay.add_overlay(&link_preview);
+        let zoom_sender = sender.clone();
+        body_overlay.add_controller(super::ctrl_scroll_zoom(
+            || true,
+            move |step| {
+                let _ = zoom_sender.output(MessageViewOutput::Zoom(step));
+            },
+        ));
         widgets.body_stack.add_named(&body_overlay, Some("body"));
         widgets.body_stack.set_visible_child_name("body");
         ComponentParts { model, widgets }

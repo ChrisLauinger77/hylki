@@ -4578,9 +4578,10 @@ msgstr "Следующее совпадение"
 msgid "Close find"
 msgstr "Закрыть поиск"
 
+#, fuzzy
 msgid ""
-"Message zoom. Ctrl+ and Ctrl- change it; a click here, or Ctrl+0, puts it "
-"back to the default from Settings."
+"Message zoom. Ctrl+ and Ctrl-, or Ctrl and the scroll wheel, change it; a "
+"click here, or Ctrl+0, puts it back to the default from Settings."
 msgstr ""
 "Масштаб сообщения. Сочетания Ctrl+ и Ctrl- меняют его; нажатие здесь или "
 "Ctrl+0 возвращает значение по умолчанию из Параметров."
