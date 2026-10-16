@@ -709,9 +709,9 @@ A message that was replied to shows a reply arrow in the message list, one
 that was forwarded a forward arrow, and one that was both shows both. A
 conversation's row shows them for its newest message in the folder. The
 arrows are kept on the server, so a message answered from another client
-shows them too. Hylki marks a message once the reply or forward has gone,
-so a send that is undone, or still waiting in the Outbox, leaves it as it
-was. IMAP keeps them as the `\Answered` flag and the `$Forwarded` keyword,
+shows them too. The arrow appears as soon as a reply or forward is sent,
+and goes again if the send is undone or fails; a message that waits in the
+Outbox, or is sent later, marks its original when it goes. IMAP keeps them as the `\Answered` flag and the `$Forwarded` keyword,
 JMAP as `$answered` and `$forwarded`, and POP3 in Hylki only. Microsoft 365
 keeps only the last thing done to a message, as Outlook shows it, so a
 message replied to and then forwarded there shows the forward arrow alone.

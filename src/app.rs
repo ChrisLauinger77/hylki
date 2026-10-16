@@ -808,6 +808,10 @@ pub struct AppModel {
     /// keyword): the same for tags. A folder list fetched ahead of the STORE took a
     /// tag just set off the row until the next sync put it back.
     pending_tags: HashMap<(u32, String, u32, String), (bool, std::time::Instant, String)>,
+    /// The messages a reply or forward on its way out marked as answered
+    /// ahead of time (#454), by send ticket: (account, folder id, uid,
+    /// forwarded). Undone or failed, the marks come off again.
+    pending_answers: HashMap<u64, Vec<(u32, u32, u32, bool)>>,
     /// Folders (account, folder) whose server unread count arrived while a
     /// read mark or a move was on its way and was set aside: synced again
     /// once those are stored. The count may also have been the only word of
@@ -2168,7 +2172,7 @@ pub enum AppMsg {
     HasAttachments { account_id: u32, path: String, message_id: u32 },
     Sent { account_id: u32 },
     /// The worker is done with a message on its way out (#434).
-    SendDone { ticket: u64 },
+    SendDone { ticket: u64, sent: bool },
     /// A message nothing could keep, back for a composer (#340).
     Unsent { account_id: u32, message: Box<crate::worker::OutgoingMessage> },
     Status { account_id: u32, text: String },
@@ -3466,6 +3470,7 @@ impl SimpleComponent for AppModel {
             folder_unread: HashMap::new(),
             pending_seen: HashMap::new(),
             pending_tags: HashMap::new(),
+            pending_answers: HashMap::new(),
             dropped_unread: Default::default(),
             pending_moves: std::cell::RefCell::new(HashMap::new()),
             transfers: HashMap::new(),
@@ -6823,6 +6828,7 @@ impl SimpleComponent for AppModel {
                         let messages = self.merge_local_tags(account_id, messages);
                         let messages = self.drop_pending_moves(account_id, folder_id, messages);
                         let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                        let messages = self.apply_pending_answers(account_id, folder_id, messages);
                         self.apply_pending_tags(account_id, folder_id, messages)
                     })
                     .collect();
@@ -9784,9 +9790,15 @@ impl SimpleComponent for AppModel {
 
             AppMsg::UndoSend(ticket) => self.undo_send(ticket, &sender),
 
-            AppMsg::SendDone { ticket } => {
+            AppMsg::SendDone { ticket, sent } => {
                 // A failure has said so already, in the status bar, and the
-                // message is in the Outbox or back in a composer.
+                // message is in the Outbox or back in a composer. Its
+                // original is answered once it goes, not before (#454).
+                if sent {
+                    self.pending_answers.remove(&ticket);
+                } else {
+                    self.unmark_answered(ticket);
+                }
                 let done = {
                     let mut list = self.outgoing.borrow_mut();
                     list.iter().position(|o| o.ticket == ticket).map(|i| list.remove(i))
@@ -11296,29 +11308,9 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::Answered { account_id, path, uid, forwarded } => {
-                let Some(fid) =
-                    self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id)
-                else {
-                    return;
-                };
-                let same = |c: &Message| c.account_id == account_id && c.folder_id == fid && c.uid == uid;
-                let mark = |c: &mut Message| if forwarded { c.forwarded = true } else { c.answered = true };
-                let mut id = None;
-                for msgs in [self.message_cache.get_mut(&(account_id, fid)), self.unified_slices.get_mut(&(account_id, fid))]
-                    .into_iter()
-                    .flatten()
-                {
-                    for c in msgs.iter_mut().filter(|c| same(c)) {
-                        mark(c);
-                        id = Some(c.id);
-                    }
-                }
-                self.current_thread.iter_mut().filter(|c| same(c)).for_each(mark);
-                if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
-                    mark(cur);
-                }
-                if let Some(id) = id {
-                    self.message_list.emit(MessageListInput::SetAnswered { slot: (account_id, fid, id), forwarded });
+                let fid = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id);
+                if let Some(fid) = fid {
+                    self.show_answered(account_id, fid, uid, forwarded, true);
                 }
             }
 
@@ -11437,6 +11429,7 @@ impl SimpleComponent for AppModel {
                 // A list fetched ahead of a read mark still in the worker's
                 // queue shows the message unread again; keep the app's state.
                 let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                let messages = self.apply_pending_answers(account_id, folder_id, messages);
                 let messages = self.apply_pending_tags(account_id, folder_id, messages);
                 // A message a move has just brought home arrives with a new
                 // UID — that is what a move does — which leaves its body filed
@@ -13419,6 +13412,7 @@ impl AppModel {
         };
         self.send_ticket += 1;
         let ticket = self.send_ticket;
+        self.mark_answered_ahead(ticket, &out);
         let delay = self.undo_send_secs;
         let toast = adw::Toast::builder().priority(adw::ToastPriority::High).timeout(0).build();
         let o = crate::outgoing::Outgoing {
@@ -13455,6 +13449,81 @@ impl AppModel {
         self.push_outbox();
     }
 
+    /// Mark what a reply or forward answers as soon as it is sent, rather
+    /// than once it has gone (#454): the messages the worker will mark, as
+    /// the cache knows them. One already marked is left out, so taking the
+    /// marks off again cannot clear what another send or client set.
+    fn mark_answered_ahead(&mut self, ticket: u64, out: &OutgoingMessage) {
+        let account_id = out.from_account_id;
+        let copies = crate::worker::answered_copies(self.cache.as_ref(), account_id, &out.in_reply_to, &out.forwards);
+        let mut marked = Vec::new();
+        for (path, uid, forwarded) in copies {
+            let Some(fid) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)).map(|f| f.id)
+            else {
+                continue;
+            };
+            let (answered, was_forwarded) =
+                self.cache.as_ref().map(|c| c.answer_state(account_id, &path, uid)).unwrap_or_default();
+            if if forwarded { was_forwarded } else { answered } {
+                continue;
+            }
+            self.show_answered(account_id, fid, uid, forwarded, true);
+            marked.push((account_id, fid, uid, forwarded));
+        }
+        if !marked.is_empty() {
+            self.pending_answers.insert(ticket, marked);
+        }
+    }
+
+    /// The send was undone, or failed: its early marks come off.
+    fn unmark_answered(&mut self, ticket: u64) {
+        for (account_id, fid, uid, forwarded) in self.pending_answers.remove(&ticket).unwrap_or_default() {
+            self.show_answered(account_id, fid, uid, forwarded, false);
+        }
+    }
+
+    /// Put a replied or forwarded mark on a message, or take it off,
+    /// wherever the app holds it.
+    fn show_answered(&mut self, account_id: u32, fid: u32, uid: u32, forwarded: bool, on: bool) {
+        let same = |c: &Message| c.account_id == account_id && c.folder_id == fid && c.uid == uid;
+        let mark = |c: &mut Message| if forwarded { c.forwarded = on } else { c.answered = on };
+        let mut id = None;
+        for msgs in [self.message_cache.get_mut(&(account_id, fid)), self.unified_slices.get_mut(&(account_id, fid))]
+            .into_iter()
+            .flatten()
+        {
+            for c in msgs.iter_mut().filter(|c| same(c)) {
+                mark(c);
+                id = Some(c.id);
+            }
+        }
+        self.current_thread.iter_mut().filter(|c| same(c)).for_each(mark);
+        if let Some(cur) = self.current.as_mut().filter(|c| same(c)) {
+            mark(cur);
+        }
+        if let Some(id) = id {
+            self.message_list.emit(MessageListInput::SetAnswered { slot: (account_id, fid, id), forwarded, on });
+        }
+    }
+
+    /// [`apply_pending_seen`] for the marks of a send still on its way: a
+    /// list fetched before it went keeps them.
+    fn apply_pending_answers(&self, account_id: u32, folder_id: u32, mut messages: Vec<Message>) -> Vec<Message> {
+        for &(a, f, uid, forwarded) in self.pending_answers.values().flatten() {
+            if (a, f) != (account_id, folder_id) {
+                continue;
+            }
+            for m in messages.iter_mut().filter(|m| m.uid == uid) {
+                if forwarded {
+                    m.forwarded = true;
+                } else {
+                    m.answered = true;
+                }
+            }
+        }
+        messages
+    }
+
     /// The delay is over, or Send now was asked for: hand the message to its
     /// worker. Undo is no longer possible.
     fn dispatch_send(&mut self, ticket: u64) {
@@ -13480,6 +13549,7 @@ impl AppModel {
         };
         let Some(o) = taken else { return };
         o.toast.dismiss();
+        self.unmark_answered(ticket);
         self.push_outbox();
         self.send_morph.finish();
         self.drop_provisional(&o.message.in_reply_to);
@@ -16289,6 +16359,7 @@ impl AppModel {
                 if !from_disk.is_empty() {
                     let from_disk = self.merge_local_tags(*account_id, from_disk);
                     let from_disk = self.apply_pending_seen(*account_id, *folder_id, from_disk);
+                    let from_disk = self.apply_pending_answers(*account_id, *folder_id, from_disk);
                     let from_disk = self.apply_pending_tags(*account_id, *folder_id, from_disk);
                     self.message_cache.insert((*account_id, *folder_id), from_disk);
                 }
@@ -25819,7 +25890,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::HasAttachments { account_id, path, message_id }
         }
         WorkerEvent::Sent => AppMsg::Sent { account_id },
-        WorkerEvent::SendDone { ticket, .. } => AppMsg::SendDone { ticket },
+        WorkerEvent::SendDone { ticket, sent } => AppMsg::SendDone { ticket, sent },
         WorkerEvent::Unsent(message) => AppMsg::Unsent { account_id, message },
         WorkerEvent::Outbox { items } => AppMsg::OutboxItems { account_id, items },
         WorkerEvent::Notice(text) => AppMsg::Notice(text),

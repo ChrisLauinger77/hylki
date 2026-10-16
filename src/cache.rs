@@ -2385,6 +2385,17 @@ impl Cache {
         );
     }
 
+    /// Whether a cached row is marked replied to and forwarded (#454).
+    pub fn answer_state(&self, account_id: u32, folder_path: &str, uid: u32) -> (bool, bool) {
+        self.conn
+            .query_row(
+                "SELECT answered, forwarded FROM messages WHERE account_id = ?1 AND folder_path = ?2 AND uid = ?3",
+                params![account_id, folder_path, uid],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap_or_default()
+    }
+
     /// Add or drop a keyword on a cached row (the server copy just changed).
     pub fn set_keyword(&self, account_id: u32, folder_path: &str, uid: u32, keyword: &str, add: bool) -> bool {
         let mut current = self.keywords_of(account_id, folder_path, uid);
@@ -3183,6 +3194,8 @@ mod tests {
         c.set_answered(1, "INBOX", 2, true);
         c.set_answered(1, "INBOX", 2, false);
         assert_eq!(flags(&c), [(true, true), (true, false)]);
+        assert_eq!(c.answer_state(1, "INBOX", 2), (true, true));
+        assert_eq!(c.answer_state(1, "INBOX", 9), (false, false), "no such row");
         let (_, tagged) = c.messages_with_keyword(1, "Work", "Work").into_iter().find(|(_, m)| m.uid == 2).unwrap();
         assert!(tagged.answered && tagged.forwarded);
         // The server's word replaces it at the next sync.

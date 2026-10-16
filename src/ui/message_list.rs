@@ -1390,8 +1390,9 @@ pub enum MessageListInput {
     /// A hover-palette action for a specific message (forwarded to the app).
     RowAction { action: RowAction, message: Box<Message> },
     SetStarred { slot: (u32, u32, u32), starred: bool },
-    /// A message was replied to or forwarded (#454).
-    SetAnswered { slot: (u32, u32, u32), forwarded: bool },
+    /// A message was replied to or forwarded (#454), or the send that
+    /// marked it ahead of time failed (`on` false).
+    SetAnswered { slot: (u32, u32, u32), forwarded: bool, on: bool },
     /// A message's keywords changed (a tag put on or taken off, #71).
     /// A message's keywords and Gmail labels changed (a tag put on or
     /// taken off, #374).
@@ -3066,10 +3067,10 @@ impl SimpleComponent for MessageList {
                 self.update_message(|m| thread_slot(m) == slot, |m| m.starred = starred);
                 self.refresh_thread_head(slot);
             }
-            MessageListInput::SetAnswered { slot, forwarded } => {
+            MessageListInput::SetAnswered { slot, forwarded, on } => {
                 self.update_message(
                     |m| thread_slot(m) == slot,
-                    |m| if forwarded { m.forwarded = true } else { m.answered = true },
+                    |m| if forwarded { m.forwarded = on } else { m.answered = on },
                 );
                 self.refresh_thread_head(slot);
             }
