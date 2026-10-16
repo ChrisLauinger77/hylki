@@ -6947,6 +6947,13 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     // ahead of the email's own CSS, so a message that styles its body (a
     // full-bleed design, say) still wins.
     let body_pad = "body{margin:0;padding:20px;box-sizing:border-box;}";
+    // An image with no size of its own (a photo sent from a phone is a bare
+    // `<img>`) would otherwise lay out at its pixel width, and the frame
+    // widens to whatever its content needs, so the card ran off the pane.
+    // Capped at the card instead; a message that sizes its images keeps its
+    // own rules, which come later. No `height:auto`: that would stretch a
+    // spacer image whose `height` attribute is all that keeps it thin.
+    let image_fit = "img{max-width:100%;}";
     // The frame's own document must never scroll: WebKit latches a wheel
     // gesture to the innermost scrollable area under the pointer, and a
     // frame document that can scroll sideways (a message wider than the
@@ -6962,7 +6969,7 @@ fn inject_csp(html: &str, allow_remote: bool, dark: bool) -> String {
     let supported = if dark { "dark light" } else { "light dark" };
     let theme = format!(
         "<meta name=\"color-scheme\" content=\"{supported}\">\
-         <style>:root{{color-scheme:{scheme};}}{body_pad}\
+         <style>:root{{color-scheme:{scheme};}}{body_pad}{image_fit}\
          html{{overflow:hidden !important;}}\
          @media print{{:root{{color-scheme:light;}}html{{overflow:visible !important;}}html,body{{background:#fff !important;}}}}\
          </style>"
@@ -9152,6 +9159,20 @@ mod tests {
         assert!(doc.contains("img,table,pre{max-width:100% !important;}"));
         // Still no scripts, and blocked remote content stays blocked.
         assert!(doc.contains("Content-Security-Policy"));
+    }
+
+    #[test]
+    fn a_bare_image_is_capped_at_the_card_unless_the_message_says_otherwise() {
+        let doc = inject_csp(
+            "<html><head><style>img{max-width:none}</style></head><body><img src=\"data:image/png;base64,AA\"></body></html>",
+            false,
+            false,
+        );
+        let ours = doc.find("img{max-width:100%;}").expect("the default image cap");
+        let theirs = doc.find("img{max-width:none}").unwrap();
+        assert!(ours < theirs, "the message's own rule must come later and win: {doc}");
+        // A body with no head at all gets it too.
+        assert!(inject_csp("<img src=x>", false, true).contains("img{max-width:100%;}"));
     }
 
     #[test]

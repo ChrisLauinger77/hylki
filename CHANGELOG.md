@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fixed: a photo in a message body ran off the side of its card.** An
+  image the message gives no size to, like a photo sent from a phone, was
+  shown at its full pixel width, and the card widened to hold it. It is now
+  scaled down to the card's width. A message that sizes its own images
+  keeps its layout.
 - **Fixed: a zoomed attachment sat inside the lightbox's frame.** A click
   that zooms an image or PDF in the lightbox now hides the title bar, the
   arrows, the bottom bar and the padding around them, so the zoomed
