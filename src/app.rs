@@ -348,6 +348,7 @@ use crate::ui::compose::{
 };
 use crate::ui::message_list::{
     BulkAction, CheckFilter, MessageList, MessageListInput, MessageListOutput, QuickFilter, QuickFilters, RowAction,
+    SearchScope,
 };
 use crate::ui::attachments_gallery::{
     AttachmentsGallery, GalleryAccount, GalleryFolder, GalleryInput, GalleryOutput, GalleryRequest,
@@ -762,8 +763,12 @@ pub struct AppModel {
     /// Accounts whose sent mail has been asked for this run (#236).
     sent_index_requested: HashSet<u32>,
     /// (account_id, folder_id) → last-seen message list, shown instantly on
-    /// revisit while a fresh sync runs in the background.
+    /// revisit while a fresh sync runs in the background. Only folders
+    /// listed whole this run: a cross-folder search reads the rest from disk.
     message_cache: HashMap<(u32, u32), Vec<Message>>,
+    /// Bumped as a search starts and ends, so a pool read from disk for a
+    /// search already over is dropped (#472).
+    search_gen: u64,
     /// (account_id, folder_id) whose background backfill has fully finished, so the
     /// message list knows no more rows will stream in for them.
     indexed_folders: HashSet<(u32, u32)>,
@@ -1560,6 +1565,9 @@ pub enum AppMsg {
     /// The search field became active/inactive — supply or drop the cross-folder
     /// search pool (every folder's messages, so search can span the mailbox).
     SearchActive(bool),
+    /// The indexes of the folders not opened this run, read from disk for
+    /// the search `gen` started (#472).
+    SearchPoolLoaded { gen: u64, lists: Vec<((u32, u32), Vec<Message>)> },
     /// The message list has no selection to show (e.g. the last message was
     /// removed), so the reader should clear.
     ClearReader,
@@ -3373,6 +3381,7 @@ impl SimpleComponent for AppModel {
             unified_boot_requested: HashSet::new(),
             sent_index_requested: HashSet::new(),
             message_cache: HashMap::new(),
+            search_gen: 0,
             indexed_folders: HashSet::new(),
             body_cache: crate::ram_cache::RamCache::new(BODY_CACHE_BUDGET),
             sender_cache: HashMap::new(),
@@ -4800,6 +4809,20 @@ impl SimpleComponent for AppModel {
                 s.input(AppMsg::ShowcaseFolder { kind: FolderKind::Inbox, account });
             });
         }
+        // HYLKI_SHOWCASE_LIST_SEARCH=<text>[:<scope>][@<seconds>] searches
+        // the list at 4 s or the time given, the scope by its place in the
+        // dropdown, real accounts included (#472).
+        if let Ok(spec) = std::env::var("HYLKI_SHOWCASE_LIST_SEARCH") {
+            let (spec, at) = showcase_at(&spec, 4);
+            let (text, scope) = match spec.rsplit_once(':') {
+                Some((t, s)) => (t.to_string(), s.parse().unwrap_or(0)),
+                None => (spec.to_string(), 0),
+            };
+            let list = model.message_list.sender().clone();
+            gtk::glib::timeout_add_seconds_local_once(at, move || {
+                let _ = list.send(MessageListInput::ShowcaseSearch(text, scope));
+            });
+        }
         // HYLKI_SHOWCASE_NOTIFY[=<seconds>[,<seconds>...]] posts the new-mail
         // notification at 5 s or at each time given (the same second twice
         // exercises the sound's hold-off), real accounts included.
@@ -4860,18 +4883,6 @@ impl SimpleComponent for AppModel {
                     gtk::glib::timeout_add_seconds_local_once(3, move || {
                         let _ = list.send(MessageListInput::MoveSelection(1));
                     });
-                    // HYLKI_SHOWCASE_LIST_SEARCH=<text>[:<scope>] searches the
-                    // list at 4s, the scope by its place in the dropdown.
-                    if let Ok(spec) = std::env::var("HYLKI_SHOWCASE_LIST_SEARCH") {
-                        let (text, scope) = match spec.rsplit_once(':') {
-                            Some((t, s)) => (t.to_string(), s.parse().unwrap_or(0)),
-                            None => (spec, 0),
-                        };
-                        let list = model.message_list.sender().clone();
-                        gtk::glib::timeout_add_seconds_local_once(4, move || {
-                            let _ = list.send(MessageListInput::ShowcaseSearch(text, scope));
-                        });
-                    }
                     // HYLKI_SHOWCASE_PALETTE=N opens row N's actions palette
                     // (so a capture can verify the floating palette's look).
                     if let Some(Ok(idx)) =
@@ -5861,6 +5872,7 @@ impl SimpleComponent for AppModel {
                 self.sync_attachment_drawer();
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
                 self.message_list.emit(MessageListInput::SetColorize(self.accounts.len() > 1));
                 self.show_message(None, false);
                 self.push_outbox();
@@ -6701,6 +6713,22 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::SearchPoolLoaded { gen, lists } => {
+                if gen != self.search_gen {
+                    return;
+                }
+                let lists = lists
+                    .into_iter()
+                    .map(|((account_id, folder_id), messages)| {
+                        let messages = self.merge_local_tags(account_id, messages);
+                        let messages = self.drop_pending_moves(account_id, folder_id, messages);
+                        let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                        self.apply_pending_tags(account_id, folder_id, messages)
+                    })
+                    .collect();
+                let pool = self.search_pool(lists);
+                self.message_list.emit(MessageListInput::SetSearchPool(pool, self.pool_folders()));
+            }
             AppMsg::OpenedByKey { already_open } => {
                 if already_open {
                     self.message_view.emit(MessageViewInput::FocusBody);
@@ -6718,13 +6746,16 @@ impl SimpleComponent for AppModel {
                 self.show_message(None, false);
             }
             AppMsg::SearchActive(active) => {
+                self.search_gen += 1;
                 if active {
                     // Snapshot every folder's indexed messages so the search can
-                    // span the whole mailbox.
+                    // span the whole mailbox: the folders opened this run at
+                    // once, the rest when the disk has answered.
                     self.message_list.emit(MessageListInput::SetSearchPool(
-                        build_search_pool(&self.message_cache),
+                        self.search_pool(Vec::new()),
                         self.pool_folders(),
                     ));
+                    self.load_search_pool(&sender);
                     // Results span accounts; tint rows by account (as in the unified
                     // inbox) so their origin is legible.
                     if self.accounts.len() > 1 {
@@ -10108,6 +10139,7 @@ impl SimpleComponent for AppModel {
                 self.show_message(None, false);
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 self.message_list.emit(MessageListInput::SetShowRecipient(false));
                 self.message_list.emit(MessageListInput::SetRestorable(false));
@@ -10141,6 +10173,7 @@ impl SimpleComponent for AppModel {
                 self.show_message(None, false);
                 self.message_list.emit(MessageListInput::SetSelected(None));
                 self.message_list.emit(MessageListInput::ResetPaging);
+                self.message_list.emit(MessageListInput::SetScope(SearchScope::ThisFolder));
                 self.message_list.emit(MessageListInput::SetColorize(true));
                 // A folder held to Sent lists what you sent: name the
                 // recipients, as Sent does.
@@ -11482,7 +11515,13 @@ impl SimpleComponent for AppModel {
                 let messages = self.merge_local_tags(account_id, messages);
                 let messages = self.drop_pending_moves(account_id, folder_id, messages);
                 let messages = self.apply_blacklist(account_id, folder_id, messages);
-                let entry = self.message_cache.entry((account_id, folder_id)).or_default();
+                // Only onto a folder listed whole already. An entry started
+                // here would hold just the newest arrivals, and a search or
+                // a unified view would take it for the folder (#472); one
+                // not open has its rows on disk, where the worker put them.
+                let Some(entry) = self.message_cache.get_mut(&(account_id, folder_id)) else {
+                    return;
+                };
                 let existing: std::collections::HashSet<u32> =
                     entry.iter().map(|m| m.uid).collect();
                 let fresh: Vec<Message> = messages
@@ -15799,6 +15838,7 @@ impl AppModel {
         self.show_message(None, false);
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
+        self.message_list.emit(MessageListInput::SetScope(default_scope(view == UnifiedView::Kind(FolderKind::Inbox))));
         self.message_list.emit(MessageListInput::SetColorize(true));
         // A Sent view's rows all come from you — name the recipients.
         self.message_list.emit(MessageListInput::SetShowRecipient(
@@ -16173,6 +16213,9 @@ impl AppModel {
         self.attachments_loading = false;
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
+        self.message_list.emit(MessageListInput::SetScope(default_scope(
+            self.folder_kind(account_id, folder_id) == Some(FolderKind::Inbox),
+        )));
         self.message_list.emit(MessageListInput::SetColorize(false));
         // A Sent folder's rows all come from you — name the recipients (#27).
         let is_sent = self
@@ -16754,6 +16797,57 @@ impl AppModel {
     /// Whether the given folder is the account's Drafts folder.
     fn is_drafts_folder(&self, account_id: u32, folder_id: u32) -> bool {
         self.folder_kind(account_id, folder_id) == Some(FolderKind::Drafts)
+    }
+
+    /// The cross-folder search pool: the folders opened this run as they
+    /// are now, and `from_disk` for the rest.
+    fn search_pool(&self, from_disk: Vec<Vec<Message>>) -> Vec<Message> {
+        let kinds: HashMap<(u32, u32), FolderKind> = self
+            .folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| ((*aid, f.id), f.kind)))
+            .collect();
+        build_search_pool(self.message_cache.values().chain(from_disk.iter()), |m| {
+            pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
+        })
+    }
+
+    /// Read the folders not opened this run from the disk cache, where the
+    /// background index keeps every folder whole, and hand them to the
+    /// search with [`AppMsg::SearchPoolLoaded`] (#472). Gmail's All Mail is
+    /// the one archived mail lives in, and it is rarely opened.
+    fn load_search_pool(&self, sender: &ComponentSender<Self>) {
+        if self.cache.is_none() {
+            return;
+        }
+        let unopened: Vec<(u32, u32, String)> = self
+            .folders
+            .iter()
+            .flat_map(|(aid, fs)| fs.iter().map(move |f| (*aid, f)))
+            .filter(|(aid, f)| !self.message_cache.contains_key(&(*aid, f.id)))
+            .map(|(aid, f)| (aid, f.id, f.path.clone()))
+            .collect();
+        if unopened.is_empty() {
+            return;
+        }
+        let gen = self.search_gen;
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let Ok(cache) = crate::cache::Cache::open() else { return };
+            let t = std::time::Instant::now();
+            let lists: Vec<((u32, u32), Vec<Message>)> = unopened
+                .into_iter()
+                .map(|(aid, fid, path)| ((aid, fid), cache.load_messages(aid, &path, fid)))
+                .filter(|(_, ms)| !ms.is_empty())
+                .collect();
+            tracing::debug!(
+                "search: {} messages in {} unopened folders read in {:?}",
+                lists.iter().map(|(_, ms)| ms.len()).sum::<usize>(),
+                lists.len(),
+                t.elapsed()
+            );
+            s.input(AppMsg::SearchPoolLoaded { gen, lists });
+        });
     }
 
     /// Every folder as a search across folders shows its results (#374):
@@ -26132,10 +26226,56 @@ fn kind_label(kind: FolderKind) -> String {
 }
 
 /// Flatten every folder's indexed messages into one pool for cross-folder search.
-/// The map is keyed by `(account_id, folder_id)`, so a flat concatenation already
-/// spans every folder of every account with no duplicates.
-fn build_search_pool(cache: &HashMap<(u32, u32), Vec<Message>>) -> Vec<Message> {
-    cache.values().flatten().cloned().collect()
+///
+/// Gmail files one message under every label it carries, so an archived mail
+/// sits in All Mail and its labels, and an inbox one in INBOX and All Mail
+/// too (#472). Each mail is kept once, from the folder `rank` puts first.
+fn build_search_pool<'a>(lists: impl IntoIterator<Item = &'a Vec<Message>>, rank: impl Fn(&Message) -> u8) -> Vec<Message> {
+    let mut out: Vec<Message> = Vec::new();
+    let mut copies: HashMap<(u32, &str), Vec<usize>> = HashMap::new();
+    for m in lists.into_iter().flatten() {
+        if m.message_id.is_empty() {
+            out.push(m.clone());
+            continue;
+        }
+        let slots = copies.entry((m.account_id, m.message_id.as_str())).or_default();
+        match slots.iter().copied().find(|&i| same_mail(&out[i], m)) {
+            Some(i) => {
+                if rank(m) < rank(&out[i]) {
+                    out[i] = m.clone();
+                }
+            }
+            None => {
+                slots.push(out.len());
+                out.push(m.clone());
+            }
+        }
+    }
+    out
+}
+
+/// Where a search starts in a view just opened (#472): across the mailbox
+/// from an Inbox, and in the folder or view itself from anywhere else, as a
+/// search of Trash or Junk most often means.
+fn default_scope(inbox: bool) -> SearchScope {
+    if inbox {
+        SearchScope::AllFolders
+    } else {
+        SearchScope::ThisFolder
+    }
+}
+
+/// Which copy of a mail filed in several folders a search shows, lowest
+/// first: the inbox's, then a folder of its own, then the folders that
+/// gather everything (Gmail's All Mail and Starred), and Trash and Junk last,
+/// which "All folders" leaves out.
+fn pool_rank(kind: Option<FolderKind>) -> u8 {
+    match kind {
+        Some(FolderKind::Inbox) => 0,
+        Some(FolderKind::Archive | FolderKind::Starred) => 2,
+        Some(FolderKind::Trash | FolderKind::Junk) => 3,
+        _ => 1,
+    }
 }
 
 /// A conversation member still waiting for its body:
@@ -27179,7 +27319,7 @@ mod tests {
         cache.insert((1, 11), vec![msg(1, 11, 3)]); // acct 1, archive
         cache.insert((2, 20), vec![msg(2, 20, 4), msg(2, 20, 5)]); // acct 2, inbox
 
-        let pool = build_search_pool(&cache);
+        let pool = build_search_pool(cache.values(), |_| 0);
         assert_eq!(pool.len(), 5, "pool must include every folder's messages");
 
         let folders: std::collections::HashSet<(u32, u32)> =
@@ -27189,7 +27329,38 @@ mod tests {
 
     #[test]
     fn search_pool_is_empty_when_nothing_indexed() {
-        assert!(build_search_pool(&HashMap::new()).is_empty());
+        assert!(build_search_pool(HashMap::<(u32, u32), Vec<Message>>::new().values(), |_| 0).is_empty());
+    }
+
+    /// Gmail's label copies of one mail are one result, from the folder that
+    /// says most about it (#472).
+    #[test]
+    fn search_pool_keeps_one_copy_of_a_labelled_mail() {
+        let copy = |folder_id: u32, uid: u32, mid: &str| {
+            let mut m = msg(1, folder_id, uid);
+            m.message_id = mid.into();
+            m.from_addr = "ada@x".into();
+            m.timestamp = 500;
+            m
+        };
+        // INBOX = 1, All Mail = 2, a label = 3.
+        let inbox = vec![copy(1, 10, "in@x")];
+        let all_mail = vec![copy(2, 20, "in@x"), copy(2, 21, "archived@x"), copy(2, 22, "only@x")];
+        let label = vec![copy(3, 30, "archived@x")];
+        let rank = |m: &Message| match m.folder_id {
+            1 => pool_rank(Some(FolderKind::Inbox)),
+            2 => pool_rank(Some(FolderKind::Archive)),
+            _ => pool_rank(Some(FolderKind::Custom)),
+        };
+        let mut pool = build_search_pool([&all_mail, &label, &inbox], rank);
+        pool.sort_by_key(|m| m.uid);
+        let kept: Vec<(u32, u32)> = pool.iter().map(|m| (m.folder_id, m.uid)).collect();
+        assert_eq!(kept, vec![(1, 10), (2, 22), (3, 30)]);
+
+        // The same Message-ID from someone else is another mail.
+        let mut other = copy(3, 31, "only@x");
+        other.from_addr = "spam@x".into();
+        assert_eq!(build_search_pool([&all_mail, &vec![other]], rank).len(), 4);
     }
 
     /// The credits metafiles are read at build time and shown in About, so a

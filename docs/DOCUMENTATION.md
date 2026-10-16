@@ -1288,10 +1288,16 @@ It is off unless switched on.
 
 The button beside the search field sets where a search looks, and the info
 button beside each choice in its popover says what that choice searches.
-**All folders (except trash & junk)**, the default, searches every folder of
-every account except Trash and Junk, unless the list is showing one of them. **Everywhere** takes in Trash and
-Junk too, and **This folder** only the folder on screen. In the first two,
-each result wears a pill with the name of the folder it is in.
+**All folders (except trash & junk)** searches every folder of every account
+except Trash and Junk, unless the list is showing one of them. **Everywhere**
+takes in Trash and Junk too, and **This folder** only the folder on screen.
+A search started in an Inbox, or in All Inboxes, looks in all folders; one
+started anywhere else looks in that folder, and the button changes it for as
+long as the folder is open. In all folders and everywhere, each result wears
+a pill with the name of the folder it is in, and a Gmail message filed under
+several labels is one result: its Inbox copy, else a label's, else All
+Mail's. Folders not opened since Hylki started are searched from the index
+Hylki keeps of them, which covers mail archived to Gmail's All Mail.
 
 The sort and filter button in the list's header opens a popover of two
 columns. **Sort by** orders the list by date, newest or oldest first, by

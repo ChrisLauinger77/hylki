@@ -1506,8 +1506,9 @@ pub enum MessageListOutput {
     /// How many rows Gmail's x has checked (#392), whenever that changes;
     /// `None` once checking ends.
     Checked(Option<usize>),
-    /// The search field became active (non-empty) or inactive (empty), so the app
-    /// can supply or drop the cross-folder search pool.
+    /// A search across folders began or ended (a query in the field and a
+    /// scope wider than this folder), so the app can supply or drop the
+    /// cross-folder search pool.
     SearchActive(bool),
     /// A column heading changed the sort (#334), by its key: the sort
     /// menus follow.
@@ -2379,9 +2380,9 @@ impl SimpleComponent for MessageList {
                 self.sync_look();
             }
             MessageListInput::Search(q) => {
-                let was_active = self.searching();
+                let was_active = self.wants_pool();
                 self.query = q;
-                let now_active = self.searching();
+                let now_active = self.wants_pool();
                 // On the empty↔non-empty edge, tell the app to supply or drop the
                 // cross-folder pool.
                 if was_active != now_active {
@@ -2395,7 +2396,13 @@ impl SimpleComponent for MessageList {
                     picker.sync(scope);
                 }
                 if self.scope != scope {
+                    let was_active = self.wants_pool();
                     self.scope = scope;
+                    // "This folder" has no use for the pool, which can run to
+                    // every message of every account (#472).
+                    if was_active != self.wants_pool() {
+                        let _ = sender.output(MessageListOutput::SearchActive(!was_active));
+                    }
                     // Scope only affects the view while a query is present.
                     if self.searching() {
                         self.sync_look();
@@ -4358,8 +4365,13 @@ impl MessageList {
         true
     }
 
+    /// Whether the search reaches past this folder, and so wants the pool.
+    fn wants_pool(&self) -> bool {
+        self.searching() && self.scope != SearchScope::ThisFolder
+    }
+
     fn searching_pool(&self) -> bool {
-        self.searching() && self.scope != SearchScope::ThisFolder && !self.search_pool.is_empty()
+        self.wants_pool() && !self.search_pool.is_empty()
     }
 
     /// The conversations of `active_source`, from the kept copy while the
@@ -4391,7 +4403,7 @@ impl MessageList {
         // The entry's own change arrives with the query already empty, too
         // late to see the search end: the cross-folder pool and the account
         // tint were left behind.
-        if self.searching() {
+        if self.wants_pool() {
             let _ = sender.output(MessageListOutput::SearchActive(false));
         }
         self.query.clear();
@@ -4612,6 +4624,9 @@ impl MessageList {
         let passes = self.filter();
         let source_len = self.active_source().len();
         let mut matches: Vec<Rc<Message>> = self.active_source().iter().filter(|m| passes(m)).cloned().collect();
+        if self.searching() {
+            tracing::debug!("list: search matched {} of {} messages ({:?})", matches.len(), source_len, self.scope);
+        }
         let mut filtered = matches.len() != source_len;
         // A large list's conversations are worked out on a background
         // thread (`threads_pending`). Until they are in, its newest messages

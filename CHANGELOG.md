@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Fixed: a search of all folders missed mail in folders not yet opened**
+  (#472). Only the folders opened since Hylki started were searched, so mail
+  archived in Gmail, which lives in All Mail alone, was never found. Every
+  folder is now searched from Hylki's index of it, and a Gmail message filed
+  under several labels shows up once.
+- **A search outside the Inbox starts in that folder** (#472). Searching in
+  Sent, Trash, Junk or any other folder or view looks there unless the
+  scope button says otherwise; a search from an Inbox still looks in all
+  folders.
 - **The composer zooms in Markdown, HTML and plain text.** Ctrl+ and Ctrl-
   scale the text of the body and its preview, Ctrl+0 puts it back to 100%,
   and the next composer opens at the same size until Hylki is next started.
