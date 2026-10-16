@@ -1312,6 +1312,17 @@ msgstr "Όνομα (Ω έως Α)"
 msgid "Full Path"
 msgstr "Πλήρης διαδρομή"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "Εμφάνιση του πρωτοτύπου."
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "Εμφάνιση του πρωτοτύπου."
+
 msgid "Sender"
 msgstr "Αποστολέας"
 
@@ -2295,12 +2306,17 @@ msgstr "Απεσταλμένα"
 msgid "Save a copy of sent mail in"
 msgstr "Αποθήκευση αντιγράφου των απεσταλμένων στο"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Αποθήκευση αντιγράφου των απεσταλμένων στο"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "Ο διακομιστής αποθηκεύει δικό του αντίγραφο των απεσταλμένων"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "Για το Gmail και άλλες υπηρεσίες που αρχειοθετούν μόνες τους τα απεσταλμένα. "
 "Απενεργοποιεί την παραπάνω αποθήκευση αντιγράφου."

@@ -1296,6 +1296,17 @@ msgstr "Nom (Z a A)"
 msgid "Full Path"
 msgstr "Camí complet"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "S'està mostrant l'original."
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "S'està mostrant l'original."
+
 msgid "Sender"
 msgstr "Remitent"
 
@@ -2266,12 +2277,17 @@ msgstr "Enviats"
 msgid "Save a copy of sent mail in"
 msgstr "Desa una còpia del correu enviat a"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Desa una còpia del correu enviat a"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "El servidor desa la seva pròpia còpia del correu enviat"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "Per al Gmail i altres que arxiven ells mateixos el correu enviat. Desactiva "
 "l'opció «Desa una còpia» de dalt."

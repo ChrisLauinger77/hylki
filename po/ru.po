@@ -1379,6 +1379,17 @@ msgstr "По имени (Я–А)"
 msgid "Full Path"
 msgstr "Полный путь"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "Отображается оригинал."
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "Отображается оригинал."
+
 msgid "Sender"
 msgstr "Отправитель"
 
@@ -2348,12 +2359,17 @@ msgstr "Отправленные"
 msgid "Save a copy of sent mail in"
 msgstr "Сохранять копию отправленных писем в"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Сохранять копию отправленных писем в"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "Сервер сам сохраняет копию отправленных писем"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "Для Gmail и других сервисов, сохраняющих отправленные письма автоматически. "
 "Отключает параметр «Сохранять копию» выше."

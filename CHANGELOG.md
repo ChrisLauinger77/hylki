@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added: replies filed beside the message they answer** (#468,
+  requested by flortsch). New setting **Mail Accounts → Edit →
+  Special Folders → Save a copy of replies in**: with sent mail (the
+  default), the folder of the original, or the folder of the original
+  but not the Inbox. The folder is the one the original is in when the reply
+  is sent; a reply to mail in Sent, Drafts, Templates, Trash or Junk, to
+  mail no longer in the account or from another account, or one the folder
+  will not take, goes with sent mail. IMAP and JMAP accounts.
+
 - **Undo Send** (#434). A sent message waits five seconds before it goes,
   with Undo in a notice at the foot of the window; Undo brings it back to
   the composer it was written in, a split reply beside its conversation.

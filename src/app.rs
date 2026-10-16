@@ -18559,8 +18559,8 @@ impl AppModel {
             .as_deref()
             .and_then(|a| worker::parse_recipients(a).into_iter().next())
             .unwrap_or_else(|| (account.name.clone(), account.email.clone()));
-        let folder_id = self
-            .sent_copy_path(account_id)
+        let folder_id = worker::reply_copy_path(account, account_id, self.cache.as_ref(), &out.in_reply_to)
+            .or_else(|| self.sent_copy_path(account_id))
             .and_then(|p| self.folders.get(&account_id)?.iter().find(|f| f.path == p).map(|f| f.id))
             .or_else(|| self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.id))
             .or_else(|| self.current.as_ref().map(|m| m.folder_id))?;
@@ -22500,8 +22500,13 @@ impl AppModel {
         // subject or a recipient would otherwise pick up your own reply and
         // move it away from the thread it was filed beside. The Sent folder is
         // the exception: everything in it is your own mail, so running rules
-        // over it (#198) plainly means to act on exactly that.
-        let diverted = self.sent_copy_path(account_id).as_deref() == src.as_deref()
+        // over it (#198) plainly means to act on exactly that. Replies filed
+        // beside what they answer (#468) can be in any folder.
+        let files_replies = self
+            .effective_config()
+            .get(account_id.saturating_sub(1) as usize)
+            .is_some_and(|c| c.reply_copies != crate::config::ReplyCopies::WithSent && !c.server_saves_sent);
+        let diverted = (files_replies || self.sent_copy_path(account_id).as_deref() == src.as_deref())
             && self.folder_of_kind(account_id, FolderKind::Sent).map(|f| f.path.as_str())
                 != src.as_deref();
         let own: Vec<String> = if diverted {
@@ -24742,6 +24747,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         folders_seeded: false,
         sent_copy_path: None,
         server_saves_sent: false,
+        reply_copies: Default::default(),
         empty_junk_days: 0,
         empty_trash_days: 0,
         clean_lists_days: 0,

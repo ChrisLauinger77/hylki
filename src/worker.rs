@@ -24,7 +24,7 @@ use tokio::sync::mpsc;
 
 use crate::backend::{MailBackend, MockBackend};
 use crate::cache::Cache;
-use crate::config::AccountConfig;
+use crate::config::{AccountConfig, ReplyCopies};
 use crate::models::{Account, Folder, FolderKind, KeywordFinding, MailboxQuota, Message, ThreadSummary};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
@@ -2767,19 +2767,21 @@ async fn run_imap(
                 match send_smtp(&account, &message).await {
                     Ok(raw) => {
                         emit(WorkerEvent::Status(String::new()));
-                        // Save a copy to the Sent folder; sending still counts as
-                        // success even if this part fails.
-                        if let Some(path) = sent_path {
-                            let sess = session.as_mut().unwrap();
-                            if let Err(e) = append_to_sent(sess, &path, &raw).await {
-                                emit(WorkerEvent::error(i18n_f("Message sent, but saving to Sent failed: {e}", &[("e", &(e).to_string())])));
-                            } else {
+                        // Save a copy to the Sent folder, or beside the
+                        // original for a reply (#468); sending still counts
+                        // as success even if this part fails.
+                        let reply = reply_copy_path(&account, account_id, cache.as_ref(), &message.in_reply_to);
+                        let sess = session.as_mut().unwrap();
+                        match file_sent_copy(sess, reply.as_deref(), sent_path.as_deref(), &raw).await {
+                            Ok(Some(path)) => {
                                 index_sent_copy(
                                     account_id, &mut session, &account, &path,
                                     &mut use_envelope, cache.as_ref(), &emit,
                                 )
                                 .await;
                             }
+                            Ok(None) => {}
+                            Err(e) => emit(WorkerEvent::error(i18n_f("Message sent, but saving to Sent failed: {e}", &[("e", &(e).to_string())]))),
                         }
                         // If sending an edited draft (from this account), remove the
                         // now-obsolete draft and refresh the Drafts folder.
@@ -4365,6 +4367,93 @@ fn pick_queued_sent_copy(
         })
 }
 
+/// Where the copy of a reply is filed when the account keeps replies
+/// beside what they answer (#468): the folder its original is in now,
+/// found by Message-ID in the cache, so a message moved or deleted while
+/// the reply was written is followed or let go. `None` files it with the
+/// rest of sent mail: the setting is off, this is no reply, or the original
+/// is in no folder of this account's that a reply belongs in.
+pub(crate) fn reply_copy_path(
+    account: &AccountConfig,
+    account_id: u32,
+    cache: Option<&Cache>,
+    in_reply_to: &str,
+) -> Option<String> {
+    // A server that files its own copy files it in Sent, and a second
+    // copy beside the original would be one more than the user asked for.
+    if account.reply_copies == ReplyCopies::WithSent || account.server_saves_sent {
+        return None;
+    }
+    let cache = cache?;
+    let id = in_reply_to
+        .split_whitespace()
+        .next()?
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .to_ascii_lowercase();
+    if id.is_empty() {
+        return None;
+    }
+    let holding: Vec<String> = cache
+        .locate_by_message_id(&id)
+        .into_iter()
+        .filter(|(a, _, _)| *a == account_id)
+        .map(|(_, path, _)| path)
+        .collect();
+    pick_reply_folder(account.reply_copies, &cache.load_folders(account_id), &holding)
+}
+
+/// [`reply_copy_path`] once it is known which folders hold the original.
+fn pick_reply_folder(choice: ReplyCopies, folders: &[Folder], holding: &[String]) -> Option<String> {
+    holding
+        .iter()
+        // A folder no longer listed was deleted, or hidden and so unsynced.
+        .filter_map(|p| folders.iter().find(|f| f.path == *p))
+        .filter_map(|f| match f.kind {
+            FolderKind::Custom => Some((0, f)),
+            FolderKind::Archive => Some((1, f)),
+            FolderKind::Inbox if choice != ReplyCopies::OriginalNotInbox => Some((2, f)),
+            // Sent takes it anyway; Drafts and Templates hold mail not yet
+            // sent, Trash and Junk mail on its way out, and Starred is a
+            // view of other folders.
+            _ => None,
+        })
+        // Gmail lists one message under each of its labels and All Mail:
+        // the label the user filed it under is where the reply belongs.
+        .min_by_key(|(rank, _)| *rank)
+        .map(|(_, f)| f.path.clone())
+}
+
+/// The In-Reply-To of a message queued as raw bytes, for
+/// [`reply_copy_path`].
+pub(crate) fn raw_in_reply_to(raw: &[u8]) -> String {
+    let parsed = mail_parser::MessageParser::default().parse_headers(raw);
+    match parsed.as_ref().map(|p| p.in_reply_to()) {
+        Some(mail_parser::HeaderValue::Text(t)) => t.to_string(),
+        Some(mail_parser::HeaderValue::TextList(v)) => v.first().map(|t| t.to_string()).unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+/// File a sent copy: beside the original when `reply` names a folder, and
+/// in `sent` when there is none or that folder will not take it (one the
+/// user may only read). The folder that took it, or why none did.
+async fn file_sent_copy(
+    session: &mut ImapSession,
+    reply: Option<&str>,
+    sent: Option<&str>,
+    raw: &[u8],
+) -> Result<Option<String>, async_imap::error::Error> {
+    if let Some(path) = reply {
+        match append_to_sent(session, path, raw).await {
+            Ok(()) => return Ok(Some(path.to_string())),
+            Err(e) => tracing::warn!("could not file the reply's copy in {path}, using Sent: {e}"),
+        }
+    }
+    let Some(path) = sent else { return Ok(None) };
+    append_to_sent(session, path, raw).await.map(|()| Some(path.to_string()))
+}
+
 async fn flush_outbox(
     cache: Option<&Cache>,
     account_id: u32,
@@ -4417,14 +4506,17 @@ async fn flush_outbox(
                     Some(cache),
                     item.sent_path.as_deref(),
                 );
-                if let (Some(path), Some(sess)) = (dest.as_deref(), session.as_mut()) {
-                    if let Err(e) = append_to_sent(sess, path, &item.raw).await {
-                        tracing::warn!("outbox: sent, but saving the copy failed: {e}");
-                    } else {
-                        index_sent_copy(
-                            account_id, session, account, path, use_envelope, Some(cache), emit,
-                        )
-                        .await;
+                let reply = reply_copy_path(account, account_id, Some(cache), &raw_in_reply_to(&item.raw));
+                if let Some(sess) = session.as_mut() {
+                    match file_sent_copy(sess, reply.as_deref(), dest.as_deref(), &item.raw).await {
+                        Ok(Some(path)) => {
+                            index_sent_copy(
+                                account_id, session, account, &path, use_envelope, Some(cache), emit,
+                            )
+                            .await;
+                        }
+                        Ok(None) => {}
+                        Err(e) => tracing::warn!("outbox: sent, but saving the copy failed: {e}"),
                     }
                 }
             }
@@ -11213,6 +11305,7 @@ pub(super) fn sample_account() -> AccountConfig {
         folders_seeded: false,
         sent_copy_path: None,
         server_saves_sent: false,
+        reply_copies: Default::default(),
         empty_junk_days: 0,
         empty_trash_days: 0,
         clean_lists_days: 0,
@@ -11584,6 +11677,95 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             println!("template {uid}: flags {flags:?}");
             assert!(flags.iter().any(|f| f == "Seen"), "{flags:?}");
             assert!(!flags.iter().any(|f| f == "Draft"), "{flags:?}");
+            let _ = sess.close().await;
+            delete_box(&mut sess, &folder).await.expect("clean up");
+        });
+    }
+
+    /// #468 against a real server, with `IMAP_LIVE=host,port,user,password`
+    /// and `SMTP_LIVE=host,port` (implicit TLS): a reply goes out, and its
+    /// copy is filed in the folder of the message it answers, or in Sent when
+    /// that folder will not take it.
+    #[test]
+    #[ignore]
+    fn live_reply_is_filed_beside_its_original() {
+        let (Ok(spec), Ok(smtp)) = (std::env::var("IMAP_LIVE"), std::env::var("SMTP_LIVE")) else { return };
+        let p: Vec<&str> = spec.splitn(4, ',').collect();
+        let (smtp_host, smtp_port) = smtp.split_once(',').expect("host,port");
+        let account = AccountConfig {
+            email: p[2].into(),
+            imap_host: p[0].into(),
+            imap_port: p[1].parse().expect("port"),
+            smtp_host: smtp_host.into(),
+            smtp_port: smtp_port.parse().expect("port"),
+            username: p[2].into(),
+            password: p[3].into(),
+            security: Some(crate::config::ServerSecurity {
+                imap_starttls: false,
+                smtp_starttls: false,
+                imap_accept_invalid_certs: true,
+                smtp_accept_invalid_certs: true,
+                ..Default::default()
+            }),
+            reply_copies: crate::config::ReplyCopies::Original,
+            ..sample_account()
+        };
+        let pid = std::process::id();
+        let folder = format!("Project-{pid}");
+        let parent = format!("hylki-468-{pid}@example.test");
+        let original = format!(
+            "From: Ada <ada@example.test>\r\nTo: {}\r\nSubject: Plans {pid}\r\nMessage-ID: <{parent}>\r\n\
+             Date: Fri, 16 Oct 2026 10:00:00 +0000\r\n\r\nShall we plan?\r\n",
+            account.email
+        );
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(async {
+            let cache = Cache::in_memory().unwrap();
+            let mut sess = connect(&account).await.expect("connect");
+            create_box(&mut sess, &folder).await.expect("create");
+            append_to_sent(&mut sess, &folder, original.as_bytes()).await.expect("original filed");
+            let folders = list_folders(1, &mut sess, &account.folder_roles, &account.hidden_folders).await.expect("list");
+            cache.save_folders(1, &folders);
+            let folder_id = folders.iter().find(|f| f.path == folder).expect("listed").id;
+            let sent = folders.iter().find(|f| f.kind == FolderKind::Sent).expect("a Sent folder").path.clone();
+            let listed = load_messages(1, &mut sess, folder_id, &folder, true, Some(&cache)).await.expect("load");
+            cache.upsert_messages(1, &folder, &listed);
+
+            let reply = OutgoingMessage {
+                to: account.email.clone(),
+                subject: format!("Re: Plans {pid}"),
+                body: "Yes.".into(),
+                in_reply_to: parent.to_ascii_uppercase(),
+                references: parent.clone(),
+                ..sample_outgoing()
+            };
+            let raw = send_smtp(&account, &reply).await.expect("sent");
+            let dest = super::reply_copy_path(&account, 1, Some(&cache), &reply.in_reply_to);
+            assert_eq!(dest.as_deref(), Some(folder.as_str()));
+            let took = file_sent_copy(&mut sess, dest.as_deref(), Some(&sent), &raw).await.expect("filed");
+            assert_eq!(took.as_deref(), Some(folder.as_str()));
+            let after = load_messages(1, &mut sess, folder_id, &folder, true, None).await.expect("load");
+            let copy = after.iter().find(|m| m.subject == reply.subject).expect("the copy is beside its original");
+            assert!(copy.references.contains(&parent), "{:?}", copy.references);
+            println!("{folder}: {:?}", after.iter().map(|m| &m.subject).collect::<Vec<_>>());
+
+            // A folder gone from the server since: Sent takes it.
+            let gone = format!("Gone-{pid}");
+            let took = file_sent_copy(&mut sess, Some(&gone), Some(&sent), &raw).await.expect("filed");
+            assert_eq!(took.as_deref(), Some(sent.as_str()));
+            let sent_id = folders.iter().find(|f| f.path == sent).unwrap().id;
+            let in_sent = load_messages(1, &mut sess, sent_id, &sent, true, None).await.expect("load");
+            let fallback = in_sent.iter().find(|m| m.subject == reply.subject).expect("the copy went to Sent");
+            delete_draft(&mut sess, &sent, fallback.uid).await.expect("clean up Sent");
+            // The reply went to the account itself: take it out of the Inbox.
+            for _ in 0..10 {
+                let inbox = load_messages(1, &mut sess, 1, "INBOX", true, None).await.expect("load");
+                if let Some(m) = inbox.iter().find(|m| m.subject == reply.subject) {
+                    delete_draft(&mut sess, "INBOX", m.uid).await.expect("clean up the Inbox");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
             let _ = sess.close().await;
             delete_box(&mut sess, &folder).await.expect("clean up");
         });
@@ -12498,6 +12680,97 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         };
         assert_eq!(super::pick_queued_sent_copy(&server_saves, &folders, Some("Sent")), None);
         assert_eq!(super::pick_queued_sent_copy(&server_saves, &[], Some("Sent")), None);
+    }
+
+    #[test]
+    fn a_reply_is_filed_beside_the_message_it_answers() {
+        use crate::config::ReplyCopies;
+        let folder = |id: u32, path: &str, kind: FolderKind| Folder {
+            id,
+            account_id: 1,
+            name: path.to_string(),
+            path: path.to_string(),
+            kind,
+            unread: 0,
+        };
+        let folders = vec![
+            folder(1, "INBOX", FolderKind::Inbox),
+            folder(2, "Sent", FolderKind::Sent),
+            folder(3, "Projects/Hylki", FolderKind::Custom),
+            folder(4, "[Gmail]/All Mail", FolderKind::Archive),
+            folder(5, "Trash", FolderKind::Trash),
+        ];
+        let held = |paths: &[&str]| paths.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+        let pick = |choice, paths: &[&str]| super::pick_reply_folder(choice, &folders, &held(paths));
+        assert_eq!(pick(ReplyCopies::Original, &["Projects/Hylki"]).as_deref(), Some("Projects/Hylki"));
+        assert_eq!(pick(ReplyCopies::Original, &["INBOX"]).as_deref(), Some("INBOX"));
+        assert_eq!(pick(ReplyCopies::OriginalNotInbox, &["INBOX"]), None);
+        // Gmail's copies under a label, All Mail and the Inbox: the label.
+        assert_eq!(
+            pick(ReplyCopies::OriginalNotInbox, &["INBOX", "[Gmail]/All Mail", "Projects/Hylki"]).as_deref(),
+            Some("Projects/Hylki"),
+        );
+        assert_eq!(pick(ReplyCopies::Original, &["INBOX", "[Gmail]/All Mail"]).as_deref(), Some("[Gmail]/All Mail"));
+        // Binned, already in Sent, or in a folder deleted since: with sent mail.
+        assert_eq!(pick(ReplyCopies::Original, &["Trash"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &["Sent"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &["Gone"]), None);
+        assert_eq!(pick(ReplyCopies::Original, &[]), None);
+
+        // Off, or the server files its own copy: nothing is looked up.
+        let account = |reply_copies, server_saves_sent| AccountConfig {
+            reply_copies,
+            server_saves_sent,
+            ..sample_account()
+        };
+        let cache = Cache::in_memory().unwrap();
+        cache.save_folders(1, &folders);
+        assert_eq!(super::reply_copy_path(&account(ReplyCopies::WithSent, false), 1, Some(&cache), "a@b"), None);
+        assert_eq!(super::reply_copy_path(&account(ReplyCopies::Original, true), 1, Some(&cache), "a@b"), None);
+        assert_eq!(super::reply_copy_path(&account(ReplyCopies::Original, false), 1, Some(&cache), ""), None);
+        // On: the original is found by its Message-ID, spelled as the
+        // reply spells it, and only among this account's folders.
+        let original = Message {
+            id: 1,
+            account_id: 1,
+            folder_id: 3,
+            uid: 7,
+            from_name: "Ada".into(),
+            from_addr: "ada@example.com".into(),
+            reply_to: String::new(),
+            to: String::new(),
+            cc: String::new(),
+            subject: "Plans".into(),
+            preview: String::new(),
+            body: String::new(),
+            date: String::new(),
+            timestamp: 1,
+            unread: false,
+            starred: false,
+            keywords: Vec::new(),
+            has_attachment: false,
+            message_id: "parent@example.com".into(),
+            references: String::new(),
+            importance: Default::default(),
+            due: 0,
+            labels: Vec::new(),
+        };
+        cache.upsert_messages(1, "Projects/Hylki", std::slice::from_ref(&original));
+        let on = account(ReplyCopies::Original, false);
+        assert_eq!(
+            super::reply_copy_path(&on, 1, Some(&cache), "<Parent@Example.com>").as_deref(),
+            Some("Projects/Hylki"),
+        );
+        assert_eq!(super::reply_copy_path(&on, 2, Some(&cache), "parent@example.com"), None);
+        assert_eq!(super::reply_copy_path(&on, 1, Some(&cache), "other@example.com"), None);
+    }
+
+    #[test]
+    fn a_queued_reply_names_what_it_answers() {
+        let raw = b"From: a@example.com\r\nTo: b@example.com\r\nIn-Reply-To: <Parent@Example.com>\r\n\
+                    Subject: Re: x\r\n\r\nbody\r\n";
+        assert_eq!(super::raw_in_reply_to(raw), "Parent@Example.com");
+        assert_eq!(super::raw_in_reply_to(b"Subject: x\r\n\r\nbody\r\n"), "");
     }
 
     #[test]

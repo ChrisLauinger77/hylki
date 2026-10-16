@@ -705,6 +705,30 @@ anything reading it did not. The recipient still gets them. In dark mode a
 quoted message that sets its own colors keeps the light ground it was
 designed for.
 
+### Replies filed beside the original
+
+A copy of a sent reply goes with the rest of sent mail unless the account
+says otherwise. In **Mail Accounts → Edit → Special Folders**, **Save a copy
+of replies in** has two other choices:
+
+- **Folder of the original** files the copy of a reply in the folder of the
+  message it answers, so a conversation kept in a project folder keeps your
+  side of it there too. A reply to mail in the Inbox is filed in the Inbox.
+- **Folder of the original, not the Inbox** does the same, but a reply to
+  mail in the Inbox goes with sent mail.
+
+The folder is the one the original is in when the reply is sent, so a
+message moved while you were writing is followed. A reply goes with sent
+mail when the original is in Sent, Drafts, Templates, Trash or Junk, when
+it is no longer in the account, when it is in another account than the one
+the reply is sent from, and when the folder will not take the copy. On
+Gmail, a message under a label is answered into that label, not into All
+Mail. Forwards and new messages are not affected.
+
+It applies to IMAP and JMAP accounts. Microsoft 365 files its own copy in
+Sent Items, POP3 has no folders to file it in, and with **Server saves its
+own copy of sent mail** on, the server's copy is the only one.
+
 ### Drafts saved as you write
 
 A message being written is saved to the Drafts folder on its own every 30

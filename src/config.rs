@@ -573,6 +573,11 @@ pub struct AccountConfig {
     /// that has stopped appending means no sent mail is kept at all.
     #[serde(default, skip_serializing_if = "is_false")]
     pub server_saves_sent: bool,
+    /// Where the copy of a reply is filed (#468): with the rest of sent
+    /// mail, or beside the message it answers, as Evolution can. Decided
+    /// when the reply goes out, from wherever the original is by then.
+    #[serde(default, skip_serializing_if = "ReplyCopies::is_default")]
+    pub reply_copies: ReplyCopies,
     /// Auto-empty (#140): mail in the Junk folder older than this many days
     /// is deleted for good at each sync. 0 = never.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2333,6 +2338,42 @@ impl FolderSort {
 
 
 
+
+/// Where an account files the copy of a reply it sends (#468).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplyCopies {
+    /// Wherever the rest of sent mail goes.
+    #[default]
+    WithSent,
+    /// In the folder of the message replied to.
+    Original,
+    /// The same, but a reply to mail in the Inbox goes with sent mail:
+    /// what the Inbox holds is waiting to be dealt with, and a reply is not.
+    OriginalNotInbox,
+}
+
+impl ReplyCopies {
+    pub const ALL: [ReplyCopies; 3] =
+        [ReplyCopies::WithSent, ReplyCopies::Original, ReplyCopies::OriginalNotInbox];
+
+    pub fn label(self) -> String {
+        match self {
+            ReplyCopies::WithSent => crate::i18n::i18n("With sent mail"),
+            ReplyCopies::Original => crate::i18n::i18n("Folder of the original"),
+            ReplyCopies::OriginalNotInbox => crate::i18n::i18n("Folder of the original, not the Inbox"),
+        }
+    }
+
+    /// Its place in [`ReplyCopies::ALL`], for combo rows.
+    pub fn index(self) -> u32 {
+        ReplyCopies::ALL.iter().position(|s| *s == self).unwrap_or(0) as u32
+    }
+
+    fn is_default(&self) -> bool {
+        *self == ReplyCopies::WithSent
+    }
+}
 
 /// When an opened message is marked read (#100).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -5599,6 +5640,7 @@ dest_path = "Lists"
             folders_seeded: false,
             sent_copy_path: None,
             server_saves_sent: false,
+            reply_copies: Default::default(),
             empty_junk_days: 0,
             empty_trash_days: 0,
             clean_lists_days: 0,

@@ -47,6 +47,9 @@ const CAP_QUOTA: &str = "urn:ietf:params:jmap:quota";
 /// there (invalidRecipients, forbiddenToSend and the rest) is final, so the
 /// message goes back to the composer rather than to the Outbox (#368).
 const SUBMISSION_REFUSED: &str = "the server refused to send it";
+/// How [`jmap_submit`] says the copy was refused before anything was sent,
+/// so a reply filed beside its original (#468) can go to Sent instead.
+const IMPORT_REFUSED: &str = "the server would not take the message";
 
 /// The summary properties one listing asks `Email/get` for.
 const EMAIL_PROPS: &[&str] = &[
@@ -1747,7 +1750,7 @@ fn jmap_submit(
         .ok_or_else(|| {
             let why = &imported["notCreated"]["m"];
             format!(
-                "the server would not take the message: {}",
+                "{IMPORT_REFUSED}: {}",
                 why["description"].as_str().or(why["type"].as_str()).unwrap_or("unknown reason")
             )
         })?;
@@ -1819,12 +1822,51 @@ async fn jmap_send_message(
     let from = envelope.from().map(|f| f.to_string()).unwrap_or_else(|| account.email.clone());
     let rcpts: Vec<String> = envelope.to().iter().map(|a| a.to_string()).collect();
     let raw = email.formatted();
-    let (folder_id, path, mailbox_id) = jmap_sent_target(account, state, sent_path)
+    let sent = jmap_sent_target(account, state, sent_path)
         .ok_or_else(|| "the account has no Sent folder to file the copy in".to_string())?;
+    let reply = jmap_reply_target(account, account_id, state, cache, &message.in_reply_to);
     let sess = s.clone();
-    let email_id = blocking(move || jmap_submit(&sess, &raw, &from, &rcpts, &mailbox_id)).await?;
+    let ((folder_id, path), email_id) =
+        blocking(move || jmap_submit_filed(&sess, &raw, &from, &rcpts, reply, sent)).await?;
     jmap_index_sent_copy(s, account_id, folder_id, &path, &email_id, cache, state, emit).await;
     Ok(())
+}
+
+/// The mailbox beside a reply's original (#468), when the account files
+/// replies there: see [`reply_copy_path`].
+fn jmap_reply_target(
+    account: &AccountConfig,
+    account_id: u32,
+    state: &JmapState,
+    cache: Option<&Cache>,
+    in_reply_to: &str,
+) -> Option<(u32, String, String)> {
+    let path = reply_copy_path(account, account_id, cache, in_reply_to)?;
+    let (folder_id, mailbox_id) = state.folders.get(&path).cloned()?;
+    Some((folder_id, path, mailbox_id))
+}
+
+/// [`jmap_submit`] with the copy filed in `reply` when there is one, and in
+/// `sent` when there is not or that mailbox will not take it (one the user
+/// may only read). The folder that took it, and the copy's id.
+fn jmap_submit_filed(
+    s: &JmapSession,
+    raw: &[u8],
+    from: &str,
+    rcpts: &[String],
+    reply: Option<(u32, String, String)>,
+    sent: (u32, String, String),
+) -> Result<((u32, String), String), String> {
+    if let Some((folder_id, path, mailbox_id)) = reply {
+        match jmap_submit(s, raw, from, rcpts, &mailbox_id) {
+            Err(e) if e.starts_with(IMPORT_REFUSED) => {
+                tracing::warn!("could not file the reply's copy in {path}, using Sent: {e}");
+            }
+            r => return r.map(|id| ((folder_id, path), id)),
+        }
+    }
+    let (folder_id, path, mailbox_id) = sent;
+    jmap_submit(s, raw, from, rcpts, &mailbox_id).map(|id| ((folder_id, path), id))
 }
 
 /// Put the sent copy in the cache and on screen before the app is told the
@@ -1883,16 +1925,17 @@ async fn jmap_flush_outbox(
     emit(WorkerEvent::Status(i18n("Sending…")));
     let mut sent_any = false;
     for item in items {
-        let Some((folder_id, path, mailbox_id)) = jmap_sent_target(account, state, item.sent_path.as_deref()) else {
+        let Some(sent) = jmap_sent_target(account, state, item.sent_path.as_deref()) else {
             cache.record_outbox_failure(item.id, "no Sent folder to file the copy in");
             continue;
         };
+        let reply = jmap_reply_target(account, account_id, state, Some(cache), &raw_in_reply_to(&item.raw));
         let sess = s.clone();
         let raw = item.raw.clone();
         let from = item.from_addr.clone();
         let rcpts = item.rcpts.clone();
-        match blocking(move || jmap_submit(&sess, &raw, &from, &rcpts, &mailbox_id)).await {
-            Ok(email_id) => {
+        match blocking(move || jmap_submit_filed(&sess, &raw, &from, &rcpts, reply, sent)).await {
+            Ok(((folder_id, path), email_id)) => {
                 sent_any = true;
                 cache.delete_outbox(item.id);
                 jmap_index_sent_copy(s, account_id, folder_id, &path, &email_id, Some(cache), state, emit).await;

@@ -1392,6 +1392,17 @@ msgstr "Nazwa (od Z do A)"
 msgid "Full Path"
 msgstr "Pełna ścieżka"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "Wyświetlana po najechaniu kursorem"
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "Wyświetlana po najechaniu kursorem"
+
 #, fuzzy
 msgid "Sender"
 msgstr "Nadawcy"
@@ -2378,12 +2389,17 @@ msgstr "Wysłane"
 msgid "Save a copy of sent mail in"
 msgstr "Katalog kopii wysłanej poczty"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Katalog kopii wysłanej poczty"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "Serwer sam zapisuje kopię wysłanej poczty"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "Dla usługi Gmail i innych, które same zapisują wysłaną pocztę. Wyłącza "
 "powyższe zapisywanie kopii."

@@ -1217,6 +1217,15 @@ msgstr ""
 msgid "Full Path"
 msgstr ""
 
+msgid "With sent mail"
+msgstr ""
+
+msgid "Folder of the original"
+msgstr ""
+
+msgid "Folder of the original, not the Inbox"
+msgstr ""
+
 msgid "Sender"
 msgstr ""
 
@@ -2081,12 +2090,15 @@ msgstr ""
 msgid "Save a copy of sent mail in"
 msgstr ""
 
+msgid "Save a copy of replies in"
+msgstr ""
+
 msgid "Server saves its own copy of sent mail"
 msgstr ""
 
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 
 msgid "Drafts"

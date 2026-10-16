@@ -1313,6 +1313,17 @@ msgstr "Nom (Z à A)"
 msgid "Full Path"
 msgstr "Chemin complet"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "Affichage de l'original."
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "Affichage de l'original."
+
 msgid "Sender"
 msgstr "Expéditeur"
 
@@ -2301,12 +2312,17 @@ msgstr "Envoyés"
 msgid "Save a copy of sent mail in"
 msgstr "Enregistrer une copie du courrier envoyé dans"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Enregistrer une copie du courrier envoyé dans"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "Le serveur enregistre sa propre copie du courrier envoyé"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "Pour Gmail et les autres services qui classent eux-mêmes le courrier envoyé. "
 "Désactive l'option Enregistrer une copie ci-dessus."

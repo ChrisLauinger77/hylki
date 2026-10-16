@@ -66,6 +66,7 @@ impl GoaMailAccount {
             folders_seeded: false,
             sent_copy_path: None,
             server_saves_sent: false,
+            reply_copies: Default::default(),
             empty_junk_days: 0,
             empty_trash_days: 0,
             clean_lists_days: 0,

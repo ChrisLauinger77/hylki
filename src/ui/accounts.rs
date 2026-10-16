@@ -603,6 +603,10 @@ const SENT_COPY_HINT: &str =
     "Any folder, inbox included. Only applies to mail sent from this Hylki client \
      going forward. Not recursive.";
 
+const REPLY_COPIES_HINT: &str =
+    "Where the message replied to is when the reply is sent. Replies to mail in Sent, \
+     Drafts, Trash or Junk go with sent mail.";
+
 /// GNOME Online Accounts mail accounts not (properly) configured in Hylki.
 /// A configured entry counts when it has an IMAP host or runs over Graph — an
 /// entry with neither is a broken pre-#36 Microsoft 365 import, so its GOA
@@ -1792,6 +1796,15 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Save a copy of sent mail in"),
                                     set_subtitle: &i18n(SENT_COPY_HINT),
                                 },
+                                // Replies beside what they answer (#468), as
+                                // Evolution offers. Microsoft 365 files its
+                                // own copy and POP3 has no folders, so the
+                                // row is for IMAP and JMAP only.
+                                #[name = "reply_copies_row"]
+                                adw::ComboRow {
+                                    set_title: &i18n("Save a copy of replies in"),
+                                    set_subtitle: &i18n(REPLY_COPIES_HINT),
+                                },
                                 // Gmail files a copy of anything sent through
                                 // its SMTP, so Hylki's append makes a second
                                 // one. Off by default: a server that does not
@@ -1801,7 +1814,7 @@ impl Component for AccountsWindow {
                                 adw::SwitchRow {
                                     set_title: &i18n("Server saves its own copy of sent mail"),
                                     set_subtitle: &i18n("For Gmail and others that file sent mail \
-                                                   themselves. Disables above Save a copy."),
+                                                   themselves. Disables both Save a copy rows above."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input(AccountsInput::SetServerSavesSent(row.is_active()));
                                     },
@@ -2007,6 +2020,7 @@ impl Component for AccountsWindow {
         // Long enough for the hint, short enough that the combo's own value
         // is not what gets shortened instead.
         wrap_subtitle(&widgets.folder_sent_copy_row, 34);
+        wrap_subtitle(&widgets.reply_copies_row, 30);
         // Left-justify the editor's wrapping labels (its group descriptions):
         // libadwaita 1.9 renders a group description fill-justified when its
         // text does not naturally fill the label's width, stretching the word
@@ -2087,6 +2101,11 @@ impl Component for AccountsWindow {
         let list_labels: Vec<&str> = list_labels.iter().map(String::as_str).collect();
         widgets.clean_lists_row.set_model(Some(&gtk::StringList::new(&list_labels)));
         widgets.clean_lists_row.set_list_factory(Some(&non_ellipsizing_factory()));
+        let reply_labels: Vec<String> = crate::config::ReplyCopies::ALL.iter().map(|c| c.label()).collect();
+        let reply_labels: Vec<&str> = reply_labels.iter().map(String::as_str).collect();
+        widgets.reply_copies_row.set_model(Some(&gtk::StringList::new(&reply_labels)));
+        widgets.reply_copies_row.set_list_factory(Some(&non_ellipsizing_factory()));
+        widgets.reply_copies_row.set_factory(Some(&non_ellipsizing_factory()));
 
         // Show the SMTP credential fields only when the toggle is on.
         widgets
@@ -2522,6 +2541,7 @@ impl Component for AccountsWindow {
 
             AccountsInput::SetServerSavesSent(on) => {
                 widgets.folder_sent_copy_row.set_sensitive(!on);
+                widgets.reply_copies_row.set_sensitive(!on);
             }
 
             AccountsInput::SetFolderSort { email, sort } => {
@@ -4013,6 +4033,7 @@ impl AccountsWindow {
         widgets.server_saves_row.set_active(server_saves);
         row.set_sensitive(unsupported.is_none() && !server_saves);
         row.set_subtitle(&unsupported.unwrap_or_else(|| i18n(SENT_COPY_HINT)));
+        widgets.reply_copies_row.set_sensitive(!server_saves);
     }
 
     /// The "Save a copy of sent mail in" combo's current choice: a folder path,
@@ -4358,6 +4379,7 @@ impl AccountsWindow {
         // The list-mail search is a server search for a header, which
         // Microsoft 365 does not offer and POP3 has no folders for.
         widgets.clean_lists_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
+        widgets.reply_copies_row.set_visible(matches!(protocol, Protocol::Imap | Protocol::Jmap));
         // GNOME Online Accounts asked Microsoft for its own scopes, and
         // Hylki cannot add the directory's to a token GNOME holds.
         let from_goa = self.editing.and_then(|i| self.accounts.get(i)).is_some_and(|a| a.goa_id.is_some());
@@ -4953,6 +4975,10 @@ fn read_account(
         folders_seeded: false,
         sent_copy_path: None,
         server_saves_sent: false,
+        reply_copies: crate::config::ReplyCopies::ALL
+            .get(widgets.reply_copies_row.selected() as usize)
+            .copied()
+            .unwrap_or_default(),
         empty_junk_days: AUTO_EMPTY_DAYS
             .get(widgets.empty_junk_row.selected() as usize)
             .copied()
@@ -5208,6 +5234,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.in_unified_row.set_active(acc.in_unified);
     widgets.folder_sort_row.set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
     widgets.sign_default_row.set_active(acc.sign_by_default);
+    widgets.reply_copies_row.set_selected(acc.reply_copies.index());
     // Show the effective label (custom, or the email address).
     widgets
         .label_row
@@ -5303,6 +5330,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.in_unified_row.set_active(true);
     widgets.folder_sort_row.set_selected(0);
     widgets.sign_default_row.set_active(false);
+    widgets.reply_copies_row.set_selected(0);
     widgets.graph_directory_row.set_active(false);
     widgets.directory_only_row.set_active(false);
     widgets.graph_status.set_visible(false);

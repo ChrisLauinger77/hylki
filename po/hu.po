@@ -1361,6 +1361,17 @@ msgstr "Név (Z–A)"
 msgid "Full Path"
 msgstr "Teljes elérési út"
 
+msgid "With sent mail"
+msgstr ""
+
+#, fuzzy
+msgid "Folder of the original"
+msgstr "Megjelenítés rámutatáskor"
+
+#, fuzzy
+msgid "Folder of the original, not the Inbox"
+msgstr "Megjelenítés rámutatáskor"
+
 #, fuzzy
 msgid "Sender"
 msgstr "Feladók"
@@ -2342,12 +2353,17 @@ msgstr "Elküldött"
 msgid "Save a copy of sent mail in"
 msgstr "Elküldött levelek másolatának mentése ide"
 
+#, fuzzy
+msgid "Save a copy of replies in"
+msgstr "Elküldött levelek másolatának mentése ide"
+
 msgid "Server saves its own copy of sent mail"
 msgstr "A szerver elmenti az elküldött levelek saját másolatát"
 
+#, fuzzy
 msgid ""
-"For Gmail and others that file sent mail themselves. Disables above Save a "
-"copy."
+"For Gmail and others that file sent mail themselves. Disables both Save a "
+"copy rows above."
 msgstr ""
 "A Gmail és más olyan szolgáltatások esetében, amelyek maguk mentik el a "
 "kiküldött leveleket. Letiltja a fenti „Másolat mentése” opciót."
