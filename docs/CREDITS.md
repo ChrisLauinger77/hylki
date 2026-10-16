@@ -116,10 +116,11 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
   Catalan translation.
 - [**Jimmy**](https://github.com/amivaleo) ([#430](https://github.com/hyprlab/hylki/issues/430)): the
   Italian translation.
-- [**Christian Dandachi**](https://github.com/Dandiccf) ([#458](https://github.com/hyprlab/hylki/pull/458), [#461](https://github.com/hyprlab/hylki/pull/461), [#464](https://github.com/hyprlab/hylki/pull/464)):
+- [**Christian Dandachi**](https://github.com/Dandiccf) ([#458](https://github.com/hyprlab/hylki/pull/458), [#461](https://github.com/hyprlab/hylki/pull/461), [#464](https://github.com/hyprlab/hylki/pull/464), [#463](https://github.com/hyprlab/hylki/pull/463)):
   Reply All leaving out every address of the account, the bodies a
-  remembered conversation lacked, and a verified sender marked suspicious
-  over its reply address.
+  remembered conversation lacked, a verified sender marked suspicious
+  over its reply address, and a conversation that opened at its top
+  instead of its new mail.
 - [**Comodino**](https://github.com/llComodino) ([#466](https://github.com/hyprlab/hylki/pull/466)):
   waiting for a keyring that asks the user first, such as a security key
   that wants a tap.

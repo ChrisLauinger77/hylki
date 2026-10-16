@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Fixed: a conversation opened at its top instead of its new mail**
+  (PR #463 by Christian Dandachi). A conversation handed to the reader
+  while the loading cover was still up spent its scroll to the first unread
+  or newest message on a document never shown, and the one painted once the
+  reader was on screen stayed at the top. That one now gets the scroll,
+  unless the reader has been scrolled meanwhile.
 - **Fixed: a verified sender marked suspicious over its reply address**
   (PR #464 by Christian Dandachi). A message every check confirmed turned
   red when its Reply-To was on another domain, as A1's mail from a1.at

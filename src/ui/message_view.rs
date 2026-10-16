@@ -223,6 +223,10 @@ pub struct MessageView {
     fold_preview_lines: u32,
     /// A document was loaded while the view was not on screen (#332).
     painted_hidden: bool,
+    /// The open scroll went to a document loaded while the view was hidden,
+    /// which never painted (#332): the next document loaded on screen is owed
+    /// it, unless the reader has a place to keep by then.
+    scroll_owed: bool,
     /// The conversation's messages filed in Sent, for the folded bar.
     sent: std::collections::HashSet<(u32, u32)>,
     /// Cards opened or folded by hand: these win over the default for as
@@ -2188,6 +2192,7 @@ impl Component for MessageView {
             fold_messages: crate::config::FoldMessages::Never,
             fold_preview_lines: 1,
             painted_hidden: false,
+            scroll_owed: false,
             sent: std::collections::HashSet::new(),
             folds: std::collections::HashMap::new(),
             translations: std::collections::HashMap::new(),
@@ -2665,6 +2670,7 @@ impl Component for MessageView {
                     self.no_autoread.clear();
                     self.did_autoscroll = false;
                     self.saved_anchor = None;
+                    self.scroll_owed = false;
                     // A per-message Reader View default (Settings) resets
                     // the view for each conversation opened; the switch can
                     // still flip this one.
@@ -3900,6 +3906,16 @@ impl MessageView {
         // part, often the user's own sent original (#351).
         if self.did_autoscroll && self.autoscroll_lone && self.thread.len() > 1 && self.saved_anchor.is_none() {
             self.did_autoscroll = false;
+        }
+        // A conversation opened behind the loading cover spends its open
+        // scroll on a document nobody saw; the repaint once it is on screen
+        // would otherwise keep that unseen place, the top.
+        if self.webview.is_mapped() {
+            if std::mem::take(&mut self.scroll_owed) && self.saved_anchor.is_none() {
+                self.did_autoscroll = false;
+            }
+        } else if !self.did_autoscroll {
+            self.scroll_owed = true;
         }
         // Only a conversation's first document may auto-scroll to the unread
         // mark; every later render of the same thread (bodies streaming in, a
