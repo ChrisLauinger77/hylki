@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fixed: a verified sender marked suspicious over its reply address**
+  (PR #464 by Christian Dandachi). A message every check confirmed turned
+  red when its Reply-To was on another domain, as A1's mail from a1.at
+  answered on email.a1.net is. The reply address is still noted; the
+  warning is kept for replies that go to a mailbox anyone can open (Gmail,
+  Outlook.com, GMX and the like). Messages flagged before are checked again
+  when next opened.
 - **Fixed: a message from another folder stayed on "Loading…" in a
   conversation** (PR #461 by Christian Dandachi). A conversation shown
   again from memory kept any card whose body had arrived after it was put
