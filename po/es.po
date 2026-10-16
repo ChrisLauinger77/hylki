@@ -1572,6 +1572,19 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Hay un mensaje nuevo con {n} archivo adjunto abierto en Hylki."
 msgstr[1] "Hay un mensaje nuevo con {n} archivos adjuntos abierto en Hylki."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "Indexando {n} mensajes…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "Enviando…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6268,6 +6281,15 @@ msgstr ""
 "Añade el separador estándar «-- » encima de la firma. Thunderbird, Evolution "
 "y Mutt lo utilizan para atenuar la firma y omitirla cuando citan tu mensaje."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Deshacer"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ortografía"
 
@@ -6753,6 +6775,12 @@ msgstr "Encima del mensaje citado"
 
 msgid "Below the quoted message"
 msgstr "Debajo del mensaje citado"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} destinatario"
+msgstr[1] "{n} destinatarios"
 
 msgid "Above the messages"
 msgstr "Encima de los mensajes"
@@ -7411,9 +7439,6 @@ msgstr "carpeta desconocida"
 msgid "Could not reach the server"
 msgstr "No se pudo contactar con el servidor"
 
-msgid "Sending…"
-msgstr "Enviando…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Una cuenta de Microsoft no puede recibir correo de otra cuenta"
 
@@ -7733,6 +7758,14 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Lista de mensajes"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "«{subject}» se enviará {when}"
 
 #~ msgid "Show only unread"
 #~ msgstr "Mostrar solo no leídos"

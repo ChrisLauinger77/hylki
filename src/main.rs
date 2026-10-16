@@ -31,6 +31,7 @@ mod ms_broker;
 mod mutf7;
 mod nautilus_ext;
 mod notify;
+mod outgoing;
 mod oauth;
 mod outlook_msg;
 mod percent;

@@ -1573,6 +1573,20 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Un nouveau message avec {n} fichier joint est ouvert dans Hylki."
 msgstr[1] "Un nouveau message avec {n} fichiers joints est ouvert dans Hylki."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "Indexation de {n} messages…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+#, fuzzy
+msgid "Waiting to send"
+msgstr "Rien à annuler"
+
+msgid "Sending…"
+msgstr "Envoi en cours…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6326,6 +6340,15 @@ msgstr ""
 "Evolution et Mutt s'en servent pour estomper la signature et l'omettre "
 "lorsqu'ils citent votre message."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Annuler"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Orthographe"
 
@@ -6812,6 +6835,12 @@ msgstr "Au-dessus du message cité"
 
 msgid "Below the quoted message"
 msgstr "En dessous du message cité"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} destinataire"
+msgstr[1] "{n} destinataires"
 
 msgid "Above the messages"
 msgstr "Au-dessus des messages"
@@ -7470,9 +7499,6 @@ msgstr "dossier inconnu"
 msgid "Could not reach the server"
 msgstr "Impossible de joindre le serveur"
 
-msgid "Sending…"
-msgstr "Envoi en cours…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte Microsoft ne peut pas recevoir de courrier d'un autre compte"
 
@@ -7796,6 +7822,14 @@ msgstr "La boîte de réception unifiée en mode clair"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Liste des messages"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "« {subject} » sera envoyé {when}"
+
 #~ msgid "Show only unread"
 #~ msgstr "Afficher uniquement les non lus"
 
@@ -8115,9 +8149,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Discord — Join the community"
 #~ msgstr "Discord — Rejoindre la communauté"
-
-#~ msgid "Nothing to undo"
-#~ msgstr "Rien à annuler"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Annulation du déplacement…"

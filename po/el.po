@@ -1576,6 +1576,19 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Ένα νέο μήνυμα με {n} συνημμένο αρχείο είναι ανοικτό στο Hylki."
 msgstr[1] "Ένα νέο μήνυμα με {n} συνημμένα αρχεία είναι ανοικτό στο Hylki."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "Ευρετηρίαση {n} μηνυμάτων…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "Αποστολή…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6312,6 +6325,15 @@ msgstr ""
 "Evolution και Mutt τη χρησιμοποιούν για να εμφανίζουν την υπογραφή πιο αχνά "
 "και να την παραλείπουν όταν παραθέτουν το μήνυμά σας."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Αναίρεση"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ορθογραφία"
 
@@ -6804,6 +6826,12 @@ msgstr "Πάνω από το παρατιθέμενο μήνυμα"
 
 msgid "Below the quoted message"
 msgstr "Κάτω από το παρατιθέμενο μήνυμα"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} παραλήπτης"
+msgstr[1] "{n} παραλήπτες"
 
 msgid "Above the messages"
 msgstr "Πάνω από τα μηνύματα"
@@ -7468,9 +7496,6 @@ msgstr "άγνωστος φάκελος"
 msgid "Could not reach the server"
 msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
 
-msgid "Sending…"
-msgstr "Αποστολή…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ένας λογαριασμός Microsoft δεν μπορεί να λαμβάνει αλληλογραφία από άλλον "
@@ -7801,6 +7826,14 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Λίστα μηνυμάτων"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "Το «{subject}» θα σταλεί {when}"
 
 #~ msgid "Show only unread"
 #~ msgstr "Εμφάνιση μόνο μη αναγνωσμένων"

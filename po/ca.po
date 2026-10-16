@@ -1559,6 +1559,19 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Hi ha un missatge nou amb {n} fitxer adjunt obert a l'Hylki."
 msgstr[1] "Hi ha un missatge nou amb {n} fitxers adjunts obert a l'Hylki."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "S'estan indexant {n} missatges…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "S'està enviant…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6222,6 +6235,15 @@ msgstr ""
 "l'Evolution i el Mutt l'utilitzen per atenuar la signatura i ometre-la quan "
 "citen el teu missatge."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Desfés"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ortografia"
 
@@ -6707,6 +6729,12 @@ msgstr "A sobre del missatge citat"
 
 msgid "Below the quoted message"
 msgstr "A sota del missatge citat"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} destinatari"
+msgstr[1] "{n} destinataris"
 
 msgid "Above the messages"
 msgstr "A sobre dels missatges"
@@ -7360,9 +7388,6 @@ msgstr "carpeta desconeguda"
 msgid "Could not reach the server"
 msgstr "No s'ha pogut contactar amb el servidor"
 
-msgid "Sending…"
-msgstr "S'està enviant…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Un compte de Microsoft no pot rebre correu d'un altre compte"
 
@@ -7681,6 +7706,14 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Llista de missatges"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "«{subject}» s'enviarà {when}"
 
 #~ msgid "Show only unread"
 #~ msgstr "Mostra només els no llegits"

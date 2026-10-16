@@ -1650,6 +1650,19 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Eine neue Nachricht mit {n}-Datei ist in Hylki geöffnet."
 msgstr[1] "Eine neue Nachricht mit {n} Dateien ist in Hylki geöffnet."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "{n} Nachrichten werden indiziert…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "Wird gesendet…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6402,6 +6415,15 @@ msgstr ""
 "Evolution und Mutt verwenden sie, um die Signatur abgeschwächt darzustellen "
 "und beim Zitieren Ihrer Nachricht auszulassen."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Rückgängig"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Rechtschreibung"
 
@@ -6893,6 +6915,12 @@ msgstr "Über der zitierten Nachricht"
 
 msgid "Below the quoted message"
 msgstr "Unterhalb der zitierten Nachricht"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} Empfänger"
+msgstr[1] "{n} Empfänger"
 
 msgid "Above the messages"
 msgstr "Vor den Meldungen"
@@ -7571,9 +7599,6 @@ msgstr "Jeden Ordner anzeigen"
 msgid "Could not reach the server"
 msgstr "Server konnte nicht erreicht werden"
 
-msgid "Sending…"
-msgstr "Wird gesendet…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Ein Microsoft-Konto kann keine E-Mails von einem anderen Konto übernehmen"
@@ -7900,6 +7925,14 @@ msgstr "Der einheitliche Posteingang im Lichtmodus"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Nachrichtenliste"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "„{subject}“ wird {when} gesendet"
 
 #, fuzzy
 #~ msgid ""

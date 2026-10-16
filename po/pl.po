@@ -1664,6 +1664,19 @@ msgstr[0] "W aplikacji Hylki otwarto nową wiadomość z {n} załączonym plikie
 msgstr[1] "W aplikacji Hylki otwarto nową wiadomość z {n} załączonymi plikami."
 msgstr[2] "W aplikacji Hylki otwarto nową wiadomość z {n} załączonymi plikami."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "Indeksowanie wiadomości ({n})…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "Wysyłanie…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6419,6 +6432,15 @@ msgid ""
 "message."
 msgstr ""
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Cofnij"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Pisownia"
 
@@ -6910,6 +6932,13 @@ msgstr "Nad cytowaną wiadomością"
 
 msgid "Below the quoted message"
 msgstr "Pod cytowaną wiadomością"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} odbiorca"
+msgstr[1] "{n} odbiorców"
+msgstr[2] "{n} odbiorców"
 
 msgid "Above the messages"
 msgstr "Nad wiadomościami"
@@ -7589,9 +7618,6 @@ msgstr "Wyświetl poszczególne katalogi"
 msgid "Could not reach the server"
 msgstr "Nie udało się połączyć z serwerem"
 
-msgid "Sending…"
-msgstr "Wysyłanie…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Konto Microsoft nie może przyjmować poczty z innego konta"
 
@@ -7913,6 +7939,14 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Lista wiadomości"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "Wiadomość „{subject}” zostanie wysłana {when}"
 
 #, fuzzy
 #~ msgid ""

@@ -2211,6 +2211,7 @@ impl Cache {
                 attempts: r.get::<_, i64>(10)? as u32,
                 last_error: r.get(11)?,
                 send_at: r.get(12)?,
+                status: String::new(),
             })
         });
         match rows {

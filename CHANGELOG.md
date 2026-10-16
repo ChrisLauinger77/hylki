@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Undo Send** (#434). A sent message waits five seconds before it goes,
+  with Undo in a notice at the foot of the window; Undo brings it back to
+  the composer it was written in, a split reply beside its conversation.
+  New setting **Settings →
+  Composing → Undo Send**: Off, 5, 10, 20 or 30 seconds, 5 by default.
+  While it waits and while it is being sent, the message is listed in the
+  Outbox, where Edit or Delete take it back and Send sends it at once.
+  Quitting during the wait keeps it in the Outbox for the next start.
+
 - **Hylki waits for the network instead of dialing into nothing** (#442).
   It follows the desktop's network status: with no network, the timed mail
   check, push, the folder watchers and Send Later make no connections and

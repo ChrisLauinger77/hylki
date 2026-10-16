@@ -10,7 +10,7 @@ use crate::config::{
 };
 use crate::ui::chip_flow::ChipFlow;
 use std::rc::Rc;
-use crate::i18n::{i18n, i18n_f, i18n_noop};
+use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 
 /// Initial data for the settings window.
 #[derive(Debug)]
@@ -131,6 +131,8 @@ pub struct PrefInit {
     /// Where the signature sits in a reply or forward (#237).
     pub signature_position: crate::config::SignaturePosition,
     pub signature_dashes: bool,
+    /// Undo Send delay in seconds, 0 for off (#434).
+    pub undo_send_secs: u32,
     pub app_theme: AppTheme,
     pub text_scale: u32,
     /// The appearance theme's id ("system" for the stock GNOME colors).
@@ -1161,6 +1163,7 @@ pub enum PrefInput {
     ChangeReplyPosition(u32),
     ChangeFoldMessages(u32),
     ChangeSignaturePosition(u32),
+    ChangeUndoSend(u32),
     ChangeAppTheme(u32),
     ChangeTextScale(u32),
     ChangeSettingsOpen(u32),
@@ -1344,6 +1347,7 @@ pub enum PrefOutput {
     SetReplyPosition(crate::config::ReplyPosition),
     SetSignaturePosition(crate::config::SignaturePosition),
     SetSignatureDashes(bool),
+    SetUndoSend(u32),
     Closed,
 }
 
@@ -3593,6 +3597,17 @@ impl Component for Preferences {
                                             let _ = sender.output(PrefOutput::SetSignatureDashes(row.is_active()));
                                         },
                                     },
+
+                                    #[name = "undo_send_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Undo Send"),
+                                        set_subtitle: &i18n("How long a sent message waits before it \
+                                                       goes, with Undo on offer to bring it back to \
+                                                       the composer."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeUndoSend(row.selected()));
+                                        },
+                                    },
                                 },
 
                                 #[name = "spelling_group"]
@@ -4667,6 +4682,23 @@ impl Component for Preferences {
             crate::config::SignaturePosition::BelowQuote => 1,
         });
         widgets.signature_dashes_row.set_active(init.signature_dashes);
+        let undo_labels: Vec<String> = crate::config::UNDO_SEND_CHOICES
+            .iter()
+            .map(|&secs| match secs {
+                0 => i18n("Off"),
+                n => ni18n_f("{n} second", "{n} seconds", n, &[("n", &n.to_string())]),
+            })
+            .collect();
+        let undo_labels: Vec<&str> = undo_labels.iter().map(String::as_str).collect();
+        widgets.undo_send_row.set_model(Some(&gtk::StringList::new(&undo_labels)));
+        no_truncate(&widgets.undo_send_row);
+        // A delay set by hand in the file shows as the nearest one offered.
+        let nearest = crate::config::UNDO_SEND_CHOICES
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, &secs)| secs.abs_diff(init.undo_send_secs))
+            .map_or(0, |(i, _)| i as u32);
+        widgets.undo_send_row.set_selected(nearest);
         widgets.reply_position_row.set_model(Some(&gtk::StringList::new(&[
             &i18n("Above the messages"),
             &i18n("Below the messages"),
@@ -5739,6 +5771,11 @@ impl Component for Preferences {
                     _ => crate::config::ReplyPosition::Top,
                 };
                 let _ = sender.output(PrefOutput::SetReplyPosition(position));
+            }
+            PrefInput::ChangeUndoSend(idx) => {
+                if let Some(&secs) = crate::config::UNDO_SEND_CHOICES.get(idx as usize) {
+                    let _ = sender.output(PrefOutput::SetUndoSend(secs));
+                }
             }
             PrefInput::ChangeSignaturePosition(idx) => {
                 let position = match idx {

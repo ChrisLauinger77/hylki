@@ -716,6 +716,22 @@ saved. **Discard** on a new message removes the copy it left; on a draft you
 had saved before, the last automatic save stays. A save that fails, offline
 say, is tried again at the next one, without a message about it.
 
+### Undo Send
+
+A message sent waits five seconds before it goes, with **Undo** on offer
+in a notice at the foot of the window. Undo brings it back to the composer
+it was written in: a reply to the split beside its conversation, if that
+conversation is still open, anything else to a window. If it cannot be
+sent, the status bar says why. **Settings →
+Composing → Undo Send** sets the wait to 5, 10, 20 or 30 seconds, or
+**Off** to send at once. Send Later does not wait: a scheduled message can
+be edited or removed in the Outbox until its time.
+
+While it waits and while it is being sent, the message is listed in the
+**Outbox**, where **Edit** and **Delete** bring it back to the composer and
+**Send** sends it without waiting. Quitting Hylki before the wait is over
+keeps it in the Outbox, and it is sent at the next start.
+
 ### Templates
 
 A template is a message kept to start new ones from. It lives in the

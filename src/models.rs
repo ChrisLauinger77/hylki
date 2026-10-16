@@ -876,6 +876,9 @@ pub struct OutboxItem {
     pub last_error: String,
     /// Send Later (#145): unix seconds it is due; `None` goes as soon as it can.
     pub send_at: Option<i64>,
+    /// Set only for a message still on its way out (#434), never stored:
+    /// what it is doing ("Sending…"), shown instead of how long it waited.
+    pub status: String,
 }
 
 impl OutboxItem {
@@ -927,7 +930,9 @@ impl OutboxItem {
             // The row's one line of context: how long it has been stuck and what
             // is stopping it, falling back to the body when nothing has failed
             // yet (a message queued while offline never got an error).
-            preview: {
+            preview: if !self.status.is_empty() {
+                self.status.clone()
+            } else {
                 // A scheduled message says when it goes, until it is due.
                 let waiting = match self.send_at {
                     Some(at) if at > crate::datefmt::now() => {
@@ -1576,6 +1581,7 @@ mod tests {
             attempts: 1,
             send_at: None,
             last_error: String::new(),
+            status: String::new(),
         }
     }
 

@@ -2823,12 +2823,13 @@ pub(super) async fn run_jmap(
             }
 
             // Send Later (#145): into the Outbox until its time.
-            MailRequest::Send { mut message, sent_path }
+            MailRequest::Send { mut message, sent_path, ticket }
                 if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
             {
                 let at = message.send_at.unwrap_or_default();
                 restore_msgid_case(cache.as_ref(), &mut message);
                 schedule_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit);
+                emit(WorkerEvent::SendDone { ticket, sent: false });
                 if let Some(o) = message.draft_origin.clone() {
                     if let Some(s) = jmap_session(&account, &mut state, &emit).await {
                         jmap_drop_draft_origin(&s, account_id, &o, cache.as_ref(), &mut state).await;
@@ -2841,7 +2842,7 @@ pub(super) async fn run_jmap(
                 }
             }
 
-            MailRequest::Send { mut message, sent_path } => {
+            MailRequest::Send { mut message, sent_path, ticket } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 restore_msgid_case(cache.as_ref(), &mut message);
                 let reachable = crate::power::reaches_url(&jmap_base_url(&account));
@@ -2867,9 +2868,11 @@ pub(super) async fn run_jmap(
                         }
                         drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
+                        emit(WorkerEvent::SendDone { ticket, sent: true });
                     }
                     Err(e) => {
                         send_failed(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e, e.starts_with(SUBMISSION_REFUSED), &emit);
+                        emit(WorkerEvent::SendDone { ticket, sent: false });
                     }
                 }
             }

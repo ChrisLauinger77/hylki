@@ -1628,6 +1628,20 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "{n} csatolt fájlt tartalmazó új üzenet megnyitva a Hylkiben."
 msgstr[1] "{n} csatolt fájlt tartalmazó új üzenet megnyitva a Hylkiben."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "{n} üzenet indexelése…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+#, fuzzy
+msgid "Waiting to send"
+msgstr "Nincs visszavonható művelet"
+
+msgid "Sending…"
+msgstr "Küldés…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6383,6 +6397,15 @@ msgstr ""
 "és a Mutt ezt használja az aláírás elhalványítására, valamint arra, hogy az "
 "üzenet idézésekor ne jelenjen meg."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Visszavonás"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Helyesírás"
 
@@ -6876,6 +6899,12 @@ msgstr "Az idézett üzenet felett"
 
 msgid "Below the quoted message"
 msgstr "Az idézett üzenet alatt"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} címzett"
+msgstr[1] "{n} címzett"
 
 msgid "Above the messages"
 msgstr "Az üzenetek felett"
@@ -7558,9 +7587,6 @@ msgstr "Minden mappa megjelenítése"
 msgid "Could not reach the server"
 msgstr "Nem sikerült elérni a kiszolgálót"
 
-msgid "Sending…"
-msgstr "Küldés…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Egy Microsoft-fiók nem tud e-maileket fogadni egy másik fióktól"
 
@@ -7886,6 +7912,14 @@ msgid "Hyprlab"
 msgstr "Hyprlab"
 
 #, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Üzenetlista"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "A(z) „{subject}” küldése ekkor történik: {when}"
+
+#, fuzzy
 #~ msgid ""
 #~ "New messages, replies and forwards. The composer's signature button puts "
 #~ "in any signature by hand."
@@ -8092,9 +8126,6 @@ msgstr "Hyprlab"
 #, fuzzy
 #~ msgid "Back to the source"
 #~ msgstr "Vissza az üzenetlistához"
-
-#~ msgid "Nothing to undo"
-#~ msgstr "Nincs visszavonható művelet"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Áthelyezés visszavonása…"

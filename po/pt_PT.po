@@ -1633,6 +1633,19 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] "Está aberta no Hylki uma nova mensagem com {n} ficheiro anexado."
 msgstr[1] "Está aberta no Hylki uma nova mensagem com {n} ficheiros anexados."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "A indexar {n} mensagens…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr "A enviar…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6375,6 +6388,15 @@ msgstr ""
 "e o Mutt utilizam-na para atenuar a assinatura e para a omitir ao citar a "
 "sua mensagem."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Anular"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Ortografia"
 
@@ -6860,6 +6882,12 @@ msgstr "Acima da mensagem citada"
 
 msgid "Below the quoted message"
 msgstr "Abaixo da mensagem citada"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} destinatário"
+msgstr[1] "{n} destinatários"
 
 msgid "Above the messages"
 msgstr "Acima das mensagens"
@@ -7519,9 +7547,6 @@ msgstr "pasta desconhecida"
 msgid "Could not reach the server"
 msgstr "Não foi possível aceder ao servidor"
 
-msgid "Sending…"
-msgstr "A enviar…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr "Uma conta Microsoft não pode receber correio de outra conta"
 
@@ -7841,6 +7866,14 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Lista de mensagens"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "«{subject}» será enviada {when}"
 
 #, fuzzy
 #~ msgid ""

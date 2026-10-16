@@ -1466,6 +1466,18 @@ msgid_plural "A new message with {n} files attached is open in Hylki."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Sending message…"
+msgstr ""
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+msgid "Waiting to send"
+msgstr ""
+
+msgid "Sending…"
+msgstr ""
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -5587,6 +5599,14 @@ msgid ""
 "message."
 msgstr ""
 
+msgid "Undo Send"
+msgstr ""
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr ""
 
@@ -5988,6 +6008,11 @@ msgstr ""
 
 msgid "Below the quoted message"
 msgstr ""
+
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Above the messages"
 msgstr ""
@@ -6613,9 +6638,6 @@ msgid "unknown folder"
 msgstr ""
 
 msgid "Could not reach the server"
-msgstr ""
-
-msgid "Sending…"
 msgstr ""
 
 msgid "A Microsoft account can't receive mail from another account"

@@ -1644,6 +1644,20 @@ msgstr[0] "Новое письмо с {n} прикрёпленным файло�
 msgstr[1] "Новое письмо с {n} прикрёпленными файлами открыто в Hylki."
 msgstr[2] "Новое письмо с {n} прикрёпленными файлами открыто в Hylki."
 
+#, fuzzy
+msgid "Sending message…"
+msgstr "Индексация {n} сообщений…"
+
+msgid "Sending “{subject}”…"
+msgstr ""
+
+#, fuzzy
+msgid "Waiting to send"
+msgstr "Нечего отменять"
+
+msgid "Sending…"
+msgstr "Отправка…"
+
 msgid ""
 "{reason} If your organization manages your account, an administrator can "
 "approve Hylki for everyone at {link}"
@@ -6358,6 +6372,15 @@ msgstr ""
 "Mutt используют её для приглушения цвета подписи и её исключения при "
 "цитировании вашего сообщения."
 
+#, fuzzy
+msgid "Undo Send"
+msgstr "Отменить"
+
+msgid ""
+"How long a sent message waits before it goes, with Undo on offer to bring it "
+"back to the composer."
+msgstr ""
+
 msgid "Spelling"
 msgstr "Орфография"
 
@@ -6843,6 +6866,13 @@ msgstr "Над цитируемым сообщением"
 
 msgid "Below the quoted message"
 msgstr "Под цитируемым сообщением"
+
+#, fuzzy
+msgid "{n} second"
+msgid_plural "{n} seconds"
+msgstr[0] "{n} получатель"
+msgstr[1] "{n} получателя"
+msgstr[2] "{n} получателей"
 
 msgid "Above the messages"
 msgstr "Над сообщениями"
@@ -7498,9 +7528,6 @@ msgstr "неизвестная папка"
 msgid "Could not reach the server"
 msgstr "Не удалось связаться с сервером"
 
-msgid "Sending…"
-msgstr "Отправка…"
-
 msgid "A Microsoft account can't receive mail from another account"
 msgstr ""
 "Учётная запись Microsoft не может получать почту из другой учётной записи"
@@ -7826,6 +7853,14 @@ msgid "Hyprlab"
 msgstr "Hyprlab"
 
 #, fuzzy
+#~ msgid "Message sent"
+#~ msgstr "Список сообщений"
+
+#, fuzzy
+#~ msgid "“{subject}” sent"
+#~ msgstr "Письмо «{subject}» будет отправлено {when}"
+
+#, fuzzy
 #~ msgid ""
 #~ "New messages, replies and forwards. The composer's signature button puts "
 #~ "in any signature by hand."
@@ -8037,9 +8072,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Back to the source"
 #~ msgstr "Вернуться к исходному тексту"
-
-#~ msgid "Nothing to undo"
-#~ msgstr "Нечего отменять"
 
 #~ msgid "Undoing move…"
 #~ msgstr "Отменяем перемещение…"

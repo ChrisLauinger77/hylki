@@ -692,6 +692,13 @@ pub struct AppModel {
     /// since it would show a second set of window decorations mid-window and
     /// spend vertical space the split needs.
     reader_header: std::cell::OnceCell<adw::HeaderBar>,
+    /// Where Send says what it is doing, with Undo while it can (#434).
+    toasts: std::cell::OnceCell<adw::ToastOverlay>,
+    /// Messages on their way out (#434), shared with the quit paths, which
+    /// park any still waiting out the Undo Send delay in the Outbox.
+    outgoing: crate::outgoing::OutgoingList,
+    /// The last ticket handed to a send; 0 is never used.
+    send_ticket: u64,
     /// Same idea over the contacts view's detail pane: composing from a
     /// contact slides down right there instead of yanking the mail view back.
     contacts_compose_revealer: gtk::Revealer,
@@ -1254,6 +1261,8 @@ pub struct AppModel {
     signature_position: config::SignaturePosition,
     /// A `-- ` line goes above the signature in new messages.
     signature_dashes: bool,
+    /// Undo Send delay in seconds, 0 for off (#434).
+    undo_send_secs: u32,
     spellcheck: bool,
     spellcheck_langs: String,
     /// How email content is themed (message content only, not the app UI).
@@ -1948,6 +1957,11 @@ pub enum AppMsg {
     /// pre-downloaded — fetch them from the server now.
     /// A composer sent a message; `from` is that composer's id.
     SendMessage { from: u32, out: Box<OutgoingMessage> },
+    /// A message's Undo Send delay is over, or Send now was asked for it in
+    /// the Outbox: it goes to its worker (#434).
+    DispatchSend(u64),
+    /// Undo on a message still waiting out its delay (#434).
+    UndoSend(u64),
     /// Where the conversation's cards stood when a reply was sent has been
     /// measured: the pane can change under the send morph's stage.
     SendMorphMeasured,
@@ -2151,6 +2165,8 @@ pub enum AppMsg {
     /// An unflagged message turned out to carry attachments — give it one.
     HasAttachments { account_id: u32, path: String, message_id: u32 },
     Sent { account_id: u32 },
+    /// The worker is done with a message on its way out (#434).
+    SendDone { ticket: u64 },
     /// A message nothing could keep, back for a composer (#340).
     Unsent { account_id: u32, message: Box<crate::worker::OutgoingMessage> },
     Status { account_id: u32, text: String },
@@ -2197,7 +2213,7 @@ impl SimpleComponent for AppModel {
             // Persist the window size + maximized state on close. (Position and
             // which monitor can't be restored on Wayland — the compositor owns
             // placement — so only the geometry is saved.)
-            connect_close_request[background = model.run_in_background.clone()] => move |w| {
+            connect_close_request[background = model.run_in_background.clone(), outgoing = model.outgoing.clone()] => move |w| {
                 let maximized = w.is_maximized();
                 let (width, height) = if maximized {
                     let (sw, sh, _) = crate::config::load_window_state();
@@ -2222,12 +2238,19 @@ impl SimpleComponent for AppModel {
                 // notification. Nothing else needs persisting on quit: accounts
                 // and settings are written as they change, the keyring's share
                 // once its thread is done.
+                crate::outgoing::park_held(&outgoing);
                 finish_keyring_writes();
                 std::process::exit(0)
             },
 
+            // Send's toasts (#434) float over everything, the status bar
+            // included, and never move the layout.
             #[wrap(Some)]
-            set_content = &gtk::Overlay {
+            #[name = "toasts"]
+            set_content = &adw::ToastOverlay {
+            #[wrap(Some)]
+            #[name = "window_overlay"]
+            set_child = &gtk::Overlay {
 
                 #[wrap(Some)]
                 set_child = &gtk::Box {
@@ -2859,6 +2882,7 @@ impl SimpleComponent for AppModel {
                 // (same CSS), no extra window.
                 add_overlay: model.lightbox.widget(),
             },
+            },
         }
     }
 
@@ -3329,6 +3353,9 @@ impl SimpleComponent for AppModel {
             },
             split_close_anim: std::rc::Rc::new(std::cell::RefCell::new(None)),
             reader_header: std::cell::OnceCell::new(),
+            toasts: std::cell::OnceCell::new(),
+            outgoing: Default::default(),
+            send_ticket: 0,
             reader_split: {
                 let p = gtk::Paned::new(gtk::Orientation::Vertical);
                 // The separator itself is styled invisible — painted the
@@ -3668,6 +3695,7 @@ impl SimpleComponent for AppModel {
             reply_position: prefs.reply_position,
             signature_position: prefs.signature_position,
             signature_dashes: prefs.signature_dashes,
+            undo_send_secs: prefs.undo_send_secs,
             spellcheck: prefs.spellcheck,
             spellcheck_langs: prefs.spellcheck_langs,
             message_theme: prefs.message_theme,
@@ -3898,6 +3926,7 @@ impl SimpleComponent for AppModel {
         let reader_move_btn = model.reader_move_btn.clone();
         let widgets = view_output!();
         let _ = model.reader_header.set(widgets.reader_header.clone());
+        let _ = model.toasts.set(widgets.toasts.clone());
         // Right-click on the header's empty space (not a button) offers
         // the way to the toolbar editor.
         {
@@ -4384,6 +4413,7 @@ impl SimpleComponent for AppModel {
             app.add_action(&model.show_accounts_action);
             app.add_action(&model.focus_action);
             let window = root.clone();
+            let outgoing = model.outgoing.clone();
             let quit = gtk::gio::SimpleAction::new("quit", None);
             quit.connect_activate(move |_, _| {
                 // Same teardown as closing the last window: save the geometry,
@@ -4397,6 +4427,7 @@ impl SimpleComponent for AppModel {
                 };
                 crate::config::save_window_state(width, height, maximized);
                 crate::background::set_status("");
+                crate::outgoing::park_held(&outgoing);
                 finish_keyring_writes();
                 std::process::exit(0)
             });
@@ -5278,7 +5309,7 @@ impl SimpleComponent for AppModel {
                 // selected message, to check the composer's grounds (#148).
                 // HYLKI_SHOWCASE_FLIP=dark|light then switches the app theme
                 // at 6 s, to check a live flip re-resolves those grounds.
-                // HYLKI_SHOWCASE_FOLDER=drafts|templates|sent|archive|junk|trash[@<s>]
+                // HYLKI_SHOWCASE_FOLDER=drafts|templates|sent|archive|junk|trash|outbox[@<s>]
                 // switches to that folder at 2 s, before the staging's 3 s
                 // selection moves onto its first row, or at the time given.
                 // HYLKI_SHOWCASE_FOCUS=<seconds> switches Focus Mode on at
@@ -5298,6 +5329,10 @@ impl SimpleComponent for AppModel {
                 }
                 if let Ok(v) = std::env::var("HYLKI_SHOWCASE_FOLDER") {
                     let (kind, at) = showcase_at(&v, 2);
+                    if kind == "outbox" {
+                        let s = sender.clone();
+                        gtk::glib::timeout_add_seconds_local_once(at, move || s.input(AppMsg::ShowOutbox));
+                    }
                     let kind = match kind {
                         "drafts" => Some(FolderKind::Drafts),
                         "templates" => Some(FolderKind::Templates),
@@ -5328,6 +5363,14 @@ impl SimpleComponent for AppModel {
                     let s = sender.clone();
                     gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
                         s.input(AppMsg::ShowcaseSend(text));
+                    });
+                }
+                // HYLKI_SHOWCASE_UNDO=<seconds> presses Undo on the first
+                // message sent, to check it comes back where it was (#434).
+                if let Some(at) = std::env::var("HYLKI_SHOWCASE_UNDO").ok().and_then(|v| v.parse::<f64>().ok()) {
+                    let s = sender.clone();
+                    gtk::glib::timeout_add_local_once(std::time::Duration::from_millis((at * 1000.0) as u64), move || {
+                        s.input(AppMsg::UndoSend(1));
                     });
                 }
                 // HYLKI_SHOWCASE_COPY=<seconds> has the sent reply's copy
@@ -5814,7 +5857,7 @@ impl SimpleComponent for AppModel {
         // up the cards for starting a new message with them (#293).
         {
             use crate::ui::drop_zones::{DropContext, DropZones};
-            let overlay = root.content().and_downcast::<gtk::Overlay>().expect("the window's content is an overlay");
+            let overlay = widgets.window_overlay.clone();
             let s = sender.input_sender().clone();
             let zones = DropZones::install(DropContext::NewMessage, &root, &overlay, move |choice, paths| {
                 s.emit(AppMsg::DropFilesAs(choice, paths));
@@ -5925,13 +5968,21 @@ impl SimpleComponent for AppModel {
 
             AppMsg::EditCurrentOutbox => {
                 if let Some(m) = self.current.clone() {
-                    self.compose_from_outbox(m.account_id, m.id, &sender);
+                    match self.outgoing_ticket(m.id) {
+                        Some(ticket) => self.undo_send(ticket, &sender),
+                        None => self.compose_from_outbox(m.account_id, m.id, &sender),
+                    }
                 }
             }
 
             AppMsg::SendCurrentOutbox => {
                 if let Some(m) = self.current.clone() {
-                    self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) });
+                    let in_flight = self.outgoing.borrow().iter().any(|o| crate::outgoing::row_id(o.ticket) == m.id);
+                    match self.outgoing_ticket(m.id) {
+                        Some(ticket) => self.dispatch_send(ticket),
+                        None if in_flight => {}
+                        None => self.send_to(m.account_id, MailRequest::FlushOutbox { id: Some(m.id) }),
+                    }
                 }
             }
 
@@ -5958,6 +6009,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::RetryAllOutbox => {
+                let held: Vec<u64> =
+                    self.outgoing.borrow().iter().filter(|o| o.held).map(|o| o.ticket).collect();
+                for ticket in held {
+                    self.dispatch_send(ticket);
+                }
                 let accounts: Vec<u32> = self.outbox_by_account
                     .iter()
                     .filter(|(_, items)| !items.is_empty())
@@ -7312,7 +7368,7 @@ impl SimpleComponent for AppModel {
                     // In the Outbox, deleting means giving up on sending it —
                     // there is no server-side copy to move to Trash.
                     if self.outbox_item(m.account_id, m.id).is_some() {
-                        self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
+                        self.drop_outbox_row(m.account_id, m.id, &sender);
                         self.current = None;
                         self.show_message(None, false);
                     } else {
@@ -7334,7 +7390,7 @@ impl SimpleComponent for AppModel {
                 }
                 if let Some(m) = self.reply_target() {
                     if self.outbox_item(m.account_id, m.id).is_some() {
-                        self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
+                        self.drop_outbox_row(m.account_id, m.id, &sender);
                         self.current = None;
                         self.show_message(None, false);
                     } else {
@@ -7479,7 +7535,7 @@ impl SimpleComponent for AppModel {
                     // and every other action would aim an IMAP command at a UID
                     // that doesn't exist on any server.
                     if matches!(action, RowAction::Delete) {
-                        self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
+                        self.drop_outbox_row(m.account_id, m.id, &sender);
                     }
                     return;
                 }
@@ -7572,7 +7628,7 @@ impl SimpleComponent for AppModel {
                 if self.showing_outbox {
                     if matches!(action, BulkAction::Delete | BulkAction::DeleteForever) {
                         for m in &messages {
-                            self.send_to(m.account_id, MailRequest::DeleteOutbox { id: m.id });
+                            self.drop_outbox_row(m.account_id, m.id, &sender);
                         }
                     }
                     self.message_list.emit(MessageListInput::ClearSelection);
@@ -8154,6 +8210,7 @@ impl SimpleComponent for AppModel {
                         tracing::info!("wizard: restart helper up, exiting");
                         let (w, h, maximized) = crate::config::load_window_state();
                         crate::config::save_window_state(w, h, maximized);
+                        crate::outgoing::park_held(&self.outgoing);
                         finish_keyring_writes();
                         std::process::exit(0);
                     }
@@ -9379,6 +9436,10 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetSignatureDashes(on)) => {
                 pref!(self.signature_dashes = on);
             }
+            AppMsg::Pref(PrefOutput::SetUndoSend(secs)) => {
+                // A message already waiting keeps the delay it was sent with.
+                pref!(self.undo_send_secs = secs);
+            }
             AppMsg::Pref(PrefOutput::SetOverrideColors(on)) => {
                 if pref!(self.override_colors = on) {
                     self.push_reader_style();
@@ -9702,7 +9763,35 @@ impl SimpleComponent for AppModel {
                     }
                 }
                 let sent_path = self.sent_copy_path(account_id);
-                self.send_to(account_id, MailRequest::Send { message: out, sent_path });
+                if out.send_at.is_some() {
+                    // Send Later has its own way back: the message waits in
+                    // the Outbox, where it can be edited or dropped.
+                    self.send_to(account_id, MailRequest::Send { message: out, sent_path, ticket: 0 });
+                } else {
+                    let origin = match self.reader_compose.as_ref().filter(|r| r.id == from) {
+                        Some(r) if r.window.is_none() => {
+                            r.answering.map_or(crate::outgoing::Origin::Pane, crate::outgoing::Origin::Split)
+                        }
+                        _ => crate::outgoing::Origin::Window,
+                    };
+                    self.queue_send(origin, out, sent_path, &sender);
+                }
+            }
+
+            AppMsg::DispatchSend(ticket) => self.dispatch_send(ticket),
+
+            AppMsg::UndoSend(ticket) => self.undo_send(ticket, &sender),
+
+            AppMsg::SendDone { ticket } => {
+                // A failure has said so already, in the status bar, and the
+                // message is in the Outbox or back in a composer.
+                let done = {
+                    let mut list = self.outgoing.borrow_mut();
+                    list.iter().position(|o| o.ticket == ticket).map(|i| list.remove(i))
+                };
+                if done.is_some() {
+                    self.push_outbox();
+                }
             }
 
             AppMsg::SaveDraftMessage(out) => {
@@ -9925,10 +10014,11 @@ impl SimpleComponent for AppModel {
             AppMsg::ComposeToggleWindow(id) => self.toggle_compose_window(id, &sender),
 
             AppMsg::Sent { account_id } => {
-                // No success notification — only send failures are surfaced (via
-                // WorkerEvent::Error). Just refresh the folder the copy landed
-                // in, if that folder is the open one — which is wherever the
-                // account files its copies (#199), not always Sent.
+                // No success notification: only send failures are surfaced
+                // (via WorkerEvent::Error). Just refresh the folder the copy
+                // landed in, if that folder is the open one, which is
+                // wherever the account files its copies (#199), not always
+                // Sent.
                 if let Some(sel) = self.selected.clone() {
                     let copied_to = self.sent_copy_path(account_id);
                     let viewing_sent = sel.account_id == account_id
@@ -12673,6 +12763,7 @@ impl AppModel {
             reply_position: self.reply_position,
             signature_position: self.signature_position,
             signature_dashes: self.signature_dashes,
+            undo_send_secs: self.undo_send_secs,
             spellcheck: self.spellcheck,
             // Every save is after the first load, which applied it.
             single_card_default_applied: true,
@@ -13228,6 +13319,7 @@ impl AppModel {
             .values()
             .flatten()
             .cloned()
+            .chain(self.outgoing.borrow().iter().map(|o| o.as_outbox_item()))
             .collect();
         items.sort_by_key(|i| (i.queued_at, i.id));
         items
@@ -13238,11 +13330,153 @@ impl AppModel {
         if !self.showing_outbox {
             return None;
         }
+        if let Some(o) = self.outgoing.borrow().iter().find(|o| crate::outgoing::row_id(o.ticket) == id) {
+            return Some(o.as_outbox_item());
+        }
         self.outbox_by_account
             .get(&account_id)?
             .iter()
             .find(|i| i.id == id)
             .cloned()
+    }
+
+    /// The ticket of the message on its way out behind an Outbox row, while
+    /// Undo can still take it back.
+    fn outgoing_ticket(&self, row: u32) -> Option<u64> {
+        self.outgoing
+            .borrow()
+            .iter()
+            .find(|o| o.held && crate::outgoing::row_id(o.ticket) == row)
+            .map(|o| o.ticket)
+    }
+
+    /// Delete on an Outbox row. A message still waiting out its delay goes
+    /// back to its composer instead, where discarding it is a choice made
+    /// with the message in view; one already with its worker is past
+    /// stopping.
+    fn drop_outbox_row(&mut self, account_id: u32, id: u32, sender: &ComponentSender<Self>) {
+        if self.outgoing.borrow().iter().any(|o| crate::outgoing::row_id(o.ticket) == id) {
+            if let Some(ticket) = self.outgoing_ticket(id) {
+                self.undo_send(ticket, sender);
+            }
+            return;
+        }
+        self.send_to(account_id, MailRequest::DeleteOutbox { id });
+    }
+
+    fn show_toast(&self, toast: &adw::Toast) {
+        if let Some(t) = self.toasts.get() {
+            t.add_toast(toast.clone());
+        }
+    }
+
+    /// Send's first stop (#434): the message waits out the Undo Send delay
+    /// with Undo on offer in a toast, listed in the Outbox, then goes to its
+    /// worker.
+    fn queue_send(
+        &mut self,
+        origin: crate::outgoing::Origin,
+        out: Box<OutgoingMessage>,
+        sent_path: Option<String>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let account_id = out.from_account_id;
+        let Some(account) = account_id
+            .checked_sub(1)
+            .and_then(|i| self.effective_config().get(i as usize).cloned())
+        else {
+            self.send_to(account_id, MailRequest::Send { message: out, sent_path, ticket: 0 });
+            return;
+        };
+        self.send_ticket += 1;
+        let ticket = self.send_ticket;
+        let delay = self.undo_send_secs;
+        let toast = adw::Toast::builder().priority(adw::ToastPriority::High).timeout(0).build();
+        let o = crate::outgoing::Outgoing {
+            ticket,
+            account_id,
+            account,
+            message: out,
+            sent_path,
+            queued_at: crate::datefmt::now(),
+            origin,
+            held: delay > 0,
+            toast: toast.clone(),
+        };
+        toast.set_title(&o.sending_title());
+        if delay > 0 {
+            toast.set_button_label(Some(&i18n("Undo")));
+            let s = sender.clone();
+            toast.connect_button_clicked(move |_| s.input(AppMsg::UndoSend(ticket)));
+            // The timer is never cancelled: Undo or Send now take the
+            // message off the list, and this finds nothing to do.
+            let s = sender.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(delay.into()), move || {
+                s.input(AppMsg::DispatchSend(ticket))
+            });
+            self.show_toast(&toast);
+        } else {
+            // With nothing to undo, there is no toast.
+            self.send_to(
+                account_id,
+                MailRequest::Send { message: o.message.clone(), sent_path: o.sent_path.clone(), ticket },
+            );
+        }
+        self.outgoing.borrow_mut().push(o);
+        self.push_outbox();
+    }
+
+    /// The delay is over, or Send now was asked for: hand the message to its
+    /// worker. Undo is no longer possible.
+    fn dispatch_send(&mut self, ticket: u64) {
+        let request = {
+            let mut list = self.outgoing.borrow_mut();
+            let Some(o) = list.iter_mut().find(|o| o.ticket == ticket && o.held) else { return };
+            o.held = false;
+            o.toast.dismiss();
+            (o.account_id, o.message.clone(), o.sent_path.clone())
+        };
+        let (account_id, message, sent_path) = request;
+        self.send_to(account_id, MailRequest::Send { message, sent_path, ticket });
+        self.push_outbox();
+    }
+
+    /// Undo Send: the message comes back to the composer it was written in,
+    /// as it was. A split reply reopens beside its card if that card is
+    /// still on screen; otherwise it gets a window.
+    fn undo_send(&mut self, ticket: u64, sender: &ComponentSender<Self>) {
+        let taken = {
+            let mut list = self.outgoing.borrow_mut();
+            list.iter().position(|o| o.ticket == ticket && o.held).map(|i| list.remove(i))
+        };
+        let Some(o) = taken else { return };
+        o.toast.dismiss();
+        self.push_outbox();
+        self.send_morph.finish();
+        self.drop_provisional(&o.message.in_reply_to);
+        if self.showing_outbox
+            && self.current.as_ref().is_some_and(|m| m.id == crate::outgoing::row_id(ticket))
+        {
+            self.current = None;
+            self.show_message(None, false);
+        }
+        let account_id = o.account_id;
+        let prefill = unsent_prefill(*o.message);
+        let free = self.reader_compose.is_none() && !self.showing_contacts && !self.showing_outbox;
+        match o.origin {
+            crate::outgoing::Origin::Split(answering)
+                if free
+                    && self
+                        .current
+                        .iter()
+                        .chain(self.current_thread.iter())
+                        .any(|m| (m.account_id, m.id) == answering) =>
+            {
+                self.open_inline_reply(account_id, prefill, Some(answering), sender);
+            }
+            crate::outgoing::Origin::Pane if free => self.open_inline_reply(account_id, prefill, None, sender),
+            _ => self.open_compose(account_id, prefill, sender),
+        }
     }
 
     /// Tell the message list whether the folder(s) currently shown are fully
@@ -17122,6 +17356,25 @@ impl AppModel {
     /// this is a local render — the same one the worker would produce.
     fn show_outbox_message(&mut self, item: &crate::models::OutboxItem) {
         let mut message = item.as_message();
+        // A message on its way out has no bytes yet (#434): it shows as
+        // its card in Sent will.
+        let outgoing = self.outgoing.borrow().iter().find(|o| crate::outgoing::row_id(o.ticket) == item.id).map(|o| {
+            let body = crate::worker::sent_body_preview(&o.account, &o.message)
+                .unwrap_or_else(|| crate::worker::wrap_plain(&o.message.body));
+            (body, o.message.attachments.is_empty())
+        });
+        if let Some((body, no_files)) = outgoing {
+            message.body = crate::legacy::current_markup(body);
+            message.date = item.status.clone();
+            message.has_attachment = !no_files;
+            self.attachments.clear();
+            self.attachments_loading = false;
+            self.sync_attachment_drawer();
+            self.current = Some(message.clone());
+            self.current_thread.clear();
+            self.show_message(Some(message), false);
+            return;
+        }
         message.body = crate::legacy::current_markup(crate::worker::extract_body(&item.raw));
         message.date = crate::models::OutboxItem::waiting_label(item.queued_at);
         self.attachments = crate::worker::extract_attachments_of(&item.raw);
@@ -17191,58 +17444,14 @@ impl AppModel {
 
     /// Open a message the worker could not send, queue or save (#340). Its
     /// composer closed when Send was pressed, so without this the message is
-    /// gone. A file that can no longer be read, the usual reason, is left out:
-    /// the error just shown names it.
+    /// gone.
     fn compose_unsent(
         &mut self,
         account_id: u32,
         m: crate::worker::OutgoingMessage,
         sender: &ComponentSender<Self>,
     ) {
-        let body_html = if m.html.trim().is_empty() {
-            m.body
-                .split("\n\n")
-                .map(|p| format!("<p>{}</p>", gtk::glib::markup_escape_text(p).replace('\n', "<br>")))
-                .collect()
-        } else {
-            m.html
-        };
-        let attachments = m
-            .attachments
-            .iter()
-            .map(std::path::PathBuf::from)
-            .filter(|p| std::fs::File::open(p).is_ok())
-            .collect();
-        let prefill = ComposePrefill {
-            to: m.to,
-            cc: m.cc,
-            bcc: m.bcc,
-            subject: m.subject,
-            body_html,
-            attachments,
-            in_reply_to: m.in_reply_to,
-            references: m.references,
-            draft_origin: m.draft_origin,
-            encrypt: m.encrypt,
-            outbox_origin: m.outbox_origin,
-            reply_addressed_to: String::new(),
-            from_address: m
-                .from_alias
-                .as_deref()
-                .map(|f| crate::config::split_identity(f).1)
-                .unwrap_or_default(),
-            custom_from: m.from_alias.clone().unwrap_or_default(),
-            send_at: m.send_at,
-            cloud_uploads: Vec::new(),
-            inline_files: Vec::new(),
-            block_remote_images: false,
-            resumed: true,
-            no_signature: false,
-            // A template that failed to save comes back cut loose from it.
-            template: false,
-            original_plain: false,
-        };
-        self.open_compose(account_id, prefill, sender);
+        self.open_compose(account_id, unsent_prefill(m), sender);
     }
 
     /// Open the compose editor pre-filled from a draft, remembering its origin so
@@ -21130,6 +21339,7 @@ impl AppModel {
             reply_position: self.reply_position,
             signature_position: self.signature_position,
             signature_dashes: self.signature_dashes,
+            undo_send_secs: self.undo_send_secs,
             notifications: self.notifications_enabled,
             notification_content: self.notification_content,
             notification_buttons: self.notification_buttons,
@@ -22979,7 +23189,7 @@ impl AppModel {
         };
         self.send_to(
             message.account_id,
-            MailRequest::Send { message: Box::new(out), sent_path: None },
+            MailRequest::Send { message: Box::new(out), sent_path: None, ticket: 0 },
         );
         self.record_invite_answer(invite, rsvp);
         self.notifications.emit(NotifyInput::Push {
@@ -23304,7 +23514,7 @@ impl AppModel {
             calendar: None,
             send_at: None,
         };
-        self.send_to(message.account_id, MailRequest::Send { message: Box::new(out), sent_path: None });
+        self.send_to(message.account_id, MailRequest::Send { message: Box::new(out), sent_path: None, ticket: 0 });
         sender.input(AppMsg::UnsubscribeDone { message: Box::new(message), result: Ok(true) });
     }
 
@@ -25568,6 +25778,7 @@ fn map_event(account_id: u32, event: WorkerEvent) -> AppMsg {
             AppMsg::HasAttachments { account_id, path, message_id }
         }
         WorkerEvent::Sent => AppMsg::Sent { account_id },
+        WorkerEvent::SendDone { ticket, .. } => AppMsg::SendDone { ticket },
         WorkerEvent::Unsent(message) => AppMsg::Unsent { account_id, message },
         WorkerEvent::Outbox { items } => AppMsg::OutboxItems { account_id, items },
         WorkerEvent::Notice(text) => AppMsg::Notice(text),
@@ -25984,6 +26195,56 @@ fn reply_all_prefill(m: &Message, own: &[String]) -> ComposePrefill {
     }
     prefill.cc = cc.join(", ");
     prefill
+}
+
+/// A message handed back from Send, as a composer's prefill: by the worker
+/// when nothing could keep it (#340), or by Undo Send (#434). A file that can
+/// no longer be read, the usual reason for the first, is left out: the error
+/// just shown names it.
+fn unsent_prefill(m: crate::worker::OutgoingMessage) -> ComposePrefill {
+    let body_html = if m.html.trim().is_empty() {
+        m.body
+            .split("\n\n")
+            .map(|p| format!("<p>{}</p>", gtk::glib::markup_escape_text(p).replace('\n', "<br>")))
+            .collect()
+    } else {
+        m.html
+    };
+    let attachments = m
+        .attachments
+        .iter()
+        .map(std::path::PathBuf::from)
+        .filter(|p| std::fs::File::open(p).is_ok())
+        .collect();
+    ComposePrefill {
+        to: m.to,
+        cc: m.cc,
+        bcc: m.bcc,
+        subject: m.subject,
+        body_html,
+        attachments,
+        in_reply_to: m.in_reply_to,
+        references: m.references,
+        draft_origin: m.draft_origin,
+        encrypt: m.encrypt,
+        outbox_origin: m.outbox_origin,
+        reply_addressed_to: String::new(),
+        from_address: m
+            .from_alias
+            .as_deref()
+            .map(|f| crate::config::split_identity(f).1)
+            .unwrap_or_default(),
+        custom_from: m.from_alias.clone().unwrap_or_default(),
+        send_at: m.send_at,
+        cloud_uploads: Vec::new(),
+        inline_files: Vec::new(),
+        block_remote_images: false,
+        resumed: true,
+        no_signature: false,
+        // A template that failed to save comes back cut loose from it.
+        template: false,
+        original_plain: false,
+    }
 }
 
 /// Write attachments out to a private temp directory: the composer attaches

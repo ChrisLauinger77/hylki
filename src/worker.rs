@@ -479,6 +479,10 @@ pub enum MailRequest {
     Send {
         message: Box<OutgoingMessage>,
         sent_path: Option<String>,
+        /// Echoed back in [`WorkerEvent::SendDone`], so the app can tell
+        /// which of its messages on their way out this was (#434). 0 for a
+        /// send nobody is watching.
+        ticket: u64,
     },
     /// Try the Outbox again now (a queued message, or every one of them).
     FlushOutbox { id: Option<u32> },
@@ -722,6 +726,10 @@ pub enum WorkerEvent {
     /// UI should show the paperclip and offer the files.
     HasAttachments { path: String, message_id: u32 },
     Sent,
+    /// The worker is done with the `MailRequest::Send` carrying `ticket`:
+    /// `sent` if it went out, otherwise it was queued in the Outbox or
+    /// handed back with `Unsent` (#434).
+    SendDone { ticket: u64, sent: bool },
     /// A message that could be neither sent, queued nor saved as a draft, handed
     /// back so the app can open it in a composer again (#340): its composer
     /// closed when Send or Save was pressed, so this is the only copy left.
@@ -1774,7 +1782,7 @@ async fn run_imap(
                 }
                 // A message sent or scheduled with the server out of reach
                 // waits in the Outbox; dropped here it was lost (#442).
-                if let MailRequest::Send { mut message, sent_path } = req {
+                if let MailRequest::Send { mut message, sent_path, ticket } = req {
                     restore_msgid_case(cache.as_ref(), &mut message);
                     match message.send_at.filter(|t| *t > crate::datefmt::now()) {
                         Some(at) => schedule_send(
@@ -1791,6 +1799,7 @@ async fn run_imap(
                             );
                         }
                     }
+                    emit(WorkerEvent::SendDone { ticket, sent: false });
                 }
                 continue;
             }
@@ -2724,12 +2733,13 @@ async fn run_imap(
             }
 
             // Send Later (#145): into the Outbox until its time.
-            MailRequest::Send { mut message, sent_path }
+            MailRequest::Send { mut message, sent_path, ticket }
                 if message.send_at.is_some_and(|t| t > crate::datefmt::now()) =>
             {
                 let at = message.send_at.unwrap_or_default();
                 restore_msgid_case(cache.as_ref(), &mut message);
                 schedule_send(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit);
+                emit(WorkerEvent::SendDone { ticket, sent: false });
                 // The draft it was opened from is superseded by the queued copy.
                 if let Some(o) = message.draft_origin.clone() {
                     if o.account_id == account_id {
@@ -2751,7 +2761,7 @@ async fn run_imap(
                 }
             }
 
-            MailRequest::Send { mut message, sent_path } => {
+            MailRequest::Send { mut message, sent_path, ticket } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
@@ -2798,10 +2808,12 @@ async fn run_imap(
                         // This version replaces the queued one it was edited from.
                         drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
+                        emit(WorkerEvent::SendDone { ticket, sent: true });
                     }
                     Err(e) => {
                         emit(WorkerEvent::Status(String::new()));
                         send_failed(cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e.to_string(), smtp_refused(&e), &emit);
+                        emit(WorkerEvent::SendDone { ticket, sent: false });
                     }
                 }
             }
@@ -4278,6 +4290,26 @@ fn queue_outbox_message(
             send_at,
         )
         .is_some()
+}
+
+/// Quitting while a message waits out the Undo Send delay (#434): queue it
+/// in the Outbox, due now, for the next launch to send. The exit that
+/// follows would otherwise take the only copy with it.
+pub(crate) fn park_for_next_launch(
+    cache: &Cache,
+    account_id: u32,
+    account: &AccountConfig,
+    msg: &OutgoingMessage,
+    sent_path: Option<&str>,
+) -> bool {
+    let mut msg = msg.clone();
+    restore_msgid_case(Some(cache), &mut msg);
+    let queued =
+        queue_outbox_message(Some(cache), account_id, account, &msg, sent_path, "", Some(crate::datefmt::now()));
+    if let (true, Some(old)) = (queued, msg.outbox_origin) {
+        cache.delete_outbox(old);
+    }
+    queued
 }
 
 /// Try the queue: one message when `id` is given, otherwise all of them, oldest
@@ -10029,17 +10061,19 @@ async fn run_pop3(
                 emit(WorkerEvent::error(i18n("POP3 accounts don't support folders")));
             }
 
-            MailRequest::Send { mut message, .. } => {
+            MailRequest::Send { mut message, ticket, .. } => {
                 restore_msgid_case(cache.as_ref(), &mut message);
                 match send_smtp(&account, &message).await {
                     Ok(_) => {
                         drop_superseded_outbox(cache.as_ref(), account_id, &message, &emit);
                         emit(WorkerEvent::Sent);
+                        emit(WorkerEvent::SendDone { ticket, sent: true });
                     }
                     Err(e) => {
                         // POP3 has no Sent folder to copy to, but the message is held
                         // exactly as it is for IMAP accounts.
                         send_failed(cache.as_ref(), account_id, &account, &message, None, &e.to_string(), smtp_refused(&e), &emit);
+                        emit(WorkerEvent::SendDone { ticket, sent: false });
                     }
                 }
             }
@@ -10429,7 +10463,10 @@ async fn run_mock(
                 emit(WorkerEvent::AttachmentDeleted { message_id, path, uid, new_uid: Some(uid), name, size })
             }
             // Pretend the send succeeded so the compose flow is demoable offline.
-            MailRequest::Send { .. } => emit(WorkerEvent::Sent),
+            MailRequest::Send { ticket, .. } => {
+                emit(WorkerEvent::Sent);
+                emit(WorkerEvent::SendDone { ticket, sent: true });
+            }
         }
     }
 }
@@ -12158,6 +12195,7 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
             attempts: 1,
             last_error: String::new(),
             send_at: None,
+            status: String::new(),
         }
     }
 

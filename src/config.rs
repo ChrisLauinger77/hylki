@@ -1641,6 +1641,10 @@ pub(crate) struct PrivacyFile {
     /// Off by default, as in most mail programs today.
     #[serde(default)]
     pub(crate) signature_dashes: bool,
+    /// Undo Send (#434): seconds a sent message waits, with Undo on offer,
+    /// before it is handed to the server. 0 sends at once.
+    #[serde(default = "default_undo_send_secs")]
+    pub(crate) undo_send_secs: u32,
     /// Whether the composer underlines misspelled words as you type.
     #[serde(default = "default_on")]
     pub(crate) spellcheck: bool,
@@ -2014,6 +2018,7 @@ impl Default for PrivacyFile {
             reply_position: ReplyPosition::default(),
             signature_position: SignaturePosition::default(),
             signature_dashes: false,
+            undo_send_secs: default_undo_send_secs(),
             spellcheck: true,
             spellcheck_langs: String::new(),
             sidebar_hover_expand: false,
@@ -3782,6 +3787,13 @@ pub struct RailFold {
     /// The Tags section.
     #[serde(default = "default_on")]
     pub tags: bool,
+}
+
+/// The delays Settings → Composing offers for Undo Send (#434), in seconds.
+pub(crate) const UNDO_SEND_CHOICES: [u32; 5] = [0, 5, 10, 20, 30];
+
+fn default_undo_send_secs() -> u32 {
+    5
 }
 
 fn default_on() -> bool {
