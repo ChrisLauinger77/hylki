@@ -957,6 +957,9 @@ pub struct AppModel {
     fetch_interval_secs: u64,
     /// Whether IMAP IDLE push is enabled.
     push: bool,
+    /// Whether a metered connection holds back the work done ahead of the
+    /// user (#442).
+    metered_save_data: bool,
     /// Whether desktop notifications (new mail, error alerts) are posted.
     notifications_enabled: bool,
     /// Whether new-mail notifications may name the sender and subject.
@@ -2087,6 +2090,10 @@ pub enum AppMsg {
     WindowInFront,
     /// The network came back after being down: the same reconnect as a wake.
     NetworkBack,
+    /// The network went down: the Refresh button turns orange (#442).
+    NetworkLost,
+    /// The connection started or stopped being metered (#442).
+    MeteredChanged,
     /// Open the settings window on the user's preferred view (the menu entry).
     OpenSettings,
     OpenPreferences,
@@ -2862,6 +2869,9 @@ impl SimpleComponent for AppModel {
     ) -> ComponentParts<Self> {
         // Every setting in privacy.toml, read once.
         let prefs = config::load_privacy();
+        // Before the workers start, so their first connection already knows
+        // whether there is a network to make it on (#442).
+        crate::power::read_network(prefs.metered_save_data);
         let launcher_badge = prefs.launcher_badge();
         relm4::set_global_css(include_str!("styles.css"));
         register_icons(prefs.desktop_icons);
@@ -3508,6 +3518,7 @@ impl SimpleComponent for AppModel {
             clock_style: config::load_date_format().1,
             fetch_interval_secs: prefs.fetch_interval_secs,
             push: prefs.push,
+            metered_save_data: prefs.metered_save_data,
             notifications_enabled: prefs.notifications,
             notification_content: prefs.notification_content,
             notification_buttons: config::load_notification_buttons(),
@@ -3765,8 +3776,12 @@ impl SimpleComponent for AppModel {
         });
         crate::power::watch_network({
             let s = sender.input_sender().clone();
-            move || {
-                let _ = s.send(AppMsg::NetworkBack);
+            move |change| {
+                let _ = s.send(match change {
+                    crate::power::NetworkChange::Back => AppMsg::NetworkBack,
+                    crate::power::NetworkChange::Lost => AppMsg::NetworkLost,
+                    crate::power::NetworkChange::Metered(_) => AppMsg::MeteredChanged,
+                });
             }
         });
         // With no accounts, no worker events will populate the sidebar, so render
@@ -4344,6 +4359,10 @@ impl SimpleComponent for AppModel {
                 .peek_refresh_stack
                 .add_named(&model.peek_refresh_spinner, Some("spinner"));
             model.peek_refresh_stack.set_visible_child_name("icon");
+        }
+        // Started with no network: orange from the first frame (#442).
+        if !crate::power::online() {
+            model.show_network_state();
         }
         if model.rail_active {
             widgets.sidebar_split.set_min_sidebar_width(SIDEBAR_RAIL_WIDTH);
@@ -5917,6 +5936,11 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::SendDueScheduled => {
+                // Its one try would be spent on no network; the time is
+                // still past when the network is back (#442).
+                if !crate::power::reaches_internet() {
+                    return;
+                }
                 let now = crate::datefmt::now();
                 let due: Vec<(u32, u32)> = self
                     .outbox_by_account
@@ -7607,6 +7631,12 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Refresh => {
                 self.resend_launcher_count();
+                // The monitor can be wrong about the network (one with no
+                // default route): a Refresh asked for while it says offline
+                // tries the servers anyway (#442).
+                if !crate::power::online() {
+                    crate::power::try_anyway();
+                }
                 if self.unified {
                     let reqs = self.unified_targets();
                     for (account_id, folder_id, path) in reqs {
@@ -8166,6 +8196,14 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetFetchInterval(secs)) => {
                 if pref!(self.fetch_interval_secs = secs) {
                     self.arm_auto_fetch(&sender);
+                }
+            }
+
+            AppMsg::Pref(PrefOutput::SetMeteredSaveData(on)) => {
+                if pref!(self.metered_save_data = on) {
+                    let was = crate::power::saving_data();
+                    crate::power::set_save_data(on);
+                    self.saving_data_changed(was);
                 }
             }
 
@@ -10795,7 +10833,7 @@ impl SimpleComponent for AppModel {
                 // Still rejoining the Wi-Fi: a reconnect now would fail and
                 // leave the account offline until the next auto-fetch.
                 // NetworkBack does it once the network is up.
-                if !crate::power::network_available() {
+                if !crate::power::online() {
                     return;
                 }
                 self.reconnect_workers(&sender);
@@ -10807,7 +10845,34 @@ impl SimpleComponent for AppModel {
                 });
             }
 
-            AppMsg::NetworkBack => self.reconnect_workers(&sender),
+            AppMsg::NetworkBack => {
+                self.show_network_state();
+                // Errors from while it was down say nothing about now.
+                self.notifications.emit(NotifyInput::ClearConnectivity);
+                self.reconnect_workers(&sender);
+                // What waited in the Outbox goes now. An IMAP account sends
+                // it as its session comes back, but JMAP, Graph and POP3 only
+                // send when asked, so their mail sat there until a manual
+                // retry (#442).
+                let queued: Vec<u32> = self
+                    .outbox_by_account
+                    .iter()
+                    .filter(|(_, items)| !items.is_empty())
+                    .map(|(id, _)| *id)
+                    .collect();
+                for account_id in queued {
+                    self.send_to(account_id, MailRequest::FlushOutbox { id: None });
+                }
+            }
+
+            AppMsg::NetworkLost => self.show_network_state(),
+
+            AppMsg::MeteredChanged => {
+                // The flag has already flipped, so before it the connection
+                // was the other way.
+                let was = self.metered_save_data && !crate::power::metered();
+                self.saving_data_changed(was);
+            }
 
             AppMsg::LauncherCountLost => self.resend_launcher_count(),
 
@@ -12093,6 +12158,11 @@ impl SimpleComponent for AppModel {
                 // is what diagnoses #226-style replies); the bar gets it
                 // readable.
                 tracing::error!("[account {account_id}] {text}");
+                // A connection that died with the network: the Refresh
+                // button already says it is down (#442).
+                if connectivity && !crate::power::reaches_internet() {
+                    return;
+                }
                 let text = crate::worker::readable_error(&text);
                 let label = self.account_label(account_id);
                 // Desktop-notify only genuine failures (not transient connectivity
@@ -12544,6 +12614,7 @@ impl AppModel {
             clock_style: self.clock_style,
             fetch_interval_secs: self.fetch_interval_secs,
             push: self.push,
+            metered_save_data: self.metered_save_data,
             blacklist: self.blacklist.clone(),
             palette_collapse_secs: self.palette_collapse_secs,
             card_palette_collapse_secs: self.card_palette_collapse_secs,
@@ -13209,6 +13280,30 @@ impl AppModel {
         self.warm_own_gravatars(sender);
     }
 
+    /// The Refresh buttons and the status bar follow the network (#442).
+    fn show_network_state(&self) {
+        let offline = !crate::power::online();
+        crate::ui::show_refresh_offline(&self.sidebar_refresh, offline);
+        if let Some(button) = self.peek_refresh_stack.parent().and_downcast::<gtk::Button>() {
+            crate::ui::show_refresh_offline(&button, offline);
+        }
+        self.sidebars_emit(SidebarInput::SetOffline(offline));
+        self.notifications.emit(NotifyInput::SetOffline(offline));
+    }
+
+    /// The work held back on a metered connection may go again: wake every
+    /// worker, whose idle loop then picks up what it set aside. A worker
+    /// waits on its next request, and a recount is one it does anyway
+    /// (#442).
+    fn saving_data_changed(&self, was: bool) {
+        if was && !crate::power::saving_data() {
+            tracing::info!("saving data no longer: resuming the work done ahead");
+            for w in self.workers.values() {
+                let _ = w.send(MailRequest::RefreshUnread);
+            }
+        }
+    }
+
     fn arm_auto_fetch(&mut self, sender: &ComponentSender<Self>) {
         if let Some(id) = self.auto_fetch_source.take() {
             id.remove();
@@ -13217,7 +13312,11 @@ impl AppModel {
             let input = sender.input_sender().clone();
             let secs = self.fetch_interval_secs.min(u32::MAX as u64) as u32;
             let id = gtk::glib::timeout_add_seconds_local(secs, move || {
-                let _ = input.send(AppMsg::Refresh);
+                // Offline the check would only fail, and a Refresh would
+                // try anyway (#442).
+                if crate::power::online() {
+                    let _ = input.send(AppMsg::Refresh);
+                }
                 gtk::glib::ControlFlow::Continue
             });
             self.auto_fetch_source = Some(id);
@@ -21000,6 +21099,7 @@ impl AppModel {
             language: config::load_language(),
             fetch_interval_secs: self.fetch_interval_secs,
             push: self.push,
+            metered_save_data: self.metered_save_data,
             palette_collapse_secs: self.palette_collapse_secs,
             card_palette_collapse_secs: self.card_palette_collapse_secs,
             threading: self.threading,
@@ -25526,6 +25626,7 @@ fn refresh_scheme_css() {
 ///   heavy on a light ground, so light mode runs 25% lighter.
 /// - The remote-content banner's shield: amber on dark, a deeper orange on
 ///   light where amber washes out.
+/// - The Refresh button while offline (#442): orange, a step deeper on light.
 /// - The composer's ground: the reader's deeper page shade, read from the
 ///   live theme (#148) rather than the stock GNOME values, so a custom theme
 ///   carries through to the composer like it does to the reader.
@@ -25554,6 +25655,8 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
         // keeps the text color picked for its fill: the white chip and the
         // window's text color left the count white on white.
         let shield = if dark { "#ffca28" } else { "#ff7800" };
+        // GNOME's orange: its lighter step on dark, its deeper one on light.
+        let offline = if dark { "#ffa348" } else { "#e66100" };
         // The compose surface sits on the reader's deeper page ground — the
         // same shade the threaded cards float on, as the theme defines it.
         let (_, page, _) = crate::ui::message_view::theme_grounds_for(&window, dark);
@@ -25575,6 +25678,7 @@ fn install_scheme_css(window: &impl IsA<gtk::Widget>) {
              .message-list:not(:focus-within):not(:backdrop) > row:selected .message-row .thread-chip image {{ \
                color: @window_fg_color; }}\
              .remote-alert image {{ color: {shield}; }}\
+             .refresh-offline {{ color: {offline}; }}\
              .inline-compose-surface, .compose-pane {{ background-color: {page}; }}\
              .reader-split > separator {{ background-color: {page}; }}"
         ));

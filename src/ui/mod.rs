@@ -43,6 +43,26 @@ pub mod welcome;
 /// accounts and the list's avatars all move on this one clock.
 pub const FOCUS_ANIM_MS: u32 = 320;
 
+/// Give a Refresh button its face for the network's state: orange, with a
+/// tooltip that says why, while the network is down (#442). The header's, the
+/// peek's and the rail's buttons all wear it.
+pub fn show_refresh_offline(button: &gtk::Button, offline: bool) {
+    use gtk::prelude::*;
+    let tip = if offline {
+        crate::i18n::i18n(
+            "Offline: there is no network connection. Mail syncs again once the network is back. Click to try now, or long-press for Status Bar",
+        )
+    } else {
+        crate::i18n::i18n("Refresh or long-press for Status Bar")
+    };
+    button.set_tooltip_text(Some(tip.as_str()));
+    if offline {
+        button.add_css_class("refresh-offline");
+    } else {
+        button.remove_css_class("refresh-offline");
+    }
+}
+
 /// Run `close` when `entry` lost focus, was left empty, and focus did not
 /// move to another widget of its own row (the scope dropdown, a button, the
 /// popover a dropdown opens). The check waits for an idle turn because the

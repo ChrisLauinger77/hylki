@@ -4797,6 +4797,12 @@ msgstr "Exportar registo"
 msgid "Collapse status bar"
 msgstr "Recolher a barra de estado"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Barra de estado ({n})"
 
@@ -5296,6 +5302,16 @@ msgid ""
 msgstr ""
 "Recebe mensagens assim que chegam. As contas Microsoft 365 verificam se há "
 "novas mensagens no intervalo indicado acima."
+
+#, fuzzy
+msgid "Save data on metered connections"
+msgstr "Eliminar conversa"
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
+msgstr ""
 
 msgid "Notifications"
 msgstr "Notificações"
@@ -7368,6 +7384,11 @@ msgstr ""
 "Introduza primeiro o seu endereço de e-mail, o ID de cliente e ambos os URL "
 "OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "O seu fornecedor de correio confirmou que esta mensagem veio realmente de "
@@ -7545,8 +7566,16 @@ msgstr ""
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "não foi possível ler a resposta do servidor (começava por: {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Testar ligação"
+
 msgid "runtime error: {e}"
 msgstr "erro de execução: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Não foi possível aceder ao servidor"
 
 msgid "Could not load {path}: {e}"
 msgstr "Não foi possível carregar {path}: {e}"
@@ -7602,6 +7631,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "A transferir anexos… falta {n}"
 msgstr[1] "A transferir anexos… faltam {n}"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"Falha ao enviar: {e}. A mensagem encontra-se na Caixa de saída e será "
+"enviada quando a ligação for restabelecida."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

@@ -1446,6 +1446,27 @@ every six hours after. Either way the list of every message stays, so the
 message list and search are unchanged, and a removed message is fetched again
 when it is opened. Nothing on the server changes.
 
+### Offline and metered connections
+
+Hylki follows the desktop's network status (GNetworkMonitor, through the
+network portal in the Flatpak). While there is no network it makes no
+connections: the timed mail check, the push channels and Send Later wait, the
+Refresh button turns orange, and its tooltip says why. The status bar does not
+open by itself, but opened it explains the same. A message sent meanwhile
+goes to the Outbox, and what waits there is sent for every kind of account
+once the network is back. A server on the computer itself, such as Proton
+Mail Bridge on `127.0.0.1`, is still reached. A desktop can report no
+network when there is one (a network without a default route); clicking
+Refresh then tries the servers anyway for a minute.
+
+**Settings → General → Save data on metered connections**, on by default,
+holds back the work done ahead of you while the connection is metered:
+downloading the newest messages and attachments, indexing older mail for
+search, watching folders other than the Inbox, and fetching sender logos and
+Gravatar pictures. New mail still arrives, and whatever you open is
+fetched. It all resumes once the connection is no longer metered. Stored as
+`metered_save_data` in `privacy.toml`.
+
 ### Notifications
 
 A new-mail notification opens the message when clicked. When it is about a

@@ -4713,6 +4713,12 @@ msgstr "Esporta log"
 msgid "Collapse status bar"
 msgstr "Comprimi barra di stato"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Barra di stato ({n})"
 
@@ -5214,6 +5220,16 @@ msgid ""
 msgstr ""
 "Riceve i messaggi nel momento in cui arrivano. Gli account Microsoft 365 "
 "controllano all'intervallo sopra."
+
+#, fuzzy
+msgid "Save data on metered connections"
+msgstr "Elimina conversazione"
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
+msgstr ""
 
 msgid "Notifications"
 msgstr "Notifiche"
@@ -7283,6 +7299,11 @@ msgstr ""
 "Inserisci prima il tuo indirizzo e-mail, l'ID client e entrambi gli URL "
 "OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "Il tuo provider di posta ha confermato che questo è arrivato davvero da "
@@ -7460,8 +7481,16 @@ msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 "la risposta del server non ha potuto essere letta (iniziava con: {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Test connessione"
+
 msgid "runtime error: {e}"
 msgstr "errore di runtime: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Impossibile raggiungere il server"
 
 msgid "Could not load {path}: {e}"
 msgstr "Impossibile caricare {path}: {e}"
@@ -7516,6 +7545,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Download allegati in corso… {n} rimanenti"
 msgstr[1] "Download allegati in corso… {n} rimanenti"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"Invio non riuscito: {e}. Il messaggio è nella Posta in uscita e verrà "
+"inviato quando la connessione sarà ripristinata."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

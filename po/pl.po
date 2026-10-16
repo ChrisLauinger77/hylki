@@ -4867,6 +4867,12 @@ msgstr "Eksportuj dziennik"
 msgid "Collapse status bar"
 msgstr "Zwiń pasek stanu"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Pasek stanu ({n})"
 
@@ -5369,6 +5375,16 @@ msgstr ""
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
 "the interval above."
+msgstr ""
+
+#, fuzzy
+msgid "Save data on metered connections"
+msgstr "Usuń rozmowę"
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
 msgstr ""
 
 msgid "Notifications"
@@ -7438,6 +7454,11 @@ msgid "Enter your email address, the client ID and both OAuth URLs first."
 msgstr ""
 "Najpierw wprowadź adres e-mail, identyfikator klienta i oba adresy URL OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "Dostawca poczty potwierdził, że ta wiadomość naprawdę pochodzi z domeny "
@@ -7614,8 +7635,16 @@ msgstr ""
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "nie udało się odczytać odpowiedzi serwera (jej początek: {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Sprawdź połączenie"
+
 msgid "runtime error: {e}"
 msgstr "błąd środowiska wykonawczego: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Nie udało się połączyć z serwerem"
 
 msgid "Could not load {path}: {e}"
 msgstr "Nie udało się wczytać pliku {path}: {e}"
@@ -7673,6 +7702,16 @@ msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Pobieranie załączników… (pozostał {n})"
 msgstr[1] "Pobieranie załączników… (pozostały {n})"
 msgstr[2] "Pobieranie załączników… (pozostało {n})"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"Nie udało się wysłać: {e}. Wiadomość jest w skrzynce nadawczej i zostanie "
+"wysłana po przywróceniu połączenia."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

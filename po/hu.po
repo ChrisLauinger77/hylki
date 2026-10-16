@@ -4816,6 +4816,12 @@ msgstr "Napló exportálása"
 msgid "Collapse status bar"
 msgstr "Állapotsáv összecsukása"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Állapotsáv ({n})"
 
@@ -5314,6 +5320,16 @@ msgstr ""
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
 "the interval above."
+msgstr ""
+
+#, fuzzy
+msgid "Save data on metered connections"
+msgstr "Beszélgetés törlése"
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
 msgstr ""
 
 msgid "Notifications"
@@ -7406,6 +7422,11 @@ msgid "Enter your email address, the client ID and both OAuth URLs first."
 msgstr ""
 "Először adja meg az e-mail címét, az ügyfélazonosítót és mindkét OAuth-URL-t."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "A levelezőszolgáltatója megerősítette, hogy ez valóban innen származik: "
@@ -7585,8 +7606,16 @@ msgstr ""
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "a kiszolgáló válasza nem olvasható (így kezdődött: {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Kapcsolat tesztelése"
+
 msgid "runtime error: {e}"
 msgstr "futásidejű hiba: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Nem sikerült elérni a kiszolgálót"
 
 msgid "Could not load {path}: {e}"
 msgstr "Nem tölthető be: {path}: {e}"
@@ -7641,6 +7670,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Mellékletek letöltése… még {n} van hátra"
 msgstr[1] "Mellékletek letöltése… még {n} van hátra"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"A küldés sikertelen volt: {e}. Az üzenet a Kimenő mappában található, és a "
+"kapcsolat helyreállása után elküldésre kerül."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- **Hylki waits for the network instead of dialing into nothing** (#442).
+  It follows the desktop's network status: with no network, the timed mail
+  check, push, the folder watchers and Send Later make no connections and
+  show no connection errors, and the Refresh button turns orange with a
+  tooltip that says why. The status bar, opened, explains it too. Clicking
+  Refresh tries anyway, and a server on the computer itself (Proton Mail
+  Bridge) is still reached. New setting **Settings → General → Save data on
+  metered connections**, on by default: on a metered connection, messages
+  and attachments are not downloaded ahead of time, older mail is not
+  indexed, only the Inbox is watched and sender logos are not fetched.
+- **Fixed: a message sent while the server was out of reach was lost**
+  (#442). An IMAP account that could not connect dropped the message
+  instead of putting it in the Outbox, and a Send Later message the same
+  way. Both now wait in the Outbox. With no network, it is a notice, not
+  an error.
+- **Fixed: the Outbox of a JMAP, Microsoft 365 or POP3 account was not sent
+  when the connection came back** (#442). Only IMAP accounts sent it by
+  themselves; the others waited for Retry. All now send it once the network
+  is back.
+- **Fixed: a sender logo that could not be fetched offline was taken for
+  none at all** (#442), and initials showed for that sender for a week.
+
 - **Fixed: a conversation opened at its top instead of its new mail**
   (PR #463 by Christian Dandachi). A conversation handed to the reader
   while the loading cover was still up spent its scroll to the first unread

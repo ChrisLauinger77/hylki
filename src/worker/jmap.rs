@@ -982,6 +982,10 @@ async fn jmap_session(
     if let Some(s) = &state.session {
         return Some(s.clone());
     }
+    // The Refresh button already says the network is down (#442).
+    if !crate::power::reaches_url(&jmap_base_url(account)) {
+        return None;
+    }
     let a = account.clone();
     match blocking(move || jmap_connect(&a)).await {
         Ok(s) => {
@@ -2076,6 +2080,12 @@ fn spawn_jmap_push(s: JmapSession, tx: mpsc::UnboundedSender<()>) {
                 if tx.is_closed() {
                     return;
                 }
+                // Offline: wait for the network rather than redial into
+                // nothing every 30 seconds (#442).
+                if !crate::power::reaches_url(&url) {
+                    std::thread::sleep(Duration::from_secs(5));
+                    continue;
+                }
                 jmap_wire("GET events");
                 let resp = ureq::AgentBuilder::new()
                     .timeout_connect(Duration::from_secs(20))
@@ -2251,7 +2261,11 @@ pub(super) async fn run_jmap(
     loop {
         // The background index (#429) runs only while nothing else is
         // asked, a single request a step.
-        let indexing = !state.backfill.is_empty();
+        // Offline or on a metered connection it waits; the request that
+        // follows the change wakes this loop to look again (#442).
+        let indexing = !state.backfill.is_empty()
+            && crate::power::reaches_url(&jmap_base_url(&account))
+            && !crate::power::saving_data();
         let wait = state.backfill_wait;
         let req = tokio::select! {
             biased;
@@ -2260,6 +2274,9 @@ pub(super) async fn run_jmap(
                 None => break,
             },
             _ = poll.tick() => {
+                if !crate::power::reaches_url(&jmap_base_url(&account)) {
+                    continue;
+                }
                 if let Some(s) = jmap_session(&account, &mut state, &|_| {}).await {
                     jmap_poll_inbox(&s, account_id, &account, cache.as_ref(), &mut state, &emit).await;
                     if push_enabled && !push_started {
@@ -2827,13 +2844,15 @@ pub(super) async fn run_jmap(
             MailRequest::Send { mut message, sent_path } => {
                 emit(WorkerEvent::Status(i18n("Sending…")));
                 restore_msgid_case(cache.as_ref(), &mut message);
+                let reachable = crate::power::reaches_url(&jmap_base_url(&account));
                 let sent = match jmap_session(&account, &mut state, &emit).await {
-                    Some(s) => {
+                    Some(s) if reachable => {
                         jmap_send_message(&s, account_id, &account, &message, sent_path.as_deref(), cache.as_ref(), &mut state, &emit)
                             .await
                             .map(|()| s)
                     }
-                    None => Err("could not reach the server".to_string()),
+                    _ if !reachable => Err(offline_text()),
+                    _ => Err("could not reach the server".to_string()),
                 };
                 emit(WorkerEvent::Status(String::new()));
                 match sent {

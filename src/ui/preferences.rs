@@ -31,6 +31,7 @@ pub struct PrefInit {
     pub language: String,
     pub fetch_interval_secs: u64,
     pub push: bool,
+    pub metered_save_data: bool,
     pub palette_collapse_secs: u64,
     /// Seconds a message card's actions palette stays open — its own, not
     /// the message list's.
@@ -1266,6 +1267,7 @@ pub enum PrefOutput {
     SetSpellcheckLangs(String),
     SetFetchInterval(u64),
     SetPush(bool),
+    SetMeteredSaveData(bool),
     SetNotifications(bool),
     SetNotificationContent(bool),
     SetNotificationButtons(crate::config::NotificationButtons),
@@ -2045,6 +2047,15 @@ impl Component for Preferences {
                                         set_subtitle: &i18n("Receives messages the moment they arrive. Microsoft 365 accounts check at the interval above."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetPush(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "metered_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Save data on metered connections"),
+                                        set_subtitle: &i18n("On a metered connection, new mail still arrives, but Hylki does not download messages and attachments ahead of time, index older mail, watch folders other than the Inbox or fetch sender logos."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetMeteredSaveData(row.is_active()));
                                         },
                                     },
                                 },
@@ -4227,6 +4238,7 @@ impl Component for Preferences {
             .unwrap_or(0);
         widgets.fetch_row.set_selected(selected as u32);
         widgets.push_row.set_active(init.push);
+        widgets.metered_row.set_active(init.metered_save_data);
         widgets.notifications_row.set_active(init.notifications);
         widgets.notification_content_row.set_active(init.notification_content);
         // Set before the handlers can act on it: the model already holds

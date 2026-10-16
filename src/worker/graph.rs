@@ -780,7 +780,11 @@ pub(super) async fn run_graph(
         // The background index (#429) only runs while nothing else is
         // asked: a request, then the poll, come first, and each step is a
         // single request so neither waits long behind one.
-        let indexing = !state.backfill.is_empty();
+        // Offline or on a metered connection it waits; the request that
+        // follows the change wakes this loop to look again (#442).
+        let indexing = !state.backfill.is_empty()
+            && crate::power::reaches_internet()
+            && !crate::power::saving_data();
         let wait = state.backfill_wait;
         let req = tokio::select! {
             biased;
@@ -789,6 +793,9 @@ pub(super) async fn run_graph(
                 None => break,
             },
             _ = poll.tick() => {
+                if !crate::power::reaches_internet() {
+                    continue;
+                }
                 graph_poll_inbox(account_id, &account, cache.as_ref(), &mut state, &emit).await;
                 continue;
             }
@@ -1637,6 +1644,11 @@ async fn graph_purge_uids(
 
 /// A fresh GOA token, or a user-actionable error.
 async fn graph_token(account: &AccountConfig, emit: &impl Fn(WorkerEvent)) -> Option<String> {
+    // Offline, no token is no fault of the sign-in; the Refresh button
+    // already says the network is down (#442).
+    if !crate::power::reaches_internet() {
+        return None;
+    }
     match fetch_oauth_token(account).await {
         Some(t) => Some(t),
         None => {
@@ -2115,6 +2127,9 @@ async fn graph_send_message(
 ) -> Result<(), String> {
     let email = build_email(account, message).map_err(|e| e.to_string())?;
     let raw = email.formatted();
+    if !crate::power::reaches_internet() {
+        return Err(offline_text());
+    }
     let token = graph_token(account, emit)
         .await
         .ok_or_else(|| "no sign-in token from GNOME Online Accounts".to_string())?;

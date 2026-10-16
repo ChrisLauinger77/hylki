@@ -1395,6 +1395,11 @@ pub(crate) struct PrivacyFile {
     /// Whether to use IMAP IDLE push for instant new-mail delivery.
     #[serde(default = "default_on")]
     pub(crate) push: bool,
+    /// On a metered connection, hold back the work done ahead of the user:
+    /// prefetching bodies and attachments, indexing old mail, watching
+    /// folders other than the Inbox, fetching sender logos (#442).
+    #[serde(default = "default_on")]
+    pub(crate) metered_save_data: bool,
     /// Addresses or whole domains whose incoming mail is auto-deleted (to Trash).
     /// Stored lowercased; a bare domain like "spam.com" matches any sender there.
     #[serde(default)]
@@ -1951,6 +1956,7 @@ impl Default for PrivacyFile {
             clock_style: ClockStyle::default(),
             fetch_interval_secs: default_fetch_interval(),
             push: true,
+            metered_save_data: true,
             blacklist: Vec::new(),
             palette_collapse_secs: default_palette_collapse(),
             card_palette_collapse_secs: default_palette_collapse(),

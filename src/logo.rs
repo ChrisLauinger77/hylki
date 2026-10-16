@@ -233,7 +233,8 @@ pub fn cached(email: &str) -> Option<gtk::gdk::Texture> {
 /// most once a session per domain, so a screenful of rows from one sender
 /// doesn't fan out into a fetch per row.
 pub fn wants_refresh(email: &str) -> bool {
-    if is_mailbox_host(email) {
+    // Spent offline, the session's one look would find nothing (#442).
+    if is_mailbox_host(email) || !crate::power::fetches_ahead() {
         return false;
     }
     let Some(domain) = domain_of(email) else {
@@ -298,7 +299,10 @@ fn fetch_from(email: &str) -> Option<(Vec<u8>, String)> {
     let img = img_path(&domain);
     let bimi = bimi_path(&domain);
     let bimi_fresh = bimi.as_ref().is_some_and(|p| fresh(p));
-    if bimi_fresh {
+    // Offline or metered, only what is on disk answers, and no answer is
+    // stored: a miss now says nothing about the domain (#442).
+    let online = crate::power::fetches_ahead();
+    if bimi_fresh || !online {
         if let Some(bytes) = stored_bimi(&domain) {
             return Some((bytes, "stored BIMI logo".into()));
         }
@@ -339,6 +343,10 @@ fn fetch_from(email: &str) -> Option<(Vec<u8>, String)> {
     }
     if miss_path(&domain).is_some_and(|p| fresh(&p)) {
         return None;
+    }
+    if !online {
+        let stale = img.as_ref().and_then(|p| std::fs::read(p).ok());
+        return stale.map(|b| (b, "stale site icon (no network)".into()));
     }
     for url in candidate_urls(&domain) {
         if let Some(bytes) = get(&url) {
@@ -936,6 +944,10 @@ pub fn decode_and_cache(email: &str, bytes: &[u8]) -> Option<gtk::gdk::Texture> 
 
 /// Remember that a sender's domain has no usable icon.
 pub fn remember_missing(email: &str) {
+    // Not looked up at all, offline or metered (#442).
+    if !crate::power::fetches_ahead() {
+        return;
+    }
     if let Some(domain) = domain_of(email) {
         remember_miss(&domain);
     }

@@ -372,6 +372,10 @@ pub struct Sidebar {
     sync_spinner: Option<gtk::Spinner>,
     /// Whether any account is syncing (drives the refresh spinner).
     busy: bool,
+    /// Whether the network is down (turns the refresh button orange).
+    offline: bool,
+    /// The rail's refresh button, for its offline face.
+    sync_button: Option<gtk::Button>,
     /// The "Outbox" row list box (one row), while anything is queued.
     outbox_list: Option<gtk::ListBox>,
     /// Display-wide provider holding each account's avatar color rules.
@@ -598,6 +602,8 @@ pub enum SidebarInput {
     SetContactsRow(bool),
     /// Whether any account is syncing — spins the refresh button.
     SetBusy(bool),
+    /// Whether the network is down: the refresh button turns orange (#442).
+    SetOffline(bool),
     /// How many messages are waiting to be sent; 0 hides the Outbox row.
     SetOutboxCount(u32),
     /// The "Outbox" row was chosen.
@@ -858,6 +864,8 @@ impl Component for Sidebar {
             sync_stack: None,
             sync_spinner: None,
             busy: false,
+            offline: !crate::power::online(),
+            sync_button: None,
             outbox_list: None,
             color_provider,
             selected: Sel::None,
@@ -1673,6 +1681,13 @@ impl Sidebar {
                 }
             }
 
+            SidebarInput::SetOffline(offline) => {
+                self.offline = offline;
+                if let Some(button) = &self.sync_button {
+                    crate::ui::show_refresh_offline(button, offline);
+                }
+            }
+
 
             SidebarInput::SetFocus { hide_accounts, fold_unified, animate } => {
                 let hiding = hide_accounts && !self.focus_hide_accounts;
@@ -2147,6 +2162,7 @@ impl Sidebar {
 
             self.sync_stack = None;
             self.sync_spinner = None;
+            self.sync_button = None;
             if self.collapsed {
                 // Refresh, showing a spinner while any account syncs.
                 let refresh = gtk::Button::new();
@@ -2176,7 +2192,9 @@ impl Sidebar {
                     let _ = s.output(SidebarOutput::StatusBarRequested);
                 });
                 refresh.add_controller(long);
+                crate::ui::show_refresh_offline(&refresh, self.offline);
                 bar.append(&refresh);
+                self.sync_button = Some(refresh);
                 self.sync_stack = Some(stack);
                 self.sync_spinner = Some(spinner);
             }

@@ -4722,6 +4722,12 @@ msgstr "Exporter le journal"
 msgid "Collapse status bar"
 msgstr "Réduire la barre d'état"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Barre d'état ({n})"
 
@@ -5226,6 +5232,16 @@ msgid ""
 msgstr ""
 "Reçoit les messages dès leur arrivée. Les comptes Microsoft 365 vérifient à "
 "l'intervalle indiqué ci-dessus."
+
+#, fuzzy
+msgid "Save data on metered connections"
+msgstr "Sélectionner les conversations lues ou non lues"
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
+msgstr ""
 
 msgid "Notifications"
 msgstr "Notifications"
@@ -7319,6 +7335,11 @@ msgid "Enter your email address, the client ID and both OAuth URLs first."
 msgstr ""
 "Saisissez d'abord votre adresse e-mail, l'ID client et les deux URL OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "Votre fournisseur de messagerie a confirmé que ce message provient bien de "
@@ -7497,8 +7518,16 @@ msgid "the server's reply could not be read (it began: {reply})"
 msgstr ""
 "la réponse du serveur n'a pas pu être lue (elle commençait par : {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Tester la connexion"
+
 msgid "runtime error: {e}"
 msgstr "erreur d'exécution : {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Impossible de joindre le serveur"
 
 msgid "Could not load {path}: {e}"
 msgstr "Impossible de charger {path} : {e}"
@@ -7553,6 +7582,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Téléchargement des pièces jointes… {n} restante"
 msgstr[1] "Téléchargement des pièces jointes… {n} restantes"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"Échec de l'envoi : {e}. Le message est dans la Boîte d'envoi et sera envoyé "
+"dès le rétablissement de la connexion."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

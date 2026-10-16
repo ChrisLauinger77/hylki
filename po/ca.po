@@ -4646,6 +4646,12 @@ msgstr "Exporta el registre"
 msgid "Collapse status bar"
 msgstr "Replega la barra d'estat"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Barra d'estat ({n})"
 
@@ -5145,6 +5151,15 @@ msgid ""
 msgstr ""
 "Rep els missatges en el moment que arriben. Els comptes de Microsoft 365 "
 "comproven a l'interval de dalt."
+
+msgid "Save data on metered connections"
+msgstr ""
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
+msgstr ""
 
 msgid "Notifications"
 msgstr "Notificacions"
@@ -7213,6 +7228,11 @@ msgstr ""
 "Introdueix primer la teva adreça de correu, l'ID de client i els dos URL "
 "d'OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "El teu proveïdor de correu ha confirmat que això prové realment de {from}."
@@ -7386,8 +7406,16 @@ msgstr ""
 msgid "the server's reply could not be read (it began: {reply})"
 msgstr "no s'ha pogut llegir la resposta del servidor (començava: {reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Prova la connexió"
+
 msgid "runtime error: {e}"
 msgstr "error en temps d'execució: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "No s'ha pogut contactar amb el servidor"
 
 msgid "Could not load {path}: {e}"
 msgstr "No s'ha pogut carregar {path}: {e}"
@@ -7442,6 +7470,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "S'estan baixant els adjunts… en queden {n}"
 msgstr[1] "S'estan baixant els adjunts… en queden {n}"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"L'enviament ha fallat: {e}. El missatge és a la bústia de sortida i "
+"s'enviarà quan torni la connexió."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "

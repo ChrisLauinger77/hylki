@@ -94,6 +94,8 @@ pub struct NotificationCenter {
     /// Current ongoing activity (connecting/syncing). Never auto-shown; only
     /// visible when the user opens the panel.
     status_text: String,
+    /// The network is down: the opened bar explains it.
+    offline: bool,
     panel_open: bool,
     /// Console mode (verbose live log): offered at all (Settings), and open.
     console_enabled: bool,
@@ -143,6 +145,10 @@ pub enum NotifyInput {
     SetStatus(String),
     /// Connectivity restored: drop any connection/sync error cards.
     ClearConnectivity,
+    /// The network went down or came back. Never shows the bar by itself:
+    /// the Refresh button turns orange, and the bar, once opened, says why
+    /// (#442).
+    SetOffline(bool),
     TogglePanel,
     /// The menu item, Ctrl+Shift+S and a long-press on Refresh: hide the bar
     /// if it shows at all, a passing message included, or open it (#294).
@@ -302,7 +308,17 @@ impl SimpleComponent for NotificationCenter {
                             set_label: &model.bar_label(),
                             set_hexpand: true,
                             set_halign: gtk::Align::Start,
-                            set_ellipsize: gtk::pango::EllipsizeMode::End,
+                            set_xalign: 0.0,
+                            // The offline explanation is read whole; anything
+                            // else is one line.
+                            #[watch]
+                            set_wrap: model.showing_offline(),
+                            #[watch]
+                            set_ellipsize: if model.showing_offline() {
+                                gtk::pango::EllipsizeMode::None
+                            } else {
+                                gtk::pango::EllipsizeMode::End
+                            },
                         },
 
                         gtk::Button {
@@ -367,6 +383,7 @@ impl SimpleComponent for NotificationCenter {
             transient_error: false,
             transient_visible: false,
             status_text: String::new(),
+            offline: !crate::power::online(),
             panel_open: false,
             console_enabled: false,
             console_open: false,
@@ -618,6 +635,10 @@ impl NotificationCenter {
                 self.status_text = text;
             }
 
+            NotifyInput::SetOffline(offline) => {
+                self.offline = offline;
+            }
+
             NotifyInput::ClearConnectivity => {
                 let before = self.ids.len();
                 self.remove_connectivity_cards();
@@ -797,7 +818,15 @@ impl NotificationCenter {
         // Amber only when something error-related is actually present: an active
         // error transient, or existing error cards. Never the stale flag, which
         // used to tint the bar amber while collapsing an already-cleared panel.
-        (self.transient_visible && self.transient_error) || !self.ids.is_empty()
+        (self.transient_visible && self.transient_error)
+            || !self.ids.is_empty()
+            || self.showing_offline()
+    }
+
+    /// Whether the bar's own line is the offline explanation: the bar was
+    /// opened while the network is down.
+    fn showing_offline(&self) -> bool {
+        self.offline && self.panel_open && !self.console_open
     }
 
     fn area_classes(&self) -> Vec<&'static str> {
@@ -817,7 +846,9 @@ impl NotificationCenter {
     }
 
     fn bar_icon(&self) -> &'static str {
-        if self.is_error_state() {
+        if self.showing_offline() {
+            "network-offline-symbolic"
+        } else if self.is_error_state() {
             "dialog-warning-symbolic"
         } else {
             // The bell — the same icon as the toolbar button that opens this
@@ -828,8 +859,14 @@ impl NotificationCenter {
 
     fn bar_label(&self) -> String {
         if self.panel_open {
+            // Nothing syncs while the network is down, so that is the
+            // activity to report.
+            if self.showing_offline() {
+                i18n(
+                    "Offline: there is no network connection, so mail is not being checked or sent. Messages you send wait in the Outbox. Everything syncs again once the network is back.",
+                )
             // Reveal the current activity when the user opens the panel.
-            if !self.status_text.is_empty() {
+            } else if !self.status_text.is_empty() {
                 self.status_text.clone()
             } else {
                 i18n_f("Status bar ({n})", &[("n", &self.ids.len().to_string())])

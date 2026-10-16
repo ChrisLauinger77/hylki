@@ -332,6 +332,9 @@ const WATCH_LEASE: Duration = Duration::from_secs(3600);
 /// SEARCH per watcher per minute; the ceiling on a watched folder's staleness
 /// whatever the server chooses to say.
 const WATCH_VERIFY: Duration = Duration::from_secs(60);
+/// How often a watcher waiting out a network outage looks again: no network
+/// traffic, only a flag read, so it can be short (#442).
+const NETWORK_WAIT: Duration = Duration::from_secs(5);
 
 /// How long ending an IDLE (the DONE handshake) may take before the connection
 /// is declared wedged and dropped (#91). Unbounded, a server that never answers
@@ -752,6 +755,12 @@ impl WorkerEvent {
     pub fn net_error(text: impl Into<String>) -> Self {
         WorkerEvent::Error { text: text.into(), connectivity: true }
     }
+}
+
+/// What a connection that was never tried, because the network is down,
+/// reports (#442).
+pub(crate) fn offline_text() -> String {
+    i18n("no network connection")
 }
 
 type ImapSession = Session<ImapIo<TlsStream<TcpStream>>>;
@@ -1404,7 +1413,12 @@ async fn run_imap(
             Ok(req) => req,
             Err(mpsc::error::TryRecvError::Disconnected) => break,
             Err(mpsc::error::TryRecvError::Empty) => {
-                if !body_prefetch.is_empty() {
+                // Offline, the queues keep for when the network is back; on
+                // a metered connection the work done ahead of the user waits
+                // for an unmetered one (#442).
+                let net = crate::power::reaches(&account.imap_host);
+                let ahead = net && !crate::power::saving_data();
+                if !body_prefetch.is_empty() && ahead {
                     // Highest priority: get new mail's body cached so opening it is
                     // instant (no network wait).
                     let interrupted_body = body_prefetch.front().cloned();
@@ -1426,13 +1440,13 @@ async fn run_imap(
                         tracing::debug!(account_id, "body prefetch yielded to the reader");
                     }
                     continue;
-                } else if folder_refresh_due && session.is_some() {
+                } else if folder_refresh_due && session.is_some() && net {
                     folder_refresh_due = false;
                     refresh_folder_names(
                         account_id, &account, session.as_mut().unwrap(), cache.as_ref(), &emit,
                     ).await;
                     continue;
-                } else if sweep_due && session.is_some() {
+                } else if sweep_due && session.is_some() && net {
                     // The unread chips' re-count, owed since IDLE last woke
                     // (or left half done by a request): folder by folder,
                     // yielding to whatever arrives, its place kept.
@@ -1460,7 +1474,7 @@ async fn run_imap(
                         ).await;
                     }
                     continue;
-                } else if !prefetch.is_empty() {
+                } else if !prefetch.is_empty() && ahead {
                     run_one_prefetch(
                         &mut prefetch,
                         &mut session,
@@ -1472,7 +1486,7 @@ async fn run_imap(
                     .await;
                     pending_resync = true;
                     continue;
-                } else if !refs_repair.is_empty() && session.is_some() && backfill.is_empty() {
+                } else if !refs_repair.is_empty() && session.is_some() && backfill.is_empty() && ahead {
                     // Lower priority than indexing new mail: repair the threading
                     // references of already-indexed replies, a chunk at a time.
                     run_one_refs_repair(
@@ -1484,11 +1498,11 @@ async fn run_imap(
                     )
                     .await;
                     continue;
-                } else if !label_fill.is_empty() && session.is_some() && backfill.is_empty() {
+                } else if !label_fill.is_empty() && session.is_some() && backfill.is_empty() && ahead {
                     run_one_label_fill(&mut label_fill, &mut session, account_id, cache.as_ref(), &emit)
                         .await;
                     continue;
-                } else if !backfill.is_empty() {
+                } else if !backfill.is_empty() && ahead {
                     // Index the rest of the mailbox in the background. Connect first
                     // for cached-folder accounts (which connect lazily); if still
                     // offline, wait for a request instead of spinning.
@@ -1547,7 +1561,7 @@ async fn run_imap(
                         }
                         continue;
                     }
-                } else if push_enabled && session.is_some() && idle_folder.is_some() {
+                } else if push_enabled && session.is_some() && idle_folder.is_some() && net {
                     let (fid, fpath) = idle_folder.clone().unwrap();
                     // Catch mail delivered while the connection was busy prefetching.
                     if pending_resync {
@@ -1737,7 +1751,12 @@ async fn run_imap(
             _ => {}
         }
 
-        // Everything below needs a live session.
+        // Everything below needs a live session. One left from before the
+        // network went is dead, and a request on it would wait out the
+        // socket's timeout (#442).
+        if session.is_some() && !crate::power::reaches(&account.imap_host) {
+            session = None;
+        }
         if session.is_none() {
             session = connect_and_list(account_id, &account, cache.as_ref(), &emit).await;
             if session.is_none() {
@@ -1752,6 +1771,26 @@ async fn run_imap(
                 | MailRequest::SyncFolder { folder_id, .. } = &req
                 {
                     emit(WorkerEvent::BackfillDone { folder_id: *folder_id });
+                }
+                // A message sent or scheduled with the server out of reach
+                // waits in the Outbox; dropped here it was lost (#442).
+                if let MailRequest::Send { mut message, sent_path } = req {
+                    restore_msgid_case(cache.as_ref(), &mut message);
+                    match message.send_at.filter(|t| *t > crate::datefmt::now()) {
+                        Some(at) => schedule_send(
+                            cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), at, &emit,
+                        ),
+                        None => {
+                            let e = if crate::power::reaches(&account.imap_host) {
+                                i18n("could not reach the server")
+                            } else {
+                                offline_text()
+                            };
+                            send_failed(
+                                cache.as_ref(), account_id, &account, &message, sent_path.as_deref(), &e, false, &emit,
+                            );
+                        }
+                    }
                 }
                 continue;
             }
@@ -2886,6 +2925,11 @@ async fn connect_and_list(
     cache: Option<&Cache>,
     emit: &impl Fn(WorkerEvent),
 ) -> Option<ImapSession> {
+    // The Refresh button already says the network is down; an error per
+    // account and per attempt would only repeat it (#442).
+    if !crate::power::reaches(&account.imap_host) {
+        return None;
+    }
     emit(WorkerEvent::Status(i18n_f("Connecting to {host}…", &[("host", &account.imap_host)])));
 
     let result = match connect(account).await {
@@ -3569,6 +3613,11 @@ fn watch_active_folder(
             return false;
         }
     }
+    // A metered connection keeps to the Inbox's own watcher; the sweep still
+    // covers the rest (#442).
+    if crate::power::saving_data() {
+        return false;
+    }
     // Lapsed watchers exited on their own; drop their leftover entries.
     watchers.retain(|_, w| !w.handle.is_finished());
     while watchers.len() >= WATCHER_LIMIT {
@@ -3637,6 +3686,18 @@ async fn watch_folder(
             // just to watch a folder nothing has touched for an hour.
             return;
         }
+        // Offline: wait for the network, neither dialing nor growing the
+        // backoff, so the watcher is back within moments of it (#442).
+        while !crate::power::reaches(&account.imap_host) {
+            tokio::time::sleep(NETWORK_WAIT).await;
+            if lapsed(&lease) {
+                return;
+            }
+        }
+        if lease.is_some() && crate::power::saving_data() {
+            tracing::info!("unwatching {path}: the connection is metered");
+            return;
+        }
         let Ok(mut sess) = connect(&account).await else {
             // Offline, or the server's connection cap is spent (the main
             // session always connects first and is never contended by this).
@@ -3669,6 +3730,14 @@ async fn watch_folder(
                 tracing::info!("unwatching {path}: quiet for the whole lease");
                 let _ = sess.logout().await;
                 return;
+            }
+            if lease.is_some() && crate::power::saving_data() {
+                tracing::info!("unwatching {path}: the connection is metered");
+                let _ = sess.logout().await;
+                return;
+            }
+            if !crate::power::reaches(&account.imap_host) {
+                break; // the socket went with the network
             }
             // A short IDLE round: woken instantly where the server announces
             // changes, and capped at [`WATCH_VERIFY`] so the recount below
@@ -4111,14 +4180,22 @@ fn send_failed(
     if let (true, Some(old), Some(c)) = (queued, msg.outbox_origin, cache) {
         c.delete_outbox(old);
     }
-    emit(WorkerEvent::error(if queued {
-        i18n_f(
-            "Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.",
-            &[("e", error)],
-        )
+    if queued && error == offline_text() {
+        // Nothing failed: the message waits for the network, which the
+        // Refresh button already shows is down (#442).
+        emit(WorkerEvent::Notice(i18n(
+            "No network connection. The message is in the Outbox and will be sent when the connection is back.",
+        )));
     } else {
-        i18n_f("Send failed: {e}", &[("e", error)])
-    }));
+        emit(WorkerEvent::error(if queued {
+            i18n_f(
+                "Send failed: {e}. The message is in the Outbox and will be sent when the connection is back.",
+                &[("e", error)],
+            )
+        } else {
+            i18n_f("Send failed: {e}", &[("e", error)])
+        }));
+    }
     if !queued {
         emit(WorkerEvent::Unsent(Box::new(msg.clone())));
     }
@@ -5332,6 +5409,10 @@ async fn send_raw_smtp(
     let alias = envelope
         .from()
         .and_then(|f| alias_with_own_smtp(account, f.as_ref()));
+    let host = alias.map(|a| a.smtp_host.trim().to_string()).unwrap_or_else(|| smtp_host(account));
+    if !crate::power::reaches(&host) {
+        return Err(offline_text().into());
+    }
     let mailer = smtp_transport(account, alias).await?;
     // The SMTP leg for the console: size and recipient count, then the verdict.
     tracing::debug!(
@@ -6537,6 +6618,9 @@ async fn sign_in_password(account: &AccountConfig, smtp: bool) -> Result<String,
 }
 
 async fn connect(account: &AccountConfig) -> Result<ImapSession, Box<dyn std::error::Error>> {
+    if !crate::power::reaches(&account.imap_host) {
+        return Err(offline_text().into());
+    }
     // Read before the connect timeout starts: the keyring's own wait is not
     // the server's, and must not be reported as one.
     let password = sign_in_password(account, false).await?;
@@ -11816,6 +11900,24 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let events = std::cell::RefCell::new(Vec::new());
         send_failed(Some(&cache), 1, &account, &msg, None, "offline", false, &|e| events.borrow_mut().push(e));
         assert!(!events.into_inner().iter().any(|e| matches!(e, WorkerEvent::Unsent(_))));
+    }
+
+    /// #442: a message sent with no network waits in the Outbox with a
+    /// notice, not an error: nothing failed.
+    #[test]
+    fn an_offline_send_waits_quietly() {
+        let cache = Cache::in_memory().expect("cache");
+        let account = sample_account();
+        let mut msg = sample_outgoing();
+        msg.to = "ann@example.com".into();
+        let events = std::cell::RefCell::new(Vec::new());
+        send_failed(Some(&cache), 1, &account, &msg, None, &offline_text(), false, &|e| {
+            events.borrow_mut().push(e)
+        });
+        let events = events.into_inner();
+        assert!(events.iter().any(|e| matches!(e, WorkerEvent::Notice(_))), "{events:?}");
+        assert!(!events.iter().any(|e| matches!(e, WorkerEvent::Error { .. })), "{events:?}");
+        assert_eq!(cache.outbox_items(1).len(), 1);
     }
 
     /// #368: a recipient the server refuses comes back to the composer and

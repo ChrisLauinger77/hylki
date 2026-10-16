@@ -4708,6 +4708,12 @@ msgstr "Εξαγωγή αρχείου καταγραφής"
 msgid "Collapse status bar"
 msgstr "Σύμπτυξη γραμμής κατάστασης"
 
+msgid ""
+"Offline: there is no network connection, so mail is not being checked or "
+"sent. Messages you send wait in the Outbox. Everything syncs again once the "
+"network is back."
+msgstr ""
+
 msgid "Status bar ({n})"
 msgstr "Γραμμή κατάστασης ({n})"
 
@@ -5214,6 +5220,15 @@ msgid ""
 msgstr ""
 "Λαμβάνει τα μηνύματα μόλις φτάσουν. Οι λογαριασμοί Microsoft 365 ελέγχονται "
 "στο παραπάνω διάστημα."
+
+msgid "Save data on metered connections"
+msgstr ""
+
+msgid ""
+"On a metered connection, new mail still arrives, but Hylki does not download "
+"messages and attachments ahead of time, index older mail, watch folders "
+"other than the Inbox or fetch sender logos."
+msgstr ""
 
 msgid "Notifications"
 msgstr "Ειδοποιήσεις"
@@ -7316,6 +7331,11 @@ msgstr ""
 "Εισαγάγετε πρώτα τη διεύθυνση email σας, το αναγνωριστικό πελάτη και τα δύο "
 "URL OAuth."
 
+msgid ""
+"Offline: there is no network connection. Mail syncs again once the network "
+"is back. Click to try now, or long-press for Status Bar"
+msgstr ""
+
 msgid "Your mail provider confirmed this really came from {from}."
 msgstr ""
 "Ο πάροχος αλληλογραφίας σας επιβεβαίωσε ότι αυτό προήλθε πράγματι από το "
@@ -7501,8 +7521,16 @@ msgstr ""
 "η απάντηση του διακομιστή δεν ήταν δυνατό να αναγνωστεί (ξεκινούσε με: "
 "{reply})"
 
+#, fuzzy
+msgid "no network connection"
+msgstr "Δοκιμή σύνδεσης"
+
 msgid "runtime error: {e}"
 msgstr "σφάλμα χρόνου εκτέλεσης: {e}"
+
+#, fuzzy
+msgid "could not reach the server"
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
 
 msgid "Could not load {path}: {e}"
 msgstr "Δεν ήταν δυνατή η φόρτωση του {path}: {e}"
@@ -7557,6 +7585,16 @@ msgid "Downloading attachments… {n} remaining"
 msgid_plural "Downloading attachments… {n} remaining"
 msgstr[0] "Λήψη συνημμένων… απομένει {n}"
 msgstr[1] "Λήψη συνημμένων… απομένουν {n}"
+
+#. Nothing failed: the message waits for the network, which the
+#. Refresh button already shows is down (#442).
+#, fuzzy
+msgid ""
+"No network connection. The message is in the Outbox and will be sent when "
+"the connection is back."
+msgstr ""
+"Η αποστολή απέτυχε: {e}. Το μήνυμα βρίσκεται στα Εξερχόμενα και θα σταλεί "
+"όταν αποκατασταθεί η σύνδεση."
 
 msgid ""
 "Send failed: {e}. The message is in the Outbox and will be sent when the "
