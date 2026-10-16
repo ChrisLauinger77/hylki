@@ -1969,6 +1969,9 @@ pub enum AppMsg {
     /// Show the keyring / Secret Service setup help. `problem: true` when a save
     /// actually failed to persist; `false` for the proactive one-time tip.
     ShowKeyringHelp { problem: bool },
+    /// Reconnect every account: a saved edit changed a secret, which the
+    /// keyring said after the save.
+    ReconnectAccounts,
     /// The one-time notice that an earlier install's data was carried over.
     ShowCarryOverNotice(&'static crate::legacy::Predecessor),
     AccountRemoved { email: String },
@@ -2196,7 +2199,9 @@ impl SimpleComponent for AppModel {
                 // way can abort — a Rust panic fired from a GObject dispose
                 // callback becomes SIGABRT, which the Flatpak surfaces as a crash
                 // notification. Nothing else needs persisting on quit: accounts
-                // and settings are written as they change.
+                // and settings are written as they change, the keyring's share
+                // once its thread is done.
+                finish_keyring_writes();
                 std::process::exit(0)
             },
 
@@ -2914,12 +2919,7 @@ impl SimpleComponent for AppModel {
         };
         let goa_removed = goa_outcome.removed;
         if !goa_removed.is_empty() {
-            for email in &goa_removed {
-                match config_before_goa.iter().find(|c| &c.email == email) {
-                    Some(acc) => config::delete_account_secrets(acc),
-                    None => config::delete_password(email),
-                }
-            }
+            forget_account_secrets(&goa_removed, &config_before_goa);
             sidebar_state.order.retain(|e| !goa_removed.contains(e));
             sidebar_state.collapsed.retain(|e| !goa_removed.contains(e));
             sidebar_state.folders_expanded.retain(|e| !goa_removed.contains(e));
@@ -4363,6 +4363,7 @@ impl SimpleComponent for AppModel {
                 };
                 crate::config::save_window_state(width, height, maximized);
                 crate::background::set_status("");
+                finish_keyring_writes();
                 std::process::exit(0)
             });
             app.add_action(&quit);
@@ -8022,6 +8023,7 @@ impl SimpleComponent for AppModel {
                         tracing::info!("wizard: restart helper up, exiting");
                         let (w, h, maximized) = crate::config::load_window_state();
                         crate::config::save_window_state(w, h, maximized);
+                        finish_keyring_writes();
                         std::process::exit(0);
                     }
                     Err(e) => {
@@ -9837,10 +9839,28 @@ impl SimpleComponent for AppModel {
                 // An edit that only changes how the account looks or signs
                 // (#382) is applied in place: reconnecting every account for
                 // it emptied the list and the reader until they had synced.
-                let display_only = original_email
+                // Whether its secrets changed too is the keyring's to say,
+                // asked now, before the save below replaces them: the keyring
+                // thread answers in order. A changed one reconnects then.
+                let look_only = original_email
                     .as_ref()
                     .and_then(|orig| self.config.iter().find(|c| &c.email == orig))
-                    .is_some_and(|old| display_only_change(old, &account));
+                    .filter(|old| look_only_change(old, &account))
+                    .cloned();
+                let display_only = look_only.is_some();
+                if let Some(old) = look_only {
+                    let (new, email, sender) = ((*account).clone(), new_email.clone(), sender.clone());
+                    config::keyring_then(
+                        move || secrets_kept(&old, &new),
+                        move |kept| {
+                            if kept {
+                                tracing::info!("{email}: saved without reconnecting, only its look or signature changed");
+                            } else {
+                                sender.input(AppMsg::ReconnectAccounts);
+                            }
+                        },
+                    );
+                }
                 // Remember the secret we expect to persist, so we can verify the
                 // keyring actually stored it (a silent keyring failure would
                 // otherwise leave the account unable to log in after a restart).
@@ -9860,10 +9880,8 @@ impl SimpleComponent for AppModel {
                                         && n.address().eq_ignore_ascii_case(&old_alias.address())
                                 });
                             if !kept {
-                                config::delete_alias_smtp_password(
-                                    &old.email,
-                                    &old_alias.address(),
-                                );
+                                let (email, address) = (old.email.clone(), old_alias.address());
+                                config::keyring_later(move || config::delete_alias_smtp_password(&email, &address));
                             }
                         }
                     }
@@ -9894,11 +9912,17 @@ impl SimpleComponent for AppModel {
                         // password can actually be read back. If not, the Secret
                         // Service isn't persisting it — tell the user how to fix it
                         // instead of silently "saving" an account that won't stay
-                        // logged in.
+                        // logged in. Queued after the save's own writes.
                         if let Some(secret) = expected_secret {
-                            if config::load_password(&new_email).as_deref() != Some(secret.as_str()) {
-                                sender.input(AppMsg::ShowKeyringHelp { problem: true });
-                            }
+                            let (email, sender) = (new_email.clone(), sender.clone());
+                            config::keyring_then(
+                                move || config::load_password(&email).as_deref() == Some(secret.as_str()),
+                                move |stored| {
+                                    if !stored {
+                                        sender.input(AppMsg::ShowKeyringHelp { problem: true });
+                                    }
+                                },
+                            );
                         }
                         self.save_sidebar_state();
                         // Changed Special Folders assignments (#82) land on the
@@ -9915,9 +9939,7 @@ impl SimpleComponent for AppModel {
                         // changed with this edit (#189).
                         self.warm_own_gravatars(&sender);
                         self.refresh_faces();
-                        if display_only {
-                            tracing::info!("{new_email}: saved without reconnecting, only its look or signature changed");
-                        } else {
+                        if !display_only {
                             self.reconnect_all(&sender);
                         }
                         if unified_changed {
@@ -9933,6 +9955,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::ShowKeyringHelp { problem } => self.show_keyring_help(problem),
+            AppMsg::ReconnectAccounts => self.reconnect_all(&sender),
             AppMsg::ShowCarryOverNotice(from) => crate::ui::carry_over::show(&self.window, from),
 
             AppMsg::AccountEnabledChanged { email, enabled } => {
@@ -10597,10 +10620,7 @@ impl SimpleComponent for AppModel {
             AppMsg::AccountRemoved { email } => {
                 // Drop the keyring entries while the config (which knows the
                 // alias addresses) is still around.
-                match self.config.iter().find(|c| c.email == email) {
-                    Some(acc) => config::delete_account_secrets(acc),
-                    None => config::delete_password(&email),
-                }
+                forget_account_secrets(std::slice::from_ref(&email), &self.config);
                 self.config.retain(|c| c.email != email);
                 self.account_order.retain(|e| *e != email);
                 self.collapsed.retain(|e| *e != email);
@@ -10626,11 +10646,8 @@ impl SimpleComponent for AppModel {
                 let before = self.config.clone();
                 let outcome = reconcile_goa(&mut self.config, &live);
                 if !outcome.removed.is_empty() {
+                    forget_account_secrets(&outcome.removed, &before);
                     for email in &outcome.removed {
-                        match before.iter().find(|c| &c.email == email) {
-                            Some(acc) => config::delete_account_secrets(acc),
-                            None => config::delete_password(email),
-                        }
                         self.account_order.retain(|e| e != email);
                         self.collapsed.retain(|e| e != email);
                         self.folders_expanded.retain(|e| e != email);
@@ -23987,6 +24004,46 @@ fn set_split_shrink(split: &gtk::Paned, bottom: bool, shrink: bool) {
     }
 }
 
+/// On the way out: hide the windows, then let the keyring thread finish
+/// what was queued for it, which a keyring waiting on its user can make take
+/// a while. Up to ten seconds, so a keyring that never answers cannot keep
+/// the process alive. Nothing queued, nothing waits.
+pub(crate) fn finish_keyring_writes() {
+    let limit = std::time::Duration::from_secs(10);
+    if config::keyring_drain(std::time::Duration::ZERO) {
+        return;
+    }
+    let tops = gtk::Window::toplevels();
+    for w in (0..tops.n_items()).filter_map(|i| tops.item(i)).filter_map(|o| o.downcast::<gtk::Window>().ok()) {
+        w.set_visible(false);
+    }
+    if let Some(display) = gtk::gdk::Display::default() {
+        display.flush();
+    }
+    tracing::info!("waiting for the keyring before quitting");
+    if !config::keyring_drain(limit) {
+        tracing::warn!("quit with keyring work still queued: the keyring did not answer in {limit:?}");
+    }
+}
+
+/// Drop the keyring entries of the accounts `removed` names, on the keyring
+/// thread. `config` still holds them: their alias entries are keyed by
+/// addresses only it knows.
+fn forget_account_secrets(removed: &[String], config: &[AccountConfig]) {
+    let gone: Vec<(String, Option<AccountConfig>)> = removed
+        .iter()
+        .map(|email| (email.clone(), config.iter().find(|c| &c.email == email).cloned()))
+        .collect();
+    config::keyring_later(move || {
+        for (email, account) in gone {
+            match account {
+                Some(account) => config::delete_account_secrets(&account),
+                None => config::delete_password(&email),
+            }
+        }
+    });
+}
+
 /// `HYLKI_DEMO` is set, so removing all real accounts leaves the app blank.
 /// Stand-in [`AccountConfig`]s mirroring the demo backend's three accounts
 /// (same names, colors and emoji), so the Accounts window has something to
@@ -23998,8 +24055,9 @@ fn set_split_shrink(split: &gtk::Paned, bottom: bool, shrink: bool) {
 /// or puts in the composer: the signature, the color, emoji or picture, the
 /// Gravatar switch, the label, or a place in the unified section. Workers
 /// never read those, so the account need not reconnect for them (#382). A
-/// password counts as changed unless it is the one already stored.
-fn display_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
+/// password counts as changed unless it is the one already stored, which
+/// [`secrets_kept`] asks the keyring.
+fn look_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
     let mut probe = new.clone();
     probe.signature = old.signature.clone();
     probe.signature_html = old.signature_html;
@@ -24016,11 +24074,13 @@ fn display_only_change(old: &AccountConfig, new: &AccountConfig) -> bool {
         (Ok(a), Ok(b)) => a == b,
         _ => false,
     };
-    if !same {
-        return false;
-    }
-    // The editor hands every secret back, read from the keyring, while the
-    // config in hand may hold none: compare with what is stored.
+    same
+}
+
+/// Whether `new` keeps the secrets of `old`. The editor hands every secret
+/// back, read from the keyring, while the config in hand may hold none:
+/// compare with what is stored. Blocking: run it on the keyring thread.
+fn secrets_kept(old: &AccountConfig, new: &AccountConfig) -> bool {
     let kept = |new: &str, old: &str, stored: &dyn Fn() -> Option<String>| {
         new.is_empty() || new == old || stored().as_deref() == Some(new)
     };
@@ -26121,16 +26181,16 @@ mod tests {
         new.in_unified = !old.in_unified;
         // The editor hands the secret back; the same one is no change.
         new.password = old.password.clone();
-        assert!(super::display_only_change(&old, &new));
+        assert!(super::look_only_change(&old, &new) && super::secrets_kept(&old, &new));
         let mut host = new.clone();
         host.imap_host = "imap.elsewhere.org".into();
-        assert!(!super::display_only_change(&old, &host));
+        assert!(!(super::look_only_change(&old, &host) && super::secrets_kept(&old, &host)));
         let mut name = new.clone();
         name.name = "Someone Else".into();
-        assert!(!super::display_only_change(&old, &name));
+        assert!(!(super::look_only_change(&old, &name) && super::secrets_kept(&old, &name)));
         let mut alias = new.clone();
         alias.aliases.push(crate::config::AliasConfig { identity: "me@alias.org".into(), ..Default::default() });
-        assert!(!super::display_only_change(&old, &alias));
+        assert!(!(super::look_only_change(&old, &alias) && super::secrets_kept(&old, &alias)));
     }
 
     /// A copy to edit carries the message's own content, not a quote of it:

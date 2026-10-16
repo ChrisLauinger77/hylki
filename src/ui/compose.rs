@@ -517,6 +517,14 @@ pub enum ComposeInput {
     /// password of their own for every link, else one is generated per
     /// file.
     CloudUpload { paths: Vec<std::path::PathBuf>, account: crate::cloud::CloudAccount, link_password: Option<String> },
+    /// [`ComposeInput::CloudUpload`] with the account's sign-in read from the
+    /// keyring (`None`: not there).
+    CloudUploadSignedIn {
+        paths: Vec<std::path::PathBuf>,
+        account: crate::cloud::CloudAccount,
+        link_password: Option<String>,
+        password: Option<String>,
+    },
     /// One upload finished (in a thread): the link, or why not.
     CloudUploaded { name: String, result: Result<crate::cloud::ShareResult, String> },
     /// Take a link back out of the body.
@@ -1976,12 +1984,21 @@ impl Component for Compose {
             }
 
             ComposeInput::CloudUpload { paths, account, link_password } => {
-                let secret = if account.has_secret() {
-                    crate::config::load_cloud_password(&account.key())
-                } else {
-                    Some(String::new())
-                };
-                let Some(password) = secret else {
+                if !account.has_secret() {
+                    sender.input(ComposeInput::CloudUploadSignedIn { paths, account, link_password, password: Some(String::new()) });
+                    break 'handle;
+                }
+                // Off the main thread: the keyring may wait on its user.
+                let key = account.key();
+                let s = sender.input_sender().clone();
+                crate::config::keyring_then(
+                    move || crate::config::load_cloud_password(&key),
+                    move |password| s.emit(ComposeInput::CloudUploadSignedIn { paths, account, link_password, password }),
+                );
+            }
+
+            ComposeInput::CloudUploadSignedIn { paths, account, link_password, password } => {
+                let Some(password) = password else {
                     let parent = root.root().and_downcast::<gtk::Window>();
                     let d = adw::MessageDialog::new(
                         parent.as_ref(),

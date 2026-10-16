@@ -273,6 +273,17 @@ pub struct AccountsWindow {
     goa: Vec<crate::goa::GoaMailAccount>,
     /// Refresh token captured from a successful OAuth sign-in, applied on save.
     pending_oauth_refresh: Option<String>,
+    /// Counts the times the editor opened, so a keyring answer for an
+    /// editor since replaced is dropped.
+    editor_session: u64,
+    /// The keyring's answer for the account in the editor, once it came:
+    /// Save fills the fields left empty from it.
+    editor_secrets: Option<AccountSecrets>,
+    /// A keyring read for the editor is out.
+    secrets_reading: bool,
+    /// Save was pressed before the keyring answered, and runs again when it
+    /// does: the keyring may be waiting on its user (#466).
+    save_waiting: bool,
     /// The editor's Microsoft sign-in may search the organization's
     /// directory (#410): saved with those scopes, or just approved for them.
     /// Save keeps asking for them, or the next sign-in would drop them.
@@ -636,7 +647,7 @@ pub enum AccountsCmd {
     /// list.
     GoaListed(Vec<crate::goa::GoaMailAccount>),
     /// An account's secrets, read from the keyring for its editor.
-    Secrets(AccountSecrets),
+    Secrets(u64, AccountSecrets),
     /// The Gravatar looked up for the address in the editor (#189).
     OwnGravatar {
         email: String,
@@ -1929,6 +1940,10 @@ impl Component for AccountsWindow {
             label_synced: String::new(),
             goa,
             pending_oauth_refresh: None,
+            editor_session: 0,
+            editor_secrets: None,
+            secrets_reading: false,
+            save_waiting: false,
             directory_granted: false,
             directory_on: false,
             labels_granted: false,
@@ -2238,6 +2253,7 @@ impl Component for AccountsWindow {
             }
             AccountsInput::AddAccount => {
                 self.editing = None;
+                self.new_editor_session();
                 self.emoji = None;
                 self.avatar = None;
                 widgets.gravatar_row.set_active(false);
@@ -2296,6 +2312,7 @@ impl Component for AccountsWindow {
                     return;
                 };
                 self.editing = Some(i);
+                self.new_editor_session();
                 self.pending_oauth_refresh = None;
                 self.directory_granted = acc.goa_id.is_none()
                     && acc.oauth
@@ -2328,22 +2345,10 @@ impl Component for AccountsWindow {
                 let _ = sender.output(AccountsOutput::WantQuota(acc.email.clone()));
                 let _ = sender.output(AccountsOutput::WantIdentities(acc.email.clone()));
                 // The secrets come from the keyring now, off the main thread,
-                // and land in the fields when they arrive (Save reads the
-                // keyring itself should it come first).
+                // and land in the fields when they arrive (Save waits for
+                // them should it come first).
                 if AccountSecrets::needed(&acc) {
-                    let acc = acc.clone();
-                    sender.oneshot_command(async move {
-                        let email = acc.email.clone();
-                        let secrets = tokio::task::spawn_blocking(move || AccountSecrets::load(&acc))
-                            .await
-                            .unwrap_or(AccountSecrets {
-                                email,
-                                password: String::new(),
-                                smtp_password: String::new(),
-                                aliases: Vec::new(),
-                            });
-                        AccountsCmd::Secrets(secrets)
-                    });
+                    self.read_secrets(&acc, &sender);
                 }
                 self.populate_folder_combos(widgets, Some(&acc));
                 self.apply_provider(widgets);
@@ -2957,9 +2962,19 @@ impl Component for AccountsWindow {
                     true
                 };
                 // Saved before the keyring answered, or with the field left
-                // as it was: the stored secrets stand.
+                // as it was: the stored secrets stand. Not read yet, they
+                // are waited for, and Save runs again once they are here.
                 if AccountSecrets::needed(&account) {
-                    AccountSecrets::load(&account).apply(&mut account);
+                    match &self.editor_secrets {
+                        Some(secrets) => secrets.apply(&mut account),
+                        None => {
+                            if !self.secrets_reading {
+                                self.read_secrets(&account, &sender);
+                            }
+                            self.save_waiting = true;
+                            return;
+                        }
+                    }
                 }
                 let password_ok = account.oauth || !account.password.is_empty();
                 // A GOA account's connection fields were all restored from the
@@ -3398,7 +3413,21 @@ impl Component for AccountsWindow {
                 widgets.goa_group.set_visible(!self.goa.is_empty());
             }
 
-            AccountsCmd::Secrets(secrets) => {
+            AccountsCmd::Secrets(session, secrets) => {
+                if session != self.editor_session {
+                    return;
+                }
+                self.secrets_reading = false;
+                self.editor_secrets = Some(secrets.clone());
+                let editor_up = widgets
+                    .nav
+                    .visible_page()
+                    .and_then(|p| p.tag())
+                    .is_some_and(|tag| tag == "editor");
+                // Queued, so it runs once the fields below are filled.
+                if std::mem::take(&mut self.save_waiting) && editor_up {
+                    sender.input(AccountsInput::Save);
+                }
                 // Still editing that account: fill in what the user hasn't
                 // typed over meanwhile.
                 let Some(i) = self.editing else { return };
@@ -4340,6 +4369,34 @@ impl AccountsWindow {
         } else {
             i18n("Turning one of these on asks Microsoft for access; some organizations need an administrator to approve it.")
         }));
+    }
+
+    /// A fresh editor: answers from the keyring for the last one no longer
+    /// apply.
+    fn new_editor_session(&mut self) {
+        self.editor_session += 1;
+        self.editor_secrets = None;
+        self.secrets_reading = false;
+        self.save_waiting = false;
+    }
+
+    /// Read `acc`'s secrets off the main thread; they arrive as
+    /// [`AccountsCmd::Secrets`].
+    fn read_secrets(&mut self, acc: &AccountConfig, sender: &ComponentSender<Self>) {
+        self.secrets_reading = true;
+        let (acc, session) = (acc.clone(), self.editor_session);
+        sender.oneshot_command(async move {
+            let email = acc.email.clone();
+            let secrets = tokio::task::spawn_blocking(move || AccountSecrets::load(&acc))
+                .await
+                .unwrap_or(AccountSecrets {
+                    email,
+                    password: String::new(),
+                    smtp_password: String::new(),
+                    aliases: Vec::new(),
+                });
+            AccountsCmd::Secrets(session, secrets)
+        });
     }
 
     fn apply_provider(&self, widgets: &AccountsWindowWidgets) {

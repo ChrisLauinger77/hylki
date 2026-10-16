@@ -275,6 +275,7 @@ fn main() {
         .with_args(args)
         .visible_on_activate(!hidden && !first_run);
     app.run::<AppModel>(());
+    app::finish_keyring_writes();
 }
 
 /// Whether another instance already owns the app's D-Bus name.

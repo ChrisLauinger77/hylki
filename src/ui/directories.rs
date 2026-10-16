@@ -498,8 +498,19 @@ fn build_editor(dir: Directory, sender: relm4::Sender<DirectoriesInput>) -> (gtk
     bind.set_title(&i18n("Sign in as, such as cn=jane,ou=people,dc=example,dc=com"));
     bind.set_text(&dir.bind_dn);
     let pass = adw::PasswordEntryRow::new();
-    let saved = !dir.uid.is_empty() && directory::has_password(&dir);
-    pass.set_title(&if saved { i18n("Password (saved; type to replace it)") } else { i18n("Password") });
+    pass.set_title(&i18n("Password"));
+    // Asked off the main thread: the keyring may wait on its user (#466).
+    if !dir.uid.is_empty() {
+        let (dir, pass) = (dir.clone(), pass.clone());
+        crate::config::keyring_then(
+            move || directory::has_password(&dir),
+            move |saved| {
+                if saved {
+                    pass.set_title(&i18n("Password (saved; type to replace it)"));
+                }
+            },
+        );
+    }
     signin.add(&bind);
     signin.add(&pass);
 

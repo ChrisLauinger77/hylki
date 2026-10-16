@@ -6,8 +6,10 @@
   Comodino). Every keyring read gave up after two seconds, so a Secret
   Service provider that waits on the user, like pass-secret-service
   decrypting with a security key that wants a tap, was reported as
-  unavailable. Hylki now waits for the answer. Building from source no
-  longer needs the D-Bus headers.
+  unavailable. Hylki now waits for the answer, and the window does not:
+  every keyring call is made on a thread of its own, in order, and a
+  password saved just before quitting still reaches the keyring. Building
+  from source no longer needs the D-Bus headers.
 
 ## 1.44.0 — 2026-10-15
 
