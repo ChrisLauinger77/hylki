@@ -3687,7 +3687,6 @@ window.__hylkiDirty=true;})()"#
     }
 
     fn ranked_matches(&self, token: &str) -> Vec<Suggestion> {
-        let q = token.to_lowercase();
         let narrowed = self.narrowed();
         let mut matches: Vec<Suggestion> = self
             .suggestions
@@ -3712,15 +3711,7 @@ window.__hylkiDirty=true;})()"#
                 .filter(|s| !known.contains(&s.email.to_lowercase()) && seen.insert(s.email.to_lowercase()))
                 .cloned(),
         );
-        matches.sort_by(|a, b| {
-            let pa = a.email.to_lowercase().starts_with(&q) || a.name.to_lowercase().starts_with(&q);
-            let pb = b.email.to_lowercase().starts_with(&q) || b.name.to_lowercase().starts_with(&q);
-            // Own addresses come after everyone else's, prefix match or not.
-            a.own.cmp(&b.own)
-                .then(pb.cmp(&pa))
-                .then(b.score.cmp(&a.score))
-                .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-        });
+        crate::contacts::rank(&mut matches, token);
         matches.truncate(8);
         matches
     }

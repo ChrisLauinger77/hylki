@@ -517,10 +517,12 @@ people in Bcc, and opens the Bcc row, so they do not see each other's
 addresses. To still needs at least one address, your own for example.
 
 **New Group**, under the **+** button in the Contacts view, makes a group in
-the Hylki book. Add people by typing a name and picking someone from the
-matches under the field, or by typing or pasting addresses and pressing
-<kbd>Return</kbd>. Anyone with an address can be in a group, not only
-people in your contacts. A contact's right-click menu has **Add to Group**,
+the Hylki book. Add people by typing part of a name or address and picking
+from the matches under the field, or by typing or pasting addresses and
+pressing <kbd>Return</kbd>. The matches are the composer's suggestions: your
+contacts, and the addresses in the mail you have sent and received, marked
+with a clock. Anyone with an address can be in a group, not only people in
+your contacts. A contact's right-click menu has **Add to Group**,
 and a group's card has **New Message**, which writes to everyone in it. The
 group's pencil, at the top of its card, changes its name, its people and the
 Bcc switch.

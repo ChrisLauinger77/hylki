@@ -5,8 +5,9 @@
 - **Added: contact groups.** A group is a name for several people that the
   composer suggests like a contact; picking it adds a pill for each of them,
   less those the field already has. **New Group**, under the **+** button in
-  the Contacts view, makes one in the Hylki book; people are added by name
-  from Contacts or by address, and a contact's menu has **Add to Group**. A
+  the Contacts view, makes one in the Hylki book; people are added from
+  the composer's suggestions (Contacts and the addresses of mail sent and
+  received) or by address, and a contact's menu has **Add to Group**. A
   group's card lists its people and has **New Message**. **Send as Bcc**
   puts the people in Bcc whichever field the group is picked in. Groups are
   saved as Evolution lists. Evolution's lists in the Evolution Data Server

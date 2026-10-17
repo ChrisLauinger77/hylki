@@ -103,6 +103,11 @@ pub struct ContactsPage {
     /// The directories that did not answer the search, listed under the
     /// people found, so a search that finds nobody says why (#307).
     directory_failures: Vec<crate::directory::DirectoryFailure>,
+    /// The composer's recipient suggestions (Contacts and mail history),
+    /// shared with an open group form, which offers them as people to add.
+    /// Read again each time a group form opens; until the first read lands
+    /// the form offers the contacts listed here.
+    suggestions: Rc<RefCell<Vec<crate::contacts::Suggestion>>>,
 }
 
 #[derive(Debug)]
@@ -154,6 +159,8 @@ pub enum ContactsPageInput {
     AddDirectoryHit(usize),
     /// Put this in the search box, as if typed.
     SetSearch(String),
+    /// The composer's suggestions, freshly read for a group form.
+    SuggestionsLoaded(Vec<crate::contacts::Suggestion>),
     /// Pick this entry of the book filter, as if chosen.
     PickBook(u32),
 }
@@ -178,6 +185,9 @@ pub enum ContactsPageOutput {
     ImportContacts(Vec<std::path::PathBuf>),
     /// Show the contact's photo in the app lightbox.
     ShowPhoto { name: String, data: Vec<u8> },
+    /// Read the composer's suggestions for a group form
+    /// ([`ContactsPageInput::SuggestionsLoaded`] brings them).
+    WantSuggestions,
 }
 
 #[relm4::component(pub)]
@@ -466,6 +476,7 @@ impl Component for ContactsPage {
             directory_generation: 0,
             directories: Vec::new(),
             directory_failures: Vec::new(),
+            suggestions: Rc::new(RefCell::new(Vec::new())),
         };
         let widgets = view_output!();
         widgets.detail_overlay.add_overlay(&compose_slot);
@@ -623,6 +634,10 @@ impl Component for ContactsPage {
 
             ContactsPageInput::SetSearch(text) => {
                 widgets.search.set_text(&text);
+            }
+
+            ContactsPageInput::SuggestionsLoaded(suggestions) => {
+                *self.suggestions.borrow_mut() = suggestions;
             }
 
             ContactsPageInput::PickBook(n) => {
@@ -1505,14 +1520,25 @@ impl ContactsPage {
         hide.set_active(c.hide_addresses);
         identity.append(&hide);
 
-        // Everyone with an address, to pick members from as a name is typed.
-        let people: Vec<(String, String)> = self
-            .contacts
-            .iter()
-            .filter(|p| !p.is_group())
-            .flat_map(|p| p.emails.iter().map(|e| (p.name.clone(), e.value.clone())))
-            .collect();
-        let members = member_editor(detail, &c.members, Rc::new(people));
+        // People to add are offered as the composer offers recipients: from
+        // Contacts and from the mail sent and received. Until that is read,
+        // the contacts here stand in.
+        if self.suggestions.borrow().is_empty() {
+            let contacts = self.contacts.iter().filter(|p| !p.is_group()).flat_map(|p| {
+                p.emails.iter().map(|e| crate::contacts::Suggestion {
+                    name: p.name.clone(),
+                    email: e.value.clone(),
+                    from_contacts: true,
+                    from_directory: false,
+                    score: 0,
+                    own: false,
+                    group: None,
+                })
+            });
+            self.suggestions.borrow_mut().extend(contacts);
+        }
+        let _ = sender.output(ContactsPageOutput::WantSuggestions);
+        let members = member_editor(detail, &c.members, self.suggestions.clone());
         if self.editing_target.is_none() {
             name.grab_focus();
         }
@@ -1780,9 +1806,14 @@ fn editor_bar(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, heading
 }
 
 /// The group form's members: a row each with a remove button, and a row to
-/// add someone, by an address or by picking from `people` (name, address)
-/// as a name is typed. Returns the live list read at save time.
-fn member_editor(detail: &gtk::Box, initial: &[Member], people: Rc<Vec<(String, String)>>) -> Rc<RefCell<Vec<Member>>> {
+/// add someone, by an address or by picking from `people` (the composer's
+/// suggestions) as a name or address is typed. Returns the live list read at
+/// save time.
+fn member_editor(
+    detail: &gtk::Box,
+    initial: &[Member],
+    people: Rc<RefCell<Vec<crate::contacts::Suggestion>>>,
+) -> Rc<RefCell<Vec<Member>>> {
     let list = group(detail, &i18n("Members"));
     let members: Rc<RefCell<Vec<Member>>> = Rc::new(RefCell::new(Vec::new()));
     let entry = adw::EntryRow::new();
@@ -1831,24 +1862,26 @@ fn member_editor(detail: &gtk::Box, initial: &[Member], people: Rc<Vec<(String, 
         add(m.clone());
     }
 
-    // Who matches the typing: by name or address, not already in.
+    // Who matches the typing, by name or address and not already in,
+    // ranked as the composer ranks them.
     let matches = {
         let (people, members) = (people.clone(), members.clone());
-        move |typed: &str| -> Vec<(String, String)> {
-            let q = typed.trim().to_lowercase();
+        move |typed: &str| -> Vec<crate::contacts::Suggestion> {
+            let q = typed.trim();
             if q.is_empty() {
                 return Vec::new();
             }
             let taken: std::collections::HashSet<String> =
                 members.borrow().iter().map(|m| m.email.to_lowercase()).collect();
-            people
+            let mut found: Vec<crate::contacts::Suggestion> = people
+                .borrow()
                 .iter()
-                .filter(|(n, e)| {
-                    !taken.contains(&e.to_lowercase()) && (n.to_lowercase().contains(&q) || e.to_lowercase().contains(&q))
-                })
-                .take(6)
+                .filter(|s| s.group.is_none() && !taken.contains(&s.email.to_lowercase()) && s.matches(q))
                 .cloned()
-                .collect()
+                .collect();
+            crate::contacts::rank(&mut found, q);
+            found.truncate(6);
+            found
         }
     };
     let matches = Rc::new(matches);
@@ -1859,19 +1892,28 @@ fn member_editor(detail: &gtk::Box, initial: &[Member], people: Rc<Vec<(String, 
             while let Some(child) = found.first_child() {
                 found.remove(&child);
             }
-            for (name, email) in matches(&e.text()) {
+            for sug in matches(&e.text()) {
                 let row = adw::ActionRow::new();
-                row.set_title(&gtk::glib::markup_escape_text(&name));
-                if name != email {
-                    row.set_subtitle(&gtk::glib::markup_escape_text(&email));
+                row.set_title(&gtk::glib::markup_escape_text(&sug.name));
+                if sug.name != sug.email {
+                    row.set_subtitle(&gtk::glib::markup_escape_text(&sug.email));
                 }
-                let plus = gtk::Image::from_icon_name("list-add-symbolic");
-                plus.add_css_class("dim-label");
-                row.add_prefix(&plus);
+                // Where the address came from, as in the composer: the
+                // address book or mail history.
+                let icon = gtk::Image::from_icon_name(if sug.from_contacts {
+                    "avatar-default-symbolic"
+                } else {
+                    "document-open-recent-symbolic"
+                });
+                icon.add_css_class("dim-label");
+                row.add_prefix(&icon);
                 row.set_activatable(true);
                 let (add, entry) = (add.clone(), e.downgrade());
+                let (name, email) = (sug.name, sug.email);
                 row.connect_activated(move |_| {
-                    add(Member { name: name.clone(), email: email.clone(), ..Member::default() });
+                    // History may know an address without a name.
+                    let name = if name == email { String::new() } else { name.clone() };
+                    add(Member { name, email: email.clone(), ..Member::default() });
                     if let Some(entry) = entry.upgrade() {
                         entry.set_text("");
                         entry.grab_focus();
@@ -1890,15 +1932,24 @@ fn member_editor(detail: &gtk::Box, initial: &[Member], people: Rc<Vec<(String, 
             .into_iter()
             .filter(|(_, email)| crate::worker::invalid_recipient(email).is_none() && email.contains('@'))
             .collect();
-        let picked = if typed.is_empty() { matches(&text).into_iter().take(1).collect() } else { typed };
+        let picked: Vec<(String, String)> = if typed.is_empty() {
+            matches(&text).into_iter().take(1).map(|s| (s.name, s.email)).collect()
+        } else {
+            typed
+        };
         if picked.is_empty() {
             e.add_css_class("error");
             return;
         }
         for (name, email) in picked {
-            // An address someone typed bare keeps the name Contacts has.
-            let name = if name.is_empty() {
-                people.iter().find(|(_, e)| e.eq_ignore_ascii_case(&email)).map(|(n, _)| n.clone()).unwrap_or_default()
+            // An address typed bare keeps the name Contacts or mail has for it.
+            let name = if name.is_empty() || name == email {
+                people
+                    .borrow()
+                    .iter()
+                    .find(|s| s.email.eq_ignore_ascii_case(&email) && s.name != s.email)
+                    .map(|s| s.name.clone())
+                    .unwrap_or_default()
             } else {
                 name
             };

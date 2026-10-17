@@ -1886,6 +1886,9 @@ pub enum AppMsg {
     /// A new message to these recipients in Bcc: a contact group that hides
     /// its members' addresses.
     ComposeBcc(String),
+    /// Read the composer's recipient suggestions for the Contacts view's
+    /// group form, off the main thread.
+    ContactSuggestions,
     /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
     ShowcaseFolder { kind: FolderKind, account: Option<u32> },
@@ -3229,6 +3232,7 @@ impl SimpleComponent for AppModel {
                         AppMsg::DeleteContact { book_uid, uid }
                     }
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
+                    ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
                     ContactsPageOutput::ShowPhoto { name, data } => {
                         // The lightbox routes by extension — a bare contact
                         // name sent the JPEG down the PDF path, where poppler
@@ -12312,6 +12316,14 @@ impl SimpleComponent for AppModel {
                     p.emit(PrefInput::SetLocalContactCount(local_count));
                 }
                 self.contacts_page.emit(ContactsPageInput::SetBooks(books));
+            }
+
+            AppMsg::ContactSuggestions => {
+                let own: Vec<(String, String)> = self.config.iter().map(|c| (c.name.clone(), c.email.clone())).collect();
+                let page = self.contacts_page.sender().clone();
+                std::thread::spawn(move || {
+                    let _ = page.send(ContactsPageInput::SuggestionsLoaded(crate::contacts::suggestions(&own)));
+                });
             }
 
             AppMsg::ContactsLoaded(contacts) => {
