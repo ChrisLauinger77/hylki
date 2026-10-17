@@ -4818,6 +4818,9 @@ msgstr "Кому"
 msgid "Cc:"
 msgstr "Копия"
 
+msgid "Bcc:"
+msgstr ""
+
 #, fuzzy
 msgid "Date:"
 msgstr "Дата"

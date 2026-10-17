@@ -50,8 +50,15 @@
   when the connection came back** (#442). Only IMAP accounts sent it by
   themselves; the others waited for Retry. All now send it once the network
   is back.
-- **Fixed: a sender logo that could not be fetched offline was taken for
-  none at all** (#442), and initials showed for that sender for a week.
+- **Fixed: a sent message did not show its Bcc recipients** (#476,
+  reported by benjaminkriss). The reader lists them under To and Cc, and
+  a printed message names them too. The copy Hylki files in Sent now keeps
+  the Bcc header, which the recipients never see. Mail already in Sent
+  shows its Bcc where the copy there names it, once its folder syncs again.
+- **Fixed: Bcc recipients of a Microsoft 365 account were not sent the
+  message** (#476). Microsoft 365 takes the recipients from the message's
+  headers, and the Bcc header was left off. It is now included, and Microsoft
+  365 removes it on delivery.
 
 - **Fixed: a conversation opened at its top instead of its new mail**
   (PR #463 by Christian Dandachi). A conversation handed to the reader

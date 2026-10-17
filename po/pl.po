@@ -4892,6 +4892,9 @@ msgstr "Do"
 msgid "Cc:"
 msgstr "DW"
 
+msgid "Bcc:"
+msgstr ""
+
 msgid "Date:"
 msgstr ""
 

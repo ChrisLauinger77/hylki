@@ -4842,6 +4842,9 @@ msgstr "Címzett"
 msgid "Cc:"
 msgstr "Másolat (Cc)"
 
+msgid "Bcc:"
+msgstr ""
+
 msgid "Date:"
 msgstr ""
 

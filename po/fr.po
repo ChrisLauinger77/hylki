@@ -4748,6 +4748,9 @@ msgstr "À :"
 msgid "Cc:"
 msgstr "Cc :"
 
+msgid "Bcc:"
+msgstr ""
+
 msgid "Date:"
 msgstr "Date :"
 

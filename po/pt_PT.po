@@ -4821,6 +4821,9 @@ msgstr "Para"
 msgid "Cc:"
 msgstr "Cc"
 
+msgid "Bcc:"
+msgstr ""
+
 #, fuzzy
 msgid "Date:"
 msgstr "Data"

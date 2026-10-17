@@ -4702,6 +4702,9 @@ msgstr "Para:"
 msgid "Cc:"
 msgstr "Cc:"
 
+msgid "Bcc:"
+msgstr ""
+
 msgid "Date:"
 msgstr "Fecha:"
 

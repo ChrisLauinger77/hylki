@@ -4154,6 +4154,7 @@ impl MessageView {
             m.from_addr.hash(&mut h);
             m.to.hash(&mut h);
             m.cc.hash(&mut h);
+            m.bcc.hash(&mut h);
             m.body.hash(&mut h);
             m.datetime_full().hash(&mut h);
             self.no_autoread.contains(&key).hash(&mut h);
@@ -5686,21 +5687,22 @@ fn paints_own_background(body: &str) -> bool {
         .any(|needle| lower.contains(needle))
 }
 
-/// How many addresses a message's To + Cc headers name.
+/// How many addresses a message's To, Cc and Bcc headers name.
 fn recipient_count(m: &Message) -> usize {
-    [m.to.as_str(), m.cc.as_str()]
+    [m.to.as_str(), m.cc.as_str(), m.bcc.as_str()]
         .iter()
         .flat_map(|s| s.split(','))
         .filter(|a| !a.trim().is_empty())
         .count()
 }
 
-/// The collapsible To/Cc block inside a conversation card's header. Starts
-/// hidden; the header's recipients chip toggles it. Empty when the message
-/// names no recipients at all.
+/// The collapsible To/Cc/Bcc block inside a conversation card's header.
+/// Starts hidden; the header's recipients chip toggles it. Empty when the
+/// message names no recipients at all. Bcc is there only on the sender's own
+/// copy (#476).
 fn recipients_html(m: &Message, always_shown: bool) -> String {
     let mut lines = String::new();
-    for (label, list) in [("To", m.to.trim()), ("Cc", m.cc.trim())] {
+    for (label, list) in [("To", m.to.trim()), ("Cc", m.cc.trim()), ("Bcc", m.bcc.trim())] {
         if list.is_empty() {
             continue;
         }
@@ -7855,12 +7857,13 @@ fn print_header_html(message: Option<&Message>) -> String {
     };
     format!(
         "<div class=\"hylki-print-hdr\">\
-           <div class=\"hylki-print-subject\">{subject}</div>{from}{to}{cc}{date}\
+           <div class=\"hylki-print-subject\">{subject}</div>{from}{to}{cc}{bcc}{date}\
          </div>",
         subject = escape_text(&subject),
         from = row(&i18n("From:"), &from),
         to = row(&i18n("To:"), &m.to),
         cc = row(&i18n("Cc:"), &m.cc),
+        bcc = row(&i18n("Bcc:"), &m.bcc),
         date = row(&i18n("Date:"), &m.datetime_full()),
     )
 }
@@ -7963,6 +7966,23 @@ mod tests {
     }
 
     // ===== Meeting invitations (#223) =====
+
+    /// A sent copy's Bcc recipients are listed under To and Cc, and counted
+    /// on the chip (#476); a message without any has no Bcc line.
+    #[test]
+    fn the_recipients_block_lists_bcc() {
+        let mut m = msg_for_print();
+        assert!(!recipients_html(&m, true).contains("Bcc:"));
+        m.bcc = "hidden@example.com".into();
+        let html = recipients_html(&m, true);
+        assert!(
+            html.contains("<b>Bcc:</b> <span class=\"hylki-mail\" data-mail=\"hidden@example.com\">"),
+            "{html}"
+        );
+        assert!(html.find("<b>Cc:</b>") < html.find("<b>Bcc:</b>"));
+        assert_eq!(recipient_count(&m), 3);
+        assert!(print_header_html(Some(&m)).contains("hidden@example.com"));
+    }
 
     /// The banner's container is emitted for every card whether or not the
     /// message is about a meeting, so an invitation read after the paint has
@@ -8362,6 +8382,7 @@ mod tests {
             reply_to: String::new(),
             to: "me@example.com".into(),
             cc: "carol@example.com".into(),
+            bcc: String::new(),
             subject: "Quarterly numbers".into(),
             preview: String::new(),
             body: "<p>hi</p>".into(),
