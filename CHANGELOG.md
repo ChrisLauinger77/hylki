@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Added: contact groups.** A group is a name for several people that the
+  composer suggests like a contact; picking it adds a pill for each of them,
+  less those the field already has. **New Group**, under the **+** button in
+  the Contacts view, makes one in the Hylki book; people are added by name
+  from Contacts or by address, and a contact's menu has **Add to Group**. A
+  group's card lists its people and has **New Message**. **Send as Bcc**
+  puts the people in Bcc whichever field the group is picked in. Groups are
+  saved as Evolution lists. Evolution's lists in the Evolution Data Server
+  books are shown, offered and editable too, their "Hide addresses" option
+  being Send as Bcc; vCard 4 and Apple (iCloud) groups are shown and
+  offered but not edited. A `.vcf` import keeps its lists as groups instead
+  of skipping them.
+
+- **Fixed: an Evolution contact list offered as a broken recipient.** The
+  composer suggested each member of a list under the list's name with the
+  member's whole line as the address ("Book Club", `alice able
+  <alice@example.org>`), which made an invalid recipient.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a

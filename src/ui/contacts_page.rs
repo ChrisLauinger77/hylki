@@ -11,7 +11,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::contacts::{ContactDetails, ContactEdit, Labeled};
+use crate::contacts::{ContactDetails, ContactEdit, GroupEdit, Labeled, Member};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 
@@ -31,8 +31,8 @@ pub enum ContactSort {
     Email,
 }
 
-/// Live handles into the open editor form.
-struct Editor {
+/// Live handles into the open contact form.
+struct ContactForm {
     name: adw::EntryRow,
     nickname: adw::EntryRow,
     org: adw::EntryRow,
@@ -46,6 +46,20 @@ struct Editor {
     book: Option<adw::ComboRow>,
 }
 
+/// Live handles into the open group form.
+struct GroupForm {
+    name: adw::EntryRow,
+    hide: adw::SwitchRow,
+    /// The members as the form has them, in order.
+    members: Rc<RefCell<Vec<Member>>>,
+}
+
+/// The form open in the detail pane.
+enum Editor {
+    Contact(ContactForm),
+    Group(GroupForm),
+}
+
 pub struct ContactsPage {
     contacts: Vec<ContactDetails>,
     query: String,
@@ -56,8 +70,8 @@ pub struct ContactsPage {
     row_map: Vec<usize>,
     /// A load is underway (the page was just opened).
     loading: bool,
-    /// The editor form, while open. `editing_target` is the contact being
-    /// edited, `None` for a brand-new one.
+    /// The editor form, while open. `editing_target` is the contact or group
+    /// being edited, `None` for a brand-new one.
     editor: Option<Editor>,
     editing_target: Option<usize>,
     /// EDS UIDs deleted here but possibly still in EDS's local cache — a
@@ -105,8 +119,15 @@ pub enum ContactsPageInput {
     /// Edit the selected contact / a specific one (context menu).
     Edit,
     EditIndex(usize),
-    /// The header's "+": a blank editor for a new contact.
+    /// The header's "+": a blank editor for a new contact, or a new group
+    /// (always in the Hylki book).
     NewContact,
+    NewGroup,
+    /// Write to everyone in the group at this index.
+    ComposeGroup(usize),
+    /// Put a person's first address in a group (both indexes into
+    /// `contacts`).
+    AddToGroup { group: usize, person: usize },
     /// The header's import button: choose `.vcf` files for the Hylki book.
     ImportContacts,
     CancelEdit,
@@ -139,8 +160,11 @@ pub enum ContactsPageInput {
 
 #[derive(Debug)]
 pub enum ContactsPageOutput {
-    /// Start a message to this address.
+    /// Start a message to this address, or these (a group).
     Compose(String),
+    /// Start a message with these recipients in Bcc: a group that hides
+    /// its members' addresses.
+    ComposeBcc(String),
     /// The header's sidebar button (same spot as the message list's).
     ToggleSidebar,
     /// Persist an edit: the patched vCard back to its book.
@@ -196,9 +220,9 @@ impl Component for ContactsPage {
                     },
                     pack_end = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
-                        set_tooltip_text: Some(i18n("New contact").as_str()),
+                        set_tooltip_text: Some(i18n("New contact or group").as_str()),
                         add_css_class: "flat",
-                        connect_clicked => ContactsPageInput::NewContact,
+                        connect_clicked[sender] => move |b| new_menu(b, &sender),
                     },
                     pack_end = &gtk::Button {
                         set_icon_name: "document-open-symbolic",
@@ -302,9 +326,9 @@ impl Component for ContactsPage {
                         },
                         pack_end = &gtk::Button {
                             set_icon_name: "list-add-symbolic",
-                            set_tooltip_text: Some(i18n("New contact").as_str()),
+                            set_tooltip_text: Some(i18n("New contact or group").as_str()),
                             add_css_class: "flat",
-                            connect_clicked => ContactsPageInput::NewContact,
+                            connect_clicked[sender] => move |b| new_menu(b, &sender),
                         },
                         pack_end = &gtk::Button {
                             set_icon_name: "document-open-symbolic",
@@ -378,6 +402,7 @@ impl Component for ContactsPage {
                         add_css_class: "flat",
                         set_show_start_title_buttons: false,
                         // Top-left of the card pane: edit the shown contact.
+                        #[name = "edit_btn"]
                         pack_start = &gtk::Button {
                             set_icon_name: "document-edit-symbolic",
                             set_tooltip_text: Some(i18n("Edit contact").as_str()),
@@ -705,9 +730,8 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::Edit => {
-                if self.selected.is_some_and(|i| i < DIRECTORY) {
-                    self.editing_target = self.selected;
-                    self.render_editor(widgets, &sender);
+                if let Some(idx) = self.selected.filter(|&i| i < DIRECTORY) {
+                    self.edit(widgets, &sender, idx);
                 }
             }
 
@@ -715,8 +739,7 @@ impl Component for ContactsPage {
                 if idx < self.contacts.len() {
                     self.selected = Some(idx);
                     self.select_row_for(widgets, idx);
-                    self.editing_target = Some(idx);
-                    self.render_editor(widgets, &sender);
+                    self.edit(widgets, &sender, idx);
                 }
             }
 
@@ -724,6 +747,37 @@ impl Component for ContactsPage {
                 self.editing_target = None;
                 widgets.page_stack.set_visible_child_name("browser");
                 self.render_editor(widgets, &sender);
+            }
+
+            ContactsPageInput::NewGroup => {
+                self.editing_target = None;
+                widgets.page_stack.set_visible_child_name("browser");
+                self.render_group_editor(widgets, &sender);
+            }
+
+            ContactsPageInput::ComposeGroup(idx) => {
+                let Some(g) = self.contacts.get(idx).filter(|g| !g.members.is_empty()) else { return };
+                let field = g.members_field();
+                let _ = sender.output(if g.hide_addresses {
+                    ContactsPageOutput::ComposeBcc(field)
+                } else {
+                    ContactsPageOutput::Compose(field)
+                });
+            }
+
+            ContactsPageInput::AddToGroup { group, person } => {
+                let (Some(g), Some(p)) = (self.contacts.get(group), self.contacts.get(person)) else { return };
+                let Some(email) = p.primary_email() else { return };
+                if !g.group_editable() || g.members.iter().any(|m| m.email.eq_ignore_ascii_case(email)) {
+                    return;
+                }
+                let mut members = g.members.clone();
+                members.push(Member { name: p.name.clone(), email: email.to_string(), ..Member::default() });
+                let edit = GroupEdit { name: g.name.clone(), members, hide_addresses: g.hide_addresses };
+                let _ = sender.output(ContactsPageOutput::SaveContact {
+                    book_uid: g.book_uid.clone(),
+                    vcard: crate::contacts::patched_group_vcard(&g.raw_vcard, &edit),
+                });
             }
 
             ContactsPageInput::ImportContacts => {
@@ -744,7 +798,38 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::SaveEdit => {
-                let Some(editor) = &self.editor else { return };
+                let editor = match &self.editor {
+                    Some(Editor::Contact(form)) => form,
+                    Some(Editor::Group(form)) => {
+                        let edit = GroupEdit {
+                            name: form.name.text().trim().to_string(),
+                            members: form.members.borrow().clone(),
+                            hide_addresses: form.hide.is_active(),
+                        };
+                        // A group is known by its name alone.
+                        if edit.name.is_empty() {
+                            form.name.add_css_class("error");
+                            form.name.grab_focus();
+                            return;
+                        }
+                        let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
+                            Some(g) => ContactsPageOutput::SaveContact {
+                                book_uid: g.book_uid.clone(),
+                                vcard: crate::contacts::patched_group_vcard(&g.raw_vcard, &edit),
+                            },
+                            None => ContactsPageOutput::CreateContact {
+                                book_uid: Some(crate::local_contacts::LOCAL_BOOK_UID.to_string()),
+                                vcard: crate::contacts::new_group_vcard(&edit),
+                            },
+                        };
+                        let _ = sender.output(output);
+                        self.editor = None;
+                        self.editing_target = None;
+                        self.render_detail(widgets, &sender);
+                        return;
+                    }
+                    None => return,
+                };
                 let edit = collect_edit(editor);
                 if edit.name.is_empty() && edit.emails.is_empty() {
                     return; // nothing worth saving
@@ -793,14 +878,24 @@ impl Component for ContactsPage {
             ContactsPageInput::DeleteRequest(idx) => {
                 let Some(c) = self.contacts.get(idx) else { return };
                 let win = widgets.page_stack.root().and_downcast::<gtk::Window>();
-                let dialog = adw::MessageDialog::new(
-                    win.as_ref(),
-                    Some(i18n("Delete Contact?").as_str()),
-                    Some(&i18n_f(
-                        "{name} is removed from your address book, and for a synced book, from the server too.",
-                        &[("name", &c.name)],
-                    )),
-                );
+                let (heading, body) = if c.is_group() {
+                    (
+                        i18n("Delete Group?"),
+                        i18n_f(
+                            "{name} is removed from your address book, and for a synced book, from the server too. The people in it are not.",
+                            &[("name", &c.name)],
+                        ),
+                    )
+                } else {
+                    (
+                        i18n("Delete Contact?"),
+                        i18n_f(
+                            "{name} is removed from your address book, and for a synced book, from the server too.",
+                            &[("name", &c.name)],
+                        ),
+                    )
+                };
+                let dialog = adw::MessageDialog::new(win.as_ref(), Some(heading.as_str()), Some(&body));
                 dialog.add_response("cancel", &i18n("Cancel"));
                 dialog.add_response("delete", &i18n("Delete"));
                 dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
@@ -985,11 +1080,20 @@ impl ContactsPage {
                 ],
             )
         });
+        // The groups a person can be put in from their menu, by name.
+        let mut editable_groups: Vec<(usize, String)> = (0..self.contacts.len())
+            .filter(|&i| self.contacts[i].group_editable())
+            .map(|i| (i, self.contacts[i].name.clone()))
+            .collect();
+        editable_groups.sort_by_key(|(_, name)| name.to_lowercase());
+        let editable_groups = Rc::new(editable_groups);
         for &idx in &self.row_map {
             let c = &self.contacts[idx];
             let row = adw::ActionRow::new();
             row.set_title(&gtk::glib::markup_escape_text(&c.name));
-            if let Some(email) = c.primary_email() {
+            if c.is_group() {
+                row.set_subtitle(&gtk::glib::markup_escape_text(&group_byline(c)));
+            } else if let Some(email) = c.primary_email() {
                 if email != c.name {
                     row.set_subtitle(&gtk::glib::markup_escape_text(email));
                 }
@@ -999,6 +1103,18 @@ impl ContactsPage {
 
             // Right-click: the quick actions on this entry.
             let local = crate::contacts::is_local_book(&c.book_uid);
+            let group = c.is_group();
+            let editable = !group || c.group_editable();
+            let has_members = !c.members.is_empty();
+            // A person with an address can go in a group they are not in.
+            let groups: Vec<(usize, String)> = match c.primary_email().filter(|_| !group) {
+                Some(email) => editable_groups
+                    .iter()
+                    .filter(|(g, _)| !self.contacts[*g].members.iter().any(|m| m.email.eq_ignore_ascii_case(email)))
+                    .cloned()
+                    .collect(),
+                None => Vec::new(),
+            };
             let right_click = gtk::GestureClick::new();
             right_click.set_button(3);
             let s = sender.input_sender().clone();
@@ -1008,9 +1124,33 @@ impl ContactsPage {
                 let mut first = vec![MenuEntry::new(i18n("Edit"), move || {
                     let _ = se.send(ContactsPageInput::EditIndex(idx));
                 })
-                .icon("document-edit-symbolic")];
-                // GNOME Contacts knows nothing of the Hylki book.
-                if !local {
+                .icon("document-edit-symbolic")
+                .enabled(editable)];
+                if group {
+                    let sc = s.clone();
+                    first.push(
+                        MenuEntry::new(i18n("New message"), move || {
+                            let _ = sc.send(ContactsPageInput::ComposeGroup(idx));
+                        })
+                        .icon("mail-message-new-symbolic")
+                        .enabled(has_members),
+                    );
+                }
+                if !groups.is_empty() {
+                    let entries = groups
+                        .iter()
+                        .map(|(g, name)| {
+                            let (sa, g) = (s.clone(), *g);
+                            MenuEntry::new(name.clone(), move || {
+                                let _ = sa.send(ContactsPageInput::AddToGroup { group: g, person: idx });
+                            })
+                            .icon("system-users-symbolic")
+                        })
+                        .collect();
+                    first.push(MenuEntry::submenu(i18n("Add to Group"), vec![entries]).icon("system-users-symbolic"));
+                }
+                // GNOME Contacts knows nothing of the Hylki book, nor of groups.
+                if !local && !group {
                     first.push(
                         MenuEntry::new(i18n("Open in GNOME Contacts"), move || {
                             let _ = sg.send(ContactsPageInput::OpenInGnome(idx));
@@ -1161,6 +1301,11 @@ impl ContactsPage {
             return;
         };
         let hit = self.selected.filter(|&i| i >= DIRECTORY);
+        widgets.edit_btn.set_sensitive(hit.is_none() && (!c.is_group() || c.group_editable()));
+        if let Some(idx) = self.selected.filter(|_| c.is_group()) {
+            render_group_card(detail, sender, c, idx);
+            return;
+        }
 
         // ---- identity header: photo, name, who they are ----
         let avatar = avatar_for(c, 96);
@@ -1316,6 +1461,64 @@ impl ContactsPage {
         }
     }
 
+    /// Open the form for the entry at `idx`: a group's, or a contact's. A
+    /// group Hylki cannot write stays as it is.
+    fn edit(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>, idx: usize) {
+        let Some(c) = self.contacts.get(idx) else { return };
+        if c.is_group() && !c.group_editable() {
+            return;
+        }
+        let group = c.is_group();
+        self.editing_target = Some(idx);
+        if group {
+            self.render_group_editor(widgets, sender);
+        } else {
+            self.render_editor(widgets, sender);
+        }
+    }
+
+    /// Replace the detail pane with the group form for `editing_target`
+    /// (blank for a new group, which goes in the Hylki book).
+    fn render_group_editor(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
+        let detail = &widgets.detail_box;
+        while let Some(child) = detail.first_child() {
+            detail.remove(&child);
+        }
+        let blank = ContactDetails::default();
+        let c = self.editing_target.and_then(|i| self.contacts.get(i)).unwrap_or(&blank);
+        let heading = if self.editing_target.is_some() { i18n("Edit Group") } else { i18n("New Group") };
+        editor_bar(detail, sender, &heading);
+
+        let identity = group(detail, &i18n("Group"));
+        let book = adw::ActionRow::new();
+        book.set_title(&i18n("Address book"));
+        let book_name = if c.book_name.is_empty() { crate::contacts::local_book().name } else { c.book_name.clone() };
+        book.set_subtitle(&gtk::glib::markup_escape_text(&book_name));
+        book.add_css_class("property");
+        identity.append(&book);
+        let name = entry_row(&i18n("Name"), &c.name);
+        name.connect_changed(|row| row.remove_css_class("error"));
+        identity.append(&name);
+        let hide = adw::SwitchRow::new();
+        hide.set_title(&i18n("Send as Bcc"));
+        hide.set_subtitle(&i18n("Members do not see each other's addresses."));
+        hide.set_active(c.hide_addresses);
+        identity.append(&hide);
+
+        // Everyone with an address, to pick members from as a name is typed.
+        let people: Vec<(String, String)> = self
+            .contacts
+            .iter()
+            .filter(|p| !p.is_group())
+            .flat_map(|p| p.emails.iter().map(|e| (p.name.clone(), e.value.clone())))
+            .collect();
+        let members = member_editor(detail, &c.members, Rc::new(people));
+        if self.editing_target.is_none() {
+            name.grab_focus();
+        }
+        self.editor = Some(Editor::Group(GroupForm { name, hide, members }));
+    }
+
     /// Replace the detail pane with the editor form for `editing_target`
     /// (blank for a new contact).
     fn render_editor(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
@@ -1329,25 +1532,8 @@ impl ContactsPage {
             .and_then(|i| self.contacts.get(i))
             .unwrap_or(&blank);
 
-        // ---- Cancel · title · Save bar (dialog-header layout) ----
-        let bar = gtk::CenterBox::new();
-        let cancel = gtk::Button::with_label(&i18n("Cancel"));
-        let s = sender.input_sender().clone();
-        cancel.connect_clicked(move |_| {
-            let _ = s.send(ContactsPageInput::CancelEdit);
-        });
-        let save = gtk::Button::with_label(&i18n("Save"));
-        save.add_css_class("suggested-action");
-        let s = sender.input_sender().clone();
-        save.connect_clicked(move |_| {
-            let _ = s.send(ContactsPageInput::SaveEdit);
-        });
-        let heading = gtk::Label::new(Some(if self.editing_target.is_some() { i18n("Edit Contact") } else { i18n("New Contact") }.as_str()));
-        heading.add_css_class("title-4");
-        bar.set_start_widget(Some(&cancel));
-        bar.set_center_widget(Some(&heading));
-        bar.set_end_widget(Some(&save));
-        detail.append(&bar);
+        let heading = if self.editing_target.is_some() { i18n("Edit Contact") } else { i18n("New Contact") };
+        editor_bar(detail, sender, &heading);
 
         // ---- identity fields ----
         let identity = group(detail, &i18n("Identity"));
@@ -1421,8 +1607,113 @@ impl ContactsPage {
         note_row.set_child(Some(&note));
         note_list.append(&note_row);
 
-        self.editor = Some(Editor { name, nickname, org, title, note, emails, phones, urls, book });
+        self.editor = Some(Editor::Contact(ContactForm { name, nickname, org, title, note, emails, phones, urls, book }));
     }
+}
+
+/// A group's card: who is in it, and a message to them all.
+fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, c: &ContactDetails, idx: usize) {
+    let avatar = avatar_for(c, 96);
+    avatar.set_halign(gtk::Align::Center);
+    detail.append(&avatar);
+
+    let name = gtk::Label::new(Some(&c.name));
+    name.add_css_class("title-1");
+    name.set_wrap(true);
+    name.set_justify(gtk::Justification::Center);
+    name.set_margin_top(12);
+    detail.append(&name);
+
+    let sub = gtk::Label::new(Some(&group_byline(c)));
+    sub.add_css_class("dim-label");
+    sub.set_wrap(true);
+    sub.set_justify(gtk::Justification::Center);
+    sub.set_margin_top(4);
+    detail.append(&sub);
+
+    if !c.members.is_empty() {
+        let write = gtk::Button::with_label(&i18n("New Message"));
+        write.add_css_class("pill");
+        write.add_css_class("suggested-action");
+        write.set_halign(gtk::Align::Center);
+        write.set_margin_top(12);
+        let s = sender.input_sender().clone();
+        write.connect_clicked(move |_| {
+            let _ = s.send(ContactsPageInput::ComposeGroup(idx));
+        });
+        detail.append(&write);
+    }
+
+    let list = group(detail, &i18n("Members"));
+    for m in &c.members {
+        let row = adw::ActionRow::new();
+        let named = !m.name.trim().is_empty() && m.name != m.email;
+        row.set_title(&gtk::glib::markup_escape_text(if named { &m.name } else { &m.email }));
+        if named {
+            row.set_subtitle(&gtk::glib::markup_escape_text(&m.email));
+        }
+        let recipient = crate::worker::format_recipient(&m.name, &m.email);
+        let compose = flat_button("mail-message-new-symbolic", &i18n("New message"));
+        let s = sender.input_sender().clone();
+        let to = recipient.clone();
+        compose.connect_clicked(move |_| {
+            let _ = s.send(ContactsPageInput::Compose(to.clone()));
+        });
+        row.add_suffix(&copy_button(&m.email));
+        row.add_suffix(&compose);
+        row.set_activatable(true);
+        let s = sender.input_sender().clone();
+        row.connect_activated(move |_| {
+            let _ = s.send(ContactsPageInput::Compose(recipient.clone()));
+        });
+        list.append(&row);
+    }
+    if c.members.is_empty() {
+        let row = adw::ActionRow::new();
+        row.set_title(&i18n("No one is in this group yet."));
+        row.add_css_class("dim-label");
+        list.append(&row);
+    }
+
+    let details = group(detail, &i18n("Details"));
+    if !c.book_name.is_empty() {
+        let row = adw::ActionRow::new();
+        row.set_title(&i18n("Address Book"));
+        row.set_subtitle(&gtk::glib::markup_escape_text(&c.book_name));
+        row.add_css_class("property");
+        details.append(&row);
+    }
+    if !c.group_editable() {
+        let row = adw::ActionRow::new();
+        row.set_title(&i18n("Changed in the app it came from"));
+        row.set_subtitle(&i18n("This group names its members by contact, which Hylki does not edit."));
+        row.add_css_class("property");
+        details.append(&row);
+    }
+}
+
+fn group_byline(c: &ContactDetails) -> String {
+    crate::contacts::group_reach(c.members.len(), c.hide_addresses)
+}
+
+/// The header's "+": a contact or a group.
+fn new_menu(button: &gtk::Button, sender: &ComponentSender<ContactsPage>) {
+    let (sc, sg) = (sender.input_sender().clone(), sender.input_sender().clone());
+    show_context_menu(
+        button,
+        (button.width() / 2) as f64,
+        button.height() as f64,
+        vec![vec![
+            MenuEntry::new(i18n("New Contact"), move || {
+                let _ = sc.send(ContactsPageInput::NewContact);
+            })
+            .icon("contact-new-symbolic"),
+            MenuEntry::new(i18n("New Group"), move || {
+                let _ = sg.send(ContactsPageInput::NewGroup);
+            })
+            .icon("system-users-symbolic"),
+        ]],
+    );
 }
 
 /// Whether a contact matches a search, already lower case; an empty one
@@ -1436,6 +1727,7 @@ fn matches_query(c: &ContactDetails, q: &str) -> bool {
         || c.org.to_lowercase().contains(q)
         || c.emails.iter().any(|e| e.value.to_lowercase().contains(q))
         || c.phones.iter().any(|p| p.value.to_lowercase().contains(q))
+        || c.members.iter().any(|m| m.name.to_lowercase().contains(q) || m.email.to_lowercase().contains(q))
 }
 
 /// Ask for `.vcf` files to import into the Hylki book, and hand their paths
@@ -1465,8 +1757,167 @@ pub fn choose_vcf_files(parent: Option<&gtk::Window>, done: impl Fn(Vec<std::pat
     });
 }
 
+/// The Cancel · title · Save bar over a form (dialog-header layout).
+fn editor_bar(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, heading: &str) {
+    let bar = gtk::CenterBox::new();
+    let cancel = gtk::Button::with_label(&i18n("Cancel"));
+    let s = sender.input_sender().clone();
+    cancel.connect_clicked(move |_| {
+        let _ = s.send(ContactsPageInput::CancelEdit);
+    });
+    let save = gtk::Button::with_label(&i18n("Save"));
+    save.add_css_class("suggested-action");
+    let s = sender.input_sender().clone();
+    save.connect_clicked(move |_| {
+        let _ = s.send(ContactsPageInput::SaveEdit);
+    });
+    let heading = gtk::Label::new(Some(heading));
+    heading.add_css_class("title-4");
+    bar.set_start_widget(Some(&cancel));
+    bar.set_center_widget(Some(&heading));
+    bar.set_end_widget(Some(&save));
+    detail.append(&bar);
+}
+
+/// The group form's members: a row each with a remove button, and a row to
+/// add someone, by an address or by picking from `people` (name, address)
+/// as a name is typed. Returns the live list read at save time.
+fn member_editor(detail: &gtk::Box, initial: &[Member], people: Rc<Vec<(String, String)>>) -> Rc<RefCell<Vec<Member>>> {
+    let list = group(detail, &i18n("Members"));
+    let members: Rc<RefCell<Vec<Member>>> = Rc::new(RefCell::new(Vec::new()));
+    let entry = adw::EntryRow::new();
+    entry.set_title(&i18n("Add a person by name or address"));
+    entry.set_show_apply_button(true);
+    list.append(&entry);
+    // The people matching what is typed, under the members.
+    let found = gtk::ListBox::new();
+    found.add_css_class("boxed-list");
+    found.set_selection_mode(gtk::SelectionMode::None);
+    found.set_margin_top(6);
+    found.set_visible(false);
+    detail.append(&found);
+
+    // Widgets are held weakly in the handlers they own, so the form is
+    // freed when the pane is cleared.
+    let add: Rc<dyn Fn(Member)> = {
+        let (list, members, entry) = (list.downgrade(), members.clone(), entry.downgrade());
+        Rc::new(move |m: Member| {
+            let (Some(list), Some(entry)) = (list.upgrade(), entry.upgrade()) else { return };
+            if members.borrow().iter().any(|x| x.email.eq_ignore_ascii_case(&m.email)) {
+                return;
+            }
+            let row = adw::ActionRow::new();
+            let named = !m.name.trim().is_empty() && m.name != m.email;
+            row.set_title(&gtk::glib::markup_escape_text(if named { &m.name } else { &m.email }));
+            if named {
+                row.set_subtitle(&gtk::glib::markup_escape_text(&m.email));
+            }
+            let remove = flat_button("user-trash-symbolic", &i18n("Remove"));
+            {
+                let (list, row, members, email) = (list.downgrade(), row.downgrade(), members.clone(), m.email.clone());
+                remove.connect_clicked(move |_| {
+                    members.borrow_mut().retain(|x| !x.email.eq_ignore_ascii_case(&email));
+                    if let (Some(list), Some(row)) = (list.upgrade(), row.upgrade()) {
+                        list.remove(&row);
+                    }
+                });
+            }
+            row.add_suffix(&remove);
+            list.insert(&row, entry.index());
+            members.borrow_mut().push(m);
+        })
+    };
+    for m in initial {
+        add(m.clone());
+    }
+
+    // Who matches the typing: by name or address, not already in.
+    let matches = {
+        let (people, members) = (people.clone(), members.clone());
+        move |typed: &str| -> Vec<(String, String)> {
+            let q = typed.trim().to_lowercase();
+            if q.is_empty() {
+                return Vec::new();
+            }
+            let taken: std::collections::HashSet<String> =
+                members.borrow().iter().map(|m| m.email.to_lowercase()).collect();
+            people
+                .iter()
+                .filter(|(n, e)| {
+                    !taken.contains(&e.to_lowercase()) && (n.to_lowercase().contains(&q) || e.to_lowercase().contains(&q))
+                })
+                .take(6)
+                .cloned()
+                .collect()
+        }
+    };
+    let matches = Rc::new(matches);
+    {
+        let (found, add, matches) = (found.downgrade(), add.clone(), matches.clone());
+        entry.connect_changed(move |e| {
+            let Some(found) = found.upgrade() else { return };
+            while let Some(child) = found.first_child() {
+                found.remove(&child);
+            }
+            for (name, email) in matches(&e.text()) {
+                let row = adw::ActionRow::new();
+                row.set_title(&gtk::glib::markup_escape_text(&name));
+                if name != email {
+                    row.set_subtitle(&gtk::glib::markup_escape_text(&email));
+                }
+                let plus = gtk::Image::from_icon_name("list-add-symbolic");
+                plus.add_css_class("dim-label");
+                row.add_prefix(&plus);
+                row.set_activatable(true);
+                let (add, entry) = (add.clone(), e.downgrade());
+                row.connect_activated(move |_| {
+                    add(Member { name: name.clone(), email: email.clone(), ..Member::default() });
+                    if let Some(entry) = entry.upgrade() {
+                        entry.set_text("");
+                        entry.grab_focus();
+                    }
+                });
+                found.append(&row);
+            }
+            found.set_visible(found.first_child().is_some());
+        });
+    }
+    // Enter or the apply button: the addresses typed or pasted, else the
+    // first person matching the name.
+    let commit = move |e: &adw::EntryRow| {
+        let text = e.text().to_string();
+        let typed: Vec<(String, String)> = crate::worker::parse_recipients(&text)
+            .into_iter()
+            .filter(|(_, email)| crate::worker::invalid_recipient(email).is_none() && email.contains('@'))
+            .collect();
+        let picked = if typed.is_empty() { matches(&text).into_iter().take(1).collect() } else { typed };
+        if picked.is_empty() {
+            e.add_css_class("error");
+            return;
+        }
+        for (name, email) in picked {
+            // An address someone typed bare keeps the name Contacts has.
+            let name = if name.is_empty() {
+                people.iter().find(|(_, e)| e.eq_ignore_ascii_case(&email)).map(|(n, _)| n.clone()).unwrap_or_default()
+            } else {
+                name
+            };
+            add(Member { name, email, ..Member::default() });
+        }
+        e.set_text("");
+    };
+    let commit = Rc::new(commit);
+    {
+        let commit = commit.clone();
+        entry.connect_apply(move |e| commit(e));
+    }
+    entry.connect_entry_activated(move |e| commit(e));
+    entry.connect_changed(|e| e.remove_css_class("error"));
+    members
+}
+
 /// Read the editor form back into a `ContactEdit`.
-fn collect_edit(e: &Editor) -> ContactEdit {
+fn collect_edit(e: &ContactForm) -> ContactEdit {
     let values = |rows: &Rc<RefCell<Vec<(adw::EntryRow, String)>>>| -> Vec<Labeled> {
         rows.borrow()
             .iter()
@@ -1576,7 +2027,10 @@ fn entry_row(title: &str, value: &str) -> adw::EntryRow {
 /// The contact's avatar: their GNOME Contacts photo when they have one, the
 /// usual initials disc when not.
 fn avatar_for(c: &ContactDetails, size: i32) -> adw::Avatar {
-    let avatar = adw::Avatar::new(size, Some(&c.name), true);
+    let avatar = adw::Avatar::new(size, Some(&c.name), !c.is_group());
+    if c.is_group() {
+        avatar.set_icon_name(Some("system-users-symbolic"));
+    }
     if let Some(photo) = &c.photo {
         let bytes = gtk::glib::Bytes::from(photo.as_slice());
         if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {

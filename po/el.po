@@ -1366,6 +1366,17 @@ msgstr "Μετακίνηση σε"
 msgid "Find"
 msgstr "Εύρεση"
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] "{n} παραλήπτης"
+msgstr[1] "{n} παραλήπτες"
+
 msgid "Hylki Address Book"
 msgstr "Βιβλίο διευθύνσεων Hylki"
 
@@ -3840,7 +3851,8 @@ msgstr "Προσθέστε επαφές στις Επαφές GNOME για να 
 msgid "Open GNOME Contacts"
 msgstr "Άνοιγμα Επαφών GNOME"
 
-msgid "New contact"
+#, fuzzy
+msgid "New contact or group"
 msgstr "Νέα επαφή"
 
 msgid "Import vCard files into the Hylki address book"
@@ -3873,6 +3885,18 @@ msgstr "Επώνυμο"
 msgid "In Directories"
 msgstr "Στους καταλόγους"
 
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Διαγραφή του κλειδιού σας;"
+
+#, fuzzy
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+
 msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
 
@@ -3888,6 +3912,9 @@ msgstr "Όλα τα βιβλία διευθύνσεων"
 
 msgid "Edit"
 msgstr "Επεξεργασία"
+
+msgid "Add to Group"
+msgstr ""
 
 msgid "Delete…"
 msgstr "Διαγραφή…"
@@ -3923,6 +3950,24 @@ msgstr "Βιβλίο διευθύνσεων"
 msgid "Details"
 msgstr "Λεπτομέρειες"
 
+#, fuzzy
+msgid "Edit Group"
+msgstr "Δεξιά ομάδα"
+
+#, fuzzy
+msgid "New Group"
+msgstr "Αριστερή ομάδα"
+
+msgid "Group"
+msgstr ""
+
+#, fuzzy
+msgid "Send as Bcc"
+msgstr "Αποστολή όλων"
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Επεξεργασία επαφής"
 
@@ -3951,6 +3996,19 @@ msgstr "Προσθήκη τηλεφώνου"
 msgid "Add website"
 msgstr "Προσθήκη ιστοτόπου"
 
+#, fuzzy
+msgid "Members"
+msgstr "Αριθμοί σελίδων"
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
 msgid "Import Contacts"
 msgstr "Εισαγωγή επαφών"
 
@@ -3959,6 +4017,10 @@ msgstr "Αρχεία vCard"
 
 msgid "All files"
 msgstr "Όλα τα αρχεία"
+
+#, fuzzy
+msgid "Add a person by name or address"
+msgstr "Μια επαφή χρειάζεται όνομα ή διεύθυνση email"
 
 msgid "LDAP Directories"
 msgstr "Κατάλογοι LDAP"

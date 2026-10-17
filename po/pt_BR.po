@@ -1420,6 +1420,17 @@ msgstr "Mover para"
 msgid "Find"
 msgstr "Localizar"
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] "{n} destinatário"
+msgstr[1] "{n} destinatários"
+
 #, fuzzy
 msgid "Hylki Address Book"
 msgstr "Catálogo de endereços"
@@ -3889,7 +3900,8 @@ msgstr "Adicione contatos no Contatos do GNOME para vê-los aqui."
 msgid "Open GNOME Contacts"
 msgstr "Abrir Contatos do GNOME"
 
-msgid "New contact"
+#, fuzzy
+msgid "New contact or group"
 msgstr "Novo contato"
 
 msgid "Import vCard files into the Hylki address book"
@@ -3920,6 +3932,15 @@ msgstr "Sobrenome"
 msgid "In Directories"
 msgstr "Diretórios LDAP"
 
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Excluir sua chave?"
+
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr "Excluir contato?"
 
@@ -3934,6 +3955,9 @@ msgstr "Catálogo de endereços"
 
 msgid "Edit"
 msgstr "Editar"
+
+msgid "Add to Group"
+msgstr ""
 
 msgid "Delete…"
 msgstr "Excluir…"
@@ -3971,6 +3995,24 @@ msgstr "Catálogo de endereços"
 msgid "Details"
 msgstr ""
 
+#, fuzzy
+msgid "Edit Group"
+msgstr "Grupo direito"
+
+#, fuzzy
+msgid "New Group"
+msgstr "Grupo esquerdo"
+
+msgid "Group"
+msgstr ""
+
+#, fuzzy
+msgid "Send as Bcc"
+msgstr "Enviar tudo"
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Editar contato"
 
@@ -4001,6 +4043,19 @@ msgid "Add website"
 msgstr "Adicionar um site"
 
 #, fuzzy
+msgid "Members"
+msgstr "Números de página"
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
+#, fuzzy
 msgid "Import Contacts"
 msgstr "Ordenar contatos"
 
@@ -4010,6 +4065,9 @@ msgstr "Arquivos grandes"
 
 msgid "All files"
 msgstr "Todos os arquivos"
+
+msgid "Add a person by name or address"
+msgstr ""
 
 msgid "LDAP Directories"
 msgstr "Diretórios LDAP"

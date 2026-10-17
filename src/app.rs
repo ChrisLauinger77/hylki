@@ -1883,6 +1883,9 @@ pub enum AppMsg {
     /// Select a settings category by id (the showcase hook).
     ShowSettingsPage(String),
     ComposeTo(String),
+    /// A new message to these recipients in Bcc: a contact group that hides
+    /// its members' addresses.
+    ComposeBcc(String),
     /// Showcase only (HYLKI_SHOWCASE_FOLDER): switch to the first account's
     /// folder of this kind, so a capture can start from Drafts, Sent, etc.
     ShowcaseFolder { kind: FolderKind, account: Option<u32> },
@@ -3214,6 +3217,7 @@ impl SimpleComponent for AppModel {
                 .launch(contacts_compose_revealer.clone())
                 .forward(sender.input_sender(), |out| match out {
                     ContactsPageOutput::Compose(email) => AppMsg::ComposeTo(email),
+                    ContactsPageOutput::ComposeBcc(field) => AppMsg::ComposeBcc(field),
                     ContactsPageOutput::ToggleSidebar => AppMsg::ToggleSidebar,
                     ContactsPageOutput::SaveContact { book_uid, vcard } => {
                         AppMsg::SaveContact { book_uid, vcard }
@@ -5658,18 +5662,23 @@ impl SimpleComponent for AppModel {
                         }
                     });
                 }
-                // HYLKI_SHOWCASE_CONTACTS=list|new|search:<text>[@<n>] opens
-                // Contacts at 3s, and with "new" its editor for a new contact
-                // at 5s, or with "search:" types the text into its search
+                // HYLKI_SHOWCASE_CONTACTS=list|new|group|search:<text>[@<n>]
+                // opens Contacts at 3s, and with "new" its editor for a new
+                // contact at 5s ("group": for a new group), or with "search:"
+                // types the text into its search
                 // then, so the directories are asked too (#307), and with
                 // "@<n>" picks entry n of the book filter at 6s.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
                     let page = model.contacts_page.sender().clone();
-                    if which == "new" {
+                    if which == "new" || which == "group" {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
-                            let _ = page.send(ContactsPageInput::NewContact);
+                            let _ = page.send(if which == "group" {
+                                ContactsPageInput::NewGroup
+                            } else {
+                                ContactsPageInput::NewContact
+                            });
                         });
                     } else if let Some(spec) = which.strip_prefix("search:") {
                         let (text, book) = match spec.rsplit_once('@') {
@@ -9454,29 +9463,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::ComposeTo(addr) => {
-                // The contacts view hosts its own compose slot (the composer
-                // slides down over the contact card); from the gallery there is
-                // no slot, so bring the mail panes back first — the composer
-                // would otherwise open invisibly behind the stack.
-                self.leave_gallery();
-                let account = self
-                    .current
-                    .as_ref()
-                    .map(|m| m.account_id)
-                    .unwrap_or_else(|| self.active_account());
-                let prefill = ComposePrefill {
-                    to: addr,
-                    ..Default::default()
-                };
-                let (account, prefill) = self.new_message_from(account, prefill);
-                // Same preference as "New Message": slide down over the
-                // reader, unless composing is set to open in a window.
-                if self.compose_inline {
-                    self.open_inline_reply(account, prefill, None, &sender);
-                } else {
-                    self.open_compose(account, prefill, &sender);
-                }
+            AppMsg::ComposeTo(to) => {
+                self.compose_addressed(ComposePrefill { to, ..Default::default() }, &sender);
+            }
+
+            AppMsg::ComposeBcc(bcc) => {
+                self.compose_addressed(ComposePrefill { bcc, ..Default::default() }, &sender);
             }
 
             AppMsg::OpenWithFiles(mut paths) => {
@@ -9760,6 +9752,7 @@ impl SimpleComponent for AppModel {
                         from_contacts: false,
                         from_directory: false,
                         score: 1,
+                        group: None,
                     })
                     .collect();
                 if !fresh.is_empty() {
@@ -18456,6 +18449,28 @@ impl AppModel {
         rest.truncate(500);
         out.extend(rest);
         out
+    }
+
+    /// A new message with these recipients, from the account being looked at.
+    fn compose_addressed(&mut self, prefill: ComposePrefill, sender: &ComponentSender<Self>) {
+        // The contacts view hosts its own compose slot (the composer
+        // slides down over the contact card); from the gallery there is
+        // no slot, so bring the mail panes back first — the composer
+        // would otherwise open invisibly behind the stack.
+        self.leave_gallery();
+        let account = self
+            .current
+            .as_ref()
+            .map(|m| m.account_id)
+            .unwrap_or_else(|| self.active_account());
+        let (account, prefill) = self.new_message_from(account, prefill);
+        // Same preference as "New Message": slide down over the
+        // reader, unless composing is set to open in a window.
+        if self.compose_inline {
+            self.open_inline_reply(account, prefill, None, sender);
+        } else {
+            self.open_compose(account, prefill, sender);
+        }
     }
 
     /// Open a standalone compose window (New Message, compose-to, edit-draft).

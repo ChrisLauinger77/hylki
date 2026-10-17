@@ -1450,6 +1450,19 @@ msgstr "Przenieś do"
 msgid "Find"
 msgstr "Znajdź"
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] "{n} odbiorca"
+msgstr[1] "{n} odbiorców"
+msgstr[2] "{n} odbiorców"
+
 #, fuzzy
 msgid "Hylki Address Book"
 msgstr "Książka adresowa"
@@ -3951,7 +3964,8 @@ msgstr "Dodaj kontakty w aplikacji Kontakty, aby były tutaj wyświetlane."
 msgid "Open GNOME Contacts"
 msgstr "Otwórz aplikację Kontakty"
 
-msgid "New contact"
+#, fuzzy
+msgid "New contact or group"
 msgstr "Nowy kontakt"
 
 msgid "Import vCard files into the Hylki address book"
@@ -3982,6 +3996,15 @@ msgstr "Nazwisko"
 msgid "In Directories"
 msgstr "Dodaj filtr"
 
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Czy usunąć własny klucz?"
+
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr "Czy usunąć kontakt?"
 
@@ -3996,6 +4019,9 @@ msgstr "Książka adresowa"
 
 msgid "Edit"
 msgstr "Modyfikuj"
+
+msgid "Add to Group"
+msgstr ""
 
 msgid "Delete…"
 msgstr "Usuń…"
@@ -4033,6 +4059,24 @@ msgstr "Książka adresowa"
 msgid "Details"
 msgstr ""
 
+#, fuzzy
+msgid "Edit Group"
+msgstr "Prawa grupa"
+
+#, fuzzy
+msgid "New Group"
+msgstr "Lewa grupa"
+
+msgid "Group"
+msgstr ""
+
+#, fuzzy
+msgid "Send as Bcc"
+msgstr "Wyślij wszystkie"
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Modyfikuj kontakt"
 
@@ -4062,6 +4106,18 @@ msgstr "Dodaj telefon"
 msgid "Add website"
 msgstr "Dodaj witrynę"
 
+msgid "Members"
+msgstr ""
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
 #, fuzzy
 msgid "Import Contacts"
 msgstr "Sortuj kontakty"
@@ -4072,6 +4128,9 @@ msgstr "Duże pliki"
 
 msgid "All files"
 msgstr "Wszystkie pliki"
+
+msgid "Add a person by name or address"
+msgstr ""
 
 msgid "LDAP Directories"
 msgstr ""

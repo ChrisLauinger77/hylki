@@ -492,8 +492,9 @@ Importing reads `.vcf` files into the Hylki book, from Settings or from the
 import button in the Contacts view's header. A file can hold many contacts,
 in vCard 2.1, 3.0 or 4.0. A contact with the same ID as one already in the
 book updates it, and one without an ID is matched by its content, so
-importing a file twice adds nothing new. Entries with neither a name nor an
-address, and mailing lists, are skipped; truncated or oversized entries
+importing a file twice adds nothing new. A contact list in the file becomes
+a group (see [Contact groups](#contact-groups)). Entries with neither a name
+nor an address are skipped; truncated or oversized entries
 (over 5 MB) are counted as damaged; a second card with the same ID in one
 file is skipped, so the first is kept. Files over 50 MB are refused, and
 photos are used only when they are inside the file: nothing is fetched from
@@ -502,6 +503,40 @@ each, with the book named, and once in the composer's suggestions.
 
 The book is the file `local_contacts.db` in Hylki's data folder, kept apart
 from the mail cache, so clearing the cache leaves it alone.
+
+### Contact groups
+
+A group is a name for several people, such as a team or a club, that the
+composer offers like a contact. Typing part of its name in To, Cc or Bcc
+lists it among the suggestions with the number of people in it, and picking
+it adds a pill for each of them. People already in that field are not added
+twice.
+
+A group can be set to **Send as Bcc**. Picking it in any field then puts its
+people in Bcc, and opens the Bcc row, so they do not see each other's
+addresses. To still needs at least one address, your own for example.
+
+**New Group**, under the **+** button in the Contacts view, makes a group in
+the Hylki book. Add people by typing a name and picking someone from the
+matches under the field, or by typing or pasting addresses and pressing
+<kbd>Return</kbd>. Anyone with an address can be in a group, not only
+people in your contacts. A contact's right-click menu has **Add to Group**,
+and a group's card has **New Message**, which writes to everyone in it. The
+group's pencil, at the top of its card, changes its name, its people and the
+Bcc switch.
+
+The lists made in Evolution, kept in the books of Evolution Data Server, are
+shown and offered too, and Evolution's **Hide addresses when sending mail to
+this list** is the same as **Send as Bcc**. They can be changed in Hylki as
+well. The groups of a CardDAV book written by other apps (vCard 4 `KIND:group`,
+and the groups of Apple Contacts and iCloud) are shown and offered with the
+people they name in the same book, but are changed in the app they came
+from.
+
+A group is saved as an Evolution list, so **Export as a vCard file** carries
+it to Evolution, and back. Groups are not counted as contacts in **Settings →
+Contacts**, and the people in a group do not count as contacts for the
+filters below.
 
 ### Filtering on Contacts
 

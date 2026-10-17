@@ -1378,6 +1378,17 @@ msgstr "Sposta in"
 msgid "Find"
 msgstr "Trova"
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] "{n} destinatario"
+msgstr[1] "{n} destinatari"
+
 msgid "Hylki Address Book"
 msgstr "Rubrica Hylki"
 
@@ -3835,7 +3846,8 @@ msgstr "Aggiungi contatti in GNOME Contatti per vederli qui."
 msgid "Open GNOME Contacts"
 msgstr "Apri GNOME Contatti"
 
-msgid "New contact"
+#, fuzzy
+msgid "New contact or group"
 msgstr "Nuovo contatto"
 
 msgid "Import vCard files into the Hylki address book"
@@ -3869,6 +3881,18 @@ msgstr "Cognome"
 msgid "In Directories"
 msgstr "Directory LDAP"
 
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Eliminare la tua chiave?"
+
+#, fuzzy
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+"{name} viene rimosso dalla rubrica, e per una rubrica sincronizzata, anche "
+"dal server."
+
 msgid "Delete Contact?"
 msgstr "Eliminare il contatto?"
 
@@ -3884,6 +3908,9 @@ msgstr "Tutte le rubriche"
 
 msgid "Edit"
 msgstr "Modifica"
+
+msgid "Add to Group"
+msgstr ""
 
 msgid "Delete…"
 msgstr "Elimina…"
@@ -3920,6 +3947,24 @@ msgstr "Rubrica"
 msgid "Details"
 msgstr "Dettagli"
 
+#, fuzzy
+msgid "Edit Group"
+msgstr "Gruppo destra"
+
+#, fuzzy
+msgid "New Group"
+msgstr "Gruppo sinistra"
+
+msgid "Group"
+msgstr ""
+
+#, fuzzy
+msgid "Send as Bcc"
+msgstr "Invia tutti"
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Modifica contatto"
 
@@ -3948,6 +3993,19 @@ msgstr "Aggiungi telefono"
 msgid "Add website"
 msgstr "Aggiungi sito web"
 
+#, fuzzy
+msgid "Members"
+msgstr "Numeri di pagina"
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
 msgid "Import Contacts"
 msgstr "Importa contatti"
 
@@ -3956,6 +4014,10 @@ msgstr "File vCard"
 
 msgid "All files"
 msgstr "Tutti i file"
+
+#, fuzzy
+msgid "Add a person by name or address"
+msgstr "Un contatto necessita di un nome o di un indirizzo e-mail"
 
 msgid "LDAP Directories"
 msgstr "Directory LDAP"

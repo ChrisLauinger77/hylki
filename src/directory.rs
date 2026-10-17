@@ -703,7 +703,7 @@ pub fn search_contacts(typed: &str, limit: usize) -> (Vec<crate::contacts::Conta
     for (dir, cards) in found {
         let mut entries = Vec::new();
         for card in cards {
-            let Some(mut c) = crate::contacts::parse_vcard_fields(&card) else { continue };
+            let Some(mut c) = crate::contacts::parse_vcard_fields(&card).filter(|c| !c.is_group()) else { continue };
             // A directory's photo is carried in the card; nothing on disk is
             // read for it.
             c.photo = crate::contacts::vcard_photo_with(&card, false);
@@ -755,7 +755,15 @@ fn suggestions_from_vcard(card: &str) -> Vec<Suggestion> {
     }
     emails
         .into_iter()
-        .map(|email| Suggestion { name: name.clone(), email, from_contacts: true, from_directory: true, score: 0, own: false })
+        .map(|email| Suggestion {
+            name: name.clone(),
+            email,
+            from_contacts: true,
+            from_directory: true,
+            score: 0,
+            own: false,
+            group: None,
+        })
         .collect()
 }
 

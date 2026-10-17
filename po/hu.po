@@ -1419,6 +1419,17 @@ msgstr "Áthelyezés ide"
 msgid "Find"
 msgstr "Keresés"
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] "{n} címzett"
+msgstr[1] "{n} címzett"
+
 #, fuzzy
 msgid "Hylki Address Book"
 msgstr "Címjegyzék"
@@ -3914,7 +3925,8 @@ msgstr "Adjon hozzá névjegyeket a GNOME Névjegyekben a megtekintésükhöz."
 msgid "Open GNOME Contacts"
 msgstr "GNOME Névjegyek megnyitása"
 
-msgid "New contact"
+#, fuzzy
+msgid "New contact or group"
 msgstr "Új névjegy"
 
 msgid "Import vCard files into the Hylki address book"
@@ -3945,6 +3957,15 @@ msgstr "Vezetéknév"
 msgid "In Directories"
 msgstr "LDAP Mappák"
 
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Törli a kulcsát?"
+
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"
 
@@ -3959,6 +3980,9 @@ msgstr "Címjegyzék"
 
 msgid "Edit"
 msgstr "Szerkesztés"
+
+msgid "Add to Group"
+msgstr ""
 
 msgid "Delete…"
 msgstr "Törlés…"
@@ -3996,6 +4020,24 @@ msgstr "Címjegyzék"
 msgid "Details"
 msgstr ""
 
+#, fuzzy
+msgid "Edit Group"
+msgstr "Jobb oldali csoport"
+
+#, fuzzy
+msgid "New Group"
+msgstr "Bal oldali csoport"
+
+msgid "Group"
+msgstr ""
+
+#, fuzzy
+msgid "Send as Bcc"
+msgstr "Összes küldése"
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Névjegy szerkesztése"
 
@@ -4025,6 +4067,18 @@ msgstr "Telefonszám hozzáadása"
 msgid "Add website"
 msgstr "Webhely hozzáadása"
 
+msgid "Members"
+msgstr ""
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
 #, fuzzy
 msgid "Import Contacts"
 msgstr "Névjegyek rendezése"
@@ -4035,6 +4089,9 @@ msgstr "Nagy fájlok"
 
 msgid "All files"
 msgstr "Minden fájl"
+
+msgid "Add a person by name or address"
+msgstr ""
 
 msgid "LDAP Directories"
 msgstr "LDAP Mappák"

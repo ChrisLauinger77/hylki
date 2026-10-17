@@ -1268,6 +1268,16 @@ msgstr ""
 msgid "Find"
 msgstr ""
 
+msgid "{n} person, in Bcc"
+msgid_plural "{n} people, in Bcc"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} person"
+msgid_plural "{n} people"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Hylki Address Book"
 msgstr ""
 
@@ -3457,7 +3467,7 @@ msgstr ""
 msgid "Open GNOME Contacts"
 msgstr ""
 
-msgid "New contact"
+msgid "New contact or group"
 msgstr ""
 
 msgid "Import vCard files into the Hylki address book"
@@ -3487,6 +3497,14 @@ msgstr ""
 msgid "In Directories"
 msgstr ""
 
+msgid "Delete Group?"
+msgstr ""
+
+msgid ""
+"{name} is removed from your address book, and for a synced book, from the "
+"server too. The people in it are not."
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr ""
 
@@ -3499,6 +3517,9 @@ msgid "All Address Books"
 msgstr ""
 
 msgid "Edit"
+msgstr ""
+
+msgid "Add to Group"
 msgstr ""
 
 msgid "Delete…"
@@ -3535,6 +3556,21 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
+msgid "Edit Group"
+msgstr ""
+
+msgid "New Group"
+msgstr ""
+
+msgid "Group"
+msgstr ""
+
+msgid "Send as Bcc"
+msgstr ""
+
+msgid "Members do not see each other's addresses."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr ""
 
@@ -3563,6 +3599,18 @@ msgstr ""
 msgid "Add website"
 msgstr ""
 
+msgid "Members"
+msgstr ""
+
+msgid "No one is in this group yet."
+msgstr ""
+
+msgid "Changed in the app it came from"
+msgstr ""
+
+msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
 msgid "Import Contacts"
 msgstr ""
 
@@ -3570,6 +3618,9 @@ msgid "vCard files"
 msgstr ""
 
 msgid "All files"
+msgstr ""
+
+msgid "Add a person by name or address"
 msgstr ""
 
 msgid "LDAP Directories"
