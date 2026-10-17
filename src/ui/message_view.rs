@@ -7130,17 +7130,24 @@ fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
 // parent-attached listeners, but a click into an iframe focuses it and blurs
 // the wrapper window — caught there, the focused frame names the card, and
 // focus is handed straight back so the next click fires again.
+//
+// `zf` is the message zoom on the frame's root. Under it WebKit reports the
+// body's scroll sizes in the body's own unzoomed pixels, not the frame's, so
+// at 90% the body always looked wider than its frame: each pass of the widen
+// loop grew the frame by 1/zoom and centred mail drifted right (#473).
 const SIZE_SCRIPT: &str = "\
+function zf(d){try{return parseFloat(d.defaultView.getComputedStyle(d.documentElement).zoom)||1;}catch(_){return 1;}}\
 function s(f){if(f._s)return;f._s=1;try{var d=f.contentDocument;if(!d||d.URL==='about:blank')return;\
 f.classList.add('hylki-live');\
 var b=d.body,e=d.documentElement;\
 var sy=window.scrollY;var _r=f.getBoundingClientRect();\
 var above=_r.bottom<=0;var old=_r.height||0;\
 f.style.width='';void f.offsetWidth;\
-for(var k=0;k<8;k++){var w=Math.max(b?b.scrollWidth:0,e?e.scrollWidth:0);\
+var z=zf(d);\
+for(var k=0;k<8;k++){var w=Math.max(b?Math.ceil(b.scrollWidth*z):0,e?e.scrollWidth:0);\
 if(w<=f.clientWidth+1)break;f.style.width=w+'px';void f.offsetWidth;}\
 var prev=f.style.height;f.style.height='0px';void f.offsetHeight;\
-var h=Math.max(b?b.scrollHeight:0,e?e.scrollHeight:0,b?b.offsetHeight:0);\
+var h=Math.max(b?Math.ceil(b.scrollHeight*z):0,e?e.scrollHeight:0,b?Math.ceil(b.offsetHeight*z):0);\
 if(h>0){f.style.height=h+'px';\
 if(f.dataset.key&&f._h!==h){f._h=h;\
 try{window.webkit.messageHandlers.hylki.postMessage('size:'+f.dataset.key+':'+h);}catch(_){}}}\
@@ -7244,7 +7251,7 @@ b.classList.toggle('open',on);\
 b.setAttribute('title',on?QT[1]:QT[0]);f._qp();\
 var to=0;try{var dd=f.contentDocument,bb=dd.body,ee=dd.documentElement;\
 var prev=f.style.height;f.style.height='0px';void f.offsetHeight;\
-to=Math.max(bb?bb.scrollHeight:0,ee?ee.scrollHeight:0,bb?bb.offsetHeight:0);\
+var z=zf(dd);to=Math.max(bb?Math.ceil(bb.scrollHeight*z):0,ee?ee.scrollHeight:0,bb?Math.ceil(bb.offsetHeight*z):0);\
 f.style.height=prev;void f.offsetHeight;}catch(_){}\
 if(!to){s(f);window.scrollTo(0,sy);return;}\
 f.style.height=from+'px';f.classList.add('anim');\
