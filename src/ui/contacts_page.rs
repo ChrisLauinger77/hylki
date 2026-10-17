@@ -1823,7 +1823,9 @@ fn member_editor(
     // The people matching what is typed, under the members.
     let found = gtk::ListBox::new();
     found.add_css_class("boxed-list");
-    found.set_selection_mode(gtk::SelectionMode::None);
+    found.add_css_class("member-matches");
+    found.set_selection_mode(gtk::SelectionMode::Single);
+    found.set_can_focus(false);
     found.set_margin_top(6);
     found.set_visible(false);
     detail.append(&found);
@@ -1885,14 +1887,46 @@ fn member_editor(
         }
     };
     let matches = Rc::new(matches);
+    // The matches listed, and the one Return takes: the first while a name
+    // is typed, none while the text is an address (Return adds what was
+    // typed), whichever the arrow keys move to.
+    let shown: Rc<RefCell<Vec<crate::contacts::Suggestion>>> = Rc::new(RefCell::new(Vec::new()));
+    let chosen: Rc<std::cell::Cell<Option<usize>>> = Rc::new(std::cell::Cell::new(None));
+    let highlight = {
+        let (found, chosen) = (found.downgrade(), chosen.clone());
+        move |at: Option<usize>| {
+            chosen.set(at);
+            let Some(found) = found.upgrade() else { return };
+            match at.and_then(|i| found.row_at_index(i as i32)) {
+                Some(row) => found.select_row(Some(&row)),
+                None => found.unselect_all(),
+            }
+        }
+    };
+    let highlight = Rc::new(highlight);
+    // Add a match as a member and start the field over.
+    let take = {
+        let add = add.clone();
+        move |sug: &crate::contacts::Suggestion, entry: &adw::EntryRow| {
+            // History may know an address without a name.
+            let name = if sug.name == sug.email { String::new() } else { sug.name.clone() };
+            add(Member { name, email: sug.email.clone(), ..Member::default() });
+            entry.set_text("");
+            entry.grab_focus();
+        }
+    };
+    let take = Rc::new(take);
     {
-        let (found, add, matches) = (found.downgrade(), add.clone(), matches.clone());
+        let (found, matches, shown, highlight, take) =
+            (found.downgrade(), matches.clone(), shown.clone(), highlight.clone(), take.clone());
         entry.connect_changed(move |e| {
             let Some(found) = found.upgrade() else { return };
             while let Some(child) = found.first_child() {
                 found.remove(&child);
             }
-            for sug in matches(&e.text()) {
+            let text = e.text();
+            *shown.borrow_mut() = matches(&text);
+            for sug in shown.borrow().iter() {
                 let row = adw::ActionRow::new();
                 row.set_title(&gtk::glib::markup_escape_text(&sug.name));
                 if sug.name != sug.email {
@@ -1908,40 +1942,60 @@ fn member_editor(
                 icon.add_css_class("dim-label");
                 row.add_prefix(&icon);
                 row.set_activatable(true);
-                let (add, entry) = (add.clone(), e.downgrade());
-                let (name, email) = (sug.name, sug.email);
+                // The typing stays in the field while the arrows move here.
+                row.set_can_focus(false);
+                let (take, entry, sug) = (take.clone(), e.downgrade(), sug.clone());
                 row.connect_activated(move |_| {
-                    // History may know an address without a name.
-                    let name = if name == email { String::new() } else { name.clone() };
-                    add(Member { name, email: email.clone(), ..Member::default() });
                     if let Some(entry) = entry.upgrade() {
-                        entry.set_text("");
-                        entry.grab_focus();
+                        take(&sug, &entry);
                     }
                 });
                 found.append(&row);
             }
-            found.set_visible(found.first_child().is_some());
+            let any = found.first_child().is_some();
+            found.set_visible(any);
+            let address = !typed_addresses(&text).is_empty();
+            highlight((any && !address).then_some(0));
         });
     }
-    // Enter or the apply button: the addresses typed or pasted, else the
-    // first person matching the name.
+    // Down and Up move through the matches; Up from the first goes back to
+    // what was typed. Escape puts the list away.
+    {
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let (found, shown, chosen, highlight) = (found.downgrade(), shown.clone(), chosen.clone(), highlight.clone());
+        keys.connect_key_pressed(move |_, keyval, _, _| {
+            use gtk::glib::Propagation;
+            let Some(found) = found.upgrade().filter(|f| f.is_visible()) else { return Propagation::Proceed };
+            let last = shown.borrow().len().saturating_sub(1);
+            if keyval == gtk::gdk::Key::Down || keyval == gtk::gdk::Key::KP_Down {
+                highlight(Some(chosen.get().map_or(0, |i| (i + 1).min(last))));
+            } else if keyval == gtk::gdk::Key::Up || keyval == gtk::gdk::Key::KP_Up {
+                highlight(chosen.get().and_then(|i| i.checked_sub(1)));
+            } else if keyval == gtk::gdk::Key::Escape {
+                highlight(None);
+                found.set_visible(false);
+            } else {
+                return Propagation::Proceed;
+            }
+            Propagation::Stop
+        });
+        entry.add_controller(keys);
+    }
+    // Return or the apply button: the match picked, else the addresses typed
+    // or pasted.
     let commit = move |e: &adw::EntryRow| {
-        let text = e.text().to_string();
-        let typed: Vec<(String, String)> = crate::worker::parse_recipients(&text)
-            .into_iter()
-            .filter(|(_, email)| crate::worker::invalid_recipient(email).is_none() && email.contains('@'))
-            .collect();
-        let picked: Vec<(String, String)> = if typed.is_empty() {
-            matches(&text).into_iter().take(1).map(|s| (s.name, s.email)).collect()
-        } else {
-            typed
-        };
-        if picked.is_empty() {
+        let picked = chosen.get().and_then(|i| shown.borrow().get(i).cloned());
+        if let Some(sug) = picked.filter(|_| found.is_visible()) {
+            take(&sug, e);
+            return;
+        }
+        let typed = typed_addresses(&e.text());
+        if typed.is_empty() {
             e.add_css_class("error");
             return;
         }
-        for (name, email) in picked {
+        for (name, email) in typed {
             // An address typed bare keeps the name Contacts or mail has for it.
             let name = if name.is_empty() || name == email {
                 people
@@ -1965,6 +2019,14 @@ fn member_editor(
     entry.connect_entry_activated(move |e| commit(e));
     entry.connect_changed(|e| e.remove_css_class("error"));
     members
+}
+
+/// The whole addresses in a typed or pasted text, as (name, address).
+fn typed_addresses(text: &str) -> Vec<(String, String)> {
+    crate::worker::parse_recipients(text)
+        .into_iter()
+        .filter(|(_, email)| email.contains('@') && crate::worker::invalid_recipient(email).is_none())
+        .collect()
 }
 
 /// Read the editor form back into a `ContactEdit`.
