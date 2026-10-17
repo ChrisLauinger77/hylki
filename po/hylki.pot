@@ -1202,6 +1202,33 @@ msgid_plural "{n} unread messages"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "Enter the server's address."
+msgstr ""
+
+msgid "“{text}” is not a server address."
+msgstr ""
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr ""
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+msgid "The server did not accept the user name or password."
+msgstr ""
+
+msgid "The server's certificate could not be verified."
+msgstr ""
+
+msgid "The server's certificate could not be verified: {error}"
+msgstr ""
+
+msgid "Could not connect to the server."
+msgstr ""
+
 msgid "Signature"
 msgstr ""
 
@@ -1288,9 +1315,6 @@ msgid "CardDAV Address Book"
 msgstr ""
 
 msgid "{date} at {time}"
-msgstr ""
-
-msgid "Evolution Data Server is not available"
 msgstr ""
 
 msgid ""
@@ -3623,6 +3647,86 @@ msgstr ""
 msgid "Add a person by name or address"
 msgstr ""
 
+msgid "CardDAV Accounts"
+msgstr ""
+
+msgid "CardDAV accounts"
+msgstr ""
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+msgid "No CardDAV accounts yet."
+msgstr ""
+
+msgid "CardDAV Account"
+msgstr ""
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+
+msgid "Looking for address books on {name}…"
+msgstr ""
+
+msgid "{name}: {problem}"
+msgstr ""
+
+msgid "No address books were found on {name} yet."
+msgstr ""
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Edit Account"
+msgstr ""
+
+msgid "Add Account"
+msgstr ""
+
+msgid "Looking for address books…"
+msgstr ""
+
+msgid "Use this account's address books"
+msgstr ""
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr ""
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr ""
+
+msgid "Enter the user name."
+msgstr ""
+
+msgid "Enter the password."
+msgstr ""
+
 msgid "LDAP Directories"
 msgstr ""
 
@@ -3690,17 +3794,11 @@ msgstr ""
 msgid "First level"
 msgstr ""
 
-msgid "Sign-in"
-msgstr ""
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
-msgstr ""
-
-msgid "Password (saved; type to replace it)"
 msgstr ""
 
 msgid "Enter the directory's server."
@@ -4757,6 +4855,14 @@ msgstr ""
 msgid ""
 "The directory editor is open. Save what you changed, or discard it, before "
 "moving on."
+msgstr ""
+
+msgid "Save the CardDAV account?"
+msgstr ""
+
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 
 msgid "Save the account?"

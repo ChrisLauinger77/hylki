@@ -1297,6 +1297,39 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} μη αναγνωσμένο μήνυμα"
 msgstr[1] "{n} μη αναγνωσμένα μηνύματα"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Εισαγάγετε τον διακομιστή του καταλόγου."
+
+#, fuzzy
+msgid "“{text}” is not a server address."
+msgstr "Το «{addr}» δεν είναι διεύθυνση email."
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "Ο Evolution Data Server δεν είναι διαθέσιμος"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "Ο κατάλογος δεν αποδέχθηκε τον κωδικό πρόσβασης."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "Δεν ήταν δυνατή η επαλήθευση του πιστοποιητικού του καταλόγου."
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "Δεν ήταν δυνατή η επαλήθευση του πιστοποιητικού του καταλόγου: {error}"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "Δεν ήταν δυνατή η επικοινωνία με τον διακομιστή"
+
 msgid "Signature"
 msgstr "Υπογραφή"
 
@@ -1388,9 +1421,6 @@ msgstr "Βιβλίο διευθύνσεων CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} στις {time}"
-
-msgid "Evolution Data Server is not available"
-msgstr "Ο Evolution Data Server δεν είναι διαθέσιμος"
 
 msgid ""
 "The directory cannot be searched without signing in. Add a sign-in in "
@@ -4022,6 +4052,103 @@ msgstr "Όλα τα αρχεία"
 msgid "Add a person by name or address"
 msgstr "Μια επαφή χρειάζεται όνομα ή διεύθυνση email"
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Λογαριασμοί αλληλογραφίας"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Όλοι οι λογαριασμοί"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Δεν υπάρχουν ακόμη λογαριασμοί cloud."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Λογαριασμός cloud"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"Ο κατάλογος αφαιρείται από τον Evolution Data Server, οπότε το Evolution και "
+"οι άλλες εφαρμογές που τον χρησιμοποιούν παύουν επίσης να τον βλέπουν. "
+"Τίποτα στον διακομιστή δεν αλλάζει."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Αναζήτηση κλειδιού για {addr}…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name}: επιτυχία"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων για προσθήκη επαφών"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Επεξεργασία λογαριασμού cloud"
+
+#, fuzzy
+msgid "Add Account"
+msgstr "Προσθήκη λογαριασμού"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Αναζήτηση κλειδιού για {addr}…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Χρήση αυτού του λογαριασμού στο Hylki"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Σύνδεση"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Κωδικός πρόσβασης (αποθηκευμένος· πληκτρολογήστε για αντικατάσταση)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Εισαγάγετε τον διακομιστή του καταλόγου."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Προστασία με κωδικό πρόσβασης"
+
 msgid "LDAP Directories"
 msgstr "Κατάλογοι LDAP"
 
@@ -4098,9 +4225,6 @@ msgstr "Ολόκληρο το δέντρο"
 msgid "First level"
 msgstr "Πρώτο επίπεδο"
 
-msgid "Sign-in"
-msgstr "Σύνδεση"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
@@ -4109,9 +4233,6 @@ msgstr ""
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr "Σύνδεση ως, όπως cn=jane,ou=people,dc=example,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Κωδικός πρόσβασης (αποθηκευμένος· πληκτρολογήστε για αντικατάσταση)"
 
 msgid "Enter the directory's server."
 msgstr "Εισαγάγετε τον διακομιστή του καταλόγου."
@@ -5252,6 +5373,18 @@ msgid ""
 msgstr ""
 "Ο επεξεργαστής καταλόγου είναι ανοιχτός. Αποθηκεύστε τις αλλαγές σας ή "
 "απορρίψτε τις πριν συνεχίσετε."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Αποθήκευση του λογαριασμού;"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"Το πρόγραμμα επεξεργασίας λογαριασμού είναι ανοικτό. Αποθηκεύστε τις αλλαγές "
+"σας ή απορρίψτε τις πριν συνεχίσετε."
 
 msgid "Save the account?"
 msgstr "Αποθήκευση του λογαριασμού;"

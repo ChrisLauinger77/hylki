@@ -1298,6 +1298,39 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} message non lu"
 msgstr[1] "{n} messages non lus"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Indiquez le serveur de l'annuaire."
+
+#, fuzzy
+msgid "“{text}” is not a server address."
+msgstr "« {addr} » n'est pas une adresse e-mail."
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "Evolution Data Server n'est pas disponible"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "L'annuaire n'a pas accepté le mot de passe."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "Le certificat de l'annuaire n'a pas pu être vérifié."
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "Le certificat de l'annuaire n'a pas pu être vérifié : {error}"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "Impossible de joindre le serveur"
+
 msgid "Signature"
 msgstr "Signature"
 
@@ -1389,9 +1422,6 @@ msgstr "Carnet d'adresses CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} à {time}"
-
-msgid "Evolution Data Server is not available"
-msgstr "Evolution Data Server n'est pas disponible"
 
 msgid ""
 "The directory cannot be searched without signing in. Add a sign-in in "
@@ -4034,6 +4064,102 @@ msgstr "Tous les fichiers"
 msgid "Add a person by name or address"
 msgstr "Un contact doit avoir un nom ou une adresse e-mail"
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Comptes e-mail"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Tous les comptes"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Aucun compte cloud pour le moment."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Compte cloud"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"L'annuaire est supprimé d'Evolution Data Server ; Evolution et les autres "
+"applications qui l'utilisent cessent donc également de le voir. Rien ne "
+"change sur le serveur."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Recherche d'une clé pour {addr}…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name} : réussi"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "Aucun carnet d'adresses disponible pour ajouter des contacts"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Modifier le compte cloud"
+
+msgid "Add Account"
+msgstr "Ajouter un compte"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Recherche d'une clé pour {addr}…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Utiliser ce compte dans Hylki"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Connexion"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Mot de passe (enregistré ; saisissez-en un pour le remplacer)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Indiquez le serveur de l'annuaire."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Protéger par un mot de passe"
+
 msgid "LDAP Directories"
 msgstr "Annuaires LDAP"
 
@@ -4110,9 +4236,6 @@ msgstr "Arborescence complète"
 msgid "First level"
 msgstr "Premier niveau"
 
-msgid "Sign-in"
-msgstr "Connexion"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr "Laissez ces champs vides pour un annuaire consultable sans connexion."
@@ -4120,9 +4243,6 @@ msgstr "Laissez ces champs vides pour un annuaire consultable sans connexion."
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr ""
 "Se connecter en tant que, par exemple cn=jane,ou=people,dc=example,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Mot de passe (enregistré ; saisissez-en un pour le remplacer)"
 
 msgid "Enter the directory's server."
 msgstr "Indiquez le serveur de l'annuaire."
@@ -5265,6 +5385,18 @@ msgid ""
 msgstr ""
 "L'éditeur d'annuaire est ouvert. Enregistrez vos modifications, ou annulez-"
 "les, avant de continuer."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Enregistrer le compte ?"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"L'éditeur de compte est ouvert. Enregistrez vos modifications ou annulez-les "
+"avant de continuer."
 
 msgid "Save the account?"
 msgstr "Enregistrer le compte ?"
@@ -8339,9 +8471,6 @@ msgstr "Hyprlab"
 #~ "Lorsque la barre latérale est réduite à sa barre d'icônes, la survoler "
 #~ "affiche la barre complète en superposition ; elle se replie peu après le "
 #~ "retrait du pointeur."
-
-#~ msgid "Add Account"
-#~ msgstr "Ajouter un compte"
 
 #~ msgid ""
 #~ "Label messages with one or more coloured tags. Tags are stored on the "

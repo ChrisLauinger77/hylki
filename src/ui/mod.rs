@@ -12,6 +12,7 @@ pub mod compose;
 pub mod contacts_browser;
 pub mod contacts_page;
 pub mod context_menu;
+pub mod carddav_accounts;
 pub mod directories;
 pub mod drop_zones;
 pub mod emoji;

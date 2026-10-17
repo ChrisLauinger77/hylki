@@ -11,6 +11,7 @@ keyboard.
 - [GNOME Online Accounts](#gnome-online-accounts)
 - [OAuth (Google / Microsoft)](#oauth-google--microsoft)
 - [Cloud attachments (Nextcloud, OneDrive, Dropbox, Seafile)](#cloud-attachments-nextcloud-onedrive-dropbox-seafile)
+- [CardDAV accounts](#carddav-accounts)
 - [LDAP directories](#ldap-directories)
 - [Translating messages](#translating-messages)
 - [Writing in Markdown or HTML](#writing-in-markdown-or-html)
@@ -557,6 +558,49 @@ minute and after a contact changes.
 
 A version of Hylki from before these conditions reads them as a From
 address condition with no text, which matches nothing.
+
+### CardDAV accounts
+
+Settings → CardDAV Accounts adds the address books on a CardDAV server, such
+as Nextcloud, iCloud, Fastmail, Radicale or a mail provider's, without GNOME
+Online Accounts or Evolution. Their contacts are listed in Contacts,
+in the book list above them, and suggested in the composer; a contact added
+or changed in Hylki is saved to the server.
+
+**Add Account…** asks for three things:
+
+- **Server**: the server's address is enough for most services, such as
+  `nextcloud.example.org`, and Hylki finds the address books on it. A full
+  CardDAV address works too. A name without `https://` is taken as HTTPS;
+  write `http://` for a server without TLS, such as one on your own network.
+  For iCloud, use `contacts.icloud.com`.
+- **User name** and **Password**. A service that signs in with two steps
+  wants an app password made for Hylki: iCloud, Fastmail, and Nextcloud with
+  two-factor sign-in among them.
+
+Saving looks for the address books and says how many it found, or why it
+found none (a password the server refused, a server it could not reach). The
+account's row lists its address books by name, or what went wrong. Its
+switch turns the account off without removing it, and **Remove**, in its
+editor, removes the account and its address books from this computer,
+leaving the server as it is.
+
+Google and Microsoft 365 address books are added in GNOME Online Accounts
+instead: Google takes no password over CardDAV, and Microsoft 365 has no
+CardDAV.
+
+An account is kept by Evolution Data Server, the service GNOME Contacts and
+Evolution keep their address books in, as one of Evolution's own collection
+accounts. Hylki adds no CardDAV client of its own, so an account set up in
+Evolution's collection accounts is listed here as well, and one added here
+shows in Evolution and GNOME Contacts. Evolution Data Server keeps the
+password in the keyring, signs in with it by itself and syncs the address
+books. While Hylki runs it keeps every address book that syncs with a server
+open, so they stay up to date on desktops with no GNOME Contacts to do it,
+and opening Contacts fetches what changed if that was more than five minutes
+ago. Away from GNOME, Evolution Data Server has to be installed: it is the
+`evolution-data-server` package on every major distribution and runs without
+GNOME. Without it, the page says so.
 
 ### LDAP directories
 

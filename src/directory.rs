@@ -220,7 +220,7 @@ impl Directory {
 /// One session-bus connection for the process: EDS closes a book when the
 /// connection that opened it goes, so a connection per search would open
 /// and close the directory every time.
-fn bus() -> Result<zbus::blocking::Connection, String> {
+pub(crate) fn bus() -> Result<zbus::blocking::Connection, String> {
     static BUS: Mutex<Option<zbus::blocking::Connection>> = Mutex::new(None);
     let mut guard = BUS.lock().map_err(|e| e.to_string())?;
     if let Some(c) = guard.as_ref() {

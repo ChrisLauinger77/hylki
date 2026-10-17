@@ -1309,6 +1309,39 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} messaggio non letto"
 msgstr[1] "{n} messaggi non letti"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Inserisci il server della directory."
+
+#, fuzzy
+msgid "“{text}” is not a server address."
+msgstr "\"{addr}\" non è un indirizzo e-mail."
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "Evolution Data Server non è disponibile"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "La directory non ha accettato la password."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "Il certificato della directory non può essere verificato."
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "Il certificato della directory non può essere verificato: {error}"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "Impossibile raggiungere il server"
+
 msgid "Signature"
 msgstr "Firma"
 
@@ -1400,9 +1433,6 @@ msgstr "Rubrica CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} alle {time}"
-
-msgid "Evolution Data Server is not available"
-msgstr "Evolution Data Server non è disponibile"
 
 #, fuzzy
 msgid ""
@@ -4019,6 +4049,102 @@ msgstr "Tutti i file"
 msgid "Add a person by name or address"
 msgstr "Un contatto necessita di un nome o di un indirizzo e-mail"
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Account e-mail"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Tutti gli account"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Nessun account cloud ancora."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Account cloud"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"La directory viene rimossa da Evolution Data Server, quindi Evolution e "
+"altre app che la usano smettono di vederla. Niente sul server cambia."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Ricerca di una chiave per {addr} in corso…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name}: superato"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "Nessuna rubrica disponibile per aggiungere contatti"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Modifica account cloud"
+
+#, fuzzy
+msgid "Add Account"
+msgstr "Aggiungi account"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Ricerca di una chiave per {addr} in corso…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Usa questo account in Hylki"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Accesso"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Password (salvata; digita per sostituirla)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Inserisci il server della directory."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Proteggi con una password"
+
 msgid "LDAP Directories"
 msgstr "Directory LDAP"
 
@@ -4094,18 +4220,12 @@ msgstr "Intero albero"
 msgid "First level"
 msgstr "Primo livello"
 
-msgid "Sign-in"
-msgstr "Accesso"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr "Lascia vuoti per una directory che può essere cercata senza accesso."
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr "Accedi come, ad esempio cn=anna,ou=persone,dc=esempio,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Password (salvata; digita per sostituirla)"
 
 msgid "Enter the directory's server."
 msgstr "Inserisci il server della directory."
@@ -5252,6 +5372,18 @@ msgid ""
 "moving on."
 msgstr ""
 "L'editor della directory è aperto. Salva le modifiche, o scartale, prima di "
+"continuare."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Salvare l'account?"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"L'editor dell'account è aperto. Salva le modifiche, o scartale, prima di "
 "continuare."
 
 msgid "Save the account?"

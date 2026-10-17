@@ -2191,6 +2191,9 @@ pub enum AppMsg {
     OpenContacts,
     /// The background EDS read for the contacts view finished.
     ContactsLoaded(Vec<crate::contacts::ContactDetails>),
+    /// The address books that sync with a server fetched what changed
+    /// (#408): read the contacts again if they are showing.
+    ContactBooksSynced,
     /// Read with the contacts: the books new contacts can go to, chosen one
     /// first, and how many contacts the Hylki book holds.
     ContactBooksLoaded { books: Vec<crate::contacts::Book>, local_count: usize },
@@ -3775,6 +3778,12 @@ impl SimpleComponent for AppModel {
         }
         if model.tray_enabled {
             model.start_tray(&sender);
+        }
+        // Nothing keeps a CardDAV or Online Accounts address book in step
+        // unless an app holds it open, and off GNOME there may be no other
+        // (#408). A moment after the window, not in its way.
+        if !demo_mode() {
+            sync_contact_books(&sender, false, 5000);
         }
         // Refresh visible avatars when the GNOME Contacts photo index
         // changes (first load finishing, or an EDS/CardDAV sync).
@@ -8269,6 +8278,11 @@ impl SimpleComponent for AppModel {
                 // The list skips the work when avatars are off; the
                 // reader's cards draw initials only, so it has nothing to do.
                 self.message_list.emit(MessageListInput::ContactPhotosChanged);
+                // The books' files changed: a sync landed, which EDS writes
+                // after its refresh call has already returned (#408).
+                if self.showing_contacts && !demo_mode() {
+                    reload_contacts(&sender, 0);
+                }
             }
 
             AppMsg::Pref(PrefOutput::SetFetchInterval(secs)) => {
@@ -12308,6 +12322,28 @@ impl SimpleComponent for AppModel {
                 // page shows its loading face until the list lands.
                 self.contacts_page.emit(ContactsPageInput::SetLoading);
                 reload_contacts(&sender, 0);
+                if !demo_mode() {
+                    sync_contact_books(&sender, false, 0);
+                }
+            }
+
+            AppMsg::ContactBooksSynced => {
+                // EDS writes what it fetched just after the sync returns.
+                if self.showing_contacts {
+                    reload_contacts(&sender, 1500);
+                }
+                if self.filters.iter().any(|r| r.needs_contacts()) {
+                    self.saved_addresses.refresh();
+                }
+            }
+
+            AppMsg::Pref(PrefOutput::CardDavChanged) => {
+                if self.showing_contacts {
+                    reload_contacts(&sender, 0);
+                }
+                // Settings synced a saved account's books already; any it
+                // did not are opened and synced now.
+                sync_contact_books(&sender, false, 0);
             }
 
             AppMsg::ContactBooksLoaded { books, local_count } => {
@@ -12422,6 +12458,19 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(_) => {}
         }
     }
+}
+
+/// Sync the address books that sync with a server, after `delay_ms` and
+/// off the main thread, and read the contacts again if any did (#408).
+/// Unless `force`d, a book synced in the last few minutes is left alone.
+fn sync_contact_books(sender: &ComponentSender<AppModel>, force: bool, delay_ms: u64) {
+    let s = sender.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+        if crate::carddav::sync_books(force) {
+            s.input(AppMsg::ContactBooksSynced);
+        }
+    });
 }
 
 /// Read the contacts, the books new ones can go to and the Hylki book's

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Added: CardDAV accounts** (#408, requested by Michael-Zebratrix).
+  Settings → CardDAV Accounts adds the address books on a CardDAV server
+  (Nextcloud, iCloud, Fastmail, Radicale and others) from the server's
+  address, a user name and a password, without GNOME Online Accounts or
+  Evolution. The accounts are Evolution Data Server collection accounts, so
+  they show in Evolution and GNOME Contacts too and Evolution's are listed
+  here. The password is kept in the keyring where Evolution Data Server looks
+  for its own, so it signs in and syncs by itself. While Hylki runs, every
+  address book that syncs with a server is held open, which keeps it up to
+  date on desktops without GNOME Contacts, and opening Contacts fetches what
+  changed. Away from GNOME, `evolution-data-server` has to be installed.
+
 - **Added: contact groups.** A group is a name for several people that the
   composer suggests like a contact; picking it adds a pill for each of them,
   less those the field already has. **New Group**, under the **+** button in

@@ -440,10 +440,13 @@ pub struct Preferences {
     cloud: Option<Controller<crate::ui::cloud_accounts::CloudAccounts>>,
     /// The LDAP Directories page (#307), likewise.
     directories: Option<Controller<crate::ui::directories::Directories>>,
+    /// The CardDAV Accounts page (#408), likewise.
+    carddav: Option<Controller<crate::ui::carddav_accounts::CardDavAccounts>>,
     /// The account editor is up in the accounts slot: leaving it for another
     /// category asks about the unsaved changes first.
     editor_open: bool,
-    /// Which side page's editor is up: "accounts", "cloud" or "directories".
+    /// Which side page's editor is up: "accounts", "cloud", "directories"
+    /// or "carddav".
     editor_page: &'static str,
     /// What downloaded mail takes up (#394): message bodies, attachment
     /// files and the whole cache file, in bytes; `None` while measuring.
@@ -886,6 +889,7 @@ const SIDE_PAGES: &[(&str, &[SidePage])] = &[
             SidePage { id: "openpgp", title: i18n_noop("OpenPGP"), icon: "channel-secure-symbolic", accounts: false },
             SidePage { id: "cloud", title: i18n_noop("Cloud Storage"), icon: "cloud-symbolic", accounts: false },
             SidePage { id: "translation", title: i18n_noop("Translation"), icon: "translate-symbolic", accounts: false },
+            SidePage { id: "carddav", title: i18n_noop("CardDAV Accounts"), icon: "folder-remote-symbolic", accounts: false },
             SidePage { id: "directories", title: i18n_noop("LDAP Directories"), icon: "x-office-address-book-symbolic", accounts: false },
             SidePage { id: "contacts", title: i18n_noop("Contacts"), icon: "avatar-default-symbolic", accounts: false },
         ],
@@ -1200,6 +1204,10 @@ pub enum PrefInput {
     CloudEditorOpen(bool),
     /// The LDAP Directories page's editor is up (or gone).
     DirectoriesEditorOpen(bool),
+    /// The CardDAV Accounts page's editor is up (or gone).
+    CardDavEditorOpen(bool),
+    /// A CardDAV account was saved or removed.
+    CardDavChanged,
 }
 
 #[derive(Debug)]
@@ -1213,6 +1221,9 @@ pub enum PrefOutput {
     /// The Contacts page is showing: read the books new contacts can go to
     /// (D-Bus, so off the main thread) and send them back.
     LoadContactBooks,
+    /// A CardDAV account was added, changed or removed (#408): sync its
+    /// address books and read the contacts again.
+    CardDavChanged,
     /// A category was shown, so the app can reopen the window on it.
     PageShown(String),
     SetAutoRemoteContent(bool),
@@ -1711,6 +1722,10 @@ impl Preferences {
                 i18n("Save the directory?"),
                 i18n("The directory editor is open. Save what you changed, or discard it, before moving on."),
             ),
+            "carddav" => (
+                i18n("Save the CardDAV account?"),
+                i18n("The CardDAV account editor is open. Save what you changed, or discard it, before moving on."),
+            ),
             _ => (
                 i18n("Save the account?"),
                 i18n("The account editor is open. Save what you changed, or discard it, before moving on."),
@@ -1728,14 +1743,20 @@ impl Preferences {
         let accounts = self.accounts_sender.clone();
         let cloud = self.cloud.as_ref().map(|c| c.sender().clone());
         let directories = self.directories.as_ref().map(|c| c.sender().clone());
+        let carddav = self.carddav.as_ref().map(|c| c.sender().clone());
         let editor_page = self.editor_page;
         let id = id.to_string();
         dialog.connect_response(None, move |_, resp| {
             let cloud_editor = editor_page == "cloud";
             let directories_editor = editor_page == "directories";
+            let carddav_editor = editor_page == "carddav";
             match resp {
                 "save" => {
-                    if cloud_editor {
+                    if carddav_editor {
+                        if let Some(c) = &carddav {
+                            let _ = c.send(crate::ui::carddav_accounts::CardDavInput::SaveClicked);
+                        }
+                    } else if cloud_editor {
                         if let Some(c) = &cloud {
                             let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::SaveClicked);
                         }
@@ -1749,7 +1770,11 @@ impl Preferences {
                     s.input(PrefInput::LeaveEditorTo(id.clone()));
                 }
                 "discard" => {
-                    if cloud_editor {
+                    if carddav_editor {
+                        if let Some(c) = &carddav {
+                            let _ = c.send(crate::ui::carddav_accounts::CardDavInput::CloseEditor);
+                        }
+                    } else if cloud_editor {
                         if let Some(c) = &cloud {
                             let _ = c.send(crate::ui::cloud_accounts::CloudAccountsInput::CloseEditor);
                         }
@@ -1951,6 +1976,10 @@ impl Component for Preferences {
                             // Message translation (#327), built by its own module.
                             #[name = "translation_slot"]
                             add_named[Some("translation")] = &adw::Bin {},
+
+                            // CardDAV accounts (#408), their own component.
+                            #[name = "carddav_slot"]
+                            add_named[Some("carddav")] = &adw::Bin {},
 
                             // LDAP directories (#307), their own component.
                             #[name = "directories_slot"]
@@ -4148,6 +4177,7 @@ impl Component for Preferences {
             identities: init.identities.clone(),
             cloud: None,
             directories: None,
+            carddav: None,
             editor_open: false,
             editor_page: "accounts",
         };
@@ -4946,6 +4976,14 @@ impl Component for Preferences {
             });
         widgets.directories_slot.set_child(Some(directories.widget()));
         model.directories = Some(directories);
+        let carddav = crate::ui::carddav_accounts::CardDavAccounts::builder()
+            .launch(())
+            .forward(sender.input_sender(), |o| match o {
+                crate::ui::carddav_accounts::CardDavOutput::EditorOpen(open) => PrefInput::CardDavEditorOpen(open),
+                crate::ui::carddav_accounts::CardDavOutput::BooksChanged => PrefInput::CardDavChanged,
+            });
+        widgets.carddav_slot.set_child(Some(carddav.widget()));
+        model.carddav = Some(carddav);
         // The sidebar (#141): a heading per section, a row per category.
         tracing::debug!("settings window: prefs tail D (before sidebar rows) at {:?}", t_init.elapsed());
         for (section, pages) in SIDE_PAGES {
@@ -5739,6 +5777,16 @@ impl Component for Preferences {
                 if let Some(header) = &self.host_header {
                     header.set_visible(!open);
                 }
+            }
+            PrefInput::CardDavEditorOpen(open) => {
+                self.editor_open = open;
+                self.editor_page = "carddav";
+                if let Some(header) = &self.host_header {
+                    header.set_visible(!open);
+                }
+            }
+            PrefInput::CardDavChanged => {
+                let _ = sender.output(PrefOutput::CardDavChanged);
             }
             PrefInput::ChangeMessageTheme(index) => {
                 let theme = MESSAGE_THEMES

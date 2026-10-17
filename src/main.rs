@@ -7,6 +7,7 @@ mod avatar;
 mod backend;
 mod brand;
 mod cache;
+mod carddav;
 mod cloud;
 mod color;
 mod config;

@@ -1364,6 +1364,39 @@ msgstr[0] "{n} непрочитанное сообщение"
 msgstr[1] "{n} непрочитанных сообщения"
 msgstr[2] "{n} непрочитанных сообщений"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Введите адрес сервера каталогов."
+
+#, fuzzy
+msgid "“{text}” is not a server address."
+msgstr "«{addr}» не является адресом электронной почты."
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "Сервис Evolution Data Server недоступен"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "Каталог не принял пароль."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "Не удалось прочитать ответ сервиса."
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "Не удалось связаться с сервисом: {e}"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "Не удалось связаться с сервером"
+
 msgid "Signature"
 msgstr "Подпись"
 
@@ -1458,9 +1491,6 @@ msgstr "Адресная книга CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} в {time}"
-
-msgid "Evolution Data Server is not available"
-msgstr "Сервис Evolution Data Server недоступен"
 
 #, fuzzy
 msgid ""
@@ -4078,6 +4108,103 @@ msgstr "Все файлы"
 msgid "Add a person by name or address"
 msgstr ""
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Почтовые учётные записи"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Все учётные записи"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Облачные учётные записи ещё не добавлены."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Облачная учётная запись"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"Каталог будет удалён из Evolution Data Server, поэтому Evolution и другие "
+"использующие его приложения также перестанут его видеть. На самом сервере "
+"ничего не изменится."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Поиск ключа для {addr}…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name}: пройден"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "Нет адресной книги для добавления контактов"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Редактировать облачную учётную запись"
+
+msgid "Add Account"
+msgstr "Добавить учётную запись"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Поиск ключа для {addr}…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Использовать эту учётную запись в Hylki"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Авторизация"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Пароль (сохранён; введите новый для замены)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Введите адрес сервера каталогов."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Защитить паролем"
+
 msgid "LDAP Directories"
 msgstr "Каталоги LDAP"
 
@@ -4153,9 +4280,6 @@ msgstr "Всё дерево"
 msgid "First level"
 msgstr "Первый уровень"
 
-msgid "Sign-in"
-msgstr "Авторизация"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
@@ -4164,9 +4288,6 @@ msgstr ""
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr "Имя пользователя (DN), например cn=jane,ou=people,dc=example,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Пароль (сохранён; введите новый для замены)"
 
 msgid "Enter the directory's server."
 msgstr "Введите адрес сервера каталогов."
@@ -5334,6 +5455,18 @@ msgid ""
 msgstr ""
 "Редактор каталогов открыт. Сохраните изменения или отмените их, прежде чем "
 "продолжить."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Сохранить учётную запись?"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"Редактор учётной записи открыт. Сохраните изменения или отмените их, прежде "
+"чем продолжить."
 
 msgid "Save the account?"
 msgstr "Сохранить учётную запись?"
@@ -8231,9 +8364,6 @@ msgstr "Hyprlab"
 #~ "Когда боковая панель свёрнута до узкой полосы с иконками, наведение "
 #~ "курсора раскрывает её поверх других панелей. Она автоматически "
 #~ "сворачивается обратно, как только курсор уходит."
-
-#~ msgid "Add Account"
-#~ msgstr "Добавить учётную запись"
 
 #~ msgid "Show name initials instead of an emoji"
 #~ msgstr "Показывать инициалы имени вместо эмодзи"

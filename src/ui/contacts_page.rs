@@ -108,6 +108,9 @@ pub struct ContactsPage {
     /// Read again each time a group form opens; until the first read lands
     /// the form offers the contacts listed here.
     suggestions: Rc<RefCell<Vec<crate::contacts::Suggestion>>>,
+    /// A read that came in while a form was open, applied once it closes:
+    /// a sync in the background must not throw away what is being typed.
+    pending: Option<Vec<ContactDetails>>,
 }
 
 #[derive(Debug)]
@@ -477,6 +480,7 @@ impl Component for ContactsPage {
             directories: Vec::new(),
             directory_failures: Vec::new(),
             suggestions: Rc::new(RefCell::new(Vec::new())),
+            pending: None,
         };
         let widgets = view_output!();
         widgets.detail_overlay.add_overlay(&compose_slot);
@@ -574,7 +578,12 @@ impl Component for ContactsPage {
                 });
             }
 
+            ContactsPageInput::SetContacts(contacts) if self.editor.is_some() => {
+                self.pending = Some(contacts);
+            }
+
             ContactsPageInput::SetContacts(mut contacts) => {
+                self.pending = None;
                 // Drop tombstoned (locally deleted) entries the read still
                 // carries; a tombstone retires once a read comes back clean.
                 let incoming: std::collections::HashSet<(String, String)> =
@@ -806,6 +815,9 @@ impl Component for ContactsPage {
             ContactsPageInput::CancelEdit => {
                 self.editor = None;
                 self.editing_target = None;
+                if let Some(contacts) = self.pending.take() {
+                    sender.input(ContactsPageInput::SetContacts(contacts));
+                }
                 if self.contacts.is_empty() && self.directories.is_empty() {
                     widgets.page_stack.set_visible_child_name("none");
                 }

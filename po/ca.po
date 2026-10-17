@@ -1281,6 +1281,39 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} missatge no llegit"
 msgstr[1] "{n} missatges no llegits"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Introdueix el servidor del directori."
+
+#, fuzzy
+msgid "“{text}” is not a server address."
+msgstr "«{addr}» no és una adreça de correu electrònic."
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "L'Evolution Data Server no està disponible"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "El directori no ha acceptat la contrasenya."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "No s'ha pogut verificar el certificat del directori."
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "No s'ha pogut verificar el certificat del directori: {error}"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "No s'ha pogut contactar amb el servidor"
+
 msgid "Signature"
 msgstr "Signatura"
 
@@ -1372,9 +1405,6 @@ msgstr "Llibreta d'adreces CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} a les {time}"
-
-msgid "Evolution Data Server is not available"
-msgstr "L'Evolution Data Server no està disponible"
 
 msgid ""
 "The directory cannot be searched without signing in. Add a sign-in in "
@@ -3962,6 +3992,103 @@ msgstr "Tots els fitxers"
 msgid "Add a person by name or address"
 msgstr "Un contacte necessita un nom o una adreça de correu electrònic"
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Comptes de correu"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Tots els comptes"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Encara no hi ha comptes al núvol."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Compte al núvol"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"El directori s'elimina de l'Evolution Data Server, així que l'Evolution i "
+"altres aplicacions que l'utilitzen també deixaran de veure'l. Res canvia al "
+"servidor."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "S'està cercant una clau per a {addr}…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name}: superat"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "No hi ha cap llibreta d'adreces disponible per afegir contactes"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Edita el compte al núvol"
+
+#, fuzzy
+msgid "Add Account"
+msgstr "Afegeix un compte"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "S'està cercant una clau per a {addr}…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Utilitza aquest compte a l'Hylki"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Inici de sessió"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Contrasenya (desada; escriu per substituir-la)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Introdueix el servidor del directori."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Protegeix amb una contrasenya"
+
 msgid "LDAP Directories"
 msgstr "Directoris LDAP"
 
@@ -4038,9 +4165,6 @@ msgstr "Arbre sencer"
 msgid "First level"
 msgstr "Primer nivell"
 
-msgid "Sign-in"
-msgstr "Inici de sessió"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
@@ -4048,9 +4172,6 @@ msgstr ""
 
 msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr "Inicia sessió com a, com ara cn=jane,ou=people,dc=example,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Contrasenya (desada; escriu per substituir-la)"
 
 msgid "Enter the directory's server."
 msgstr "Introdueix el servidor del directori."
@@ -5183,6 +5304,18 @@ msgid ""
 msgstr ""
 "L'editor de directoris és obert. Desa el que has canviat, o descarta-ho, "
 "abans de continuar."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Vols desar el compte?"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"L'editor de comptes és obert. Desa el que has canviat, o descarta-ho, abans "
+"de continuar."
 
 msgid "Save the account?"
 msgstr "Vols desar el compte?"

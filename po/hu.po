@@ -1346,6 +1346,38 @@ msgid_plural "{n} unread messages"
 msgstr[0] "{n} olvasatlan üzenet"
 msgstr[1] "{n} olvasatlan üzenet"
 
+#, fuzzy
+msgid "Enter the server's address."
+msgstr "Lépjen be a könyvtár kiszolgálójára."
+
+msgid "“{text}” is not a server address."
+msgstr ""
+
+msgid "The address starts with https:// or http://."
+msgstr ""
+
+msgid "Evolution Data Server is not available"
+msgstr "Az Evolution Data Server nem érhető el"
+
+msgid "Enter the password to sign in."
+msgstr ""
+
+#, fuzzy
+msgid "The server did not accept the user name or password."
+msgstr "A könyvtár nem fogadta el a jelszót."
+
+#, fuzzy
+msgid "The server's certificate could not be verified."
+msgstr "a lista e-mail-címét nem sikerült beolvasni"
+
+#, fuzzy
+msgid "The server's certificate could not be verified: {error}"
+msgstr "A fájl nem megnyitható"
+
+#, fuzzy
+msgid "Could not connect to the server."
+msgstr "Nem sikerült elérni a kiszolgálót"
+
 msgid "Signature"
 msgstr "Aláírás"
 
@@ -1442,9 +1474,6 @@ msgstr "CardDAV címjegyzék"
 
 msgid "{date} at {time}"
 msgstr "{date} {time} órakor"
-
-msgid "Evolution Data Server is not available"
-msgstr "Az Evolution Data Server nem érhető el"
 
 #, fuzzy
 msgid ""
@@ -4093,6 +4122,102 @@ msgstr "Minden fájl"
 msgid "Add a person by name or address"
 msgstr ""
 
+#, fuzzy
+msgid "CardDAV Accounts"
+msgstr "Levelezési fiókok"
+
+#, fuzzy
+msgid "CardDAV accounts"
+msgstr "Összes fiók"
+
+msgid ""
+"The address books on these servers are listed in Contacts and suggested in "
+"the composer, and changes made in Hylki are sent back. They are kept by "
+"Evolution Data Server, so an account set up in Evolution is listed here too. "
+"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+msgstr ""
+
+#, fuzzy
+msgid "No CardDAV accounts yet."
+msgstr "Még nincsenek felhőfiókok."
+
+#, fuzzy
+msgid "CardDAV Account"
+msgstr "Felhőfiók"
+
+msgid ""
+"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
+"Install the evolution-data-server package, which runs without GNOME, and "
+"open this page again."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"The account and its address books are removed from this computer, so "
+"Evolution and other apps that use them stop seeing them too. Nothing on the "
+"server changes."
+msgstr ""
+"A könyvtár eltávolításra kerül az Evolution Data Server-ről, így az "
+"Evolution és az azt használó egyéb alkalmazások sem látják többé. A "
+"kiszolgálón semmi sem változik."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Kulcs keresése ehhez: {addr}…"
+
+#, fuzzy
+msgid "{name}: {problem}"
+msgstr "{name}: sikeres"
+
+#, fuzzy
+msgid "No address books were found on {name} yet."
+msgstr "Névjegyek hozzáadásához nem érhető el címjegyzék"
+
+msgid "Found {n} address book on {name}"
+msgid_plural "Found {n} address books on {name}"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Edit Account"
+msgstr "Felhőfiók szerkesztése"
+
+msgid "Add Account"
+msgstr "Fiók hozzáadása"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Kulcs keresése ehhez: {addr}…"
+
+#, fuzzy
+msgid "Use this account's address books"
+msgstr "Fiók használata a Hylki-ben"
+
+msgid ""
+"The server's address is enough for most services, such as "
+"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
+"contacts.icloud.com."
+msgstr ""
+
+msgid "Sign-in"
+msgstr "Bejelentkezés"
+
+msgid ""
+"Services that sign in with two steps want an app password made for Hylki: "
+"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
+msgstr ""
+
+msgid "Password (saved; type to replace it)"
+msgstr "Jelszó (elmentve; írja be, ha módosítani szeretné)"
+
+#, fuzzy
+msgid "Enter the user name."
+msgstr "Lépjen be a könyvtár kiszolgálójára."
+
+#, fuzzy
+msgid "Enter the password."
+msgstr "Védelem jelszóval"
+
 msgid "LDAP Directories"
 msgstr "LDAP Mappák"
 
@@ -4169,9 +4294,6 @@ msgstr "Teljes fa"
 msgid "First level"
 msgstr "Első szint"
 
-msgid "Sign-in"
-msgstr "Bejelentkezés"
-
 msgid ""
 "Leave these empty for a directory that can be searched without signing in."
 msgstr ""
@@ -4182,9 +4304,6 @@ msgid "Sign in as, such as cn=jane,ou=people,dc=example,dc=com"
 msgstr ""
 "Jelentkezzen be például a következő névvel: "
 "cn=jane,ou=people,dc=example,dc=com"
-
-msgid "Password (saved; type to replace it)"
-msgstr "Jelszó (elmentve; írja be, ha módosítani szeretné)"
 
 msgid "Enter the directory's server."
 msgstr "Lépjen be a könyvtár kiszolgálójára."
@@ -5356,6 +5475,18 @@ msgid ""
 msgstr ""
 "A könyvtárszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a "
 "módosításokat, vagy dobja el őket."
+
+#, fuzzy
+msgid "Save the CardDAV account?"
+msgstr "Elmented a fiókot?"
+
+#, fuzzy
+msgid ""
+"The CardDAV account editor is open. Save what you changed, or discard it, "
+"before moving on."
+msgstr ""
+"A fiókszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a módosításokat, "
+"vagy törölje azokat."
 
 msgid "Save the account?"
 msgstr "Elmented a fiókot?"
@@ -8271,9 +8402,6 @@ msgstr "Hyprlab"
 
 #~ msgid "Send All"
 #~ msgstr "Összes küldése"
-
-#~ msgid "Add Account"
-#~ msgstr "Fiók hozzáadása"
 
 #~ msgid ""
 #~ "Label messages with one or more colored tags. Tags are stored on the mail "
