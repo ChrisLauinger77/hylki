@@ -9,11 +9,15 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::carddav::{self, Account, Status};
+use crate::carddav::{self, Account, MailOffer, Status};
 use crate::i18n::{i18n, i18n_f, ni18n_f};
 
 pub struct CardDavAccounts {
     accounts: Vec<(Account, Status)>,
+    /// Mail accounts whose address books can be added in one go.
+    offers: Vec<MailOffer>,
+    offers_group: adw::PreferencesGroup,
+    offers_list: gtk::ListBox,
     list: gtk::ListBox,
     empty: gtk::Label,
     add_btn: gtk::Button,
@@ -33,8 +37,10 @@ pub struct CardDavAccounts {
 pub enum CardDavInput {
     /// Ask EDS for the accounts again.
     Load,
-    Loaded(Result<Vec<(Account, Status)>, String>),
+    Loaded(Result<(Vec<(Account, Status)>, Vec<MailOffer>), String>),
     Add,
+    /// Add the address books of the mail account offered at this index.
+    AddOffer(usize),
     Edit(usize),
     ToggleEnabled { index: usize, enabled: bool },
     RemoveCurrent,
@@ -43,6 +49,8 @@ pub enum CardDavInput {
     SaveClicked,
     CloseEditor,
     Save { account: Account, password: String },
+    /// The keyring has no password for the offered mail account.
+    OfferNeedsPassword(MailOffer),
     /// A save or removal went through (or not); `found` is a saved
     /// account as it stood once EDS had looked at the server.
     Done { error: Option<String>, found: Option<(Account, Status)> },
@@ -107,6 +115,17 @@ impl SimpleComponent for CardDavAccounts {
                                         set_margin_top: 12,
                                     },
                                 },
+                                #[name = "offers_group"]
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("From your mail accounts"),
+                                    set_description: Some(&i18n("These mail accounts keep contacts too, under the same sign-in. Adding them uses the password the mail account already has.")),
+                                    set_visible: false,
+                                    #[name = "offers_list"]
+                                    gtk::ListBox {
+                                        add_css_class: "boxed-list",
+                                        set_selection_mode: gtk::SelectionMode::None,
+                                    },
+                                },
                             },
                         },
                     },
@@ -161,6 +180,9 @@ impl SimpleComponent for CardDavAccounts {
         let widgets = view_output!();
         let model = CardDavAccounts {
             accounts: Vec::new(),
+            offers: Vec::new(),
+            offers_group: widgets.offers_group.clone(),
+            offers_list: widgets.offers_list.clone(),
             list: widgets.list.clone(),
             empty: widgets.empty.clone(),
             add_btn: widgets.add_btn.clone(),
@@ -185,8 +207,9 @@ impl SimpleComponent for CardDavAccounts {
                 let _ = s.send(CardDavOutput::EditorOpen(editor));
             });
         }
-        // HYLKI_SHOWCASE_EDIT_CARDDAV=<index>|add opens that account's
-        // editor, or a new one, for a capture (demo only).
+        // HYLKI_SHOWCASE_EDIT_CARDDAV=<index>|add|offer<index> opens that
+        // account's editor, a new one, or presses an offer's button, for a
+        // capture (demo only).
         if let Ok(what) = std::env::var("HYLKI_SHOWCASE_EDIT_CARDDAV") {
             if std::env::var_os("HYLKI_DEMO").is_some() {
                 let s = sender.input_sender().clone();
@@ -195,6 +218,7 @@ impl SimpleComponent for CardDavAccounts {
                 gtk::glib::timeout_add_seconds_local_once(7, move || {
                     let _ = s.send(match what.as_str() {
                         "add" => CardDavInput::Add,
+                        o if o.starts_with("offer") => CardDavInput::AddOffer(o[5..].parse().unwrap_or(0)),
                         i => CardDavInput::Edit(i.parse().unwrap_or(0)),
                     });
                 });
@@ -217,26 +241,30 @@ impl SimpleComponent for CardDavAccounts {
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let listed = carddav::list().map(|accounts| {
-                        accounts
+                        let offers = carddav::mail_offers(&accounts);
+                        let accounts = accounts
                             .into_iter()
                             .map(|a| {
                                 let status = carddav::status(&a);
                                 (a, status)
                             })
-                            .collect()
+                            .collect();
+                        (accounts, offers)
                     });
                     let _ = s.send(CardDavInput::Loaded(listed));
                 });
             }
             CardDavInput::Loaded(result) => {
                 match result {
-                    Ok(accounts) => {
+                    Ok((accounts, offers)) => {
                         self.accounts = accounts;
+                        self.offers = offers;
                         self.add_btn.set_sensitive(true);
                         self.empty.set_label(&i18n("No CardDAV accounts yet."));
                     }
                     Err(_) => {
                         self.accounts.clear();
+                        self.offers.clear();
                         self.add_btn.set_sensitive(false);
                         self.empty.set_label(&i18n("CardDAV accounts are kept by Evolution Data Server, which is not installed. Install the evolution-data-server package, which runs without GNOME, and open this page again."));
                     }
@@ -244,6 +272,24 @@ impl SimpleComponent for CardDavAccounts {
                 self.rebuild(&sender);
             }
             CardDavInput::Add => self.open_editor(None, Account::empty(), &sender),
+            CardDavInput::AddOffer(i) => {
+                let Some(offer) = self.offers.get(i).cloned() else { return };
+                self.toast(&i18n_f("Looking for address books on {name}…", &[("name", &offer.account().title())]));
+                let s = sender.input_sender().clone();
+                std::thread::spawn(move || {
+                    match carddav::add_offer(&offer) {
+                        Some(saved) => report_save(&s, saved, true),
+                        // No password kept for the mail account: the form
+                        // asks for it, filled in otherwise.
+                        None => {
+                            let _ = s.send(CardDavInput::OfferNeedsPassword(offer));
+                        }
+                    }
+                });
+            }
+            CardDavInput::OfferNeedsPassword(offer) => {
+                self.open_editor(None, offer.account(), &sender);
+            }
             CardDavInput::Edit(i) => {
                 if let Some((a, _)) = self.accounts.get(i).cloned() {
                     self.open_editor(Some(i), a, &sender);
@@ -314,22 +360,12 @@ impl SimpleComponent for CardDavAccounts {
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let password = (!password.is_empty()).then_some(password);
-                    let msg = match carddav::save(&account, password.as_deref()) {
-                        Err(e) => CardDavInput::Done { error: Some(e), found: None },
-                        Ok(uid) if account.enabled => {
-                            // The list shows the account at once, not only
-                            // once the server has answered.
-                            let _ = s.send(CardDavInput::Load);
-                            let signing_in = password.is_some();
-                            let found = carddav::await_books(&uid, std::time::Duration::from_secs(30), signing_in).map(|a| {
-                                let status = carddav::status(&a);
-                                (a, status)
-                            });
-                            CardDavInput::Done { error: None, found }
-                        }
-                        Ok(_) => CardDavInput::Done { error: None, found: None },
-                    };
-                    let _ = s.send(msg);
+                    let saved = carddav::save(&account, password.as_deref());
+                    if account.enabled {
+                        report_save(&s, saved, password.is_some());
+                    } else {
+                        let _ = s.send(CardDavInput::Done { error: saved.err(), found: None });
+                    }
                 });
             }
             CardDavInput::Done { error, found } => {
@@ -437,7 +473,56 @@ impl CardDavAccounts {
         }
         self.list.set_visible(!self.accounts.is_empty());
         self.empty.set_visible(self.accounts.is_empty());
+
+        while let Some(child) = self.offers_list.first_child() {
+            self.offers_list.remove(&child);
+        }
+        for (i, offer) in self.offers.iter().enumerate() {
+            let row = adw::ActionRow::new();
+            row.set_title(&gtk::glib::markup_escape_text(&offer.email));
+            let host = carddav::parse_url(&offer.url).map(|u| u.host).unwrap_or_default();
+            let mut sub = format!("{} · {host}", offer.provider);
+            if offer.online_accounts {
+                sub = i18n_f(
+                    "{provider} contacts are synced through GNOME Online Accounts already, maybe for this account under another address.",
+                    &[("provider", offer.provider)],
+                );
+            }
+            row.set_subtitle(&gtk::glib::markup_escape_text(&sub));
+            row.set_subtitle_lines(3);
+            let add = gtk::Button::with_label(&i18n("Add Address Books"));
+            add.set_valign(gtk::Align::Center);
+            let s = sender.input_sender().clone();
+            add.connect_clicked(move |b| {
+                b.set_sensitive(false);
+                let _ = s.send(CardDavInput::AddOffer(i));
+            });
+            row.add_suffix(&add);
+            self.offers_list.append(&row);
+        }
+        self.offers_group.set_visible(!self.offers.is_empty());
     }
+}
+
+/// After a save: show the account at once, wait for EDS to look at the
+/// server, and say what it found. Blocking; `signing_in` when a new
+/// password was given.
+fn report_save(s: &relm4::Sender<CardDavInput>, saved: Result<String, String>, signing_in: bool) {
+    let uid = match saved {
+        Ok(uid) => uid,
+        Err(e) => {
+            let _ = s.send(CardDavInput::Done { error: Some(e), found: None });
+            return;
+        }
+    };
+    // The list shows the account at once, not only once the server has
+    // answered.
+    let _ = s.send(CardDavInput::Load);
+    let found = carddav::await_books(&uid, std::time::Duration::from_secs(30), signing_in).map(|a| {
+        let status = carddav::status(&a);
+        (a, status)
+    });
+    let _ = s.send(CardDavInput::Done { error: None, found });
 }
 
 /// The account editor's form, and what the page's Save does with it.
@@ -484,11 +569,16 @@ fn build_editor(account: Account, sender: relm4::Sender<CardDavInput>) -> (gtk::
             let _ = sender.send(CardDavInput::SaveClicked);
         });
     }
-    // A new account starts at its server, the one field always needed.
+    // A new account starts at its server, the one field always needed, or
+    // at the password when the rest came filled in from a mail account.
     if account.uid.is_empty() {
-        let url = url.clone();
+        let (url, pass) = (url.clone(), pass.clone());
         gtk::glib::idle_add_local_once(move || {
-            url.grab_focus();
+            if url.text().is_empty() {
+                url.grab_focus();
+            } else {
+                pass.grab_focus();
+            }
         });
     }
 

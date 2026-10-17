@@ -4143,6 +4143,15 @@ msgid "No CardDAV accounts yet."
 msgstr "Ainda não existem contas de armazenamento na nuvem."
 
 #, fuzzy
+msgid "From your mail accounts"
+msgstr "Adicione a sua conta de e-mail"
+
+msgid ""
+"These mail accounts keep contacts too, under the same sign-in. Adding them "
+"uses the password the mail account already has."
+msgstr ""
+
+#, fuzzy
 msgid "CardDAV Account"
 msgstr "Conta de armazenamento na nuvem"
 
@@ -4153,6 +4162,10 @@ msgid ""
 msgstr ""
 
 #, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "A procurar uma chave para {addr}…"
+
+#, fuzzy
 msgid ""
 "The account and its address books are removed from this computer, so "
 "Evolution and other apps that use them stop seeing them too. Nothing on the "
@@ -4160,10 +4173,6 @@ msgid ""
 msgstr ""
 "O diretório é removido do Evolution Data Server, pelo que deixa de aparecer "
 "no Evolution e noutras aplicações que o utilizem. Nada muda no servidor."
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "A procurar uma chave para {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4193,6 +4202,15 @@ msgstr "A procurar uma chave para {addr}…"
 #, fuzzy
 msgid "Use this account's address books"
 msgstr "Utilizar esta conta no Hylki"
+
+msgid ""
+"{provider} contacts are synced through GNOME Online Accounts already, maybe "
+"for this account under another address."
+msgstr ""
+
+#, fuzzy
+msgid "Add Address Books"
+msgstr "Livro de endereços"
 
 msgid ""
 "The server's address is enough for most services, such as "

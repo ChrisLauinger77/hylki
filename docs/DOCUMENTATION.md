@@ -578,6 +578,17 @@ or changed in Hylki is saved to the server.
   wants an app password made for Hylki: iCloud, Fastmail, and Nextcloud with
   two-factor sign-in among them.
 
+Below the accounts, **From your mail accounts** lists the mail accounts set
+up in Hylki whose provider keeps contacts on CardDAV under the same app
+password: iCloud, Fastmail and Yahoo. **Add Address Books** adds them with
+the mail account's user name and password, so nothing is typed again; when
+the keyring holds no password for it, the form opens filled in and asks for
+one. A Fastmail app password made for mail only is refused for contacts.
+Mail accounts signed in through the browser (Google, Microsoft 365) or
+through GNOME Online Accounts are not listed. When GNOME Online Accounts
+already syncs an address book on the same service, the row says so, since
+it may be the same account under another address.
+
 Saving looks for the address books and says how many it found, or why it
 found none (a password the server refused, a server it could not reach). The
 account's row lists its address books by name, or what went wrong. Its

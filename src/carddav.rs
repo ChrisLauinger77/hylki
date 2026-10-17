@@ -309,6 +309,112 @@ pub fn status(account: &Account) -> Status {
 }
 
 // ---------------------------------------------------------------------------
+// Address books of the mail accounts
+// ---------------------------------------------------------------------------
+
+/// The CardDAV server of a mail provider whose app password signs in to
+/// contacts too, by the account's incoming server: (provider, server).
+fn provider_server(imap_host: &str) -> Option<(&'static str, &'static str)> {
+    match imap_host.trim().to_ascii_lowercase().as_str() {
+        "imap.mail.me.com" => Some(("iCloud", "https://contacts.icloud.com")),
+        "imap.fastmail.com" => Some(("Fastmail", "https://carddav.fastmail.com")),
+        "imap.mail.yahoo.com" => Some(("Yahoo", "https://carddav.address.yahoo.com")),
+        _ => None,
+    }
+}
+
+/// A mail account whose address books Settings offers to add (#408): its
+/// provider is known to keep contacts on CardDAV under the same sign-in.
+#[derive(Debug, Clone)]
+pub struct MailOffer {
+    /// The mail account's address, which its password is kept under.
+    pub email: String,
+    pub provider: &'static str,
+    pub url: String,
+    pub user: String,
+    /// GNOME Online Accounts already syncs an address book on the same
+    /// server, perhaps this one under another address.
+    pub online_accounts: bool,
+}
+
+impl MailOffer {
+    /// The account to make for it.
+    pub fn account(&self) -> Account {
+        let mut a = Account::empty();
+        a.name = format!("{} ({})", self.email, self.provider);
+        a.url = self.url.clone();
+        a.user = self.user.clone();
+        a
+    }
+}
+
+/// The offers for these mail accounts: those signing in with a password at
+/// a provider [`provider_server`] knows, less those whose address books are
+/// set up already. `others` are the CardDAV hosts GNOME Online Accounts
+/// syncs.
+fn offers_for(
+    mail: &[crate::config::AccountConfig],
+    accounts: &[Account],
+    online_hosts: &HashSet<String>,
+) -> Vec<MailOffer> {
+    let mut out: Vec<MailOffer> = Vec::new();
+    for m in mail {
+        // A sign-in Hylki holds for the account, not GNOME's or a browser's.
+        if m.oauth || m.goa_id.is_some() || m.protocol != crate::config::Protocol::Imap {
+            continue;
+        }
+        let Some((provider, url)) = provider_server(&m.imap_host) else { continue };
+        let user = if m.username.contains('@') { m.username.trim().to_string() } else { m.email.trim().to_string() };
+        let host = parse_url(url).map(|u| u.host).unwrap_or_default();
+        let added = accounts.iter().any(|a| {
+            a.user.eq_ignore_ascii_case(&user) && parse_url(&a.url).is_ok_and(|u| u.host.eq_ignore_ascii_case(&host))
+        });
+        if added || out.iter().any(|o| o.user.eq_ignore_ascii_case(&user) && o.url == url) {
+            continue;
+        }
+        // iCloud's books live on numbered hosts under icloud.com.
+        let domain = host.splitn(2, '.').nth(1).unwrap_or(&host).to_ascii_lowercase();
+        let online_accounts = online_hosts.iter().any(|h| h == &host || h.ends_with(&format!(".{domain}")) || *h == domain);
+        out.push(MailOffer { email: m.email.clone(), provider, url: url.to_string(), user, online_accounts });
+    }
+    out
+}
+
+/// The mail accounts whose address books could be added, for Settings.
+/// Blocking: it reads the account file and asks EDS.
+pub fn mail_offers(accounts: &[Account]) -> Vec<MailOffer> {
+    let mail = if std::env::var_os("HYLKI_DEMO").is_some() {
+        crate::config::load_demo_accounts()
+    } else {
+        crate::config::load()
+    }
+    .unwrap_or_default();
+    let online_hosts: HashSet<String> = crate::contacts::registry_sources()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|(_, _, data)| {
+            let kf = crate::platform::keyfile(data)?;
+            kf.has_group("Address Book").then_some(())?;
+            kf.string("Authentication", "Host").ok().map(|h| h.to_ascii_lowercase())
+        })
+        .filter(|h| !h.is_empty())
+        .collect();
+    // Hosts of books Hylki or Evolution set up are covered by `accounts`;
+    // what is left is GNOME Online Accounts'.
+    let own: HashSet<String> = accounts.iter().filter_map(|a| parse_url(&a.url).ok()).map(|u| u.host.to_ascii_lowercase()).collect();
+    let online_hosts = online_hosts.into_iter().filter(|h| !own.contains(h)).collect();
+    offers_for(&mail, accounts, &online_hosts)
+}
+
+/// Add a mail account's address books, signing in with the password the
+/// mail account keeps. `None` when the keyring has none for it, so the form
+/// has to ask.
+pub fn add_offer(offer: &MailOffer) -> Option<Result<String, String>> {
+    let password = crate::config::load_password(&offer.email)?;
+    Some(save(&offer.account(), Some(&password)))
+}
+
+// ---------------------------------------------------------------------------
 // Keeping the books in step
 // ---------------------------------------------------------------------------
 
@@ -439,6 +545,36 @@ mod tests {
     }
 
     #[test]
+    fn mail_accounts_with_a_known_server_are_offered_once() {
+        let mail = |email: &str, host: &str, user: &str| crate::config::AccountConfig {
+            email: email.into(),
+            imap_host: host.into(),
+            username: user.into(),
+            ..crate::ui::welcome::blank_account()
+        };
+        let accounts = vec![
+            mail("ann@me.com", "imap.mail.me.com", "ann@me.com"),
+            mail("bob@fastmail.com", "imap.fastmail.com", "bob"),
+            mail("carl@example.org", "imap.example.org", "carl"),
+            mail("ann@me.com", "imap.mail.me.com", "ann@me.com"),
+        ];
+        let online: std::collections::HashSet<String> = ["p31-contacts.icloud.com".to_string()].into();
+        let offers = super::offers_for(&accounts, &[], &online);
+        let got: Vec<(&str, &str, bool)> = offers.iter().map(|o| (o.provider, o.user.as_str(), o.online_accounts)).collect();
+        assert_eq!(got, vec![("iCloud", "ann@me.com", true), ("Fastmail", "bob@fastmail.com", false)]);
+        // Added already: not offered again.
+        let mut added = Account::empty();
+        added.url = "contacts.icloud.com".into();
+        added.user = "ANN@me.com".into();
+        let offers = super::offers_for(&accounts, &[added], &Default::default());
+        assert_eq!(offers.iter().map(|o| o.provider).collect::<Vec<_>>(), vec!["Fastmail"]);
+        // A sign-in held by GNOME or a browser cannot be lent to EDS.
+        let mut goa = mail("dee@me.com", "imap.mail.me.com", "dee@me.com");
+        goa.goa_id = Some("account_1".into());
+        assert!(super::offers_for(&[goa], &[], &Default::default()).is_empty());
+    }
+
+    #[test]
     fn a_new_account_asks_for_address_books_only() {
         let mut a = Account::empty();
         a.url = "dav.example.org".into();
@@ -489,5 +625,25 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(2));
         assert!(super::list().unwrap().iter().all(|x| x.uid != uid));
         assert!(!super::has_password(&again));
+    }
+
+    /// A mail account's offer, signing in with the password kept for the
+    /// mail account: `CARDDAV_LIVE` as for [`live`], on the same sealed bus.
+    #[test]
+    #[ignore]
+    fn live_offer() {
+        let Ok(spec) = std::env::var("CARDDAV_LIVE") else { return };
+        let mut f = spec.splitn(3, '|').map(str::to_string);
+        let (url, user, pw) = (f.next().unwrap(), f.next().unwrap(), f.next().unwrap());
+        let email = format!("{user}@mail.example");
+        crate::config::store_password(&email, &pw).unwrap();
+        let offer = super::MailOffer { email: email.clone(), provider: "Test", url, user, online_accounts: false };
+        let uid = super::add_offer(&offer).expect("the mail password is kept").unwrap();
+        let got = super::await_books(&uid, std::time::Duration::from_secs(30), true).unwrap();
+        println!("offer {}: books {:?}, {:?}", got.title(), got.books, super::status(&got));
+        assert!(!got.books.is_empty());
+        let none = super::MailOffer { email: "nobody@mail.example".into(), ..offer };
+        assert!(super::add_offer(&none).is_none());
+        super::remove(&got).unwrap();
     }
 }

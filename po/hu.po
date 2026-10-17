@@ -4142,6 +4142,15 @@ msgid "No CardDAV accounts yet."
 msgstr "Még nincsenek felhőfiókok."
 
 #, fuzzy
+msgid "From your mail accounts"
+msgstr "E-mail-fiók hozzáadása"
+
+msgid ""
+"These mail accounts keep contacts too, under the same sign-in. Adding them "
+"uses the password the mail account already has."
+msgstr ""
+
+#, fuzzy
 msgid "CardDAV Account"
 msgstr "Felhőfiók"
 
@@ -4152,6 +4161,10 @@ msgid ""
 msgstr ""
 
 #, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Kulcs keresése ehhez: {addr}…"
+
+#, fuzzy
 msgid ""
 "The account and its address books are removed from this computer, so "
 "Evolution and other apps that use them stop seeing them too. Nothing on the "
@@ -4160,10 +4173,6 @@ msgstr ""
 "A könyvtár eltávolításra kerül az Evolution Data Server-ről, így az "
 "Evolution és az azt használó egyéb alkalmazások sem látják többé. A "
 "kiszolgálón semmi sem változik."
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "Kulcs keresése ehhez: {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4192,6 +4201,15 @@ msgstr "Kulcs keresése ehhez: {addr}…"
 #, fuzzy
 msgid "Use this account's address books"
 msgstr "Fiók használata a Hylki-ben"
+
+msgid ""
+"{provider} contacts are synced through GNOME Online Accounts already, maybe "
+"for this account under another address."
+msgstr ""
+
+#, fuzzy
+msgid "Add Address Books"
+msgstr "Címjegyzék"
 
 msgid ""
 "The server's address is enough for most services, such as "

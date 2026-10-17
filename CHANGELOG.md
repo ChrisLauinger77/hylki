@@ -13,6 +13,9 @@
   address book that syncs with a server is held open, which keeps it up to
   date on desktops without GNOME Contacts, and opening Contacts fetches what
   changed. Away from GNOME, `evolution-data-server` has to be installed.
+  **From your mail accounts**, on the same page, adds the address books of
+  an iCloud, Fastmail or Yahoo mail account with the password it already
+  has.
 
 - **Added: contact groups.** A group is a name for several people that the
   composer suggests like a contact; picking it adds a pill for each of them,

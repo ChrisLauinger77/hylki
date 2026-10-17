@@ -4012,6 +4012,15 @@ msgid "No CardDAV accounts yet."
 msgstr "Encara no hi ha comptes al núvol."
 
 #, fuzzy
+msgid "From your mail accounts"
+msgstr "Afegeix el teu compte de correu"
+
+msgid ""
+"These mail accounts keep contacts too, under the same sign-in. Adding them "
+"uses the password the mail account already has."
+msgstr ""
+
+#, fuzzy
 msgid "CardDAV Account"
 msgstr "Compte al núvol"
 
@@ -4022,6 +4031,10 @@ msgid ""
 msgstr ""
 
 #, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "S'està cercant una clau per a {addr}…"
+
+#, fuzzy
 msgid ""
 "The account and its address books are removed from this computer, so "
 "Evolution and other apps that use them stop seeing them too. Nothing on the "
@@ -4030,10 +4043,6 @@ msgstr ""
 "El directori s'elimina de l'Evolution Data Server, així que l'Evolution i "
 "altres aplicacions que l'utilitzen també deixaran de veure'l. Res canvia al "
 "servidor."
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "S'està cercant una clau per a {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4063,6 +4072,15 @@ msgstr "S'està cercant una clau per a {addr}…"
 #, fuzzy
 msgid "Use this account's address books"
 msgstr "Utilitza aquest compte a l'Hylki"
+
+msgid ""
+"{provider} contacts are synced through GNOME Online Accounts already, maybe "
+"for this account under another address."
+msgstr ""
+
+#, fuzzy
+msgid "Add Address Books"
+msgstr "Totes les llibretes d'adreces"
 
 msgid ""
 "The server's address is enough for most services, such as "
