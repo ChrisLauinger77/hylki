@@ -152,6 +152,20 @@
   that zooms an image or PDF in the lightbox now hides the title bar, the
   arrows, the bottom bar and the padding around them, so the zoomed
   document fills the window. A second click or Escape brings them back.
+- **Fixed: mail zoomed out below 100% drifted right** (#473, reported by
+  bstegmaier75). A centred message moved further right at each zoom step
+  out, and off the screen at 70%. It now stays where it is at every zoom.
+
+- **Fixed: deleting one message of the open conversation closed it.**
+  Deleting, archiving or moving a card other than the one the conversation
+  opened on left it on screen; deleting that one closed the whole
+  conversation and took its row out of the list. The card now goes, the
+  rest of the conversation stays open and its row stays selected.
+
+- **Fixed: a deleted reply filed in another folder stayed counted.** A
+  reply in Sent deleted from the conversation left the row's message count
+  and newest message as they were.
+
 - **Fixed: a keyring that asks first was taken for no keyring** (PR #466 by
   Comodino). Every keyring read gave up after two seconds, so a Secret
   Service provider that waits on the user, like pass-secret-service
