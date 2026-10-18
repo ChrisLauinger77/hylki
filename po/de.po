@@ -3905,8 +3905,8 @@ msgstr "Vorname"
 msgid "Last name"
 msgstr "Nachname"
 
-msgid "In Directories"
-msgstr "In Verzeichnissen"
+msgid "Groups"
+msgstr ""
 
 msgid "Delete Group?"
 msgstr ""
@@ -3929,6 +3929,23 @@ msgstr ""
 msgid "All Address Books"
 msgstr "Alle Adressbücher"
 
+#, fuzzy
+msgid "Search groups"
+msgstr "Suchfilter"
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+msgid "In Directories"
+msgstr "In Verzeichnissen"
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+"Mindestens drei Buchstaben eingeben, um das Verzeichnis zu durchsuchen."
+
+msgid "Nobody in the directory matches."
+msgstr "Keine passenden Einträge im Verzeichnis gefunden."
+
 msgid "Edit"
 msgstr "Bearbeiten"
 
@@ -3937,13 +3954,6 @@ msgstr ""
 
 msgid "Delete…"
 msgstr "Löschen…"
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-"Mindestens drei Buchstaben eingeben, um das Verzeichnis zu durchsuchen."
-
-msgid "Nobody in the directory matches."
-msgstr "Keine passenden Einträge im Verzeichnis gefunden."
 
 msgid "View photo"
 msgstr "Foto ansehen"

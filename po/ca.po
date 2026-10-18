@@ -3882,8 +3882,9 @@ msgstr "Nom"
 msgid "Last name"
 msgstr "Cognom"
 
-msgid "In Directories"
-msgstr "Als directoris"
+#, fuzzy
+msgid "Groups"
+msgstr "Grup esquerre"
 
 #, fuzzy
 msgid "Delete Group?"
@@ -3910,6 +3911,22 @@ msgstr ""
 msgid "All Address Books"
 msgstr "Totes les llibretes d'adreces"
 
+#, fuzzy
+msgid "Search groups"
+msgstr "Cerca filtres"
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+msgid "In Directories"
+msgstr "Als directoris"
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "Edit"
 msgstr "Edita"
 
@@ -3918,12 +3935,6 @@ msgstr ""
 
 msgid "Delete…"
 msgstr "Suprimeix…"
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-
-msgid "Nobody in the directory matches."
-msgstr ""
 
 msgid "View photo"
 msgstr "Mostra la foto"

@@ -24,6 +24,13 @@ const DIRECTORY: usize = usize::MAX / 2;
 /// At most this many directory entries are listed for one search.
 const DIRECTORY_LIMIT: usize = 50;
 
+/// Which side of the list shows: the people, or the groups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContactsView {
+    People,
+    Groups,
+}
+
 /// How the contact list is ordered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContactSort {
@@ -65,6 +72,8 @@ pub struct ContactsPage {
     contacts: Vec<ContactDetails>,
     query: String,
     sort: ContactSort,
+    /// People or groups: the switch above the search.
+    view: ContactsView,
     /// Index into `contacts` of the contact shown in the detail pane.
     selected: Option<usize>,
     /// List position → index into `contacts` (or a directory hit, see
@@ -134,6 +143,8 @@ pub enum ContactsPageInput {
     SetLoading,
     Query(String),
     SetSort(ContactSort),
+    /// The switch above the search moved to people or groups.
+    SetView(ContactsView),
     /// The list's selection moved to this position.
     RowSelected(u32),
     /// A right-click on the line for this entry, at (x, y) on the list.
@@ -374,6 +385,16 @@ impl Component for ContactsPage {
                         set_orientation: gtk::Orientation::Vertical,
                         set_width_request: 280,
 
+                        // People and groups, each a list of its own. The
+                        // toggles are added in `init`.
+                        #[name = "view_switch"]
+                        adw::ToggleGroup {
+                            set_homogeneous: true,
+                            set_margin_top: 8,
+                            set_margin_start: 10,
+                            set_margin_end: 10,
+                        },
+
                         #[name = "search"]
                         gtk::SearchEntry {
                             set_placeholder_text: Some(i18n("Search contacts").as_str()),
@@ -477,6 +498,7 @@ impl Component for ContactsPage {
             contacts: Vec::new(),
             query: String::new(),
             sort: ContactSort::FirstName,
+            view: ContactsView::People,
             selected: None,
             row_map: Vec::new(),
             store: gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>(),
@@ -551,6 +573,21 @@ impl Component for ContactsPage {
             }
             pop.set_child(Some(&vbox));
             widgets.sort_btn.set_popover(Some(&pop));
+        }
+
+        for (name, label) in [("people", i18n("Contacts")), ("groups", i18n("Groups"))] {
+            widgets.view_switch.add(adw::Toggle::builder().name(name).label(label.as_str()).build());
+        }
+        widgets.view_switch.set_active_name(Some("people"));
+        {
+            let s = sender.input_sender().clone();
+            widgets.view_switch.connect_active_name_notify(move |group| {
+                let view = match group.active_name().as_deref() {
+                    Some("groups") => ContactsView::Groups,
+                    _ => ContactsView::People,
+                };
+                let _ = s.send(ContactsPageInput::SetView(view));
+            });
         }
 
         model.selection.set_model(Some(&model.store));
@@ -752,9 +789,24 @@ impl Component for ContactsPage {
                 }
             }
 
+            ContactsPageInput::SetView(view) => {
+                if self.view != view {
+                    self.show_view(widgets, view);
+                    // Moving to the other side abandons an open editor.
+                    self.editor = None;
+                    self.editing_target = None;
+                    self.rebuild(widgets, &sender);
+                }
+            }
+
             ContactsPageInput::RowSelected(pos) => {
+                // Sent from the selection's notify, so it may be stale: the
+                // selection moved on (or was cleared) before it came.
+                if self.selection.selected() != pos {
+                    return;
+                }
                 let Some(&Some(idx)) = self.row_map.get(pos as usize) else { return };
-                if self.selected == Some(idx) && self.editor.is_none() {
+                if self.selected == Some(idx) && (self.editor.is_none() || self.editing_target == Some(idx)) {
                     return;
                 }
                 // Moving away abandons an open editor.
@@ -789,14 +841,12 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::NewContact => {
-                self.editing_target = None;
-                widgets.page_stack.set_visible_child_name("browser");
+                self.new_on_side(widgets, &sender, ContactsView::People);
                 self.render_editor(widgets, &sender);
             }
 
             ContactsPageInput::NewGroup => {
-                self.editing_target = None;
-                widgets.page_stack.set_visible_child_name("browser");
+                self.new_on_side(widgets, &sender, ContactsView::Groups);
                 self.render_group_editor(widgets, &sender);
             }
 
@@ -1040,6 +1090,9 @@ impl Component for ContactsPage {
 impl ContactsPage {
     /// Whether a contact matches the active search.
     fn matches(&self, c: &ContactDetails) -> bool {
+        if c.is_group() != (self.view == ContactsView::Groups) {
+            return false;
+        }
         if self.book_filter.as_ref().is_some_and(|b| *b != c.book_uid) {
             return false;
         }
@@ -1100,6 +1153,31 @@ impl ContactsPage {
         widgets.book_filter.set_visible(self.filter_books.len() > 1);
     }
 
+    /// Put the switch, the search's hint and the sort button in step with
+    /// `view`. The switch notifies after the fact; `SetView` then finds the
+    /// side already shown.
+    fn show_view(&mut self, widgets: &ContactsPageWidgets, view: ContactsView) {
+        self.view = view;
+        let groups = view == ContactsView::Groups;
+        widgets.view_switch.set_active_name(Some(if groups { "groups" } else { "people" }));
+        widgets.search.set_placeholder_text(Some(&if groups { i18n("Search groups") } else { i18n("Search contacts") }));
+        // Groups go by name; the other orders are a person's.
+        widgets.sort_btn.set_sensitive(!groups);
+    }
+
+    /// Ready the list for a new contact or group: the side it will be on,
+    /// with nothing selected, so the form is what the pane shows.
+    fn new_on_side(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>, view: ContactsView) {
+        self.editing_target = None;
+        widgets.page_stack.set_visible_child_name("browser");
+        if self.view != view {
+            self.show_view(widgets, view);
+            self.rebuild(widgets, sender);
+        }
+        self.selected = None;
+        self.selection.set_selected(gtk::INVALID_LIST_POSITION);
+    }
+
     /// Move the list selection to the row showing contact `idx` (if visible).
     fn select_row_for(&self, idx: usize) {
         if let Some(pos) = self.row_map.iter().position(|&i| i == Some(idx)) {
@@ -1121,6 +1199,7 @@ impl ContactsPage {
             let c = &self.contacts[i];
             let name = c.name.to_lowercase();
             match self.sort {
+                _ if c.is_group() => name,
                 ContactSort::FirstName => name,
                 // Sort by the final word of the name (then the whole name for
                 // ties) — how an address book orders by surname.
@@ -1132,18 +1211,21 @@ impl ContactsPage {
                 }
             }
         });
+        let groups = self.view == ContactsView::Groups;
+        let total = self.contacts.iter().filter(|c| c.is_group() == groups).count();
         widgets.count_label.set_label(&if self.query.is_empty() {
-            self.contacts.len().to_string()
+            total.to_string()
         } else {
-            i18n_f(
-                "{shown} of {total}",
-                &[
-                    ("shown", &people.len().to_string()),
-                    ("total", &self.contacts.len().to_string()),
-                ],
-            )
+            i18n_f("{shown} of {total}", &[("shown", &people.len().to_string()), ("total", &total.to_string())])
         });
         let mut lines: Vec<Line> = Vec::new();
+        if groups && total == 0 {
+            lines.push(Line::other(
+                LineKind::Note,
+                i18n("No groups yet. Make one with New Group, under the + button."),
+                String::new(),
+            ));
+        }
 
         // The directories' answers, after the contacts and by name whatever
         // the sort, under a heading of their own so nobody takes them for
@@ -1152,7 +1234,7 @@ impl ContactsPage {
         let mut listed = std::collections::HashSet::new();
         let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
-            if !in_filter(&c.book_uid) {
+            if groups || !in_filter(&c.book_uid) {
                 continue;
             }
             let emails: Vec<String> = c.emails.iter().map(|e| e.value.to_lowercase()).collect();
@@ -1174,7 +1256,7 @@ impl ContactsPage {
 
         // A directory that did not answer, last and not selectable, so a
         // search that finds nobody in it says why.
-        for f in self.directory_failures.iter().filter(|f| in_filter(&f.uid)) {
+        for f in self.directory_failures.iter().filter(|f| !groups && in_filter(&f.uid)) {
             lines.push(Line::other(LineKind::Failure, f.name.clone(), f.message.clone()));
         }
 
@@ -1183,7 +1265,7 @@ impl ContactsPage {
             .book_filter
             .as_ref()
             .is_some_and(|b| self.directories.iter().any(|(uid, _)| uid == b));
-        if directory_picked && people.is_empty() && lines.is_empty() {
+        if directory_picked && !groups && people.is_empty() && lines.is_empty() {
             let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
                 i18n("Type three letters or more to search the directory.")
             } else {

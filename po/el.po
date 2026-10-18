@@ -3942,8 +3942,9 @@ msgstr "Όνομα"
 msgid "Last name"
 msgstr "Επώνυμο"
 
-msgid "In Directories"
-msgstr "Στους καταλόγους"
+#, fuzzy
+msgid "Groups"
+msgstr "Αριστερή ομάδα"
 
 #, fuzzy
 msgid "Delete Group?"
@@ -3970,6 +3971,22 @@ msgstr ""
 msgid "All Address Books"
 msgstr "Όλα τα βιβλία διευθύνσεων"
 
+#, fuzzy
+msgid "Search groups"
+msgstr "Αναζήτηση φίλτρων"
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+msgid "In Directories"
+msgstr "Στους καταλόγους"
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "Edit"
 msgstr "Επεξεργασία"
 
@@ -3978,12 +3995,6 @@ msgstr ""
 
 msgid "Delete…"
 msgstr "Διαγραφή…"
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-
-msgid "Nobody in the directory matches."
-msgstr ""
 
 msgid "View photo"
 msgstr "Προβολή φωτογραφίας"

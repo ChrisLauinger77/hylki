@@ -3540,7 +3540,7 @@ msgstr ""
 msgid "Last name"
 msgstr ""
 
-msgid "In Directories"
+msgid "Groups"
 msgstr ""
 
 msgid "Delete Group?"
@@ -3562,6 +3562,21 @@ msgstr ""
 msgid "All Address Books"
 msgstr ""
 
+msgid "Search groups"
+msgstr ""
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+msgid "In Directories"
+msgstr ""
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "Edit"
 msgstr ""
 
@@ -3569,12 +3584,6 @@ msgid "Add to Group"
 msgstr ""
 
 msgid "Delete…"
-msgstr ""
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-
-msgid "Nobody in the directory matches."
 msgstr ""
 
 msgid "View photo"

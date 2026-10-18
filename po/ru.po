@@ -3997,8 +3997,8 @@ msgid "Last name"
 msgstr "Фамилия"
 
 #, fuzzy
-msgid "In Directories"
-msgstr "Каталоги LDAP"
+msgid "Groups"
+msgstr "Левая группа"
 
 #, fuzzy
 msgid "Delete Group?"
@@ -4021,6 +4021,23 @@ msgstr ""
 msgid "All Address Books"
 msgstr "Адресная книга"
 
+#, fuzzy
+msgid "Search groups"
+msgstr "Поиск фильтров"
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+#, fuzzy
+msgid "In Directories"
+msgstr "Каталоги LDAP"
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "Edit"
 msgstr "Редактировать"
 
@@ -4029,12 +4046,6 @@ msgstr ""
 
 msgid "Delete…"
 msgstr "Удалить…"
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-
-msgid "Nobody in the directory matches."
-msgstr ""
 
 msgid "View photo"
 msgstr "Просмотреть фото"

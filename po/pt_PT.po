@@ -4012,8 +4012,8 @@ msgid "Last name"
 msgstr "Apelido"
 
 #, fuzzy
-msgid "In Directories"
-msgstr "Diretórios LDAP"
+msgid "Groups"
+msgstr "Grupo esquerdo"
 
 #, fuzzy
 msgid "Delete Group?"
@@ -4036,6 +4036,23 @@ msgstr ""
 msgid "All Address Books"
 msgstr "Livro de endereços"
 
+#, fuzzy
+msgid "Search groups"
+msgstr "Pesquisar filtros"
+
+msgid "No groups yet. Make one with New Group, under the + button."
+msgstr ""
+
+#, fuzzy
+msgid "In Directories"
+msgstr "Diretórios LDAP"
+
+msgid "Type three letters or more to search the directory."
+msgstr ""
+
+msgid "Nobody in the directory matches."
+msgstr ""
+
 msgid "Edit"
 msgstr "Editar"
 
@@ -4044,12 +4061,6 @@ msgstr ""
 
 msgid "Delete…"
 msgstr "Eliminar…"
-
-msgid "Type three letters or more to search the directory."
-msgstr ""
-
-msgid "Nobody in the directory matches."
-msgstr ""
 
 msgid "View photo"
 msgstr "Ver fotografia"

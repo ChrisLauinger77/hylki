@@ -38,7 +38,8 @@
   books are shown, offered and editable too, their "Hide addresses" option
   being Send as Bcc; vCard 4 and Apple (iCloud) groups are shown and
   offered but not edited. A `.vcf` import keeps its lists as groups instead
-  of skipping them.
+  of skipping them. The Contacts view lists groups apart from people, with
+  a **Contacts** | **Groups** switch above the search.
 
 - **Fixed: an Evolution contact list offered as a broken recipient.** The
   composer suggested each member of a list under the list's name with the

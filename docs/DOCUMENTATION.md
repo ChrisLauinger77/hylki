@@ -551,6 +551,10 @@ A group can be set to **Send as Bcc**. Picking it in any field then puts its
 people in Bcc, and opens the Bcc row, so they do not see each other's
 addresses. To still needs at least one address, your own for example.
 
+The Contacts view lists groups apart from people: **Contacts** and **Groups**,
+above the search, switch between the two. Groups are listed by name, and the
+search and the address book menu work on whichever is shown.
+
 **New Group**, under the **+** button in the Contacts view, makes a group in
 the Hylki book. Add people by typing part of a name or address and picking
 from the matches under the field, or by typing or pasting addresses and
