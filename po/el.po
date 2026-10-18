@@ -7619,6 +7619,10 @@ msgid "Insert"
 msgstr "Εισαγωγή"
 
 #, fuzzy
+msgid "Hylki, on this computer"
+msgstr "Σε αυτόν τον υπολογιστή"
+
+#, fuzzy
 msgid "Rename…"
 msgstr "Μετονομασία"
 

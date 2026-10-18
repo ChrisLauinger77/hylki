@@ -7567,6 +7567,10 @@ msgid "Insert"
 msgstr "Insertar"
 
 #, fuzzy
+msgid "Hylki, on this computer"
+msgstr "En este equipo"
+
+#, fuzzy
 msgid "Rename…"
 msgstr "Renombrar"
 

@@ -1697,9 +1697,14 @@ impl ContactsPage {
                 let (account, own) = if directory {
                     (i18n("Directories"), name.trim_start_matches("LDAP — ").to_string())
                 } else {
+                    // "Account · book", or a book that is its account
+                    // alone: "CardDAV — a@b.org", the address its name.
                     match name.split_once(" · ") {
                         Some((account, own)) => (account.to_string(), own.to_string()),
-                        None => (String::new(), name.clone()),
+                        None => match name.split_once(" — ") {
+                            Some((kind, account)) => (kind.to_string(), account.to_string()),
+                            None => (String::new(), name.clone()),
+                        },
                     }
                 };
                 let book = self.books.iter().find(|b| b.uid == *uid);

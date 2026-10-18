@@ -7656,6 +7656,10 @@ msgid "Insert"
 msgstr "Beszúrás"
 
 #, fuzzy
+msgid "Hylki, on this computer"
+msgstr "Ezen a számítógépen"
+
+#, fuzzy
 msgid "Rename…"
 msgstr "Átnevezés"
 

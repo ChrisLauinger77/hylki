@@ -7521,6 +7521,10 @@ msgid "Insert"
 msgstr "Insereix"
 
 #, fuzzy
+msgid "Hylki, on this computer"
+msgstr "En aquest ordinador"
+
+#, fuzzy
 msgid "Rename…"
 msgstr "Canvia el nom"
 

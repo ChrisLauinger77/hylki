@@ -19,8 +19,8 @@ pub struct Filled {
     pub chevrons: Vec<(String, gtk::Image)>,
 }
 
-/// A row that hides while a node above it (its account, its book) is
-/// folded, sliding as folder rows do.
+/// A row that hides while the book above it is folded, sliding as folder
+/// rows do.
 pub struct TreeRow {
     pub row: gtk::ListBoxRow,
     pub revealer: gtk::Revealer,
@@ -28,22 +28,17 @@ pub struct TreeRow {
     pub under: Vec<String>,
 }
 
-/// The key that folds an account's books.
-fn account_key(account: &str) -> String {
-    format!("account:{account}")
-}
-
 /// The key that folds a book's groups.
 fn book_key(uid: &str) -> String {
     format!("book:{uid}")
 }
 
-/// Fill `list`, the Contacts row's list in the sidebar, with `tree`: the
-/// books that are no account's first, then each account, its books under
-/// it and each book's groups under the book, each account and each book
-/// with groups folding as a folder with sub-folders does (`folded` holds
-/// the keys of those folded). In the icon rail (`collapsed`) the books show
-/// as icons alone, with no accounts or groups.
+/// Fill `list`, the Contacts row's list in the sidebar, with `tree`: each
+/// address book, named with its account under the name, the books that are
+/// no account's first, and each book's groups under it, a book with groups
+/// folding as a folder with sub-folders does (`folded` holds the keys of
+/// those folded). In the icon rail (`collapsed`) the books show as icons
+/// alone, with no groups.
 pub fn fill(
     list: &gtk::ListBox,
     tree: &ContactTree,
@@ -53,25 +48,23 @@ pub fn fill(
     input: &relm4::Sender<SidebarInput>,
 ) -> Filled {
     let mut out = Filled { rows: Vec::new(), layout: Vec::new(), chevrons: Vec::new() };
-    // The books of no account head the list; the accounts keep their order.
-    let mut books: Vec<&TreeBook> = tree.books.iter().filter(|b| b.account.is_empty()).collect();
-    books.extend(tree.books.iter().filter(|b| !b.account.is_empty()));
-    let mut account: Option<&str> = None;
+    // The Hylki book heads the list, then the books of no account; the
+    // accounts keep their order.
+    let mut books: Vec<&TreeBook> = tree.books.iter().collect();
+    books.sort_by_key(|b| (b.uid != crate::local_contacts::LOCAL_BOOK_UID, !b.account.is_empty()));
     for book in books {
         let mut under = Vec::new();
-        if !book.account.is_empty() && !collapsed {
-            let key = account_key(&book.account);
-            if account != Some(book.account.as_str()) {
-                let (row, chevron) = heading(&book.account, &key, folded, input);
-                list.append(&row);
-                out.chevrons.push((key.clone(), chevron));
-            }
-            under.push(key);
-        }
-        account = Some(book.account.as_str());
-
         let icon = if book.directory { "network-server-symbolic" } else { "x-office-address-book-symbolic" };
-        let tip = if book.account.is_empty() { book.name.clone() } else { format!("{} · {}", book.account, book.name) };
+        // Where the book is kept, under its name: a book called "card" or
+        // "Contacts" says little on its own.
+        let place = if !book.account.is_empty() {
+            book.account.clone()
+        } else if book.uid == crate::local_contacts::LOCAL_BOOK_UID {
+            i18n("Hylki, on this computer")
+        } else {
+            String::new()
+        };
+        let tip = if place.is_empty() { book.name.clone() } else { format!("{} · {place}", book.name) };
         let count = (!book.directory).then_some(book.count);
         let key = book_key(&book.uid);
         let expander = (!collapsed && !book.groups.is_empty()).then(|| expander(&key, folded, input));
@@ -79,7 +72,7 @@ pub fn fill(
             out.chevrons.push((key.clone(), chevron.clone()));
         }
         let lead = expander.map(|(button, _)| button.upcast::<gtk::Widget>());
-        let r = row(&book.name, &tip, icon, count, lead, 0, collapsed, inset);
+        let r = row(&book.name, &place, &tip, icon, count, lead, 0, collapsed, inset);
         if book.writable && !book.directory {
             drop_target(&r, DropOn::Book(book.uid.clone()), input);
         }
@@ -117,7 +110,7 @@ pub fn fill(
         }
         under.push(key);
         for g in &book.groups {
-            let r = row(&g.name, &g.name, "system-users-symbolic", Some(g.count), None, 1, false, inset);
+            let r = row(&g.name, "", &g.name, "system-users-symbolic", Some(g.count), None, 1, false, inset);
             if g.editable {
                 drop_target(&r, DropOn::Group { book: g.book.clone(), uid: g.uid.clone() }, input);
             }
@@ -202,12 +195,13 @@ fn expander(key: &str, folded: &std::collections::HashSet<String>, input: &relm4
 }
 
 /// A row shaped as the other unified rows' are: the caret slot (a caret
-/// for a book with groups, else a spacer as wide), an icon, the name and,
-/// when `count` is given, how many it holds; `depth` 1 sets a group under
-/// its book.
+/// for a book with groups, else a spacer as wide), an icon, the name with
+/// `place` (the book's account) under it and, when `count` is given, how
+/// many it holds; `depth` 1 sets a group under its book.
 #[allow(clippy::too_many_arguments)]
 fn row(
     name: &str,
+    place: &str,
     tip: &str,
     icon: &str,
     count: Option<usize>,
@@ -232,50 +226,38 @@ fn row(
     lead.append(&img);
     let (row, badge) = crate::ui::sidebar::build_unified_sub_row(&lead, name, tip, 0, collapsed, inset, false);
     badge.set_visible(false);
-    if !collapsed {
-        // A count, not unread mail: dim, where the unread chip would be.
-        if let (Some(n), Some(hbox)) = (count, row.child().and_downcast::<gtk::Box>()) {
-            let label = gtk::Label::new(Some(&n.to_string()));
-            label.add_css_class("dim-label");
-            label.add_css_class("caption");
-            hbox.append(&label);
+    if collapsed {
+        return row;
+    }
+    let Some(hbox) = row.child().and_downcast::<gtk::Box>() else { return row };
+    // The account under the name, small and dim, as a mail row's preview
+    // sits under its subject.
+    if !place.is_empty() {
+        if let Some(label) = lead.next_sibling().and_downcast::<gtk::Label>() {
+            let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            column.set_hexpand(true);
+            column.set_valign(gtk::Align::Center);
+            column.set_margin_start(label.margin_start());
+            label.set_margin_start(0);
+            hbox.remove(&label);
+            column.append(&label);
+            let sub = gtk::Label::new(Some(place));
+            sub.add_css_class("dim-label");
+            sub.add_css_class("caption");
+            sub.set_halign(gtk::Align::Start);
+            sub.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            column.append(&sub);
+            hbox.insert_child_after(&column, Some(&lead));
         }
     }
+    // A count, not unread mail: dim, where the unread chip would be.
+    if let Some(n) = count {
+        let label = gtk::Label::new(Some(&n.to_string()));
+        label.add_css_class("dim-label");
+        label.add_css_class("caption");
+        hbox.append(&label);
+    }
     row
-}
-
-/// An account's name over its books, with the caret that folds them: not
-/// a row to pick; a click on it folds or opens too.
-fn heading(
-    text: &str,
-    key: &str,
-    folded: &std::collections::HashSet<String>,
-    input: &relm4::Sender<SidebarInput>,
-) -> (gtk::ListBoxRow, gtk::Image) {
-    let row = gtk::ListBoxRow::new();
-    row.set_selectable(false);
-    row.set_can_focus(false);
-    row.add_css_class("contact-account-row");
-    let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    hbox.add_css_class("folder-row");
-    let (button, chevron) = expander(key, folded, input);
-    hbox.append(&button);
-    let label = gtk::Label::new(Some(text));
-    label.add_css_class("dim-label");
-    label.add_css_class("caption-heading");
-    label.set_halign(gtk::Align::Start);
-    label.set_hexpand(true);
-    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    hbox.append(&label);
-    row.set_child(Some(&hbox));
-    let click = gtk::GestureClick::new();
-    let (s, key) = (input.clone(), key.to_string());
-    click.connect_released(move |gesture, _, _, _| {
-        gesture.set_state(gtk::EventSequenceState::Claimed);
-        let _ = s.send(SidebarInput::ToggleContactNode(key.clone()));
-    });
-    row.add_controller(click);
-    (row, chevron)
 }
 
 /// A right-click menu on `row`, made by `sections` each time it opens.

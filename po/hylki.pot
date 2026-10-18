@@ -6675,6 +6675,9 @@ msgstr ""
 msgid "Insert"
 msgstr ""
 
+msgid "Hylki, on this computer"
+msgstr ""
+
 msgid "Rename…"
 msgstr ""
 
