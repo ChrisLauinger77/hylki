@@ -271,6 +271,12 @@ pub enum ContactsPageInput {
     /// index, ask to move them to this book or to delete them all.
     BulkAddToGroup(usize),
     BulkMoveRequest(String),
+    /// Ask to move the contact at this index to the book `to`.
+    MoveRequest { idx: usize, to: String },
+    /// Move the contact being edited, by book and UID, to the book `to`
+    /// as `vcard` (its card with the edits, made for the new book),
+    /// confirmed.
+    EditMoveConfirmed { to: String, key: (String, String), vcard: String },
     /// Move these people, by book and UID, to this book, confirmed.
     BulkMoveConfirmed { to: String, keys: Vec<(String, String)> },
     BulkDeleteRequest,
@@ -1061,29 +1067,21 @@ impl Component for ContactsPage {
                     .into_iter()
                     .map(|i| (self.contacts[i].book_uid.clone(), self.contacts[i].eds_uid.clone()))
                     .collect();
-                let Some(book) = self.books.iter().find(|b| b.uid == to) else { return };
-                if keys.is_empty() {
-                    return;
-                }
-                let n = keys.len() as u32;
-                let count = n.to_string();
-                let body = ni18n_f(
-                    "This will add {n} contact to {book} and remove it from the address book it is in now, locally and on the server. A group that names it by its card there loses it.",
-                    "This will add {n} contacts to {book} and remove them from the address books they are in now, locally and on the server. A group that names them by their cards there loses them.",
-                    n,
-                    &[("n", &count), ("book", &book.name)],
-                );
-                let s = sender.input_sender().clone();
-                confirm(
-                    widgets,
-                    &ni18n_f("Move {n} Contact?", "Move {n} Contacts?", n, &[("n", &count)]),
-                    &body,
-                    &i18n("Move"),
-                    false,
-                    move || {
-                        let _ = s.send(ContactsPageInput::BulkMoveConfirmed { to: to.clone(), keys: keys.clone() });
-                    },
-                );
+                self.ask_move(widgets, &sender, keys, to, None);
+            }
+
+            ContactsPageInput::MoveRequest { idx, to } => {
+                let Some(c) = self.contacts.get(idx).filter(|c| self.can_move(c, &to)) else { return };
+                let key = (c.book_uid.clone(), c.eds_uid.clone());
+                self.ask_move(widgets, &sender, vec![key], to, None);
+            }
+
+            ContactsPageInput::EditMoveConfirmed { to, key, vcard } => {
+                self.forget(std::slice::from_ref(&key));
+                let _ = sender.output(ContactsPageOutput::MoveContacts { to, cards: vec![(key.0, key.1, vcard)] });
+                self.editor = None;
+                self.editing_target = None;
+                self.rebuild(widgets, &sender);
             }
 
             ContactsPageInput::BulkMoveConfirmed { to, keys } => {
@@ -1325,7 +1323,27 @@ impl Component for ContactsPage {
                 if empty {
                     return;
                 }
+                let picked = editor.book.as_ref().and_then(|row| self.books.get(row.selected() as usize));
                 match self.editing_target.and_then(|i| self.contacts.get(i)) {
+                    // Saved in another book: moved there, with the edits,
+                    // once the move is confirmed. The form stays till then.
+                    Some(c) if picked.is_some_and(|b| b.uid != c.book_uid) => {
+                        let to = picked.map(|b| b.uid.clone()).unwrap_or_default();
+                        if !self.can_move(c, &to) {
+                            return;
+                        }
+                        let mut moved = c.clone();
+                        moved.raw_vcard = crate::contacts::patched_vcard(&c.raw_vcard, &edit);
+                        moved.photo = match &edit.photo {
+                            crate::contacts::PhotoEdit::Keep => c.photo.clone(),
+                            crate::contacts::PhotoEdit::Remove => None,
+                            crate::contacts::PhotoEdit::Set(bytes) => Some(bytes.clone()),
+                        };
+                        let vcard = crate::contacts::moved_vcard(&moved);
+                        let key = (c.book_uid.clone(), c.eds_uid.clone());
+                        self.ask_move(widgets, &sender, vec![key], to, Some(vcard));
+                        return;
+                    }
                     Some(c) => {
                         let vcard = crate::contacts::patched_vcard(&c.raw_vcard, &edit);
                         let _ = sender.output(ContactsPageOutput::SaveContact {
@@ -1544,17 +1562,64 @@ impl ContactsPage {
     /// The people of the selection that can move to the book `to`: those
     /// in another book Hylki can write to, and delete from.
     fn movable(&self, to: &str) -> Vec<usize> {
+        self.chosen().into_iter().filter(|&i| self.can_move(&self.contacts[i], to)).collect()
+    }
+
+    /// Whether a person can move to the book `to`: from another book Hylki
+    /// can write to, and delete from.
+    fn can_move(&self, c: &ContactDetails, to: &str) -> bool {
         let writable = |uid: &str| self.books.iter().any(|b| b.uid == uid);
-        if !writable(to) {
-            return Vec::new();
-        }
-        self.chosen()
-            .into_iter()
-            .filter(|&i| {
-                let c = &self.contacts[i];
-                !c.is_group() && c.book_uid != to && !c.eds_uid.is_empty() && writable(&c.book_uid)
-            })
-            .collect()
+        !c.is_group() && c.book_uid != to && !c.eds_uid.is_empty() && writable(to) && writable(&c.book_uid)
+    }
+
+    /// Ask before moving these contacts, by book and UID, to the book `to`:
+    /// out of the books they are in, into that one. `edited` is the card
+    /// of a contact being edited, saved with the move.
+    fn ask_move(
+        &self,
+        widgets: &ContactsPageWidgets,
+        sender: &ComponentSender<Self>,
+        keys: Vec<(String, String)>,
+        to: String,
+        edited: Option<String>,
+    ) {
+        let Some(book) = self.books.iter().find(|b| b.uid == to) else { return };
+        let one = match keys.as_slice() {
+            [] => return,
+            [(b, u)] => self.contacts.iter().find(|c| c.book_uid == *b && c.eds_uid == *u),
+            _ => None,
+        };
+        let (heading, body) = match one {
+            Some(c) => (
+                i18n("Move Contact?"),
+                i18n_f(
+                    "This will move {name} out of {from} and into {to}, locally and on the server. A group in {from} that holds the contact will no longer have it.",
+                    &[("name", &c.name), ("from", &c.book_name), ("to", &book.name)],
+                ),
+            ),
+            None => {
+                let n = keys.len() as u32;
+                let count = n.to_string();
+                (
+                    ni18n_f("Move {n} Contact?", "Move {n} Contacts?", n, &[("n", &count)]),
+                    ni18n_f(
+                        "This will move {n} contact out of the address book it is in and into {to}, locally and on the server. A group there that holds it will no longer have it.",
+                        "This will move {n} contacts out of the address books they are in and into {to}, locally and on the server. Groups there that hold them will no longer have them.",
+                        n,
+                        &[("n", &count), ("to", &book.name)],
+                    ),
+                )
+            }
+        };
+        let s = sender.input_sender().clone();
+        confirm(widgets, &heading, &body, &i18n("Move"), false, move || {
+            let _ = s.send(match (&edited, keys.first()) {
+                (Some(vcard), Some(key)) => {
+                    ContactsPageInput::EditMoveConfirmed { to: to.clone(), key: key.clone(), vcard: vcard.clone() }
+                }
+                _ => ContactsPageInput::BulkMoveConfirmed { to: to.clone(), keys: keys.clone() },
+            });
+        });
     }
 
     /// Whether a book syncs with a server. Books on this computer keep
@@ -1971,6 +2036,26 @@ impl ContactsPage {
                     .collect();
                 first.push(MenuEntry::submenu(i18n("Add to Group"), vec![entries]).icon("system-users-symbolic"));
             }
+        }
+        // Another book, with a question first.
+        let books: Vec<(String, String)> = self
+            .books
+            .iter()
+            .filter(|b| self.can_move(c, &b.uid))
+            .map(|b| (b.uid.clone(), b.name.clone()))
+            .collect();
+        if !books.is_empty() {
+            let entries = books
+                .into_iter()
+                .map(|(uid, name)| {
+                    let sm = s.clone();
+                    MenuEntry::new(name, move || {
+                        let _ = sm.send(ContactsPageInput::MoveRequest { idx, to: uid.clone() });
+                    })
+                    .icon("x-office-address-book-symbolic")
+                })
+                .collect();
+            first.push(MenuEntry::submenu(i18n("Move to Address Book"), vec![entries]).icon("x-office-address-book-symbolic"));
         }
         // GNOME Contacts knows nothing of the Hylki book, nor of groups.
         if !local && !group {
@@ -2444,18 +2529,28 @@ impl ContactsPage {
         let (birthday_row, birthday) = BirthdayForm::new(&c.birthday_raw);
         identity.append(&birthday_row);
 
-        // ---- the address book: chosen for a new contact, named for one
-        // being edited (a contact stays in its book) ----
+        // ---- the address book: chosen for a new contact; for one being
+        // edited, its own, or another to move it to (when Hylki can write
+        // to its book, and so delete from it) ----
         let mut book = None;
-        if self.editing_target.is_none() && !self.books.is_empty() {
+        let editing = self.editing_target.is_some();
+        let own = self.books.iter().position(|b| b.uid == c.book_uid).filter(|_| !c.eds_uid.is_empty());
+        if (!editing || own.is_some()) && !self.books.is_empty() {
             let row = adw::ComboRow::new();
             row.set_title(&i18n("Address book"));
             let labels: Vec<&str> = self.books.iter().map(|b| b.name.as_str()).collect();
             row.set_model(Some(&gtk::StringList::new(&labels)));
-            // The first book the list shows, else the default (first).
-            let at = self.books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0);
+            // Its own book, or for a new one the first book the list shows,
+            // else the default (first).
+            let at = own
+                .filter(|_| editing)
+                .or_else(|| self.books.iter().position(|b| !self.hidden_books.contains(&b.uid)))
+                .unwrap_or(0);
             row.set_selected(at as u32);
             row.set_sensitive(self.books.len() > 1);
+            if editing {
+                row.set_subtitle(&i18n("Another book moves the contact there when saved."));
+            }
             identity.prepend(&row);
             book = Some(row);
         } else if !c.book_name.is_empty() {

@@ -535,7 +535,14 @@ search field open** keeps the Contacts search open too.
 A new contact, made with the **+** button, has an **Address
 book** row at the top of its form that picks where it is saved; it starts on
 the default book, or on the first book the list shows when the default one
-is unticked in the filter. A contact being edited stays in its book, which the form names.
+is unticked in the filter. A contact being edited can move to another book
+from the same row, which then names the one it is in: saving asks first,
+and moves it with its changes. A contact's right-click menu has **Move to
+Address Book** too, and several selected together move with **Move to…**
+(see below). A move takes the contact out of its book and puts it in the
+other, locally and on the server, after a question that names both; a group
+in the old book that held the contact no longer has it. A contact in a book
+Hylki cannot write to stays where it is.
 
 The contact form holds the photo, which **Change Photo…** replaces with an
 image file (made at most 512 pixels a side and kept in the card) and

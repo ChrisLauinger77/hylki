@@ -67,13 +67,15 @@
   was left out before. A group in a CardDAV book takes contacts with no
   email address from its form too.
 
-- **Added: several contacts at once.** Ctrl or Shift and a click, or
-  Ctrl+A, select several contacts in the Contacts view, and the right-hand
-  pane then has **Add to Group**, **Move to…** another address book and
-  **Delete…** for them all, as has a right-click on one of them; Delete
-  asks to delete them too. A move adds each contact to the new book, photo
-  included, and removes it from the old one. Several groups can be deleted
-  together.
+- **Added: several contacts at once.** Ctrl or Shift and a click, or Ctrl+A,
+  select several contacts in the Contacts view, and the right-hand pane then
+  has **Add to Group**, **Move to…** another address book and **Delete…**
+  for them all, as has a right-click on one of them; Delete asks to delete
+  them too. A move adds each contact to the new book, photo included, and
+  removes it from the old one. Several groups can be deleted together. One
+  contact moves from its edit form, whose address book can be changed, or
+  from **Move to Address Book** in its right-click menu; every move asks
+  first, naming the book it leaves and the one it goes to.
 
 - **Changed: the composer's contacts button leads to Hylki's Contacts.** The
   button in the header of the composer's contacts window opens the Contacts

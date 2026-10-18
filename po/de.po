@@ -3937,27 +3937,6 @@ msgstr "Kontakt bearbeiten"
 msgid "Groups"
 msgstr ""
 
-msgid ""
-"This will add {n} contact to {book} and remove it from the address book it "
-"is in now, locally and on the server. A group that names it by its card "
-"there loses it."
-msgid_plural ""
-"This will add {n} contacts to {book} and remove them from the address books "
-"they are in now, locally and on the server. A group that names them by their "
-"cards there loses them."
-msgstr[0] ""
-msgstr[1] ""
-
-#, fuzzy
-msgid "Move {n} Contact?"
-msgid_plural "Move {n} Contacts?"
-msgstr[0] "Kontakte öffnen"
-msgstr[1] "Kontakte öffnen"
-
-#, fuzzy
-msgid "Move"
-msgstr "Verschieben nach"
-
 #, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
@@ -4048,6 +4027,44 @@ msgstr ""
 
 msgid "Delete Contact?"
 msgstr "Kontakt löschen?"
+
+#, fuzzy
+msgid "Move Contact?"
+msgstr "Kontakte öffnen"
+
+#, fuzzy
+msgid ""
+"This will move {name} out of {from} and into {to}, locally and on the "
+"server. A group in {from} that holds the contact will no longer have it."
+msgstr ""
+"{name} wird aus dem Adressbuch und bei synchronisierten Adressbüchern auch "
+"vom Server entfernt."
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Kontakte öffnen"
+msgstr[1] "Kontakte öffnen"
+
+#, fuzzy
+msgid ""
+"This will move {n} contact out of the address book it is in and into {to}, "
+"locally and on the server. A group there that holds it will no longer have "
+"it."
+msgid_plural ""
+"This will move {n} contacts out of the address books they are in and into "
+"{to}, locally and on the server. Groups there that hold them will no longer "
+"have them."
+msgstr[0] ""
+"{name} wird aus dem Adressbuch und bei synchronisierten Adressbüchern auch "
+"vom Server entfernt."
+msgstr[1] ""
+"{name} wird aus dem Adressbuch und bei synchronisierten Adressbüchern auch "
+"vom Server entfernt."
+
+#, fuzzy
+msgid "Move"
+msgstr "Verschieben nach"
 
 #, fuzzy
 msgid "Search groups"
@@ -4178,6 +4195,9 @@ msgstr "Organisation"
 
 msgid "Title"
 msgstr "Titel"
+
+msgid "Another book moves the contact there when saved."
+msgstr ""
 
 msgid "Add email"
 msgstr "E-Mail hinzufügen"

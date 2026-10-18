@@ -4019,27 +4019,6 @@ msgstr "Editar contato"
 msgid "Groups"
 msgstr "Grupo esquerdo"
 
-msgid ""
-"This will add {n} contact to {book} and remove it from the address book it "
-"is in now, locally and on the server. A group that names it by its card "
-"there loses it."
-msgid_plural ""
-"This will add {n} contacts to {book} and remove them from the address books "
-"they are in now, locally and on the server. A group that names them by their "
-"cards there loses them."
-msgstr[0] ""
-msgstr[1] ""
-
-#, fuzzy
-msgid "Move {n} Contact?"
-msgid_plural "Move {n} Contacts?"
-msgstr[0] "Abrir Contatos"
-msgstr[1] "Abrir Contatos"
-
-#, fuzzy
-msgid "Move"
-msgstr "Mover para"
-
 #, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
@@ -4108,6 +4087,36 @@ msgstr ""
 
 msgid "Delete Contact?"
 msgstr "Excluir contato?"
+
+#, fuzzy
+msgid "Move Contact?"
+msgstr "Abrir Contatos"
+
+msgid ""
+"This will move {name} out of {from} and into {to}, locally and on the "
+"server. A group in {from} that holds the contact will no longer have it."
+msgstr ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Abrir Contatos"
+msgstr[1] "Abrir Contatos"
+
+msgid ""
+"This will move {n} contact out of the address book it is in and into {to}, "
+"locally and on the server. A group there that holds it will no longer have "
+"it."
+msgid_plural ""
+"This will move {n} contacts out of the address books they are in and into "
+"{to}, locally and on the server. Groups there that hold them will no longer "
+"have them."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Move"
+msgstr "Mover para"
 
 #, fuzzy
 msgid "Search groups"
@@ -4243,6 +4252,9 @@ msgid "Organization"
 msgstr "Tradução"
 
 msgid "Title"
+msgstr ""
+
+msgid "Another book moves the contact there when saved."
 msgstr ""
 
 msgid "Add email"
