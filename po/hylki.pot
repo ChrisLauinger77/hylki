@@ -3574,12 +3574,15 @@ msgstr ""
 msgid "Delete Group?"
 msgstr ""
 
-msgid "Delete Contact?"
+msgid ""
+"This will remove the contact {name} from your address book locally and on "
+"the server."
 msgstr ""
 
-msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+
+msgid "Delete Contact?"
 msgstr ""
 
 msgid "All Address Books"

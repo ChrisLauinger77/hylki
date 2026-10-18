@@ -3930,15 +3930,22 @@ msgstr ""
 msgid "Delete Group?"
 msgstr "Vols suprimir la teva clau?"
 
-msgid "Delete Contact?"
-msgstr "Vols suprimir el contacte?"
-
+#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
+"This will remove the contact {name} from your address book locally and on "
+"the server."
 msgstr ""
 "{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
 "sincronitzada, també del servidor."
+
+#, fuzzy
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+
+msgid "Delete Contact?"
+msgstr "Vols suprimir el contacte?"
 
 msgid "All Address Books"
 msgstr "Totes les llibretes d'adreces"
@@ -8047,6 +8054,13 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "{name} is removed from your address book, and for a synced book, from the "
+#~ "server too."
+#~ msgstr ""
+#~ "{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+#~ "sincronitzada, també del servidor."
 
 #, fuzzy
 #~ msgid "From your mail accounts"

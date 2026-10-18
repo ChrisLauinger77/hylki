@@ -3959,15 +3959,22 @@ msgstr ""
 msgid "Delete Group?"
 msgstr "¿Eliminar tu clave?"
 
-msgid "Delete Contact?"
-msgstr "¿Eliminar contacto?"
-
+#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
+"This will remove the contact {name} from your address book locally and on "
+"the server."
 msgstr ""
 "Se eliminará a {name} de tu libreta de direcciones y, si está sincronizada, "
 "también del servidor."
+
+#, fuzzy
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+"Se eliminará a {name} de tu libreta de direcciones y, si está sincronizada, "
+"también del servidor."
+
+msgid "Delete Contact?"
+msgstr "¿Eliminar contacto?"
 
 msgid "All Address Books"
 msgstr "Todas las libretas de direcciones"
@@ -8098,6 +8105,13 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "{name} is removed from your address book, and for a synced book, from the "
+#~ "server too."
+#~ msgstr ""
+#~ "Se eliminará a {name} de tu libreta de direcciones y, si está "
+#~ "sincronizada, también del servidor."
 
 #~ msgid "Sort contacts"
 #~ msgstr "Ordenar contactos"

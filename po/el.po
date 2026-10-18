@@ -3990,15 +3990,22 @@ msgstr ""
 msgid "Delete Group?"
 msgstr "Διαγραφή του κλειδιού σας;"
 
-msgid "Delete Contact?"
-msgstr "Διαγραφή επαφής;"
-
+#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
+"This will remove the contact {name} from your address book locally and on "
+"the server."
 msgstr ""
 "Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
 "βιβλίο, και από τον διακομιστή."
+
+#, fuzzy
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+
+msgid "Delete Contact?"
+msgstr "Διαγραφή επαφής;"
 
 msgid "All Address Books"
 msgstr "Όλα τα βιβλία διευθύνσεων"
@@ -8167,6 +8174,13 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "{name} is removed from your address book, and for a synced book, from the "
+#~ "server too."
+#~ msgstr ""
+#~ "Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+#~ "βιβλίο, και από τον διακομιστή."
 
 #, fuzzy
 #~ msgid "From your mail accounts"

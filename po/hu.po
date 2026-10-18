@@ -4053,13 +4053,16 @@ msgstr ""
 msgid "Delete Group?"
 msgstr "Törli a kulcsát?"
 
+msgid ""
+"This will remove the contact {name} from your address book locally and on "
+"the server."
+msgstr ""
+
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+
 msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"
-
-msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
-msgstr ""
 
 #, fuzzy
 msgid "All Address Books"

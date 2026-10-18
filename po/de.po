@@ -3947,15 +3947,19 @@ msgstr ""
 msgid "Delete Group?"
 msgstr ""
 
-msgid "Delete Contact?"
-msgstr "Kontakt löschen?"
-
+#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too."
+"This will remove the contact {name} from your address book locally and on "
+"the server."
 msgstr ""
 "{name} wird aus dem Adressbuch und bei synchronisierten Adressbüchern auch "
 "vom Server entfernt."
+
+msgid "This will remove the contact {name} from your address book."
+msgstr ""
+
+msgid "Delete Contact?"
+msgstr "Kontakt löschen?"
 
 msgid "All Address Books"
 msgstr "Alle Adressbücher"
