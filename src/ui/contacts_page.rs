@@ -31,6 +31,61 @@ pub enum ContactsView {
     Groups,
 }
 
+/// The "Show only" filters of the sort and filter button, as the message
+/// list has for mail. They narrow the people; groups are not filtered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContactFilter {
+    Photo,
+    Email,
+    Phone,
+    Address,
+    Birthday,
+    Company,
+    NoGroup,
+}
+
+impl ContactFilter {
+    pub const ALL: [ContactFilter; 7] = [
+        ContactFilter::Photo,
+        ContactFilter::Email,
+        ContactFilter::Phone,
+        ContactFilter::Address,
+        ContactFilter::Birthday,
+        ContactFilter::Company,
+        ContactFilter::NoGroup,
+    ];
+
+    fn label(self) -> String {
+        match self {
+            ContactFilter::Photo => i18n("Has Photo"),
+            ContactFilter::Email => i18n("Has Email"),
+            ContactFilter::Phone => i18n("Has Phone"),
+            ContactFilter::Address => i18n("Has Address"),
+            ContactFilter::Birthday => i18n("Has Birthday"),
+            ContactFilter::Company => i18n("Has Company"),
+            ContactFilter::NoGroup => i18n("Not in a Group"),
+        }
+    }
+
+    fn bit(self) -> u8 {
+        1 << ContactFilter::ALL.iter().position(|f| *f == self).unwrap_or(0)
+    }
+
+    /// Whether `c` passes; `grouped` holds every group member's address,
+    /// lower case.
+    fn passes(self, c: &ContactDetails, grouped: &std::collections::HashSet<String>) -> bool {
+        match self {
+            ContactFilter::Photo => c.photo.is_some(),
+            ContactFilter::Email => !c.emails.is_empty(),
+            ContactFilter::Phone => !c.phones.is_empty(),
+            ContactFilter::Address => !c.addresses.is_empty(),
+            ContactFilter::Birthday => !c.birthday.is_empty(),
+            ContactFilter::Company => !c.org.is_empty(),
+            ContactFilter::NoGroup => !c.emails.iter().any(|e| grouped.contains(&e.value.to_lowercase())),
+        }
+    }
+}
+
 /// How the contact list is ordered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContactSort {
@@ -72,8 +127,23 @@ pub struct ContactsPage {
     contacts: Vec<ContactDetails>,
     query: String,
     sort: ContactSort,
-    /// People or groups: the switch above the search.
+    /// People or groups: the switch above the list.
     view: ContactsView,
+    /// The "Show only" filters on, by [`ContactFilter::bit`].
+    filters: u8,
+    /// The sort and filter button's popover, kept in step with `sort` and
+    /// `filters`.
+    filter_menu: Option<FilterMenu>,
+    /// The address book picker beside the search.
+    book_picker: Option<BookPicker>,
+    /// The search bar is shown: opened, or kept open by the setting the
+    /// message list's search has too.
+    search_open: bool,
+    search_pinned: bool,
+    /// When the bar last closed: the click on the search button that took
+    /// focus from an empty search, and closed the bar, must not open it
+    /// again (as in the message list).
+    search_closed_at: Option<std::time::Instant>,
     /// Index into `contacts` of the contact shown in the detail pane.
     selected: Option<usize>,
     /// List position → index into `contacts` (or a directory hit, see
@@ -143,8 +213,17 @@ pub enum ContactsPageInput {
     SetLoading,
     Query(String),
     SetSort(ContactSort),
-    /// The switch above the search moved to people or groups.
+    /// The switch above the list moved to people or groups.
     SetView(ContactsView),
+    /// A "Show only" filter turned on or off.
+    SetFilter(ContactFilter, bool),
+    ClearFilters,
+    /// The search button, Ctrl+F or `/`: open the search, or close it.
+    FocusSearch,
+    /// Esc in the search, or focus left it empty: close it and clear it.
+    CloseSearch,
+    /// The setting that keeps the search field open.
+    SetSearchPinned(bool),
     /// The list's selection moved to this position.
     RowSelected(u32),
     /// A right-click on the line for this entry, at (x, y) on the list.
@@ -343,13 +422,20 @@ impl Component for ContactsPage {
                                 let _ = sender.output(ContactsPageOutput::ToggleSidebar);
                             },
                         },
-                        // pack_end packs right-to-left: sort at the far right
-                        // (matching the message list), then the count, then
-                        // the GNOME Contacts launcher, then "+".
-                        #[name = "sort_btn"]
+                        // Beside it, as in the message list's header.
+                        pack_start = &gtk::Button {
+                            set_icon_name: "system-search-symbolic",
+                            set_tooltip_text: Some(i18n("Search contacts (Ctrl+F)").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked => ContactsPageInput::FocusSearch,
+                        },
+                        // pack_end packs right-to-left: sort and filter at the
+                        // far right (matching the message list), then the
+                        // count, then the GNOME Contacts launcher, then "+".
+                        #[name = "filter_btn"]
                         pack_end = &gtk::MenuButton {
-                            set_icon_name: "view-sort-descending-symbolic",
-                            set_tooltip_text: Some(i18n("Sort contacts").as_str()),
+                            set_icon_name: "filter-symbolic",
+                            set_tooltip_text: Some(i18n("Sort and filter contacts").as_str()),
                             set_valign: gtk::Align::Center,
                             add_css_class: "flat",
                         },
@@ -385,41 +471,59 @@ impl Component for ContactsPage {
                         set_orientation: gtk::Orientation::Vertical,
                         set_width_request: 280,
 
+                        // The search, shown by the header's search button,
+                        // with the address book it searches beside it: the
+                        // message list's search bar and its folder picker.
+                        gtk::Revealer {
+                            set_transition_type: gtk::RevealerTransitionType::SlideDown,
+                            #[watch]
+                            set_reveal_child: model.search_open || model.search_pinned,
+
+                            gtk::Box {
+                                set_spacing: 6,
+                                add_css_class: "list-search-row",
+
+                                #[name = "search"]
+                                gtk::SearchEntry {
+                                    set_hexpand: true,
+                                    set_width_chars: 3,
+                                    set_placeholder_text: Some(i18n("Search contacts").as_str()),
+                                    connect_search_changed[sender] => move |e| {
+                                        sender.input(ContactsPageInput::Query(e.text().to_string()));
+                                    },
+                                    connect_stop_search[sender] => move |_| {
+                                        sender.input(ContactsPageInput::CloseSearch);
+                                    },
+                                    // Leaving it empty closes it too.
+                                    add_controller = gtk::EventControllerFocus {
+                                        connect_leave[sender] => move |ctl| {
+                                            let Some(entry) = ctl.widget().and_downcast::<gtk::SearchEntry>() else { return };
+                                            let sender = sender.clone();
+                                            crate::ui::close_if_focus_left_row(&entry, move || {
+                                                sender.input(ContactsPageInput::CloseSearch);
+                                            });
+                                        },
+                                    },
+                                },
+
+                                // Hidden while there is only one book.
+                                #[name = "book_btn"]
+                                gtk::MenuButton {
+                                    set_valign: gtk::Align::Center,
+                                    set_visible: false,
+                                    set_tooltip_text: Some(i18n("Choose which address book to search").as_str()),
+                                },
+                            },
+                        },
+
                         // People and groups, each a list of its own. The
                         // toggles are added in `init`.
                         #[name = "view_switch"]
                         adw::ToggleGroup {
                             set_homogeneous: true,
-                            set_margin_top: 8,
+                            set_margin_bottom: 6,
                             set_margin_start: 10,
                             set_margin_end: 10,
-                        },
-
-                        #[name = "search"]
-                        gtk::SearchEntry {
-                            set_placeholder_text: Some(i18n("Search contacts").as_str()),
-                            set_margin_top: 8,
-                            set_margin_bottom: 8,
-                            set_margin_start: 10,
-                            set_margin_end: 10,
-                            connect_search_changed[sender] => move |e| {
-                                sender.input(ContactsPageInput::Query(e.text().to_string()));
-                            },
-                        },
-
-                        // Which address book the list shows: every one, the
-                        // Hylki book, or one of GNOME Contacts'. Hidden while
-                        // there is only one.
-                        #[name = "book_filter"]
-                        gtk::DropDown {
-                            set_margin_bottom: 8,
-                            set_margin_start: 10,
-                            set_margin_end: 10,
-                            set_visible: false,
-                            set_tooltip_text: Some(i18n("Address book").as_str()),
-                            connect_selected_notify[sender] => move |d| {
-                                sender.input(ContactsPageInput::FilterBook(d.selected()));
-                            },
                         },
 
                         gtk::ScrolledWindow {
@@ -494,11 +598,17 @@ impl Component for ContactsPage {
         root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = ContactsPage {
+        let mut model = ContactsPage {
             contacts: Vec::new(),
             query: String::new(),
             sort: ContactSort::FirstName,
             view: ContactsView::People,
+            filters: 0,
+            filter_menu: None,
+            book_picker: None,
+            search_open: false,
+            search_pinned: false,
+            search_closed_at: None,
             selected: None,
             row_map: Vec::new(),
             store: gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>(),
@@ -539,41 +649,8 @@ impl Component for ContactsPage {
             widgets.list.add_controller(keys);
         }
 
-        // The sort menu: a radio per order, mirroring the message list's
-        // sort button.
-        {
-            let pop = gtk::Popover::new();
-            let vbox = gtk::Box::new(gtk::Orientation::Vertical, 2);
-            vbox.set_margin_top(6);
-            vbox.set_margin_bottom(6);
-            vbox.set_margin_start(6);
-            vbox.set_margin_end(6);
-            let mut first: Option<gtk::CheckButton> = None;
-            for (label, sort) in [
-                (i18n_noop("First name"), ContactSort::FirstName),
-                (i18n_noop("Last name"), ContactSort::LastName),
-                (i18n_noop("Email"), ContactSort::Email),
-            ] {
-                let check = gtk::CheckButton::with_label(&i18n(label));
-                if let Some(f) = &first {
-                    check.set_group(Some(f));
-                } else {
-                    check.set_active(true);
-                    first = Some(check.clone());
-                }
-                let s = sender.input_sender().clone();
-                let p = pop.clone();
-                check.connect_toggled(move |c| {
-                    if c.is_active() {
-                        let _ = s.send(ContactsPageInput::SetSort(sort));
-                        p.popdown();
-                    }
-                });
-                vbox.append(&check);
-            }
-            pop.set_child(Some(&vbox));
-            widgets.sort_btn.set_popover(Some(&pop));
-        }
+        model.filter_menu = Some(FilterMenu::new(&widgets.filter_btn, sender.input_sender()));
+        model.book_picker = Some(BookPicker::new(&widgets.book_btn, sender.input_sender()));
 
         for (name, label) in [("people", i18n("Contacts")), ("groups", i18n("Groups"))] {
             widgets.view_switch.add(adw::Toggle::builder().name(name).label(label.as_str()).build());
@@ -674,6 +751,8 @@ impl Component for ContactsPage {
                 self.rebuild(widgets, &sender);
             }
 
+            ContactsPageInput::Query(q) if q.to_lowercase() == self.query => {}
+
             ContactsPageInput::Query(q) => {
                 self.query = q.to_lowercase();
                 self.directory_generation = self.directory_generation.wrapping_add(1);
@@ -700,7 +779,71 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::SetSearch(text) => {
+                self.search_open = true;
                 widgets.search.set_text(&text);
+            }
+
+            ContactsPageInput::FocusSearch => {
+                if self.search_pinned {
+                    widgets.search.grab_focus();
+                } else if self.search_open {
+                    sender.input(ContactsPageInput::CloseSearch);
+                } else if self.search_closed_at.is_none_or(|t| t.elapsed() > std::time::Duration::from_millis(300)) {
+                    self.search_open = true;
+                    // Once the revealer has mapped it.
+                    let entry = widgets.search.clone();
+                    gtk::glib::idle_add_local_once(move || {
+                        entry.grab_focus();
+                    });
+                }
+            }
+
+            ContactsPageInput::CloseSearch => {
+                let had_focus = widgets.search.has_focus() || widgets.search.focus_child().is_some();
+                if !self.search_pinned {
+                    self.search_open = false;
+                    self.search_closed_at = Some(std::time::Instant::now());
+                }
+                // A hidden search narrows nothing: its text and its book go.
+                let narrowed = !self.query.is_empty() || self.book_filter.is_some();
+                self.query.clear();
+                widgets.search.set_text("");
+                self.directory_generation = self.directory_generation.wrapping_add(1);
+                self.directory_hits.clear();
+                self.directory_failures.clear();
+                if !self.search_pinned {
+                    self.book_filter = None;
+                    if let Some(picker) = &self.book_picker {
+                        picker.pick(0);
+                    }
+                }
+                if narrowed {
+                    self.rebuild(widgets, &sender);
+                }
+                if had_focus {
+                    widgets.list.grab_focus();
+                }
+            }
+
+            ContactsPageInput::SetSearchPinned(on) => {
+                self.search_pinned = on;
+            }
+
+            ContactsPageInput::SetFilter(filter, on) => {
+                let filters = if on { self.filters | filter.bit() } else { self.filters & !filter.bit() };
+                if filters != self.filters {
+                    self.filters = filters;
+                    self.sync_filter_menu();
+                    self.rebuild(widgets, &sender);
+                }
+            }
+
+            ContactsPageInput::ClearFilters => {
+                if self.filters != 0 {
+                    self.filters = 0;
+                    self.sync_filter_menu();
+                    self.rebuild(widgets, &sender);
+                }
             }
 
             ContactsPageInput::SuggestionsLoaded(suggestions) => {
@@ -708,7 +851,10 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::PickBook(n) => {
-                widgets.book_filter.set_selected(n);
+                self.search_open = true;
+                if let Some(picker) = &self.book_picker {
+                    picker.pick(n as usize);
+                }
             }
 
             ContactsPageInput::DirectoriesKnown(directories) => {
@@ -785,6 +931,7 @@ impl Component for ContactsPage {
             ContactsPageInput::SetSort(sort) => {
                 if self.sort != sort {
                     self.sort = sort;
+                    self.sync_filter_menu();
                     self.rebuild(widgets, &sender);
                 }
             }
@@ -1099,6 +1246,31 @@ impl ContactsPage {
         matches_query(c, &self.query)
     }
 
+    /// Whether `c` passes the "Show only" filters on; groups always do.
+    fn passes_filters(&self, c: &ContactDetails, grouped: &std::collections::HashSet<String>) -> bool {
+        c.is_group()
+            || ContactFilter::ALL.iter().all(|f| self.filters & f.bit() == 0 || f.passes(c, grouped))
+    }
+
+    /// The addresses of every group's people, lower case, for "Not in a
+    /// Group"; empty unless that filter is on.
+    fn grouped_addresses(&self) -> std::collections::HashSet<String> {
+        if self.filters & ContactFilter::NoGroup.bit() == 0 {
+            return std::collections::HashSet::new();
+        }
+        self.contacts
+            .iter()
+            .filter(|c| c.is_group())
+            .flat_map(|c| c.members.iter().map(|m| m.email.to_lowercase()))
+            .collect()
+    }
+
+    fn sync_filter_menu(&self) {
+        if let Some(menu) = &self.filter_menu {
+            menu.sync(self.sort, self.filters);
+        }
+    }
+
     /// The entry at `idx`, a directory entry's index included.
     fn entry(&self, idx: usize) -> Option<&ContactDetails> {
         match idx.checked_sub(DIRECTORY) {
@@ -1116,7 +1288,7 @@ impl ContactsPage {
         self.directory_hits.retain(|c| !c.emails.iter().any(|e| known.contains(&e.value.to_lowercase())));
     }
 
-    /// Fill the book filter from the books known: the writable ones (the
+    /// Fill the book picker from the books known: the writable ones (the
     /// Hylki book always among them) and any others the contacts come from.
     /// The book picked stays picked while it is still there.
     fn refresh_book_filter(&mut self, widgets: &ContactsPageWidgets) {
@@ -1148,9 +1320,10 @@ impl ContactsPage {
         if at == 0 {
             self.book_filter = None;
         }
-        widgets.book_filter.set_model(Some(&gtk::StringList::new(&labels)));
-        widgets.book_filter.set_selected(at as u32);
-        widgets.book_filter.set_visible(self.filter_books.len() > 1);
+        if let Some(picker) = &self.book_picker {
+            picker.set_books(&labels, at);
+        }
+        widgets.book_btn.set_visible(self.filter_books.len() > 1);
     }
 
     /// Put the switch, the search's hint and the sort button in step with
@@ -1161,8 +1334,8 @@ impl ContactsPage {
         let groups = view == ContactsView::Groups;
         widgets.view_switch.set_active_name(Some(if groups { "groups" } else { "people" }));
         widgets.search.set_placeholder_text(Some(&if groups { i18n("Search groups") } else { i18n("Search contacts") }));
-        // Groups go by name; the other orders are a person's.
-        widgets.sort_btn.set_sensitive(!groups);
+        // Groups go by name, and the filters are a person's.
+        widgets.filter_btn.set_sensitive(!groups);
     }
 
     /// Ready the list for a new contact or group: the side it will be on,
@@ -1192,8 +1365,9 @@ impl ContactsPage {
         let empty = self.contacts.is_empty() && self.directories.is_empty();
         widgets.page_stack.set_visible_child_name(if empty { "none" } else { "browser" });
 
+        let grouped = self.grouped_addresses();
         let mut people: Vec<usize> = (0..self.contacts.len())
-            .filter(|&i| self.matches(&self.contacts[i]))
+            .filter(|&i| self.matches(&self.contacts[i]) && self.passes_filters(&self.contacts[i], &grouped))
             .collect();
         people.sort_by_key(|&i| {
             let c = &self.contacts[i];
@@ -1213,7 +1387,8 @@ impl ContactsPage {
         });
         let groups = self.view == ContactsView::Groups;
         let total = self.contacts.iter().filter(|c| c.is_group() == groups).count();
-        widgets.count_label.set_label(&if self.query.is_empty() {
+        let narrowed = !self.query.is_empty() || self.book_filter.is_some() || (!groups && self.filters != 0);
+        widgets.count_label.set_label(&if !narrowed {
             total.to_string()
         } else {
             i18n_f("{shown} of {total}", &[("shown", &people.len().to_string()), ("total", &total.to_string())])
@@ -1234,7 +1409,7 @@ impl ContactsPage {
         let mut listed = std::collections::HashSet::new();
         let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
-            if groups || !in_filter(&c.book_uid) {
+            if groups || !in_filter(&c.book_uid) || !self.passes_filters(c, &grouped) {
                 continue;
             }
             let emails: Vec<String> = c.emails.iter().map(|e| e.value.to_lowercase()).collect();
@@ -1863,6 +2038,188 @@ fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, 
 
 fn group_byline(c: &ContactDetails) -> String {
     crate::contacts::group_reach(c.members.len(), c.hide_addresses)
+}
+
+/// The sort and filter button's popover, laid out as the message list's
+/// (#441): the orders in one column, the "Show only" filters in the other.
+/// It stays open as rows are clicked, so an order and several filters can
+/// be set in one visit.
+struct FilterMenu {
+    button: gtk::MenuButton,
+    sorts: Vec<(ContactSort, gtk::CheckButton)>,
+    filters: Vec<(ContactFilter, gtk::CheckButton)>,
+    clear: gtk::Button,
+}
+
+impl FilterMenu {
+    fn new(button: &gtk::MenuButton, input: &relm4::Sender<ContactsPageInput>) -> Self {
+        let column = |title: &str| {
+            let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            col.add_css_class("sort-filter-column");
+            let caption = gtk::Label::new(Some(title));
+            caption.set_xalign(0.0);
+            caption.add_css_class("dim-label");
+            caption.add_css_class("caption-heading");
+            col.append(&caption);
+            col
+        };
+        let sort_col = column(&i18n("Sort by"));
+        let mut sorts: Vec<(ContactSort, gtk::CheckButton)> = Vec::new();
+        for (label, sort) in [
+            (i18n_noop("First name"), ContactSort::FirstName),
+            (i18n_noop("Last name"), ContactSort::LastName),
+            (i18n_noop("Email"), ContactSort::Email),
+        ] {
+            let radio = gtk::CheckButton::with_label(&i18n(label));
+            if let Some((_, first)) = sorts.first() {
+                radio.set_group(Some(first));
+            }
+            radio.set_active(sort == ContactSort::FirstName);
+            let s = input.clone();
+            radio.connect_toggled(move |r| {
+                if r.is_active() {
+                    let _ = s.send(ContactsPageInput::SetSort(sort));
+                }
+            });
+            sort_col.append(&radio);
+            sorts.push((sort, radio));
+        }
+        let filter_col = column(&i18n("Show only"));
+        let mut filters = Vec::new();
+        for f in ContactFilter::ALL {
+            let check = gtk::CheckButton::with_label(&f.label());
+            let s = input.clone();
+            check.connect_toggled(move |c| {
+                let _ = s.send(ContactsPageInput::SetFilter(f, c.is_active()));
+            });
+            filter_col.append(&check);
+            filters.push((f, check));
+        }
+        let clear = gtk::Button::with_label(&i18n("Clear Filters"));
+        clear.add_css_class("flat");
+        clear.set_halign(gtk::Align::Start);
+        clear.set_sensitive(false);
+        let s = input.clone();
+        clear.connect_clicked(move |_| {
+            let _ = s.send(ContactsPageInput::ClearFilters);
+        });
+        filter_col.append(&clear);
+
+        let columns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        columns.add_css_class("sort-filter-popover");
+        columns.append(&sort_col);
+        columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
+        columns.append(&filter_col);
+        let popover = gtk::Popover::new();
+        popover.set_child(Some(&columns));
+        button.set_popover(Some(&popover));
+        FilterMenu { button: button.clone(), sorts, filters, clear }
+    }
+
+    /// Show the order and the filters on the rows, and tint the button
+    /// while any filter is on, so a narrowed list never passes for a short
+    /// one.
+    fn sync(&self, sort: ContactSort, on: u8) {
+        for (s, radio) in &self.sorts {
+            if *s == sort && !radio.is_active() {
+                radio.set_active(true);
+            }
+        }
+        for (f, check) in &self.filters {
+            let active = on & f.bit() != 0;
+            if check.is_active() != active {
+                check.set_active(active);
+            }
+        }
+        self.clear.set_sensitive(on != 0);
+        if on == 0 {
+            self.button.remove_css_class("list-filter-active");
+            self.button.set_tooltip_text(Some(&i18n("Sort and filter contacts")));
+        } else {
+            self.button.add_css_class("list-filter-active");
+            let names: Vec<String> =
+                ContactFilter::ALL.iter().filter(|f| on & f.bit() != 0).map(|f| f.label()).collect();
+            self.button.set_tooltip_text(Some(&i18n_f("Filtered: {names}", &[("names", &names.join(", "))])));
+        }
+    }
+}
+
+/// The address book picker beside the search, made as the message list's
+/// folder picker: the book's name on the button, a radio per book in its
+/// popover. Entry 0 is every book.
+struct BookPicker {
+    label: gtk::Label,
+    list: gtk::Box,
+    radios: RefCell<Vec<gtk::CheckButton>>,
+    popover: gtk::Popover,
+    input: relm4::Sender<ContactsPageInput>,
+    /// Set while the radios are made or moved here, not by a click.
+    quiet: Rc<Cell<bool>>,
+}
+
+impl BookPicker {
+    fn new(button: &gtk::MenuButton, input: &relm4::Sender<ContactsPageInput>) -> Self {
+        let face = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let label = gtk::Label::new(Some(&i18n("All Address Books")));
+        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        label.set_max_width_chars(14);
+        face.append(&label);
+        face.append(&gtk::Image::from_icon_name("pan-down-symbolic"));
+        button.set_child(Some(&face));
+        let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        list.add_css_class("search-scope-popover");
+        let popover = gtk::Popover::new();
+        popover.set_child(Some(&list));
+        button.set_popover(Some(&popover));
+        BookPicker {
+            label,
+            list,
+            radios: RefCell::new(Vec::new()),
+            popover,
+            input: input.clone(),
+            quiet: Rc::new(Cell::new(false)),
+        }
+    }
+
+    /// Offer `labels` (every book first), `at` picked.
+    fn set_books(&self, labels: &[&str], at: usize) {
+        self.quiet.set(true);
+        while let Some(child) = self.list.first_child() {
+            self.list.remove(&child);
+        }
+        let mut radios: Vec<gtk::CheckButton> = Vec::new();
+        for (i, name) in labels.iter().enumerate() {
+            let radio = gtk::CheckButton::with_label(name);
+            if let Some(first) = radios.first() {
+                radio.set_group(Some(first));
+            }
+            radio.set_active(i == at);
+            let (s, popover, quiet) = (self.input.clone(), self.popover.clone(), self.quiet.clone());
+            radio.connect_toggled(move |r| {
+                if r.is_active() && !quiet.get() {
+                    let _ = s.send(ContactsPageInput::FilterBook(i as u32));
+                    popover.popdown();
+                }
+            });
+            self.list.append(&radio);
+            radios.push(radio);
+        }
+        self.label.set_label(labels.get(at).copied().unwrap_or_default());
+        self.radios.replace(radios);
+        self.quiet.set(false);
+    }
+
+    /// Pick entry `at`, as if clicked.
+    fn pick(&self, at: usize) {
+        let radios = self.radios.borrow();
+        if let Some(radio) = radios.get(at) {
+            if radio.is_active() {
+                return;
+            }
+            radio.set_active(true);
+            self.label.set_label(&radio.label().unwrap_or_default());
+        }
+    }
 }
 
 /// The header's "+": a contact or a group.

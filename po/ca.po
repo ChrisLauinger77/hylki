@@ -3848,6 +3848,32 @@ msgstr "No hi ha contactes"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Afegeix contactes als contactes del GNOME per veure'ls aquí."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "Correu electrònic"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Telèfon"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Adreça"
+
+#, fuzzy
+msgid "Has Birthday"
+msgstr "Aniversari"
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Grup esquerre"
+
 msgid "Open GNOME Contacts"
 msgstr "Obre els contactes del GNOME"
 
@@ -3870,17 +3896,20 @@ msgstr ""
 "conserven a la llibreta d'adreces pròpia de l'Hylki, i les llibretes "
 "d'adreces dels contactes del GNOME també es llisten aquí."
 
-msgid "Sort contacts"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Cerca contactes"
+
+#, fuzzy
+msgid "Sort and filter contacts"
 msgstr "Ordena els contactes"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Tria quines carpetes cercar"
 
 msgid "Edit contact"
 msgstr "Edita el contacte"
-
-msgid "First name"
-msgstr "Nom"
-
-msgid "Last name"
-msgstr "Cognom"
 
 #, fuzzy
 msgid "Groups"
@@ -4019,6 +4048,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Nom"
+
+msgid "Last name"
+msgstr "Cognom"
 
 msgid "Import Contacts"
 msgstr "Importa contactes"

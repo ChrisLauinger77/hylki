@@ -3908,6 +3908,32 @@ msgstr "Δεν υπάρχουν επαφές"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Προσθέστε επαφές στις Επαφές GNOME για να τις βλέπετε εδώ."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "Email"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Τηλέφωνο"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Διεύθυνση"
+
+#, fuzzy
+msgid "Has Birthday"
+msgstr "Γενέθλια"
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Αριστερή ομάδα"
+
 msgid "Open GNOME Contacts"
 msgstr "Άνοιγμα Επαφών GNOME"
 
@@ -3930,17 +3956,20 @@ msgstr ""
 "διατηρούνται στο δικό του βιβλίο διευθύνσεων του Hylki, ενώ εδώ εμφανίζονται "
 "και τα βιβλία διευθύνσεων των Επαφών GNOME."
 
-msgid "Sort contacts"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Αναζήτηση επαφών"
+
+#, fuzzy
+msgid "Sort and filter contacts"
 msgstr "Ταξινόμηση επαφών"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Επιλέξτε τους φακέλους αναζήτησης"
 
 msgid "Edit contact"
 msgstr "Επεξεργασία επαφής"
-
-msgid "First name"
-msgstr "Όνομα"
-
-msgid "Last name"
-msgstr "Επώνυμο"
 
 #, fuzzy
 msgid "Groups"
@@ -4079,6 +4108,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Όνομα"
+
+msgid "Last name"
+msgstr "Επώνυμο"
 
 msgid "Import Contacts"
 msgstr "Εισαγωγή επαφών"

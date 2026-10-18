@@ -3872,6 +3872,31 @@ msgstr ""
 "Kontakte müssen in GNOME Kontakte hinzugefügt werden, damit sie hier "
 "sichtbar sind."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "E-Mail"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Telefon"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Adresse"
+
+#, fuzzy
+msgid "Has Birthday"
+msgstr "Geburtstag"
+
+msgid "Has Company"
+msgstr ""
+
+msgid "Not in a Group"
+msgstr ""
+
 msgid "Open GNOME Contacts"
 msgstr "GNOME Kontakte öffnen"
 
@@ -3893,17 +3918,20 @@ msgstr ""
 "importieren. Kontakte werden im eigenen Adressbuch von Hylki gespeichert; "
 "zudem werden die Adressbücher von GNOME Kontakte hier aufgelistet."
 
-msgid "Sort contacts"
-msgstr "Kontakte sortieren"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Kontakte durchsuchen"
+
+#, fuzzy
+msgid "Sort and filter contacts"
+msgstr "Nachrichten sortieren und filtern"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Ordner zum Durchsuchen auswählen"
 
 msgid "Edit contact"
 msgstr "Kontakt bearbeiten"
-
-msgid "First name"
-msgstr "Vorname"
-
-msgid "Last name"
-msgstr "Nachname"
 
 msgid "Groups"
 msgstr ""
@@ -4034,6 +4062,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Vorname"
+
+msgid "Last name"
+msgstr "Nachname"
 
 msgid "Import Contacts"
 msgstr "Kontakte importieren"
@@ -7986,6 +8020,9 @@ msgstr "Der gemeinsame Posteingang im hellen Modus."
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort contacts"
+#~ msgstr "Kontakte sortieren"
 
 #~ msgid ""
 #~ "The directory cannot be searched without signing in. Add a sign-in in "

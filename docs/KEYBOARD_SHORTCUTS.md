@@ -166,8 +166,9 @@ In the attachment drawer, <kbd>Space</kbd> or <kbd>Enter</kbd> previews the
 highlighted attachment. In the attachments gallery's preview, <kbd>←</kbd> and
 <kbd>→</kbd> step to the previous and next one, and <kbd>Esc</kbd> closes it.
 
-In the Contacts view, <kbd>Delete</kbd> asks to delete the contact shown,
-while the contact list has the focus. In a group's form, <kbd>↓</kbd> and
+In the Contacts view, <kbd>Ctrl+F</kbd> and <kbd>/</kbd> open its search
+and <kbd>Esc</kbd> closes it, as in the message list. <kbd>Delete</kbd> asks
+to delete the contact shown, while the contact list has the focus. In a group's form, <kbd>↓</kbd> and
 <kbd>↑</kbd> move through the people matching what is typed in the field
 that adds them, <kbd>Enter</kbd> adds the one highlighted, and <kbd>Esc</kbd>
 puts the matches away.

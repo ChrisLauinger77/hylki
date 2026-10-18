@@ -4018,6 +4018,31 @@ msgstr "Brak kontaktów"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Dodaj kontakty w aplikacji Kontakty, aby były tutaj wyświetlane."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "Adres e-mail"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Telefon"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Adres"
+
+msgid "Has Birthday"
+msgstr ""
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Lewa grupa"
+
 msgid "Open GNOME Contacts"
 msgstr "Otwórz aplikację Kontakty"
 
@@ -4037,17 +4062,20 @@ msgid ""
 "here too."
 msgstr ""
 
-msgid "Sort contacts"
-msgstr "Sortuj kontakty"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Wyszukaj kontakty"
+
+#, fuzzy
+msgid "Sort and filter contacts"
+msgstr "wiadomości: {n}"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Wybierz katalogi do przeszukania"
 
 msgid "Edit contact"
 msgstr "Modyfikuj kontakt"
-
-msgid "First name"
-msgstr "Imię"
-
-msgid "Last name"
-msgstr "Nazwisko"
 
 #, fuzzy
 msgid "Groups"
@@ -4185,6 +4213,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Imię"
+
+msgid "Last name"
+msgstr "Nazwisko"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -8207,6 +8241,9 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort contacts"
+#~ msgstr "Sortuj kontakty"
 
 #, fuzzy
 #~ msgid "From your mail accounts"

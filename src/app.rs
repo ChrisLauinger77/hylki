@@ -3890,6 +3890,7 @@ impl SimpleComponent for AppModel {
         model.message_list.emit(MessageListInput::SetHeadings(model.list_headings));
         model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
         model.message_list.emit(MessageListInput::SetSearchPinned(model.list_search_open));
+        model.contacts_page.emit(ContactsPageInput::SetSearchPinned(model.list_search_open));
         model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
         model.sidebars_emit(SidebarInput::SetFocus {
             hide_accounts: model.focus.active(config::FocusPart::HideAccounts),
@@ -5678,12 +5679,13 @@ impl SimpleComponent for AppModel {
                         }
                     });
                 }
-                // HYLKI_SHOWCASE_CONTACTS=list|new|group|search:<text>[@<n>]
+                // HYLKI_SHOWCASE_CONTACTS=list|new|group|search:<text>[@<n>]|filter:<n>
                 // opens Contacts at 3s, and with "new" its editor for a new
                 // contact at 5s ("group": for a new group), or with "search:"
                 // types the text into its search
                 // then, so the directories are asked too (#307), and with
-                // "@<n>" picks entry n of the book filter at 6s.
+                // "@<n>" picks entry n of the book filter at 6s; "filter:"
+                // turns on its nth "Show only" filter at 5s.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
@@ -5695,6 +5697,14 @@ impl SimpleComponent for AppModel {
                             } else {
                                 ContactsPageInput::NewContact
                             });
+                        });
+                    } else if let Some(filter) =
+                        which.strip_prefix("filter:").and_then(|n| n.parse::<usize>().ok()).and_then(|n| {
+                            crate::ui::contacts_page::ContactFilter::ALL.get(n).copied()
+                        })
+                    {
+                        gtk::glib::timeout_add_seconds_local_once(5, move || {
+                            let _ = page.send(ContactsPageInput::SetFilter(filter, true));
                         });
                     } else if let Some(spec) = which.strip_prefix("search:") {
                         let (text, book) = match spec.rsplit_once('@') {
@@ -8536,6 +8546,7 @@ impl SimpleComponent for AppModel {
             AppMsg::Pref(PrefOutput::SetListSearchOpen(on)) => {
                 if pref!(self.list_search_open = on) {
                     self.message_list.emit(MessageListInput::SetSearchPinned(on));
+                    self.contacts_page.emit(ContactsPageInput::SetSearchPinned(on));
                 }
             }
             AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
@@ -10651,8 +10662,11 @@ impl SimpleComponent for AppModel {
 
             AppMsg::OpenListSearch => {
                 // Ctrl+F routes by focus (#102/#103): in the reader it finds
-                // within the message, everywhere else it searches the list.
-                if self.reader_has_focus() && self.current.is_some() {
+                // within the message, everywhere else it searches the list
+                // shown, Contacts' included.
+                if self.showing_contacts {
+                    self.contacts_page.emit(ContactsPageInput::FocusSearch);
+                } else if self.reader_has_focus() && self.current.is_some() {
                     self.message_view.emit(MessageViewInput::OpenFind);
                 } else {
                     self.message_list.emit(MessageListInput::FocusSearch);
@@ -12932,6 +12946,7 @@ impl AppModel {
                     self.message_list.emit(MessageListInput::FocusList);
                 }
             }
+            Shortcut::Search if self.showing_contacts => self.contacts_page.emit(ContactsPageInput::FocusSearch),
             Shortcut::Search => self.message_list.emit(MessageListInput::FocusSearch),
             // The open message's own view, not the reader's first page,
             // which is the "No message selected" one and takes no focus.

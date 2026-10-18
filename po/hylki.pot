@@ -3510,6 +3510,27 @@ msgstr ""
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr ""
 
+msgid "Has Photo"
+msgstr ""
+
+msgid "Has Email"
+msgstr ""
+
+msgid "Has Phone"
+msgstr ""
+
+msgid "Has Address"
+msgstr ""
+
+msgid "Has Birthday"
+msgstr ""
+
+msgid "Has Company"
+msgstr ""
+
+msgid "Not in a Group"
+msgstr ""
+
 msgid "Open GNOME Contacts"
 msgstr ""
 
@@ -3528,16 +3549,16 @@ msgid ""
 "here too."
 msgstr ""
 
-msgid "Sort contacts"
+msgid "Search contacts (Ctrl+F)"
+msgstr ""
+
+msgid "Sort and filter contacts"
+msgstr ""
+
+msgid "Choose which address book to search"
 msgstr ""
 
 msgid "Edit contact"
-msgstr ""
-
-msgid "First name"
-msgstr ""
-
-msgid "Last name"
 msgstr ""
 
 msgid "Groups"
@@ -3664,6 +3685,12 @@ msgid "Changed in the app it came from"
 msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
+msgstr ""
+
+msgid "First name"
+msgstr ""
+
+msgid "Last name"
 msgstr ""
 
 msgid "Import Contacts"

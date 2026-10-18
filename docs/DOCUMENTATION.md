@@ -507,9 +507,20 @@ holds. It is there whether EDS is installed or not. Its contacts are
 created, edited and deleted like any other, and their addresses and photos
 are used for suggestions and avatars.
 
-In the Contacts view, the menu above the list shows **All Address Books** or
-one of them, the Hylki book included. The menu is hidden while there is only
-one book. A new contact, made with the **+** button, has an **Address
+The Contacts view searches as the message list does. The search button in
+the list's header, <kbd>Ctrl+F</kbd> or <kbd>/</kbd> shows the search field,
+and <kbd>Esc</kbd>, or leaving the field empty, hides it and clears the
+search. Beside the field, a menu picks the address book searched: **All
+Address Books** or one of them, the Hylki book and the LDAP directories
+included. It is hidden while there is only one book, and hiding the search
+goes back to every book. The button at the right of the header sorts the
+people by first name, last name or email, and its **Show only** column
+keeps those with a photo, an email address, a phone number, a street
+address, a birthday or a company, or those in no group; the button turns
+the accent color while a filter is on. **Settings → Message List → Keep the
+search field open** keeps the Contacts search open too.
+
+A new contact, made with the **+** button, has an **Address
 book** row at the top of its form that picks where it is saved; it starts on
 the book the list shows, or on the default book when the list shows them
 all. A contact being edited stays in its book, which the form names.

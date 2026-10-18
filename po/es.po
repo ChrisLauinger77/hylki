@@ -3877,6 +3877,32 @@ msgstr "No hay contactos"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Añade contactos en Contactos de GNOME para verlos aquí."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "Correo electrónico"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Teléfono"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Dirección"
+
+#, fuzzy
+msgid "Has Birthday"
+msgstr "Cumpleaños"
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Grupo izquierdo"
+
 msgid "Open GNOME Contacts"
 msgstr "Abrir Contactos de GNOME"
 
@@ -3899,17 +3925,20 @@ msgstr ""
 "guardan en la libreta de direcciones de Hylki; también se muestran aquí las "
 "libretas de GNOME Contactos."
 
-msgid "Sort contacts"
-msgstr "Ordenar contactos"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Buscar contactos"
+
+#, fuzzy
+msgid "Sort and filter contacts"
+msgstr "Ordenar y filtrar mensajes"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Elegir las carpetas en las que buscar"
 
 msgid "Edit contact"
 msgstr "Editar contacto"
-
-msgid "First name"
-msgstr "Nombre"
-
-msgid "Last name"
-msgstr "Apellidos"
 
 #, fuzzy
 msgid "Groups"
@@ -4048,6 +4077,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Nombre"
+
+msgid "Last name"
+msgstr "Apellidos"
 
 msgid "Import Contacts"
 msgstr "Importar contactos"
@@ -8044,6 +8079,9 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort contacts"
+#~ msgstr "Ordenar contactos"
 
 #, fuzzy
 #~ msgid "From your mail accounts"

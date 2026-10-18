@@ -3965,6 +3965,31 @@ msgstr "Нет контактов"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Добавьте контакты в «Контактах GNOME», чтобы увидеть их здесь."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "Email"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Телефон"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Адрес"
+
+msgid "Has Birthday"
+msgstr ""
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Левая группа"
+
 msgid "Open GNOME Contacts"
 msgstr "Открыть «Контакты GNOME»"
 
@@ -3984,17 +4009,20 @@ msgid ""
 "here too."
 msgstr ""
 
-msgid "Sort contacts"
-msgstr "Сортировка контактов"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Поиск контактов"
+
+#, fuzzy
+msgid "Sort and filter contacts"
+msgstr "{n} сообщений"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Выберите папки для поиска"
 
 msgid "Edit contact"
 msgstr "Редактировать контакт"
-
-msgid "First name"
-msgstr "Имя"
-
-msgid "Last name"
-msgstr "Фамилия"
 
 #, fuzzy
 msgid "Groups"
@@ -4133,6 +4161,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Имя"
+
+msgid "Last name"
+msgstr "Фамилия"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -8132,6 +8166,9 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort contacts"
+#~ msgstr "Сортировка контактов"
 
 #, fuzzy
 #~ msgid "From your mail accounts"

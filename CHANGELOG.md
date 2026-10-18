@@ -41,6 +41,13 @@
   of skipping them. The Contacts view lists groups apart from people, with
   a **Contacts** | **Groups** switch above the search.
 
+- **Changed: the Contacts search works as the message list's.** The search
+  button in the list's header, Ctrl+F or / show the search field, with the
+  address book it searches picked beside it, and Esc hides it and clears
+  it. The sort button became a sort and filter button, whose **Show only**
+  column keeps the people with a photo, an email address, a phone number, a
+  street address, a birthday or a company, or those in no group.
+
 - **Fixed: an Evolution contact list offered as a broken recipient.** The
   composer suggested each member of a list under the list's name with the
   member's whole line as the address ("Book Club", `alice able

@@ -3978,6 +3978,31 @@ msgstr "Nincsenek névjegyek"
 msgid "Add contacts in GNOME Contacts to see them here."
 msgstr "Adjon hozzá névjegyeket a GNOME Névjegyekben a megtekintésükhöz."
 
+msgid "Has Photo"
+msgstr ""
+
+#, fuzzy
+msgid "Has Email"
+msgstr "E-mail"
+
+#, fuzzy
+msgid "Has Phone"
+msgstr "Telefon"
+
+#, fuzzy
+msgid "Has Address"
+msgstr "Cím"
+
+msgid "Has Birthday"
+msgstr ""
+
+msgid "Has Company"
+msgstr ""
+
+#, fuzzy
+msgid "Not in a Group"
+msgstr "Bal oldali csoport"
+
 msgid "Open GNOME Contacts"
 msgstr "GNOME Névjegyek megnyitása"
 
@@ -3997,17 +4022,20 @@ msgid ""
 "here too."
 msgstr ""
 
-msgid "Sort contacts"
-msgstr "Névjegyek rendezése"
+#, fuzzy
+msgid "Search contacts (Ctrl+F)"
+msgstr "Névjegyek keresése"
+
+#, fuzzy
+msgid "Sort and filter contacts"
+msgstr "{n} db üzenet"
+
+#, fuzzy
+msgid "Choose which address book to search"
+msgstr "Válassza ki a keresendő mappákat"
 
 msgid "Edit contact"
 msgstr "Névjegy szerkesztése"
-
-msgid "First name"
-msgstr "Keresztnév"
-
-msgid "Last name"
-msgstr "Vezetéknév"
 
 #, fuzzy
 msgid "Groups"
@@ -4145,6 +4173,12 @@ msgstr ""
 
 msgid "This group names its members by contact, which Hylki does not edit."
 msgstr ""
+
+msgid "First name"
+msgstr "Keresztnév"
+
+msgid "Last name"
+msgstr "Vezetéknév"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -8183,6 +8217,9 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Sort contacts"
+#~ msgstr "Névjegyek rendezése"
 
 #, fuzzy
 #~ msgid "From your mail accounts"
