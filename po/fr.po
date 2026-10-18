@@ -1451,6 +1451,9 @@ msgstr[1] "{n} destinataires"
 msgid "CardDAV Address Book"
 msgstr "Carnet d'adresses CardDAV"
 
+msgid "Hylki cannot change this kind of group"
+msgstr ""
+
 msgid "{date} at {time}"
 msgstr "{date} à {time}"
 
@@ -3944,12 +3947,12 @@ msgstr ""
 msgid "Not in a Group"
 msgstr "Groupe de gauche"
 
+msgid "Import vCard files into the Hylki address book"
+msgstr "Importer des fichiers vCard dans le carnet d'adresses Hylki"
+
 #, fuzzy
 msgid "New contact or group"
 msgstr "Nouveau contact"
-
-msgid "Import vCard files into the Hylki address book"
-msgstr "Importer des fichiers vCard dans le carnet d'adresses Hylki"
 
 msgid "Loading Contacts…"
 msgstr "Chargement des contacts…"
@@ -4076,6 +4079,12 @@ msgid "Send as Bcc"
 msgstr "Tout envoyer"
 
 msgid "Members do not see each other's addresses."
+msgstr ""
+
+#. An Apple group (iCloud's) holds cards of its own book.
+msgid ""
+"Groups in this address book hold its own contacts: anyone added who is not "
+"in it yet is added to it."
 msgstr ""
 
 msgid "Edit Contact"

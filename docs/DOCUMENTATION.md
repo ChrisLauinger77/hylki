@@ -567,7 +567,9 @@ above the search, switch between the two. Groups are listed by name, and the
 search and the address book menu work on whichever is shown.
 
 **New Group**, under the **+** button in the Contacts view, makes a group in
-the Hylki book. Add people by typing part of a name or address and picking
+the address book picked at the top of the form: the Hylki book, a book on
+this computer, or a CardDAV book such as iCloud's. Google and Microsoft 365
+keep no groups, so their books are not offered. Add people by typing part of a name or address and picking
 from the matches under the field, or by typing or pasting addresses and
 pressing <kbd>Return</kbd>. The matches are the composer's suggestions: your
 contacts, and the addresses in the mail you have sent and received, marked
@@ -581,13 +583,18 @@ Bcc switch.
 The lists made in Evolution, kept in the books of Evolution Data Server, are
 shown and offered too, and Evolution's **Hide addresses when sending mail to
 this list** is the same as **Send as Bcc**. They can be changed in Hylki as
-well. The groups of a CardDAV book written by other apps (vCard 4 `KIND:group`,
-and the groups of Apple Contacts and iCloud) are shown and offered with the
-people they name in the same book, but are changed in the app they came
-from.
+well.
 
-A group is saved as an Evolution list, so **Export as a vCard file** carries
-it to Evolution, and back. Groups are not counted as contacts in **Settings →
+A group in the Hylki book or on this computer is saved as an Evolution list,
+so **Export as a vCard file** carries it to Evolution, and back. A group in
+a CardDAV book is saved as Apple Contacts and iCloud save theirs, which
+the Apple apps, Fastmail and DAVx⁵ read as groups too. Such a group holds
+contacts of its own book, so someone added to it who is not in that book is
+added to the book as a contact with their name and address. The groups
+made by Apple Contacts and iCloud can be changed in Hylki the same way.
+Send as Bcc is kept in the group, where other apps pass it over. A vCard 4
+group (`KIND:group`) is shown and offered with the people it names in the
+same book, but is changed in the app it came from. Groups are not counted as contacts in **Settings →
 Contacts**, and the people in a group do not count as contacts for the
 filters below.
 

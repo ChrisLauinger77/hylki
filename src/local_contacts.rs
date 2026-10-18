@@ -797,6 +797,7 @@ mod tests {
             name: "Team".into(),
             members: vec![crate::contacts::Member { name: "Ann".into(), email: "a@x.org".into(), ..Default::default() }],
             hide_addresses: false,
+            kept: Vec::new(),
         };
         store.upsert_one(&crate::contacts::new_group_vcard(&edit)).unwrap();
         let stored = store.group_vcards().unwrap();

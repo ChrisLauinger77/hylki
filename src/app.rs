@@ -2207,6 +2207,13 @@ pub enum AppMsg {
     /// A new contact, into the book picked in the editor (`None`: the
     /// default one).
     CreateContact { book_uid: Option<String>, vcard: String },
+    /// A group, new (`original` is `None`) or changed.
+    SaveGroup {
+        book_uid: String,
+        format: crate::contacts::GroupFormat,
+        original: Option<String>,
+        edit: crate::contacts::GroupEdit,
+    },
     DeleteContact { book_uid: String, uid: String },
     /// A contact write finished (`Some` = the error to show).
     ContactWriteDone(Option<String>),
@@ -3233,6 +3240,9 @@ impl SimpleComponent for AppModel {
                     }
                     ContactsPageOutput::CreateContact { book_uid, vcard } => {
                         AppMsg::CreateContact { book_uid, vcard }
+                    }
+                    ContactsPageOutput::SaveGroup { book_uid, format, original, edit } => {
+                        AppMsg::SaveGroup { book_uid, format, original, edit }
                     }
                     ContactsPageOutput::DeleteContact { book_uid, uid } => {
                         AppMsg::DeleteContact { book_uid, uid }
@@ -12422,6 +12432,14 @@ impl SimpleComponent for AppModel {
                         Some(uid) => crate::contacts::create_contact(&uid, &vcard),
                         None => Err(i18n("No address book available")),
                     };
+                    s.input(AppMsg::ContactWriteDone(result.err()));
+                });
+            }
+
+            AppMsg::SaveGroup { book_uid, format, original, edit } => {
+                let s = sender.clone();
+                std::thread::spawn(move || {
+                    let result = crate::contacts::save_group(&book_uid, format, original.as_deref(), edit);
                     s.input(AppMsg::ContactWriteDone(result.err()));
                 });
             }

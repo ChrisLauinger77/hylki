@@ -29,17 +29,22 @@
 - **Added: contact groups.** A group is a name for several people that the
   composer suggests like a contact; picking it adds a pill for each of them,
   less those the field already has. **New Group**, under the **+** button in
-  the Contacts view, makes one in the Hylki book; people are added from
-  the composer's suggestions (Contacts and the addresses of mail sent and
-  received) or by address, and a contact's menu has **Add to Group**. A
-  group's card lists its people and has **New Message**. **Send as Bcc**
-  puts the people in Bcc whichever field the group is picked in. Groups are
+  the Contacts view, makes one in the address book picked in its form;
+  people are added from the composer's suggestions (Contacts and the
+  addresses of mail sent and received) or by address, and a contact's menu
+  has **Add to Group**. A group's card lists its people and has **New
+  Message**. **Send as Bcc** puts the people in Bcc whichever field the
+  group is picked in. Groups in the Hylki book and on this computer are
   saved as Evolution lists. Evolution's lists in the Evolution Data Server
   books are shown, offered and editable too, their "Hide addresses" option
-  being Send as Bcc; vCard 4 and Apple (iCloud) groups are shown and
-  offered but not edited. A `.vcf` import keeps its lists as groups instead
-  of skipping them. The Contacts view lists groups apart from people, with
-  a **Contacts** | **Groups** switch above the search.
+  being Send as Bcc. In a CardDAV book, iCloud's among them, a group is made
+  and changed in Apple's format, which names contacts of the same book;
+  someone added who is not in the book is added to it first. New Group asks
+  which book; Google and Microsoft 365 books keep no groups and are not
+  offered. vCard 4 groups are shown and offered but not edited. A `.vcf`
+  import keeps its lists as groups instead of skipping them. The Contacts
+  view lists groups apart from people, with a **Contacts** | **Groups**
+  switch above the search.
 
 - **Changed: the Contacts search works as the message list's.** The search
   button in the list's header, Ctrl+F or / show the search field, with the

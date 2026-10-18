@@ -12,7 +12,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::contacts::{ContactDetails, ContactEdit, GroupEdit, Labeled, Member};
+use crate::contacts::{ContactDetails, ContactEdit, GroupEdit, GroupFormat, Labeled, Member};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::i18n::{i18n, i18n_f, i18n_noop};
 
@@ -115,6 +115,10 @@ struct GroupForm {
     hide: adw::SwitchRow,
     /// The members as the form has them, in order.
     members: Rc<RefCell<Vec<Member>>>,
+    /// A new group's address book, picked from `books`, those that keep
+    /// groups.
+    book: Option<adw::ComboRow>,
+    books: Vec<crate::contacts::Book>,
 }
 
 /// The form open in the detail pane.
@@ -290,6 +294,9 @@ pub enum ContactsPageOutput {
     /// Create a brand-new contact in the book picked in the editor
     /// (`None`: the default book).
     CreateContact { book_uid: Option<String>, vcard: String },
+    /// Write a group: a change to `original`, its stored card, or a new
+    /// one when there is none.
+    SaveGroup { book_uid: String, format: GroupFormat, original: Option<String>, edit: GroupEdit },
     /// Delete, already confirmed by the user.
     DeleteContact { book_uid: String, uid: String },
     /// `.vcf` files chosen for import into the local Hylki book.
@@ -998,11 +1005,22 @@ impl Component for ContactsPage {
                     return;
                 }
                 let mut members = g.members.clone();
-                members.push(Member { name: p.name.clone(), email: email.to_string(), ..Member::default() });
-                let edit = GroupEdit { name: g.name.clone(), members, hide_addresses: g.hide_addresses };
-                let _ = sender.output(ContactsPageOutput::SaveContact {
+                // In an Apple group the person is named by their card,
+                // when it is in the group's book.
+                let uid = if p.book_uid == g.book_uid { p.eds_uid.clone() } else { String::new() };
+                members.push(Member { name: p.name.clone(), email: email.to_string(), uid, ..Member::default() });
+                let edit = GroupEdit {
+                    name: g.name.clone(),
+                    members,
+                    hide_addresses: g.hide_addresses,
+                    kept: g.hidden_members.clone(),
+                };
+                let Some(format) = g.group else { return };
+                let _ = sender.output(ContactsPageOutput::SaveGroup {
                     book_uid: g.book_uid.clone(),
-                    vcard: crate::contacts::patched_group_vcard(&g.raw_vcard, &edit),
+                    format,
+                    original: Some(g.raw_vcard.clone()),
+                    edit,
                 });
             }
 
@@ -1030,10 +1048,11 @@ impl Component for ContactsPage {
                 let editor = match &self.editor {
                     Some(Editor::Contact(form)) => form,
                     Some(Editor::Group(form)) => {
-                        let edit = GroupEdit {
+                        let mut edit = GroupEdit {
                             name: form.name.text().trim().to_string(),
                             members: form.members.borrow().clone(),
                             hide_addresses: form.hide.is_active(),
+                            ..GroupEdit::default()
                         };
                         // A group is known by its name alone.
                         if edit.name.is_empty() {
@@ -1042,14 +1061,29 @@ impl Component for ContactsPage {
                             return;
                         }
                         let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
-                            Some(g) => ContactsPageOutput::SaveContact {
-                                book_uid: g.book_uid.clone(),
-                                vcard: crate::contacts::patched_group_vcard(&g.raw_vcard, &edit),
-                            },
-                            None => ContactsPageOutput::CreateContact {
-                                book_uid: Some(crate::local_contacts::LOCAL_BOOK_UID.to_string()),
-                                vcard: crate::contacts::new_group_vcard(&edit),
-                            },
+                            Some(g) => {
+                                edit.kept = g.hidden_members.clone();
+                                ContactsPageOutput::SaveGroup {
+                                    book_uid: g.book_uid.clone(),
+                                    format: g.group.unwrap_or(GroupFormat::Evolution),
+                                    original: Some(g.raw_vcard.clone()),
+                                    edit,
+                                }
+                            }
+                            None => {
+                                let book = form
+                                    .book
+                                    .as_ref()
+                                    .and_then(|row| form.books.get(row.selected() as usize))
+                                    .cloned()
+                                    .unwrap_or_else(crate::contacts::local_book);
+                                ContactsPageOutput::SaveGroup {
+                                    book_uid: book.uid,
+                                    format: book.groups.unwrap_or(GroupFormat::Evolution),
+                                    original: None,
+                                    edit,
+                                }
+                            }
                         };
                         let _ = sender.output(output);
                         self.editor = None;
@@ -1795,7 +1829,8 @@ impl ContactsPage {
     }
 
     /// Replace the detail pane with the group form for `editing_target`
-    /// (blank for a new group, which goes in the Hylki book).
+    /// (blank for a new group, in a book picked from those that keep
+    /// groups).
     fn render_group_editor(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
         let detail = &widgets.detail_box;
         while let Some(child) = detail.first_child() {
@@ -1807,12 +1842,37 @@ impl ContactsPage {
         editor_bar(detail, sender, &heading);
 
         let identity = group(detail, &i18n("Group"));
-        let book = adw::ActionRow::new();
-        book.set_title(&i18n("Address book"));
-        let book_name = if c.book_name.is_empty() { crate::contacts::local_book().name } else { c.book_name.clone() };
-        book.set_subtitle(&gtk::glib::markup_escape_text(&book_name));
-        book.add_css_class("property");
-        identity.append(&book);
+        // A group stays in its book; a new one goes in any that keeps
+        // groups, the Hylki book when none is listed yet.
+        let mut books: Vec<crate::contacts::Book> = Vec::new();
+        let mut book_row = None;
+        let mut apple = c.group == Some(GroupFormat::Apple);
+        if self.editing_target.is_none() {
+            books = self.books.iter().filter(|b| b.groups.is_some()).cloned().collect();
+            if books.is_empty() {
+                books.push(crate::contacts::local_book());
+            }
+            let row = adw::ComboRow::new();
+            row.set_title(&i18n("Address book"));
+            let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
+            row.set_model(Some(&gtk::StringList::new(&labels)));
+            let at = self
+                .book_filter
+                .as_ref()
+                .and_then(|uid| books.iter().position(|b| b.uid == *uid))
+                .unwrap_or(0);
+            row.set_selected(at as u32);
+            row.set_sensitive(books.len() > 1);
+            apple = books[at].groups == Some(GroupFormat::Apple);
+            identity.append(&row);
+            book_row = Some(row);
+        } else {
+            let book = adw::ActionRow::new();
+            book.set_title(&i18n("Address book"));
+            book.set_subtitle(&gtk::glib::markup_escape_text(&c.book_name));
+            book.add_css_class("property");
+            identity.append(&book);
+        }
         let name = entry_row(&i18n("Name"), &c.name);
         name.connect_changed(|row| row.remove_css_class("error"));
         identity.append(&name);
@@ -1841,10 +1901,31 @@ impl ContactsPage {
         }
         let _ = sender.output(ContactsPageOutput::WantSuggestions);
         let members = member_editor(detail, &c.members, self.suggestions.clone());
+        // An Apple group (iCloud's) holds cards of its own book.
+        let note = gtk::Label::new(Some(&i18n(
+            "Groups in this address book hold its own contacts: anyone added who is not in it yet is added to it.",
+        )));
+        note.add_css_class("dim-label");
+        note.add_css_class("caption");
+        note.set_wrap(true);
+        note.set_xalign(0.0);
+        note.set_margin_top(6);
+        note.set_visible(apple);
+        detail.append(&note);
+        if let Some(row) = &book_row {
+            let formats: Vec<Option<GroupFormat>> = books.iter().map(|b| b.groups).collect();
+            let note = note.downgrade();
+            row.connect_selected_notify(move |row| {
+                let apple = formats.get(row.selected() as usize) == Some(&Some(GroupFormat::Apple));
+                if let Some(note) = note.upgrade() {
+                    note.set_visible(apple);
+                }
+            });
+        }
         if self.editing_target.is_none() {
             name.grab_focus();
         }
-        self.editor = Some(Editor::Group(GroupForm { name, hide, members }));
+        self.editor = Some(Editor::Group(GroupForm { name, hide, members, book: book_row, books }));
     }
 
     /// Replace the detail pane with the editor form for `editing_target`

@@ -194,6 +194,10 @@ pub struct Book {
     /// EDS source UID (what `OpenAddressBook` expects).
     pub uid: String,
     pub name: String,
+    /// How a new group is written to this book; `None` where the server
+    /// keeps no groups (Google stores them as odd people, Microsoft 365
+    /// refuses them).
+    pub groups: Option<GroupFormat>,
 }
 
 // Inside a Flatpak sandbox `dirs::{data,cache,config}_dir()` are redirected into
@@ -445,7 +449,11 @@ pub fn is_local_book(book_uid: &str) -> bool {
 
 /// The local Hylki book as a [`Book`].
 pub fn local_book() -> Book {
-    Book { uid: crate::local_contacts::LOCAL_BOOK_UID.to_string(), name: i18n("Hylki Address Book") }
+    Book {
+        uid: crate::local_contacts::LOCAL_BOOK_UID.to_string(),
+        name: i18n("Hylki Address Book"),
+        groups: Some(GroupFormat::Evolution),
+    }
 }
 
 /// Parse stored local vCards into the Contacts view's entries. A local
@@ -1070,6 +1078,7 @@ fn read_book_db(path: &std::path::Path, query: &str, out: &mut Vec<Contact>, see
 pub fn writable_books() -> Vec<Book> {
     let mut books = Vec::new();
     let active = registry_books();
+    let formats = book_group_formats();
     if let Some(dir) = data_dir() {
         for entry in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
             if !entry.path().join("contacts.db").is_file() {
@@ -1086,7 +1095,8 @@ pub fn writable_books() -> Vec<Book> {
                 continue;
             }
             let name = book_uid_name(&uid, &active, "On This Computer");
-            books.push(Book { uid, name });
+            let groups = formats.get(&uid).copied().unwrap_or(Some(GroupFormat::Evolution));
+            books.push(Book { uid, name, groups });
         }
     }
     if let Some(dir) = cache_dir() {
@@ -1099,7 +1109,8 @@ pub fn writable_books() -> Vec<Book> {
                 continue;
             }
             let name = book_uid_name(&uid, &active, "CardDAV Address Book");
-            books.push(Book { uid, name });
+            let groups = formats.get(&uid).copied().unwrap_or(Some(GroupFormat::Apple));
+            books.push(Book { uid, name, groups });
         }
     }
     if let (Some(dest), Ok(conn)) = (factory_dest(), zbus::blocking::Connection::session()) {
@@ -1449,8 +1460,13 @@ pub struct ContactDetails {
     pub group: Option<GroupFormat>,
     pub members: Vec<Member>,
     /// Members named by the UID of a contact in the same book
-    /// (`urn:uuid:`), until [`resolve_members`] looks them up.
-    pub(crate) member_refs: Vec<String>,
+    /// (`urn:uuid:`), with the line naming them, until [`resolve_members`]
+    /// looks them up.
+    pub(crate) member_refs: Vec<(String, String)>,
+    /// The lines of members [`resolve_members`] found no address for (a
+    /// person with only a phone, a card not synced yet). They are not
+    /// shown, and an edit keeps them.
+    pub(crate) hidden_members: Vec<String>,
     /// Mail to the group puts its members in Bcc, so they do not see each
     /// other's addresses: Evolution's "Hide addresses when sending mail to
     /// this list".
@@ -1467,11 +1483,10 @@ impl ContactDetails {
         self.group.is_some()
     }
 
-    /// Whether the group can be changed here: Evolution's lists, the kind
-    /// Hylki writes. A vCard 4 or Apple group names its members by contact
-    /// UID, which an edit here could not keep in step with the server.
+    /// Whether the group can be changed here: Evolution's lists and
+    /// Apple's groups, the kinds Hylki writes. A vCard 4 group is only read.
     pub fn group_editable(&self) -> bool {
-        self.group == Some(GroupFormat::Evolution)
+        matches!(self.group, Some(GroupFormat::Evolution | GroupFormat::Apple))
     }
 
     /// The members' addresses as one recipient field.
@@ -1490,8 +1505,11 @@ pub enum GroupFormat {
     /// `X-EVOLUTION-LIST:TRUE`, one `EMAIL` per member: what Evolution
     /// makes, and what Hylki writes, so an exported group imports there.
     Evolution,
-    /// `KIND:group` (vCard 4) or `X-ADDRESSBOOKSERVER-KIND:group` (Apple,
-    /// iCloud), with `MEMBER` lines.
+    /// `X-ADDRESSBOOKSERVER-KIND:group`, one `X-ADDRESSBOOKSERVER-MEMBER`
+    /// per member naming a contact of the same book by UID: Apple's, what
+    /// iCloud and most CardDAV clients keep.
+    Apple,
+    /// `KIND:group` (vCard 4), with `MEMBER` lines.
     Kind,
 }
 
@@ -1505,6 +1523,9 @@ pub struct Member {
     /// contact it was picked from, HTML mail) survives. Empty for a member
     /// added here.
     pub(crate) line: String,
+    /// The UID of the member's own card in the group's book, for an Apple
+    /// group, which names its members by it. Empty when not known yet.
+    pub(crate) uid: String,
 }
 
 /// Every *live, enabled* address-book source, straight from the EDS source
@@ -1575,26 +1596,9 @@ pub(crate) fn registry_sources() -> Option<Vec<(String, String, String)>> {
 /// up the source's parent chain to the account collection, whose backend
 /// (google / microsoft365 / webdav) and identity say it best.
 fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
-    let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
-    let mut identity: Option<String> = None;
     let own = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
-    let mut top_display = own.clone();
-    let mut current = book_data.to_string();
-    for _ in 0..4 {
-        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else { break };
-        let Some(parent_data) = sources.get(&parent) else { break };
-        if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
-            backend = Some(b);
-        }
-        if identity.is_none() {
-            identity = crate::platform::keyfile_value(parent_data, "Collection", "Identity");
-        }
-        if let Some(d) = crate::platform::keyfile_value(parent_data, "Data Source", "DisplayName") {
-            top_display = Some(d);
-        }
-        current = parent_data.clone();
-    }
-    let account = identity.or(top_display);
+    let (backend, identity, top_display) = book_account(book_data, sources);
+    let account = identity.or(top_display.or(own.clone()));
     let label = match (backend.as_deref(), account.as_deref()) {
         (Some("local"), _) | (None, None) => i18n("On This Computer"),
         (Some("google"), Some(a)) => format!("Google — {a}"),
@@ -1612,6 +1616,54 @@ fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> Stri
     match own {
         Some(own) if !own.is_empty() && Some(&own) != account.as_ref() => format!("{label} · {own}"),
         _ => label,
+    }
+}
+
+/// The backend that serves a book, walked up its parent chain to the
+/// account collection (google / microsoft365 / webdav / local…), with the
+/// account's identity and display name when there is one.
+fn book_account(book_data: &str, sources: &HashMap<String, String>) -> (Option<String>, Option<String>, Option<String>) {
+    let mut backend = crate::platform::keyfile_value(book_data, "Address Book", "BackendName");
+    let mut identity: Option<String> = None;
+    let mut top_display = None;
+    let mut current = book_data.to_string();
+    for _ in 0..4 {
+        let Some(parent) = crate::platform::keyfile_value(&current, "Data Source", "Parent") else { break };
+        let Some(parent_data) = sources.get(&parent) else { break };
+        if let Some(b) = crate::platform::keyfile_value(parent_data, "Collection", "BackendName") {
+            backend = Some(b);
+        }
+        if identity.is_none() {
+            identity = crate::platform::keyfile_value(parent_data, "Collection", "Identity");
+        }
+        if let Some(d) = crate::platform::keyfile_value(parent_data, "Data Source", "DisplayName") {
+            top_display = Some(d);
+        }
+        current = parent_data.clone();
+    }
+    (backend, identity, top_display)
+}
+
+/// How each address book in the registry keeps a new group: Evolution's
+/// lists on this computer, Apple's groups on a CardDAV server (what iCloud,
+/// Fastmail and the Apple and DAVx⁵ clients read), none on Google, which
+/// keeps a group as a person with odd addresses, nor on Microsoft 365 or a
+/// directory, which take none.
+fn book_group_formats() -> HashMap<String, Option<GroupFormat>> {
+    let Some(sources) = registry_sources() else { return HashMap::new() };
+    let sources: HashMap<String, String> = sources.into_iter().map(|(_, uid, data)| (uid, data)).collect();
+    sources
+        .iter()
+        .filter(|(_, data)| data.contains("[Address Book]"))
+        .map(|(uid, data)| (uid.clone(), group_format_for(book_account(data, &sources).0.as_deref())))
+        .collect()
+}
+
+fn group_format_for(backend: Option<&str>) -> Option<GroupFormat> {
+    match backend {
+        None | Some("local") => Some(GroupFormat::Evolution),
+        Some("google" | "microsoft365" | "ldap") => None,
+        Some(_) => Some(GroupFormat::Apple),
     }
 }
 
@@ -1852,8 +1904,7 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
     // A list's EMAIL lines are its members, and the line saying so may come
     // after them, so they are kept aside until the card is read.
     let mut email_lines: Vec<(String, Vec<String>, String)> = Vec::new();
-    // Evolution's own default: a list with no say hides its addresses.
-    let mut show_addresses = false;
+    let mut show_addresses = None;
     for line in unfold_vcard(vcard).lines() {
         let Some((prop, raw_value)) = split_vcard_line(line) else { continue };
         let mut parts = prop.split(';');
@@ -1872,8 +1923,11 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
         }
         match name.as_str() {
             "X-EVOLUTION-LIST" if value.eq_ignore_ascii_case("true") => c.group = Some(GroupFormat::Evolution),
-            "X-EVOLUTION-LIST-SHOW-ADDRESSES" => show_addresses = value.eq_ignore_ascii_case("true"),
-            "KIND" | "X-ADDRESSBOOKSERVER-KIND" if value.eq_ignore_ascii_case("group") => {
+            "X-EVOLUTION-LIST-SHOW-ADDRESSES" => show_addresses = Some(value.eq_ignore_ascii_case("true")),
+            "X-ADDRESSBOOKSERVER-KIND" if value.eq_ignore_ascii_case("group") => {
+                c.group.get_or_insert(GroupFormat::Apple);
+            }
+            "KIND" if value.eq_ignore_ascii_case("group") => {
                 c.group.get_or_insert(GroupFormat::Kind);
             }
             "MEMBER" | "X-ADDRESSBOOKSERVER-MEMBER" => {
@@ -1881,11 +1935,11 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                 if lower.starts_with("mailto:") {
                     let email = value[7..].trim().to_string();
                     if email.contains('@') && !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                        c.members.push(Member { name: String::new(), email, line: line.to_string() });
+                        c.members.push(Member { name: String::new(), email, line: line.to_string(), uid: String::new() });
                     }
                 } else {
                     let uid = if lower.starts_with("urn:uuid:") { &value[9..] } else { value.as_str() };
-                    c.member_refs.push(uid.trim().to_string());
+                    c.member_refs.push((uid.trim().to_string(), line.to_string()));
                 }
             }
             "UID" if c.eds_uid.is_empty() => c.eds_uid = value,
@@ -1935,13 +1989,18 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             return None;
         }
         if c.group == Some(GroupFormat::Evolution) {
-            c.hide_addresses = !show_addresses;
+            // Evolution's own default: a list with no say hides its addresses.
+            c.hide_addresses = show_addresses != Some(true);
             for (line, params, value) in email_lines {
                 let Some((name, email)) = evolution_member(&params, &value) else { continue };
                 if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                    c.members.push(Member { name, email, line });
+                    c.members.push(Member { name, email, line, uid: String::new() });
                 }
             }
+        } else {
+            // Other groups have no say of their own; Hylki writes
+            // Evolution's line into an Apple group to keep Send as Bcc.
+            c.hide_addresses = show_addresses == Some(false);
         }
         c.emails.clear();
         return Some(c);
@@ -1975,13 +2034,15 @@ fn evolution_member(params: &[String], value: &str) -> Option<(String, String)> 
 }
 
 /// Fill in the group members named by contact UID, from `lookup` (UID →
-/// that contact's vCard, in the group's own book). A member with no address
-/// is left out: there is nothing to send to.
+/// that contact's name and address, in the group's own book). A member with
+/// no address is not shown, there being nothing to send to, but is kept.
 pub(crate) fn resolve_members(c: &mut ContactDetails, lookup: impl Fn(&str) -> Option<(String, String)>) {
-    for uid in std::mem::take(&mut c.member_refs) {
-        let Some((name, email)) = lookup(&uid) else { continue };
-        if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-            c.members.push(Member { name, email, line: String::new() });
+    for (uid, line) in std::mem::take(&mut c.member_refs) {
+        match lookup(&uid) {
+            Some((name, email)) if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) => {
+                c.members.push(Member { name, email, line, uid });
+            }
+            _ => c.hidden_members.push(line),
         }
     }
 }
@@ -2009,8 +2070,12 @@ fn is_group_vcard(vcard: &str) -> bool {
 /// The books demo mode offers new contacts, the Hylki book among them.
 pub fn demo_books() -> Vec<Book> {
     vec![
-        Book { uid: "On This Computer".into(), name: "On This Computer".into() },
-        Book { uid: "CardDAV — jason@hylki.hyprlab.co".into(), name: "CardDAV — jason@hylki.hyprlab.co".into() },
+        Book { uid: "On This Computer".into(), name: "On This Computer".into(), groups: Some(GroupFormat::Evolution) },
+        Book {
+            uid: "CardDAV — jason@hylki.hyprlab.co".into(),
+            name: "CardDAV — jason@hylki.hyprlab.co".into(),
+            groups: Some(GroupFormat::Apple),
+        },
         local_book(),
     ]
 }
@@ -2110,7 +2175,7 @@ fn demo_group(name: &str, hide_addresses: bool, people: &[(&str, &str)]) -> Cont
         .iter()
         .map(|(n, e)| Member { name: n.to_string(), email: e.to_string(), ..Member::default() })
         .collect();
-    let edit = GroupEdit { name: name.into(), members: members.clone(), hide_addresses };
+    let edit = GroupEdit { name: name.into(), members: members.clone(), hide_addresses, kept: Vec::new() };
     ContactDetails {
         name: name.into(),
         book_name: i18n("Hylki Address Book"),
@@ -2263,6 +2328,9 @@ pub struct GroupEdit {
     pub name: String,
     pub members: Vec<Member>,
     pub hide_addresses: bool,
+    /// Member lines the editor did not show ([`ContactDetails::hidden_members`]),
+    /// written back as they were.
+    pub(crate) kept: Vec<String>,
 }
 
 /// Rewrite a stored Evolution list with the editor's values. A member who
@@ -2309,7 +2377,118 @@ pub fn patched_group_vcard(original: &str, e: &GroupEdit) -> String {
 
 /// A brand-new group's vCard from the editor's values.
 pub fn new_group_vcard(e: &GroupEdit) -> String {
-    patched_group_vcard("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n", e)
+    patched_group_vcard(EMPTY_VCARD, e)
+}
+
+const EMPTY_VCARD: &str = "BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n";
+
+/// Rewrite an Apple group (or write a new one, from [`EMPTY_VCARD`]) with
+/// the editor's values. Every member must carry the UID of their card in
+/// the group's book, which [`save_group`] sees to.
+fn patched_apple_group(original: &str, e: &GroupEdit) -> String {
+    const REPLACED: [&str; 5] =
+        ["FN", "N", "X-ADDRESSBOOKSERVER-KIND", "X-ADDRESSBOOKSERVER-MEMBER", "X-EVOLUTION-LIST-SHOW-ADDRESSES"];
+    let mut out = kept_lines(original, &REPLACED);
+    let name = escape_vcard_value(e.name.trim());
+    out.push(format!("FN:{name}"));
+    out.push(format!("N:{name};;;;"));
+    out.push("X-ADDRESSBOOKSERVER-KIND:group".to_string());
+    // Apple's groups have no Bcc of their own; Evolution's line, which
+    // other apps pass over, keeps the choice.
+    if e.hide_addresses {
+        out.push("X-EVOLUTION-LIST-SHOW-ADDRESSES:FALSE".to_string());
+    }
+    for m in &e.members {
+        if !m.line.is_empty() {
+            out.push(m.line.clone());
+        } else if !m.uid.is_empty() {
+            out.push(format!("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:{}", m.uid));
+        }
+    }
+    out.extend(e.kept.iter().cloned());
+    out.push("END:VCARD".to_string());
+    out.join("\r\n") + "\r\n"
+}
+
+/// Write a group to `book_uid`: changed when `original` is its stored card,
+/// else new. An Apple group holds cards of its own book, so a member with
+/// no card there gets one first, with their name and address (blocking:
+/// call from a background thread).
+pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, mut edit: GroupEdit) -> Result<(), String> {
+    let create = original.is_none();
+    let original = original.unwrap_or(EMPTY_VCARD);
+    let vcard = match format {
+        GroupFormat::Evolution => patched_group_vcard(original, &edit),
+        GroupFormat::Apple => {
+            if edit.members.iter().any(|m| m.uid.is_empty() && m.line.is_empty()) {
+                let mut cards = BookCards::open(book_uid)?;
+                for m in edit.members.iter_mut().filter(|m| m.uid.is_empty() && m.line.is_empty()) {
+                    m.uid = cards.card_for(&m.name, &m.email)?;
+                }
+            }
+            patched_apple_group(original, &edit)
+        }
+        GroupFormat::Kind => return Err(i18n("Hylki cannot change this kind of group")),
+    };
+    if create {
+        create_contact(book_uid, &vcard)
+    } else {
+        modify_contact(book_uid, &vcard)
+    }
+}
+
+/// The people's cards of one book, for giving each group member one.
+enum BookCards {
+    Local,
+    Eds { conn: zbus::blocking::Connection, bus: String, path: String },
+}
+
+impl BookCards {
+    fn open(book_uid: &str) -> Result<Self, String> {
+        if is_local_book(book_uid) {
+            return Ok(Self::Local);
+        }
+        let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
+        let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
+        let (bus, path) = open_book(&conn, &dest, book_uid)?;
+        Ok(Self::Eds { conn, bus, path })
+    }
+
+    /// The UID of the person in the book with `email`, after making them
+    /// a card when there is none.
+    fn card_for(&mut self, name: &str, email: &str) -> Result<String, String> {
+        let card = new_vcard(&ContactEdit {
+            name: if name.trim().is_empty() { email.to_string() } else { name.trim().to_string() },
+            emails: vec![Labeled { label: String::new(), value: email.to_string() }],
+            ..ContactEdit::default()
+        });
+        match self {
+            Self::Local => {
+                let found = crate::local_contacts::list_vcards()?.into_iter().find_map(|v| {
+                    let c = parse_vcard_fields(&v).filter(|c| !c.is_group())?;
+                    c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(email)).then_some(c.eds_uid)
+                });
+                if let Some(uid) = found.filter(|u| !u.is_empty()) {
+                    return Ok(uid);
+                }
+                let uid = format!("hylki-{}", crate::rng::token(24).map_err(|e| e.to_string())?);
+                let card = card.replacen("VERSION:3.0\r\n", &format!("VERSION:3.0\r\nUID:{uid}\r\n"), 1);
+                write_local(crate::local_contacts::create(&card))?;
+                Ok(uid)
+            }
+            Self::Eds { conn, bus, path } => {
+                let query = format!("(is \"email\" \"{}\")", sexpr_escape(email.trim()));
+                for uid in book_get_uids(conn, bus, path, &query)? {
+                    if !is_group_vcard(&book_get_contact(conn, bus, path, &uid)?) {
+                        return Ok(uid);
+                    }
+                }
+                let reply = book_call(conn, bus, path, "CreateContacts", &(vec![card], 0u32))?;
+                let (uids,): (Vec<String>,) = reply.body().deserialize().map_err(|e| e.to_string())?;
+                uids.into_iter().next().ok_or_else(|| "The address book made no contact".to_string())
+            }
+        }
+    }
 }
 
 /// Tell the photo index and the UI about a finished local write.
@@ -2577,7 +2756,7 @@ mod tests {
 
     #[test]
     fn the_chosen_book_comes_first() {
-        let book = |uid: &str| Book { uid: uid.into(), name: uid.into() };
+        let book = |uid: &str| Book { uid: uid.into(), name: uid.into(), groups: None };
         let mut books = vec![book("a"), book("b"), book("hylki-local")];
         prefer_book(&mut books, "hylki-local");
         assert_eq!(books.iter().map(|b| b.uid.as_str()).collect::<Vec<_>>(), ["hylki-local", "a", "b"]);
@@ -2681,10 +2860,64 @@ mod tests {
         super::resolve_book_members(&mut book);
         assert_eq!(people(&book[1]), vec![("", "ann@x.org"), ("Pat Doe", "pat@x.org")]);
         assert_eq!(people(&book[2]), vec![("Pat Doe", "pat@x.org")]);
-        // Neither has Evolution's Bcc switch, and Hylki does not edit them.
+        // Neither has Evolution's Bcc switch; Hylki edits Apple's only.
         assert!(!book[1].hide_addresses && !book[1].group_editable());
+        assert!(!book[2].hide_addresses && book[2].group_editable());
+        assert_eq!(book[2].group, Some(super::GroupFormat::Apple));
+        // The member with no card in the book is kept, out of sight.
+        assert_eq!(book[1].hidden_members, vec!["MEMBER:urn:uuid:gone".to_string()]);
         assert!(super::is_group_vcard(apple));
         assert!(!super::is_group_vcard(person));
+    }
+
+    #[test]
+    fn an_edited_apple_group_names_its_members_by_card() {
+        let apple = "BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Apple Inc.//iOS 18//EN\r\nUID:g2\r\n\
+                     X-ADDRESSBOOKSERVER-KIND:group\r\nN:Family\r\nFN:Family\r\n\
+                     X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p2\r\n\
+                     X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:nomail\r\nREV:2026-10-18T09:00:00Z\r\nEND:VCARD\r\n";
+        let mut g = super::parse_vcard_fields(apple).unwrap();
+        super::resolve_members(&mut g, |uid| match uid {
+            "p1" => Some(("Pat".into(), "pat@x.org".into())),
+            "p2" => Some(("Kim".into(), "kim@x.org".into())),
+            _ => None,
+        });
+        assert_eq!(g.members[0].uid, "p1");
+        // Kim leaves, Lee (whose card save_group made) joins, Bcc goes on.
+        let mut members = vec![g.members[0].clone()];
+        members.push(super::Member { name: "Lee".into(), email: "lee@x.org".into(), uid: "p3".into(), ..Default::default() });
+        let edit = super::GroupEdit { name: "Family; Close".into(), members, hide_addresses: true, kept: g.hidden_members.clone() };
+        let out = super::patched_apple_group(apple, &edit);
+        assert!(out.contains("\r\nUID:g2\r\n") && out.contains("PRODID:-//Apple Inc.//iOS 18//EN"), "{out}");
+        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\n"), "{out}");
+        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p3\r\n"), "{out}");
+        assert!(out.contains("X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:nomail\r\n"), "{out}");
+        assert!(!out.contains("urn:uuid:p2"), "{out}");
+        assert_eq!(out.matches("X-ADDRESSBOOKSERVER-KIND:group").count(), 1);
+        assert!(!out.contains("X-EVOLUTION-LIST:"), "{out}");
+        let back = super::parse_vcard_fields(&out).unwrap();
+        assert_eq!(back.name, "Family; Close");
+        assert_eq!(back.group, Some(super::GroupFormat::Apple));
+        assert!(back.hide_addresses);
+        let refs: Vec<&str> = back.member_refs.iter().map(|(uid, _)| uid.as_str()).collect();
+        assert_eq!(refs, vec!["p1", "p3", "nomail"]);
+
+        // A new one, with Bcc off, says nothing of it.
+        let edit = super::GroupEdit { name: "Team".into(), hide_addresses: false, ..edit };
+        let new = super::patched_apple_group(super::EMPTY_VCARD, &edit);
+        assert!(new.starts_with("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Team\r\nN:Team;;;;\r\n"), "{new}");
+        assert!(!new.contains("SHOW-ADDRESSES") && !new.contains("UID:"), "{new}");
+    }
+
+    #[test]
+    fn books_keep_groups_as_their_servers_do() {
+        use super::{group_format_for, GroupFormat};
+        assert_eq!(group_format_for(Some("local")), Some(GroupFormat::Evolution));
+        assert_eq!(group_format_for(None), Some(GroupFormat::Evolution));
+        assert_eq!(group_format_for(Some("webdav")), Some(GroupFormat::Apple));
+        assert_eq!(group_format_for(Some("carddav")), Some(GroupFormat::Apple));
+        assert_eq!(group_format_for(Some("google")), None);
+        assert_eq!(group_format_for(Some("microsoft365")), None);
     }
 
     #[test]
@@ -2692,7 +2925,7 @@ mod tests {
         let c = super::parse_vcard_fields(EDS_LIST).unwrap();
         let mut members = vec![c.members[0].clone()];
         members.push(super::Member { name: "Carol \"CJ\", Ng".into(), email: "carol@x.org".into(), ..Default::default() });
-        let edit = super::GroupEdit { name: "Readers, All".into(), members, hide_addresses: false };
+        let edit = super::GroupEdit { name: "Readers, All".into(), members, hide_addresses: false, kept: Vec::new() };
         let out = super::patched_group_vcard(EDS_LIST, &edit);
         assert!(out.contains("X-EVOLUTION-DEST-CONTACT-UID=p1"), "{out}");
         assert!(out.contains("\r\nUID:l1\r\n") && out.contains("\r\nREV:"), "{out}");
@@ -2710,6 +2943,7 @@ mod tests {
             name: "Book Club".into(),
             members: vec![super::Member { name: "Ann".into(), email: "ann@x.org".into(), ..Default::default() }],
             hide_addresses: true,
+            kept: Vec::new(),
         };
         let back = super::parse_vcard_fields(&super::new_group_vcard(&edit)).unwrap();
         assert_eq!(back.group, Some(super::GroupFormat::Evolution));
@@ -2736,5 +2970,65 @@ mod tests {
         assert!(out.iter().all(|s| s.email.is_empty() && s.group.is_some()));
         // Only the name finds a group, not its members' addresses.
         assert!(out[0].matches("tea") && !out[0].matches("a@x"));
+    }
+
+    /// GROUP_LIVE=<book uid>: make an Apple group there through EDS with
+    /// one new member, change it, and remove what it made (GROUP_KEEP=1
+    /// leaves it). For a sealed rig or a book the tester owns.
+    #[test]
+    #[ignore]
+    fn live_group() {
+        let Ok(book) = std::env::var("GROUP_LIVE") else { return };
+        // "apple": the first book that keeps Apple's groups.
+        let book = if book == "apple" {
+            let books = super::writable_books();
+            println!("books: {books:?}");
+            books.into_iter().find(|b| b.groups == Some(super::GroupFormat::Apple)).expect("a CardDAV book").uid
+        } else {
+            book
+        };
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let name = format!("Hylki group test {stamp} (delete me)");
+        let member = |n: &str, e: &str| super::Member { name: n.into(), email: e.into(), ..Default::default() };
+        let edit = super::GroupEdit {
+            name: name.clone(),
+            members: vec![member("Hylki Test Member (delete me)", &format!("hylki-test-{stamp}@example.com"))],
+            hide_addresses: true,
+            kept: Vec::new(),
+        };
+        super::save_group(&book, super::GroupFormat::Apple, None, edit).unwrap();
+        let dest = super::factory_dest().unwrap();
+        let conn = zbus::blocking::Connection::session().unwrap();
+        let (bus, path) = super::open_book(&conn, &dest, &book).unwrap();
+        let find = |q: String| super::book_get_uids(&conn, &bus, &path, &q).unwrap();
+        let group_uid = find(format!("(is \"full_name\" \"{name}\")")).pop().expect("the group");
+        let card = super::book_get_contact(&conn, &bus, &path, &group_uid).unwrap();
+        println!("=== made:\n{card}");
+        let stub = find(format!("(is \"email\" \"hylki-test-{stamp}@example.com\")")).pop().expect("the member's card");
+        println!("=== member's card:\n{}", super::book_get_contact(&conn, &bus, &path, &stub).unwrap());
+        let mut g = super::parse_vcard_fields(&card).unwrap();
+        assert_eq!(g.group, Some(super::GroupFormat::Apple));
+        assert!(g.hide_addresses);
+        assert_eq!(g.member_refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![stub.as_str()]);
+        super::resolve_members(&mut g, |uid| {
+            super::person_address(&super::book_get_contact(&conn, &bus, &path, uid).ok()?)
+        });
+        // Bcc off and a second member, who already has a card by then.
+        let mut members = g.members.clone();
+        members.push(member("Again", &format!("hylki-test-{stamp}@example.com")));
+        members.dedup_by(|a, b| a.email == b.email);
+        let edit = super::GroupEdit { name: name.clone(), members, hide_addresses: false, kept: g.hidden_members.clone() };
+        super::save_group(&book, super::GroupFormat::Apple, Some(&card), edit).unwrap();
+        let changed = super::book_get_contact(&conn, &bus, &path, &group_uid).unwrap();
+        println!("=== changed:\n{changed}");
+        let back = super::parse_vcard_fields(&changed).unwrap();
+        assert!(!back.hide_addresses);
+        assert_eq!(back.member_refs.len(), 1);
+        if std::env::var_os("GROUP_KEEP").is_some() {
+            return;
+        }
+        super::delete_contact(&book, &group_uid).unwrap();
+        super::delete_contact(&book, &stub).unwrap();
+        println!("removed {group_uid} and {stub}");
     }
 }
