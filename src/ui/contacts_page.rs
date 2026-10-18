@@ -332,16 +332,16 @@ impl Component for ContactsPage {
                         },
                     },
                     pack_end = &gtk::Button {
-                        set_icon_name: "list-add-symbolic",
-                        set_tooltip_text: Some(i18n("New contact or group").as_str()),
-                        add_css_class: "flat",
-                        connect_clicked[sender] => move |b| new_menu(b, &sender),
-                    },
-                    pack_end = &gtk::Button {
                         set_icon_name: "document-open-symbolic",
                         set_tooltip_text: Some(i18n("Import vCard files into the Hylki address book").as_str()),
                         add_css_class: "flat",
                         connect_clicked => ContactsPageInput::ImportContacts,
+                    },
+                    pack_end = &gtk::Button {
+                        set_icon_name: "list-add-symbolic",
+                        set_tooltip_text: Some(i18n("New contact or group").as_str()),
+                        add_css_class: "flat",
+                        connect_clicked[sender] => move |b| new_menu(b, &sender),
                     },
                 },
 
@@ -423,7 +423,7 @@ impl Component for ContactsPage {
                         },
                         // pack_end packs right-to-left: sort and filter at the
                         // far right (matching the message list), then the
-                        // count, then "+".
+                        // count, then import, then "+", first on the right.
                         #[name = "filter_btn"]
                         pack_end = &gtk::MenuButton {
                             set_icon_name: "filter-symbolic",
@@ -437,16 +437,16 @@ impl Component for ContactsPage {
                             add_css_class: "list-count",
                         },
                         pack_end = &gtk::Button {
-                            set_icon_name: "list-add-symbolic",
-                            set_tooltip_text: Some(i18n("New contact or group").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked[sender] => move |b| new_menu(b, &sender),
-                        },
-                        pack_end = &gtk::Button {
                             set_icon_name: "document-open-symbolic",
                             set_tooltip_text: Some(i18n("Import vCard files into the Hylki address book").as_str()),
                             add_css_class: "flat",
                             connect_clicked => ContactsPageInput::ImportContacts,
+                        },
+                        pack_end = &gtk::Button {
+                            set_icon_name: "list-add-symbolic",
+                            set_tooltip_text: Some(i18n("New contact or group").as_str()),
+                            add_css_class: "flat",
+                            connect_clicked[sender] => move |b| new_menu(b, &sender),
                         },
                     },
 
