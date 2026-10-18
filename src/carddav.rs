@@ -433,6 +433,8 @@ const SYNC_AFTER: Duration = Duration::from_secs(5 * 60);
 /// nothing to fetch, nor LDAP directories, which are asked as one types.
 fn server_books() -> Vec<String> {
     let Some(sources) = crate::contacts::registry_sources() else { return Vec::new() };
+    let by_uid: HashMap<String, String> = sources.iter().map(|(_, uid, data)| (uid.clone(), data.clone())).collect();
+    let off = crate::contact_sources::off();
     let disabled: HashSet<String> = sources
         .iter()
         .filter(|(_, _, data)| {
@@ -449,7 +451,8 @@ fn server_books() -> Vec<String> {
             let parent = kf.string("Data Source", "Parent").map(|s| s.to_string()).unwrap_or_default();
             let wanted = !matches!(backend.as_str(), "local" | "ldap" | "")
                 && !disabled.contains(uid)
-                && !disabled.contains(&parent);
+                && !disabled.contains(&parent)
+                && crate::contact_sources::book_used(uid, &by_uid, &off);
             wanted.then(|| uid.clone())
         })
         .collect()

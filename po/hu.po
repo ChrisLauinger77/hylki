@@ -1451,6 +1451,42 @@ msgstr "Áthelyezés ide"
 msgid "Find"
 msgstr "Keresés"
 
+#, fuzzy
+msgid "{n} address book"
+msgid_plural "{n} address books"
+msgstr[0] "Címjegyzék"
+msgstr[1] "Címjegyzék"
+
+#, fuzzy
+msgid "Hylki Address Book"
+msgstr "Címjegyzék"
+
+#, fuzzy
+msgid "{n} contact, kept by Hylki"
+msgid_plural "{n} contacts, kept by Hylki"
+msgstr[0] "A napló exportálva ide: {display}"
+msgstr[1] "A napló exportálva ide: {display}"
+
+msgid "On This Computer"
+msgstr "Ezen a számítógépen"
+
+msgid "{books} · kept by GNOME Contacts and Evolution"
+msgstr ""
+
+msgid "Online account"
+msgstr "Internetes Fiókok"
+
+#, fuzzy
+msgid "Contacts is switched off for this account in GNOME Online Accounts."
+msgstr "Bejelentkezés a GNOME Internetes Fiókok keresztül."
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Kulcs keresése ehhez: {addr}…"
+
+msgid "This address book is switched off in Evolution."
+msgstr ""
+
 msgid "{n} person, in Bcc"
 msgid_plural "{n} people, in Bcc"
 msgstr[0] ""
@@ -1462,13 +1498,6 @@ msgid_plural "{n} people"
 msgstr[0] "{n} címzett"
 msgstr[1] "{n} címzett"
 
-#, fuzzy
-msgid "Hylki Address Book"
-msgstr "Címjegyzék"
-
-msgid "On This Computer"
-msgstr "Ezen a számítógépen"
-
 msgid "CardDAV Address Book"
 msgstr "CardDAV címjegyzék"
 
@@ -1477,8 +1506,8 @@ msgstr "{date} {time} órakor"
 
 #, fuzzy
 msgid ""
-"The directory cannot be searched without signing in. Add a sign-in in "
-"Settings → LDAP Directories."
+"The directory cannot be searched without signing in. Add a sign-in to it in "
+"Settings → Contacts."
 msgstr ""
 "A könyvtár jelszót igényel. Adja hozzá a Beállítások → LDAP könyvtárak "
 "menüpontban."
@@ -1510,7 +1539,8 @@ msgstr ""
 msgid "Could not reach {server}. Check the server's name and the network."
 msgstr ""
 
-msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+#, fuzzy
+msgid "The directory needs a password. Add it in Settings → Contacts."
 msgstr ""
 "A könyvtár jelszót igényel. Adja hozzá a Beállítások → LDAP könyvtárak "
 "menüpontban."
@@ -3311,9 +3341,6 @@ msgstr ""
 "egyszer API-tokenként alakítja át, és a jelszó helyett ezt őrzi meg. Más "
 "módon szerzett token beilleszthető a jelszómezőbe."
 
-msgid "Online account"
-msgstr "Internetes Fiókok"
-
 msgid "Dropbox app key"
 msgstr "Dropbox alkalmazáskulcs"
 
@@ -4123,23 +4150,55 @@ msgid "Add a person by name or address"
 msgstr ""
 
 #, fuzzy
-msgid "CardDAV Accounts"
-msgstr "Levelezési fiókok"
+msgid "Use an app-specific password, not your usual one."
+msgstr "Alkalmazásjelszó szükséges (nem a szokásos bejelentkezési jelszava)."
 
 #, fuzzy
-msgid "CardDAV accounts"
-msgstr "Összes fiók"
+msgid "CardDAV Server"
+msgstr "Kiszolgáló"
 
 msgid ""
-"The address books on these servers are listed in Contacts and suggested in "
-"the composer, and changes made in Hylki are sent back. They are kept by "
-"Evolution Data Server, so an account set up in Evolution is listed here too. "
-"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+"The server's address is enough for most services; Hylki finds the address "
+"books on it. Services that sign in with two steps want an app password."
+msgstr ""
+
+msgid ""
+"Your Nextcloud's address, such as cloud.example.org. With two-factor sign-"
+"in, make an app password in Nextcloud under Settings → Security."
+msgstr ""
+
+msgid ""
+"Use an app password with access to contacts, made in Fastmail under Settings "
+"→ Privacy & Security."
+msgstr ""
+
+msgid "LDAP Directory"
+msgstr "LDAP Mappa"
+
+#, fuzzy
+msgid "Address Books"
+msgstr "Címjegyzék"
+
+msgid ""
+"Where Hylki finds contacts: for Contacts, the composer's suggestions, sender "
+"pictures and the filters. Switch one off to leave it out of Hylki; GNOME and "
+"Evolution keep using it."
 msgstr ""
 
 #, fuzzy
-msgid "No CardDAV accounts yet."
-msgstr "Még nincsenek felhőfiókok."
+msgid "Look again for address books"
+msgstr "Kulcs keresése ehhez: {addr}…"
+
+#, fuzzy
+msgid "Add Address Book…"
+msgstr "Címjegyzék"
+
+msgid ""
+"The address books of GNOME Contacts, CardDAV accounts and LDAP directories "
+"are kept by Evolution Data Server, which is not installed. Install the "
+"evolution-data-server package, which runs without GNOME, and open this page "
+"again."
+msgstr ""
 
 #, fuzzy
 msgid "From your mail accounts"
@@ -4151,18 +4210,33 @@ msgid ""
 msgstr ""
 
 #, fuzzy
-msgid "CardDAV Account"
-msgstr "Felhőfiók"
+msgid "New Contacts"
+msgstr "Új névjegy"
+
+#, fuzzy
+msgid "Save new contacts in"
+msgstr "Új névjegy"
 
 msgid ""
-"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
-"Install the evolution-data-server package, which runs without GNOME, and "
-"open this page again."
+"The address book a contact made in Hylki goes to, unless another is picked "
+"when it is made."
 msgstr ""
 
 #, fuzzy
 msgid "Looking for address books on {name}…"
 msgstr "Kulcs keresése ehhez: {addr}…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Címjegyzék"
+
+msgid ""
+"The directory is removed from Evolution Data Server, so Evolution and other "
+"apps that use it stop seeing it too. Nothing on the server changes."
+msgstr ""
+"A könyvtár eltávolításra kerül az Evolution Data Server-ről, így az "
+"Evolution és az azt használó egyéb alkalmazások sem látják többé. A "
+"kiszolgálón semmi sem változik."
 
 #, fuzzy
 msgid ""
@@ -4187,20 +4261,94 @@ msgid_plural "Found {n} address books on {name}"
 msgstr[0] ""
 msgstr[1] ""
 
-#, fuzzy
-msgid "Edit Account"
-msgstr "Felhőfiók szerkesztése"
+msgid "Connected to {name}"
+msgstr "Kapcsolódva erre: {name}"
 
-msgid "Add Account"
-msgstr "Fiók hozzáadása"
-
-#, fuzzy
-msgid "Looking for address books…"
-msgstr "Kulcs keresése ehhez: {addr}…"
+msgid "The server took too long to answer."
+msgstr ""
 
 #, fuzzy
-msgid "Use this account's address books"
-msgstr "Fiók használata a Hylki-ben"
+msgid "Kept by Evolution Data Server"
+msgstr "Az Evolution Data Server nem érhető el"
+
+msgid ""
+"The address books GNOME Contacts and Evolution keep on this computer. They "
+"are changed there, and in Hylki's Contacts."
+msgstr ""
+
+#, fuzzy
+msgid "Set up in GNOME Online Accounts"
+msgstr "Megtalálható a GNOME Online-fiókok között"
+
+msgid ""
+"The account's sign-in, and whether it keeps contacts at all, are changed in "
+"GNOME Settings."
+msgstr ""
+
+#, fuzzy
+msgid "Open Online Accounts"
+msgstr "Internetes Fiókok megnyitása…"
+
+#, fuzzy
+msgid "Added in GNOME Online Accounts"
+msgstr "Megtalálható a GNOME Online-fiókok között"
+
+msgid ""
+"Google and Microsoft 365 sign in through the browser, which Evolution Data "
+"Server leaves to GNOME Online Accounts. Add the account there with Contacts "
+"switched on, and it is listed here."
+msgstr ""
+
+msgid ""
+"Contacts Hylki keeps itself, in its own data folder. They work without GNOME."
+msgstr ""
+
+#, fuzzy
+msgid "Contacts in the Hylki book"
+msgstr "Névjegyek az oldalsávban"
+
+#, fuzzy
+msgid "Import vCard files"
+msgstr "Nagy fájlok"
+
+msgid ""
+"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
+"updates its contacts."
+msgstr ""
+
+#, fuzzy
+msgid "Export as a vCard file"
+msgstr "Nagy fájlok"
+
+msgid ""
+"Saves every contact in the Hylki book in one .vcf file, which other apps can "
+"import."
+msgstr ""
+
+#, fuzzy
+msgid "Delete all contacts"
+msgstr "Törli a névjegyet?"
+
+msgid "Empties the Hylki book. The other address books are not touched."
+msgstr ""
+
+#, fuzzy
+msgid "Set up in Hylki"
+msgstr "Megjelenítés a Hylkiben"
+
+#, fuzzy
+msgid "From GNOME Online Accounts"
+msgstr "GNOME Internetes Fiókok"
+
+msgid "Evolution"
+msgstr ""
+
+msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
+msgstr ""
+
+#, fuzzy
+msgid "Use in Hylki"
+msgstr "Hylki megnyitása"
 
 msgid ""
 "{provider} contacts are synced through GNOME Online Accounts already, maybe "
@@ -4211,19 +4359,15 @@ msgstr ""
 msgid "Add Address Books"
 msgstr "Címjegyzék"
 
-msgid ""
-"The server's address is enough for most services, such as "
-"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
-"contacts.icloud.com."
+#, fuzzy
+msgid "Address books"
+msgstr "Címjegyzék"
+
+msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
 
 msgid "Sign-in"
 msgstr "Bejelentkezés"
-
-msgid ""
-"Services that sign in with two steps want an app password made for Hylki: "
-"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
-msgstr ""
 
 msgid "Password (saved; type to replace it)"
 msgstr "Jelszó (elmentve; írja be, ha módosítani szeretné)"
@@ -4236,60 +4380,14 @@ msgstr "Lépjen be a könyvtár kiszolgálójára."
 msgid "Enter the password."
 msgstr "Védelem jelszóval"
 
-msgid "LDAP Directories"
-msgstr "LDAP Mappák"
-
-msgid "LDAP directories"
-msgstr "LDAP mappák"
-
 #, fuzzy
 msgid ""
-"The composer looks up recipients in these directories as you type an "
-"address, and a search in Contacts looks in them too. They are kept by "
-"Evolution Data Server, so a directory set up in Evolution is listed here too."
+"The composer looks up recipients in the directory as you type an address, "
+"and a search in Contacts looks in it too."
 msgstr ""
 "A program a cím beírása közben ezekben a címjegyzékekben keresi meg a "
 "címzetteket. Ezeket az Evolution Data Server tárolja, így az Evolution-ban "
 "létrehozott címjegyzékek is megjelennek itt."
-
-msgid "Add Directory…"
-msgstr "Könyvtár hozzáadása…"
-
-msgid "No directories yet."
-msgstr "Nincsenek még mappák."
-
-msgid "LDAP Directory"
-msgstr "LDAP Mappa"
-
-msgid ""
-"Evolution Data Server, which keeps the directories, is not available on this "
-"system."
-msgstr ""
-"Az Evolution Data Server, amely a könyvtárakat tárolja, ezen a rendszeren "
-"nem érhető el."
-
-msgid ""
-"The directory is removed from Evolution Data Server, so Evolution and other "
-"apps that use it stop seeing it too. Nothing on the server changes."
-msgstr ""
-"A könyvtár eltávolításra kerül az Evolution Data Server-ről, így az "
-"Evolution és az azt használó egyéb alkalmazások sem látják többé. A "
-"kiszolgálón semmi sem változik."
-
-msgid "Connected to {name}"
-msgstr "Kapcsolódva erre: {name}"
-
-msgid "The server took too long to answer."
-msgstr ""
-
-msgid "Edit Directory"
-msgstr "Könyvtár szerkesztése"
-
-msgid "Add Directory"
-msgstr "Könyvtár hozzáadása"
-
-msgid "Look up recipients in this directory"
-msgstr "Címzettek keresése ebben a címjegyzékben"
 
 msgid "Encryption"
 msgstr "Titkosítás"
@@ -5484,27 +5582,17 @@ msgstr ""
 "A címkeszerkesztő megnyílt. Mielőtt továbbmennél, mentsd el a módosításokat, "
 "vagy dobd el őket."
 
-msgid "Save the directory?"
+#, fuzzy
+msgid "Save the address book?"
 msgstr "El akarod menteni a könyvtárat?"
 
+#, fuzzy
 msgid ""
-"The directory editor is open. Save what you changed, or discard it, before "
-"moving on."
+"The address book editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "A könyvtárszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a "
 "módosításokat, vagy dobja el őket."
-
-#, fuzzy
-msgid "Save the CardDAV account?"
-msgstr "Elmented a fiókot?"
-
-#, fuzzy
-msgid ""
-"The CardDAV account editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-"A fiókszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a módosításokat, "
-"vagy törölje azokat."
 
 msgid "Save the account?"
 msgstr "Elmented a fiókot?"
@@ -5515,54 +5603,6 @@ msgid ""
 msgstr ""
 "A fiókszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a módosításokat, "
 "vagy törölje azokat."
-
-msgid ""
-"Contacts Hylki keeps itself, in its own data folder. They are listed in "
-"Contacts beside the address books of GNOME Contacts, and work without GNOME."
-msgstr ""
-
-#, fuzzy
-msgid "Contacts in the Hylki book"
-msgstr "Névjegyek az oldalsávban"
-
-#, fuzzy
-msgid "Import vCard files"
-msgstr "Nagy fájlok"
-
-msgid ""
-"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
-"updates its contacts."
-msgstr ""
-
-#, fuzzy
-msgid "Export as a vCard file"
-msgstr "Nagy fájlok"
-
-msgid ""
-"Saves every contact in the Hylki book in one .vcf file, which other apps can "
-"import."
-msgstr ""
-
-#, fuzzy
-msgid "Delete all contacts"
-msgstr "Törli a névjegyet?"
-
-msgid ""
-"Empties the Hylki book. The address books of GNOME Contacts are not touched."
-msgstr ""
-
-#, fuzzy
-msgid "New Contacts"
-msgstr "Új névjegy"
-
-#, fuzzy
-msgid "Save new contacts in"
-msgstr "Új névjegy"
-
-msgid ""
-"The address book a contact made in Hylki goes to, unless another is picked "
-"when it is made."
-msgstr ""
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
@@ -8145,6 +8185,73 @@ msgid "Hyprlab"
 msgstr "Hyprlab"
 
 #, fuzzy
+#~ msgid "CardDAV Accounts"
+#~ msgstr "Levelezési fiókok"
+
+#, fuzzy
+#~ msgid "CardDAV accounts"
+#~ msgstr "Összes fiók"
+
+#, fuzzy
+#~ msgid "No CardDAV accounts yet."
+#~ msgstr "Még nincsenek felhőfiókok."
+
+#, fuzzy
+#~ msgid "CardDAV Account"
+#~ msgstr "Felhőfiók"
+
+#, fuzzy
+#~ msgid "Edit Account"
+#~ msgstr "Felhőfiók szerkesztése"
+
+#~ msgid "Add Account"
+#~ msgstr "Fiók hozzáadása"
+
+#, fuzzy
+#~ msgid "Use this account's address books"
+#~ msgstr "Fiók használata a Hylki-ben"
+
+#~ msgid "LDAP Directories"
+#~ msgstr "LDAP Mappák"
+
+#~ msgid "LDAP directories"
+#~ msgstr "LDAP mappák"
+
+#~ msgid "Add Directory…"
+#~ msgstr "Könyvtár hozzáadása…"
+
+#~ msgid "No directories yet."
+#~ msgstr "Nincsenek még mappák."
+
+#~ msgid ""
+#~ "Evolution Data Server, which keeps the directories, is not available on "
+#~ "this system."
+#~ msgstr ""
+#~ "Az Evolution Data Server, amely a könyvtárakat tárolja, ezen a rendszeren "
+#~ "nem érhető el."
+
+#~ msgid "Edit Directory"
+#~ msgstr "Könyvtár szerkesztése"
+
+#~ msgid "Add Directory"
+#~ msgstr "Könyvtár hozzáadása"
+
+#~ msgid "Look up recipients in this directory"
+#~ msgstr "Címzettek keresése ebben a címjegyzékben"
+
+#, fuzzy
+#~ msgid "Save the CardDAV account?"
+#~ msgstr "Elmented a fiókot?"
+
+#, fuzzy
+#~ msgid ""
+#~ "The CardDAV account editor is open. Save what you changed, or discard it, "
+#~ "before moving on."
+#~ msgstr ""
+#~ "A fiókszerkesztő megnyílt. Mielőtt továbbmenne, mentse el a "
+#~ "módosításokat, vagy törölje azokat."
+
+#, fuzzy
 #~ msgid "Message sent"
 #~ msgstr "Üzenetlista"
 
@@ -8230,9 +8337,6 @@ msgstr "Hyprlab"
 #~ msgid "Flagged first"
 #~ msgstr "Megjelöltek elöl"
 
-#~ msgid "Sign in through GNOME Online Accounts."
-#~ msgstr "Bejelentkezés a GNOME Internetes Fiókok keresztül."
-
 #~ msgid "Flag"
 #~ msgstr "Megjelölés"
 
@@ -8262,9 +8366,6 @@ msgstr "Hyprlab"
 #~ msgid_plural "Send them with the message"
 #~ msgstr[0] "Üzenet archiválása"
 #~ msgstr[1] "Üzenet archiválása"
-
-#~ msgid "Found in GNOME Online Accounts"
-#~ msgstr "Megtalálható a GNOME Online-fiókok között"
 
 #~ msgid "Start Reading"
 #~ msgstr "Olvasás megkezdése"

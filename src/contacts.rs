@@ -395,7 +395,7 @@ fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<ContactDetail
             }
         }
     }
-    if crate::local_contacts::exists() {
+    if crate::local_contacts::exists() && crate::contact_sources::hylki_used() {
         match crate::local_contacts::group_vcards() {
             Ok(vcards) => {
                 for vcard in vcards {
@@ -417,7 +417,7 @@ fn read_groups_in(active: &Option<HashMap<String, String>>) -> Vec<ContactDetail
 /// Append the local book's addresses, skipping the ones already in `seen`.
 /// False when the book is there but could not be read.
 fn add_local_contacts(out: &mut Vec<Contact>, seen: &mut HashSet<String>) -> bool {
-    if !crate::local_contacts::exists() {
+    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
         return true;
     }
     let rows = match crate::local_contacts::emails() {
@@ -467,7 +467,7 @@ fn details_from_local_vcards(vcards: Vec<String>, book_name: &str) -> Vec<Contac
 
 /// The local book's contacts, parsed (empty when it was never written).
 fn local_details() -> Vec<ContactDetails> {
-    if !crate::local_contacts::exists() {
+    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
         return Vec::new();
     }
     match crate::local_contacts::list_vcards() {
@@ -701,8 +701,10 @@ fn photo_db_paths() -> Vec<PathBuf> {
 
 fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
     let mut photos = HashMap::new();
+    // A book switched off, in EDS or for Hylki, lends no faces.
+    let active = registry_books();
     if let Some(dir) = data_dir() {
-        for db in find_dbs(&dir, "contacts.db") {
+        for db in find_dbs(&dir, "contacts.db").into_iter().filter(|db| db_book_wanted(db, &active, false)) {
             read_photo_locations(
                 &db,
                 "SELECT e.value, f.uid FROM folder_id f \
@@ -714,7 +716,7 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
         }
     }
     if let Some(dir) = cache_dir() {
-        for db in find_dbs(&dir, "cache.db") {
+        for db in find_dbs(&dir, "cache.db").into_iter().filter(|db| db_book_wanted(db, &active, false)) {
             read_photo_locations(
                 &db,
                 "SELECT e.value, o.ECacheUID FROM ECacheObjects o \
@@ -732,7 +734,7 @@ fn load_contact_photo_index() -> HashMap<String, Vec<PhotoLocation>> {
 
 /// Index the local Hylki book's contacts that carry a photo.
 fn add_local_photo_locations(photos: &mut HashMap<String, Vec<PhotoLocation>>) {
-    if !crate::local_contacts::exists() {
+    if !crate::local_contacts::exists() || !crate::contact_sources::hylki_used() {
         return;
     }
     let entries = match crate::local_contacts::photo_entries() {
@@ -1105,7 +1107,9 @@ pub fn writable_books() -> Vec<Book> {
     }
     // Last: unless chosen in Settings, EDS books keep priority as the
     // default destination.
-    books.push(local_book());
+    if crate::contact_sources::hylki_used() {
+        books.push(local_book());
+    }
     prefer_book(&mut books, &crate::config::load_contact_book());
     books
 }
@@ -1514,12 +1518,17 @@ fn registry_books() -> Option<HashMap<String, String>> {
     let sources: HashMap<String, String> =
         registry_sources()?.into_iter().map(|(_, uid, data)| (uid, data)).collect();
     let mut books = HashMap::new();
+    let off = crate::contact_sources::off();
     for (uid, data) in &sources {
         // An address book, and not switched off (GOA sets the book source's
         // [Data Source] Enabled=false when Contacts is toggled off for the
         // account). Only that section's Enabled counts — other sections
-        // (Refresh etc.) have Enabled keys of their own.
-        if data.contains("[Address Book]") && !data_source_disabled(data) {
+        // (Refresh etc.) have Enabled keys of their own. Nor switched off
+        // for Hylki in Settings → Contacts, it or its account.
+        if data.contains("[Address Book]")
+            && !data_source_disabled(data)
+            && crate::contact_sources::book_used(uid, &sources, &off)
+        {
             books.insert(uid.clone(), book_display_name(data, &sources));
         }
     }
@@ -1630,9 +1639,10 @@ fn sources_dest_from_files() -> Option<String> {
     None
 }
 
-/// Whether the registry lists `uid` as live (fail-open when unreachable).
+/// Whether the registry lists `uid` as live (fail-open when unreachable,
+/// but for a book switched off for Hylki by its own UID).
 fn book_uid_active(uid: &str, books: &Option<HashMap<String, String>>) -> bool {
-    books.as_ref().map_or(true, |map| map.contains_key(uid))
+    books.as_ref().map_or_else(|| !crate::contact_sources::off().contains(uid), |map| map.contains_key(uid))
 }
 
 /// The registry's friendly name for a book, with a fallback for when the

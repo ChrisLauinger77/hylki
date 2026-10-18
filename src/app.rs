@@ -12337,9 +12337,13 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Pref(PrefOutput::CardDavChanged) => {
+            AppMsg::Pref(PrefOutput::ContactSourcesChanged) => {
+                // A book switched on or off counts at once everywhere.
                 if self.showing_contacts {
                     reload_contacts(&sender, 0);
+                }
+                if self.filters.iter().any(|r| r.needs_contacts()) {
+                    self.saved_addresses.refresh();
                 }
                 // Settings synced a saved account's books already; any it
                 // did not are opened and synced now.

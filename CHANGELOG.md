@@ -2,8 +2,20 @@
 
 ## Unreleased
 
+- **Changed: one Contacts page in Settings.** Settings → Contacts lists
+  every address book Hylki reads, as Mail Accounts lists mail accounts: the
+  Hylki book, the books on this computer, each GNOME Online Accounts account
+  that keeps contacts, CardDAV accounts and LDAP directories, which had pages
+  of their own. Each has a switch that uses it in Hylki or leaves it out of
+  Contacts, the suggestions, sender pictures, the filters and syncing,
+  without changing it for GNOME or Evolution, and a page with its address
+  books, switched one by one, its sign-in or the Hylki book's import and
+  export. **Add Address Book…** adds a CardDAV server, iCloud, Nextcloud,
+  Fastmail, Yahoo or an LDAP directory, and points Google and Microsoft 365
+  to GNOME Online Accounts.
+
 - **Added: CardDAV accounts** (#408, requested by Michael-Zebratrix).
-  Settings → CardDAV Accounts adds the address books on a CardDAV server
+  Settings → Contacts adds the address books on a CardDAV server
   (Nextcloud, iCloud, Fastmail, Radicale and others) from the server's
   address, a user name and a password, without GNOME Online Accounts or
   Evolution. The accounts are Evolution Data Server collection accounts, so

@@ -382,7 +382,7 @@ fn connect_error(dir: &Directory, last: &LastCredentials, fallback: String) -> S
         // Still waiting for a password: neither Hylki nor the keyring EDS
         // reads has one for it.
         "required" if !dir.bind_dn.trim().is_empty() => needs_password(),
-        "required" => i18n("The directory cannot be searched without signing in. Add a sign-in in Settings → LDAP Directories."),
+        "required" => i18n("The directory cannot be searched without signing in. Add a sign-in to it in Settings → Contacts."),
         "rejected" => i18n("The directory did not accept the password."),
         "ssl_failed" if detail.is_empty() => i18n("The directory's certificate could not be verified."),
         "ssl_failed" => i18n_f("The directory's certificate could not be verified: {error}", &[("error", detail)]),
@@ -492,7 +492,7 @@ fn wait_for_answer(
 }
 
 fn needs_password() -> String {
-    i18n("The directory needs a password. Add it in Settings → LDAP Directories.")
+    i18n("The directory needs a password. Add it in Settings → Contacts.")
 }
 
 /// An EDS query string: a quoted, escaped literal.
@@ -513,7 +513,7 @@ const RETRY_AFTER: Duration = Duration::from_secs(30);
 static LIST_STALE: AtomicBool = AtomicBool::new(false);
 
 /// Hylki changed a directory: read the list again at the next lookup.
-fn list_changed() {
+pub(crate) fn list_changed() {
     LIST_STALE.store(true, Ordering::Relaxed);
 }
 
@@ -527,8 +527,9 @@ fn enabled() -> Vec<Directory> {
             return dirs;
         }
     }
+    let off = crate::contact_sources::off();
     let dirs: Vec<Directory> = match list() {
-        Ok(d) => d.into_iter().filter(|d| d.enabled).collect(),
+        Ok(d) => d.into_iter().filter(|d| d.enabled && !off.contains(&d.uid)).collect(),
         Err(e) => {
             tracing::debug!("LDAP directories unavailable: {e}");
             Vec::new()

@@ -1455,6 +1455,44 @@ msgstr "Mover para"
 msgid "Find"
 msgstr "Localizar"
 
+#, fuzzy
+msgid "{n} address book"
+msgid_plural "{n} address books"
+msgstr[0] "Livro de endereços"
+msgstr[1] "Livro de endereços"
+
+#, fuzzy
+msgid "Hylki Address Book"
+msgstr "Livro de endereços"
+
+#, fuzzy
+msgid "{n} contact, kept by Hylki"
+msgid_plural "{n} contacts, kept by Hylki"
+msgstr[0] "Registo exportado para {display}"
+msgstr[1] "Registo exportado para {display}"
+
+msgid "On This Computer"
+msgstr "Neste computador"
+
+msgid "{books} · kept by GNOME Contacts and Evolution"
+msgstr ""
+
+msgid "Online account"
+msgstr "Conta online"
+
+#, fuzzy
+msgid "Contacts is switched off for this account in GNOME Online Accounts."
+msgstr ""
+"Ao desativar esta opção, a conta volta à lista de importação — continua a "
+"existir nas Contas online do GNOME."
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "A procurar uma chave para {addr}…"
+
+msgid "This address book is switched off in Evolution."
+msgstr ""
+
 msgid "{n} person, in Bcc"
 msgid_plural "{n} people, in Bcc"
 msgstr[0] ""
@@ -1466,13 +1504,6 @@ msgid_plural "{n} people"
 msgstr[0] "{n} destinatário"
 msgstr[1] "{n} destinatários"
 
-#, fuzzy
-msgid "Hylki Address Book"
-msgstr "Livro de endereços"
-
-msgid "On This Computer"
-msgstr "Neste computador"
-
 msgid "CardDAV Address Book"
 msgstr "Livro de endereços CardDAV"
 
@@ -1481,8 +1512,8 @@ msgstr "{date} às {time}"
 
 #, fuzzy
 msgid ""
-"The directory cannot be searched without signing in. Add a sign-in in "
-"Settings → LDAP Directories."
+"The directory cannot be searched without signing in. Add a sign-in to it in "
+"Settings → Contacts."
 msgstr ""
 "O diretório requer uma palavra-passe. Adicione-a em Definições → Diretórios "
 "LDAP."
@@ -1514,7 +1545,8 @@ msgstr ""
 msgid "Could not reach {server}. Check the server's name and the network."
 msgstr ""
 
-msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+#, fuzzy
+msgid "The directory needs a password. Add it in Settings → Contacts."
 msgstr ""
 "O diretório requer uma palavra-passe. Adicione-a em Definições → Diretórios "
 "LDAP."
@@ -3323,9 +3355,6 @@ msgstr ""
 "vez da palavra-passe. Também pode colar no campo da palavra-passe um token "
 "obtido de outra forma."
 
-msgid "Online account"
-msgstr "Conta online"
-
 msgid "Dropbox app key"
 msgstr "Chave da aplicação Dropbox"
 
@@ -4124,23 +4153,57 @@ msgid "Add a person by name or address"
 msgstr ""
 
 #, fuzzy
-msgid "CardDAV Accounts"
-msgstr "Contas de correio"
+msgid "Use an app-specific password, not your usual one."
+msgstr ""
+"Requer uma palavra-passe específica da aplicação (não a sua palavra-passe de "
+"início de sessão habitual)."
 
 #, fuzzy
-msgid "CardDAV accounts"
-msgstr "Todas as contas"
+msgid "CardDAV Server"
+msgstr "Servidor"
 
 msgid ""
-"The address books on these servers are listed in Contacts and suggested in "
-"the composer, and changes made in Hylki are sent back. They are kept by "
-"Evolution Data Server, so an account set up in Evolution is listed here too. "
-"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+"The server's address is enough for most services; Hylki finds the address "
+"books on it. Services that sign in with two steps want an app password."
+msgstr ""
+
+msgid ""
+"Your Nextcloud's address, such as cloud.example.org. With two-factor sign-"
+"in, make an app password in Nextcloud under Settings → Security."
+msgstr ""
+
+msgid ""
+"Use an app password with access to contacts, made in Fastmail under Settings "
+"→ Privacy & Security."
+msgstr ""
+
+msgid "LDAP Directory"
+msgstr "Diretório LDAP"
+
+#, fuzzy
+msgid "Address Books"
+msgstr "Livro de endereços"
+
+msgid ""
+"Where Hylki finds contacts: for Contacts, the composer's suggestions, sender "
+"pictures and the filters. Switch one off to leave it out of Hylki; GNOME and "
+"Evolution keep using it."
 msgstr ""
 
 #, fuzzy
-msgid "No CardDAV accounts yet."
-msgstr "Ainda não existem contas de armazenamento na nuvem."
+msgid "Look again for address books"
+msgstr "A procurar uma chave para {addr}…"
+
+#, fuzzy
+msgid "Add Address Book…"
+msgstr "Livro de endereços"
+
+msgid ""
+"The address books of GNOME Contacts, CardDAV accounts and LDAP directories "
+"are kept by Evolution Data Server, which is not installed. Install the "
+"evolution-data-server package, which runs without GNOME, and open this page "
+"again."
+msgstr ""
 
 #, fuzzy
 msgid "From your mail accounts"
@@ -4152,18 +4215,32 @@ msgid ""
 msgstr ""
 
 #, fuzzy
-msgid "CardDAV Account"
-msgstr "Conta de armazenamento na nuvem"
+msgid "New Contacts"
+msgstr "Novo contacto"
+
+#, fuzzy
+msgid "Save new contacts in"
+msgstr "Novo contacto"
 
 msgid ""
-"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
-"Install the evolution-data-server package, which runs without GNOME, and "
-"open this page again."
+"The address book a contact made in Hylki goes to, unless another is picked "
+"when it is made."
 msgstr ""
 
 #, fuzzy
 msgid "Looking for address books on {name}…"
 msgstr "A procurar uma chave para {addr}…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Livro de endereços"
+
+msgid ""
+"The directory is removed from Evolution Data Server, so Evolution and other "
+"apps that use it stop seeing it too. Nothing on the server changes."
+msgstr ""
+"O diretório é removido do Evolution Data Server, pelo que deixa de aparecer "
+"no Evolution e noutras aplicações que o utilizem. Nada muda no servidor."
 
 #, fuzzy
 msgid ""
@@ -4187,21 +4264,94 @@ msgid_plural "Found {n} address books on {name}"
 msgstr[0] ""
 msgstr[1] ""
 
-#, fuzzy
-msgid "Edit Account"
-msgstr "Editar conta de armazenamento na nuvem"
+msgid "Connected to {name}"
+msgstr "Ligado a {name}"
+
+msgid "The server took too long to answer."
+msgstr ""
 
 #, fuzzy
-msgid "Add Account"
-msgstr "Adicionar conta"
+msgid "Kept by Evolution Data Server"
+msgstr "O Evolution Data Server não está disponível"
+
+msgid ""
+"The address books GNOME Contacts and Evolution keep on this computer. They "
+"are changed there, and in Hylki's Contacts."
+msgstr ""
 
 #, fuzzy
-msgid "Looking for address books…"
-msgstr "A procurar uma chave para {addr}…"
+msgid "Set up in GNOME Online Accounts"
+msgstr "Contas online do GNOME"
+
+msgid ""
+"The account's sign-in, and whether it keeps contacts at all, are changed in "
+"GNOME Settings."
+msgstr ""
 
 #, fuzzy
-msgid "Use this account's address books"
-msgstr "Utilizar esta conta no Hylki"
+msgid "Open Online Accounts"
+msgstr "Abrir Contas online…"
+
+#, fuzzy
+msgid "Added in GNOME Online Accounts"
+msgstr "Contas online do GNOME"
+
+msgid ""
+"Google and Microsoft 365 sign in through the browser, which Evolution Data "
+"Server leaves to GNOME Online Accounts. Add the account there with Contacts "
+"switched on, and it is listed here."
+msgstr ""
+
+msgid ""
+"Contacts Hylki keeps itself, in its own data folder. They work without GNOME."
+msgstr ""
+
+#, fuzzy
+msgid "Contacts in the Hylki book"
+msgstr "Contactos na barra lateral"
+
+#, fuzzy
+msgid "Import vCard files"
+msgstr "Ficheiros grandes"
+
+msgid ""
+"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
+"updates its contacts."
+msgstr ""
+
+#, fuzzy
+msgid "Export as a vCard file"
+msgstr "Ficheiros grandes"
+
+msgid ""
+"Saves every contact in the Hylki book in one .vcf file, which other apps can "
+"import."
+msgstr ""
+
+#, fuzzy
+msgid "Delete all contacts"
+msgstr "Eliminar contacto?"
+
+msgid "Empties the Hylki book. The other address books are not touched."
+msgstr ""
+
+#, fuzzy
+msgid "Set up in Hylki"
+msgstr "Mostrar no Hylki"
+
+#, fuzzy
+msgid "From GNOME Online Accounts"
+msgstr "Contas online do GNOME"
+
+msgid "Evolution"
+msgstr ""
+
+msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
+msgstr ""
+
+#, fuzzy
+msgid "Use in Hylki"
+msgstr "Abrir o Hylki"
 
 msgid ""
 "{provider} contacts are synced through GNOME Online Accounts already, maybe "
@@ -4212,19 +4362,15 @@ msgstr ""
 msgid "Add Address Books"
 msgstr "Livro de endereços"
 
-msgid ""
-"The server's address is enough for most services, such as "
-"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
-"contacts.icloud.com."
+#, fuzzy
+msgid "Address books"
+msgstr "Livro de endereços"
+
+msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
 
 msgid "Sign-in"
 msgstr "Início de sessão"
-
-msgid ""
-"Services that sign in with two steps want an app password made for Hylki: "
-"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
-msgstr ""
 
 msgid "Password (saved; type to replace it)"
 msgstr "Palavra-passe (guardada; escreva para a substituir)"
@@ -4237,59 +4383,14 @@ msgstr "Introduza o servidor do diretório."
 msgid "Enter the password."
 msgstr "Proteger com uma palavra-passe"
 
-msgid "LDAP Directories"
-msgstr "Diretórios LDAP"
-
-msgid "LDAP directories"
-msgstr "Diretórios LDAP"
-
 #, fuzzy
 msgid ""
-"The composer looks up recipients in these directories as you type an "
-"address, and a search in Contacts looks in them too. They are kept by "
-"Evolution Data Server, so a directory set up in Evolution is listed here too."
+"The composer looks up recipients in the directory as you type an address, "
+"and a search in Contacts looks in it too."
 msgstr ""
 "O editor de mensagens procura destinatários nestes diretórios à medida que "
 "escreve um endereço. Os diretórios são mantidos pelo Evolution Data Server, "
 "pelo que um diretório configurado no Evolution também aparece aqui."
-
-msgid "Add Directory…"
-msgstr "Adicionar diretório…"
-
-msgid "No directories yet."
-msgstr "Ainda não há diretórios."
-
-msgid "LDAP Directory"
-msgstr "Diretório LDAP"
-
-msgid ""
-"Evolution Data Server, which keeps the directories, is not available on this "
-"system."
-msgstr ""
-"O Evolution Data Server, que mantém os diretórios, não está disponível neste "
-"sistema."
-
-msgid ""
-"The directory is removed from Evolution Data Server, so Evolution and other "
-"apps that use it stop seeing it too. Nothing on the server changes."
-msgstr ""
-"O diretório é removido do Evolution Data Server, pelo que deixa de aparecer "
-"no Evolution e noutras aplicações que o utilizem. Nada muda no servidor."
-
-msgid "Connected to {name}"
-msgstr "Ligado a {name}"
-
-msgid "The server took too long to answer."
-msgstr ""
-
-msgid "Edit Directory"
-msgstr "Editar diretório"
-
-msgid "Add Directory"
-msgstr "Adicionar diretório"
-
-msgid "Look up recipients in this directory"
-msgstr "Procurar destinatários neste diretório"
 
 msgid "Encryption"
 msgstr "Encriptação"
@@ -5464,27 +5565,17 @@ msgstr ""
 "O editor de etiquetas está aberto. Antes de continuar, guarde ou descarte as "
 "alterações."
 
-msgid "Save the directory?"
+#, fuzzy
+msgid "Save the address book?"
 msgstr "Guardar o diretório?"
 
+#, fuzzy
 msgid ""
-"The directory editor is open. Save what you changed, or discard it, before "
-"moving on."
+"The address book editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "O editor de diretórios está aberto. Guarde ou descarte as alterações antes "
 "de continuar."
-
-#, fuzzy
-msgid "Save the CardDAV account?"
-msgstr "Guardar a conta?"
-
-#, fuzzy
-msgid ""
-"The CardDAV account editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-"O editor de contas está aberto. Antes de continuar, guarde ou descarte as "
-"alterações."
 
 msgid "Save the account?"
 msgstr "Guardar a conta?"
@@ -5495,54 +5586,6 @@ msgid ""
 msgstr ""
 "O editor de contas está aberto. Antes de continuar, guarde ou descarte as "
 "alterações."
-
-msgid ""
-"Contacts Hylki keeps itself, in its own data folder. They are listed in "
-"Contacts beside the address books of GNOME Contacts, and work without GNOME."
-msgstr ""
-
-#, fuzzy
-msgid "Contacts in the Hylki book"
-msgstr "Contactos na barra lateral"
-
-#, fuzzy
-msgid "Import vCard files"
-msgstr "Ficheiros grandes"
-
-msgid ""
-"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
-"updates its contacts."
-msgstr ""
-
-#, fuzzy
-msgid "Export as a vCard file"
-msgstr "Ficheiros grandes"
-
-msgid ""
-"Saves every contact in the Hylki book in one .vcf file, which other apps can "
-"import."
-msgstr ""
-
-#, fuzzy
-msgid "Delete all contacts"
-msgstr "Eliminar contacto?"
-
-msgid ""
-"Empties the Hylki book. The address books of GNOME Contacts are not touched."
-msgstr ""
-
-#, fuzzy
-msgid "New Contacts"
-msgstr "Novo contacto"
-
-#, fuzzy
-msgid "Save new contacts in"
-msgstr "Novo contacto"
-
-msgid ""
-"The address book a contact made in Hylki goes to, unless another is picked "
-"when it is made."
-msgstr ""
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
@@ -8101,6 +8144,74 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "CardDAV Accounts"
+#~ msgstr "Contas de correio"
+
+#, fuzzy
+#~ msgid "CardDAV accounts"
+#~ msgstr "Todas as contas"
+
+#, fuzzy
+#~ msgid "No CardDAV accounts yet."
+#~ msgstr "Ainda não existem contas de armazenamento na nuvem."
+
+#, fuzzy
+#~ msgid "CardDAV Account"
+#~ msgstr "Conta de armazenamento na nuvem"
+
+#, fuzzy
+#~ msgid "Edit Account"
+#~ msgstr "Editar conta de armazenamento na nuvem"
+
+#, fuzzy
+#~ msgid "Add Account"
+#~ msgstr "Adicionar conta"
+
+#, fuzzy
+#~ msgid "Use this account's address books"
+#~ msgstr "Utilizar esta conta no Hylki"
+
+#~ msgid "LDAP Directories"
+#~ msgstr "Diretórios LDAP"
+
+#~ msgid "LDAP directories"
+#~ msgstr "Diretórios LDAP"
+
+#~ msgid "Add Directory…"
+#~ msgstr "Adicionar diretório…"
+
+#~ msgid "No directories yet."
+#~ msgstr "Ainda não há diretórios."
+
+#~ msgid ""
+#~ "Evolution Data Server, which keeps the directories, is not available on "
+#~ "this system."
+#~ msgstr ""
+#~ "O Evolution Data Server, que mantém os diretórios, não está disponível "
+#~ "neste sistema."
+
+#~ msgid "Edit Directory"
+#~ msgstr "Editar diretório"
+
+#~ msgid "Add Directory"
+#~ msgstr "Adicionar diretório"
+
+#~ msgid "Look up recipients in this directory"
+#~ msgstr "Procurar destinatários neste diretório"
+
+#, fuzzy
+#~ msgid "Save the CardDAV account?"
+#~ msgstr "Guardar a conta?"
+
+#, fuzzy
+#~ msgid ""
+#~ "The CardDAV account editor is open. Save what you changed, or discard it, "
+#~ "before moving on."
+#~ msgstr ""
+#~ "O editor de contas está aberto. Antes de continuar, guarde ou descarte as "
+#~ "alterações."
 
 #, fuzzy
 #~ msgid "Message sent"

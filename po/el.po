@@ -1399,6 +1399,43 @@ msgstr "Μετακίνηση σε"
 msgid "Find"
 msgstr "Εύρεση"
 
+#, fuzzy
+msgid "{n} address book"
+msgid_plural "{n} address books"
+msgstr[0] "Βιβλίο διευθύνσεων"
+msgstr[1] "Βιβλίο διευθύνσεων"
+
+msgid "Hylki Address Book"
+msgstr "Βιβλίο διευθύνσεων Hylki"
+
+#, fuzzy
+msgid "{n} contact, kept by Hylki"
+msgid_plural "{n} contacts, kept by Hylki"
+msgstr[0] "Εξήχθη {n} επαφή στο {path}"
+msgstr[1] "Εξήχθησαν {n} επαφές στο {path}"
+
+msgid "On This Computer"
+msgstr "Σε αυτόν τον υπολογιστή"
+
+msgid "{books} · kept by GNOME Contacts and Evolution"
+msgstr ""
+
+msgid "Online account"
+msgstr "Διαδικτυακός λογαριασμός"
+
+#, fuzzy
+msgid "Contacts is switched off for this account in GNOME Online Accounts."
+msgstr ""
+"Σε παύση: η αλληλογραφία είναι απενεργοποιημένη για αυτόν τον λογαριασμό "
+"στις Ρυθμίσεις GNOME"
+
+#, fuzzy
+msgid "Looking for address books…"
+msgstr "Αναζήτηση κλειδιού για {addr}…"
+
+msgid "This address book is switched off in Evolution."
+msgstr ""
+
 msgid "{n} person, in Bcc"
 msgid_plural "{n} people, in Bcc"
 msgstr[0] ""
@@ -1410,21 +1447,16 @@ msgid_plural "{n} people"
 msgstr[0] "{n} παραλήπτης"
 msgstr[1] "{n} παραλήπτες"
 
-msgid "Hylki Address Book"
-msgstr "Βιβλίο διευθύνσεων Hylki"
-
-msgid "On This Computer"
-msgstr "Σε αυτόν τον υπολογιστή"
-
 msgid "CardDAV Address Book"
 msgstr "Βιβλίο διευθύνσεων CardDAV"
 
 msgid "{date} at {time}"
 msgstr "{date} στις {time}"
 
+#, fuzzy
 msgid ""
-"The directory cannot be searched without signing in. Add a sign-in in "
-"Settings → LDAP Directories."
+"The directory cannot be searched without signing in. Add a sign-in to it in "
+"Settings → Contacts."
 msgstr ""
 "Δεν είναι δυνατή η αναζήτηση στον κατάλογο χωρίς σύνδεση. Προσθέστε σύνδεση "
 "στις Ρυθμίσεις → Κατάλογοι LDAP."
@@ -1462,7 +1494,8 @@ msgstr ""
 "Δεν ήταν δυνατή η πρόσβαση στον {server}. Ελέγξτε το όνομα του διακομιστή "
 "και το δίκτυο."
 
-msgid "The directory needs a password. Add it in Settings → LDAP Directories."
+#, fuzzy
+msgid "The directory needs a password. Add it in Settings → Contacts."
 msgstr ""
 "Ο κατάλογος απαιτεί κωδικό πρόσβασης. Προσθέστε τον στις Ρυθμίσεις → "
 "Κατάλογοι LDAP."
@@ -3252,9 +3285,6 @@ msgstr ""
 "διακριτικό που αποκτήθηκε με άλλον τρόπο μπορεί να επικολληθεί στο πεδίο "
 "κωδικού πρόσβασης."
 
-msgid "Online account"
-msgstr "Διαδικτυακός λογαριασμός"
-
 msgid "Dropbox app key"
 msgstr "Κλειδί εφαρμογής Dropbox"
 
@@ -4053,23 +4083,57 @@ msgid "Add a person by name or address"
 msgstr "Μια επαφή χρειάζεται όνομα ή διεύθυνση email"
 
 #, fuzzy
-msgid "CardDAV Accounts"
-msgstr "Λογαριασμοί αλληλογραφίας"
+msgid "Use an app-specific password, not your usual one."
+msgstr ""
+"Απαιτεί κωδικό πρόσβασης ειδικά για την εφαρμογή (όχι τον κανονικό κωδικό "
+"σύνδεσής σας)."
 
 #, fuzzy
-msgid "CardDAV accounts"
-msgstr "Όλοι οι λογαριασμοί"
+msgid "CardDAV Server"
+msgstr "Διακομιστής"
 
 msgid ""
-"The address books on these servers are listed in Contacts and suggested in "
-"the composer, and changes made in Hylki are sent back. They are kept by "
-"Evolution Data Server, so an account set up in Evolution is listed here too. "
-"Google and Microsoft 365 address books are added in GNOME Online Accounts."
+"The server's address is enough for most services; Hylki finds the address "
+"books on it. Services that sign in with two steps want an app password."
+msgstr ""
+
+msgid ""
+"Your Nextcloud's address, such as cloud.example.org. With two-factor sign-"
+"in, make an app password in Nextcloud under Settings → Security."
+msgstr ""
+
+msgid ""
+"Use an app password with access to contacts, made in Fastmail under Settings "
+"→ Privacy & Security."
+msgstr ""
+
+msgid "LDAP Directory"
+msgstr "Κατάλογος LDAP"
+
+#, fuzzy
+msgid "Address Books"
+msgstr "Βιβλίο διευθύνσεων"
+
+msgid ""
+"Where Hylki finds contacts: for Contacts, the composer's suggestions, sender "
+"pictures and the filters. Switch one off to leave it out of Hylki; GNOME and "
+"Evolution keep using it."
 msgstr ""
 
 #, fuzzy
-msgid "No CardDAV accounts yet."
-msgstr "Δεν υπάρχουν ακόμη λογαριασμοί cloud."
+msgid "Look again for address books"
+msgstr "Αναζήτηση κλειδιού για {addr}…"
+
+#, fuzzy
+msgid "Add Address Book…"
+msgstr "Όλα τα βιβλία διευθύνσεων"
+
+msgid ""
+"The address books of GNOME Contacts, CardDAV accounts and LDAP directories "
+"are kept by Evolution Data Server, which is not installed. Install the "
+"evolution-data-server package, which runs without GNOME, and open this page "
+"again."
+msgstr ""
 
 #, fuzzy
 msgid "From your mail accounts"
@@ -4080,19 +4144,34 @@ msgid ""
 "uses the password the mail account already has."
 msgstr ""
 
-#, fuzzy
-msgid "CardDAV Account"
-msgstr "Λογαριασμός cloud"
+msgid "New Contacts"
+msgstr "Νέες επαφές"
+
+msgid "Save new contacts in"
+msgstr "Αποθήκευση νέων επαφών στο"
 
 msgid ""
-"CardDAV accounts are kept by Evolution Data Server, which is not installed. "
-"Install the evolution-data-server package, which runs without GNOME, and "
-"open this page again."
+"The address book a contact made in Hylki goes to, unless another is picked "
+"when it is made."
 msgstr ""
+"Το βιβλίο διευθύνσεων όπου αποθηκεύεται μια επαφή που δημιουργείται στο "
+"Hylki, εκτός αν επιλεγεί άλλο κατά τη δημιουργία της."
 
 #, fuzzy
 msgid "Looking for address books on {name}…"
 msgstr "Αναζήτηση κλειδιού για {addr}…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Όλα τα βιβλία διευθύνσεων"
+
+msgid ""
+"The directory is removed from Evolution Data Server, so Evolution and other "
+"apps that use it stop seeing it too. Nothing on the server changes."
+msgstr ""
+"Ο κατάλογος αφαιρείται από τον Evolution Data Server, οπότε το Evolution και "
+"οι άλλες εφαρμογές που τον χρησιμοποιούν παύουν επίσης να τον βλέπουν. "
+"Τίποτα στον διακομιστή δεν αλλάζει."
 
 #, fuzzy
 msgid ""
@@ -4117,21 +4196,101 @@ msgid_plural "Found {n} address books on {name}"
 msgstr[0] ""
 msgstr[1] ""
 
-#, fuzzy
-msgid "Edit Account"
-msgstr "Επεξεργασία λογαριασμού cloud"
+msgid "Connected to {name}"
+msgstr "Συνδέθηκε με το {name}"
+
+msgid "The server took too long to answer."
+msgstr "Ο διακομιστής άργησε υπερβολικά να απαντήσει."
 
 #, fuzzy
-msgid "Add Account"
-msgstr "Προσθήκη λογαριασμού"
+msgid "Kept by Evolution Data Server"
+msgstr "Ο Evolution Data Server δεν είναι διαθέσιμος"
+
+msgid ""
+"The address books GNOME Contacts and Evolution keep on this computer. They "
+"are changed there, and in Hylki's Contacts."
+msgstr ""
 
 #, fuzzy
-msgid "Looking for address books…"
-msgstr "Αναζήτηση κλειδιού για {addr}…"
+msgid "Set up in GNOME Online Accounts"
+msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
+
+msgid ""
+"The account's sign-in, and whether it keeps contacts at all, are changed in "
+"GNOME Settings."
+msgstr ""
 
 #, fuzzy
-msgid "Use this account's address books"
-msgstr "Χρήση αυτού του λογαριασμού στο Hylki"
+msgid "Open Online Accounts"
+msgstr "Άνοιγμα Διαδικτυακών λογαριασμών…"
+
+#, fuzzy
+msgid "Added in GNOME Online Accounts"
+msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
+
+msgid ""
+"Google and Microsoft 365 sign in through the browser, which Evolution Data "
+"Server leaves to GNOME Online Accounts. Add the account there with Contacts "
+"switched on, and it is listed here."
+msgstr ""
+
+#, fuzzy
+msgid ""
+"Contacts Hylki keeps itself, in its own data folder. They work without GNOME."
+msgstr ""
+"Οι επαφές που διατηρεί το Hylki βρίσκονται στον δικό του φάκελο δεδομένων. "
+"Εμφανίζονται στις Επαφές μαζί με τα βιβλία διευθύνσεων των Επαφών GNOME και "
+"λειτουργούν χωρίς το GNOME."
+
+msgid "Contacts in the Hylki book"
+msgstr "Επαφές στο βιβλίο του Hylki"
+
+msgid "Import vCard files"
+msgstr "Εισαγωγή αρχείων vCard"
+
+msgid ""
+"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
+"updates its contacts."
+msgstr ""
+"Προσθέτει τις επαφές από αρχεία .vcf στο βιβλίο του Hylki. Η επανεισαγωγή "
+"ενός αρχείου ενημερώνει τις επαφές του."
+
+msgid "Export as a vCard file"
+msgstr "Εξαγωγή ως αρχείο vCard"
+
+msgid ""
+"Saves every contact in the Hylki book in one .vcf file, which other apps can "
+"import."
+msgstr ""
+"Αποθηκεύει κάθε επαφή του βιβλίου του Hylki σε ένα αρχείο .vcf, το οποίο "
+"μπορούν να εισαγάγουν άλλες εφαρμογές."
+
+msgid "Delete all contacts"
+msgstr "Διαγραφή όλων των επαφών"
+
+#, fuzzy
+msgid "Empties the Hylki book. The other address books are not touched."
+msgstr ""
+"Αδειάζει το βιβλίο του Hylki. Τα βιβλία διευθύνσεων των Επαφών GNOME δεν "
+"επηρεάζονται."
+
+#, fuzzy
+msgid "Set up in Hylki"
+msgstr "Εμφάνιση στο Hylki"
+
+#, fuzzy
+msgid "From GNOME Online Accounts"
+msgstr "Διαδικτυακοί λογαριασμοί GNOME"
+
+msgid "Evolution"
+msgstr ""
+
+msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
+msgstr ""
+
+#, fuzzy
+msgid "Use in Hylki"
+msgstr "Άνοιγμα Hylki"
 
 msgid ""
 "{provider} contacts are synced through GNOME Online Accounts already, maybe "
@@ -4142,19 +4301,15 @@ msgstr ""
 msgid "Add Address Books"
 msgstr "Όλα τα βιβλία διευθύνσεων"
 
-msgid ""
-"The server's address is enough for most services, such as "
-"nextcloud.example.org; Hylki finds the address books on it. For iCloud, use "
-"contacts.icloud.com."
+#, fuzzy
+msgid "Address books"
+msgstr "Βιβλίο διευθύνσεων"
+
+msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
 
 msgid "Sign-in"
 msgstr "Σύνδεση"
-
-msgid ""
-"Services that sign in with two steps want an app password made for Hylki: "
-"iCloud, Fastmail and Nextcloud with two-factor sign-in among them."
-msgstr ""
 
 msgid "Password (saved; type to replace it)"
 msgstr "Κωδικός πρόσβασης (αποθηκευμένος· πληκτρολογήστε για αντικατάσταση)"
@@ -4167,60 +4322,15 @@ msgstr "Εισαγάγετε τον διακομιστή του καταλόγο
 msgid "Enter the password."
 msgstr "Προστασία με κωδικό πρόσβασης"
 
-msgid "LDAP Directories"
-msgstr "Κατάλογοι LDAP"
-
-msgid "LDAP directories"
-msgstr "Κατάλογοι LDAP"
-
+#, fuzzy
 msgid ""
-"The composer looks up recipients in these directories as you type an "
-"address, and a search in Contacts looks in them too. They are kept by "
-"Evolution Data Server, so a directory set up in Evolution is listed here too."
+"The composer looks up recipients in the directory as you type an address, "
+"and a search in Contacts looks in it too."
 msgstr ""
 "Ο συντάκτης αναζητά παραλήπτες σε αυτούς τους καταλόγους καθώς "
 "πληκτρολογείτε μια διεύθυνση, και η αναζήτηση στις Επαφές τους περιλαμβάνει "
 "επίσης. Τους διαχειρίζεται ο Evolution Data Server, επομένως εδώ εμφανίζεται "
 "και κατάλογος που έχει ρυθμιστεί στο Evolution."
-
-msgid "Add Directory…"
-msgstr "Προσθήκη καταλόγου…"
-
-msgid "No directories yet."
-msgstr "Δεν υπάρχουν ακόμη κατάλογοι."
-
-msgid "LDAP Directory"
-msgstr "Κατάλογος LDAP"
-
-msgid ""
-"Evolution Data Server, which keeps the directories, is not available on this "
-"system."
-msgstr ""
-"Ο Evolution Data Server, ο οποίος διαχειρίζεται τους καταλόγους, δεν είναι "
-"διαθέσιμος σε αυτό το σύστημα."
-
-msgid ""
-"The directory is removed from Evolution Data Server, so Evolution and other "
-"apps that use it stop seeing it too. Nothing on the server changes."
-msgstr ""
-"Ο κατάλογος αφαιρείται από τον Evolution Data Server, οπότε το Evolution και "
-"οι άλλες εφαρμογές που τον χρησιμοποιούν παύουν επίσης να τον βλέπουν. "
-"Τίποτα στον διακομιστή δεν αλλάζει."
-
-msgid "Connected to {name}"
-msgstr "Συνδέθηκε με το {name}"
-
-msgid "The server took too long to answer."
-msgstr "Ο διακομιστής άργησε υπερβολικά να απαντήσει."
-
-msgid "Edit Directory"
-msgstr "Επεξεργασία καταλόγου"
-
-msgid "Add Directory"
-msgstr "Προσθήκη καταλόγου"
-
-msgid "Look up recipients in this directory"
-msgstr "Αναζήτηση παραληπτών σε αυτόν τον κατάλογο"
 
 msgid "Encryption"
 msgstr "Κρυπτογράφηση"
@@ -5382,27 +5492,17 @@ msgstr ""
 "Το πρόγραμμα επεξεργασίας ετικέτας είναι ανοικτό. Αποθηκεύστε τις αλλαγές "
 "σας ή απορρίψτε τις πριν συνεχίσετε."
 
-msgid "Save the directory?"
+#, fuzzy
+msgid "Save the address book?"
 msgstr "Αποθήκευση του καταλόγου;"
 
+#, fuzzy
 msgid ""
-"The directory editor is open. Save what you changed, or discard it, before "
-"moving on."
+"The address book editor is open. Save what you changed, or discard it, "
+"before moving on."
 msgstr ""
 "Ο επεξεργαστής καταλόγου είναι ανοιχτός. Αποθηκεύστε τις αλλαγές σας ή "
 "απορρίψτε τις πριν συνεχίσετε."
-
-#, fuzzy
-msgid "Save the CardDAV account?"
-msgstr "Αποθήκευση του λογαριασμού;"
-
-#, fuzzy
-msgid ""
-"The CardDAV account editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-"Το πρόγραμμα επεξεργασίας λογαριασμού είναι ανοικτό. Αποθηκεύστε τις αλλαγές "
-"σας ή απορρίψτε τις πριν συνεχίσετε."
 
 msgid "Save the account?"
 msgstr "Αποθήκευση του λογαριασμού;"
@@ -5413,59 +5513,6 @@ msgid ""
 msgstr ""
 "Το πρόγραμμα επεξεργασίας λογαριασμού είναι ανοικτό. Αποθηκεύστε τις αλλαγές "
 "σας ή απορρίψτε τις πριν συνεχίσετε."
-
-msgid ""
-"Contacts Hylki keeps itself, in its own data folder. They are listed in "
-"Contacts beside the address books of GNOME Contacts, and work without GNOME."
-msgstr ""
-"Οι επαφές που διατηρεί το Hylki βρίσκονται στον δικό του φάκελο δεδομένων. "
-"Εμφανίζονται στις Επαφές μαζί με τα βιβλία διευθύνσεων των Επαφών GNOME και "
-"λειτουργούν χωρίς το GNOME."
-
-msgid "Contacts in the Hylki book"
-msgstr "Επαφές στο βιβλίο του Hylki"
-
-msgid "Import vCard files"
-msgstr "Εισαγωγή αρχείων vCard"
-
-msgid ""
-"Adds the contacts in .vcf files to the Hylki book. Importing a file again "
-"updates its contacts."
-msgstr ""
-"Προσθέτει τις επαφές από αρχεία .vcf στο βιβλίο του Hylki. Η επανεισαγωγή "
-"ενός αρχείου ενημερώνει τις επαφές του."
-
-msgid "Export as a vCard file"
-msgstr "Εξαγωγή ως αρχείο vCard"
-
-msgid ""
-"Saves every contact in the Hylki book in one .vcf file, which other apps can "
-"import."
-msgstr ""
-"Αποθηκεύει κάθε επαφή του βιβλίου του Hylki σε ένα αρχείο .vcf, το οποίο "
-"μπορούν να εισαγάγουν άλλες εφαρμογές."
-
-msgid "Delete all contacts"
-msgstr "Διαγραφή όλων των επαφών"
-
-msgid ""
-"Empties the Hylki book. The address books of GNOME Contacts are not touched."
-msgstr ""
-"Αδειάζει το βιβλίο του Hylki. Τα βιβλία διευθύνσεων των Επαφών GNOME δεν "
-"επηρεάζονται."
-
-msgid "New Contacts"
-msgstr "Νέες επαφές"
-
-msgid "Save new contacts in"
-msgstr "Αποθήκευση νέων επαφών στο"
-
-msgid ""
-"The address book a contact made in Hylki goes to, unless another is picked "
-"when it is made."
-msgstr ""
-"Το βιβλίο διευθύνσεων όπου αποθηκεύεται μια επαφή που δημιουργείται στο "
-"Hylki, εκτός αν επιλεγεί άλλο κατά τη δημιουργία της."
 
 msgid ""
 "Receives messages the moment they arrive. Microsoft 365 accounts check at "
@@ -8068,6 +8115,74 @@ msgid "Hyprlab"
 msgstr "Hyprlab"
 
 #, fuzzy
+#~ msgid "CardDAV Accounts"
+#~ msgstr "Λογαριασμοί αλληλογραφίας"
+
+#, fuzzy
+#~ msgid "CardDAV accounts"
+#~ msgstr "Όλοι οι λογαριασμοί"
+
+#, fuzzy
+#~ msgid "No CardDAV accounts yet."
+#~ msgstr "Δεν υπάρχουν ακόμη λογαριασμοί cloud."
+
+#, fuzzy
+#~ msgid "CardDAV Account"
+#~ msgstr "Λογαριασμός cloud"
+
+#, fuzzy
+#~ msgid "Edit Account"
+#~ msgstr "Επεξεργασία λογαριασμού cloud"
+
+#, fuzzy
+#~ msgid "Add Account"
+#~ msgstr "Προσθήκη λογαριασμού"
+
+#, fuzzy
+#~ msgid "Use this account's address books"
+#~ msgstr "Χρήση αυτού του λογαριασμού στο Hylki"
+
+#~ msgid "LDAP Directories"
+#~ msgstr "Κατάλογοι LDAP"
+
+#~ msgid "LDAP directories"
+#~ msgstr "Κατάλογοι LDAP"
+
+#~ msgid "Add Directory…"
+#~ msgstr "Προσθήκη καταλόγου…"
+
+#~ msgid "No directories yet."
+#~ msgstr "Δεν υπάρχουν ακόμη κατάλογοι."
+
+#~ msgid ""
+#~ "Evolution Data Server, which keeps the directories, is not available on "
+#~ "this system."
+#~ msgstr ""
+#~ "Ο Evolution Data Server, ο οποίος διαχειρίζεται τους καταλόγους, δεν "
+#~ "είναι διαθέσιμος σε αυτό το σύστημα."
+
+#~ msgid "Edit Directory"
+#~ msgstr "Επεξεργασία καταλόγου"
+
+#~ msgid "Add Directory"
+#~ msgstr "Προσθήκη καταλόγου"
+
+#~ msgid "Look up recipients in this directory"
+#~ msgstr "Αναζήτηση παραληπτών σε αυτόν τον κατάλογο"
+
+#, fuzzy
+#~ msgid "Save the CardDAV account?"
+#~ msgstr "Αποθήκευση του λογαριασμού;"
+
+#, fuzzy
+#~ msgid ""
+#~ "The CardDAV account editor is open. Save what you changed, or discard it, "
+#~ "before moving on."
+#~ msgstr ""
+#~ "Το πρόγραμμα επεξεργασίας λογαριασμού είναι ανοικτό. Αποθηκεύστε τις "
+#~ "αλλαγές σας ή απορρίψτε τις πριν συνεχίσετε."
+
+#, fuzzy
 #~ msgid "Message sent"
 #~ msgstr "Λίστα μηνυμάτων"
 
@@ -8216,9 +8331,6 @@ msgstr "Hyprlab"
 #~ msgid_plural "Send them with the message"
 #~ msgstr[0] "Επεξεργασία αυτού του μηνύματος"
 #~ msgstr[1] "Επεξεργασία αυτού του μηνύματος"
-
-#~ msgid "Found in GNOME Online Accounts"
-#~ msgstr "Βρέθηκε στους Διαδικτυακούς λογαριασμούς GNOME"
 
 #~ msgid "Start Reading"
 #~ msgstr "Έναρξη ανάγνωσης"

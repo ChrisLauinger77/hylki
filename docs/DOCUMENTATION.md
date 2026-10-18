@@ -11,6 +11,7 @@ keyboard.
 - [GNOME Online Accounts](#gnome-online-accounts)
 - [OAuth (Google / Microsoft)](#oauth-google--microsoft)
 - [Cloud attachments (Nextcloud, OneDrive, Dropbox, Seafile)](#cloud-attachments-nextcloud-onedrive-dropbox-seafile)
+- [Address books](#address-books)
 - [CardDAV accounts](#carddav-accounts)
 - [LDAP directories](#ldap-directories)
 - [Translating messages](#translating-messages)
@@ -466,6 +467,38 @@ of the generated one.
   empty. Link passwords and expiry dates are a paid Dropbox feature; on a
   Basic plan leave both off, or the share step reports it.
 
+### Address books
+
+**Settings → Contacts** lists every address book Hylki reads contacts from,
+one row each, as Mail Accounts lists mail accounts: the Hylki book, the books
+on this computer that GNOME Contacts and Evolution keep, each GNOME Online
+Accounts account that keeps contacts (Google, Microsoft 365, Nextcloud,
+iCloud), each [CardDAV account](#carddav-accounts) and each
+[LDAP directory](#ldap-directories). A row names the account, what it holds,
+and where it was set up: **Hylki**, **GOA** or **Evolution**.
+
+A row's switch uses the address book in Hylki or leaves it out: of Contacts,
+the composer's suggestions, sender pictures, the
+[filters on Contacts](#filtering-on-contacts) and syncing. The switch is
+Hylki's own; GNOME Contacts and Evolution go on using the book. An account
+whose Contacts are switched off in GNOME Online Accounts has its switch
+greyed out, and says so.
+
+The arrow at the end of a row opens the address book's page. An account's
+page lists its address books, each with a switch of its own, under the
+account's switch. The Hylki book's page holds its import and export. A
+GNOME Online Accounts account's page has **Open Online Accounts**, where its
+sign-in is changed; a CardDAV account's and a directory's page is their form,
+with **Remove**.
+
+**Add Address Book…** offers a CardDAV server, iCloud, Nextcloud, Fastmail,
+Yahoo and an LDAP directory, set up in Hylki, and Google and Microsoft 365,
+which are added in GNOME Online Accounts and then listed here; the refresh
+button beside it looks again for one just added there. Every kind but the
+Hylki book is kept by Evolution Data Server; without it, the page says so.
+**Save new contacts in**, at the foot of the page, sets the book a contact
+made in Hylki goes to.
+
 ### The Hylki address book
 
 Hylki keeps an address book of its own, the **Hylki Address Book**, beside
@@ -481,13 +514,14 @@ book** row at the top of its form that picks where it is saved; it starts on
 the book the list shows, or on the default book when the list shows them
 all. A contact being edited stays in its book, which the form names.
 
-**Settings → Contacts** manages the Hylki book: how many contacts it holds,
-**Import vCard files**, **Export as a vCard file** (one `.vcf` file with every
-contact, which other apps can import) and **Delete all contacts**, which asks
-first and leaves the GNOME Contacts books alone. **Save new contacts in**
-sets the default book for contacts made in Hylki, from the Contacts view or
-with **Add Sender to Contacts**. Until it is set, a new contact goes to the
-first writable EDS book, or to the Hylki book when there is none.
+The Hylki book's page in **Settings → Contacts** shows how many contacts it
+holds, and has **Import vCard files**, **Export as a vCard file** (one `.vcf`
+file with every contact, which other apps can import) and **Delete all
+contacts**, which asks first and leaves the other books alone. **Save new
+contacts in**, on the same page as the list, sets the default book for
+contacts made in Hylki, from the Contacts view or with **Add Sender to
+Contacts**. Until it is set, a new contact goes to the first writable EDS
+book, or to the Hylki book when there is none.
 
 Importing reads `.vcf` files into the Hylki book, from Settings or from the
 import button in the Contacts view's header. A file can hold many contacts,
@@ -561,13 +595,14 @@ address condition with no text, which matches nothing.
 
 ### CardDAV accounts
 
-Settings → CardDAV Accounts adds the address books on a CardDAV server, such
-as Nextcloud, iCloud, Fastmail, Radicale or a mail provider's, without GNOME
-Online Accounts or Evolution. Their contacts are listed in Contacts,
+**Add Address Book…** in Settings → Contacts adds the address books on a
+CardDAV server, such as Nextcloud, iCloud, Fastmail, Radicale or a mail
+provider's, without GNOME Online Accounts or Evolution. Their contacts are listed in Contacts,
 in the book list above them, and suggested in the composer; a contact added
 or changed in Hylki is saved to the server.
 
-**Add Account…** asks for three things:
+Pick **CardDAV Server**, or the service by name: iCloud, Fastmail and Yahoo
+fill in their server, and Nextcloud asks for yours. The form asks for:
 
 - **Server**: the server's address is enough for most services, such as
   `nextcloud.example.org`, and Hylki finds the address books on it. A full
@@ -578,7 +613,7 @@ or changed in Hylki is saved to the server.
   wants an app password made for Hylki: iCloud, Fastmail, and Nextcloud with
   two-factor sign-in among them.
 
-Below the accounts, **From your mail accounts** lists the mail accounts set
+Below the address books, **From your mail accounts** lists the mail accounts set
 up in Hylki whose provider keeps contacts on CardDAV under the same app
 password: iCloud, Fastmail and Yahoo. **Add Address Books** adds them with
 the mail account's user name and password, so nothing is typed again; when
@@ -591,14 +626,14 @@ it may be the same account under another address.
 
 Saving looks for the address books and says how many it found, or why it
 found none (a password the server refused, a server it could not reach). The
-account's row lists its address books by name, or what went wrong. Its
-switch turns the account off without removing it, and **Remove**, in its
-editor, removes the account and its address books from this computer,
-leaving the server as it is.
+account's row lists its address books by name, or what went wrong. Its page
+has the form, the address books with a switch each, and **Remove**, which
+removes the account and its address books from this computer, leaving the
+server as it is.
 
 Google and Microsoft 365 address books are added in GNOME Online Accounts
-instead: Google takes no password over CardDAV, and Microsoft 365 has no
-CardDAV.
+instead, which **Add Address Book…** points to: Google takes no password over
+CardDAV, and Microsoft 365 has no CardDAV.
 
 An account is kept by Evolution Data Server, the service GNOME Contacts and
 Evolution keep their address books in, as one of Evolution's own collection
@@ -615,8 +650,9 @@ GNOME. Without it, the page says so.
 
 ### LDAP directories
 
-Settings → LDAP Directories holds the directories the composer looks
-recipients up in. Once three characters of a name or address are typed in
+The directories the composer looks recipients up in are added in Settings →
+Contacts, with **Add Address Book…** → **LDAP Directory**, and listed there
+with the other address books. Once three characters of a name or address are typed in
 To, Cc or Bcc, each directory that is switched on is asked for people whose
 name, surname or address starts with them, and the answers join the
 suggestions from GNOME Contacts and your mail. Nothing is copied from the
@@ -659,8 +695,7 @@ why not (a password it refused, a server it could not reach or find, TLS
 that could not start). The check gives up after 30 seconds. A directory
 that fails during a search, such as one that needs a password neither
 Hylki nor Evolution has, says why under **In Directories** in Contacts, once
-in the status bar of each composer, and in its row in Settings → LDAP
-Directories. It is left alone for 30 seconds before it is asked again. The
+in the status bar of each composer, and in its row in Settings → Contacts. It is left alone for 30 seconds before it is asked again. The
 console ([the status bar](#the-status-bar) with **Settings → System → Console
 mode** on) records each directory's answer to a search: how many entries it
 found and how many of them have an address, and **Export log** saves it. The Flatpak

@@ -12,6 +12,7 @@ mod cloud;
 mod color;
 mod config;
 mod console_log;
+mod contact_sources;
 mod contacts;
 mod datefmt;
 mod desktop;
