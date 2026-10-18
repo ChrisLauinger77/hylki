@@ -5,7 +5,8 @@
 //! sync). Anything Hylki doesn't do — linking, photos, address books — is one
 //! click away via "Open GNOME Contacts".
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use adw::prelude::*;
@@ -66,8 +67,20 @@ pub struct ContactsPage {
     sort: ContactSort,
     /// Index into `contacts` of the contact shown in the detail pane.
     selected: Option<usize>,
-    /// Filtered + sorted list-row order → index into `contacts`.
-    row_map: Vec<usize>,
+    /// List position → index into `contacts` (or a directory hit, see
+    /// [`DIRECTORY`]); `None` for a line that is nobody, such as a heading.
+    row_map: Vec<Option<usize>>,
+    /// The list's lines, shown by a list view that builds rows only for the
+    /// lines on screen: a thousand contacts took most of a second to build
+    /// as rows, at every visit and every key typed in the search (#477).
+    store: gtk::gio::ListStore,
+    selection: gtk::SingleSelection,
+    /// The row widgets the list view has made, by their list item.
+    rows: Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
+    /// One list item per contact, in step with `contacts`. The same item
+    /// keeps its row through a search, a sort or a re-read that leaves it
+    /// as it was: the view makes rows only for items it has not shown.
+    items: Vec<gtk::glib::BoxedAnyObject>,
     /// A load is underway (the page was just opened).
     loading: bool,
     /// The editor form, while open. `editing_target` is the contact or group
@@ -87,8 +100,6 @@ pub struct ContactsPage {
     book_filter: Option<String>,
     /// The filter's entries after "All Address Books": (book UID, name).
     filter_books: Vec<(String, String)>,
-    /// Set while the filter's model is replaced, which fires its notify.
-    filter_guard: std::cell::Cell<bool>,
     /// The people the LDAP directories hold for the search (#307), listed
     /// after the contacts under their own heading. Read-only: they can be
     /// written to and added to Contacts, not edited.
@@ -111,6 +122,8 @@ pub struct ContactsPage {
     /// A read that came in while a form was open, applied once it closes:
     /// a sync in the background must not throw away what is being typed.
     pending: Option<Vec<ContactDetails>>,
+    /// The photos handed to a decoding thread that has not finished them.
+    decoding: std::collections::HashSet<u64>,
 }
 
 #[derive(Debug)]
@@ -121,7 +134,10 @@ pub enum ContactsPageInput {
     SetLoading,
     Query(String),
     SetSort(ContactSort),
-    RowSelected(i32),
+    /// The list's selection moved to this position.
+    RowSelected(u32),
+    /// A right-click on the line for this entry, at (x, y) on the list.
+    RowMenu { idx: usize, x: f64, y: f64 },
     Compose(String),
     OpenUrl(String),
     /// Edit the selected contact / a specific one (context menu).
@@ -166,6 +182,8 @@ pub enum ContactsPageInput {
     SuggestionsLoaded(Vec<crate::contacts::Suggestion>),
     /// Pick this entry of the book filter, as if chosen.
     PickBook(u32),
+    /// More list photos are decoded and cached.
+    PhotosDecoded,
 }
 
 #[derive(Debug)]
@@ -388,15 +406,9 @@ impl Component for ContactsPage {
                             set_hscrollbar_policy: gtk::PolicyType::Never,
 
                             #[name = "list"]
-                            gtk::ListBox {
+                            gtk::ListView {
                                 add_css_class: "navigation-sidebar",
                                 add_css_class: "contacts-listbox",
-                                set_selection_mode: gtk::SelectionMode::Single,
-                                connect_row_selected[sender] => move |_, row| {
-                                    if let Some(row) = row {
-                                        sender.input(ContactsPageInput::RowSelected(row.index()));
-                                    }
-                                },
                             },
                         },
                     },
@@ -467,6 +479,10 @@ impl Component for ContactsPage {
             sort: ContactSort::FirstName,
             selected: None,
             row_map: Vec::new(),
+            store: gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>(),
+            selection: gtk::SingleSelection::builder().autoselect(false).can_unselect(true).build(),
+            rows: Rc::new(RefCell::new(HashMap::new())),
+            items: Vec::new(),
             loading: true,
             editor: None,
             editing_target: None,
@@ -474,13 +490,13 @@ impl Component for ContactsPage {
             books: Vec::new(),
             book_filter: None,
             filter_books: Vec::new(),
-            filter_guard: std::cell::Cell::new(false),
             directory_hits: Vec::new(),
             directory_generation: 0,
             directories: Vec::new(),
             directory_failures: Vec::new(),
             suggestions: Rc::new(RefCell::new(Vec::new())),
             pending: None,
+            decoding: std::collections::HashSet::new(),
         };
         let widgets = view_output!();
         widgets.detail_overlay.add_overlay(&compose_slot);
@@ -537,24 +553,18 @@ impl Component for ContactsPage {
             widgets.sort_btn.set_popover(Some(&pop));
         }
 
-        // The directory entries sit under a heading of their own, so nobody
-        // takes them for contacts.
-        widgets.list.set_header_func(|row, before| {
-            let first = row.has_css_class("directory-hit")
-                && !before.is_some_and(|b| b.has_css_class("directory-hit"));
-            if !first {
-                row.set_header(None::<&gtk::Widget>);
-                return;
-            }
-            let heading = gtk::Label::new(Some(&i18n("In Directories")));
-            heading.add_css_class("heading");
-            heading.add_css_class("dim-label");
-            heading.set_xalign(0.0);
-            heading.set_margin_top(12);
-            heading.set_margin_bottom(4);
-            heading.set_margin_start(12);
-            row.set_header(Some(&heading));
-        });
+        model.selection.set_model(Some(&model.store));
+        {
+            let s = sender.input_sender().clone();
+            model.selection.connect_selected_notify(move |selection| {
+                let pos = selection.selected();
+                if pos != gtk::INVALID_LIST_POSITION {
+                    let _ = s.send(ContactsPageInput::RowSelected(pos));
+                }
+            });
+        }
+        widgets.list.set_model(Some(&model.selection));
+        widgets.list.set_factory(Some(&row_factory(&model.rows, sender.input_sender())));
 
         ComponentParts { model, widgets }
     }
@@ -590,12 +600,23 @@ impl Component for ContactsPage {
                     contacts.iter().map(|c| (c.book_uid.clone(), c.eds_uid.clone())).collect();
                 self.deleted.retain(|key| incoming.contains(key));
                 contacts.retain(|c| !self.deleted.contains(&(c.book_uid.clone(), c.eds_uid.clone())));
+                // Every visit re-reads the books, and a sync behind it reads
+                // them again; unchanged, the list on screen stays (#477).
+                if !contacts.is_empty() && same_contacts(&self.contacts, &contacts) {
+                    // In the same order, so every index still holds: the
+                    // fresh cards (an edit patches them) without new rows.
+                    self.contacts = contacts;
+                    self.loading = false;
+                    self.update_view(widgets, sender);
+                    return;
+                }
                 // Keep the same person selected across a refresh, by identity.
                 let on_hit = self.selected.filter(|&i| i >= DIRECTORY);
                 let keep = self
                     .selected
                     .and_then(|i| self.contacts.get(i))
                     .map(|c| (c.name.clone(), c.primary_email().map(str::to_string)));
+                self.items = self.items_for(&contacts);
                 self.contacts = contacts;
                 self.loading = false;
                 self.editor = None;
@@ -731,8 +752,8 @@ impl Component for ContactsPage {
                 }
             }
 
-            ContactsPageInput::RowSelected(row) => {
-                let Some(&idx) = self.row_map.get(row as usize) else { return };
+            ContactsPageInput::RowSelected(pos) => {
+                let Some(&Some(idx)) = self.row_map.get(pos as usize) else { return };
                 if self.selected == Some(idx) && self.editor.is_none() {
                     return;
                 }
@@ -762,7 +783,7 @@ impl Component for ContactsPage {
             ContactsPageInput::EditIndex(idx) => {
                 if idx < self.contacts.len() {
                     self.selected = Some(idx);
-                    self.select_row_for(widgets, idx);
+                    self.select_row_for(idx);
                     self.edit(widgets, &sender, idx);
                 }
             }
@@ -946,14 +967,31 @@ impl Component for ContactsPage {
                 self.refresh_book_filter(widgets);
             }
 
-            ContactsPageInput::FilterBook(index) => {
-                if self.filter_guard.get() {
-                    return;
+            ContactsPageInput::PhotosDecoded => {
+                for row in self.rows.borrow().values() {
+                    row.show_photo();
                 }
-                self.book_filter = (index as usize)
+                self.decoding.retain(|key| crate::avatar::photo_thumbnail(*key).is_none());
+            }
+
+            ContactsPageInput::RowMenu { idx, x, y } => {
+                let entries = self.row_menu(idx, &sender);
+                if !entries.is_empty() {
+                    show_context_menu(&widgets.list, x, y, entries);
+                }
+            }
+
+            ContactsPageInput::FilterBook(index) => {
+                let picked = (index as usize)
                     .checked_sub(1)
                     .and_then(|i| self.filter_books.get(i))
                     .map(|(uid, _)| uid.clone());
+                // Replacing the filter's model notifies too, after the fact:
+                // the same book again is no reason to list everyone anew.
+                if picked == self.book_filter {
+                    return;
+                }
+                self.book_filter = picked;
                 if self.editor.is_none() {
                     self.selected = None;
                 }
@@ -971,6 +1009,10 @@ impl Component for ContactsPage {
                     return;
                 };
                 let c = self.contacts.remove(idx);
+                self.items.remove(idx);
+                for (i, item) in self.items.iter().enumerate() {
+                    item.borrow::<Line>().idx.set(Some(i));
+                }
                 if !c.eds_uid.is_empty() {
                     self.deleted.insert((c.book_uid.clone(), c.eds_uid.clone()));
                     let _ = sender.output(ContactsPageOutput::DeleteContact {
@@ -1053,35 +1095,29 @@ impl ContactsPage {
         if at == 0 {
             self.book_filter = None;
         }
-        self.filter_guard.set(true);
         widgets.book_filter.set_model(Some(&gtk::StringList::new(&labels)));
         widgets.book_filter.set_selected(at as u32);
-        self.filter_guard.set(false);
         widgets.book_filter.set_visible(self.filter_books.len() > 1);
     }
 
     /// Move the list selection to the row showing contact `idx` (if visible).
-    fn select_row_for(&self, widgets: &ContactsPageWidgets, idx: usize) {
-        if let Some(pos) = self.row_map.iter().position(|&i| i == idx) {
-            if let Some(row) = widgets.list.row_at_index(pos as i32) {
-                widgets.list.select_row(Some(&row));
-            }
+    fn select_row_for(&self, idx: usize) {
+        if let Some(pos) = self.row_map.iter().position(|&i| i == Some(idx)) {
+            self.selection.set_selected(pos as u32);
         }
     }
 
     /// Rebuild the list from `contacts` + `query` + `sort`, keep (or default)
     /// the selection, and render its detail card.
     fn rebuild(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
+        let started = std::time::Instant::now();
         let empty = self.contacts.is_empty() && self.directories.is_empty();
         widgets.page_stack.set_visible_child_name(if empty { "none" } else { "browser" });
 
-        while let Some(child) = widgets.list.first_child() {
-            widgets.list.remove(&child);
-        }
-        self.row_map = (0..self.contacts.len())
+        let mut people: Vec<usize> = (0..self.contacts.len())
             .filter(|&i| self.matches(&self.contacts[i]))
             .collect();
-        self.row_map.sort_by_key(|&i| {
+        people.sort_by_key(|&i| {
             let c = &self.contacts[i];
             let name = c.name.to_lowercase();
             match self.sort {
@@ -1102,110 +1138,19 @@ impl ContactsPage {
             i18n_f(
                 "{shown} of {total}",
                 &[
-                    ("shown", &self.row_map.len().to_string()),
+                    ("shown", &people.len().to_string()),
                     ("total", &self.contacts.len().to_string()),
                 ],
             )
         });
-        // The groups a person can be put in from their menu, by name.
-        let mut editable_groups: Vec<(usize, String)> = (0..self.contacts.len())
-            .filter(|&i| self.contacts[i].group_editable())
-            .map(|i| (i, self.contacts[i].name.clone()))
-            .collect();
-        editable_groups.sort_by_key(|(_, name)| name.to_lowercase());
-        let editable_groups = Rc::new(editable_groups);
-        for &idx in &self.row_map {
-            let c = &self.contacts[idx];
-            let row = adw::ActionRow::new();
-            row.set_title(&gtk::glib::markup_escape_text(&c.name));
-            if c.is_group() {
-                row.set_subtitle(&gtk::glib::markup_escape_text(&group_byline(c)));
-            } else if let Some(email) = c.primary_email() {
-                if email != c.name {
-                    row.set_subtitle(&gtk::glib::markup_escape_text(email));
-                }
-            }
-            row.set_activatable(true);
-            row.add_prefix(&avatar_for(c, 34));
-
-            // Right-click: the quick actions on this entry.
-            let local = crate::contacts::is_local_book(&c.book_uid);
-            let group = c.is_group();
-            let editable = !group || c.group_editable();
-            let has_members = !c.members.is_empty();
-            // A person with an address can go in a group they are not in.
-            let groups: Vec<(usize, String)> = match c.primary_email().filter(|_| !group) {
-                Some(email) => editable_groups
-                    .iter()
-                    .filter(|(g, _)| !self.contacts[*g].members.iter().any(|m| m.email.eq_ignore_ascii_case(email)))
-                    .cloned()
-                    .collect(),
-                None => Vec::new(),
-            };
-            let right_click = gtk::GestureClick::new();
-            right_click.set_button(3);
-            let s = sender.input_sender().clone();
-            right_click.connect_pressed(move |gesture, _, x, y| {
-                let Some(widget) = gesture.widget() else { return };
-                let (se, sd, sg) = (s.clone(), s.clone(), s.clone());
-                let mut first = vec![MenuEntry::new(i18n("Edit"), move || {
-                    let _ = se.send(ContactsPageInput::EditIndex(idx));
-                })
-                .icon("document-edit-symbolic")
-                .enabled(editable)];
-                if group {
-                    let sc = s.clone();
-                    first.push(
-                        MenuEntry::new(i18n("New message"), move || {
-                            let _ = sc.send(ContactsPageInput::ComposeGroup(idx));
-                        })
-                        .icon("mail-message-new-symbolic")
-                        .enabled(has_members),
-                    );
-                }
-                if !groups.is_empty() {
-                    let entries = groups
-                        .iter()
-                        .map(|(g, name)| {
-                            let (sa, g) = (s.clone(), *g);
-                            MenuEntry::new(name.clone(), move || {
-                                let _ = sa.send(ContactsPageInput::AddToGroup { group: g, person: idx });
-                            })
-                            .icon("system-users-symbolic")
-                        })
-                        .collect();
-                    first.push(MenuEntry::submenu(i18n("Add to Group"), vec![entries]).icon("system-users-symbolic"));
-                }
-                // GNOME Contacts knows nothing of the Hylki book, nor of groups.
-                if !local && !group {
-                    first.push(
-                        MenuEntry::new(i18n("Open in GNOME Contacts"), move || {
-                            let _ = sg.send(ContactsPageInput::OpenInGnome(idx));
-                        })
-                        .icon("adw-external-link-symbolic"),
-                    );
-                }
-                show_context_menu(
-                    &widget,
-                    x,
-                    y,
-                    vec![
-                        first,
-                        vec![MenuEntry::new(i18n("Delete…"), move || {
-                            let _ = sd.send(ContactsPageInput::DeleteRequest(idx));
-                        })
-                        .icon("user-trash-symbolic")],
-                    ],
-                );
-            });
-            row.add_controller(right_click);
-            widgets.list.append(&row);
-        }
+        let mut lines: Vec<Line> = Vec::new();
 
         // The directories' answers, after the contacts and by name whatever
-        // the sort. The book filter keeps those of the directory it names.
+        // the sort, under a heading of their own so nobody takes them for
+        // contacts. The book filter keeps those of the directory it names.
         let in_filter = |uid: &str| self.book_filter.as_deref().is_none_or(|b| b == uid);
         let mut listed = std::collections::HashSet::new();
+        let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
             if !in_filter(&c.book_uid) {
                 continue;
@@ -1215,64 +1160,22 @@ impl ContactsPage {
                 continue;
             }
             listed.extend(emails);
-            let idx = DIRECTORY + i;
-            self.row_map.push(idx);
-            let row = adw::ActionRow::new();
-            row.add_css_class("directory-hit");
-            row.set_title(&gtk::glib::markup_escape_text(&c.name));
             // Which directory it is in, after the address.
-            let sub = match c.primary_email() {
+            let subtitle = match c.primary_email() {
                 Some(email) => format!("{email} · {}", c.book_name),
                 None => c.book_name.clone(),
             };
-            row.set_subtitle(&gtk::glib::markup_escape_text(&sub));
-            row.set_activatable(true);
-            row.add_prefix(&avatar_for(c, 34));
-            let right_click = gtk::GestureClick::new();
-            right_click.set_button(3);
-            let s = sender.input_sender().clone();
-            let email = c.primary_email().map(str::to_string);
-            right_click.connect_pressed(move |gesture, _, x, y| {
-                let Some(widget) = gesture.widget() else { return };
-                let mut entries = Vec::new();
-                if let Some(email) = email.clone() {
-                    let sc = s.clone();
-                    entries.push(
-                        MenuEntry::new(i18n("New message"), move || {
-                            let _ = sc.send(ContactsPageInput::Compose(email.clone()));
-                        })
-                        .icon("mail-message-new-symbolic"),
-                    );
-                }
-                let sa = s.clone();
-                entries.push(
-                    MenuEntry::new(i18n("Add to Contacts"), move || {
-                        let _ = sa.send(ContactsPageInput::AddDirectoryHit(idx));
-                    })
-                    .icon("contact-new-symbolic"),
-                );
-                show_context_menu(&widget, x, y, vec![entries]);
-            });
-            row.add_controller(right_click);
-            widgets.list.append(&row);
+            hits.push(Line::entry(DIRECTORY + i, c, subtitle));
+        }
+        if !hits.is_empty() {
+            lines.push(Line::other(LineKind::Heading, i18n("In Directories"), String::new()));
+            lines.extend(hits);
         }
 
         // A directory that did not answer, last and not selectable, so a
         // search that finds nobody in it says why.
         for f in self.directory_failures.iter().filter(|f| in_filter(&f.uid)) {
-            let row = adw::ActionRow::new();
-            row.add_css_class("directory-hit");
-            row.set_selectable(false);
-            row.set_activatable(false);
-            row.set_title(&gtk::glib::markup_escape_text(&f.name));
-            row.set_subtitle(&gtk::glib::markup_escape_text(&f.message));
-            row.set_subtitle_lines(3);
-            let icon = gtk::Image::from_icon_name("dialog-warning-symbolic");
-            icon.add_css_class("warning");
-            // As wide as an avatar, so the names line up.
-            icon.set_size_request(34, -1);
-            row.add_prefix(&icon);
-            widgets.list.append(&row);
+            lines.push(Line::other(LineKind::Failure, f.name.clone(), f.message.clone()));
         }
 
         // A directory picked in the book filter is empty until searched.
@@ -1280,41 +1183,187 @@ impl ContactsPage {
             .book_filter
             .as_ref()
             .is_some_and(|b| self.directories.iter().any(|(uid, _)| uid == b));
-        if directory_picked && widgets.list.first_child().is_none() {
+        if directory_picked && people.is_empty() && lines.is_empty() {
             let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
                 i18n("Type three letters or more to search the directory.")
             } else {
                 i18n("Nobody in the directory matches.")
             };
-            let label = gtk::Label::new(Some(&text));
-            label.add_css_class("dim-label");
-            label.set_wrap(true);
-            label.set_justify(gtk::Justification::Center);
-            label.set_margin_top(24);
-            label.set_margin_start(12);
-            label.set_margin_end(12);
-            let row = gtk::ListBoxRow::new();
-            row.set_selectable(false);
-            row.set_activatable(false);
-            row.set_child(Some(&label));
-            widgets.list.append(&row);
+            lines.push(Line::other(LineKind::Note, text, String::new()));
         }
+
+        let items: Vec<gtk::glib::BoxedAnyObject> = people
+            .iter()
+            .filter_map(|&idx| self.items.get(idx).cloned())
+            .chain(lines.into_iter().map(gtk::glib::BoxedAnyObject::new))
+            .collect();
+        self.row_map = items.iter().map(|item| item.borrow::<Line>().idx.get()).collect();
+        let missing: std::collections::HashSet<u64> = items
+            .iter()
+            .filter_map(|item| match item.borrow::<Line>().kind {
+                LineKind::Entry { photo_key, .. } if photo_key != 0 => Some(photo_key),
+                _ => None,
+            })
+            .filter(|key| !self.decoding.contains(key) && crate::avatar::photo_thumbnail(*key).is_none())
+            .collect();
+        // Unselected first: the selection would otherwise follow the old
+        // lines through the swap and report a position in the new ones.
+        self.selection.set_selected(gtk::INVALID_LIST_POSITION);
+        self.store.splice(0, self.store.n_items(), &items);
 
         // Selection: keep it if it survived the filter, else the first match.
         let shown_pos = self
             .selected
-            .and_then(|sel| self.row_map.iter().position(|&i| i == sel))
-            .or((!self.row_map.is_empty()).then_some(0));
+            .and_then(|sel| self.row_map.iter().position(|&i| i == Some(sel)))
+            .or_else(|| self.row_map.iter().position(Option::is_some));
         match shown_pos {
             Some(pos) => {
-                self.selected = Some(self.row_map[pos]);
-                if let Some(row) = widgets.list.row_at_index(pos as i32) {
-                    widgets.list.select_row(Some(&row));
-                }
+                self.selected = self.row_map[pos];
+                self.selection.set_selected(pos as u32);
             }
             None => self.selected = None,
         }
         self.render_detail(widgets, sender);
+        self.decode_photos(missing, sender);
+        tracing::debug!("contacts: listed {} in {:?}", self.row_map.len(), started.elapsed());
+    }
+
+    /// The list items for a fresh read: an unchanged line keeps the item it
+    /// had, and with it its row.
+    fn items_for(&self, contacts: &[ContactDetails]) -> Vec<gtk::glib::BoxedAnyObject> {
+        let mut had: HashMap<(&str, &str), &gtk::glib::BoxedAnyObject> = self
+            .contacts
+            .iter()
+            .zip(&self.items)
+            .map(|(c, item)| ((c.book_uid.as_str(), c.eds_uid.as_str()), item))
+            .collect();
+        contacts
+            .iter()
+            .enumerate()
+            .map(|(idx, c)| {
+                let subtitle = if c.is_group() {
+                    group_byline(c)
+                } else {
+                    c.primary_email().filter(|e| *e != c.name).unwrap_or_default().to_string()
+                };
+                let line = Line::entry(idx, c, subtitle);
+                match had.remove(&(c.book_uid.as_str(), c.eds_uid.as_str())) {
+                    Some(item) if *item.borrow::<Line>() == line => {
+                        item.borrow::<Line>().idx.set(Some(idx));
+                        item.clone()
+                    }
+                    _ => gtk::glib::BoxedAnyObject::new(line),
+                }
+            })
+            .collect()
+    }
+
+    /// Decode these photos on other threads; the rows waiting for them show
+    /// each as it lands.
+    fn decode_photos(&mut self, mut keys: std::collections::HashSet<u64>, sender: &ComponentSender<Self>) {
+        // Each photo once, however many people share it.
+        let photos: Vec<(u64, Vec<u8>)> = self
+            .contacts
+            .iter()
+            .chain(&self.directory_hits)
+            .filter_map(|c| {
+                let key = line_photo_key(c);
+                keys.remove(&key).then(|| Some((key, c.photo.clone()?))).flatten()
+            })
+            .collect();
+        if photos.is_empty() {
+            return;
+        }
+        self.decoding.extend(photos.iter().map(|(key, _)| *key));
+        let s = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            crate::avatar::decode_photo_thumbnails(photos, || {
+                let _ = s.send(ContactsPageInput::PhotosDecoded);
+            });
+        });
+    }
+
+    /// The right-click menu for an entry of the list.
+    fn row_menu(&self, idx: usize, sender: &ComponentSender<Self>) -> Vec<Vec<MenuEntry>> {
+        let s = sender.input_sender();
+        if idx >= DIRECTORY {
+            let Some(c) = self.entry(idx) else { return Vec::new() };
+            let mut entries = Vec::new();
+            if let Some(email) = c.primary_email().map(str::to_string) {
+                let sc = s.clone();
+                entries.push(
+                    MenuEntry::new(i18n("New message"), move || {
+                        let _ = sc.send(ContactsPageInput::Compose(email.clone()));
+                    })
+                    .icon("mail-message-new-symbolic"),
+                );
+            }
+            let sa = s.clone();
+            entries.push(
+                MenuEntry::new(i18n("Add to Contacts"), move || {
+                    let _ = sa.send(ContactsPageInput::AddDirectoryHit(idx));
+                })
+                .icon("contact-new-symbolic"),
+            );
+            return vec![entries];
+        }
+        let Some(c) = self.contacts.get(idx) else { return Vec::new() };
+        let local = crate::contacts::is_local_book(&c.book_uid);
+        let group = c.is_group();
+        let (se, sd, sg) = (s.clone(), s.clone(), s.clone());
+        let mut first = vec![MenuEntry::new(i18n("Edit"), move || {
+            let _ = se.send(ContactsPageInput::EditIndex(idx));
+        })
+        .icon("document-edit-symbolic")
+        .enabled(!group || c.group_editable())];
+        if group {
+            let sc = s.clone();
+            first.push(
+                MenuEntry::new(i18n("New message"), move || {
+                    let _ = sc.send(ContactsPageInput::ComposeGroup(idx));
+                })
+                .icon("mail-message-new-symbolic")
+                .enabled(!c.members.is_empty()),
+            );
+        }
+        // A person with an address can go in a group they are not in, by name.
+        if let Some(email) = c.primary_email().filter(|_| !group) {
+            let mut groups: Vec<(usize, &str)> = (0..self.contacts.len())
+                .filter(|&g| self.contacts[g].group_editable())
+                .filter(|&g| !self.contacts[g].members.iter().any(|m| m.email.eq_ignore_ascii_case(email)))
+                .map(|g| (g, self.contacts[g].name.as_str()))
+                .collect();
+            groups.sort_by_key(|(_, name)| name.to_lowercase());
+            if !groups.is_empty() {
+                let entries = groups
+                    .into_iter()
+                    .map(|(g, name)| {
+                        let sa = s.clone();
+                        MenuEntry::new(name.to_string(), move || {
+                            let _ = sa.send(ContactsPageInput::AddToGroup { group: g, person: idx });
+                        })
+                        .icon("system-users-symbolic")
+                    })
+                    .collect();
+                first.push(MenuEntry::submenu(i18n("Add to Group"), vec![entries]).icon("system-users-symbolic"));
+            }
+        }
+        // GNOME Contacts knows nothing of the Hylki book, nor of groups.
+        if !local && !group {
+            first.push(
+                MenuEntry::new(i18n("Open in GNOME Contacts"), move || {
+                    let _ = sg.send(ContactsPageInput::OpenInGnome(idx));
+                })
+                .icon("adw-external-link-symbolic"),
+            );
+        }
+        vec![
+            first,
+            vec![MenuEntry::new(i18n("Delete…"), move || {
+                let _ = sd.send(ContactsPageInput::DeleteRequest(idx));
+            })
+            .icon("user-trash-symbolic")],
+        ]
     }
 
     /// Fill the right-hand pane with the selected contact's card.
@@ -2149,6 +2198,326 @@ fn entry_row(title: &str, value: &str) -> adw::EntryRow {
     row
 }
 
+/// One line of the contact list.
+struct Line {
+    /// The entry the line shows (see `row_map`); `None` for one that is
+    /// nobody and cannot be selected. Moves when a contact before it is
+    /// deleted.
+    idx: Cell<Option<usize>>,
+    title: String,
+    subtitle: String,
+    kind: LineKind,
+}
+
+/// Lines are alike when they show the same thing, wherever they are.
+impl PartialEq for Line {
+    fn eq(&self, other: &Self) -> bool {
+        self.title == other.title && self.subtitle == other.subtitle && self.kind == other.kind
+    }
+}
+
+#[derive(PartialEq)]
+enum LineKind {
+    /// A person or a group, with their photo's key (0: none).
+    Entry { photo_key: u64, group: bool },
+    /// The heading above the people found in the directories.
+    Heading,
+    /// A directory that did not answer the search.
+    Failure,
+    /// A dim line in place of an empty list.
+    Note,
+}
+
+impl Line {
+    fn entry(idx: usize, c: &ContactDetails, subtitle: String) -> Self {
+        Line {
+            idx: Cell::new(Some(idx)),
+            title: c.name.clone(),
+            subtitle,
+            kind: LineKind::Entry { photo_key: line_photo_key(c), group: c.is_group() },
+        }
+    }
+
+    fn other(kind: LineKind, title: String, subtitle: String) -> Self {
+        Line { idx: Cell::new(None), title, subtitle, kind }
+    }
+}
+
+/// The key a contact's photo is decoded under. A read of the address books
+/// works it out off the main thread; a directory entry's is worked out here.
+fn line_photo_key(c: &ContactDetails) -> u64 {
+    match (&c.photo, c.photo_key) {
+        (Some(photo), 0) => crate::contacts::photo_key(photo),
+        (_, key) => key,
+    }
+}
+
+/// The widgets of one row, which the list view binds to line after line.
+/// Kept light, since the view holds a couple of hundred: the face is an
+/// image in a clipped disc rather than an `adw::Avatar`, and the parts only
+/// a heading, a note or a group needs are made when one first shows here.
+struct ListRow {
+    root: gtk::Box,
+    header: gtk::Box,
+    /// The circle the face is drawn in; its rounded corners clip a photo.
+    disc: gtk::Box,
+    face: gtk::Image,
+    warning: gtk::Image,
+    title: gtk::Label,
+    subtitle: gtk::Label,
+    /// For a group, or a name with no letter to draw: libadwaita's avatar.
+    avatar: RefCell<Option<adw::Avatar>>,
+    /// The heading or note text, for those lines.
+    banner: RefCell<Option<gtk::Label>>,
+    /// The line bound now, for the right-click.
+    line: RefCell<Option<gtk::glib::BoxedAnyObject>>,
+    /// The photo the face waits for (0: none).
+    waiting: Cell<u64>,
+}
+
+/// The size of a list face.
+const FACE: i32 = 34;
+
+impl ListRow {
+    fn new() -> Self {
+        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        // `header`, as in a list box row: the selected row's text turns
+        // white by that class (styles.css).
+        // The measures of the `adw::ActionRow` the list had before.
+        let header = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        header.add_css_class("header");
+        header.set_size_request(-1, 50);
+        header.set_margin_start(12);
+        header.set_margin_end(12);
+        let disc = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        disc.add_css_class("contact-face");
+        disc.set_overflow(gtk::Overflow::Hidden);
+        disc.set_valign(gtk::Align::Center);
+        let face = gtk::Image::new();
+        face.set_pixel_size(FACE);
+        disc.append(&face);
+        let warning = gtk::Image::from_icon_name("dialog-warning-symbolic");
+        warning.add_css_class("warning");
+        // As wide as a face, so the names line up.
+        warning.set_size_request(FACE, -1);
+        let text = gtk::Box::new(gtk::Orientation::Vertical, 3);
+        text.set_valign(gtk::Align::Center);
+        text.set_hexpand(true);
+        let title = gtk::Label::new(None);
+        title.set_xalign(0.0);
+        title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        let subtitle = gtk::Label::new(None);
+        subtitle.add_css_class("dim-label");
+        subtitle.add_css_class("caption");
+        subtitle.set_xalign(0.0);
+        subtitle.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        text.append(&title);
+        text.append(&subtitle);
+        header.append(&disc);
+        header.append(&warning);
+        header.append(&text);
+        root.append(&header);
+        ListRow {
+            root,
+            header,
+            disc,
+            face,
+            warning,
+            title,
+            subtitle,
+            avatar: RefCell::new(None),
+            banner: RefCell::new(None),
+            line: RefCell::new(None),
+            waiting: Cell::new(0),
+        }
+    }
+
+    fn bind(&self, item: &gtk::glib::BoxedAnyObject) {
+        let line = item.borrow::<Line>();
+        self.line.replace(Some(item.clone()));
+        self.waiting.set(0);
+        let banner = matches!(line.kind, LineKind::Heading | LineKind::Note);
+        self.header.set_visible(!banner);
+        self.show_banner(banner.then_some(&line));
+        if banner {
+            return;
+        }
+        self.title.set_label(&line.title);
+        self.subtitle.set_label(&line.subtitle);
+        self.subtitle.set_visible(!line.subtitle.is_empty());
+        let failure = matches!(line.kind, LineKind::Failure);
+        // A failure says why in full; an address fits one line.
+        self.subtitle.set_wrap(failure);
+        self.subtitle.set_lines(if failure { 3 } else { 1 });
+        self.warning.set_visible(failure);
+        self.disc.set_visible(!failure);
+        if let LineKind::Entry { photo_key, group } = line.kind {
+            let initials = (!group).then(|| crate::ui::initials::InitialsPaintable::for_name(&line.title)).flatten();
+            match initials {
+                Some(paintable) => {
+                    self.face.set_paintable(Some(&paintable));
+                    self.face.set_visible(true);
+                    self.show_avatar(None);
+                }
+                None => {
+                    self.face.set_visible(false);
+                    self.show_avatar(Some((&line.title, group)));
+                }
+            }
+            self.waiting.set(photo_key);
+            self.show_photo();
+        }
+    }
+
+    /// Put the awaited photo in the face, once it is decoded.
+    fn show_photo(&self) {
+        let key = self.waiting.get();
+        if key == 0 {
+            return;
+        }
+        if let Some(texture) = crate::avatar::photo_thumbnail(key) {
+            if let Some(texture) = texture {
+                self.face.set_paintable(Some(&texture));
+                self.face.set_visible(true);
+                self.show_avatar(None);
+            }
+            self.waiting.set(0);
+        }
+    }
+
+    /// libadwaita's avatar for `(name, group)`, in place of the face; `None`
+    /// hides it.
+    fn show_avatar(&self, who: Option<(&str, bool)>) {
+        let mut avatar = self.avatar.borrow_mut();
+        let Some((name, group)) = who else {
+            if let Some(a) = avatar.as_ref() {
+                a.set_visible(false);
+            }
+            return;
+        };
+        let a = avatar.get_or_insert_with(|| {
+            let a = adw::Avatar::new(FACE, None, true);
+            self.disc.append(&a);
+            a
+        });
+        a.set_text(Some(name));
+        a.set_show_initials(!group);
+        a.set_icon_name(group.then_some("system-users-symbolic"));
+        a.set_visible(true);
+    }
+
+    /// A heading's or a note's text in place of the row; `None` hides it.
+    fn show_banner(&self, line: Option<&Line>) {
+        let mut banner = self.banner.borrow_mut();
+        let Some(line) = line else {
+            if let Some(b) = banner.as_ref() {
+                b.set_visible(false);
+            }
+            return;
+        };
+        let label = banner.get_or_insert_with(|| {
+            let label = gtk::Label::new(None);
+            label.add_css_class("dim-label");
+            self.root.append(&label);
+            label
+        });
+        let heading = matches!(line.kind, LineKind::Heading);
+        label.set_label(&line.title);
+        label.set_css_classes(if heading { &["heading", "dim-label"] } else { &["dim-label"] });
+        label.set_xalign(if heading { 0.0 } else { 0.5 });
+        label.set_wrap(!heading);
+        label.set_justify(if heading { gtk::Justification::Left } else { gtk::Justification::Center });
+        label.set_margin_top(if heading { 12 } else { 24 });
+        label.set_margin_bottom(if heading { 4 } else { 0 });
+        label.set_margin_start(12);
+        label.set_margin_end(12);
+        label.set_visible(true);
+    }
+
+    /// The entry the bound line shows.
+    fn idx(&self) -> Option<usize> {
+        self.line.borrow().as_ref().and_then(|item| item.borrow::<Line>().idx.get())
+    }
+}
+
+/// The list view's rows: made for the lines on screen and bound to each
+/// line scrolled to.
+fn row_factory(
+    rows: &Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
+    input: &relm4::Sender<ContactsPageInput>,
+) -> gtk::SignalListItemFactory {
+    let factory = gtk::SignalListItemFactory::new();
+    let key = |obj: &gtk::glib::Object| obj.as_ptr() as usize;
+    {
+        let (rows, input) = (Rc::downgrade(rows), input.clone());
+        factory.connect_setup(move |_, obj| {
+            let (Some(rows), Some(item)) = (rows.upgrade(), obj.downcast_ref::<gtk::ListItem>()) else {
+                return;
+            };
+            let row = Rc::new(ListRow::new());
+            // Right-click: the quick actions on this entry, built when asked.
+            let right_click = gtk::GestureClick::new();
+            right_click.set_button(3);
+            let (weak, input) = (Rc::downgrade(&row), input.clone());
+            right_click.connect_pressed(move |gesture, _, x, y| {
+                let (Some(row), Some(widget)) = (weak.upgrade(), gesture.widget()) else { return };
+                let Some(idx) = row.idx() else { return };
+                let Some(list) = widget.ancestor(gtk::ListView::static_type()) else { return };
+                let Some(at) = widget.compute_point(&list, &gtk::graphene::Point::new(x as f32, y as f32)) else {
+                    return;
+                };
+                let _ = input.send(ContactsPageInput::RowMenu { idx, x: at.x().into(), y: at.y().into() });
+            });
+            row.root.add_controller(right_click);
+            item.set_child(Some(&row.root));
+            rows.borrow_mut().insert(key(obj), row);
+        });
+    }
+    {
+        let rows = Rc::downgrade(rows);
+        factory.connect_bind(move |_, obj| {
+            let Some(rows) = rows.upgrade() else { return };
+            let Some(item) = obj.downcast_ref::<gtk::ListItem>() else { return };
+            let Some(line) = item.item().and_downcast::<gtk::glib::BoxedAnyObject>() else { return };
+            let someone = line.borrow::<Line>().idx.get().is_some();
+            item.set_selectable(someone);
+            item.set_activatable(someone);
+            let row = rows.borrow().get(&key(obj)).cloned();
+            if let Some(row) = row {
+                row.bind(&line);
+            }
+        });
+    }
+    {
+        let rows = Rc::downgrade(rows);
+        factory.connect_teardown(move |_, obj| {
+            if let Some(rows) = rows.upgrade() {
+                rows.borrow_mut().remove(&key(obj));
+            }
+        });
+    }
+    factory
+}
+
+/// Whether a fresh read holds what the list already shows. The stored vCard
+/// carries everything parsed from it, the photo key a photo kept in a file.
+/// Its REV is left out: some books (Microsoft 365's Recent Contacts) stamp
+/// every card anew at every sync.
+fn same_contacts(shown: &[ContactDetails], read: &[ContactDetails]) -> bool {
+    fn card(c: &ContactDetails) -> impl Iterator<Item = &str> {
+        c.raw_vcard.lines().filter(|l| !l.starts_with("REV:") && !l.starts_with("REV;"))
+    }
+    shown.len() == read.len()
+        && shown.iter().zip(read).all(|(a, b)| {
+            a.book_uid == b.book_uid
+                && a.book_name == b.book_name
+                && a.eds_uid == b.eds_uid
+                && a.name == b.name
+                && a.photo_key == b.photo_key
+                && card(a).eq(card(b))
+        })
+}
+
 /// The contact's avatar: their GNOME Contacts photo when they have one, the
 /// usual initials disc when not.
 fn avatar_for(c: &ContactDetails, size: i32) -> adw::Avatar {
@@ -2212,4 +2581,34 @@ fn copy_button(text: &str) -> gtk::Button {
         });
     });
     b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::same_contacts;
+    use crate::contacts::ContactDetails;
+
+    fn contact(vcard: &str) -> ContactDetails {
+        ContactDetails {
+            name: "Ann".into(),
+            book_uid: "book".into(),
+            eds_uid: "ann".into(),
+            raw_vcard: vcard.into(),
+            ..ContactDetails::default()
+        }
+    }
+
+    /// A sync that only stamps the cards anew leaves the list as it is; any
+    /// real change, a new photo among them, has it listed again (#477).
+    #[test]
+    fn a_reread_that_only_moves_rev_is_the_same_list() {
+        let card = |rev: &str, tel: &str| format!("BEGIN:VCARD\r\nFN:Ann\r\nREV:{rev}\r\nTEL:{tel}\r\nEND:VCARD");
+        let shown = vec![contact(&card("2026-10-18T12:23:02Z", "1"))];
+        assert!(same_contacts(&shown, &[contact(&card("2026-10-18T12:25:15Z", "1"))]));
+        assert!(!same_contacts(&shown, &[contact(&card("2026-10-18T12:25:15Z", "2"))]));
+        let mut photo = contact(&card("2026-10-18T12:23:02Z", "1"));
+        photo.photo_key = 7;
+        assert!(!same_contacts(&shown, &[photo]));
+        assert!(!same_contacts(&shown, &[]));
+    }
 }

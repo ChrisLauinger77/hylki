@@ -572,6 +572,11 @@ flowbox.attach-flow > flowboxchild {
   background-color: @accent_bg_color;
 }
 
+/* A contact's face in the list: the disc clips a photo round. */
+.contact-face {
+  border-radius: 9999px;
+}
+
 /* Scoped to the row's own header box: a context-menu popover anchored to the
    row is also its descendant, and a bare `label` selector painted the menu's
    text white-on-white. */

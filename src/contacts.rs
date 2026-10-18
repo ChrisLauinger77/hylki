@@ -1432,6 +1432,9 @@ pub struct ContactDetails {
     pub addresses: Vec<Labeled>,
     pub urls: Vec<String>,
     pub photo: Option<Vec<u8>>,
+    /// [`photo_key`] of `photo`, set by [`read_contact_details`]; 0 when
+    /// there is none or it was not worked out.
+    pub photo_key: u64,
     /// EDS source UID of the book this contact came from — where edits go.
     pub book_uid: String,
     /// That book's display name ("On This Computer", the CardDAV account…).
@@ -1706,7 +1709,21 @@ pub fn read_contact_details() -> Vec<ContactDetails> {
     // filter that de-duplicates the EDS books among themselves.
     out.extend(local_details());
     out.sort_by_key(|c| c.name.to_lowercase());
+    // Hashed here, off the main thread: the page finds the photos it has
+    // decoded already by these (#477).
+    for c in &mut out {
+        c.photo_key = c.photo.as_deref().map_or(0, photo_key);
+    }
     out
+}
+
+/// A photo's identity, for the decoded avatars kept between reads. Never 0,
+/// which stands for no photo.
+pub fn photo_key(bytes: &[u8]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish().max(1)
 }
 
 fn read_detail_db(

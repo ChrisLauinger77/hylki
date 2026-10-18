@@ -166,6 +166,15 @@
   reply in Sent deleted from the conversation left the row's message count
   and newest message as they were.
 
+- **Fixed: Contacts was slow to open, every time** (#477). Each visit read
+  the address books again, decoded every photo at full size and built a row
+  for every contact, which took seconds with a thousand contacts; each key
+  typed in the search built the rows again. The list is now read in the
+  background after start and kept between visits, a photo is decoded once,
+  at list size and away from the window, and the list makes rows only for
+  the contacts on screen. Contacts opens at once, and a visit still reads
+  the books again and changes only what changed.
+
 - **Fixed: a keyring that asks first was taken for no keyring** (PR #466 by
   Comodino). Every keyring read gave up after two seconds, so a Secret
   Service provider that waits on the user, like pass-secret-service

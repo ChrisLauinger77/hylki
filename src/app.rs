@@ -3785,6 +3785,9 @@ impl SimpleComponent for AppModel {
         if !demo_mode() {
             sync_contact_books(&sender, false, 5000);
         }
+        // Contacts is read and listed in the background, so the first visit
+        // shows it at once (#477); a visit re-reads it to catch up.
+        reload_contacts(&sender, 4000);
         // Refresh visible avatars when the GNOME Contacts photo index
         // changes (first load finishing, or an EDS/CardDAV sync).
         crate::contacts::watch_photo_changes({
@@ -12329,9 +12332,9 @@ impl SimpleComponent for AppModel {
 
             AppMsg::ContactBooksSynced => {
                 // EDS writes what it fetched just after the sync returns.
-                if self.showing_contacts {
-                    reload_contacts(&sender, 1500);
-                }
+                // Read even while Contacts is hidden: the page keeps its
+                // list between visits, and this keeps that list current.
+                reload_contacts(&sender, 1500);
                 if self.filters.iter().any(|r| r.needs_contacts()) {
                     self.saved_addresses.refresh();
                 }
@@ -12489,7 +12492,9 @@ fn reload_contacts(sender: &ComponentSender<AppModel>, delay_ms: u64) {
             s.input(AppMsg::ContactBooksLoaded { books: crate::contacts::demo_books(), local_count: 1 });
             return;
         }
-        s.input(AppMsg::ContactsLoaded(crate::contacts::read_contact_details()));
+        let contacts = crate::contacts::read_contact_details();
+        crate::avatar::retain_photo_thumbnails(&contacts.iter().map(|c| c.photo_key).collect());
+        s.input(AppMsg::ContactsLoaded(contacts));
         s.input(AppMsg::ContactBooksLoaded {
             books: crate::contacts::writable_books(),
             local_count: crate::local_contacts::count(),
