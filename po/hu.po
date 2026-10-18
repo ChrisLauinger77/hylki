@@ -301,6 +301,10 @@ msgid "No address book available"
 msgstr "Nem érhető el címjegyzék"
 
 #, fuzzy
+msgid "Could not rename the address book: {e}"
+msgstr "A mappa nem nevezhető át: {e}"
+
+#, fuzzy
 msgid "{n} contact was not copied: {e}"
 msgid_plural "{n} contacts were not copied: {e}"
 msgstr[0] "A napló exportálva ide: {display}"
@@ -4113,6 +4117,18 @@ msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"
 
 #, fuzzy
+msgid "Rename Address Book"
+msgstr "Címjegyzék"
+
+msgid ""
+"The name is used in Hylki only; GNOME Contacts and Evolution keep the book's "
+"own."
+msgstr ""
+
+msgid "Use Its Own Name"
+msgstr ""
+
+#, fuzzy
 msgid "Directories"
 msgstr "LDAP Mappák"
 
@@ -7640,8 +7656,16 @@ msgid "Insert"
 msgstr "Beszúrás"
 
 #, fuzzy
+msgid "Rename…"
+msgstr "Átnevezés"
+
+#, fuzzy
 msgid "Delete Group…"
 msgstr "Törli a kulcsát?"
+
+#, fuzzy
+msgid "Show or hide"
+msgstr "Címkék megjelenítése vagy elrejtése"
 
 msgid "Favorites"
 msgstr ""

@@ -9,7 +9,7 @@
 //! owned by the app (persisted); collapse is animated locally and reported for
 //! persistence WITHOUT a full rebuild (which would interrupt the animation).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use adw::prelude::*;
 use relm4::prelude::*;
@@ -235,6 +235,7 @@ pub struct SidebarInit {
     pub favorites_expanded: bool,
     pub smart_expanded: bool,
     pub contacts_expanded: bool,
+    pub contacts_folded: Vec<String>,
     /// Whether the "Attachments" row is shown.
     pub show_attachments: bool,
     /// Whether the "Contacts" row is shown.
@@ -454,6 +455,11 @@ pub struct Sidebar {
     smart_expanded: bool,
     /// Whether the Contacts row's address books are shown.
     contacts_expanded: bool,
+    /// The accounts and books folded under it, by key.
+    contacts_folded: HashSet<String>,
+    /// Its rows that fold, and the carets that fold them.
+    contact_layout: Vec<crate::ui::contact_tree::TreeRow>,
+    contact_chevrons: Vec<(String, gtk::Image)>,
     smart_unread: HashMap<String, u32>,
     smart_badges: HashMap<String, gtk::Label>,
     /// The rows of every Filtered Folders section (the unified one and each
@@ -568,6 +574,8 @@ pub enum SidebarInput {
     SetContactTree(crate::ui::contacts_page::ContactTree),
     /// Open or fold the Contacts row's list.
     ToggleContactsExpand,
+    /// Fold or open an account or book under it, by key.
+    ToggleContactNode(String),
     /// A book or group (or every contact) was picked in that list.
     ContactTreeSelected(crate::ui::contacts_page::ContactScope),
     /// Contacts were dropped on a book or group there.
@@ -703,6 +711,9 @@ pub enum SidebarOutput {
     },
     /// A right-click choice on a book or group in the sidebar.
     ContactTreeAction(crate::ui::contacts_page::TreeAction),
+    /// The accounts and books folded under the Contacts row changed: for
+    /// persistence.
+    ContactsFolded(Vec<String>),
     /// A folder-tree node was collapsed or expanded (#51) — for persistence.
     FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
     /// A folder was dropped onto a new parent ("" = the account's top level).
@@ -936,6 +947,9 @@ impl Component for Sidebar {
             smart_folders: Vec::new(),
             smart_expanded: init.smart_expanded,
             contacts_expanded: init.contacts_expanded,
+            contacts_folded: init.contacts_folded.iter().cloned().collect(),
+            contact_layout: Vec::new(),
+            contact_chevrons: Vec::new(),
             smart_unread: HashMap::new(),
             smart_badges: HashMap::new(),
             filtered_rows: HashMap::new(),
@@ -1282,6 +1296,31 @@ impl Sidebar {
 
             SidebarInput::ToggleContactsExpand => {
                 self.toggle_row(UnifiedRow::Contacts, &sender);
+            }
+
+            SidebarInput::ToggleContactNode(key) => {
+                let was_folded = self.contacts_folded.remove(&key);
+                if !was_folded {
+                    self.contacts_folded.insert(key.clone());
+                }
+                for (k, chevron) in &self.contact_chevrons {
+                    if *k == key {
+                        if was_folded {
+                            chevron.add_css_class("open");
+                        } else {
+                            chevron.remove_css_class("open");
+                        }
+                    }
+                }
+                for t in &self.contact_layout {
+                    if t.under.contains(&key) {
+                        let hidden = t.under.iter().any(|k| self.contacts_folded.contains(k));
+                        slide_tree_row(&t.row, &t.revealer, hidden);
+                    }
+                }
+                let mut keys: Vec<String> = self.contacts_folded.iter().cloned().collect();
+                keys.sort();
+                let _ = sender.output(SidebarOutput::ContactsFolded(keys));
             }
 
             SidebarInput::ContactTreeSelected(scope) => {
@@ -3714,9 +3753,17 @@ impl Sidebar {
                 // The tree the contact page handed over; filled again as it
                 // changes (see `fill_contact_tree`).
                 if let Some(tree) = &self.contact_tree {
-                    let filled =
-                        crate::ui::contact_tree::fill(&sub, tree, self.collapsed, self.chevrons_left, sender.input_sender());
-                    *self.tree_rows.borrow_mut() = filled;
+                    let filled = crate::ui::contact_tree::fill(
+                        &sub,
+                        tree,
+                        self.collapsed,
+                        self.chevrons_left,
+                        &self.contacts_folded,
+                        sender.input_sender(),
+                    );
+                    *self.tree_rows.borrow_mut() = filled.rows;
+                    self.contact_layout = filled.layout;
+                    self.contact_chevrons = filled.chevrons;
                 }
                 let ss = sender.input_sender().clone();
                 let quiet = self.quiet.clone();
@@ -4467,14 +4514,23 @@ impl Sidebar {
         while let Some(child) = list.first_child() {
             list.remove(&child);
         }
-        let rows = crate::ui::contact_tree::fill(&list, tree, self.collapsed, self.chevrons_left, sender.input_sender());
+        let filled = crate::ui::contact_tree::fill(
+            &list,
+            tree,
+            self.collapsed,
+            self.chevrons_left,
+            &self.contacts_folded,
+            sender.input_sender(),
+        );
         if let Sel::ContactScope(scope) = &self.selected {
-            if let Some((_, row)) = rows.iter().find(|(s, _)| s == scope) {
+            if let Some((_, row)) = filled.rows.iter().find(|(s, _)| s == scope) {
                 list.select_row(Some(row));
             }
         }
         self.quiet.set(false);
-        *self.tree_rows.borrow_mut() = rows;
+        *self.tree_rows.borrow_mut() = filled.rows;
+        self.contact_layout = filled.layout;
+        self.contact_chevrons = filled.chevrons;
     }
 
     fn clear_other_selections(&self, keep: Sel) {
@@ -5441,7 +5497,7 @@ pub(crate) fn account_initials(name: &str, email: &str) -> String {
 
 /// Width of the tree-expander slot: chevron button and leaf spacer alike, so
 /// folder names at one depth line up whether or not they have children (#51).
-const TREE_EXPANDER_WIDTH: i32 = 18;
+pub(crate) const TREE_EXPANDER_WIDTH: i32 = 18;
 
 /// Whether `child` sits under `parent` in the mailbox hierarchy — a strict
 /// descendant, with a real delimiter at the boundary (any of the common ones;
@@ -5650,7 +5706,7 @@ impl Sidebar {
 /// Show a tree row and slide its content open, or slide it closed and
 /// drop the row once the animation is done: an empty visible row still
 /// paints its chrome. The drop is skipped if it was re-expanded meanwhile.
-fn slide_tree_row(row: &gtk::ListBoxRow, rev: &gtk::Revealer, hidden: bool) {
+pub(crate) fn slide_tree_row(row: &gtk::ListBoxRow, rev: &gtk::Revealer, hidden: bool) {
     if !hidden {
         row.set_visible(true);
         rev.set_reveal_child(true);

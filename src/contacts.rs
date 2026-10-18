@@ -451,7 +451,9 @@ pub fn is_local_book(book_uid: &str) -> bool {
 pub fn local_book() -> Book {
     Book {
         uid: crate::local_contacts::LOCAL_BOOK_UID.to_string(),
-        name: i18n("Hylki Address Book"),
+        name: crate::contact_sources::names()
+            .remove(crate::local_contacts::LOCAL_BOOK_UID)
+            .unwrap_or_else(|| i18n("Hylki Address Book")),
         groups: Some(GroupFormat::Evolution),
     }
 }
@@ -1677,6 +1679,7 @@ fn registry_books() -> Option<HashMap<String, String>> {
         registry_sources()?.into_iter().map(|(_, uid, data)| (uid, data)).collect();
     let mut books = HashMap::new();
     let off = crate::contact_sources::off();
+    let names = crate::contact_sources::names();
     for (uid, data) in &sources {
         // An address book, and not switched off (GOA sets the book source's
         // [Data Source] Enabled=false when Contacts is toggled off for the
@@ -1687,7 +1690,8 @@ fn registry_books() -> Option<HashMap<String, String>> {
             && !data_source_disabled(data)
             && crate::contact_sources::book_used(uid, &sources, &off)
         {
-            books.insert(uid.clone(), book_display_name(data, &sources));
+            let name = book_display_name(data, &sources);
+            books.insert(uid.clone(), with_given_name(&name, names.get(uid)));
         }
     }
     Some(books)
@@ -1729,6 +1733,18 @@ pub(crate) fn registry_sources() -> Option<Vec<(String, String, String)>> {
 /// A book's friendly name: which account it belongs to and over what — walked
 /// up the source's parent chain to the account collection, whose backend
 /// (google / microsoft365 / webdav) and identity say it best.
+/// A book's name with the one given to it in Hylki, if any, in place of the
+/// book's own: after its account's ("CardDAV — a@b.org · Family"), or alone
+/// for a book that is no account's.
+fn with_given_name(name: &str, given: Option<&String>) -> String {
+    match (given, name.split_once(" · ")) {
+        (None, _) => name.to_string(),
+        (Some(given), Some((account, _))) => format!("{account} · {given}"),
+        (Some(given), None) if name.contains(" — ") => format!("{name} · {given}"),
+        (Some(given), None) => given.clone(),
+    }
+}
+
 fn book_display_name(book_data: &str, sources: &HashMap<String, String>) -> String {
     let own = crate::platform::keyfile_value(book_data, "Data Source", "DisplayName");
     let (backend, identity, top_display) = book_account(book_data, sources);
@@ -3558,6 +3574,15 @@ mod tests {
         };
         let out = super::new_vcard(&edit);
         assert!(out.contains("\r\nFN:Acme\r\n") && out.contains("TEL;TYPE=WORK:+1 555 0100"), "{out}");
+    }
+
+    #[test]
+    fn a_book_named_in_hylki_keeps_its_account() {
+        let given = "Family".to_string();
+        assert_eq!(super::with_given_name("CardDAV — a@b.org · card", Some(&given)), "CardDAV — a@b.org · Family");
+        assert_eq!(super::with_given_name("CardDAV — Work", Some(&given)), "CardDAV — Work · Family");
+        assert_eq!(super::with_given_name("Hylki Address Book", Some(&given)), "Family");
+        assert_eq!(super::with_given_name("CardDAV — a@b.org · card", None), "CardDAV — a@b.org · card");
     }
 
     #[test]

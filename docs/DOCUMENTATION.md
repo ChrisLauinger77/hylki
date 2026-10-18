@@ -518,14 +518,21 @@ filter is on, and **Clear Filters** shows everything again.
 
 **Contacts** is a row of the sidebar's unified section, under the merged
 mail rows, and opens every contact. Its chevron opens the list beneath:
-each address book, under the account it belongs to, with how many
-contacts it holds, and each book's groups under it. The list stays open
-or folded as it was left. Picking a book opens Contacts on its contacts
-alone; picking a group lists the group and then its people, with **Remove
-from Group** in their right-click menu. An LDAP directory, under
-**Directories**, is searched by typing. A book's right-click menu has
-**New Contact** and **New Group**, made in that book, and a group's has
-**New Message**, **Edit Group** and **Delete Group…**.
+the books that belong to no account (the Hylki book) first, then each
+account, with its address books under it and each book's groups under
+the book, every book with how many contacts it holds. An account folds
+and opens with the caret beside its name, or a click on it, and a book
+with groups with the caret beside it, as folders with sub-folders do;
+the list, the accounts and the books stay open or folded as they were
+left. Picking a book opens Contacts on its contacts alone; picking a
+group lists the group and then its people, with **Remove from Group** in
+their right-click menu. An LDAP directory, under **Directories**, is
+searched by typing. A book's right-click menu has **New Contact** and
+**New Group**, made in that book, and **Rename…**, which gives the book
+a name of its own in Hylki: in the sidebar, on its contacts' cards and
+wherever Hylki names it, while GNOME Contacts and Evolution keep the
+book's own. **Use Its Own Name**, in the same window, goes back to it. A
+group's menu has **New Message**, **Edit Group** and **Delete Group…**.
 
 Contacts dragged from the list onto a book in the sidebar are copied
 there, and stay where they were. With <kbd>Ctrl</kbd> held as they are

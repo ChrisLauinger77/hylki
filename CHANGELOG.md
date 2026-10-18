@@ -57,13 +57,14 @@
 
 - **Changed: Contacts is a row of the sidebar's unified section.** It opens
   every contact, and its chevron lists each account's address books with
-  their groups under them, open or folded as it was left; picking one lists
-  its contacts, or a group's people. Contacts dragged onto a book are
-  copied there, or moved with Ctrl held after a question, and dragged onto
-  a group join it. A book's menu makes a contact or a group in it, and a
-  group's writes to it, edits or deletes it. The Contacts row left the
-  sidebar's foot, and this replaces the address book menu beside the
-  search and the Contacts | Groups switch.
+  their groups under them, each account and each book with groups folding
+  with a caret as a folder does, all remembered; picking one lists its
+  contacts, or a group's people. Contacts dragged onto a book are copied
+  there, or moved with Ctrl held after a question, and dragged onto a group
+  join it. A book's menu makes a contact or a group in it and renames it, in
+  Hylki only, wherever Hylki names it, and a group's writes to it, edits or
+  deletes it. The Contacts row left the sidebar's foot, and this replaces
+  the address book menu beside the search and the Contacts | Groups switch.
 
 - **Changed: Contacts manages every contact, not only those with an email
   address.** The contact form edits postal addresses, the birthday and the

@@ -901,6 +901,8 @@ pub struct AppModel {
     favorites_expanded: bool,
     smart_expanded: bool,
     contacts_expanded: bool,
+    /// The accounts and books folded under the sidebar's Contacts row.
+    contacts_folded: Vec<String>,
     /// Account emails whose own Filtered Folders / Tags sections are open.
     filtered_expanded_accounts: Vec<String>,
     tags_expanded_accounts: Vec<String>,
@@ -2240,6 +2242,10 @@ pub enum AppMsg {
     ContactTreeAction(crate::ui::contacts_page::TreeAction),
     /// Copy these cards into the book `to`.
     CopyContacts { to: String, cards: Vec<String> },
+    /// The accounts and books folded under the sidebar's Contacts row.
+    ContactsFolded(Vec<String>),
+    /// Name an address book in Hylki (`None`: its own name again).
+    RenameBook { uid: String, name: Option<String> },
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// The import finished.
@@ -2999,6 +3005,7 @@ impl SimpleComponent for AppModel {
         let favorites_expanded = sidebar_state.favorites_expanded;
         let smart_expanded = sidebar_state.smart_expanded;
         let contacts_expanded = sidebar_state.contacts_expanded;
+        let contacts_folded = sidebar_state.contacts_folded.clone();
         let favorites = sidebar_state.favorites.clone();
 
         // Load accounts, then reconcile against GNOME Online Accounts: drop any
@@ -3071,6 +3078,7 @@ impl SimpleComponent for AppModel {
                 favorites_expanded,
                 smart_expanded,
                 contacts_expanded,
+                contacts_folded: contacts_folded.clone(),
                 show_attachments,
                 show_contacts,
                 start,
@@ -3101,6 +3109,7 @@ impl SimpleComponent for AppModel {
                 favorites_expanded,
                 smart_expanded,
                 contacts_expanded,
+                contacts_folded: contacts_folded.clone(),
                 show_attachments,
                 show_contacts,
                 start: None,
@@ -3276,6 +3285,7 @@ impl SimpleComponent for AppModel {
                     }
                     ContactsPageOutput::MoveContacts { to, cards } => AppMsg::MoveContacts { to, cards },
                     ContactsPageOutput::CopyContacts { to, cards } => AppMsg::CopyContacts { to, cards },
+                    ContactsPageOutput::RenameBook { uid, name } => AppMsg::RenameBook { uid, name },
                     ContactsPageOutput::Tree(tree) => AppMsg::ContactTree(tree),
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
                     ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
@@ -3578,6 +3588,7 @@ impl SimpleComponent for AppModel {
             favorites_expanded,
             smart_expanded,
             contacts_expanded,
+            contacts_folded,
             filtered_expanded_accounts,
             tags_expanded_accounts,
             rail_dots: prefs.rail_dots,
@@ -12526,6 +12537,23 @@ impl SimpleComponent for AppModel {
                 self.contacts_page.emit(ContactsPageInput::Tree(action));
             }
 
+            AppMsg::ContactsFolded(keys) => {
+                self.contacts_folded = keys;
+                self.save_sidebar_state();
+            }
+
+            AppMsg::RenameBook { uid, name } => {
+                if let Err(e) = crate::contact_sources::set_name(&uid, name.as_deref()) {
+                    self.notifications.emit(NotifyInput::Push {
+                        text: i18n_f("Could not rename the address book: {e}", &[("e", &e)]),
+                        error: true,
+                        connectivity: false,
+                    });
+                }
+                // Every name of the book is read again with the books.
+                reload_contacts(&sender, 0);
+            }
+
             AppMsg::CopyContacts { to, cards } => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
@@ -15177,6 +15205,7 @@ impl AppModel {
             favorites_expanded: self.favorites_expanded,
             smart_expanded: self.smart_expanded,
             contacts_expanded: self.contacts_expanded,
+            contacts_folded: self.contacts_folded.clone(),
             filtered_expanded_accounts: self.filtered_expanded_accounts.clone(),
             tags_expanded_accounts: self.tags_expanded_accounts.clone(),
         });
@@ -25729,6 +25758,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::ContactScope(scope) => AppMsg::ContactScope(scope),
         SidebarOutput::ContactDrop { keys, on, moving } => AppMsg::ContactDrop { keys, on, moving },
         SidebarOutput::ContactTreeAction(action) => AppMsg::ContactTreeAction(action),
+        SidebarOutput::ContactsFolded(keys) => AppMsg::ContactsFolded(keys),
         SidebarOutput::OutboxSelected => AppMsg::ShowOutbox,
         SidebarOutput::FolderSelected { account_id, folder_id, name, path } => {
             AppMsg::FolderSelected { account_id, folder_id, name, path }

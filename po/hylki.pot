@@ -275,6 +275,9 @@ msgstr ""
 msgid "No address book available"
 msgstr ""
 
+msgid "Could not rename the address book: {e}"
+msgstr ""
+
 msgid "{n} contact was not copied: {e}"
 msgid_plural "{n} contacts were not copied: {e}"
 msgstr[0] ""
@@ -3631,6 +3634,17 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr ""
 
+msgid "Rename Address Book"
+msgstr ""
+
+msgid ""
+"The name is used in Hylki only; GNOME Contacts and Evolution keep the book's "
+"own."
+msgstr ""
+
+msgid "Use Its Own Name"
+msgstr ""
+
 msgid "Directories"
 msgstr ""
 
@@ -6661,7 +6675,13 @@ msgstr ""
 msgid "Insert"
 msgstr ""
 
+msgid "Rename…"
+msgstr ""
+
 msgid "Delete Group…"
+msgstr ""
+
+msgid "Show or hide"
 msgstr ""
 
 msgid "Favorites"

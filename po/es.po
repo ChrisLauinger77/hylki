@@ -296,6 +296,10 @@ msgid "No address book available"
 msgstr "No hay ninguna libreta de direcciones disponible"
 
 #, fuzzy
+msgid "Could not rename the address book: {e}"
+msgstr "No se pudo renombrar la carpeta: {e}"
+
+#, fuzzy
 msgid "{n} contact was not copied: {e}"
 msgid_plural "{n} contacts were not copied: {e}"
 msgstr[0] "{n} contacto exportado a {path}"
@@ -4046,6 +4050,18 @@ msgid "Delete Contact?"
 msgstr "¿Eliminar contacto?"
 
 #, fuzzy
+msgid "Rename Address Book"
+msgstr "Libreta de direcciones"
+
+msgid ""
+"The name is used in Hylki only; GNOME Contacts and Evolution keep the book's "
+"own."
+msgstr ""
+
+msgid "Use Its Own Name"
+msgstr ""
+
+#, fuzzy
 msgid "Directories"
 msgstr "En directorios"
 
@@ -7551,8 +7567,16 @@ msgid "Insert"
 msgstr "Insertar"
 
 #, fuzzy
+msgid "Rename…"
+msgstr "Renombrar"
+
+#, fuzzy
 msgid "Delete Group…"
 msgstr "¿Eliminar tu clave?"
+
+#, fuzzy
+msgid "Show or hide"
+msgstr "Mostrar u ocultar etiquetas"
 
 msgid "Favorites"
 msgstr "Favoritos"

@@ -297,6 +297,10 @@ msgid "No address book available"
 msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων"
 
 #, fuzzy
+msgid "Could not rename the address book: {e}"
+msgstr "Δεν ήταν δυνατή η μετονομασία φακέλου: {e}"
+
+#, fuzzy
 msgid "{n} contact was not copied: {e}"
 msgid_plural "{n} contacts were not copied: {e}"
 msgstr[0] "Εξήχθη {n} επαφή στο {path}"
@@ -4077,6 +4081,18 @@ msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
 
 #, fuzzy
+msgid "Rename Address Book"
+msgstr "Βιβλίο διευθύνσεων"
+
+msgid ""
+"The name is used in Hylki only; GNOME Contacts and Evolution keep the book's "
+"own."
+msgstr ""
+
+msgid "Use Its Own Name"
+msgstr ""
+
+#, fuzzy
 msgid "Directories"
 msgstr "Στους καταλόγους"
 
@@ -7603,8 +7619,16 @@ msgid "Insert"
 msgstr "Εισαγωγή"
 
 #, fuzzy
+msgid "Rename…"
+msgstr "Μετονομασία"
+
+#, fuzzy
 msgid "Delete Group…"
 msgstr "Διαγραφή του κλειδιού σας;"
+
+#, fuzzy
+msgid "Show or hide"
+msgstr "Εμφάνιση ή απόκρυψη ετικετών"
 
 msgid "Favorites"
 msgstr "Αγαπημένα"

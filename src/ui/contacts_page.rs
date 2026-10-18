@@ -84,6 +84,8 @@ pub enum TreeAction {
     EditGroup { book: String, uid: String },
     DeleteGroup { book: String, uid: String },
     ComposeGroup { book: String, uid: String },
+    /// Give the book a name of its own in Hylki.
+    RenameBook(String),
 }
 
 /// The start of what a contact row carries when dragged, before a line of
@@ -402,6 +404,8 @@ pub enum ContactsPageOutput {
     CopyContacts { to: String, cards: Vec<String> },
     /// The books and groups changed: the sidebar lists them anew.
     Tree(ContactTree),
+    /// Name an address book in Hylki (`None`: its own name again).
+    RenameBook { uid: String, name: Option<String> },
     /// `.vcf` files chosen for import into the local Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// Show the contact's photo in the app lightbox.
@@ -1081,6 +1085,7 @@ impl Component for ContactsPage {
                             sender.input(ContactsPageInput::DeleteRequest(idx));
                         }
                     }
+                    TreeAction::RenameBook(uid) => self.ask_book_name(widgets, &sender, uid),
                     TreeAction::ComposeGroup { book, uid } => {
                         if let Some(idx) = group(&book, &uid) {
                             sender.input(ContactsPageInput::ComposeGroup(idx));
@@ -1639,6 +1644,42 @@ impl ContactsPage {
             original: Some(group.raw_vcard.clone()),
             edit,
         });
+    }
+
+    /// Ask for a name for the book `uid`, Hylki's own: GNOME and Evolution
+    /// keep the book's. One given before can be dropped again.
+    fn ask_book_name(&self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>, uid: String) {
+        let Some((_, name)) = self.filter_books.iter().find(|(u, _)| *u == uid) else { return };
+        let own = name.split_once(" · ").map_or(name.as_str(), |(_, own)| own).to_string();
+        let given = crate::contact_sources::names().contains_key(&uid);
+        let entry = gtk::Entry::new();
+        entry.set_text(&own);
+        entry.set_activates_default(true);
+        let dialog = adw::AlertDialog::new(
+            Some(&i18n("Rename Address Book")),
+            Some(&i18n("The name is used in Hylki only; GNOME Contacts and Evolution keep the book's own.")),
+        );
+        dialog.set_extra_child(Some(&entry));
+        dialog.add_response("cancel", &i18n("Cancel"));
+        if given {
+            dialog.add_response("reset", &i18n("Use Its Own Name"));
+        }
+        dialog.add_response("rename", &i18n("Rename"));
+        dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("rename"));
+        dialog.set_close_response("cancel");
+        let s = sender.output_sender().clone();
+        let field = entry.clone();
+        dialog.connect_response(None, move |_, response| {
+            let name = match response {
+                "rename" => Some(field.text().trim().to_string()).filter(|n| !n.is_empty()),
+                "reset" => None,
+                _ => return,
+            };
+            let _ = s.send(ContactsPageOutput::RenameBook { uid: uid.clone(), name });
+        });
+        dialog.present(widgets.page_stack.root().as_ref());
+        entry.grab_focus();
     }
 
     /// The books and groups for the sidebar, handed over when they change.

@@ -290,6 +290,10 @@ msgid "No address book available"
 msgstr "No hi ha cap llibreta d'adreces disponible"
 
 #, fuzzy
+msgid "Could not rename the address book: {e}"
+msgstr "No s'ha pogut canviar el nom de la carpeta: {e}"
+
+#, fuzzy
 msgid "{n} contact was not copied: {e}"
 msgid_plural "{n} contacts were not copied: {e}"
 msgstr[0] "{n} contacte exportat a {path}"
@@ -4017,6 +4021,18 @@ msgid "Delete Contact?"
 msgstr "Vols suprimir el contacte?"
 
 #, fuzzy
+msgid "Rename Address Book"
+msgstr "Llibreta d'adreces"
+
+msgid ""
+"The name is used in Hylki only; GNOME Contacts and Evolution keep the book's "
+"own."
+msgstr ""
+
+msgid "Use Its Own Name"
+msgstr ""
+
+#, fuzzy
 msgid "Directories"
 msgstr "Als directoris"
 
@@ -7505,8 +7521,16 @@ msgid "Insert"
 msgstr "Insereix"
 
 #, fuzzy
+msgid "Rename…"
+msgstr "Canvia el nom"
+
+#, fuzzy
 msgid "Delete Group…"
 msgstr "Vols suprimir la teva clau?"
+
+#, fuzzy
+msgid "Show or hide"
+msgstr "Mostra o amaga les etiquetes"
 
 msgid "Favorites"
 msgstr "Preferits"

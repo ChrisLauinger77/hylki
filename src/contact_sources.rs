@@ -28,6 +28,43 @@ struct SwitchFile {
     /// The sources and books switched off for Hylki, by ID.
     #[serde(default)]
     off: Vec<String>,
+    /// The names given to address books in Hylki, by book UID, in place of
+    /// the book's own.
+    #[serde(default)]
+    names: std::collections::BTreeMap<String, String>,
+}
+
+fn read_file() -> SwitchFile {
+    switch_path()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|text| toml::from_str::<SwitchFile>(&text).ok())
+        .unwrap_or_default()
+}
+
+fn write_file(file: &SwitchFile) -> Result<(), String> {
+    let path = switch_path().ok_or("no configuration folder")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let text = toml::to_string_pretty(file).map_err(|e| e.to_string())?;
+    crate::config::write_private_file(&path, &text).map_err(|e| e.to_string())
+}
+
+/// The names given to address books in Hylki, by book UID.
+pub fn names() -> HashMap<String, String> {
+    read_file().names.into_iter().collect()
+}
+
+/// Give an address book a name of its own in Hylki, or (`None`, or a
+/// blank one) go back to the book's own name. GNOME and Evolution keep
+/// theirs.
+pub fn set_name(uid: &str, name: Option<&str>) -> Result<(), String> {
+    let mut file = read_file();
+    match name.map(str::trim).filter(|n| !n.is_empty()) {
+        Some(name) => file.names.insert(uid.to_string(), name.to_string()),
+        None => file.names.remove(uid),
+    };
+    write_file(&file)
 }
 
 fn switch_path() -> Option<PathBuf> {
@@ -37,11 +74,7 @@ fn switch_path() -> Option<PathBuf> {
 /// The IDs switched off for Hylki: sources (an account, a directory, the
 /// Hylki book, [`THIS_COMPUTER`]) and single books.
 pub fn off() -> HashSet<String> {
-    switch_path()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|text| toml::from_str::<SwitchFile>(&text).ok())
-        .map(|f| f.off.into_iter().collect())
-        .unwrap_or_default()
+    read_file().off.into_iter().collect()
 }
 
 /// Switch a source or a book on or off for Hylki.
@@ -54,12 +87,9 @@ pub fn set_off(id: &str, is_off: bool) -> Result<(), String> {
     }
     let mut list: Vec<String> = ids.into_iter().collect();
     list.sort();
-    let path = switch_path().ok_or("no configuration folder")?;
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    }
-    let text = toml::to_string_pretty(&SwitchFile { off: list }).map_err(|e| e.to_string())?;
-    crate::config::write_private_file(&path, &text).map_err(|e| e.to_string())
+    let mut file = read_file();
+    file.off = list;
+    write_file(&file)
 }
 
 /// Whether the Hylki book is used.
