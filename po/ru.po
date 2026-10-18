@@ -4316,6 +4316,10 @@ msgid "Add a person by name or address"
 msgstr ""
 
 #, fuzzy
+msgid "No email address · {book}"
+msgstr "Адрес электронной почты"
+
+#, fuzzy
 msgid "Use an app-specific password, not your usual one."
 msgstr "Требуется пароль приложения (не ваш обычный пароль для входа)."
 

@@ -3816,6 +3816,9 @@ msgstr ""
 msgid "Add a person by name or address"
 msgstr ""
 
+msgid "No email address · {book}"
+msgstr ""
+
 msgid "Use an app-specific password, not your usual one."
 msgstr ""
 

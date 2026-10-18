@@ -1264,7 +1264,7 @@ impl Component for ContactsPage {
                             Some(g) if picked.as_ref().is_some_and(|b| b.uid != g.book_uid) => {
                                 let to = picked.unwrap_or_else(crate::contacts::local_book);
                                 let format = to.groups.unwrap_or(GroupFormat::Evolution);
-                                edit.members = self.members_moved(g, edit.members, format);
+                                edit.members = self.members_for(edit.members, Some(&g.book_uid), &to.uid, format);
                                 let key = (g.book_uid.clone(), g.eds_uid.clone());
                                 self.forget(&[key.clone()]);
                                 let _ = sender.output(ContactsPageOutput::MoveGroup {
@@ -1280,27 +1280,21 @@ impl Component for ContactsPage {
                                 return;
                             }
                             Some(g) => {
+                                let format = g.group.unwrap_or(GroupFormat::Evolution);
+                                edit.members = self.members_for(edit.members, Some(&g.book_uid), &g.book_uid, format);
                                 edit.kept = g.hidden_members.clone();
                                 ContactsPageOutput::SaveGroup {
                                     book_uid: g.book_uid.clone(),
-                                    format: g.group.unwrap_or(GroupFormat::Evolution),
+                                    format,
                                     original: Some(g.raw_vcard.clone()),
                                     edit,
                                 }
                             }
                             None => {
-                                let book = form
-                                    .book
-                                    .as_ref()
-                                    .and_then(|row| form.books.get(row.selected() as usize))
-                                    .cloned()
-                                    .unwrap_or_else(crate::contacts::local_book);
-                                ContactsPageOutput::SaveGroup {
-                                    book_uid: book.uid,
-                                    format: book.groups.unwrap_or(GroupFormat::Evolution),
-                                    original: None,
-                                    edit,
-                                }
+                                let book = picked.unwrap_or_else(crate::contacts::local_book);
+                                let format = book.groups.unwrap_or(GroupFormat::Evolution);
+                                edit.members = self.members_for(edit.members, None, &book.uid, format);
+                                ContactsPageOutput::SaveGroup { book_uid: book.uid, format, original: None, edit }
                             }
                         };
                         let _ = sender.output(output);
@@ -1482,36 +1476,46 @@ impl ContactsPage {
             .collect()
     }
 
-    /// A group's people, as they go in a group of `format` in another book.
-    /// Their lines and cards were the old book's: an Apple group's members
-    /// are copied from their cards there (unless the new book has them),
-    /// and an Evolution list keeps those with an address.
-    fn members_moved(&self, g: &ContactDetails, members: Vec<Member>, format: GroupFormat) -> Vec<Member> {
+    /// A group's people as the group in book `to`, of `format`, keeps
+    /// them; `from` is the book it is in now, if any. A member it already
+    /// names there stays as written. Anyone else is found in Contacts: by
+    /// the contact they were picked as, their card in `from`, or their
+    /// address, a contact in `to` first. An Apple group names that contact
+    /// in `to`, copied there when it is in another book (someone known only
+    /// by an address gets a card at the save); an Evolution list holds the
+    /// address, so someone with none is left out.
+    fn members_for(&self, members: Vec<Member>, from: Option<&str>, to: &str, format: GroupFormat) -> Vec<Member> {
+        let same = from == Some(to);
+        let people = || self.contacts.iter().filter(|c| !c.is_group());
         members
             .into_iter()
             .filter_map(|m| {
-                // Their card in the old book, else a contact anywhere with
-                // their address.
-                let person = (format == GroupFormat::Apple)
-                    .then(|| {
-                        self.contacts
-                            .iter()
-                            .filter(|c| !c.is_group())
-                            .find(|c| !m.uid.is_empty() && c.book_uid == g.book_uid && c.eds_uid == m.uid)
-                            .or_else(|| {
-                                self.contacts.iter().filter(|c| !c.is_group()).find(|c| {
-                                    !m.email.is_empty() && c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(&m.email))
-                                })
-                            })
+                if same && !m.line.is_empty() {
+                    return Some(m);
+                }
+                if format == GroupFormat::Evolution {
+                    return (!m.email.is_empty())
+                        .then(|| Member { name: m.name, email: m.email, ..Member::default() });
+                }
+                let person = m
+                    .source
+                    .as_ref()
+                    .and_then(|(book, uid)| people().find(|c| c.book_uid == *book && c.eds_uid == *uid))
+                    .or_else(|| {
+                        let from = from?;
+                        people().find(|c| !m.uid.is_empty() && c.book_uid == from && c.eds_uid == m.uid)
                     })
-                    .flatten();
-                let card = person.map(crate::contacts::moved_vcard).unwrap_or(m.card);
-                let moved = Member { name: m.name, email: m.email, card, ..Member::default() };
-                let kept = match format {
-                    GroupFormat::Evolution => !moved.email.is_empty(),
-                    _ => !moved.email.is_empty() || !moved.card.is_empty(),
-                };
-                kept.then_some(moved)
+                    .or_else(|| {
+                        people()
+                            .filter(|c| !m.email.is_empty() && c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(&m.email)))
+                            .min_by_key(|c| c.book_uid != to)
+                    });
+                let base = Member { name: m.name, email: m.email, ..Member::default() };
+                match person {
+                    Some(p) if p.book_uid == to && !p.eds_uid.is_empty() => Some(Member { uid: p.eds_uid.clone(), ..base }),
+                    Some(p) => Some(Member { card: crate::contacts::moved_vcard(p), ..base }),
+                    None => (!base.email.is_empty() || !m.card.is_empty()).then(|| Member { card: m.card, ..base }),
+                }
             })
             .collect()
     }
@@ -2322,7 +2326,25 @@ impl ContactsPage {
             self.suggestions.borrow_mut().extend(contacts);
         }
         let _ = sender.output(ContactsPageOutput::WantSuggestions);
-        let members = member_editor(detail, &c.members, self.suggestions.clone());
+        // The contacts with no address, who can join a group that names
+        // its members by contact.
+        let no_address: Vec<(Member, String)> = self
+            .contacts
+            .iter()
+            .filter(|p| !p.is_group() && p.emails.is_empty() && !p.eds_uid.is_empty())
+            .map(|p| {
+                let m = Member {
+                    name: p.name.clone(),
+                    source: Some((p.book_uid.clone(), p.eds_uid.clone())),
+                    // Their card, when it is in the group's book already.
+                    uid: if p.book_uid == c.book_uid { p.eds_uid.clone() } else { String::new() },
+                    ..Member::default()
+                };
+                (m, p.book_name.clone())
+            })
+            .collect();
+        let cards = Rc::new(Cell::new(apple));
+        let members = member_editor(detail, &c.members, self.suggestions.clone(), Rc::new(no_address), cards.clone());
         // An Apple group (iCloud's) holds cards of its own book.
         let note = gtk::Label::new(Some(&i18n(
             "Groups in this address book hold its own contacts: anyone added who is not in it yet is added to it.",
@@ -2341,6 +2363,7 @@ impl ContactsPage {
             row.connect_selected_notify(move |row| {
                 let at = row.selected() as usize;
                 let format = formats.get(at).copied().flatten();
+                cards.set(format == Some(GroupFormat::Apple));
                 if let Some(note) = note.upgrade() {
                     note.set_visible(format == Some(GroupFormat::Apple));
                 }
@@ -2898,10 +2921,26 @@ fn editor_bar(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, heading
 /// add someone, by an address or by picking from `people` (the composer's
 /// suggestions) as a name or address is typed. Returns the live list read at
 /// save time.
+/// One of the people the group form offers for what is typed.
+#[derive(Clone)]
+struct Pick {
+    member: Member,
+    title: String,
+    subtitle: String,
+    /// From Contacts, not from mail history.
+    contact: bool,
+}
+
+/// The group form's members, with the field that adds them. `people` are
+/// the composer's suggestions, by address; `no_address` the contacts with
+/// none, offered too while `cards` says the group's book names its members
+/// by contact (they cannot be in a list of addresses).
 fn member_editor(
     detail: &gtk::Box,
     initial: &[Member],
     people: Rc<RefCell<Vec<crate::contacts::Suggestion>>>,
+    no_address: Rc<Vec<(Member, String)>>,
+    cards: Rc<Cell<bool>>,
 ) -> Rc<RefCell<Vec<Member>>> {
     let list = group(detail, &i18n("Members"));
     let members: Rc<RefCell<Vec<Member>>> = Rc::new(RefCell::new(Vec::new()));
@@ -2956,10 +2995,11 @@ fn member_editor(
     }
 
     // Who matches the typing, by name or address and not already in,
-    // ranked as the composer ranks them.
+    // ranked as the composer ranks them; then the contacts with no address
+    // whose name matches.
     let matches = {
         let (people, members) = (people.clone(), members.clone());
-        move |typed: &str| -> Vec<crate::contacts::Suggestion> {
+        move |typed: &str| -> Vec<Pick> {
             let q = typed.trim();
             if q.is_empty() {
                 return Vec::new();
@@ -2974,14 +3014,44 @@ fn member_editor(
                 .collect();
             crate::contacts::rank(&mut found, q);
             found.truncate(6);
-            found
+            let mut picks: Vec<Pick> = found
+                .into_iter()
+                .map(|sug| Pick {
+                    // History may know an address without a name.
+                    member: Member {
+                        name: if sug.name == sug.email { String::new() } else { sug.name.clone() },
+                        email: sug.email.clone(),
+                        ..Member::default()
+                    },
+                    subtitle: if sug.name != sug.email { sug.email.clone() } else { String::new() },
+                    title: sug.name,
+                    contact: sug.from_contacts,
+                })
+                .collect();
+            if cards.get() {
+                let q = q.to_lowercase();
+                let members = members.borrow();
+                picks.extend(
+                    no_address
+                        .iter()
+                        .filter(|(m, _)| m.name.to_lowercase().contains(&q) && !members.iter().any(|x| x.same(m)))
+                        .take(4)
+                        .map(|(m, book)| Pick {
+                            member: m.clone(),
+                            title: m.name.clone(),
+                            subtitle: i18n_f("No email address · {book}", &[("book", book)]),
+                            contact: true,
+                        }),
+                );
+            }
+            picks
         }
     };
     let matches = Rc::new(matches);
     // The matches listed, and the one Return takes: the first while a name
     // is typed, none while the text is an address (Return adds what was
     // typed), whichever the arrow keys move to.
-    let shown: Rc<RefCell<Vec<crate::contacts::Suggestion>>> = Rc::new(RefCell::new(Vec::new()));
+    let shown: Rc<RefCell<Vec<Pick>>> = Rc::new(RefCell::new(Vec::new()));
     let chosen: Rc<std::cell::Cell<Option<usize>>> = Rc::new(std::cell::Cell::new(None));
     let highlight = {
         let (found, chosen) = (found.downgrade(), chosen.clone());
@@ -2998,10 +3068,8 @@ fn member_editor(
     // Add a match as a member and start the field over.
     let take = {
         let add = add.clone();
-        move |sug: &crate::contacts::Suggestion, entry: &adw::EntryRow| {
-            // History may know an address without a name.
-            let name = if sug.name == sug.email { String::new() } else { sug.name.clone() };
-            add(Member { name, email: sug.email.clone(), ..Member::default() });
+        move |pick: &Pick, entry: &adw::EntryRow| {
+            add(pick.member.clone());
             entry.set_text("");
             entry.grab_focus();
         }
@@ -3019,13 +3087,13 @@ fn member_editor(
             *shown.borrow_mut() = matches(&text);
             for sug in shown.borrow().iter() {
                 let row = adw::ActionRow::new();
-                row.set_title(&gtk::glib::markup_escape_text(&sug.name));
-                if sug.name != sug.email {
-                    row.set_subtitle(&gtk::glib::markup_escape_text(&sug.email));
+                row.set_title(&gtk::glib::markup_escape_text(&sug.title));
+                if !sug.subtitle.is_empty() {
+                    row.set_subtitle(&gtk::glib::markup_escape_text(&sug.subtitle));
                 }
                 // Where the address came from, as in the composer: the
                 // address book or mail history.
-                let icon = gtk::Image::from_icon_name(if sug.from_contacts {
+                let icon = gtk::Image::from_icon_name(if sug.contact {
                     "avatar-default-symbolic"
                 } else {
                     "document-open-recent-symbolic"

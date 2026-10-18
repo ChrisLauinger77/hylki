@@ -4224,6 +4224,10 @@ msgstr "Alle Dateien"
 msgid "Add a person by name or address"
 msgstr ""
 
+#, fuzzy
+msgid "No email address · {book}"
+msgstr "E-Mail-Adresse"
+
 msgid "Use an app-specific password, not your usual one."
 msgstr ""
 

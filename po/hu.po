@@ -4317,6 +4317,10 @@ msgid "Add a person by name or address"
 msgstr ""
 
 #, fuzzy
+msgid "No email address · {book}"
+msgstr "E-mail-cím"
+
+#, fuzzy
 msgid "Use an app-specific password, not your usual one."
 msgstr "Alkalmazásjelszó szükséges (nem a szokásos bejelentkezési jelszava)."
 

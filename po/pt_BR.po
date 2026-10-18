@@ -4296,6 +4296,10 @@ msgid "Add a person by name or address"
 msgstr ""
 
 #, fuzzy
+msgid "No email address · {book}"
+msgstr "Endereço de email"
+
+#, fuzzy
 msgid "Use an app-specific password, not your usual one."
 msgstr ""
 "Requer uma senha específica do aplicativo (não a senha normal de acesso)."

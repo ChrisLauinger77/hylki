@@ -4288,6 +4288,10 @@ msgid "Add a person by name or address"
 msgstr "Un contact doit avoir un nom ou une adresse e-mail"
 
 #, fuzzy
+msgid "No email address · {book}"
+msgstr "Adresse e-mail"
+
+#, fuzzy
 msgid "Use an app-specific password, not your usual one."
 msgstr ""
 "Nécessite un mot de passe spécifique à l'application (différent de votre mot "

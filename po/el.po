@@ -4276,6 +4276,10 @@ msgid "Add a person by name or address"
 msgstr "Μια επαφή χρειάζεται όνομα ή διεύθυνση email"
 
 #, fuzzy
+msgid "No email address · {book}"
+msgstr "Διεύθυνση email"
+
+#, fuzzy
 msgid "Use an app-specific password, not your usual one."
 msgstr ""
 "Απαιτεί κωδικό πρόσβασης ειδικά για την εφαρμογή (όχι τον κανονικό κωδικό "

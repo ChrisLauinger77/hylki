@@ -1540,6 +1540,9 @@ pub struct Member {
     /// book when they join it ([`moved_vcard`]); empty for someone added by
     /// address, who gets a card with their name and address.
     pub(crate) card: String,
+    /// The contact, by book and UID, a member was picked as in the group's
+    /// form; the save finds their card by it.
+    pub(crate) source: Option<(String, String)>,
 }
 
 impl Member {
@@ -1548,6 +1551,7 @@ impl Member {
     pub fn same(&self, other: &Member) -> bool {
         (!self.uid.is_empty() && self.uid == other.uid)
             || (!self.email.is_empty() && self.email.eq_ignore_ascii_case(&other.email))
+            || (self.source.is_some() && self.source == other.source)
     }
 
     /// The key [`ContactDetails::grouped_key`] gives the member's card.
