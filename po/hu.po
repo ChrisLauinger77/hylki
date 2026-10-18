@@ -4172,6 +4172,10 @@ msgstr "Webhely hozzáadása"
 msgid "Members"
 msgstr ""
 
+#, fuzzy
+msgid "No email address"
+msgstr "E-mail-cím"
+
 msgid "No one is in this group yet."
 msgstr ""
 

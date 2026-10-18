@@ -72,7 +72,7 @@ impl ContactFilter {
     }
 
     /// Whether `c` passes; `grouped` holds every group member's address,
-    /// lower case.
+    /// lower case, and the cards members are named by.
     fn passes(self, c: &ContactDetails, grouped: &std::collections::HashSet<String>) -> bool {
         match self {
             ContactFilter::Photo => c.photo.is_some(),
@@ -81,7 +81,9 @@ impl ContactFilter {
             ContactFilter::Address => !c.addresses.is_empty(),
             ContactFilter::Birthday => !c.birthday.is_empty(),
             ContactFilter::Company => !c.org.is_empty(),
-            ContactFilter::NoGroup => !c.emails.iter().any(|e| grouped.contains(&e.value.to_lowercase())),
+            ContactFilter::NoGroup => {
+                !grouped.contains(&c.grouped_key()) && !c.emails.iter().any(|e| grouped.contains(&e.value.to_lowercase()))
+            }
         }
     }
 }
@@ -989,7 +991,7 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::ComposeGroup(idx) => {
-                let Some(g) = self.contacts.get(idx).filter(|g| !g.members.is_empty()) else { return };
+                let Some(g) = self.contacts.get(idx).filter(|g| g.reachable().next().is_some()) else { return };
                 let field = g.members_field();
                 let _ = sender.output(if g.hide_addresses {
                     ContactsPageOutput::ComposeBcc(field)
@@ -1000,15 +1002,9 @@ impl Component for ContactsPage {
 
             ContactsPageInput::AddToGroup { group, person } => {
                 let (Some(g), Some(p)) = (self.contacts.get(group), self.contacts.get(person)) else { return };
-                let Some(email) = p.primary_email() else { return };
-                if !g.group_editable() || g.members.iter().any(|m| m.email.eq_ignore_ascii_case(email)) {
-                    return;
-                }
+                let Some(member) = member_for(g, p) else { return };
                 let mut members = g.members.clone();
-                // In an Apple group the person is named by their card,
-                // when it is in the group's book.
-                let uid = if p.book_uid == g.book_uid { p.eds_uid.clone() } else { String::new() };
-                members.push(Member { name: p.name.clone(), email: email.to_string(), uid, ..Member::default() });
+                members.push(member);
                 let edit = GroupEdit {
                     name: g.name.clone(),
                     members,
@@ -1279,7 +1275,8 @@ impl ContactsPage {
         self.contacts
             .iter()
             .filter(|c| c.is_group())
-            .flat_map(|c| c.members.iter().map(|m| m.email.to_lowercase()))
+            .flat_map(|c| c.members.iter().flat_map(|m| [Some(m.email.to_lowercase()), m.card_key(&c.book_uid)]))
+            .flatten()
             .collect()
     }
 
@@ -1598,14 +1595,13 @@ impl ContactsPage {
                     let _ = sc.send(ContactsPageInput::ComposeGroup(idx));
                 })
                 .icon("mail-message-new-symbolic")
-                .enabled(!c.members.is_empty()),
+                .enabled(c.reachable().next().is_some()),
             );
         }
-        // A person with an address can go in a group they are not in, by name.
-        if let Some(email) = c.primary_email().filter(|_| !group) {
+        // A person can go in a group they are not in, by name.
+        if !group {
             let mut groups: Vec<(usize, &str)> = (0..self.contacts.len())
-                .filter(|&g| self.contacts[g].group_editable())
-                .filter(|&g| !self.contacts[g].members.iter().any(|m| m.email.eq_ignore_ascii_case(email)))
+                .filter(|&g| member_for(&self.contacts[g], c).is_some())
                 .map(|g| (g, self.contacts[g].name.as_str()))
                 .collect();
             groups.sort_by_key(|(_, name)| name.to_lowercase());
@@ -2040,7 +2036,7 @@ fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, 
     sub.set_margin_top(4);
     detail.append(&sub);
 
-    if !c.members.is_empty() {
+    if c.reachable().next().is_some() {
         let write = gtk::Button::with_label(&i18n("New Message"));
         write.add_css_class("pill");
         write.add_css_class("suggested-action");
@@ -2056,6 +2052,14 @@ fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, 
     let list = group(detail, &i18n("Members"));
     for m in &c.members {
         let row = adw::ActionRow::new();
+        // Someone known by their phone number only: in the group, but
+        // not written to.
+        if m.email.is_empty() {
+            row.set_title(&gtk::glib::markup_escape_text(&m.name));
+            row.set_subtitle(&i18n("No email address"));
+            list.append(&row);
+            continue;
+        }
         let named = !m.name.trim().is_empty() && m.name != m.email;
         row.set_title(&gtk::glib::markup_escape_text(if named { &m.name } else { &m.email }));
         if named {
@@ -2099,6 +2103,29 @@ fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, 
         row.add_css_class("property");
         details.append(&row);
     }
+}
+
+/// `person` as a new member of `group`, when the group can take them and
+/// does not have them. An Apple group names its members by their card, so
+/// it can take someone of its own book with no address; anyone else needs
+/// one.
+fn member_for(group: &ContactDetails, person: &ContactDetails) -> Option<Member> {
+    if !group.group_editable() || person.is_group() {
+        return None;
+    }
+    let own_card = group.group == Some(GroupFormat::Apple) && person.book_uid == group.book_uid;
+    let member = Member {
+        name: person.name.clone(),
+        email: person.primary_email().unwrap_or_default().to_string(),
+        uid: if own_card { person.eds_uid.clone() } else { String::new() },
+        ..Member::default()
+    };
+    if member.email.is_empty() && member.uid.is_empty() {
+        return None;
+    }
+    let present = group.members.iter().any(|m| m.same(&member))
+        || person.emails.iter().any(|e| group.members.iter().any(|m| m.email.eq_ignore_ascii_case(&e.value)));
+    (!present).then_some(member)
 }
 
 fn group_byline(c: &ContactDetails) -> String {
@@ -2401,20 +2428,22 @@ fn member_editor(
         let (list, members, entry) = (list.downgrade(), members.clone(), entry.downgrade());
         Rc::new(move |m: Member| {
             let (Some(list), Some(entry)) = (list.upgrade(), entry.upgrade()) else { return };
-            if members.borrow().iter().any(|x| x.email.eq_ignore_ascii_case(&m.email)) {
+            if members.borrow().iter().any(|x| x.same(&m)) {
                 return;
             }
             let row = adw::ActionRow::new();
             let named = !m.name.trim().is_empty() && m.name != m.email;
             row.set_title(&gtk::glib::markup_escape_text(if named { &m.name } else { &m.email }));
-            if named {
+            if m.email.is_empty() {
+                row.set_subtitle(&i18n("No email address"));
+            } else if named {
                 row.set_subtitle(&gtk::glib::markup_escape_text(&m.email));
             }
             let remove = flat_button("user-trash-symbolic", &i18n("Remove"));
             {
-                let (list, row, members, email) = (list.downgrade(), row.downgrade(), members.clone(), m.email.clone());
+                let (list, row, members, gone) = (list.downgrade(), row.downgrade(), members.clone(), m.clone());
                 remove.connect_clicked(move |_| {
-                    members.borrow_mut().retain(|x| !x.email.eq_ignore_ascii_case(&email));
+                    members.borrow_mut().retain(|x| !x.same(&gone));
                     if let (Some(list), Some(row)) = (list.upgrade(), row.upgrade()) {
                         list.remove(&row);
                     }

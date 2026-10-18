@@ -4107,6 +4107,10 @@ msgstr "Προσθήκη ιστοτόπου"
 msgid "Members"
 msgstr "Αριθμοί σελίδων"
 
+#, fuzzy
+msgid "No email address"
+msgstr "Διεύθυνση email"
+
 msgid "No one is in this group yet."
 msgstr ""
 

@@ -591,7 +591,11 @@ a CardDAV book is saved as Apple Contacts and iCloud save theirs, which
 the Apple apps, Fastmail and DAVx⁵ read as groups too. Such a group holds
 contacts of its own book, so someone added to it who is not in that book is
 added to the book as a contact with their name and address. The groups
-made by Apple Contacts and iCloud can be changed in Hylki the same way.
+made by Apple Contacts and iCloud can be changed in Hylki the same way. Such a
+group can hold people with no email address, known by a phone number for
+example: they are listed in it as having none, and mail to the group goes to
+the others. **Add to Group** puts someone with no address only in a group of
+their own book.
 Send as Bcc is kept in the group, where other apps pass it over. A vCard 4
 group (`KIND:group`) is shown and offered with the people it names in the
 same book, but is changed in the app it came from. Groups are not counted as contacts in **Settings →

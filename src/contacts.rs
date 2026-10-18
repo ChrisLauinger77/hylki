@@ -168,7 +168,7 @@ fn group_suggestions(groups: Vec<ContactDetails>) -> Vec<Suggestion> {
     let mut out = Vec::new();
     for g in groups {
         let members: Vec<Contact> =
-            g.members.iter().map(|m| Contact { name: m.name.clone(), email: m.email.clone() }).collect();
+            g.reachable().map(|m| Contact { name: m.name.clone(), email: m.email.clone() }).collect();
         let mut key: Vec<String> = members.iter().map(|m| m.email.to_lowercase()).collect();
         key.sort();
         key.push(g.name.to_lowercase());
@@ -1489,10 +1489,20 @@ impl ContactDetails {
         matches!(self.group, Some(GroupFormat::Evolution | GroupFormat::Apple))
     }
 
+    /// How a group member found by card is known in a set of addresses.
+    pub fn grouped_key(&self) -> String {
+        format!("card:{}:{}", self.book_uid, self.eds_uid)
+    }
+
+    /// The members with an address to send to: an Apple group may hold
+    /// people known only by a phone number.
+    pub fn reachable(&self) -> impl Iterator<Item = &Member> {
+        self.members.iter().filter(|m| !m.email.is_empty())
+    }
+
     /// The members' addresses as one recipient field.
     pub fn members_field(&self) -> String {
-        self.members
-            .iter()
+        self.reachable()
             .map(|m| crate::worker::format_recipient(&m.name, &m.email))
             .collect::<Vec<_>>()
             .join(", ")
@@ -1526,6 +1536,20 @@ pub struct Member {
     /// The UID of the member's own card in the group's book, for an Apple
     /// group, which names its members by it. Empty when not known yet.
     pub(crate) uid: String,
+}
+
+impl Member {
+    /// Whether `other` is the same person: the same card, or the same
+    /// address.
+    pub fn same(&self, other: &Member) -> bool {
+        (!self.uid.is_empty() && self.uid == other.uid)
+            || (!self.email.is_empty() && self.email.eq_ignore_ascii_case(&other.email))
+    }
+
+    /// The key [`ContactDetails::grouped_key`] gives the member's card.
+    pub fn card_key(&self, book_uid: &str) -> Option<String> {
+        (!self.uid.is_empty()).then(|| format!("card:{book_uid}:{}", self.uid))
+    }
 }
 
 /// Every *live, enabled* address-book source, straight from the EDS source
@@ -1837,7 +1861,7 @@ fn resolve_book_members(book: &mut [ContactDetails]) {
     let people: HashMap<String, (String, String)> = book
         .iter()
         .filter(|c| !c.is_group() && !c.eds_uid.is_empty())
-        .filter_map(|c| Some((c.eds_uid.clone(), (c.name.clone(), c.primary_email()?.to_string()))))
+        .map(|c| (c.eds_uid.clone(), (c.name.clone(), c.primary_email().unwrap_or_default().to_string())))
         .collect();
     for c in book.iter_mut().filter(|c| !c.member_refs.is_empty()) {
         resolve_members(c, |uid| people.get(uid).cloned());
@@ -2034,12 +2058,16 @@ fn evolution_member(params: &[String], value: &str) -> Option<(String, String)> 
 }
 
 /// Fill in the group members named by contact UID, from `lookup` (UID →
-/// that contact's name and address, in the group's own book). A member with
-/// no address is not shown, there being nothing to send to, but is kept.
+/// that contact's name and first address, empty when they have none, in the
+/// group's own book). A member whose card is not there is not shown, but is
+/// kept.
 pub(crate) fn resolve_members(c: &mut ContactDetails, lookup: impl Fn(&str) -> Option<(String, String)>) {
     for (uid, line) in std::mem::take(&mut c.member_refs) {
-        match lookup(&uid) {
-            Some((name, email)) if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) => {
+        let found = lookup(&uid).filter(|(_, email)| {
+            email.is_empty() || !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(email))
+        });
+        match found {
+            Some((name, email)) if !c.members.iter().any(|m| m.uid == uid) => {
                 c.members.push(Member { name, email, line, uid });
             }
             _ => c.hidden_members.push(line),
@@ -2047,10 +2075,11 @@ pub(crate) fn resolve_members(c: &mut ContactDetails, lookup: impl Fn(&str) -> O
     }
 }
 
-/// The (name, first address) of a person's vCard, for [`resolve_members`].
+/// The (name, first address or "") of a person's vCard, for
+/// [`resolve_members`].
 fn person_address(vcard: &str) -> Option<(String, String)> {
     let c = parse_vcard_fields(vcard).filter(|c| !c.is_group())?;
-    let email = c.primary_email()?.to_string();
+    let email = c.primary_email().unwrap_or_default().to_string();
     Some((c.name, email))
 }
 
@@ -2420,9 +2449,10 @@ pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, m
     let vcard = match format {
         GroupFormat::Evolution => patched_group_vcard(original, &edit),
         GroupFormat::Apple => {
-            if edit.members.iter().any(|m| m.uid.is_empty() && m.line.is_empty()) {
+            let cardless = |m: &Member| m.uid.is_empty() && m.line.is_empty() && !m.email.is_empty();
+            if edit.members.iter().any(cardless) {
                 let mut cards = BookCards::open(book_uid)?;
-                for m in edit.members.iter_mut().filter(|m| m.uid.is_empty() && m.line.is_empty()) {
+                for m in edit.members.iter_mut().filter(|m| cardless(m)) {
                     m.uid = cards.card_for(&m.name, &m.email)?;
                 }
             }
@@ -2868,6 +2898,24 @@ mod tests {
         assert_eq!(book[1].hidden_members, vec!["MEMBER:urn:uuid:gone".to_string()]);
         assert!(super::is_group_vcard(apple));
         assert!(!super::is_group_vcard(person));
+    }
+
+    #[test]
+    fn an_apple_group_shows_people_with_no_address() {
+        let person = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p1\r\nFN:Pat Doe\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
+        let mailed = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p2\r\nFN:Kim\r\nEMAIL:kim@x.org\r\nEND:VCARD\r\n";
+        let apple = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:g\r\nX-ADDRESSBOOKSERVER-KIND:group\r\nFN:Mission\r\n\
+                     X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nX-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p2\r\n\
+                     X-ADDRESSBOOKSERVER-MEMBER:urn:uuid:p1\r\nEND:VCARD\r\n";
+        let mut book: Vec<super::ContactDetails> =
+            [person, mailed, apple].iter().map(|v| super::parse_vcard_fields(v).unwrap()).collect();
+        super::resolve_book_members(&mut book);
+        let g = &book[2];
+        assert_eq!(people(g), vec![("Pat Doe", ""), ("Kim", "kim@x.org")]);
+        assert_eq!(g.hidden_members.len(), 1, "the repeated card is kept, once shown");
+        // Mail goes to those with an address only.
+        assert_eq!(g.members_field(), "Kim <kim@x.org>");
+        assert_eq!(super::group_suggestions(vec![g.clone()])[0].group.as_ref().unwrap().members.len(), 1);
     }
 
     #[test]

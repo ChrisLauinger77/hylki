@@ -4102,6 +4102,10 @@ msgstr "Aggiungi sito web"
 msgid "Members"
 msgstr "Numeri di pagina"
 
+#, fuzzy
+msgid "No email address"
+msgstr "Indirizzo e-mail"
+
 msgid "No one is in this group yet."
 msgstr ""
 

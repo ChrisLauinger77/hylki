@@ -4047,6 +4047,10 @@ msgstr "Afegeix un lloc web"
 msgid "Members"
 msgstr "Números de pàgina"
 
+#, fuzzy
+msgid "No email address"
+msgstr "Adreça de correu electrònic"
+
 msgid "No one is in this group yet."
 msgstr ""
 
