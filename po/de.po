@@ -1475,7 +1475,8 @@ msgstr ""
 msgid "{name} did not answer: {error}"
 msgstr "{name} hat nicht geantwortet: {error}"
 
-msgid "A contact needs a name or an email address"
+#, fuzzy
+msgid "A contact needs a name, an email address or a phone number"
 msgstr "Ein Kontakt benötigt einen Namen oder eine E-Mail-Adresse."
 
 msgid "The contact is too large"
@@ -4227,6 +4228,62 @@ msgstr ""
 #, fuzzy
 msgid "No email address · {book}"
 msgstr "E-Mail-Adresse"
+
+msgid "No label"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Work"
+msgstr ""
+
+msgid "Mobile"
+msgstr ""
+
+msgid "Fax"
+msgstr ""
+
+#, fuzzy
+msgid "Label"
+msgstr "Beschriftungen"
+
+#, fuzzy
+msgid "Add address"
+msgstr "Adresse"
+
+msgid "Street"
+msgstr ""
+
+msgid "City"
+msgstr ""
+
+msgid "State or region"
+msgstr ""
+
+msgid "Postal code"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+#, fuzzy
+msgid "No birthday"
+msgstr "Geburtstag"
+
+msgid "Year"
+msgstr ""
+
+msgid "Change Photo…"
+msgstr ""
+
+#, fuzzy
+msgid "Remove Photo"
+msgstr "Tag entfernen"
+
+#, fuzzy
+msgid "Choose a Photo"
+msgstr "Bild auswählen"
 
 msgid "Use an app-specific password, not your usual one."
 msgstr ""

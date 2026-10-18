@@ -170,7 +170,7 @@ impl Store {
         let tx = self.conn.transaction().map_err(|e| e.to_string())?;
         match upsert_tx(&tx, vcard, false, None)? {
             Upsert::Added | Upsert::Updated | Upsert::Duplicate => {}
-            Upsert::Invalid => return Err(i18n("A contact needs a name or an email address")),
+            Upsert::Invalid => return Err(i18n("A contact needs a name, an email address or a phone number")),
             Upsert::TooBig => return Err(i18n("The contact is too large")),
         }
         tx.commit().map_err(|e| e.to_string())

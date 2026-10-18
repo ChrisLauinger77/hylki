@@ -103,9 +103,13 @@ struct ContactForm {
     org: adw::EntryRow,
     title: adw::EntryRow,
     note: gtk::TextView,
-    emails: Rc<RefCell<Vec<(adw::EntryRow, String)>>>,
-    phones: Rc<RefCell<Vec<(adw::EntryRow, String)>>>,
-    urls: Rc<RefCell<Vec<(adw::EntryRow, String)>>>,
+    emails: ValueRows,
+    phones: ValueRows,
+    urls: ValueRows,
+    addresses: Rc<RefCell<Vec<AddressForm>>>,
+    birthday: BirthdayForm,
+    /// What happens to the photo: kept, removed or a new one.
+    photo: Rc<RefCell<crate::contacts::PhotoEdit>>,
     /// The book a new contact goes to; `None` when editing one (it stays in
     /// its book) or before the books are known.
     book: Option<adw::ComboRow>,
@@ -944,6 +948,9 @@ impl Component for ContactsPage {
                     emails: c.emails.clone(),
                     phones: c.phones.clone(),
                     urls: c.urls.clone(),
+                    addresses: c.postal.clone(),
+                    birthday: c.birthday_raw.clone(),
+                    photo: c.photo.clone().map_or(crate::contacts::PhotoEdit::Keep, crate::contacts::PhotoEdit::Set),
                 };
                 let _ = sender.output(ContactsPageOutput::CreateContact {
                     book_uid: None,
@@ -1306,8 +1313,17 @@ impl Component for ContactsPage {
                     None => return,
                 };
                 let edit = collect_edit(editor);
-                if edit.name.is_empty() && edit.emails.is_empty() {
-                    return; // nothing worth saving
+                // Anything at all is a contact; an empty form is nothing.
+                let empty = [&edit.name, &edit.nickname, &edit.org, &edit.title, &edit.note, &edit.birthday]
+                    .iter()
+                    .all(|v| v.is_empty())
+                    && edit.emails.is_empty()
+                    && edit.phones.is_empty()
+                    && edit.urls.is_empty()
+                    && edit.addresses.is_empty()
+                    && !matches!(edit.photo, crate::contacts::PhotoEdit::Set(_));
+                if empty {
+                    return;
                 }
                 match self.editing_target.and_then(|i| self.contacts.get(i)) {
                     Some(c) => {
@@ -1826,7 +1842,14 @@ impl ContactsPage {
                 let subtitle = if c.is_group() {
                     group_byline(c)
                 } else {
-                    c.primary_email().filter(|e| *e != c.name).unwrap_or_default().to_string()
+                    // An address, else a phone number, else the company:
+                    // whatever tells the card apart, as an address book does.
+                    c.primary_email()
+                        .or_else(|| c.phones.first().map(|p| p.value.as_str()))
+                        .or_else(|| (!c.org.is_empty()).then_some(c.org.as_str()))
+                        .filter(|v| *v != c.name)
+                        .unwrap_or_default()
+                        .to_string()
                 };
                 let line = Line::entry(idx, c, subtitle);
                 match had.remove(&(c.book_uid.as_str(), c.eds_uid.as_str())) {
@@ -2405,6 +2428,9 @@ impl ContactsPage {
         let heading = if self.editing_target.is_some() { i18n("Edit Contact") } else { i18n("New Contact") };
         editor_bar(detail, sender, &heading);
 
+        let photo = Rc::new(RefCell::new(crate::contacts::PhotoEdit::Keep));
+        photo_editor(detail, c, photo.clone());
+
         // ---- identity fields ----
         let identity = group(detail, &i18n("Identity"));
         let name = entry_row(&i18n("Name"), &c.name);
@@ -2415,6 +2441,8 @@ impl ContactsPage {
         identity.append(&nickname);
         identity.append(&org);
         identity.append(&title);
+        let (birthday_row, birthday) = BirthdayForm::new(&c.birthday_raw);
+        identity.append(&birthday_row);
 
         // ---- the address book: chosen for a new contact, named for one
         // being edited (a contact stays in its book) ----
@@ -2444,18 +2472,22 @@ impl ContactsPage {
             &i18n("Email"),
             &i18n("Add email"),
             &c.emails.iter().map(|l| (l.value.clone(), l.label.clone())).collect::<Vec<_>>(),
+            EMAIL_LABELS,
         );
         let phones = editable_values(
             detail,
             &i18n("Phone"),
             &i18n("Add phone"),
             &c.phones.iter().map(|l| (l.value.clone(), l.label.clone())).collect::<Vec<_>>(),
+            PHONE_LABELS,
         );
+        let addresses = address_editor(detail, &c.postal);
         let urls = editable_values(
             detail,
             &i18n("Website"),
             &i18n("Add website"),
             &c.urls.iter().map(|u| (u.clone(), String::new())).collect::<Vec<_>>(),
+            &[],
         );
 
         // ---- note ----
@@ -2473,7 +2505,20 @@ impl ContactsPage {
         note_row.set_child(Some(&note));
         note_list.append(&note_row);
 
-        self.editor = Some(Editor::Contact(ContactForm { name, nickname, org, title, note, emails, phones, urls, book }));
+        self.editor = Some(Editor::Contact(ContactForm {
+            name,
+            nickname,
+            org,
+            title,
+            note,
+            emails,
+            phones,
+            urls,
+            addresses,
+            birthday,
+            photo,
+            book,
+        }));
     }
 }
 
@@ -3190,17 +3235,31 @@ fn typed_addresses(text: &str) -> Vec<(String, String)> {
 
 /// Read the editor form back into a `ContactEdit`.
 fn collect_edit(e: &ContactForm) -> ContactEdit {
-    let values = |rows: &Rc<RefCell<Vec<(adw::EntryRow, String)>>>| -> Vec<Labeled> {
-        rows.borrow()
+    let values = |rows: &ValueRows| -> Vec<Labeled> {
+        let rows = rows.borrow();
+        rows.rows
             .iter()
             .filter_map(|(entry, label)| {
                 let value = entry.text().trim().to_string();
-                (!value.is_empty()).then(|| Labeled { label: label.clone(), value })
+                let label = label
+                    .as_ref()
+                    .and_then(|d| rows.labels.get(d.selected() as usize))
+                    .map_or(String::new(), |l| l.to_string());
+                (!value.is_empty()).then(|| Labeled { label, value })
             })
             .collect()
     };
     let buffer = e.note.buffer();
     ContactEdit {
+        addresses: e
+            .addresses
+            .borrow()
+            .iter()
+            .map(AddressForm::read)
+            .filter(|a| !a.is_empty())
+            .collect(),
+        birthday: e.birthday.read(),
+        photo: e.photo.borrow().clone(),
         name: e.name.text().trim().to_string(),
         nickname: e.nickname.text().trim().to_string(),
         org: e.org.text().trim().to_string(),
@@ -3215,6 +3274,42 @@ fn collect_edit(e: &ContactForm) -> ContactEdit {
     }
 }
 
+/// The value rows of one kind (emails, phones…), each with its label menu
+/// when the kind has labels: `labels[i]` is what item `i` stands for, the
+/// first being none.
+struct ValueRowsInner {
+    rows: Vec<(adw::EntryRow, Option<gtk::DropDown>)>,
+    labels: &'static [&'static str],
+}
+type ValueRows = Rc<RefCell<ValueRowsInner>>;
+
+/// The labels an email can have, as vCard TYPEs name them.
+const EMAIL_LABELS: &[&str] = &["", "Home", "Work"];
+const PHONE_LABELS: &[&str] = &["", "Mobile", "Home", "Work", "Fax"];
+const ADDRESS_LABELS: &[&str] = &["", "Home", "Work"];
+
+/// A label menu over `labels`, on `current`.
+fn label_menu(labels: &'static [&'static str], current: &str) -> gtk::DropDown {
+    let names: Vec<String> = labels
+        .iter()
+        .map(|l| match *l {
+            "" => i18n("No label"),
+            "Home" => i18n("Home"),
+            "Work" => i18n("Work"),
+            "Mobile" => i18n("Mobile"),
+            "Fax" => i18n("Fax"),
+            other => other.to_string(),
+        })
+        .collect();
+    let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+    let menu = gtk::DropDown::from_strings(&refs);
+    menu.add_css_class("flat");
+    menu.set_valign(gtk::Align::Center);
+    menu.set_tooltip_text(Some(&i18n("Label")));
+    menu.set_selected(labels.iter().position(|l| *l == current).unwrap_or(0) as u32);
+    menu
+}
+
 /// A titled group of editable value rows with a remove button each and an
 /// "add" row at the bottom. Returns the live handle used at save time.
 fn editable_values(
@@ -3222,9 +3317,10 @@ fn editable_values(
     title: &str,
     add_label: &str,
     initial: &[(String, String)],
-) -> Rc<RefCell<Vec<(adw::EntryRow, String)>>> {
+    labels: &'static [&'static str],
+) -> ValueRows {
     let list = group(detail, title);
-    let rows: Rc<RefCell<Vec<(adw::EntryRow, String)>>> = Rc::new(RefCell::new(Vec::new()));
+    let rows: ValueRows = Rc::new(RefCell::new(ValueRowsInner { rows: Vec::new(), labels }));
 
     // The "add" row sits last; value rows are inserted above it.
     let add_row = gtk::ListBoxRow::new();
@@ -3248,8 +3344,12 @@ fn editable_values(
         let add_row = add_row.clone();
         move |value: &str, label: String, grab: bool| {
             let entry = adw::EntryRow::new();
-            entry.set_title(&if label.is_empty() { field.clone() } else { label.clone() });
+            entry.set_title(&field);
             entry.set_text(value);
+            let menu = (!labels.is_empty()).then(|| label_menu(labels, &label));
+            if let Some(menu) = &menu {
+                entry.add_suffix(menu);
+            }
             let remove = gtk::Button::from_icon_name("user-trash-symbolic");
             remove.set_tooltip_text(Some(i18n("Remove").as_str()));
             remove.set_valign(gtk::Align::Center);
@@ -3259,14 +3359,14 @@ fn editable_values(
                 let rows = rows.clone();
                 let entry = entry.clone();
                 remove.connect_clicked(move |_| {
-                    rows.borrow_mut().retain(|(e, _)| e != &entry);
+                    rows.borrow_mut().rows.retain(|(e, _)| e != &entry);
                     list.remove(&entry);
                 });
             }
             entry.add_suffix(&remove);
             // Insert above the trailing "add" row.
             list.insert(&entry, add_row.index());
-            rows.borrow_mut().push((entry.clone(), label));
+            rows.borrow_mut().rows.push((entry.clone(), menu));
             if grab {
                 entry.grab_focus();
             }
@@ -3287,6 +3387,237 @@ fn editable_values(
     }
     list.append(&add_row);
     rows
+}
+
+/// One postal address in the contact form: its parts, and its label. The
+/// post office box and the extended part, which the form does not show,
+/// are kept as they were.
+struct AddressForm {
+    base: crate::contacts::Postal,
+    street: adw::EntryRow,
+    locality: adw::EntryRow,
+    region: adw::EntryRow,
+    code: adw::EntryRow,
+    country: adw::EntryRow,
+    label: gtk::DropDown,
+}
+
+impl AddressForm {
+    fn read(&self) -> crate::contacts::Postal {
+        let text = |e: &adw::EntryRow| e.text().trim().to_string();
+        crate::contacts::Postal {
+            label: ADDRESS_LABELS.get(self.label.selected() as usize).map_or(String::new(), |l| l.to_string()),
+            street: text(&self.street),
+            locality: text(&self.locality),
+            region: text(&self.region),
+            code: text(&self.code),
+            country: text(&self.country),
+            ..self.base.clone()
+        }
+    }
+}
+
+/// The contact form's addresses: a block of rows for each, and a row that
+/// adds one.
+fn address_editor(detail: &gtk::Box, initial: &[crate::contacts::Postal]) -> Rc<RefCell<Vec<AddressForm>>> {
+    let heading = gtk::Label::new(Some(&i18n("Address")));
+    heading.add_css_class("heading");
+    heading.set_halign(gtk::Align::Start);
+    heading.set_margin_top(20);
+    heading.set_margin_bottom(6);
+    detail.append(&heading);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    detail.append(&column);
+    let forms: Rc<RefCell<Vec<AddressForm>>> = Rc::new(RefCell::new(Vec::new()));
+
+    // The same "add" row as the other kinds of value have.
+    let add_list = gtk::ListBox::new();
+    add_list.add_css_class("boxed-list");
+    add_list.set_selection_mode(gtk::SelectionMode::None);
+    let add_row = gtk::ListBoxRow::new();
+    add_row.set_activatable(true);
+    let add_box = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    add_box.set_margin_top(10);
+    add_box.set_margin_bottom(10);
+    add_box.set_margin_start(12);
+    let plus = gtk::Image::from_icon_name("list-add-symbolic");
+    plus.add_css_class("dim-label");
+    let add_label = gtk::Label::new(Some(&i18n("Add address")));
+    add_label.add_css_class("dim-label");
+    add_box.append(&plus);
+    add_box.append(&add_label);
+    add_row.set_child(Some(&add_box));
+    add_list.append(&add_row);
+
+    let add = {
+        let (column, forms, add_list) = (column.downgrade(), forms.clone(), add_list.downgrade());
+        Rc::new(move |p: &crate::contacts::Postal, grab: bool| {
+            let (Some(column), Some(add_list)) = (column.upgrade(), add_list.upgrade()) else { return };
+            let list = gtk::ListBox::new();
+            list.add_css_class("boxed-list");
+            list.set_selection_mode(gtk::SelectionMode::None);
+            let head = adw::ActionRow::new();
+            head.set_title(&i18n("Label"));
+            let label = label_menu(ADDRESS_LABELS, &p.label);
+            head.add_suffix(&label);
+            let remove = gtk::Button::from_icon_name("user-trash-symbolic");
+            remove.set_tooltip_text(Some(i18n("Remove").as_str()));
+            remove.set_valign(gtk::Align::Center);
+            remove.add_css_class("flat");
+            head.add_suffix(&remove);
+            list.append(&head);
+            let street = entry_row(&i18n("Street"), &p.street);
+            let locality = entry_row(&i18n("City"), &p.locality);
+            let region = entry_row(&i18n("State or region"), &p.region);
+            let code = entry_row(&i18n("Postal code"), &p.code);
+            let country = entry_row(&i18n("Country"), &p.country);
+            for row in [&street, &locality, &region, &code, &country] {
+                list.append(row);
+            }
+            {
+                let (forms, list_weak, street) = (forms.clone(), list.downgrade(), street.clone());
+                remove.connect_clicked(move |_| {
+                    forms.borrow_mut().retain(|f| f.street != street);
+                    if let Some(list) = list_weak.upgrade() {
+                        if let Some(parent) = list.parent().and_downcast::<gtk::Box>() {
+                            parent.remove(&list);
+                        }
+                    }
+                });
+            }
+            column.insert_child_after(&list, add_list.prev_sibling().as_ref());
+            if grab {
+                street.grab_focus();
+            }
+            forms.borrow_mut().push(AddressForm { base: p.clone(), street, locality, region, code, country, label });
+        })
+    };
+    column.append(&add_list);
+    for p in initial {
+        add(p, false);
+    }
+    add_list.connect_row_activated(move |_, _| add(&crate::contacts::Postal::default(), true));
+    forms
+}
+
+/// The contact form's birthday: day, month and an optional year. No month
+/// is no birthday.
+struct BirthdayForm {
+    day: gtk::SpinButton,
+    month: gtk::DropDown,
+    year: gtk::Entry,
+}
+
+impl BirthdayForm {
+    fn new(raw: &str) -> (adw::ActionRow, BirthdayForm) {
+        let row = adw::ActionRow::new();
+        row.set_title(&i18n("Birthday"));
+        let parts = crate::contacts::birthday_parts(raw);
+        let day = gtk::SpinButton::with_range(1.0, 31.0, 1.0);
+        day.set_valign(gtk::Align::Center);
+        day.set_value(parts.map_or(1, |(_, _, d)| d) as f64);
+        let mut months = vec![i18n("No birthday")];
+        months.extend((1..=12).map(|m| {
+            gtk::glib::DateTime::from_local(2000, m, 1, 12, 0, 0.0)
+                .ok()
+                .and_then(|d| d.format("%B").ok())
+                .map_or(m.to_string(), |s| s.to_string())
+        }));
+        let refs: Vec<&str> = months.iter().map(String::as_str).collect();
+        let month = gtk::DropDown::from_strings(&refs);
+        month.set_valign(gtk::Align::Center);
+        month.set_selected(parts.map_or(0, |(_, m, _)| m));
+        let year = gtk::Entry::new();
+        year.set_valign(gtk::Align::Center);
+        year.set_width_chars(5);
+        year.set_max_width_chars(5);
+        year.set_placeholder_text(Some(&i18n("Year")));
+        year.set_input_purpose(gtk::InputPurpose::Digits);
+        if let Some((Some(y), _, _)) = parts {
+            year.set_text(&y.to_string());
+        }
+        let sync = {
+            let (day, year) = (day.clone(), year.clone());
+            move |month: &gtk::DropDown| {
+                let on = month.selected() != 0;
+                day.set_sensitive(on);
+                year.set_sensitive(on);
+            }
+        };
+        sync(&month);
+        month.connect_selected_notify(sync);
+        row.add_suffix(&day);
+        row.add_suffix(&month);
+        row.add_suffix(&year);
+        (row, BirthdayForm { day, month, year })
+    }
+
+    /// The BDAY value, empty for none.
+    fn read(&self) -> String {
+        let month = self.month.selected();
+        if month == 0 {
+            return String::new();
+        }
+        let year = self.year.text().trim().parse::<i32>().ok().filter(|y| (1..=9999).contains(y));
+        crate::contacts::birthday_value(year, month, self.day.value() as u32)
+    }
+}
+
+/// The contact form's photo: the picture, with buttons to change it or
+/// remove it.
+fn photo_editor(detail: &gtk::Box, c: &ContactDetails, photo: Rc<RefCell<crate::contacts::PhotoEdit>>) {
+    let avatar = avatar_for(c, 96);
+    avatar.set_halign(gtk::Align::Center);
+    avatar.set_margin_top(12);
+    detail.append(&avatar);
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    buttons.set_halign(gtk::Align::Center);
+    buttons.set_margin_top(8);
+    let change = gtk::Button::with_label(&i18n("Change Photo…"));
+    change.add_css_class("pill");
+    let remove = gtk::Button::with_label(&i18n("Remove Photo"));
+    remove.add_css_class("pill");
+    remove.set_visible(c.photo.is_some());
+    buttons.append(&change);
+    buttons.append(&remove);
+    detail.append(&buttons);
+    {
+        let (photo, avatar, remove_btn) = (photo.clone(), avatar.clone(), remove.clone());
+        remove.connect_clicked(move |_| {
+            *photo.borrow_mut() = crate::contacts::PhotoEdit::Remove;
+            avatar.set_custom_image(None::<&gtk::gdk::Paintable>);
+            remove_btn.set_visible(false);
+        });
+    }
+    change.connect_clicked(move |b| {
+        let dialog = gtk::FileDialog::builder().title(&i18n("Choose a Photo")).build();
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some(&i18n("Images")));
+        filter.add_pixbuf_formats();
+        let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+        dialog.set_filters(Some(&filters));
+        let parent = b.root().and_downcast::<gtk::Window>();
+        let (photo, avatar, remove) = (photo.clone(), avatar.clone(), remove.clone());
+        dialog.open(parent.as_ref(), gtk::gio::Cancellable::NONE, move |res| {
+            let Some(path) = res.ok().and_then(|f| f.path()) else { return };
+            let Some(bytes) = small_photo(&path) else { return };
+            if let Ok(texture) = gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from(&bytes)) {
+                avatar.set_custom_image(Some(&texture));
+            }
+            *photo.borrow_mut() = crate::contacts::PhotoEdit::Set(bytes);
+            remove.set_visible(true);
+        });
+    });
+}
+
+/// An image file as a contact photo: at most 512 pixels a side, a JPEG (a
+/// PNG when it has see-through parts), so it goes in the card itself.
+fn small_photo(path: &std::path::Path) -> Option<Vec<u8>> {
+    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_file_at_scale(path, 512, 512, true).ok()?;
+    let (kind, options): (&str, &[(&str, &str)]) =
+        if pixbuf.has_alpha() { ("png", &[]) } else { ("jpeg", &[("quality", "90")]) };
+    pixbuf.save_to_bufferv(kind, options).ok()
 }
 
 fn entry_row(title: &str, value: &str) -> adw::EntryRow {

@@ -1420,6 +1420,103 @@ fn vcard_for(name: &str, email: &str) -> String {
 // Full contact details (the in-app Contacts view)
 // ---------------------------------------------------------------------------
 
+/// A postal address in the parts of a vCard ADR.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Postal {
+    pub label: String,
+    pub pobox: String,
+    pub extended: String,
+    pub street: String,
+    pub locality: String,
+    pub region: String,
+    pub code: String,
+    pub country: String,
+}
+
+impl Postal {
+    fn from_adr(label: String, raw: &str) -> Postal {
+        let mut parts = split_unescaped(raw, ';').into_iter().map(|p| unescape_vcard_text(p.trim()));
+        let mut next = || parts.next().unwrap_or_default();
+        Postal {
+            label,
+            pobox: next(),
+            extended: next(),
+            street: next(),
+            locality: next(),
+            region: next(),
+            code: next(),
+            country: next(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
+            .iter()
+            .all(|p| p.trim().is_empty())
+    }
+
+    /// The parts on one line, as the card shows the address.
+    pub fn one_line(&self) -> String {
+        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
+            .iter()
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    fn adr_value(&self) -> String {
+        [&self.pobox, &self.extended, &self.street, &self.locality, &self.region, &self.code, &self.country]
+            .iter()
+            .map(|p| escape_vcard_value(p.trim()))
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+}
+
+/// `s` split at each `sep` not escaped with a backslash; the parts keep
+/// their escapes.
+fn split_unescaped(s: &str, sep: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let (mut start, mut escaped) = (0, false);
+    for (i, ch) in s.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else if ch == sep {
+            parts.push(&s[start..i]);
+            start = i + ch.len_utf8();
+        }
+    }
+    parts.push(&s[start..]);
+    parts
+}
+
+/// A birthday as (year, month, day) from a stored BDAY, the year `None`
+/// when it has none ("--04-12").
+pub fn birthday_parts(raw: &str) -> Option<(Option<i32>, u32, u32)> {
+    let head = raw.split('T').next().unwrap_or(raw).trim();
+    let digits: String = head.chars().filter(|c| c.is_ascii_digit()).collect();
+    let (year, month, day) = if head.starts_with("--") && digits.len() == 4 {
+        (None, &digits[0..2], &digits[2..4])
+    } else if digits.len() == 8 {
+        (digits[0..4].parse().ok(), &digits[4..6], &digits[6..8])
+    } else {
+        return None;
+    };
+    let (month, day) = (month.parse().ok()?, day.parse().ok()?);
+    ((1..=12).contains(&month) && (1..=31).contains(&day)).then_some((year, month, day))
+}
+
+/// A BDAY value from its parts, with no year as "--MM-DD".
+pub fn birthday_value(year: Option<i32>, month: u32, day: u32) -> String {
+    match year {
+        Some(y) => format!("{y:04}-{month:02}-{day:02}"),
+        None => format!("--{month:02}-{day:02}"),
+    }
+}
+
 /// One labelled value on a contact (a "Home" email, a "Mobile" phone…). The
 /// label may be empty when the vCard carries no usable TYPE.
 #[derive(Debug, Clone)]
@@ -1441,6 +1538,11 @@ pub struct ContactDetails {
     pub emails: Vec<Labeled>,
     pub phones: Vec<Labeled>,
     pub addresses: Vec<Labeled>,
+    /// The same addresses in their parts, for the editor.
+    pub postal: Vec<Postal>,
+    /// BDAY as stored ("1985-04-12", "--04-12"…), for the editor;
+    /// `birthday` is it in words.
+    pub birthday_raw: String,
     pub urls: Vec<String>,
     pub photo: Option<Vec<u8>>,
     /// [`photo_key`] of `photo`, set by [`read_contact_details`]; 0 when
@@ -1789,8 +1891,6 @@ pub fn read_contact_details() -> Vec<ContactDetails> {
             );
         }
     }
-    // Every copy of a person is shown, so the local book skips the `seen`
-    // filter that de-duplicates the EDS books among themselves.
     out.extend(local_details());
     out.sort_by_key(|c| c.name.to_lowercase());
     // Hashed here, off the main thread: the page finds the photos it has
@@ -1844,17 +1944,14 @@ fn read_detail_db(
     }
     resolve_book_members(&mut book);
     for c in book {
-        // The same person can live in several books; the first email is
-        // as stable an identity as vCards offer. A group is its book's own.
         if c.is_group() {
             out.push(c);
             continue;
         }
-        let key = c
-            .primary_email()
-            .map(|e| e.to_lowercase())
-            .unwrap_or_else(|| format!("name:{}", c.name.to_lowercase()));
-        if seen.insert(key) {
+        // Every card is listed, the same person in two books twice, each
+        // with its book, as an address book app lists them. Only a card
+        // read twice (a book in two places on disk) is listed once.
+        if c.eds_uid.is_empty() || seen.insert(format!("{}\u{0}{}", c.book_uid, c.eds_uid)) {
             out.push(c);
         }
     }
@@ -1982,7 +2079,10 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                 c.org = value.split(';').next().unwrap_or("").trim().to_string();
             }
             "TITLE" if c.title.is_empty() => c.title = value,
-            "BDAY" => c.birthday = pretty_birthday(&value),
+            "BDAY" => {
+                c.birthday = pretty_birthday(&value);
+                c.birthday_raw = value;
+            }
             "NOTE" if c.note.is_empty() => c.note = value,
             "EMAIL" => {
                 email_lines.push((line.to_string(), params.iter().map(|p| p.to_string()).collect(), value.clone()));
@@ -2010,6 +2110,7 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                     .join(", ");
                 if !formatted.is_empty() && !c.addresses.iter().any(|a| a.value == formatted) {
                     c.addresses.push(Labeled { label: vcard_type_label(&params), value: formatted });
+                    c.postal.push(Postal::from_adr(vcard_type_label(&params), raw_value.trim()));
                 }
             }
             _ => {}
@@ -2037,13 +2138,22 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
         c.emails.clear();
         return Some(c);
     }
+    // A card with no name goes by what else it has, as an address book
+    // lists it; one with nothing to go by is skipped.
     if c.name.trim().is_empty() {
-        c.name = c
-            .primary_email()
-            .map(str::to_string)
-            .or_else(|| (!c.nickname.is_empty()).then(|| c.nickname.clone()))?;
+        c.name = fallback_name(&c)?;
     }
     Some(c)
+}
+
+/// What a card with no name is listed as: its address, nickname, company
+/// or phone number.
+fn fallback_name(c: &ContactDetails) -> Option<String> {
+    c.primary_email()
+        .map(str::to_string)
+        .or_else(|| (!c.nickname.is_empty()).then(|| c.nickname.clone()))
+        .or_else(|| (!c.org.is_empty()).then(|| c.org.clone()))
+        .or_else(|| c.phones.first().map(|p| p.value.clone()))
 }
 
 /// The (name, address) of one member of an Evolution list. The value is a
@@ -2240,6 +2350,20 @@ pub struct ContactEdit {
     pub emails: Vec<Labeled>,
     pub phones: Vec<Labeled>,
     pub urls: Vec<String>,
+    pub addresses: Vec<Postal>,
+    /// A BDAY value ([`birthday_value`]), empty for none.
+    pub birthday: String,
+    pub photo: PhotoEdit,
+}
+
+/// What the editor does to a contact's photo.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum PhotoEdit {
+    #[default]
+    Keep,
+    Remove,
+    /// A new photo: the image file's bytes, made small by the editor.
+    Set(Vec<u8>),
 }
 
 /// Escape a value for a vCard text property.
@@ -2273,12 +2397,26 @@ fn type_param_for(label: &str) -> &'static str {
 /// properties are replaced — everything else (UID, PHOTO, ADR, REV, X-…)
 /// passes through untouched, so nothing GNOME Contacts manages is lost.
 pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
-    const REPLACED: [&str; 9] =
-        ["FN", "N", "NICKNAME", "ORG", "TITLE", "NOTE", "EMAIL", "TEL", "URL"];
-    let mut out = kept_lines(original, &REPLACED);
+    const REPLACED: [&str; 11] =
+        ["FN", "N", "NICKNAME", "ORG", "TITLE", "NOTE", "EMAIL", "TEL", "URL", "ADR", "BDAY"];
+    let photo = e.photo != PhotoEdit::Keep;
+    let mut out = kept_lines_by(original, |prop| {
+        REPLACED.contains(&prop) || (photo && matches!(prop, "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH"))
+    });
 
-    let name = e.name.trim();
-    out.push(format!("FN:{}", escape_vcard_value(name)));
+    // FN is required: with no name, the card goes by what else it has.
+    let fallback = || {
+        [&e.org, &e.nickname]
+            .into_iter()
+            .map(|s| s.trim().to_string())
+            .chain(e.emails.iter().chain(&e.phones).map(|l| l.value.trim().to_string()))
+            .find(|s| !s.is_empty())
+            .unwrap_or_default()
+    };
+    let named = !e.name.trim().is_empty();
+    let fn_value = if named { e.name.trim().to_string() } else { fallback() };
+    out.push(format!("FN:{}", escape_vcard_value(&fn_value)));
+    let name = if named { e.name.trim() } else { "" };
     // Structured name: last word as the family name — the same heuristic an
     // address book's "sort by surname" uses.
     let mut words: Vec<&str> = name.split_whitespace().collect();
@@ -2288,6 +2426,21 @@ pub fn patched_vcard(original: &str, e: &ContactEdit) -> String {
         escape_vcard_value(family),
         escape_vcard_value(&words.join(" "))
     ));
+    for a in e.addresses.iter().filter(|a| !a.is_empty()) {
+        out.push(format!("ADR{}:{}", type_param_for(&a.label), a.adr_value()));
+    }
+    if !e.birthday.trim().is_empty() {
+        out.push(format!("BDAY:{}", e.birthday.trim()));
+    }
+    if let PhotoEdit::Set(bytes) = &e.photo {
+        use base64::Engine as _;
+        let kind = match crate::models::image_ext(bytes) {
+            "png" => "PNG",
+            "gif" => "GIF",
+            _ => "JPEG",
+        };
+        out.push(format!("PHOTO;ENCODING=b;TYPE={kind}:{}", base64::engine::general_purpose::STANDARD.encode(bytes)));
+    }
     if !e.nickname.trim().is_empty() {
         out.push(format!("NICKNAME:{}", escape_vcard_value(e.nickname.trim())));
     }
@@ -3354,6 +3507,55 @@ mod tests {
         for (book, uid) in [(to, &new_group), (to, &copy_uid), (from, &person_uid)] {
             super::delete_contact(book, uid).unwrap();
         }
+    }
+
+    #[test]
+    fn an_edit_writes_addresses_birthdays_and_photos() {
+        let original = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Pat Doe\r\n\
+                        ADR;TYPE=HOME:PO 7;Flat 2;1 Main St\\, Rear;Springfield;IL;62701;USA\r\n\
+                        BDAY:1985-04-12\r\nPHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo=\r\nEND:VCARD\r\n";
+        let c = super::parse_vcard_fields(original).unwrap();
+        assert_eq!(c.postal[0].street, "1 Main St, Rear");
+        assert_eq!((c.postal[0].pobox.as_str(), c.postal[0].label.as_str()), ("PO 7", "Home"));
+        assert_eq!(super::birthday_parts(&c.birthday_raw), Some((Some(1985), 4, 12)));
+        let mut postal = c.postal.clone();
+        postal[0].locality = "Shelbyville".into();
+        postal.push(super::Postal { label: "Work".into(), street: "2 Side Rd".into(), ..Default::default() });
+        let edit = super::ContactEdit {
+            name: "Pat Doe".into(),
+            addresses: postal,
+            birthday: super::birthday_value(None, 4, 12),
+            ..Default::default()
+        };
+        let out = super::patched_vcard(original, &edit);
+        assert!(out.contains("ADR;TYPE=HOME:PO 7;Flat 2;1 Main St\\, Rear;Shelbyville;IL;62701;USA\r\n"), "{out}");
+        assert!(out.contains("ADR;TYPE=WORK:;;2 Side Rd;;;;\r\n"), "{out}");
+        assert!(out.contains("BDAY:--04-12\r\n") && !out.contains("1985"), "{out}");
+        assert!(out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORw0KGgo="), "a kept photo stays: {out}");
+        let gone = super::patched_vcard(original, &super::ContactEdit { photo: super::PhotoEdit::Remove, ..edit.clone() });
+        assert!(!gone.contains("PHOTO"), "{gone}");
+        let set = super::patched_vcard(
+            original,
+            &super::ContactEdit { photo: super::PhotoEdit::Set(vec![0xFF, 0xD8, 0xFF, 1]), ..edit },
+        );
+        assert!(set.contains("PHOTO;ENCODING=b;TYPE=JPEG:/9j/AQ==\r\n") && !set.contains("iVBOR"), "{set}");
+    }
+
+    #[test]
+    fn a_card_with_no_name_or_address_is_still_a_contact() {
+        let phone = "BEGIN:VCARD\r\nVERSION:3.0\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
+        assert_eq!(super::parse_vcard_fields(phone).unwrap().name, "+1 555 0100");
+        let org = "BEGIN:VCARD\r\nVERSION:3.0\r\nORG:Acme;\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
+        assert_eq!(super::parse_vcard_fields(org).unwrap().name, "Acme");
+        assert!(super::parse_vcard_fields("BEGIN:VCARD\r\nVERSION:3.0\r\nEND:VCARD\r\n").is_none());
+        // Saved with no name, it goes by its company.
+        let edit = super::ContactEdit {
+            org: "Acme".into(),
+            phones: vec![super::Labeled { label: "Work".into(), value: "+1 555 0100".into() }],
+            ..Default::default()
+        };
+        let out = super::new_vcard(&edit);
+        assert!(out.contains("\r\nFN:Acme\r\n") && out.contains("TEL;TYPE=WORK:+1 555 0100"), "{out}");
     }
 
     #[test]

@@ -1386,7 +1386,7 @@ msgstr ""
 msgid "{name} did not answer: {error}"
 msgstr ""
 
-msgid "A contact needs a name or an email address"
+msgid "A contact needs a name, an email address or a phone number"
 msgstr ""
 
 msgid "The contact is too large"
@@ -3817,6 +3817,57 @@ msgid "Add a person by name or address"
 msgstr ""
 
 msgid "No email address · {book}"
+msgstr ""
+
+msgid "No label"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Work"
+msgstr ""
+
+msgid "Mobile"
+msgstr ""
+
+msgid "Fax"
+msgstr ""
+
+msgid "Label"
+msgstr ""
+
+msgid "Add address"
+msgstr ""
+
+msgid "Street"
+msgstr ""
+
+msgid "City"
+msgstr ""
+
+msgid "State or region"
+msgstr ""
+
+msgid "Postal code"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "No birthday"
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "Change Photo…"
+msgstr ""
+
+msgid "Remove Photo"
+msgstr ""
+
+msgid "Choose a Photo"
 msgstr ""
 
 msgid "Use an app-specific password, not your usual one."

@@ -57,6 +57,16 @@
   books unticked, several at once. It replaces the address book menu that
   was beside the search.
 
+- **Changed: Contacts manages every contact, not only those with an email
+  address.** The contact form edits postal addresses, the birthday and the
+  photo, and labels email addresses and phone numbers (Home, Work, Mobile,
+  Fax). A card with only a phone number or a company is a contact: it is
+  listed, saved and named by what it has, and the list shows its phone
+  number or company where others show an address. Every card of every book
+  is listed: one with the same address or name as a card in another book
+  was left out before. A group in a CardDAV book takes contacts with no
+  email address from its form too.
+
 - **Added: several contacts at once.** Ctrl or Shift and a click, or
   Ctrl+A, select several contacts in the Contacts view, and the right-hand
   pane then has **Add to Group**, **Move to…** another address book and

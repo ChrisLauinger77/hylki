@@ -537,6 +537,18 @@ book** row at the top of its form that picks where it is saved; it starts on
 the default book, or on the first book the list shows when the default one
 is unticked in the filter. A contact being edited stays in its book, which the form names.
 
+The contact form holds the photo, which **Change Photo…** replaces with an
+image file (made at most 512 pixels a side and kept in the card) and
+**Remove Photo** takes away; the name, nickname, organization, title and
+birthday (a day and a month, the year if known); email addresses and phone
+numbers, each with a label (Home, Work, Mobile, Fax); postal addresses, in
+their parts; websites; and a note. No field is required: a card with only a
+phone number, or only a company, is a contact, and one with no name is
+listed by its email address, nickname, company or phone number, which the
+list also shows under the name when there is no email address. Every card
+in every book is listed, so someone kept in two books shows twice, each
+with its book named.
+
 The Hylki book's page in **Settings → Contacts** shows how many contacts it
 holds, and has **Import vCard files**, **Export as a vCard file** (one `.vcf`
 file with every contact, which other apps can import) and **Delete all
