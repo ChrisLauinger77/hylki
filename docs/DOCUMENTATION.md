@@ -516,16 +516,16 @@ an email address, a phone number, a street address, a birthday or a
 company, or those in no group. The button turns the accent color while a
 filter is on, and **Clear Filters** shows everything again.
 
-While Contacts is open, the sidebar lists the address books in place of
-the mail accounts: **All Contacts** first, then each book, under the
-account it belongs to, with how many contacts it holds, and its groups
-under it. Picking a book lists its contacts alone; picking a group lists
-the group and then its people, with **Remove from Group** in their
-right-click menu. An LDAP directory, under **Directories**, is searched by
-typing. A book's right-click menu has **New Contact** and **New Group**,
-made in that book, and a group's has **New Message**, **Edit Group** and
-**Delete Group…**. **Mail**, at the foot of the sidebar, goes back to the
-mail that was open.
+**Contacts** is a row of the sidebar's unified section, under the merged
+mail rows, and opens every contact. Its chevron opens the list beneath:
+each address book, under the account it belongs to, with how many
+contacts it holds, and each book's groups under it. The list stays open
+or folded as it was left. Picking a book opens Contacts on its contacts
+alone; picking a group lists the group and then its people, with **Remove
+from Group** in their right-click menu. An LDAP directory, under
+**Directories**, is searched by typing. A book's right-click menu has
+**New Contact** and **New Group**, made in that book, and a group's has
+**New Message**, **Edit Group** and **Delete Group…**.
 
 Contacts dragged from the list onto a book in the sidebar are copied
 there, and stay where they were. With <kbd>Ctrl</kbd> held as they are

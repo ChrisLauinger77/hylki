@@ -6069,10 +6069,9 @@ msgid "Contacts in the sidebar"
 msgstr "Επαφές στην πλευρική στήλη"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
 msgstr ""
-"Μια συντόμευση που ανοίγει τις επαφές σας, καρφιτσωμένη στο κάτω μέρος της "
-"πλευρικής στήλης."
 
 msgid "Expand the sidebar on hover"
 msgstr "Ανάπτυξη πλευρικής στήλης κατά την αιώρηση"
@@ -7604,10 +7603,6 @@ msgid "Insert"
 msgstr "Εισαγωγή"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Επαφές"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "Διαγραφή του κλειδιού σας;"
 
@@ -7685,6 +7680,10 @@ msgstr "Εμφάνιση κάθε ετικέτας"
 
 msgid "Show each smart folder"
 msgstr "Εμφάνιση κάθε έξυπνου φακέλου"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "Αποθήκευση του καταλόγου;"
 
 msgid "Long-press to expand or collapse"
 msgstr "Παρατεταμένο πάτημα για ανάπτυξη ή σύμπτυξη"
@@ -8383,6 +8382,16 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr ""
+#~ "Μια συντόμευση που ανοίγει τις επαφές σας, καρφιτσωμένη στο κάτω μέρος "
+#~ "της πλευρικής στήλης."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Επαφές"
 
 #, fuzzy
 #~ msgid "Groups"

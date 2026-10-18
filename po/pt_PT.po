@@ -6099,10 +6099,9 @@ msgid "Contacts in the sidebar"
 msgstr "Contactos na barra lateral"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
 msgstr ""
-"Um atalho que abre os seus contactos, afixado na parte inferior da barra "
-"lateral."
 
 msgid "Expand the sidebar on hover"
 msgstr "Expandir a barra lateral ao passar o ponteiro"
@@ -7612,10 +7611,6 @@ msgid "Insert"
 msgstr "Inserir"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Contactos"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "Eliminar a sua chave?"
 
@@ -7696,6 +7691,10 @@ msgstr "Mostrar cada etiqueta"
 #, fuzzy
 msgid "Show each smart folder"
 msgstr "Mostrar cada pasta"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "Guardar o diretório?"
 
 msgid "Long-press to expand or collapse"
 msgstr "Premir sem soltar para expandir ou recolher"
@@ -8377,6 +8376,16 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr ""
+#~ "Um atalho que abre os seus contactos, afixado na parte inferior da barra "
+#~ "lateral."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Contactos"
 
 #, fuzzy
 #~ msgid "Groups"

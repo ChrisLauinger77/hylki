@@ -6114,10 +6114,9 @@ msgid "Contacts in the sidebar"
 msgstr "Névjegyek az oldalsávban"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
 msgstr ""
-"Egy gyorsbillentyű, amely megnyitja a névjegyeket, és az oldalsáv alján van "
-"rögzítve."
 
 msgid "Expand the sidebar on hover"
 msgstr "Oldalsáv kibontása rámutatáskor"
@@ -7641,10 +7640,6 @@ msgid "Insert"
 msgstr "Beszúrás"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Névjegyek"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "Törli a kulcsát?"
 
@@ -7725,6 +7720,10 @@ msgstr "Minden címke megjelenítése"
 #, fuzzy
 msgid "Show each smart folder"
 msgstr "Minden mappa megjelenítése"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "El akarod menteni a könyvtárat?"
 
 msgid "Long-press to expand or collapse"
 msgstr "Hosszú gombnyomással kibontható vagy összecsukható"
@@ -8416,6 +8415,16 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr ""
+#~ "Egy gyorsbillentyű, amely megnyitja a névjegyeket, és az oldalsáv alján "
+#~ "van rögzítve."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Névjegyek"
 
 #, fuzzy
 #~ msgid "Groups"

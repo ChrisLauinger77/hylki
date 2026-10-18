@@ -1,8 +1,7 @@
-//! The sidebar's rows while Contacts is open: every contact, then each
-//! account's address books with their groups under them, as the mail
-//! sidebar lists accounts and folders. Picking a row picks what the
-//! contact list shows; contacts dragged from the list are copied onto a
-//! book (moved, with Ctrl held) or put in a group.
+//! The list under the sidebar's Contacts row: each account's address books
+//! with their groups under them. Picking a row picks what the contact list
+//! shows; contacts dragged from the list are copied onto a book (moved, with
+//! Ctrl held) or put in a group.
 
 use adw::prelude::*;
 
@@ -11,26 +10,18 @@ use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::contacts_page::{dragged_contacts, ContactScope, ContactTree, DropOn, TreeAction};
 use crate::ui::sidebar::SidebarInput;
 
-/// The rows built for `tree`, with the scope each one picks. In the icon
-/// rail (`collapsed`) the books show as icons alone and the groups not at
-/// all.
-pub fn build(
+/// Fill `list`, the Contacts row's list in the sidebar, with `tree`: each
+/// account's name, its address books under it and each book's groups under
+/// the book. Returns the rows with the scope each picks. In the icon rail
+/// (`collapsed`) the books show as icons alone and the groups not at all.
+pub fn fill(
+    list: &gtk::ListBox,
     tree: &ContactTree,
     collapsed: bool,
+    inset: bool,
     input: &relm4::Sender<SidebarInput>,
-) -> (gtk::ListBox, Vec<(ContactScope, gtk::ListBoxRow)>) {
-    let list = gtk::ListBox::new();
-    list.set_selection_mode(gtk::SelectionMode::Single);
-    list.add_css_class("navigation-sidebar");
-    if collapsed {
-        list.add_css_class("rail-collapsed");
-    }
+) -> Vec<(ContactScope, gtk::ListBoxRow)> {
     let mut rows = Vec::new();
-
-    let all = row(&i18n("All Contacts"), "x-office-address-book-symbolic", tree.total, 0, collapsed);
-    list.append(&all);
-    rows.push((ContactScope::All, all));
-
     let mut account: Option<&str> = None;
     for book in &tree.books {
         // A heading for each account that holds books of its own name.
@@ -39,15 +30,9 @@ pub fn build(
         }
         account = Some(book.account.as_str());
         let icon = if book.directory { "network-server-symbolic" } else { "x-office-address-book-symbolic" };
-        let count = if book.directory { usize::MAX } else { book.count };
-        let r = row(&book.name, icon, count, 0, collapsed);
-        if collapsed {
-            r.set_tooltip_text(Some(&if book.account.is_empty() {
-                book.name.clone()
-            } else {
-                format!("{} · {}", book.account, book.name)
-            }));
-        }
+        let tip = if book.account.is_empty() { book.name.clone() } else { format!("{} · {}", book.account, book.name) };
+        let count = (!book.directory).then_some(book.count);
+        let r = row(&book.name, &tip, icon, count, 0, collapsed, inset);
         if book.writable && !book.directory {
             drop_target(&r, DropOn::Book(book.uid.clone()), input);
         }
@@ -77,7 +62,7 @@ pub fn build(
             continue;
         }
         for g in &book.groups {
-            let r = row(&g.name, "system-users-symbolic", g.count, 1, false);
+            let r = row(&g.name, &g.name, "system-users-symbolic", Some(g.count), 1, false, inset);
             if g.editable {
                 drop_target(&r, DropOn::Group { book: g.book.clone(), uid: g.uid.clone() }, input);
             }
@@ -111,47 +96,30 @@ pub fn build(
             rows.push((ContactScope::Group { book: g.book.clone(), uid: g.uid.clone() }, r));
         }
     }
-
-    {
-        let (s, scopes) = (input.clone(), rows.clone());
-        list.connect_row_selected(move |_, row| {
-            let Some(row) = row else { return };
-            if let Some((scope, _)) = scopes.iter().find(|(_, r)| r == row) {
-                let _ = s.send(SidebarInput::ContactTreeSelected(scope.clone()));
-            }
-        });
-    }
-    (list, rows)
+    rows
 }
 
-/// A row: icon, name and, unless `count` is `usize::MAX`, how many it
-/// holds; `depth` 1 indents a group under its book.
-fn row(name: &str, icon: &str, count: usize, depth: i32, collapsed: bool) -> gtk::ListBoxRow {
-    let row = gtk::ListBoxRow::new();
-    let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    hbox.add_css_class("folder-row");
+/// A row shaped as the other unified rows' are: an icon, the name and, when
+/// `count` is given, how many it holds; `depth` 1 sets a group under its
+/// book.
+fn row(name: &str, tip: &str, icon: &str, count: Option<usize>, depth: i32, collapsed: bool, inset: bool) -> gtk::ListBoxRow {
     let img = gtk::Image::from_icon_name(icon);
     img.add_css_class("folder-icon");
     crate::ui::sidebar::pin_icon_size(&img);
-    hbox.append(&img);
-    if collapsed {
-        hbox.set_halign(gtk::Align::Center);
-        row.set_tooltip_text(Some(name));
-    } else {
-        hbox.set_margin_start(8 + depth * 18);
-        let label = gtk::Label::new(Some(name));
-        label.set_hexpand(true);
-        label.set_halign(gtk::Align::Start);
-        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        hbox.append(&label);
-        if count != usize::MAX {
-            let n = gtk::Label::new(Some(&count.to_string()));
-            n.add_css_class("dim-label");
-            n.add_css_class("caption");
-            hbox.append(&n);
+    let (row, badge) = crate::ui::sidebar::build_unified_sub_row(&img, name, tip, 0, collapsed, inset, false);
+    badge.set_visible(false);
+    if !collapsed {
+        if depth > 0 {
+            img.set_margin_start(img.margin_start() + 18 * depth);
+        }
+        // A count, not unread mail: dim, where the unread chip would be.
+        if let (Some(n), Some(hbox)) = (count, row.child().and_downcast::<gtk::Box>()) {
+            let label = gtk::Label::new(Some(&n.to_string()));
+            label.add_css_class("dim-label");
+            label.add_css_class("caption");
+            hbox.append(&label);
         }
     }
-    row.set_child(Some(&hbox));
     row
 }
 
@@ -166,8 +134,8 @@ fn heading(text: &str) -> gtk::ListBoxRow {
     label.add_css_class("caption-heading");
     label.set_halign(gtk::Align::Start);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    label.set_margin_top(12);
-    label.set_margin_start(8);
+    label.set_margin_top(8);
+    label.set_margin_start(10);
     row.set_child(Some(&label));
     row
 }

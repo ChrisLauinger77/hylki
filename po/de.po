@@ -5968,10 +5968,9 @@ msgid "Contacts in the sidebar"
 msgstr "Kontakte in der Seitenleiste"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
 msgstr ""
-"Eine Tastenkombination zum Öffnen der Kontakte, fixiert am unteren Ende der "
-"Seitenleiste."
 
 msgid "Expand the sidebar on hover"
 msgstr "Seitenleiste beim Darüberfahren ausklappen"
@@ -7493,10 +7492,6 @@ msgid "Insert"
 msgstr "Einfügen"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Kontakte"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "{n} Nachrichten löschen"
 
@@ -7574,6 +7569,10 @@ msgstr "Jedes Tag anzeigen"
 
 msgid "Show each smart folder"
 msgstr "Jeden Smart Folder anzeigen"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "E-Mail-Adresse"
 
 msgid "Long-press to expand or collapse"
 msgstr "Lange drücken, um aus- oder einzuklappen"
@@ -8253,6 +8252,16 @@ msgstr "Der gemeinsame Posteingang im hellen Modus."
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr ""
+#~ "Eine Tastenkombination zum Öffnen der Kontakte, fixiert am unteren Ende "
+#~ "der Seitenleiste."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Kontakte"
 
 #, fuzzy
 #~ msgid "Search groups"

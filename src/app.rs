@@ -900,6 +900,7 @@ pub struct AppModel {
     favorites: Vec<String>,
     favorites_expanded: bool,
     smart_expanded: bool,
+    contacts_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open.
     filtered_expanded_accounts: Vec<String>,
     tags_expanded_accounts: Vec<String>,
@@ -1804,6 +1805,7 @@ pub enum AppMsg {
         trash: bool,
         favorites: bool,
         smart: bool,
+        contacts: bool,
     },
     /// A tag view's rows, read from the index off the main thread: the
     /// view they answer and, per message, its account and folder path.
@@ -2996,6 +2998,7 @@ impl SimpleComponent for AppModel {
         let trash_expanded = sidebar_state.trash_expanded;
         let favorites_expanded = sidebar_state.favorites_expanded;
         let smart_expanded = sidebar_state.smart_expanded;
+        let contacts_expanded = sidebar_state.contacts_expanded;
         let favorites = sidebar_state.favorites.clone();
 
         // Load accounts, then reconcile against GNOME Online Accounts: drop any
@@ -3067,6 +3070,7 @@ impl SimpleComponent for AppModel {
                 trash_expanded,
                 favorites_expanded,
                 smart_expanded,
+                contacts_expanded,
                 show_attachments,
                 show_contacts,
                 start,
@@ -3096,6 +3100,7 @@ impl SimpleComponent for AppModel {
                 trash_expanded,
                 favorites_expanded,
                 smart_expanded,
+                contacts_expanded,
                 show_attachments,
                 show_contacts,
                 start: None,
@@ -3572,6 +3577,7 @@ impl SimpleComponent for AppModel {
             favorites,
             favorites_expanded,
             smart_expanded,
+            contacts_expanded,
             filtered_expanded_accounts,
             tags_expanded_accounts,
             rail_dots: prefs.rail_dots,
@@ -6025,7 +6031,7 @@ impl SimpleComponent for AppModel {
                 // server request is ever aimed at it.
                 self.showing_outbox = true;
                 self.leave_gallery();
-                self.set_showing_contacts(false);
+                self.showing_contacts = false;
                 self.unified = false;
                 self.tag_view = None;
                 self.smart_view = None;
@@ -6122,7 +6128,7 @@ impl SimpleComponent for AppModel {
                 self.mirror_selection(crate::ui::sidebar::Sel::Attachments);
                 self.showing_outbox = false;
                 self.showing_gallery = true;
-                self.set_showing_contacts(false);
+                self.showing_contacts = false;
                 self.gallery.emit(GalleryInput::SetLoading(true));
                 // Handing over the folder list is what starts the load: the
                 // gallery asks for its first page once it knows the scope, so
@@ -6202,7 +6208,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::OpenAttachmentMessage { account_id, folder_path, uid } => {
                 self.leave_gallery();
-                self.set_showing_contacts(false);
+                self.showing_contacts = false;
                 self.showing_outbox = false;
                 if let Some(folder) = self
                     .folders
@@ -6592,8 +6598,10 @@ impl SimpleComponent for AppModel {
                 trash,
                 favorites,
                 smart,
+                contacts,
             } => {
-                let now = (all_inboxes, filtered, tags, starred, sent, drafts, archive, junk, trash, favorites, smart);
+                let now =
+                    (all_inboxes, filtered, tags, starred, sent, drafts, archive, junk, trash, favorites, smart, contacts);
                 let was = (
                     self.unified_expanded,
                     self.filtered_expanded,
@@ -6606,6 +6614,7 @@ impl SimpleComponent for AppModel {
                     self.trash_expanded,
                     self.favorites_expanded,
                     self.smart_expanded,
+                    self.contacts_expanded,
                 );
                 if now != was {
                     self.unified_expanded = all_inboxes;
@@ -6619,6 +6628,7 @@ impl SimpleComponent for AppModel {
                     self.trash_expanded = trash;
                     self.favorites_expanded = favorites;
                     self.smart_expanded = smart;
+                    self.contacts_expanded = contacts;
                     self.save_sidebar_state();
                 }
             }
@@ -10385,7 +10395,7 @@ impl SimpleComponent for AppModel {
                     None => crate::ui::sidebar::Sel::UnifiedTags,
                 });
                 self.leave_gallery();
-                self.set_showing_contacts(false);
+                self.showing_contacts = false;
                 self.showing_outbox = false;
                 self.unified = false;
                 self.selected = None;
@@ -10419,7 +10429,7 @@ impl SimpleComponent for AppModel {
                 self.close_sidebar_peek();
                 self.mirror_selection(crate::ui::sidebar::Sel::Smart(id.clone()));
                 self.leave_gallery();
-                self.set_showing_contacts(false);
+                self.showing_contacts = false;
                 self.showing_outbox = false;
                 self.unified = false;
                 self.selected = None;
@@ -12378,18 +12388,24 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::OpenContacts => {
-                self.close_sidebar_peek();
                 self.mirror_selection(crate::ui::sidebar::Sel::Contacts);
-                self.showing_outbox = false;
-                self.leave_gallery();
-                self.set_showing_contacts(true);
-                // Read EDS off the UI thread (SQLite + photo decoding); the
-                // page shows its loading face until the list lands.
-                self.contacts_page.emit(ContactsPageInput::SetLoading);
-                reload_contacts(&sender, 0);
-                if !demo_mode() {
-                    sync_contact_books(&sender, false, 0);
+                self.show_contacts_view(&sender);
+            }
+
+            AppMsg::ContactTree(tree) => {
+                self.sidebar.emit(SidebarInput::SetContactTree(tree.clone()));
+                self.peek_sidebar.emit(SidebarInput::SetContactTree(tree));
+            }
+
+            AppMsg::ContactScope(scope) => {
+                // A book or group under the sidebar's Contacts row opens
+                // Contacts on it.
+                if !self.showing_contacts {
+                    self.show_contacts_view(&sender);
+                } else {
+                    self.close_sidebar_peek();
                 }
+                self.contacts_page.emit(ContactsPageInput::SetScope(scope));
             }
 
             AppMsg::ContactBooksSynced => {
@@ -12499,16 +12515,6 @@ impl SimpleComponent for AppModel {
                     let result = crate::contacts::move_group(&from, &uid, &to, format, edit);
                     s.input(AppMsg::ContactWriteDone(result.err()));
                 });
-            }
-
-            AppMsg::ContactTree(tree) => {
-                self.sidebar.emit(SidebarInput::SetContactTree(tree.clone()));
-                self.peek_sidebar.emit(SidebarInput::SetContactTree(tree));
-            }
-
-            AppMsg::ContactScope(scope) => {
-                self.close_sidebar_peek();
-                self.contacts_page.emit(ContactsPageInput::SetScope(scope));
             }
 
             AppMsg::ContactDrop { keys, on, moving } => {
@@ -15170,6 +15176,7 @@ impl AppModel {
             favorites: self.favorites.clone(),
             favorites_expanded: self.favorites_expanded,
             smart_expanded: self.smart_expanded,
+            contacts_expanded: self.contacts_expanded,
             filtered_expanded_accounts: self.filtered_expanded_accounts.clone(),
             tags_expanded_accounts: self.tags_expanded_accounts.clone(),
         });
@@ -15335,13 +15342,18 @@ impl AppModel {
     /// overlay mode. The docked rail is not involved: it keeps its rows,
     /// header and width throughout and stays clickable beside the panel.
     /// `animate` is advisory — libadwaita animates the overlay itself.
-    /// Show Contacts or not; the sidebars list its address books while it
-    /// shows, and mail's accounts otherwise.
-    fn set_showing_contacts(&mut self, on: bool) {
-        if self.showing_contacts != on {
-            self.showing_contacts = on;
-            self.sidebar.emit(SidebarInput::SetContactsMode(on));
-            self.peek_sidebar.emit(SidebarInput::SetContactsMode(on));
+    /// Show Contacts in place of the mail panes, read afresh.
+    fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
+        self.close_sidebar_peek();
+        self.showing_outbox = false;
+        self.leave_gallery();
+        self.showing_contacts = true;
+        // Read EDS off the UI thread (SQLite + photo decoding); the page
+        // shows its loading face until the list lands.
+        self.contacts_page.emit(ContactsPageInput::SetLoading);
+        reload_contacts(sender, 0);
+        if !demo_mode() {
+            sync_contact_books(sender, false, 0);
         }
     }
 
@@ -16515,7 +16527,7 @@ impl AppModel {
             UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
         });
         self.leave_gallery();
-        self.set_showing_contacts(false);
+        self.showing_contacts = false;
         self.showing_outbox = false;
         // Another view's slices are another view's: start afresh
         // (the loads below refill them).
@@ -16897,7 +16909,7 @@ impl AppModel {
             config::save_last_view(config::LastView { email, path: path.clone() });
         }
         self.leave_gallery();
-        self.set_showing_contacts(false);
+        self.showing_contacts = false;
         self.showing_outbox = false;
         // Mirror the selection in the sidebar. Navigation that starts in the
         // sidebar hits its already-selected guard; navigation from anywhere
@@ -25736,6 +25748,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
             trash,
             favorites,
             smart,
+            contacts,
         } => AppMsg::SidebarSectionsOpen {
             all_inboxes,
             filtered,
@@ -25748,6 +25761,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
             trash,
             favorites,
             smart,
+            contacts,
         },
         SidebarOutput::FolderNodeCollapsed { account_id, path, collapsed } => {
             AppMsg::FolderNodeCollapsed { account_id, path, collapsed }

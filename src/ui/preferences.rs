@@ -2457,8 +2457,8 @@ impl Component for Preferences {
                                     #[name = "show_contacts_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Contacts in the sidebar"),
-                                        set_subtitle: &i18n("A shortcut that opens your contacts, pinned at the \
-                                                       bottom of the sidebar."),
+                                        set_subtitle: &i18n("A row under the merged mail rows that opens your \
+                                                       contacts, with your address books and groups beneath it."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetContactsRow(row.is_active()));
                                         },

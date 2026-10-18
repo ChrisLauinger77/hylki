@@ -90,6 +90,9 @@ enum UnifiedRow {
     Tags,
     /// The smart folders (#417): saved searches, each a row of the list.
     Smart,
+    /// Contacts: every contact, and under it each account's address
+    /// books with their groups.
+    Contacts,
 }
 
 /// What a unified row is called.
@@ -100,6 +103,7 @@ fn row_title(row: UnifiedRow) -> String {
         UnifiedRow::Filtered => i18n("Filters"),
         UnifiedRow::Tags => i18n("Tags"),
         UnifiedRow::Smart => i18n("Smart Folders"),
+        UnifiedRow::Contacts => i18n("Contacts"),
     }
 }
 
@@ -111,6 +115,7 @@ fn row_icon(row: UnifiedRow) -> &'static str {
         UnifiedRow::Filtered => "filter-folder-symbolic",
         UnifiedRow::Tags => "tag-outline-symbolic",
         UnifiedRow::Smart => "folder-saved-search-symbolic",
+        UnifiedRow::Contacts => "x-office-address-book-symbolic",
     }
 }
 
@@ -126,6 +131,7 @@ fn select_msg(row: UnifiedRow) -> SidebarInput {
         UnifiedRow::Tags => SidebarInput::UnifiedTagsSelected,
         // Each smart folder is a view of its own; the header holds them.
         UnifiedRow::Smart => SidebarInput::ToggleSmartExpand,
+        UnifiedRow::Contacts => SidebarInput::ContactsRowClicked,
     }
 }
 
@@ -138,6 +144,7 @@ fn toggle_msg(row: UnifiedRow) -> SidebarInput {
         UnifiedRow::Filtered => SidebarInput::ToggleFilteredExpand(Slot::Unified),
         UnifiedRow::Tags => SidebarInput::ToggleTagsExpand(Slot::Unified),
         UnifiedRow::Smart => SidebarInput::ToggleSmartExpand,
+        UnifiedRow::Contacts => SidebarInput::ToggleContactsExpand,
     }
 }
 
@@ -227,6 +234,7 @@ pub struct SidebarInit {
     pub trash_expanded: bool,
     pub favorites_expanded: bool,
     pub smart_expanded: bool,
+    pub contacts_expanded: bool,
     /// Whether the "Attachments" row is shown.
     pub show_attachments: bool,
     /// Whether the "Contacts" row is shown.
@@ -250,8 +258,10 @@ pub enum Sel {
     Unified,
     /// The attachments gallery (all inboxes).
     Attachments,
-    /// The in-app contacts view.
+    /// The in-app contacts view, every contact.
     Contacts,
+    /// An address book or group picked under the Contacts row.
+    ContactScope(crate::ui::contacts_page::ContactScope),
     Outbox,
     Folder(u32, String),
     /// An account's inbox selected via the "All Inboxes" sub-list.
@@ -365,18 +375,12 @@ pub struct Sidebar {
     /// The pinned footer's single list box (Contacts + Attachments rows) and
     /// the rows themselves, for selection management.
     footer_list: Option<gtk::ListBox>,
-    /// Contacts is open: the address books and groups are listed in place
-    /// of the accounts, and the footer leads back to mail.
-    contacts_mode: bool,
+    /// The address books and groups the Contacts row lists.
     contact_tree: Option<crate::ui::contacts_page::ContactTree>,
-    /// The tree's rows, by the scope each picks.
-    tree_rows: Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>,
-    /// What mail showed before Contacts opened, which the Mail row opens.
-    before_contacts: Sel,
-    /// The footer's Mail row, shown while Contacts is open.
-    mail_row: Option<gtk::ListBoxRow>,
+    /// That list's rows, by the scope each picks; shared with its
+    /// selection handler.
+    tree_rows: std::rc::Rc<std::cell::RefCell<Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>>>,
     attachments_row: Option<gtk::ListBoxRow>,
-    contacts_row: Option<gtk::ListBoxRow>,
     /// Refresh/spinner stack + spinner beside the "New Message" button.
     sync_stack: Option<gtk::Stack>,
     sync_spinner: Option<gtk::Spinner>,
@@ -448,6 +452,8 @@ pub struct Sidebar {
     /// each one's unread count and the badge showing it.
     smart_folders: Vec<(String, String)>,
     smart_expanded: bool,
+    /// Whether the Contacts row's address books are shown.
+    contacts_expanded: bool,
     smart_unread: HashMap<String, u32>,
     smart_badges: HashMap<String, gtk::Label>,
     /// The rows of every Filtered Folders section (the unified one and each
@@ -558,10 +564,10 @@ pub enum SidebarInput {
     AttachmentsRowSelected,
     /// The "Contacts" row was clicked (it acts as a launcher, not a selection).
     ContactsRowClicked,
-    /// Contacts opened or closed: the sidebar lists its books, or mail.
-    SetContactsMode(bool),
-    /// The address books and groups to list while Contacts is open.
+    /// The address books and groups the Contacts row lists.
     SetContactTree(crate::ui::contacts_page::ContactTree),
+    /// Open or fold the Contacts row's list.
+    ToggleContactsExpand,
     /// A book or group (or every contact) was picked in that list.
     ContactTreeSelected(crate::ui::contacts_page::ContactScope),
     /// Contacts were dropped on a book or group there.
@@ -572,8 +578,6 @@ pub enum SidebarInput {
     },
     /// A right-click choice on a book or group there.
     ContactTreeMenu(crate::ui::contacts_page::TreeAction),
-    /// The footer's Mail row: back to what mail showed.
-    MailRowClicked,
     FolderRowSelected { account_id: u32, index: i32 },
     /// Select a folder row programmatically — the app navigated there itself
     /// ("Go to Message" from the gallery, a notification click) and the
@@ -665,6 +669,7 @@ pub enum SidebarOutput {
         trash: bool,
         favorites: bool,
         smart: bool,
+        contacts: bool,
     },
     /// A unified Starred / Sent / Drafts row was chosen: every account's
     /// folder of that kind, merged.
@@ -831,21 +836,9 @@ impl Component for Sidebar {
                         // split view's min/max sidebar widths govern instead.
                         set_hscrollbar_policy: gtk::PolicyType::External,
 
+                        #[name = "normal_box"]
                         gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
-
-                            #[name = "normal_box"]
-                            gtk::Box {
-                                set_orientation: gtk::Orientation::Vertical,
-                            },
-
-                            // While Contacts is open: its address books
-                            // and groups, in place of the accounts.
-                            #[name = "contacts_box"]
-                            gtk::Box {
-                                set_orientation: gtk::Orientation::Vertical,
-                                set_visible: false,
-                            },
                         },
                     },
 
@@ -907,13 +900,9 @@ impl Component for Sidebar {
             custom_chevrons: HashMap::new(),
             unified_list: None,
             footer_list: None,
-            contacts_mode: false,
             contact_tree: None,
-            tree_rows: Vec::new(),
-            before_contacts: Sel::None,
-            mail_row: None,
+            tree_rows: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             attachments_row: None,
-            contacts_row: None,
             sync_stack: None,
             sync_spinner: None,
             busy: false,
@@ -946,6 +935,7 @@ impl Component for Sidebar {
             favorites_expanded: init.favorites_expanded,
             smart_folders: Vec::new(),
             smart_expanded: init.smart_expanded,
+            contacts_expanded: init.contacts_expanded,
             smart_unread: HashMap::new(),
             smart_badges: HashMap::new(),
             filtered_rows: HashMap::new(),
@@ -1042,9 +1032,6 @@ impl Sidebar {
             }
 
             SidebarInput::MirrorSelection(sel) => {
-                if sel == Sel::Contacts {
-                    self.remember_mail_view();
-                }
                 if self.selected != sel {
                     self.selected = sel.clone();
                     self.quiet.set(true);
@@ -1264,41 +1251,46 @@ impl Sidebar {
                 if self.selected == Sel::Contacts {
                     return;
                 }
-                self.remember_mail_view();
                 self.selected = Sel::Contacts;
                 self.clear_other_selections(Sel::Contacts);
                 let _ = sender.output(SidebarOutput::ContactsClicked);
-            }
-
-            SidebarInput::SetContactsMode(on) => {
-                if self.contacts_mode == on {
-                    return;
-                }
-                self.contacts_mode = on;
-                widgets.pinned_box.set_visible(!on);
-                widgets.normal_box.set_visible(!on);
-                widgets.contacts_box.set_visible(on);
-                // The footer gains, or loses, its Mail row.
-                self.rebuild_normal(&widgets.pinned_box, &widgets.normal_box, &widgets.footer_box, &sender);
-                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
-                self.restore_selection();
+                // The row itself is every contact.
+                let _ = sender.output(SidebarOutput::ContactScope(crate::ui::contacts_page::ContactScope::All));
             }
 
             SidebarInput::SetContactTree(tree) => {
                 if self.contact_tree.as_ref() == Some(&tree) {
                     return;
                 }
+                // The highlight follows a scope the contact page picked
+                // itself (a book's New Contact opens that book).
+                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) {
+                    self.selected = match &tree.scope {
+                        crate::ui::contacts_page::ContactScope::All => Sel::Contacts,
+                        scope => Sel::ContactScope(scope.clone()),
+                    };
+                    self.quiet.set(true);
+                    self.clear_other_selections(self.selected.clone());
+                    if self.selected == Sel::Contacts {
+                        self.select_contacts(None);
+                    }
+                    self.quiet.set(false);
+                }
                 self.contact_tree = Some(tree);
-                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
+                self.fill_contact_tree(&sender);
+            }
+
+            SidebarInput::ToggleContactsExpand => {
+                self.toggle_row(UnifiedRow::Contacts, &sender);
             }
 
             SidebarInput::ContactTreeSelected(scope) => {
-                if self.contact_tree.as_ref().is_some_and(|t| t.scope == scope) {
+                let key = Sel::ContactScope(scope.clone());
+                if self.selected == key {
                     return;
                 }
-                if let Some(tree) = &mut self.contact_tree {
-                    tree.scope = scope.clone();
-                }
+                self.selected = key.clone();
+                self.clear_other_selections(key);
                 let _ = sender.output(SidebarOutput::ContactScope(scope));
             }
 
@@ -1308,18 +1300,6 @@ impl Sidebar {
 
             SidebarInput::ContactTreeMenu(action) => {
                 let _ = sender.output(SidebarOutput::ContactTreeAction(action));
-            }
-
-            SidebarInput::MailRowClicked => {
-                // The view mail had, picked again: its row announces it.
-                // With none, the usual first view.
-                match self.before_contacts.clone() {
-                    Sel::None => {
-                        self.selected = Sel::None;
-                        self.restore_selection();
-                    }
-                    sel => self.select_sel(sel),
-                }
             }
 
             SidebarInput::OutboxRowSelected => {
@@ -1869,7 +1849,6 @@ impl Sidebar {
                         &widgets.footer_box,
                         &sender,
                     );
-                    self.rebuild_contact_tree(&widgets.contacts_box, &sender);
                     self.restore_selection();
                 }
             }
@@ -1884,7 +1863,6 @@ impl Sidebar {
                     &widgets.footer_box,
                     &sender,
                 );
-                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
                 self.restore_selection();
                 let _ = sender.output(SidebarOutput::CollapsedChanged(self.collapsed));
             }
@@ -2191,7 +2169,6 @@ impl Sidebar {
         self.unified_list = None;
         self.footer_list = None;
         self.attachments_row = None;
-        self.contacts_row = None;
         self.outbox_list = None;
         self.folder_badges.clear();
         self.tree_chevrons.clear();
@@ -2445,6 +2422,10 @@ impl Sidebar {
         if !self.smart_folders.is_empty() {
             unified_rows.push(UnifiedRow::Smart);
         }
+        // Contacts last, its address books and groups beneath it.
+        if self.show_contacts {
+            unified_rows.push(UnifiedRow::Contacts);
+        }
         let unified_sections: Vec<SectionData> =
             sections.iter().filter(|s| s.in_unified).cloned().collect();
         self.build_unified_run(container, &unified_rows, &unified_sections, sender);
@@ -2455,7 +2436,7 @@ impl Sidebar {
         // whatever the scroller above ends on. ONE list box holds both rows,
         // so they read as one gapless section (beta 1.18.0b feedback) and
         // selecting one automatically clears the other.
-        if self.show_contacts || self.show_attachments {
+        if self.show_attachments {
             let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
             sep.add_css_class("footer-separator");
             footer.append(&sep);
@@ -2463,84 +2444,6 @@ impl Sidebar {
             let list = gtk::ListBox::new();
             list.set_selection_mode(gtk::SelectionMode::Single);
             list.add_css_class("navigation-sidebar");
-
-            // "Mail" row — while Contacts is open, the way back to mail,
-            // where its folders were.
-            self.mail_row = None;
-            if self.contacts_mode {
-                let row = gtk::ListBoxRow::new();
-                let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-                hbox.add_css_class("folder-row");
-                let img = gtk::Image::from_icon_name("mail-unread-symbolic");
-                img.add_css_class("folder-icon");
-                pin_icon_size(&img);
-                if self.collapsed {
-                    hbox.set_halign(gtk::Align::Center);
-                    row.set_tooltip_text(Some(i18n("Mail").as_str()));
-                    hbox.append(&img);
-                } else {
-                    if self.chevrons_left {
-                        img.set_margin_start(ROW_LEFT_INSET);
-                    }
-                    hbox.append(&img);
-                    let label = gtk::Label::new(Some(i18n("Mail").as_str()));
-                    label.set_hexpand(true);
-                    label.set_halign(gtk::Align::Start);
-                    label.add_css_class("account-name");
-                    hbox.append(&label);
-                }
-                row.set_child(Some(&hbox));
-                list.append(&row);
-                self.mail_row = Some(row);
-            }
-
-            // "Contacts" row — shows the in-app contacts view. Right-click
-            // offers a jump straight to the GNOME Contacts app.
-            if self.show_contacts {
-                let row = gtk::ListBoxRow::new();
-                let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-                hbox.add_css_class("folder-row");
-                let img =
-                    gtk::Image::from_icon_name("x-office-address-book-symbolic");
-                img.add_css_class("folder-icon");
-                pin_icon_size(&img);
-                if self.collapsed {
-                    hbox.set_halign(gtk::Align::Center);
-                    row.set_tooltip_text(Some(i18n("Contacts").as_str()));
-                    hbox.append(&img);
-                } else {
-                    if self.chevrons_left {
-                        img.set_margin_start(ROW_LEFT_INSET);
-                    }
-                    hbox.append(&img);
-                    let label = gtk::Label::new(Some(i18n("Contacts").as_str()));
-                    label.set_hexpand(true);
-                    label.set_halign(gtk::Align::Start);
-                    label.add_css_class("account-name");
-                    hbox.append(&label);
-                }
-                row.set_child(Some(&hbox));
-
-                let right_click = gtk::GestureClick::new();
-                right_click.set_button(3);
-                let s = sender.clone();
-                right_click.connect_pressed(move |gesture, _, x, y| {
-                    let Some(widget) = gesture.widget() else { return };
-                    let s2 = s.clone();
-                    show_context_menu(
-                        &widget,
-                        x,
-                        y,
-                        vec![vec![MenuEntry::new(i18n("Open GNOME Contacts"), move || {
-                            let _ = s2.output(SidebarOutput::OpenGnomeContacts);
-                        })
-                        .icon("adw-external-link-symbolic")]],
-                    );
-                });
-                row.add_controller(right_click);
-                list.append(&row);
-                self.contacts_row = Some(row);
-            }
 
             // "Attachments" row — a gallery of every inbox attachment. The
             // very last row in the sidebar, below Contacts.
@@ -2572,20 +2475,14 @@ impl Sidebar {
             }
 
             let s = sender.clone();
-            let contacts_row = self.contacts_row.clone();
             let attachments_row = self.attachments_row.clone();
-            let mail_row = self.mail_row.clone();
             let quiet = self.quiet.clone();
             list.connect_row_selected(move |_, row| {
                 if quiet.get() {
                     return;
                 }
                 let Some(row) = row else { return };
-                if Some(row) == mail_row.as_ref() {
-                    s.input(SidebarInput::MailRowClicked);
-                } else if Some(row) == contacts_row.as_ref() {
-                    s.input(SidebarInput::ContactsRowClicked);
-                } else if Some(row) == attachments_row.as_ref() {
+                if Some(row) == attachments_row.as_ref() {
                     s.input(SidebarInput::AttachmentsRowSelected);
                 }
             });
@@ -3450,6 +3347,7 @@ impl Sidebar {
             UnifiedRow::Favorites | UnifiedRow::Filtered => i18n("Show each folder"),
             UnifiedRow::Tags => i18n("Show each tag"),
             UnifiedRow::Smart => i18n("Show each smart folder"),
+            UnifiedRow::Contacts => i18n("Show each address book"),
         };
 
         let list = gtk::ListBox::new();
@@ -3812,6 +3710,27 @@ impl Sidebar {
                 });
                 sub.add_controller(click);
             }
+            UnifiedRow::Contacts => {
+                // The tree the contact page handed over; filled again as it
+                // changes (see `fill_contact_tree`).
+                if let Some(tree) = &self.contact_tree {
+                    let filled =
+                        crate::ui::contact_tree::fill(&sub, tree, self.collapsed, self.chevrons_left, sender.input_sender());
+                    *self.tree_rows.borrow_mut() = filled;
+                }
+                let ss = sender.input_sender().clone();
+                let quiet = self.quiet.clone();
+                let rows = self.tree_rows.clone();
+                sub.connect_row_selected(move |_, row| {
+                    if quiet.get() {
+                        return;
+                    }
+                    let Some(row) = row else { return };
+                    if let Some((scope, _)) = rows.borrow().iter().find(|(_, r)| r == row) {
+                        let _ = ss.send(SidebarInput::ContactTreeSelected(scope.clone()));
+                    }
+                });
+            }
             UnifiedRow::Filtered => {
                 let refs = self.unified_folders.clone();
                 for r in &refs {
@@ -3938,6 +3857,7 @@ impl Sidebar {
             UnifiedRow::Filtered => self.unified_folders_expanded,
             UnifiedRow::Tags => self.tags_expanded,
             UnifiedRow::Smart => self.smart_expanded,
+            UnifiedRow::Contacts => self.contacts_expanded,
         }
     }
 
@@ -3950,7 +3870,7 @@ impl Sidebar {
             || self.collapsed
                 && match row {
                     UnifiedRow::Kind(kind) => self.rail_fold.folds_kind(kind),
-                    UnifiedRow::Favorites | UnifiedRow::Smart => false,
+                    UnifiedRow::Favorites | UnifiedRow::Smart | UnifiedRow::Contacts => false,
                     UnifiedRow::Filtered => self.rail_fold.folds_filtered(),
                     UnifiedRow::Tags => self.rail_fold.folds_tags(),
                 }
@@ -4002,6 +3922,7 @@ impl Sidebar {
             UnifiedRow::Filtered => self.unified_folders_expanded = open,
             UnifiedRow::Tags => self.tags_expanded = open,
             UnifiedRow::Smart => self.smart_expanded = open,
+            UnifiedRow::Contacts => self.contacts_expanded = open,
         }
     }
 
@@ -4041,6 +3962,7 @@ impl Sidebar {
             UnifiedRow::Filtered => self.filtered_unread(Slot::Unified),
             UnifiedRow::Tags => 0,
             UnifiedRow::Smart => self.smart_unread.values().sum(),
+            UnifiedRow::Contacts => 0,
         }
     }
 
@@ -4414,7 +4336,7 @@ impl Sidebar {
             UnifiedRow::Kind(kind) => self.unified_chips.has(kind),
             UnifiedRow::Favorites | UnifiedRow::Smart => true,
             UnifiedRow::Filtered => self.unified_chips.filtered,
-            UnifiedRow::Tags => false,
+            UnifiedRow::Tags | UnifiedRow::Contacts => false,
         }
     }
 
@@ -4536,29 +4458,23 @@ impl Sidebar {
 
     /// Deselect every list except the one owning `keep` (whose own list keeps its
     /// selection). Used when a selection moves between sections.
-    /// Keep the mail view on screen as Contacts opens, for the Mail row.
-    fn remember_mail_view(&mut self) {
-        if !matches!(self.selected, Sel::Contacts | Sel::Attachments) {
-            self.before_contacts = self.selected.clone();
+    /// List the address books and groups under the Contacts row, the one
+    /// the contact list shows picked.
+    fn fill_contact_tree(&mut self, sender: &ComponentSender<Self>) {
+        let Some(list) = self.kind_widgets.get(&UnifiedRow::Contacts).map(|w| w.list.clone()) else { return };
+        let Some(tree) = self.contact_tree.as_ref() else { return };
+        self.quiet.set(true);
+        while let Some(child) = list.first_child() {
+            list.remove(&child);
         }
-    }
-
-    /// List the address books and groups, the scope shown picked.
-    fn rebuild_contact_tree(&mut self, container: &gtk::Box, sender: &ComponentSender<Self>) {
-        while let Some(child) = container.first_child() {
-            container.remove(&child);
+        let rows = crate::ui::contact_tree::fill(&list, tree, self.collapsed, self.chevrons_left, sender.input_sender());
+        if let Sel::ContactScope(scope) = &self.selected {
+            if let Some((_, row)) = rows.iter().find(|(s, _)| s == scope) {
+                list.select_row(Some(row));
+            }
         }
-        self.tree_rows.clear();
-        let Some(tree) = self.contact_tree.as_ref().filter(|_| self.contacts_mode) else { return };
-        let (list, rows) = crate::ui::contact_tree::build(tree, self.collapsed, sender.input_sender());
-        // Picked quietly: the list already shows it.
-        if let Some((_, row)) = rows.iter().find(|(scope, _)| *scope == tree.scope) {
-            self.quiet.set(true);
-            list.select_row(Some(row));
-            self.quiet.set(false);
-        }
-        container.append(&list);
-        self.tree_rows = rows;
+        self.quiet.set(false);
+        *self.tree_rows.borrow_mut() = rows;
     }
 
     fn clear_other_selections(&self, keep: Sel) {
@@ -4573,6 +4489,7 @@ impl Sidebar {
                 UnifiedRow::Favorites | UnifiedRow::Smart => false,
                 UnifiedRow::Filtered => keep == Sel::UnifiedFiltered,
                 UnifiedRow::Tags => keep == Sel::UnifiedTags,
+                UnifiedRow::Contacts => keep == Sel::Contacts,
             };
             if !keep_header {
                 w.header.unselect_all();
@@ -4583,6 +4500,7 @@ impl Sidebar {
                 UnifiedRow::Filtered => matches!(keep, Sel::UnifiedFolder(..)),
                 UnifiedRow::Tags => matches!(keep, Sel::Tag(None, _)),
                 UnifiedRow::Smart => matches!(keep, Sel::Smart(_)),
+                UnifiedRow::Contacts => matches!(keep, Sel::ContactScope(_)),
             };
             if !keep_list {
                 w.list.unselect_all();
@@ -4647,9 +4565,16 @@ impl Sidebar {
         }
     }
 
-    fn select_contacts(&self) {
-        if let (Some(list), Some(row)) = (&self.footer_list, &self.contacts_row) {
-            list.select_row(Some(row));
+    /// The Contacts row (every contact), or a book or group under it.
+    fn select_contacts(&self, scope: Option<&crate::ui::contacts_page::ContactScope>) {
+        let Some(w) = self.kind_widgets.get(&UnifiedRow::Contacts) else { return };
+        match scope {
+            None => w.header.select_row(w.header.row_at_index(0).as_ref()),
+            Some(scope) => {
+                if let Some((_, row)) = self.tree_rows.borrow().iter().find(|(s, _)| s == scope) {
+                    w.list.select_row(Some(row));
+                }
+            }
         }
     }
 
@@ -4748,7 +4673,8 @@ impl Sidebar {
         match sel {
             Sel::Unified => self.select_unified(),
             Sel::Attachments => self.select_attachments(),
-            Sel::Contacts => self.select_contacts(),
+            Sel::Contacts => self.select_contacts(None),
+            Sel::ContactScope(scope) => self.select_contacts(Some(&scope)),
             Sel::Outbox => self.select_outbox(),
             Sel::Folder(acc, path) => self.select_folder(acc, &path),
             Sel::UnifiedInbox(acc) => self.select_unified_inbox(acc),
@@ -5714,6 +5640,7 @@ impl Sidebar {
             trash: self.kind_open(FolderKind::Trash),
             favorites: self.favorites_expanded,
             smart: self.smart_expanded,
+            contacts: self.contacts_expanded,
         });
     }
 
@@ -5865,7 +5792,7 @@ fn build_unified_inbox_row(
 /// and an unread badge. In the compact rail only the lead is shown
 /// (centred), with the count as a corner chip and `tip` (plus the count) as
 /// the tooltip. Returns the badge for in-place updates.
-fn build_unified_sub_row(
+pub(crate) fn build_unified_sub_row(
     lead: &impl IsA<gtk::Widget>,
     title: &str,
     tip: &str,

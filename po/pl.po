@@ -6173,8 +6173,9 @@ msgid "Contacts in the sidebar"
 msgstr "Kontakty w panelu bocznym"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
-msgstr "Skrót otwierający kontakty, przypięty na dole panelu bocznego."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
+msgstr ""
 
 msgid "Expand the sidebar on hover"
 msgstr "Rozwijanie panelu bocznego po najechaniu kursorem"
@@ -7684,10 +7685,6 @@ msgid "Insert"
 msgstr "Wstaw"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Kontakty"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "Czy usunąć własny klucz?"
 
@@ -7768,6 +7765,10 @@ msgstr "Wyświetl poszczególne etykiety"
 #, fuzzy
 msgid "Show each smart folder"
 msgstr "Wyświetl poszczególne katalogi"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "Czy zapisać filtr?"
 
 msgid "Long-press to expand or collapse"
 msgstr "Przytrzymaj, aby rozwinąć lub zwinąć"
@@ -8452,6 +8453,14 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr "Skrót otwierający kontakty, przypięty na dole panelu bocznego."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Kontakty"
 
 #, fuzzy
 #~ msgid "Groups"

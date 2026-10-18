@@ -45,8 +45,8 @@
   editing a group can move it to another, its people with it; Google and
   Microsoft 365 books keep no groups and are not offered. vCard 4 groups are
   shown and offered but not edited. A `.vcf` import keeps its lists as
-  groups instead of skipping them. The sidebar lists each book's groups
-  under it while Contacts is open.
+  groups instead of skipping them. The sidebar's Contacts row lists each
+  book's groups under it.
 
 - **Changed: the Contacts search works as the message list's.** The search
   button in the list's header, Ctrl+F or / show the search field, and Esc
@@ -55,15 +55,15 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
-- **Added: the sidebar lists the address books while Contacts is open.**
-  All Contacts, then each book under its account with its groups under it,
-  in place of the mail accounts; picking one lists its contacts, or a
-  group's people, and **Mail** at the foot goes back to mail. Contacts
-  dragged onto a book are copied there, or moved with Ctrl held after a
-  question, and dragged onto a group join it. A book's menu makes a contact
-  or a group in it, and a group's writes to it, edits or deletes it. This
-  replaces the address book menu beside the search and the Contacts |
-  Groups switch.
+- **Changed: Contacts is a row of the sidebar's unified section.** It opens
+  every contact, and its chevron lists each account's address books with
+  their groups under them, open or folded as it was left; picking one lists
+  its contacts, or a group's people. Contacts dragged onto a book are
+  copied there, or moved with Ctrl held after a question, and dragged onto
+  a group join it. A book's menu makes a contact or a group in it, and a
+  group's writes to it, edits or deletes it. The Contacts row left the
+  sidebar's foot, and this replaces the address book menu beside the
+  search and the Contacts | Groups switch.
 
 - **Changed: Contacts manages every contact, not only those with an email
   address.** The contact form edits postal addresses, the birthday and the

@@ -5404,7 +5404,8 @@ msgid "Contacts in the sidebar"
 msgstr ""
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
 msgstr ""
 
 msgid "Expand the sidebar on hover"
@@ -6660,9 +6661,6 @@ msgstr ""
 msgid "Insert"
 msgstr ""
 
-msgid "All Contacts"
-msgstr ""
-
 msgid "Delete Group…"
 msgstr ""
 
@@ -6739,6 +6737,9 @@ msgid "Show each tag"
 msgstr ""
 
 msgid "Show each smart folder"
+msgstr ""
+
+msgid "Show each address book"
 msgstr ""
 
 msgid "Long-press to expand or collapse"

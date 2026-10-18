@@ -4218,6 +4218,9 @@ struct SidebarFile {
     /// Whether the Smart Folders list (#417) is open.
     #[serde(default = "default_on")]
     smart_expanded: bool,
+    /// Whether the Contacts row's address books are shown.
+    #[serde(default)]
+    contacts_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open
     /// (closed by default, like their custom folders).
     #[serde(default)]
@@ -4262,6 +4265,7 @@ pub struct SidebarState {
     pub favorites: Vec<String>,
     pub favorites_expanded: bool,
     pub smart_expanded: bool,
+    pub contacts_expanded: bool,
     /// Account emails whose own Filtered Folders / Tags sections are open.
     pub filtered_expanded_accounts: Vec<String>,
     pub tags_expanded_accounts: Vec<String>,
@@ -4294,6 +4298,7 @@ pub fn load_sidebar_state() -> SidebarState {
             favorites: s.favorites,
             favorites_expanded: s.favorites_expanded,
             smart_expanded: s.smart_expanded,
+            contacts_expanded: s.contacts_expanded,
             filtered_expanded_accounts: s.filtered_expanded_accounts,
             tags_expanded_accounts: s.tags_expanded_accounts,
         })
@@ -4326,6 +4331,7 @@ pub fn save_sidebar_state(state: &SidebarState) {
         favorites: state.favorites.clone(),
         favorites_expanded: state.favorites_expanded,
         smart_expanded: state.smart_expanded,
+        contacts_expanded: state.contacts_expanded,
         filtered_expanded_accounts: state.filtered_expanded_accounts.clone(),
         tags_expanded_accounts: state.tags_expanded_accounts.clone(),
     };

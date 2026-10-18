@@ -6107,8 +6107,9 @@ msgid "Contacts in the sidebar"
 msgstr "Контакты на боковой панели"
 
 msgid ""
-"A shortcut that opens your contacts, pinned at the bottom of the sidebar."
-msgstr "Ярлык для открытия ваших контактов, закреплённый внизу боковой панели."
+"A row under the merged mail rows that opens your contacts, with your address "
+"books and groups beneath it."
+msgstr ""
 
 msgid "Expand the sidebar on hover"
 msgstr "Раскрывать боковую панель при наведении"
@@ -7612,10 +7613,6 @@ msgid "Insert"
 msgstr "Вставить"
 
 #, fuzzy
-msgid "All Contacts"
-msgstr "Контакты"
-
-#, fuzzy
 msgid "Delete Group…"
 msgstr "Удалить ваш ключ?"
 
@@ -7696,6 +7693,10 @@ msgstr "Показывать каждую метку"
 #, fuzzy
 msgid "Show each smart folder"
 msgstr "Показывать каждую папку"
+
+#, fuzzy
+msgid "Show each address book"
+msgstr "Сохранить каталог?"
 
 msgid "Long-press to expand or collapse"
 msgstr "Долгое нажатие — развернуть или свернуть"
@@ -8377,6 +8378,15 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."
+#~ msgstr ""
+#~ "Ярлык для открытия ваших контактов, закреплённый внизу боковой панели."
+
+#, fuzzy
+#~ msgid "All Contacts"
+#~ msgstr "Контакты"
 
 #, fuzzy
 #~ msgid "Groups"
