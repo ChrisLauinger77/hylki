@@ -2479,6 +2479,13 @@ pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, m
     }
 }
 
+/// Move a group to another book: made in `to_book` as `format` from `edit`,
+/// then deleted from `from_book`, and only once made.
+pub fn move_group(from_book: &str, uid: &str, to_book: &str, format: GroupFormat, edit: GroupEdit) -> Result<(), String> {
+    save_group(to_book, format, None, edit)?;
+    delete_contact(from_book, uid)
+}
+
 /// The people's cards of one book, for giving each group member one.
 enum BookCards {
     Local,
@@ -3284,6 +3291,63 @@ mod tests {
         assert_eq!(find(to, by_name).len(), 1);
         let (group2, _) = find(to, "(is \"full_name\" \"Hylki copy test 2\")").pop().unwrap();
         for (book, uid) in [(to, &group_uid), (to, &group2), (to, &copy_uid), (from, &src_uid)] {
+            super::delete_contact(book, uid).unwrap();
+        }
+    }
+
+    /// MOVE_LIVE=1: an Apple group, with a member who has only a phone
+    /// number, moves to another book: made there with the member copied,
+    /// gone from the first.
+    #[test]
+    #[ignore]
+    fn live_move_group() {
+        if std::env::var_os("MOVE_LIVE").is_none() {
+            return;
+        }
+        let books: Vec<String> = super::writable_books()
+            .into_iter()
+            .filter(|b| b.groups == Some(super::GroupFormat::Apple))
+            .map(|b| b.uid)
+            .collect();
+        let (from, to) = (&books[0], &books[1]);
+        let dest = super::factory_dest().unwrap();
+        let conn = zbus::blocking::Connection::session().unwrap();
+        let find = |book: &str, q: &str| {
+            let (bus, path) = super::open_book(&conn, &dest, book).unwrap();
+            super::book_get_uids(&conn, &bus, &path, q)
+                .unwrap()
+                .into_iter()
+                .map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap()))
+                .collect::<Vec<_>>()
+        };
+        let person_q = "(is \"full_name\" \"Hylki Mover\")";
+        let group_q = "(is \"full_name\" \"Hylki moving group\")";
+        for book in [from, to] {
+            for q in [person_q, group_q] {
+                for (uid, _) in find(book, q) {
+                    super::delete_contact(book, &uid).unwrap();
+                }
+            }
+        }
+        super::create_contact(from, "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Hylki Mover\r\nTEL:+1 555 0142\r\nEND:VCARD\r\n").unwrap();
+        let (person_uid, stored) = find(from, person_q).pop().unwrap();
+        let mut person = super::parse_vcard_details(&stored).unwrap();
+        person.raw_vcard = stored;
+        let member = super::Member { name: person.name.clone(), uid: person_uid.clone(), ..Default::default() };
+        let edit = super::GroupEdit { name: "Hylki moving group".into(), members: vec![member], ..Default::default() };
+        super::save_group(from, super::GroupFormat::Apple, None, edit).unwrap();
+        let (group_uid, _) = find(from, group_q).pop().unwrap();
+        // As the form sends it: the member's card copied from the old book.
+        let moved = super::Member { name: person.name.clone(), card: super::moved_vcard(&person), ..Default::default() };
+        let edit = super::GroupEdit { name: "Hylki moving group".into(), members: vec![moved], ..Default::default() };
+        super::move_group(from, &group_uid, to, super::GroupFormat::Apple, edit).unwrap();
+        assert!(find(from, group_q).is_empty(), "gone from the first book");
+        let (new_group, group) = find(to, group_q).pop().expect("in the second book");
+        let (copy_uid, copy) = find(to, person_q).pop().expect("the member copied");
+        assert!(copy.contains("555 0142"));
+        let refs = super::parse_vcard_fields(&group).unwrap().member_refs;
+        assert_eq!(refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![copy_uid.as_str()]);
+        for (book, uid) in [(to, &new_group), (to, &copy_uid), (from, &person_uid)] {
             super::delete_contact(book, uid).unwrap();
         }
     }

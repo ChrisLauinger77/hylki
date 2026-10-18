@@ -314,6 +314,9 @@ pub enum ContactsPageOutput {
     /// Write a group: a change to `original`, its stored card, or a new
     /// one when there is none.
     SaveGroup { book_uid: String, format: GroupFormat, original: Option<String>, edit: GroupEdit },
+    /// Move a group: made in the book `to` from `edit`, then the one with
+    /// UID `uid` deleted from the book `from`.
+    MoveGroup { from: String, uid: String, to: String, format: GroupFormat, edit: GroupEdit },
     /// Delete these, by book and UID, already confirmed by the user.
     DeleteContacts(Vec<(String, String)>),
     /// Move these people to the book `to`: (book, UID, the card for the
@@ -1254,7 +1257,28 @@ impl Component for ContactsPage {
                             form.name.grab_focus();
                             return;
                         }
+                        let picked = form.book.as_ref().and_then(|row| form.books.get(row.selected() as usize)).cloned();
                         let output = match self.editing_target.and_then(|i| self.contacts.get(i)) {
+                            // Saved in another book: made there, then removed
+                            // from its own.
+                            Some(g) if picked.as_ref().is_some_and(|b| b.uid != g.book_uid) => {
+                                let to = picked.unwrap_or_else(crate::contacts::local_book);
+                                let format = to.groups.unwrap_or(GroupFormat::Evolution);
+                                edit.members = self.members_moved(g, edit.members, format);
+                                let key = (g.book_uid.clone(), g.eds_uid.clone());
+                                self.forget(&[key.clone()]);
+                                let _ = sender.output(ContactsPageOutput::MoveGroup {
+                                    from: key.0,
+                                    uid: key.1,
+                                    to: to.uid,
+                                    format,
+                                    edit,
+                                });
+                                self.editor = None;
+                                self.editing_target = None;
+                                self.rebuild(widgets, &sender);
+                                return;
+                            }
                             Some(g) => {
                                 edit.kept = g.hidden_members.clone();
                                 ContactsPageOutput::SaveGroup {
@@ -1455,6 +1479,40 @@ impl ContactsPage {
         let bits = self.selection.selection();
         (0..bits.size())
             .filter_map(|n| self.row_map.get(bits.nth(n as u32) as usize).copied().flatten())
+            .collect()
+    }
+
+    /// A group's people, as they go in a group of `format` in another book.
+    /// Their lines and cards were the old book's: an Apple group's members
+    /// are copied from their cards there (unless the new book has them),
+    /// and an Evolution list keeps those with an address.
+    fn members_moved(&self, g: &ContactDetails, members: Vec<Member>, format: GroupFormat) -> Vec<Member> {
+        members
+            .into_iter()
+            .filter_map(|m| {
+                // Their card in the old book, else a contact anywhere with
+                // their address.
+                let person = (format == GroupFormat::Apple)
+                    .then(|| {
+                        self.contacts
+                            .iter()
+                            .filter(|c| !c.is_group())
+                            .find(|c| !m.uid.is_empty() && c.book_uid == g.book_uid && c.eds_uid == m.uid)
+                            .or_else(|| {
+                                self.contacts.iter().filter(|c| !c.is_group()).find(|c| {
+                                    !m.email.is_empty() && c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(&m.email))
+                                })
+                            })
+                    })
+                    .flatten();
+                let card = person.map(crate::contacts::moved_vcard).unwrap_or(m.card);
+                let moved = Member { name: m.name, email: m.email, card, ..Member::default() };
+                let kept = match format {
+                    GroupFormat::Evolution => !moved.email.is_empty(),
+                    _ => !moved.email.is_empty() || !moved.card.is_empty(),
+                };
+                kept.then_some(moved)
+            })
             .collect()
     }
 
@@ -2201,34 +2259,42 @@ impl ContactsPage {
         editor_bar(detail, sender, &heading);
 
         let identity = group(detail, &i18n("Group"));
-        // A group stays in its book; a new one goes in any that keeps
-        // groups, the Hylki book when none is listed yet.
-        let mut books: Vec<crate::contacts::Book> = Vec::new();
-        let mut book_row = None;
-        let mut apple = c.group == Some(GroupFormat::Apple);
-        if self.editing_target.is_none() {
-            books = self.books.iter().filter(|b| b.groups.is_some()).cloned().collect();
-            if books.is_empty() {
-                books.push(crate::contacts::local_book());
-            }
-            let row = adw::ComboRow::new();
-            row.set_title(&i18n("Address book"));
-            let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
-            row.set_model(Some(&gtk::StringList::new(&labels)));
-            // The first book the list shows, else the default (first).
-            let at = books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0);
-            row.set_selected(at as u32);
-            row.set_sensitive(books.len() > 1);
-            apple = books[at].groups == Some(GroupFormat::Apple);
-            identity.append(&row);
-            book_row = Some(row);
-        } else {
-            let book = adw::ActionRow::new();
-            book.set_title(&i18n("Address book"));
-            book.set_subtitle(&gtk::glib::markup_escape_text(&c.book_name));
-            book.add_css_class("property");
-            identity.append(&book);
+        // Any book that keeps groups: a new group goes in one, a group
+        // being edited can move to another. The Hylki book when none is
+        // listed yet.
+        let mut books: Vec<crate::contacts::Book> = self.books.iter().filter(|b| b.groups.is_some()).cloned().collect();
+        let editing = self.editing_target.is_some();
+        if editing && !books.iter().any(|b| b.uid == c.book_uid) {
+            books.insert(0, crate::contacts::Book { uid: c.book_uid.clone(), name: c.book_name.clone(), groups: c.group });
         }
+        if books.is_empty() {
+            books.push(crate::contacts::local_book());
+        }
+        let row = adw::ComboRow::new();
+        row.set_title(&i18n("Address book"));
+        let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
+        row.set_model(Some(&gtk::StringList::new(&labels)));
+        // Its own book, or for a new one the first book the list shows,
+        // else the default (first).
+        let at = if editing {
+            books.iter().position(|b| b.uid == c.book_uid).unwrap_or(0)
+        } else {
+            books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0)
+        };
+        row.set_selected(at as u32);
+        row.set_sensitive(books.len() > 1);
+        let apple = books[at].groups == Some(GroupFormat::Apple);
+        identity.append(&row);
+        // What saving in another book does, said while one is picked.
+        let move_note = gtk::Label::new(None);
+        move_note.add_css_class("dim-label");
+        move_note.add_css_class("caption");
+        move_note.set_wrap(true);
+        move_note.set_xalign(0.0);
+        move_note.set_margin_top(6);
+        move_note.set_visible(false);
+        detail.append(&move_note);
+        let book_row = Some(row);
         let name = entry_row(&i18n("Name"), &c.name);
         name.connect_changed(|row| row.remove_css_class("error"));
         identity.append(&name);
@@ -2270,11 +2336,27 @@ impl ContactsPage {
         detail.append(&note);
         if let Some(row) = &book_row {
             let formats: Vec<Option<GroupFormat>> = books.iter().map(|b| b.groups).collect();
-            let note = note.downgrade();
+            let (note, move_note) = (note.downgrade(), move_note.downgrade());
+            let (own, old_name) = (editing.then_some(at), c.book_name.clone());
             row.connect_selected_notify(move |row| {
-                let apple = formats.get(row.selected() as usize) == Some(&Some(GroupFormat::Apple));
+                let at = row.selected() as usize;
+                let format = formats.get(at).copied().flatten();
                 if let Some(note) = note.upgrade() {
-                    note.set_visible(apple);
+                    note.set_visible(format == Some(GroupFormat::Apple));
+                }
+                let Some(move_note) = move_note.upgrade() else { return };
+                let moving = own.is_some_and(|own| own != at);
+                move_note.set_visible(moving);
+                if moving {
+                    let mut text = i18n_f(
+                        "Saving moves the group to this address book, with its people, and removes it from {book}.",
+                        &[("book", &old_name)],
+                    );
+                    if format == Some(GroupFormat::Evolution) {
+                        text.push(' ');
+                        text.push_str(&i18n("Groups here hold addresses, so people with no email address are left out."));
+                    }
+                    move_note.set_label(&text);
                 }
             });
         }

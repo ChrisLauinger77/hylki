@@ -4238,6 +4238,15 @@ msgid ""
 "in it yet is added to it."
 msgstr ""
 
+msgid ""
+"Saving moves the group to this address book, with its people, and removes it "
+"from {book}."
+msgstr ""
+
+msgid ""
+"Groups here hold addresses, so people with no email address are left out."
+msgstr ""
+
 msgid "Edit Contact"
 msgstr "Névjegy szerkesztése"
 

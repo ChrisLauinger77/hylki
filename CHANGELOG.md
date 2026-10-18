@@ -41,9 +41,10 @@
   and changed in Apple's format, which names contacts of the same book; a
   contact of another book added to it is copied to the book first, whole,
   unless the book has them already, and its people with no email address are
-  listed too, mail going to the others. New Group asks which book; Google
-  and Microsoft 365 books keep no groups and are not offered. vCard 4 groups
-  are shown and offered but not edited. A `.vcf` import keeps its lists as
+  listed too, mail going to the others. New Group asks which book, and
+  editing a group can move it to another, its people with it; Google and
+  Microsoft 365 books keep no groups and are not offered. vCard 4 groups are
+  shown and offered but not edited. A `.vcf` import keeps its lists as
   groups instead of skipping them. The Contacts view lists groups apart from
   people, with a **Contacts** | **Groups** switch above the search.
 

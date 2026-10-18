@@ -2216,6 +2216,14 @@ pub enum AppMsg {
     },
     /// Contacts to delete, by book and UID.
     DeleteContacts(Vec<(String, String)>),
+    /// A group to make in the book `to` and delete from `from`.
+    MoveGroup {
+        from: String,
+        uid: String,
+        to: String,
+        format: crate::contacts::GroupFormat,
+        edit: crate::contacts::GroupEdit,
+    },
     /// Contacts to move to the book `to`: (book, UID, the card for `to`).
     MoveContacts { to: String, cards: Vec<(String, String, String)> },
     /// A contact write finished (`Some` = the error to show).
@@ -3248,6 +3256,9 @@ impl SimpleComponent for AppModel {
                         AppMsg::SaveGroup { book_uid, format, original, edit }
                     }
                     ContactsPageOutput::DeleteContacts(keys) => AppMsg::DeleteContacts(keys),
+                    ContactsPageOutput::MoveGroup { from, uid, to, format, edit } => {
+                        AppMsg::MoveGroup { from, uid, to, format, edit }
+                    }
                     ContactsPageOutput::MoveContacts { to, cards } => AppMsg::MoveContacts { to, cards },
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
                     ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
@@ -12467,6 +12478,14 @@ impl SimpleComponent for AppModel {
                         .filter_map(|(book, uids)| crate::contacts::delete_contacts(book, uids).err())
                         .next();
                     s.input(AppMsg::ContactWriteDone(err));
+                });
+            }
+
+            AppMsg::MoveGroup { from, uid, to, format, edit } => {
+                let s = sender.clone();
+                std::thread::spawn(move || {
+                    let result = crate::contacts::move_group(&from, &uid, &to, format, edit);
+                    s.input(AppMsg::ContactWriteDone(result.err()));
                 });
             }
 

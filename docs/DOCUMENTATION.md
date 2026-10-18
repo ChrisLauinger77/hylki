@@ -590,7 +590,12 @@ with a clock. <kbd>↓</kbd> and <kbd>↑</kbd> move through them and
 a group, not only people in your contacts. A contact's right-click menu has **Add to Group**,
 and a group's card has **New Message**, which writes to everyone in it. The
 group's pencil, at the top of its card, changes its name, its people and the
-Bcc switch.
+Bcc switch, and its **Address book** moves it to another book: saving makes
+the group there, with its people, and then removes it from the book it was
+in. Moved into a CardDAV book, its people are copied there as contacts when
+the book does not have them yet; moved into the Hylki book or one on this
+computer, whose groups hold addresses, its people with no email address are
+left out. The form says so when another book is picked.
 
 The lists made in Evolution, kept in the books of Evolution Data Server, are
 shown and offered too, and Evolution's **Hide addresses when sending mail to
