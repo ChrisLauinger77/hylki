@@ -14,7 +14,7 @@ use relm4::prelude::*;
 
 use crate::contacts::{ContactDetails, ContactEdit, GroupEdit, GroupFormat, Labeled, Member};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
-use crate::i18n::{i18n, i18n_f, i18n_noop};
+use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 
 /// Where the people found in the LDAP directories (#307) start in the
 /// index space `selected` and `row_map` share with `contacts`: an index this
@@ -137,11 +137,9 @@ pub struct ContactsPage {
     view: ContactsView,
     /// The "Show only" filters on, by [`ContactFilter::bit`].
     filters: u8,
-    /// The sort and filter button's popover, kept in step with `sort` and
-    /// `filters`.
+    /// The sort and filter button's popover, kept in step with `sort`,
+    /// `filters` and `hidden_books`.
     filter_menu: Option<FilterMenu>,
-    /// The address book picker beside the search.
-    book_picker: Option<BookPicker>,
     /// The search bar is shown: opened, or kept open by the setting the
     /// message list's search has too.
     search_open: bool,
@@ -152,6 +150,9 @@ pub struct ContactsPage {
     search_closed_at: Option<std::time::Instant>,
     /// Index into `contacts` of the contact shown in the detail pane.
     selected: Option<usize>,
+    /// The contacts selected together, as indexes into `contacts`, while
+    /// more than one is: the pane then offers what can be done to them all.
+    multi: Vec<usize>,
     /// List position → index into `contacts` (or a directory hit, see
     /// [`DIRECTORY`]); `None` for a line that is nobody, such as a heading.
     row_map: Vec<Option<usize>>,
@@ -159,7 +160,7 @@ pub struct ContactsPage {
     /// lines on screen: a thousand contacts took most of a second to build
     /// as rows, at every visit and every key typed in the search (#477).
     store: gtk::gio::ListStore,
-    selection: gtk::SingleSelection,
+    selection: gtk::MultiSelection,
     /// The row widgets the list view has made, by their list item.
     rows: Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
     /// One list item per contact, in step with `contacts`. The same item
@@ -181,9 +182,10 @@ pub struct ContactsPage {
     /// The books new contacts can go to, the chosen default first; the
     /// Hylki book is always among them.
     books: Vec<crate::contacts::Book>,
-    /// The book the list is narrowed to, or `None` for every book.
-    book_filter: Option<String>,
-    /// The filter's entries after "All Address Books": (book UID, name).
+    /// The books unticked in the filter popover, whose entries are not
+    /// listed. A book seen for the first time is listed.
+    hidden_books: std::collections::HashSet<String>,
+    /// The books the filter popover offers: (book UID, name).
     filter_books: Vec<(String, String)>,
     /// The people the LDAP directories hold for the search (#307), listed
     /// after the contacts under their own heading. Read-only: they can be
@@ -230,8 +232,10 @@ pub enum ContactsPageInput {
     CloseSearch,
     /// The setting that keeps the search field open.
     SetSearchPinned(bool),
-    /// The list's selection moved to this position.
-    RowSelected(u32),
+    /// The list's selection changed.
+    SelectionChanged,
+    /// Select the first `n` entries of the list (a showcase).
+    SelectFirst(u32),
     /// A right-click on the line for this entry, at (x, y) on the list.
     RowMenu { idx: usize, x: f64, y: f64 },
     Compose(String),
@@ -256,15 +260,25 @@ pub enum ContactsPageInput {
     DeleteRequest(usize),
     /// The Delete key on the list: ask to delete the contact shown.
     DeleteSelected,
-    /// The contact to delete, by book and UID: the list may have been
+    /// The contacts to delete, by book and UID: the list may have been
     /// re-read and re-sorted while the dialog was open.
-    DeleteConfirmed { book_uid: String, uid: String },
+    DeleteConfirmed(Vec<(String, String)>),
+    /// The entries selected together: put the people in the group at this
+    /// index, ask to move them to this book or to delete them all.
+    BulkAddToGroup(usize),
+    BulkMoveRequest(String),
+    /// Move these people, by book and UID, to this book, confirmed.
+    BulkMoveConfirmed { to: String, keys: Vec<(String, String)> },
+    BulkDeleteRequest,
+    /// A write failed: what was deleted or moved here may still be in its
+    /// book, so the next read lists whatever is there.
+    WriteFailed,
     /// The card's photo was clicked: expand it in the app lightbox.
     OpenPhoto { name: String, data: Vec<u8> },
     /// The books new contacts can go to, freshly read, default first.
     SetBooks(Vec<crate::contacts::Book>),
-    /// The book filter above the list: 0 is every book.
-    FilterBook(u32),
+    /// A book ticked or unticked in the filter popover.
+    ShowBook { uid: String, on: bool },
     /// The LDAP directories switched on, as (UID, name).
     DirectoriesKnown(Vec<(String, String)>),
     /// The search paused: ask the directories, unless it changed since.
@@ -276,7 +290,8 @@ pub enum ContactsPageInput {
     SetSearch(String),
     /// The composer's suggestions, freshly read for a group form.
     SuggestionsLoaded(Vec<crate::contacts::Suggestion>),
-    /// Pick this entry of the book filter, as if chosen.
+    /// Show only the book at this place in the filter popover (1 is the
+    /// first), or every book (0).
     PickBook(u32),
     /// More list photos are decoded and cached.
     PhotosDecoded,
@@ -299,8 +314,11 @@ pub enum ContactsPageOutput {
     /// Write a group: a change to `original`, its stored card, or a new
     /// one when there is none.
     SaveGroup { book_uid: String, format: GroupFormat, original: Option<String>, edit: GroupEdit },
-    /// Delete, already confirmed by the user.
-    DeleteContact { book_uid: String, uid: String },
+    /// Delete these, by book and UID, already confirmed by the user.
+    DeleteContacts(Vec<(String, String)>),
+    /// Move these people to the book `to`: (book, UID, the card for the
+    /// new book), confirmed.
+    MoveContacts { to: String, cards: Vec<(String, String, String)> },
     /// `.vcf` files chosen for import into the local Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// Show the contact's photo in the app lightbox.
@@ -464,9 +482,8 @@ impl Component for ContactsPage {
                         set_orientation: gtk::Orientation::Vertical,
                         set_width_request: 280,
 
-                        // The search, shown by the header's search button,
-                        // with the address book it searches beside it: the
-                        // message list's search bar and its folder picker.
+                        // The search, shown by the header's search button:
+                        // the message list's search bar.
                         gtk::Revealer {
                             set_transition_type: gtk::RevealerTransitionType::SlideDown,
                             #[watch]
@@ -499,13 +516,6 @@ impl Component for ContactsPage {
                                     },
                                 },
 
-                                // Hidden while there is only one book.
-                                #[name = "book_btn"]
-                                gtk::MenuButton {
-                                    set_valign: gtk::Align::Center,
-                                    set_visible: false,
-                                    set_tooltip_text: Some(i18n("Choose which address book to search").as_str()),
-                                },
                             },
                         },
 
@@ -598,14 +608,14 @@ impl Component for ContactsPage {
             view: ContactsView::People,
             filters: 0,
             filter_menu: None,
-            book_picker: None,
             search_open: false,
             search_pinned: false,
             search_closed_at: None,
             selected: None,
+            multi: Vec::new(),
             row_map: Vec::new(),
             store: gtk::gio::ListStore::new::<gtk::glib::BoxedAnyObject>(),
-            selection: gtk::SingleSelection::builder().autoselect(false).can_unselect(true).build(),
+            selection: gtk::MultiSelection::new(None::<gtk::gio::ListStore>),
             rows: Rc::new(RefCell::new(HashMap::new())),
             items: Vec::new(),
             loading: true,
@@ -613,7 +623,7 @@ impl Component for ContactsPage {
             editing_target: None,
             deleted: std::collections::HashSet::new(),
             books: Vec::new(),
-            book_filter: None,
+            hidden_books: std::collections::HashSet::new(),
             filter_books: Vec::new(),
             directory_hits: Vec::new(),
             directory_generation: 0,
@@ -643,7 +653,6 @@ impl Component for ContactsPage {
         }
 
         model.filter_menu = Some(FilterMenu::new(&widgets.filter_btn, sender.input_sender()));
-        model.book_picker = Some(BookPicker::new(&widgets.book_btn, sender.input_sender()));
 
         for (name, label) in [("people", i18n("Contacts")), ("groups", i18n("Groups"))] {
             widgets.view_switch.add(adw::Toggle::builder().name(name).label(label.as_str()).build());
@@ -663,11 +672,8 @@ impl Component for ContactsPage {
         model.selection.set_model(Some(&model.store));
         {
             let s = sender.input_sender().clone();
-            model.selection.connect_selected_notify(move |selection| {
-                let pos = selection.selected();
-                if pos != gtk::INVALID_LIST_POSITION {
-                    let _ = s.send(ContactsPageInput::RowSelected(pos));
-                }
+            model.selection.connect_selection_changed(move |_, _, _| {
+                let _ = s.send(ContactsPageInput::SelectionChanged);
             });
         }
         widgets.list.set_model(Some(&model.selection));
@@ -723,6 +729,17 @@ impl Component for ContactsPage {
                     .selected
                     .and_then(|i| self.contacts.get(i))
                     .map(|c| (c.name.clone(), c.primary_email().map(str::to_string)));
+                // And those selected together, the same way.
+                let identity = |c: &ContactDetails| {
+                    (c.book_uid.clone(), c.eds_uid.clone(), c.name.clone(), c.primary_email().map(str::to_string))
+                };
+                let multi: Vec<_> = self.multi.iter().filter_map(|&i| self.contacts.get(i)).map(identity).collect();
+                self.multi = contacts
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| multi.contains(&identity(c)))
+                    .map(|(i, _)| i)
+                    .collect();
                 self.items = self.items_for(&contacts);
                 self.contacts = contacts;
                 self.loading = false;
@@ -740,7 +757,7 @@ impl Component for ContactsPage {
                 if self.selected.is_some_and(|i| self.entry(i).is_none()) {
                     self.selected = None;
                 }
-                self.refresh_book_filter(widgets);
+                self.refresh_book_filter();
                 self.rebuild(widgets, &sender);
             }
 
@@ -797,19 +814,13 @@ impl Component for ContactsPage {
                     self.search_open = false;
                     self.search_closed_at = Some(std::time::Instant::now());
                 }
-                // A hidden search narrows nothing: its text and its book go.
-                let narrowed = !self.query.is_empty() || self.book_filter.is_some();
+                // A hidden search narrows nothing: its text goes.
+                let narrowed = !self.query.is_empty();
                 self.query.clear();
                 widgets.search.set_text("");
                 self.directory_generation = self.directory_generation.wrapping_add(1);
                 self.directory_hits.clear();
                 self.directory_failures.clear();
-                if !self.search_pinned {
-                    self.book_filter = None;
-                    if let Some(picker) = &self.book_picker {
-                        picker.pick(0);
-                    }
-                }
                 if narrowed {
                     self.rebuild(widgets, &sender);
                 }
@@ -832,8 +843,9 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::ClearFilters => {
-                if self.filters != 0 {
+                if self.filters != 0 || !self.hidden_books.is_empty() {
                     self.filters = 0;
+                    self.hidden_books.clear();
                     self.sync_filter_menu();
                     self.rebuild(widgets, &sender);
                 }
@@ -844,9 +856,24 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::PickBook(n) => {
-                self.search_open = true;
-                if let Some(picker) = &self.book_picker {
-                    picker.pick(n as usize);
+                let only = (n as usize).checked_sub(1).and_then(|i| self.filter_books.get(i)).map(|(uid, _)| uid);
+                self.hidden_books =
+                    self.filter_books.iter().map(|(uid, _)| uid).filter(|uid| Some(*uid) != only).cloned().collect();
+                if only.is_none() {
+                    self.hidden_books.clear();
+                }
+                self.sync_filter_menu();
+                self.rebuild(widgets, &sender);
+            }
+
+            ContactsPageInput::ShowBook { uid, on } => {
+                let changed = if on { self.hidden_books.remove(&uid) } else { self.hidden_books.insert(uid) };
+                if changed {
+                    if self.editor.is_none() {
+                        self.selected = None;
+                    }
+                    self.sync_filter_menu();
+                    self.rebuild(widgets, &sender);
                 }
             }
 
@@ -855,7 +882,7 @@ impl Component for ContactsPage {
                     return;
                 }
                 self.directories = directories;
-                self.refresh_book_filter(widgets);
+                self.refresh_book_filter();
                 if !self.directories.is_empty() && self.contacts.is_empty() && !self.loading {
                     widgets.page_stack.set_visible_child_name("browser");
                 }
@@ -939,21 +966,192 @@ impl Component for ContactsPage {
                 }
             }
 
-            ContactsPageInput::RowSelected(pos) => {
-                // Sent from the selection's notify, so it may be stale: the
-                // selection moved on (or was cleared) before it came.
-                if self.selection.selected() != pos {
+            ContactsPageInput::SelectionChanged => {
+                // Read as the selection is now: the change that sent this
+                // may have been followed by others.
+                let picked = self.picked_entries();
+                match picked.as_slice() {
+                    [] => {}
+                    [idx] => {
+                        let idx = *idx;
+                        if self.multi.is_empty()
+                            && self.selected == Some(idx)
+                            && (self.editor.is_none() || self.editing_target == Some(idx))
+                        {
+                            return;
+                        }
+                        // Moving away abandons an open editor.
+                        self.multi.clear();
+                        self.editor = None;
+                        self.editing_target = None;
+                        self.selected = Some(idx);
+                        self.render_detail(widgets, &sender);
+                    }
+                    many => {
+                        // A directory's entry is not a contact to act on.
+                        let keys: Vec<usize> = many.iter().copied().filter(|&i| i < self.contacts.len()).collect();
+                        if keys == self.multi && self.editor.is_none() {
+                            return;
+                        }
+                        self.multi = keys;
+                        self.editor = None;
+                        self.editing_target = None;
+                        self.selected = None;
+                        self.render_detail(widgets, &sender);
+                    }
+                }
+            }
+
+            ContactsPageInput::SelectFirst(n) => {
+                let entries: Vec<u32> = self
+                    .row_map
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, i)| i.is_some())
+                    .map(|(pos, _)| pos as u32)
+                    .take(n as usize)
+                    .collect();
+                self.selection.unselect_all();
+                for pos in entries {
+                    self.selection.select_item(pos, false);
+                }
+            }
+
+            ContactsPageInput::BulkAddToGroup(g) => {
+                let Some(group) = self.contacts.get(g) else { return };
+                let Some(format) = group.group else { return };
+                let mut members = group.members.clone();
+                for p in self.chosen() {
+                    if let Some(m) = member_for(group, &self.contacts[p]) {
+                        if !members.iter().any(|x| x.same(&m)) {
+                            members.push(m);
+                        }
+                    }
+                }
+                if members.len() == group.members.len() {
                     return;
                 }
-                let Some(&Some(idx)) = self.row_map.get(pos as usize) else { return };
-                if self.selected == Some(idx) && (self.editor.is_none() || self.editing_target == Some(idx)) {
+                let edit = GroupEdit {
+                    name: group.name.clone(),
+                    members,
+                    hide_addresses: group.hide_addresses,
+                    kept: group.hidden_members.clone(),
+                };
+                let _ = sender.output(ContactsPageOutput::SaveGroup {
+                    book_uid: group.book_uid.clone(),
+                    format,
+                    original: Some(group.raw_vcard.clone()),
+                    edit,
+                });
+            }
+
+            ContactsPageInput::BulkMoveRequest(to) => {
+                let keys: Vec<(String, String)> = self
+                    .movable(&to)
+                    .into_iter()
+                    .map(|i| (self.contacts[i].book_uid.clone(), self.contacts[i].eds_uid.clone()))
+                    .collect();
+                let Some(book) = self.books.iter().find(|b| b.uid == to) else { return };
+                if keys.is_empty() {
                     return;
                 }
-                // Moving away abandons an open editor.
-                self.editor = None;
-                self.editing_target = None;
-                self.selected = Some(idx);
-                self.render_detail(widgets, &sender);
+                let n = keys.len() as u32;
+                let count = n.to_string();
+                let body = ni18n_f(
+                    "This will add {n} contact to {book} and remove it from the address book it is in now, locally and on the server. A group that names it by its card there loses it.",
+                    "This will add {n} contacts to {book} and remove them from the address books they are in now, locally and on the server. A group that names them by their cards there loses them.",
+                    n,
+                    &[("n", &count), ("book", &book.name)],
+                );
+                let s = sender.input_sender().clone();
+                confirm(
+                    widgets,
+                    &ni18n_f("Move {n} Contact?", "Move {n} Contacts?", n, &[("n", &count)]),
+                    &body,
+                    &i18n("Move"),
+                    false,
+                    move || {
+                        let _ = s.send(ContactsPageInput::BulkMoveConfirmed { to: to.clone(), keys: keys.clone() });
+                    },
+                );
+            }
+
+            ContactsPageInput::BulkMoveConfirmed { to, keys } => {
+                let cards: Vec<(String, String, String)> = keys
+                    .iter()
+                    .filter_map(|(book, uid)| self.contacts.iter().find(|c| c.book_uid == *book && c.eds_uid == *uid))
+                    .map(|c| (c.book_uid.clone(), c.eds_uid.clone(), crate::contacts::moved_vcard(c)))
+                    .collect();
+                if cards.is_empty() {
+                    return;
+                }
+                // They leave their old books' lists now; the re-read after
+                // the move shows them in the new one.
+                self.forget(&keys);
+                let _ = sender.output(ContactsPageOutput::MoveContacts { to, cards });
+                self.rebuild(widgets, &sender);
+            }
+
+            ContactsPageInput::WriteFailed => {
+                self.deleted.clear();
+            }
+
+            ContactsPageInput::BulkDeleteRequest => {
+                let chosen = self.chosen();
+                if chosen.is_empty() {
+                    return;
+                }
+                let keys: Vec<(String, String)> = chosen
+                    .iter()
+                    .map(|&i| (self.contacts[i].book_uid.clone(), self.contacts[i].eds_uid.clone()))
+                    .collect();
+                let synced = chosen.iter().any(|&i| self.synced(&self.contacts[i].book_uid));
+                let groups = chosen.iter().all(|&i| self.contacts[i].is_group());
+                let n = chosen.len() as u32;
+                let count = n.to_string();
+                let args = [("n", count.as_str())];
+                let (heading, body) = match (groups, synced) {
+                    (true, true) => (
+                        ni18n_f("Delete {n} Group?", "Delete {n} Groups?", n, &args),
+                        ni18n_f(
+                            "This will remove {n} group from your address books locally and on the server. The contacts are not removed.",
+                            "This will remove {n} groups from your address books locally and on the server. The contacts are not removed.",
+                            n,
+                            &args,
+                        ),
+                    ),
+                    (true, false) => (
+                        ni18n_f("Delete {n} Group?", "Delete {n} Groups?", n, &args),
+                        ni18n_f(
+                            "This will remove {n} group from your address book. The contacts are not removed.",
+                            "This will remove {n} groups from your address books. The contacts are not removed.",
+                            n,
+                            &args,
+                        ),
+                    ),
+                    (false, true) => (
+                        ni18n_f("Delete {n} Contact?", "Delete {n} Contacts?", n, &args),
+                        ni18n_f(
+                            "This will remove {n} contact from your address books locally and on the server.",
+                            "This will remove {n} contacts from your address books locally and on the server.",
+                            n,
+                            &args,
+                        ),
+                    ),
+                    (false, false) => (
+                        ni18n_f("Delete {n} Contact?", "Delete {n} Contacts?", n, &args),
+                        ni18n_f(
+                            "This will remove {n} contact from your address book.",
+                            "This will remove {n} contacts from your address books.",
+                            n,
+                            &args,
+                        ),
+                    ),
+                };
+                let s = sender.input_sender().clone();
+                confirm(widgets, &heading, &body, &i18n("Delete"), true, move || {
+                    let _ = s.send(ContactsPageInput::DeleteConfirmed(keys.clone()));
+                });
             }
 
             ContactsPageInput::Compose(email) => {
@@ -1129,22 +1327,16 @@ impl Component for ContactsPage {
                 if self.editor.is_some() {
                     return;
                 }
-                if let Some(idx) = self.selected {
+                if !self.multi.is_empty() {
+                    sender.input(ContactsPageInput::BulkDeleteRequest);
+                } else if let Some(idx) = self.selected {
                     sender.input(ContactsPageInput::DeleteRequest(idx));
                 }
             }
 
             ContactsPageInput::DeleteRequest(idx) => {
                 let Some(c) = self.contacts.get(idx) else { return };
-                let win = widgets.page_stack.root().and_downcast::<gtk::Window>();
-                // Books on this computer keep groups as Evolution lists;
-                // the rest sync with a server.
-                let synced = !crate::contacts::is_local_book(&c.book_uid)
-                    && self
-                        .books
-                        .iter()
-                        .find(|b| b.uid == c.book_uid)
-                        .is_none_or(|b| b.groups != Some(GroupFormat::Evolution));
+                let synced = self.synced(&c.book_uid);
                 let name = [("name", c.name.as_str())];
                 let (heading, body) = if c.is_group() {
                     let body = if synced {
@@ -1167,28 +1359,16 @@ impl Component for ContactsPage {
                     };
                     (i18n("Delete Contact?"), body)
                 };
-                let dialog = adw::MessageDialog::new(win.as_ref(), Some(heading.as_str()), Some(&body));
-                dialog.add_response("cancel", &i18n("Cancel"));
-                dialog.add_response("delete", &i18n("Delete"));
-                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
                 let s = sender.input_sender().clone();
-                let (book_uid, uid) = (c.book_uid.clone(), c.eds_uid.clone());
-                dialog.connect_response(None, move |_, resp| {
-                    if resp == "delete" {
-                        let _ = s.send(ContactsPageInput::DeleteConfirmed {
-                            book_uid: book_uid.clone(),
-                            uid: uid.clone(),
-                        });
-                    }
+                let keys = vec![(c.book_uid.clone(), c.eds_uid.clone())];
+                confirm(widgets, &heading, &body, &i18n("Delete"), true, move || {
+                    let _ = s.send(ContactsPageInput::DeleteConfirmed(keys.clone()));
                 });
-                dialog.present();
             }
 
             ContactsPageInput::SetBooks(books) => {
                 self.books = books;
-                self.refresh_book_filter(widgets);
+                self.refresh_book_filter();
             }
 
             ContactsPageInput::PhotosDecoded => {
@@ -1205,48 +1385,18 @@ impl Component for ContactsPage {
                 }
             }
 
-            ContactsPageInput::FilterBook(index) => {
-                let picked = (index as usize)
-                    .checked_sub(1)
-                    .and_then(|i| self.filter_books.get(i))
-                    .map(|(uid, _)| uid.clone());
-                // Replacing the filter's model notifies too, after the fact:
-                // the same book again is no reason to list everyone anew.
-                if picked == self.book_filter {
-                    return;
-                }
-                self.book_filter = picked;
-                if self.editor.is_none() {
-                    self.selected = None;
-                }
-                self.rebuild(widgets, &sender);
-            }
 
             ContactsPageInput::OpenPhoto { name, data } => {
                 let _ = sender.output(ContactsPageOutput::ShowPhoto { name, data });
             }
 
-            ContactsPageInput::DeleteConfirmed { book_uid, uid } => {
-                let Some(idx) =
-                    self.contacts.iter().position(|c| c.book_uid == book_uid && c.eds_uid == uid)
-                else {
-                    return;
-                };
-                let c = self.contacts.remove(idx);
-                self.items.remove(idx);
-                for (i, item) in self.items.iter().enumerate() {
-                    item.borrow::<Line>().idx.set(Some(i));
+            ContactsPageInput::DeleteConfirmed(keys) => {
+                let gone = self.forget(&keys);
+                if !gone.is_empty() {
+                    let _ = sender.output(ContactsPageOutput::DeleteContacts(gone));
                 }
-                if !c.eds_uid.is_empty() {
-                    self.deleted.insert((c.book_uid.clone(), c.eds_uid.clone()));
-                    let _ = sender.output(ContactsPageOutput::DeleteContact {
-                        book_uid: c.book_uid,
-                        uid: c.eds_uid,
-                    });
-                }
-                // The entry leaves the list right now; the EDS delete and the
-                // reconciling re-read follow behind.
-                self.selected = None;
+                // The entries leave the list right now; the EDS delete and
+                // the reconciling re-read follow behind.
                 self.editor = None;
                 self.editing_target = None;
                 self.rebuild(widgets, &sender);
@@ -1267,7 +1417,7 @@ impl ContactsPage {
         if c.is_group() != (self.view == ContactsView::Groups) {
             return false;
         }
-        if self.book_filter.as_ref().is_some_and(|b| *b != c.book_uid) {
+        if self.hidden_books.contains(&c.book_uid) {
             return false;
         }
         matches_query(c, &self.query)
@@ -1295,8 +1445,73 @@ impl ContactsPage {
 
     fn sync_filter_menu(&self) {
         if let Some(menu) = &self.filter_menu {
-            menu.sync(self.sort, self.filters);
+            menu.sync(self.sort, self.filters, &self.hidden_books);
         }
+    }
+
+    /// The list positions selected, as entries (contacts and directory
+    /// hits), in list order.
+    fn picked_entries(&self) -> Vec<usize> {
+        let bits = self.selection.selection();
+        (0..bits.size())
+            .filter_map(|n| self.row_map.get(bits.nth(n as u32) as usize).copied().flatten())
+            .collect()
+    }
+
+    /// The contacts selected together, as indexes into `contacts`.
+    fn chosen(&self) -> Vec<usize> {
+        self.multi.iter().copied().filter(|&i| i < self.contacts.len()).collect()
+    }
+
+    /// The people of the selection that can move to the book `to`: those
+    /// in another book Hylki can write to, and delete from.
+    fn movable(&self, to: &str) -> Vec<usize> {
+        let writable = |uid: &str| self.books.iter().any(|b| b.uid == uid);
+        if !writable(to) {
+            return Vec::new();
+        }
+        self.chosen()
+            .into_iter()
+            .filter(|&i| {
+                let c = &self.contacts[i];
+                !c.is_group() && c.book_uid != to && !c.eds_uid.is_empty() && writable(&c.book_uid)
+            })
+            .collect()
+    }
+
+    /// Whether a book syncs with a server. Books on this computer keep
+    /// groups as Evolution lists; the rest are a server's.
+    fn synced(&self, book_uid: &str) -> bool {
+        !crate::contacts::is_local_book(book_uid)
+            && self
+                .books
+                .iter()
+                .find(|b| b.uid == book_uid)
+                .is_none_or(|b| b.groups != Some(GroupFormat::Evolution))
+    }
+
+    /// Take these entries (by book and UID) off the list, for good: a
+    /// re-read that still has them leaves them out until EDS lets go.
+    /// Returns those that are EDS's to delete.
+    fn forget(&mut self, keys: &[(String, String)]) -> Vec<(String, String)> {
+        let mut gone = Vec::new();
+        for (book, uid) in keys {
+            let Some(idx) = self.contacts.iter().position(|c| c.book_uid == *book && c.eds_uid == *uid) else {
+                continue;
+            };
+            self.contacts.remove(idx);
+            self.items.remove(idx);
+            if !uid.is_empty() {
+                self.deleted.insert((book.clone(), uid.clone()));
+                gone.push((book.clone(), uid.clone()));
+            }
+        }
+        for (i, item) in self.items.iter().enumerate() {
+            item.borrow::<Line>().idx.set(Some(i));
+        }
+        self.selected = None;
+        self.multi.clear();
+        gone
     }
 
     /// The entry at `idx`, a directory entry's index included.
@@ -1316,10 +1531,11 @@ impl ContactsPage {
         self.directory_hits.retain(|c| !c.emails.iter().any(|e| known.contains(&e.value.to_lowercase())));
     }
 
-    /// Fill the book picker from the books known: the writable ones (the
-    /// Hylki book always among them) and any others the contacts come from.
-    /// The book picked stays picked while it is still there.
-    fn refresh_book_filter(&mut self, widgets: &ContactsPageWidgets) {
+    /// Fill the filter popover's books from those known: the writable ones
+    /// (the Hylki book always among them), any others the contacts come
+    /// from, and the directories. A book unticked stays so while it is
+    /// there.
+    fn refresh_book_filter(&mut self) {
         let mut books: Vec<(String, String)> =
             self.books.iter().map(|b| (b.uid.clone(), b.name.clone())).collect();
         for c in &self.contacts {
@@ -1337,21 +1553,13 @@ impl ContactsPage {
             return;
         }
         self.filter_books = books;
-        let all = i18n("All Address Books");
-        let mut labels: Vec<&str> = vec![all.as_str()];
-        labels.extend(self.filter_books.iter().map(|(_, name)| name.as_str()));
-        let at = self
-            .book_filter
-            .as_ref()
-            .and_then(|uid| self.filter_books.iter().position(|(u, _)| u == uid))
-            .map_or(0, |i| i + 1);
-        if at == 0 {
-            self.book_filter = None;
+        // A book that went is no longer narrowing anything.
+        let known: std::collections::HashSet<&String> = self.filter_books.iter().map(|(uid, _)| uid).collect();
+        self.hidden_books.retain(|uid| known.contains(uid));
+        if let Some(menu) = &self.filter_menu {
+            menu.set_books(&self.filter_books);
         }
-        if let Some(picker) = &self.book_picker {
-            picker.set_books(&labels, at);
-        }
-        widgets.book_btn.set_visible(self.filter_books.len() > 1);
+        self.sync_filter_menu();
     }
 
     /// Put the switch, the search's hint and the sort button in step with
@@ -1362,8 +1570,11 @@ impl ContactsPage {
         let groups = view == ContactsView::Groups;
         widgets.view_switch.set_active_name(Some(if groups { "groups" } else { "people" }));
         widgets.search.set_placeholder_text(Some(&if groups { i18n("Search groups") } else { i18n("Search contacts") }));
-        // Groups go by name, and the filters are a person's.
-        widgets.filter_btn.set_sensitive(!groups);
+        // Groups go by name, and the "Show only" filters are a person's;
+        // the books are both's.
+        if let Some(menu) = &self.filter_menu {
+            menu.set_people(!groups);
+        }
     }
 
     /// Ready the list for a new contact or group: the side it will be on,
@@ -1376,13 +1587,14 @@ impl ContactsPage {
             self.rebuild(widgets, sender);
         }
         self.selected = None;
-        self.selection.set_selected(gtk::INVALID_LIST_POSITION);
+        self.multi.clear();
+        self.selection.unselect_all();
     }
 
     /// Move the list selection to the row showing contact `idx` (if visible).
     fn select_row_for(&self, idx: usize) {
         if let Some(pos) = self.row_map.iter().position(|&i| i == Some(idx)) {
-            self.selection.set_selected(pos as u32);
+            self.selection.select_item(pos as u32, true);
         }
     }
 
@@ -1415,7 +1627,7 @@ impl ContactsPage {
         });
         let groups = self.view == ContactsView::Groups;
         let total = self.contacts.iter().filter(|c| c.is_group() == groups).count();
-        let narrowed = !self.query.is_empty() || self.book_filter.is_some() || (!groups && self.filters != 0);
+        let narrowed = !self.query.is_empty() || !self.hidden_books.is_empty() || (!groups && self.filters != 0);
         widgets.count_label.set_label(&if !narrowed {
             total.to_string()
         } else {
@@ -1433,7 +1645,7 @@ impl ContactsPage {
         // The directories' answers, after the contacts and by name whatever
         // the sort, under a heading of their own so nobody takes them for
         // contacts. The book filter keeps those of the directory it names.
-        let in_filter = |uid: &str| self.book_filter.as_deref().is_none_or(|b| b == uid);
+        let in_filter = |uid: &str| !self.hidden_books.contains(uid);
         let mut listed = std::collections::HashSet::new();
         let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
@@ -1463,11 +1675,15 @@ impl ContactsPage {
             lines.push(Line::other(LineKind::Failure, f.name.clone(), f.message.clone()));
         }
 
-        // A directory picked in the book filter is empty until searched.
-        let directory_picked = self
-            .book_filter
-            .as_ref()
-            .is_some_and(|b| self.directories.iter().any(|(uid, _)| uid == b));
+        // A directory, the only book ticked in the filter, is empty until
+        // searched.
+        let directory_picked = !self.hidden_books.is_empty()
+            && self
+                .filter_books
+                .iter()
+                .filter(|(uid, _)| !self.hidden_books.contains(uid))
+                .all(|(uid, _)| self.directories.iter().any(|(d, _)| d == uid))
+            && self.filter_books.iter().any(|(uid, _)| !self.hidden_books.contains(uid));
         if directory_picked && !groups && people.is_empty() && lines.is_empty() {
             let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
                 i18n("Type three letters or more to search the directory.")
@@ -1493,8 +1709,27 @@ impl ContactsPage {
             .collect();
         // Unselected first: the selection would otherwise follow the old
         // lines through the swap and report a position in the new ones.
-        self.selection.set_selected(gtk::INVALID_LIST_POSITION);
+        self.selection.unselect_all();
         self.store.splice(0, self.store.n_items(), &items);
+
+        // Several selected together stay so while two of them are listed.
+        let multi_pos: Vec<u32> = self
+            .multi
+            .iter()
+            .filter_map(|&idx| self.row_map.iter().position(|&i| i == Some(idx)))
+            .map(|pos| pos as u32)
+            .collect();
+        if multi_pos.len() > 1 {
+            for &pos in &multi_pos {
+                self.selection.select_item(pos, false);
+            }
+            self.multi.retain(|idx| self.row_map.contains(&Some(*idx)));
+            self.selected = None;
+            self.render_detail(widgets, sender);
+            self.decode_photos(missing, sender);
+            return;
+        }
+        self.multi.clear();
 
         // Selection: keep it if it survived the filter, else the first match.
         let shown_pos = self
@@ -1504,7 +1739,7 @@ impl ContactsPage {
         match shown_pos {
             Some(pos) => {
                 self.selected = self.row_map[pos];
-                self.selection.set_selected(pos as u32);
+                self.selection.select_item(pos as u32, true);
             }
             None => self.selected = None,
         }
@@ -1593,6 +1828,26 @@ impl ContactsPage {
             return vec![entries];
         }
         let Some(c) = self.contacts.get(idx) else { return Vec::new() };
+        // On one of several selected: what can be done to them all.
+        if self.multi.contains(&idx) {
+            let choices = self.bulk_choices();
+            let mut first = Vec::new();
+            if !choices.groups.is_empty() {
+                first.push(MenuEntry::submenu(i18n("Add to Group"), vec![choices.group_entries(s)]).icon("system-users-symbolic"));
+            }
+            if !choices.books.is_empty() {
+                first.push(
+                    MenuEntry::submenu(i18n("Move to Address Book"), vec![choices.book_entries(s)])
+                        .icon("x-office-address-book-symbolic"),
+                );
+            }
+            let sd = s.clone();
+            let delete = vec![MenuEntry::new(i18n("Delete…"), move || {
+                let _ = sd.send(ContactsPageInput::BulkDeleteRequest);
+            })
+            .icon("user-trash-symbolic")];
+            return if first.is_empty() { vec![delete] } else { vec![first, delete] };
+        }
         let local = crate::contacts::is_local_book(&c.book_uid);
         let group = c.is_group();
         let (se, sd, sg) = (s.clone(), s.clone(), s.clone());
@@ -1650,12 +1905,107 @@ impl ContactsPage {
         ]
     }
 
+    /// What the entries selected together can be given: the groups any of
+    /// them can join, and the books any of them can move to.
+    fn bulk_choices(&self) -> BulkChoices {
+        let chosen = self.chosen();
+        let mut groups: Vec<(usize, String)> = (0..self.contacts.len())
+            .filter(|&g| chosen.iter().any(|&p| member_for(&self.contacts[g], &self.contacts[p]).is_some()))
+            .map(|g| (g, self.contacts[g].name.clone()))
+            .collect();
+        groups.sort_by_key(|(_, name)| name.to_lowercase());
+        let books = self
+            .books
+            .iter()
+            .filter(|b| !self.movable(&b.uid).is_empty())
+            .map(|b| (b.uid.clone(), b.name.clone()))
+            .collect();
+        BulkChoices { groups, books }
+    }
+
+    /// The pane for several entries selected together: how many, what
+    /// can be done to them all, and who they are.
+    fn render_multi(&self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
+        let detail = &widgets.detail_box;
+        widgets.edit_btn.set_sensitive(false);
+        let chosen = self.chosen();
+        let n = chosen.len() as u32;
+        let count = n.to_string();
+        let groups = self.view == ContactsView::Groups;
+
+        let icon = gtk::Image::from_icon_name(if groups { "system-users-symbolic" } else { "edit-select-all-symbolic" });
+        icon.set_pixel_size(64);
+        icon.add_css_class("dim-label");
+        icon.set_margin_top(24);
+        detail.append(&icon);
+        let title = gtk::Label::new(Some(&if groups {
+            ni18n_f("{n} Group Selected", "{n} Groups Selected", n, &[("n", &count)])
+        } else {
+            ni18n_f("{n} Contact Selected", "{n} Contacts Selected", n, &[("n", &count)])
+        }));
+        title.add_css_class("title-1");
+        title.set_wrap(true);
+        title.set_justify(gtk::Justification::Center);
+        title.set_margin_top(12);
+        detail.append(&title);
+
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        actions.set_halign(gtk::Align::Center);
+        actions.set_margin_top(18);
+        let choices = Rc::new(self.bulk_choices());
+        let pill = |label: &str| {
+            let b = gtk::Button::with_label(label);
+            b.add_css_class("pill");
+            b
+        };
+        if !groups {
+            let add = pill(&i18n("Add to Group"));
+            add.set_sensitive(!choices.groups.is_empty());
+            let (c, s) = (choices.clone(), sender.input_sender().clone());
+            add.connect_clicked(move |b| {
+                show_context_menu(b, (b.width() / 2) as f64, b.height() as f64, vec![c.group_entries(&s)]);
+            });
+            actions.append(&add);
+            let move_btn = pill(&i18n("Move to…"));
+            move_btn.set_tooltip_text(Some(&i18n("Move to another address book")));
+            move_btn.set_sensitive(!choices.books.is_empty());
+            let (c, s) = (choices.clone(), sender.input_sender().clone());
+            move_btn.connect_clicked(move |b| {
+                show_context_menu(b, (b.width() / 2) as f64, b.height() as f64, vec![c.book_entries(&s)]);
+            });
+            actions.append(&move_btn);
+        }
+        let delete = pill(&i18n("Delete…"));
+        delete.add_css_class("destructive-action");
+        delete.set_sensitive(!chosen.is_empty());
+        let s = sender.input_sender().clone();
+        delete.connect_clicked(move |_| {
+            let _ = s.send(ContactsPageInput::BulkDeleteRequest);
+        });
+        actions.append(&delete);
+        detail.append(&actions);
+
+        let list = group(detail, &i18n("Selected"));
+        for &i in &chosen {
+            let c = &self.contacts[i];
+            let row = adw::ActionRow::new();
+            row.set_title(&gtk::glib::markup_escape_text(&c.name));
+            row.set_subtitle(&gtk::glib::markup_escape_text(&c.book_name));
+            row.add_prefix(&avatar_for(c, 32));
+            list.append(&row);
+        }
+    }
+
     /// Fill the right-hand pane with the selected contact's card.
     fn render_detail(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
         self.editor = None;
         let detail = &widgets.detail_box;
         while let Some(child) = detail.first_child() {
             detail.remove(&child);
+        }
+        if !self.multi.is_empty() {
+            self.render_multi(widgets, sender);
+            return;
         }
         let Some(c) = self.selected.and_then(|i| self.entry(i)) else {
             return;
@@ -1865,11 +2215,8 @@ impl ContactsPage {
             row.set_title(&i18n("Address book"));
             let labels: Vec<&str> = books.iter().map(|b| b.name.as_str()).collect();
             row.set_model(Some(&gtk::StringList::new(&labels)));
-            let at = self
-                .book_filter
-                .as_ref()
-                .and_then(|uid| books.iter().position(|b| b.uid == *uid))
-                .unwrap_or(0);
+            // The first book the list shows, else the default (first).
+            let at = books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0);
             row.set_selected(at as u32);
             row.set_sensitive(books.len() > 1);
             apple = books[at].groups == Some(GroupFormat::Apple);
@@ -1972,12 +2319,8 @@ impl ContactsPage {
             row.set_title(&i18n("Address book"));
             let labels: Vec<&str> = self.books.iter().map(|b| b.name.as_str()).collect();
             row.set_model(Some(&gtk::StringList::new(&labels)));
-            // The book the list is narrowed to, else the default (first).
-            let at = self
-                .book_filter
-                .as_ref()
-                .and_then(|uid| self.books.iter().position(|b| b.uid == *uid))
-                .unwrap_or(0);
+            // The first book the list shows, else the default (first).
+            let at = self.books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0);
             row.set_selected(at as u32);
             row.set_sensitive(self.books.len() > 1);
             identity.prepend(&row);
@@ -2154,6 +2497,12 @@ struct FilterMenu {
     sorts: Vec<(ContactSort, gtk::CheckButton)>,
     filters: Vec<(ContactFilter, gtk::CheckButton)>,
     clear: gtk::Button,
+    /// The sort and "Show only" columns, a person's, off on Groups.
+    people_cols: [gtk::Box; 2],
+    /// A tick per book, made again when the books change.
+    book_col: gtk::Box,
+    books: RefCell<Vec<(String, gtk::CheckButton)>>,
+    input: relm4::Sender<ContactsPageInput>,
 }
 
 impl FilterMenu {
@@ -2210,21 +2559,74 @@ impl FilterMenu {
         });
         filter_col.append(&clear);
 
+        // Which address books are listed: all, until some are unticked.
+        let book_col = column(&i18n("Address books"));
+        let book_scroll = gtk::ScrolledWindow::new();
+        book_scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
+        book_scroll.set_propagate_natural_height(true);
+        book_scroll.set_propagate_natural_width(true);
+        book_scroll.set_max_content_height(360);
+        book_scroll.set_child(Some(&book_col));
+
         let columns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         columns.add_css_class("sort-filter-popover");
         columns.append(&sort_col);
         columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
         columns.append(&filter_col);
+        columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
+        columns.append(&book_scroll);
         let popover = gtk::Popover::new();
         popover.set_child(Some(&columns));
         button.set_popover(Some(&popover));
-        FilterMenu { button: button.clone(), sorts, filters, clear }
+        FilterMenu {
+            button: button.clone(),
+            sorts,
+            filters,
+            clear,
+            people_cols: [sort_col, filter_col],
+            book_col,
+            books: RefCell::new(Vec::new()),
+            input: input.clone(),
+        }
+    }
+
+    /// Offer these books, (UID, name), each ticked until `sync` says.
+    fn set_books(&self, books: &[(String, String)]) {
+        for (_, check) in self.books.borrow_mut().drain(..) {
+            self.book_col.remove(&check);
+        }
+        let mut made = Vec::new();
+        for (uid, name) in books {
+            let label = gtk::Label::new(Some(name));
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            label.set_max_width_chars(30);
+            label.set_xalign(0.0);
+            let check = gtk::CheckButton::new();
+            check.set_child(Some(&label));
+            check.set_tooltip_text(Some(name));
+            check.set_active(true);
+            let (s, uid) = (self.input.clone(), uid.clone());
+            let id = uid.clone();
+            check.connect_toggled(move |c| {
+                let _ = s.send(ContactsPageInput::ShowBook { uid: id.clone(), on: c.is_active() });
+            });
+            self.book_col.append(&check);
+            made.push((uid, check));
+        }
+        self.books.replace(made);
+    }
+
+    /// The sort and "Show only" columns are a person's: off on Groups.
+    fn set_people(&self, on: bool) {
+        for col in &self.people_cols {
+            col.set_sensitive(on);
+        }
     }
 
     /// Show the order and the filters on the rows, and tint the button
     /// while any filter is on, so a narrowed list never passes for a short
     /// one.
-    fn sync(&self, sort: ContactSort, on: u8) {
+    fn sync(&self, sort: ContactSort, on: u8, hidden: &std::collections::HashSet<String>) {
         for (s, radio) in &self.sorts {
             if *s == sort && !radio.is_active() {
                 radio.set_active(true);
@@ -2236,95 +2638,88 @@ impl FilterMenu {
                 check.set_active(active);
             }
         }
-        self.clear.set_sensitive(on != 0);
-        if on == 0 {
+        for (uid, check) in self.books.borrow().iter() {
+            let shown = !hidden.contains(uid);
+            if check.is_active() != shown {
+                check.set_active(shown);
+            }
+        }
+        self.clear.set_sensitive(on != 0 || !hidden.is_empty());
+        if on == 0 && hidden.is_empty() {
             self.button.remove_css_class("list-filter-active");
             self.button.set_tooltip_text(Some(&i18n("Sort and filter contacts")));
         } else {
             self.button.add_css_class("list-filter-active");
-            let names: Vec<String> =
+            let mut names: Vec<String> =
                 ContactFilter::ALL.iter().filter(|f| on & f.bit() != 0).map(|f| f.label()).collect();
+            if !hidden.is_empty() {
+                names.push(i18n("Address books"));
+            }
             self.button.set_tooltip_text(Some(&i18n_f("Filtered: {names}", &[("names", &names.join(", "))])));
         }
     }
 }
 
-/// The address book picker beside the search, made as the message list's
-/// folder picker: the book's name on the button, a radio per book in its
-/// popover. Entry 0 is every book.
-struct BookPicker {
-    label: gtk::Label,
-    list: gtk::Box,
-    radios: RefCell<Vec<gtk::CheckButton>>,
-    popover: gtk::Popover,
-    input: relm4::Sender<ContactsPageInput>,
-    /// Set while the radios are made or moved here, not by a click.
-    quiet: Rc<Cell<bool>>,
+/// The groups and books a selection of several can go to, as (index into
+/// `contacts`, name) and (book UID, name).
+struct BulkChoices {
+    groups: Vec<(usize, String)>,
+    books: Vec<(String, String)>,
 }
 
-impl BookPicker {
-    fn new(button: &gtk::MenuButton, input: &relm4::Sender<ContactsPageInput>) -> Self {
-        let face = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let label = gtk::Label::new(Some(&i18n("All Address Books")));
-        label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        label.set_max_width_chars(14);
-        face.append(&label);
-        face.append(&gtk::Image::from_icon_name("pan-down-symbolic"));
-        button.set_child(Some(&face));
-        let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        list.add_css_class("search-scope-popover");
-        let popover = gtk::Popover::new();
-        popover.set_child(Some(&list));
-        button.set_popover(Some(&popover));
-        BookPicker {
-            label,
-            list,
-            radios: RefCell::new(Vec::new()),
-            popover,
-            input: input.clone(),
-            quiet: Rc::new(Cell::new(false)),
-        }
+impl BulkChoices {
+    fn group_entries(&self, s: &relm4::Sender<ContactsPageInput>) -> Vec<MenuEntry> {
+        self.groups
+            .iter()
+            .map(|(g, name)| {
+                let (s, g) = (s.clone(), *g);
+                MenuEntry::new(name.clone(), move || {
+                    let _ = s.send(ContactsPageInput::BulkAddToGroup(g));
+                })
+                .icon("system-users-symbolic")
+            })
+            .collect()
     }
 
-    /// Offer `labels` (every book first), `at` picked.
-    fn set_books(&self, labels: &[&str], at: usize) {
-        self.quiet.set(true);
-        while let Some(child) = self.list.first_child() {
-            self.list.remove(&child);
-        }
-        let mut radios: Vec<gtk::CheckButton> = Vec::new();
-        for (i, name) in labels.iter().enumerate() {
-            let radio = gtk::CheckButton::with_label(name);
-            if let Some(first) = radios.first() {
-                radio.set_group(Some(first));
-            }
-            radio.set_active(i == at);
-            let (s, popover, quiet) = (self.input.clone(), self.popover.clone(), self.quiet.clone());
-            radio.connect_toggled(move |r| {
-                if r.is_active() && !quiet.get() {
-                    let _ = s.send(ContactsPageInput::FilterBook(i as u32));
-                    popover.popdown();
-                }
-            });
-            self.list.append(&radio);
-            radios.push(radio);
-        }
-        self.label.set_label(labels.get(at).copied().unwrap_or_default());
-        self.radios.replace(radios);
-        self.quiet.set(false);
+    fn book_entries(&self, s: &relm4::Sender<ContactsPageInput>) -> Vec<MenuEntry> {
+        self.books
+            .iter()
+            .map(|(uid, name)| {
+                let (s, uid) = (s.clone(), uid.clone());
+                MenuEntry::new(name.clone(), move || {
+                    let _ = s.send(ContactsPageInput::BulkMoveRequest(uid.clone()));
+                })
+                .icon("x-office-address-book-symbolic")
+            })
+            .collect()
     }
+}
 
-    /// Pick entry `at`, as if clicked.
-    fn pick(&self, at: usize) {
-        let radios = self.radios.borrow();
-        if let Some(radio) = radios.get(at) {
-            if radio.is_active() {
-                return;
-            }
-            radio.set_active(true);
-            self.label.set_label(&radio.label().unwrap_or_default());
+/// Ask before doing something to contacts that cannot be taken back.
+fn confirm(
+    widgets: &ContactsPageWidgets,
+    heading: &str,
+    body: &str,
+    action: &str,
+    destructive: bool,
+    on_yes: impl Fn() + 'static,
+) {
+    let win = widgets.page_stack.root().and_downcast::<gtk::Window>();
+    let dialog = adw::MessageDialog::new(win.as_ref(), Some(heading), Some(body));
+    dialog.add_response("cancel", &i18n("Cancel"));
+    dialog.add_response("yes", action);
+    dialog.set_response_appearance(
+        "yes",
+        if destructive { adw::ResponseAppearance::Destructive } else { adw::ResponseAppearance::Suggested },
+    );
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+    dialog.connect_response(None, move |_, resp| {
+        if resp == "yes" {
+            on_yes();
         }
-    }
+    });
+    dialog.present();
 }
 
 /// The header's "+": a contact or a group.

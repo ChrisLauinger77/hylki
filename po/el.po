@@ -296,6 +296,12 @@ msgstr "Δεν ήταν δυνατή η αποθήκευση του μηνύμα
 msgid "No address book available"
 msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων"
 
+#, fuzzy
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] "Εξήχθη {n} επαφή στο {path}"
+msgstr[1] "Εξήχθησαν {n} επαφές στο {path}"
+
 msgid "Could not update contact: {e}"
 msgstr "Αδυναμία ενημέρωσης επαφής: {e}"
 
@@ -3962,16 +3968,97 @@ msgstr "Αναζήτηση επαφών"
 msgid "Sort and filter contacts"
 msgstr "Ταξινόμηση επαφών"
 
-#, fuzzy
-msgid "Choose which address book to search"
-msgstr "Επιλέξτε τους φακέλους αναζήτησης"
-
 msgid "Edit contact"
 msgstr "Επεξεργασία επαφής"
 
 #, fuzzy
 msgid "Groups"
 msgstr "Αριστερή ομάδα"
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Άνοιγμα Επαφών"
+msgstr[1] "Άνοιγμα Επαφών"
+
+#, fuzzy
+msgid "Move"
+msgstr "Μετακίνηση σε"
+
+#, fuzzy
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] "Διαγραφή του κλειδιού σας;"
+msgstr[1] "Διαγραφή του κλειδιού σας;"
+
+#, fuzzy
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+msgstr[1] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+
+#, fuzzy
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+msgstr[1] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+
+#, fuzzy
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] "Διαγραφή επαφής;"
+msgstr[1] "Διαγραφή επαφής;"
+
+#, fuzzy
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+msgstr[1] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+
+#, fuzzy
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
+msgstr[1] ""
+"Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
+"βιβλίο, και από τον διακομιστή."
 
 #, fuzzy
 msgid ""
@@ -4007,9 +4094,6 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
 
-msgid "All Address Books"
-msgstr "Όλα τα βιβλία διευθύνσεων"
-
 #, fuzzy
 msgid "Search groups"
 msgstr "Αναζήτηση φίλτρων"
@@ -4026,17 +4110,44 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
-msgstr "Επεξεργασία"
-
 msgid "Add to Group"
 msgstr ""
+
+#, fuzzy
+msgid "Move to Address Book"
+msgstr "Βιβλίο διευθύνσεων"
+
+msgid "Delete…"
+msgstr "Διαγραφή…"
+
+msgid "Edit"
+msgstr "Επεξεργασία"
 
 msgid "Open in GNOME Contacts"
 msgstr "Άνοιγμα στις Επαφές GNOME"
 
-msgid "Delete…"
-msgstr "Διαγραφή…"
+#, fuzzy
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] "Εισαγωγή επιλεγμένων"
+msgstr[1] "Εισαγωγή επιλεγμένων"
+
+#, fuzzy
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] "Εισαγωγή επιλεγμένων"
+msgstr[1] "Εισαγωγή επιλεγμένων"
+
+msgid "Move to…"
+msgstr "Μετακίνηση σε…"
+
+#, fuzzy
+msgid "Move to another address book"
+msgstr "Αποθήκευση του καταλόγου;"
+
+#, fuzzy
+msgid "Selected"
+msgstr "Εισαγωγή επιλεγμένων"
 
 msgid "View photo"
 msgstr "Προβολή φωτογραφίας"
@@ -4137,6 +4248,10 @@ msgstr "Όνομα"
 
 msgid "Last name"
 msgstr "Επώνυμο"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Βιβλίο διευθύνσεων"
 
 msgid "Import Contacts"
 msgstr "Εισαγωγή επαφών"
@@ -4354,10 +4469,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Άνοιγμα Hylki"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Βιβλίο διευθύνσεων"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -4650,9 +4761,6 @@ msgstr "άγνωστος φάκελος"
 
 msgid "Mark as read"
 msgstr "Σήμανση ως αναγνωσμένο"
-
-msgid "Move to…"
-msgstr "Μετακίνηση σε…"
 
 msgid "Not spam"
 msgstr "Μη ανεπιθύμητο"
@@ -8174,6 +8282,13 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Choose which address book to search"
+#~ msgstr "Επιλέξτε τους φακέλους αναζήτησης"
+
+#~ msgid "All Address Books"
+#~ msgstr "Όλα τα βιβλία διευθύνσεων"
 
 #~ msgid ""
 #~ "{name} is removed from your address book, and for a synced book, from the "

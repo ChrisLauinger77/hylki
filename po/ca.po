@@ -289,6 +289,12 @@ msgstr "No s'ha pogut desar el missatge: {e}"
 msgid "No address book available"
 msgstr "No hi ha cap llibreta d'adreces disponible"
 
+#, fuzzy
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] "{n} contacte exportat a {path}"
+msgstr[1] "{n} contactes exportats a {path}"
+
 msgid "Could not update contact: {e}"
 msgstr "No s'ha pogut actualitzar el contacte: {e}"
 
@@ -3902,16 +3908,97 @@ msgstr "Cerca contactes"
 msgid "Sort and filter contacts"
 msgstr "Ordena els contactes"
 
-#, fuzzy
-msgid "Choose which address book to search"
-msgstr "Tria quines carpetes cercar"
-
 msgid "Edit contact"
 msgstr "Edita el contacte"
 
 #, fuzzy
 msgid "Groups"
 msgstr "Grup esquerre"
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Obre els contactes"
+msgstr[1] "Obre els contactes"
+
+#, fuzzy
+msgid "Move"
+msgstr "Mou a"
+
+#, fuzzy
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] "Vols suprimir la teva clau?"
+msgstr[1] "Vols suprimir la teva clau?"
+
+#, fuzzy
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+msgstr[1] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+
+#, fuzzy
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+msgstr[1] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+
+#, fuzzy
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] "Vols suprimir el contacte?"
+msgstr[1] "Vols suprimir el contacte?"
+
+#, fuzzy
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+msgstr[1] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+
+#, fuzzy
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
+msgstr[1] ""
+"{name} s'elimina de la teva llibreta d'adreces, i per a una llibreta "
+"sincronitzada, també del servidor."
 
 #, fuzzy
 msgid ""
@@ -3947,9 +4034,6 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr "Vols suprimir el contacte?"
 
-msgid "All Address Books"
-msgstr "Totes les llibretes d'adreces"
-
 #, fuzzy
 msgid "Search groups"
 msgstr "Cerca filtres"
@@ -3966,17 +4050,44 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
-msgstr "Edita"
-
 msgid "Add to Group"
 msgstr ""
+
+#, fuzzy
+msgid "Move to Address Book"
+msgstr "Llibreta d'adreces"
+
+msgid "Delete…"
+msgstr "Suprimeix…"
+
+msgid "Edit"
+msgstr "Edita"
 
 msgid "Open in GNOME Contacts"
 msgstr "Obre als contactes del GNOME"
 
-msgid "Delete…"
-msgstr "Suprimeix…"
+#, fuzzy
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] "Importa les seleccionades"
+msgstr[1] "Importa les seleccionades"
+
+#, fuzzy
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] "Importa les seleccionades"
+msgstr[1] "Importa les seleccionades"
+
+msgid "Move to…"
+msgstr "Mou a…"
+
+#, fuzzy
+msgid "Move to another address book"
+msgstr "Vols desar el directori?"
+
+#, fuzzy
+msgid "Selected"
+msgstr "Importa les seleccionades"
 
 msgid "View photo"
 msgstr "Mostra la foto"
@@ -4077,6 +4188,10 @@ msgstr "Nom"
 
 msgid "Last name"
 msgstr "Cognom"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Llibreta d'adreces"
 
 msgid "Import Contacts"
 msgstr "Importa contactes"
@@ -4294,10 +4409,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Obre l'Hylki"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Llibreta d'adreces"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -4589,9 +4700,6 @@ msgstr "carpeta desconeguda"
 
 msgid "Mark as read"
 msgstr "Marca com a llegit"
-
-msgid "Move to…"
-msgstr "Mou a…"
 
 msgid "Not spam"
 msgstr "No és brossa"
@@ -8054,6 +8162,13 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Choose which address book to search"
+#~ msgstr "Tria quines carpetes cercar"
+
+#~ msgid "All Address Books"
+#~ msgstr "Totes les llibretes d'adreces"
 
 #~ msgid ""
 #~ "{name} is removed from your address book, and for a synced book, from the "

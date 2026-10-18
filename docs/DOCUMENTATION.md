@@ -510,20 +510,32 @@ are used for suggestions and avatars.
 The Contacts view searches as the message list does. The search button in
 the list's header, <kbd>Ctrl+F</kbd> or <kbd>/</kbd> shows the search field,
 and <kbd>Esc</kbd>, or leaving the field empty, hides it and clears the
-search. Beside the field, a menu picks the address book searched: **All
-Address Books** or one of them, the Hylki book and the LDAP directories
-included. It is hidden while there is only one book, and hiding the search
-goes back to every book. The button at the right of the header sorts the
-people by first name, last name or email, and its **Show only** column
-keeps those with a photo, an email address, a phone number, a street
-address, a birthday or a company, or those in no group; the button turns
-the accent color while a filter is on. **Settings → Message List → Keep the
+search. The button at the right of the header sorts the people by first
+name, last name or email. Its **Show only** column keeps those with a photo,
+an email address, a phone number, a street address, a birthday or a
+company, or those in no group, and its **Address books** column lists
+every book, the Hylki book and the LDAP directories included: unticking a
+book leaves its contacts and groups out of the list until it is ticked
+again, and a directory, the only book ticked, is searched by typing. The
+button turns the accent color while a filter is on, and **Clear Filters**
+shows everything again.
+
+Several contacts are selected together with <kbd>Ctrl</kbd> or
+<kbd>Shift</kbd> and a click, or <kbd>Ctrl+A</kbd> for the whole list. The
+right-hand pane then lists them, with **Add to Group**, which puts them in
+a group (those it can take: see [Contact groups](#contact-groups)), **Move
+to…**, which moves them to another address book, and **Delete…**; a
+right-click on one of them offers the same. A move adds each contact to the
+book picked and removes it from the one it was in, locally and on the
+server, with its photo; a group that names it by its card in the old book
+loses it. Contacts in a book Hylki cannot write to are not moved. Several
+groups selected together can be deleted the same way. **Settings → Message List → Keep the
 search field open** keeps the Contacts search open too.
 
 A new contact, made with the **+** button, has an **Address
 book** row at the top of its form that picks where it is saved; it starts on
-the book the list shows, or on the default book when the list shows them
-all. A contact being edited stays in its book, which the form names.
+the default book, or on the first book the list shows when the default one
+is unticked in the filter. A contact being edited stays in its book, which the form names.
 
 The Hylki book's page in **Settings → Contacts** shows how many contacts it
 holds, and has **Import vCard files**, **Export as a vCard file** (one `.vcf`
@@ -564,7 +576,7 @@ addresses. To still needs at least one address, your own for example.
 
 The Contacts view lists groups apart from people: **Contacts** and **Groups**,
 above the search, switch between the two. Groups are listed by name, and the
-search and the address book menu work on whichever is shown.
+search and the filter's **Address books** work on whichever is shown.
 
 **New Group**, under the **+** button in the Contacts view, makes a group in
 the address book picked at the top of the form: the Hylki book, a book on

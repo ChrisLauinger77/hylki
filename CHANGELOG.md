@@ -48,11 +48,21 @@
   switch above the search.
 
 - **Changed: the Contacts search works as the message list's.** The search
-  button in the list's header, Ctrl+F or / show the search field, with the
-  address book it searches picked beside it, and Esc hides it and clears
-  it. The sort button became a sort and filter button, whose **Show only**
-  column keeps the people with a photo, an email address, a phone number, a
-  street address, a birthday or a company, or those in no group.
+  button in the list's header, Ctrl+F or / show the search field, and Esc
+  hides it and clears it. The sort button became a sort and filter button,
+  whose **Show only** column keeps the people with a photo, an email
+  address, a phone number, a street address, a birthday or a company, or
+  those in no group, and whose **Address books** column leaves out the
+  books unticked, several at once. It replaces the address book menu that
+  was beside the search.
+
+- **Added: several contacts at once.** Ctrl or Shift and a click, or
+  Ctrl+A, select several contacts in the Contacts view, and the right-hand
+  pane then has **Add to Group**, **Move to…** another address book and
+  **Delete…** for them all, as has a right-click on one of them; Delete
+  asks to delete them too. A move adds each contact to the new book, photo
+  included, and removes it from the old one. Several groups can be deleted
+  together.
 
 - **Changed: the composer's contacts button leads to Hylki's Contacts.** The
   button in the header of the composer's contacts window opens the Contacts

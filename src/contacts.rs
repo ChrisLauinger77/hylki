@@ -2321,6 +2321,13 @@ pub fn new_vcard(e: &ContactEdit) -> String {
 /// The lines of a stored vCard up to its END, less the properties in
 /// `replaced` (folded continuations go with their property).
 fn kept_lines(original: &str, replaced: &[&str]) -> Vec<String> {
+    kept_lines_by(original, |prop| replaced.contains(&prop))
+}
+
+/// The lines of `original` before END:VCARD, less the properties (with
+/// their folded continuations) `drop` names; `drop` is given the upper-case
+/// property name.
+fn kept_lines_by(original: &str, drop: impl Fn(&str) -> bool) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut skipping = false;
     for raw in original.lines() {
@@ -2343,7 +2350,7 @@ fn kept_lines(original: &str, replaced: &[&str]) -> Vec<String> {
             .next()
             .unwrap_or("")
             .to_ascii_uppercase();
-        skipping = replaced.contains(&prop.as_str());
+        skipping = drop(&prop);
         if !skipping {
             out.push(line.to_string());
         }
@@ -2561,6 +2568,52 @@ pub fn create_contact(book_uid: &str, vcard: &str) -> Result<(), String> {
     let (bus, path) = open_book(&conn, &dest, book_uid)?;
     book_call(&conn, &bus, &path, "CreateContacts", &(vec![vcard.to_string()], 0u32))?;
     Ok(())
+}
+
+/// Delete contacts (by their EDS UIDs) from one book, in one call.
+pub fn delete_contacts(book_uid: &str, uids: &[String]) -> Result<(), String> {
+    if is_local_book(book_uid) {
+        for uid in uids {
+            crate::local_contacts::delete(uid)?;
+        }
+        return write_local(Ok(()));
+    }
+    let dest = factory_dest().ok_or("Evolution Data Server is not available")?;
+    let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
+    let (bus, path) = open_book(&conn, &dest, book_uid)?;
+    book_call(&conn, &bus, &path, "RemoveContacts", &(uids.to_vec(), 0u32))?;
+    Ok(())
+}
+
+/// A contact's card as a new one for another book: without the UID, the
+/// revision and what the old book's server kept in it, and with its photo
+/// in the card itself. A cached photo is a file of the old book, which goes
+/// with the contact.
+pub fn moved_vcard(c: &ContactDetails) -> String {
+    use base64::Engine as _;
+    let mut out = kept_lines_by(&c.raw_vcard, |prop| {
+        matches!(prop, "UID" | "REV" | "PHOTO" | "X-IMAGETYPE" | "X-IMAGEHASH")
+            || prop.starts_with("X-EVOLUTION-WEBDAV")
+            || prop.starts_with("X-EVOLUTION-GOOGLE")
+            || prop.starts_with("X-EVOLUTION-M365")
+    });
+    if let Some(photo) = &c.photo {
+        let kind = crate::models::image_ext(photo).to_ascii_uppercase();
+        let kind = if kind == "JPG" { "JPEG".to_string() } else { kind };
+        out.push(format!(
+            "PHOTO;ENCODING=b;TYPE={kind}:{}",
+            base64::engine::general_purpose::STANDARD.encode(photo)
+        ));
+    }
+    out.push("END:VCARD".to_string());
+    out.join("\r\n") + "\r\n"
+}
+
+/// Move a contact: made in `to_book` from `vcard` ([`moved_vcard`]), then
+/// deleted from `from_book`, and only once the new one is made.
+pub fn move_contact(from_book: &str, uid: &str, vcard: &str, to_book: &str) -> Result<(), String> {
+    create_contact(to_book, vcard)?;
+    delete_contact(from_book, uid)
 }
 
 /// Delete a contact (by its EDS UID) from its book.
@@ -2901,6 +2954,27 @@ mod tests {
     }
 
     #[test]
+    fn a_moved_card_leaves_its_old_book_behind() {
+        let c = super::ContactDetails {
+            raw_vcard: "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:abc\r\nFN:Pat Doe\r\nEMAIL:pat@x.org\r\n\
+                        PHOTO;VALUE=uri:file:///home/u/.cache/evolution/addressbook/b/photos/abc.jpg\r\n\
+                        X-EVOLUTION-WEBDAV-ETAG:k4lwse3r\r\nREV:2026-10-18T09:00:00Z\r\nNOTE:Long note that\r\n \
+                        goes on\r\nEND:VCARD\r\n"
+                .into(),
+            photo: Some(vec![0x89, b'P', b'N', b'G', 1, 2]),
+            ..Default::default()
+        };
+        let out = super::moved_vcard(&c);
+        assert!(!out.contains("UID:") && !out.contains("REV:") && !out.contains("WEBDAV"), "{out}");
+        assert!(!out.contains("file://"), "{out}");
+        assert!(out.contains("PHOTO;ENCODING=b;TYPE=PNG:iVBORwEC\r\n"), "{out}");
+        assert!(out.contains("NOTE:Long note that\r\n goes on\r\n"), "{out}");
+        assert!(out.ends_with("END:VCARD\r\n"));
+        let back = super::parse_vcard_fields(&out).unwrap();
+        assert_eq!((back.name.as_str(), back.primary_email()), ("Pat Doe", Some("pat@x.org")));
+    }
+
+    #[test]
     fn an_apple_group_shows_people_with_no_address() {
         let person = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p1\r\nFN:Pat Doe\r\nTEL:+1 555 0100\r\nEND:VCARD\r\n";
         let mailed = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:p2\r\nFN:Kim\r\nEMAIL:kim@x.org\r\nEND:VCARD\r\n";
@@ -3078,5 +3152,44 @@ mod tests {
         super::delete_contact(&book, &group_uid).unwrap();
         super::delete_contact(&book, &stub).unwrap();
         println!("removed {group_uid} and {stub}");
+    }
+
+    /// MOVE_LIVE=1: move a contact with a photo between the first two books
+    /// that keep Apple's groups (a sealed rig's CardDAV books), and remove it.
+    #[test]
+    #[ignore]
+    fn live_move() {
+        if std::env::var_os("MOVE_LIVE").is_none() {
+            return;
+        }
+        let books: Vec<String> = super::writable_books()
+            .into_iter()
+            .filter(|b| b.groups == Some(super::GroupFormat::Apple))
+            .map(|b| b.uid)
+            .collect();
+        let (from, to) = (&books[0], &books[1]);
+        let card = format!(
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Hylki Move Test\r\nN:Test;Hylki Move;;;\r\nEMAIL:move-test@example.com\r\n\
+             PHOTO;ENCODING=b;TYPE=PNG:{ONE_PIXEL_PNG}\r\nEND:VCARD\r\n"
+        );
+        super::create_contact(from, &card).unwrap();
+        let dest = super::factory_dest().unwrap();
+        let conn = zbus::blocking::Connection::session().unwrap();
+        let find = |book: &str| {
+            let (bus, path) = super::open_book(&conn, &dest, book).unwrap();
+            let uids = super::book_get_uids(&conn, &bus, &path, "(is \"email\" \"move-test@example.com\")").unwrap();
+            uids.into_iter().map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap())).collect::<Vec<_>>()
+        };
+        let (uid, stored) = find(from).pop().expect("made in the first book");
+        let mut c = super::parse_vcard_details(&stored).unwrap();
+        c.raw_vcard = stored;
+        println!("photo bytes: {:?}", c.photo.as_ref().map(Vec::len));
+        let moved = super::moved_vcard(&c);
+        super::move_contact(from, &uid, &moved, to).unwrap();
+        assert!(find(from).is_empty(), "gone from the first book");
+        let (new_uid, there) = find(to).pop().expect("in the second book");
+        println!("=== in the second book:\n{there}");
+        assert!(super::parse_vcard_details(&there).unwrap().photo.is_some());
+        super::delete_contact(to, &new_uid).unwrap();
     }
 }

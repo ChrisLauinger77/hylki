@@ -275,6 +275,11 @@ msgstr ""
 msgid "No address book available"
 msgstr ""
 
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Could not update contact: {e}"
 msgstr ""
 
@@ -3552,14 +3557,72 @@ msgstr ""
 msgid "Sort and filter contacts"
 msgstr ""
 
-msgid "Choose which address book to search"
-msgstr ""
-
 msgid "Edit contact"
 msgstr ""
 
 msgid "Groups"
 msgstr ""
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Move"
+msgstr ""
+
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid ""
 "This will remove the group {name} from your address book locally and on the "
@@ -3585,9 +3648,6 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr ""
 
-msgid "All Address Books"
-msgstr ""
-
 msgid "Search groups"
 msgstr ""
 
@@ -3603,16 +3663,38 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
+msgid "Add to Group"
 msgstr ""
 
-msgid "Add to Group"
+msgid "Move to Address Book"
+msgstr ""
+
+msgid "Delete…"
+msgstr ""
+
+msgid "Edit"
 msgstr ""
 
 msgid "Open in GNOME Contacts"
 msgstr ""
 
-msgid "Delete…"
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Move to…"
+msgstr ""
+
+msgid "Move to another address book"
+msgstr ""
+
+msgid "Selected"
 msgstr ""
 
 msgid "View photo"
@@ -3708,6 +3790,9 @@ msgid "First name"
 msgstr ""
 
 msgid "Last name"
+msgstr ""
+
+msgid "Address books"
 msgstr ""
 
 msgid "Import Contacts"
@@ -3886,9 +3971,6 @@ msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
 msgstr ""
 
 msgid "Use in Hylki"
-msgstr ""
-
-msgid "Address books"
 msgstr ""
 
 msgid "Switch off an address book to leave it out of Hylki."
@@ -4157,9 +4239,6 @@ msgid "In {folder}"
 msgstr ""
 
 msgid "Mark as read"
-msgstr ""
-
-msgid "Move to…"
 msgstr ""
 
 msgid "Not spam"

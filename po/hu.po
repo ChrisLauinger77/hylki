@@ -300,6 +300,12 @@ msgstr "Az üzenet nem frissíthető: {e}"
 msgid "No address book available"
 msgstr "Nem érhető el címjegyzék"
 
+#, fuzzy
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] "A napló exportálva ide: {display}"
+msgstr[1] "A napló exportálva ide: {display}"
+
 msgid "Could not update contact: {e}"
 msgstr "A névjegy nem frissíthető: {e}"
 
@@ -4028,16 +4034,77 @@ msgstr "Névjegyek keresése"
 msgid "Sort and filter contacts"
 msgstr "{n} db üzenet"
 
-#, fuzzy
-msgid "Choose which address book to search"
-msgstr "Válassza ki a keresendő mappákat"
-
 msgid "Edit contact"
 msgstr "Névjegy szerkesztése"
 
 #, fuzzy
 msgid "Groups"
 msgstr "Bal oldali csoport"
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Névjegyek megnyitása"
+msgstr[1] "Névjegyek megnyitása"
+
+#, fuzzy
+msgid "Move"
+msgstr "Áthelyezés ide"
+
+#, fuzzy
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] "Törli a kulcsát?"
+msgstr[1] "Törli a kulcsát?"
+
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] "Törli a névjegyet?"
+msgstr[1] "Törli a névjegyet?"
+
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid ""
 "This will remove the group {name} from your address book locally and on the "
@@ -4065,10 +4132,6 @@ msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"
 
 #, fuzzy
-msgid "All Address Books"
-msgstr "Címjegyzék"
-
-#, fuzzy
 msgid "Search groups"
 msgstr "Keresési szűrők"
 
@@ -4085,17 +4148,44 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
-msgstr "Szerkesztés"
-
 msgid "Add to Group"
 msgstr ""
+
+#, fuzzy
+msgid "Move to Address Book"
+msgstr "Címjegyzék"
+
+msgid "Delete…"
+msgstr "Törlés…"
+
+msgid "Edit"
+msgstr "Szerkesztés"
 
 msgid "Open in GNOME Contacts"
 msgstr "Megnyitás a GNOME Névjegyekben"
 
-msgid "Delete…"
-msgstr "Törlés…"
+#, fuzzy
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] "Beszélgetés törlésének megerősítése"
+msgstr[1] "Beszélgetés törlésének megerősítése"
+
+#, fuzzy
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] "Beszélgetés törlésének megerősítése"
+msgstr[1] "Beszélgetés törlésének megerősítése"
+
+msgid "Move to…"
+msgstr "Áthelyezés…"
+
+#, fuzzy
+msgid "Move to another address book"
+msgstr "El akarod menteni a könyvtárat?"
+
+#, fuzzy
+msgid "Selected"
+msgstr "Kijelöltek importálása"
 
 msgid "View photo"
 msgstr "Fénykép megtekintése"
@@ -4198,6 +4288,10 @@ msgstr "Keresztnév"
 
 msgid "Last name"
 msgstr "Vezetéknév"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Címjegyzék"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -4407,10 +4501,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Hylki megnyitása"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Címjegyzék"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -4718,9 +4808,6 @@ msgstr "Minden mappa megjelenítése"
 
 msgid "Mark as read"
 msgstr "Megjelölés olvasottként"
-
-msgid "Move to…"
-msgstr "Áthelyezés…"
 
 msgid "Not spam"
 msgstr "Nem levélszemét"
@@ -8239,6 +8326,14 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Choose which address book to search"
+#~ msgstr "Válassza ki a keresendő mappákat"
+
+#, fuzzy
+#~ msgid "All Address Books"
+#~ msgstr "Címjegyzék"
 
 #~ msgid "Sort contacts"
 #~ msgstr "Névjegyek rendezése"

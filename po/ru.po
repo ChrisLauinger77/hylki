@@ -298,6 +298,13 @@ msgstr "Не удалось обновить сообщение: {e}"
 msgid "No address book available"
 msgstr "Адресная книга недоступна"
 
+#, fuzzy
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] "Журнал экспортирован в {display}"
+msgstr[1] "Журнал экспортирован в {display}"
+msgstr[2] "Журнал экспортирован в {display}"
+
 msgid "Could not update contact: {e}"
 msgstr "Не удалось обновить контакт: {e}"
 
@@ -4015,16 +4022,85 @@ msgstr "Поиск контактов"
 msgid "Sort and filter contacts"
 msgstr "{n} сообщений"
 
-#, fuzzy
-msgid "Choose which address book to search"
-msgstr "Выберите папки для поиска"
-
 msgid "Edit contact"
 msgstr "Редактировать контакт"
 
 #, fuzzy
 msgid "Groups"
 msgstr "Левая группа"
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Открыть «Контакты»"
+msgstr[1] "Открыть «Контакты»"
+msgstr[2] "Открыть «Контакты»"
+
+#, fuzzy
+msgid "Move"
+msgstr "Переместить в"
+
+#, fuzzy
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] "Удалить ваш ключ?"
+msgstr[1] "Удалить ваш ключ?"
+msgstr[2] "Удалить ваш ключ?"
+
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#, fuzzy
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] "Удалить контакт?"
+msgstr[1] "Удалить контакт?"
+msgstr[2] "Удалить контакт?"
+
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 msgid ""
 "This will remove the group {name} from your address book locally and on the "
@@ -4052,10 +4128,6 @@ msgid "Delete Contact?"
 msgstr "Удалить контакт?"
 
 #, fuzzy
-msgid "All Address Books"
-msgstr "Адресная книга"
-
-#, fuzzy
 msgid "Search groups"
 msgstr "Поиск фильтров"
 
@@ -4072,17 +4144,46 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
-msgstr "Редактировать"
-
 msgid "Add to Group"
 msgstr ""
+
+#, fuzzy
+msgid "Move to Address Book"
+msgstr "Адресная книга"
+
+msgid "Delete…"
+msgstr "Удалить…"
+
+msgid "Edit"
+msgstr "Редактировать"
 
 msgid "Open in GNOME Contacts"
 msgstr "Открыть в «Контактах GNOME»"
 
-msgid "Delete…"
-msgstr "Удалить…"
+#, fuzzy
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] "Подтверждать удаление обсуждения"
+msgstr[1] "Подтверждать удаление обсуждения"
+msgstr[2] "Подтверждать удаление обсуждения"
+
+#, fuzzy
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] "Подтверждать удаление обсуждения"
+msgstr[1] "Подтверждать удаление обсуждения"
+msgstr[2] "Подтверждать удаление обсуждения"
+
+msgid "Move to…"
+msgstr "Переместить в…"
+
+#, fuzzy
+msgid "Move to another address book"
+msgstr "Сохранить каталог?"
+
+#, fuzzy
+msgid "Selected"
+msgstr "Импортировать выбранные"
 
 msgid "View photo"
 msgstr "Просмотреть фото"
@@ -4186,6 +4287,10 @@ msgstr "Имя"
 
 msgid "Last name"
 msgstr "Фамилия"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Адресная книга"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -4396,10 +4501,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Открыть Hylki"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Адресная книга"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -4713,9 +4814,6 @@ msgstr "неизвестная папка"
 
 msgid "Mark as read"
 msgstr "Отметить как прочитанное"
-
-msgid "Move to…"
-msgstr "Переместить в…"
 
 msgid "Not spam"
 msgstr "Не спам"
@@ -8188,6 +8286,14 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Choose which address book to search"
+#~ msgstr "Выберите папки для поиска"
+
+#, fuzzy
+#~ msgid "All Address Books"
+#~ msgstr "Адресная книга"
 
 #~ msgid "Sort contacts"
 #~ msgstr "Сортировка контактов"

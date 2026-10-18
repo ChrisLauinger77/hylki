@@ -300,6 +300,12 @@ msgstr "Não foi possível atualizar a mensagem: {e}"
 msgid "No address book available"
 msgstr "Não está disponível nenhum livro de endereços"
 
+#, fuzzy
+msgid "{n} contact was not moved: {e}"
+msgid_plural "{n} contacts were not moved: {e}"
+msgstr[0] "Registo exportado para {display}"
+msgstr[1] "Registo exportado para {display}"
+
 msgid "Could not update contact: {e}"
 msgstr "Não foi possível atualizar o contacto: {e}"
 
@@ -4030,16 +4036,77 @@ msgstr "Pesquisar contactos"
 msgid "Sort and filter contacts"
 msgstr "Mensagens: {n}"
 
-#, fuzzy
-msgid "Choose which address book to search"
-msgstr "Escolher as pastas a pesquisar"
-
 msgid "Edit contact"
 msgstr "Editar contacto"
 
 #, fuzzy
 msgid "Groups"
 msgstr "Grupo esquerdo"
+
+msgid ""
+"This will add {n} contact to {book} and remove it from the address book it "
+"is in now, locally and on the server. A group that names it by its card "
+"there loses it."
+msgid_plural ""
+"This will add {n} contacts to {book} and remove them from the address books "
+"they are in now, locally and on the server. A group that names them by their "
+"cards there loses them."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Move {n} Contact?"
+msgid_plural "Move {n} Contacts?"
+msgstr[0] "Abrir Contactos"
+msgstr[1] "Abrir Contactos"
+
+#, fuzzy
+msgid "Move"
+msgstr "Mover para"
+
+#, fuzzy
+msgid "Delete {n} Group?"
+msgid_plural "Delete {n} Groups?"
+msgstr[0] "Eliminar a sua chave?"
+msgstr[1] "Eliminar a sua chave?"
+
+msgid ""
+"This will remove {n} group from your address books locally and on the "
+"server. The contacts are not removed."
+msgid_plural ""
+"This will remove {n} groups from your address books locally and on the "
+"server. The contacts are not removed."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid ""
+"This will remove {n} group from your address book. The contacts are not "
+"removed."
+msgid_plural ""
+"This will remove {n} groups from your address books. The contacts are not "
+"removed."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Delete {n} Contact?"
+msgid_plural "Delete {n} Contacts?"
+msgstr[0] "Eliminar contacto?"
+msgstr[1] "Eliminar contacto?"
+
+msgid ""
+"This will remove {n} contact from your address books locally and on the "
+"server."
+msgid_plural ""
+"This will remove {n} contacts from your address books locally and on the "
+"server."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "This will remove {n} contact from your address book."
+msgid_plural "This will remove {n} contacts from your address books."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid ""
 "This will remove the group {name} from your address book locally and on the "
@@ -4067,10 +4134,6 @@ msgid "Delete Contact?"
 msgstr "Eliminar contacto?"
 
 #, fuzzy
-msgid "All Address Books"
-msgstr "Livro de endereços"
-
-#, fuzzy
 msgid "Search groups"
 msgstr "Pesquisar filtros"
 
@@ -4087,17 +4150,44 @@ msgstr ""
 msgid "Nobody in the directory matches."
 msgstr ""
 
-msgid "Edit"
-msgstr "Editar"
-
 msgid "Add to Group"
 msgstr ""
+
+#, fuzzy
+msgid "Move to Address Book"
+msgstr "Livro de endereços"
+
+msgid "Delete…"
+msgstr "Eliminar…"
+
+msgid "Edit"
+msgstr "Editar"
 
 msgid "Open in GNOME Contacts"
 msgstr "Abrir nos Contactos do GNOME"
 
-msgid "Delete…"
-msgstr "Eliminar…"
+#, fuzzy
+msgid "{n} Group Selected"
+msgid_plural "{n} Groups Selected"
+msgstr[0] "Confirmar a eliminação de conversas"
+msgstr[1] "Confirmar a eliminação de conversas"
+
+#, fuzzy
+msgid "{n} Contact Selected"
+msgid_plural "{n} Contacts Selected"
+msgstr[0] "Confirmar a eliminação de conversas"
+msgstr[1] "Confirmar a eliminação de conversas"
+
+msgid "Move to…"
+msgstr "Mover para…"
+
+#, fuzzy
+msgid "Move to another address book"
+msgstr "Guardar o diretório?"
+
+#, fuzzy
+msgid "Selected"
+msgstr "Importar selecionadas"
 
 msgid "View photo"
 msgstr "Ver fotografia"
@@ -4201,6 +4291,10 @@ msgstr "Nome próprio"
 
 msgid "Last name"
 msgstr "Apelido"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Livro de endereços"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -4410,10 +4504,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Abrir o Hylki"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Livro de endereços"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -4716,9 +4806,6 @@ msgstr "pasta desconhecida"
 
 msgid "Mark as read"
 msgstr "Marcar como lida"
-
-msgid "Move to…"
-msgstr "Mover para…"
 
 msgid "Not spam"
 msgstr "Não é lixo eletrónico"
@@ -8200,6 +8287,14 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Choose which address book to search"
+#~ msgstr "Escolher as pastas a pesquisar"
+
+#, fuzzy
+#~ msgid "All Address Books"
+#~ msgstr "Livro de endereços"
 
 #~ msgid "Sort contacts"
 #~ msgstr "Ordenar contactos"

@@ -2214,7 +2214,10 @@ pub enum AppMsg {
         original: Option<String>,
         edit: crate::contacts::GroupEdit,
     },
-    DeleteContact { book_uid: String, uid: String },
+    /// Contacts to delete, by book and UID.
+    DeleteContacts(Vec<(String, String)>),
+    /// Contacts to move to the book `to`: (book, UID, the card for `to`).
+    MoveContacts { to: String, cards: Vec<(String, String, String)> },
     /// A contact write finished (`Some` = the error to show).
     ContactWriteDone(Option<String>),
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
@@ -3244,9 +3247,8 @@ impl SimpleComponent for AppModel {
                     ContactsPageOutput::SaveGroup { book_uid, format, original, edit } => {
                         AppMsg::SaveGroup { book_uid, format, original, edit }
                     }
-                    ContactsPageOutput::DeleteContact { book_uid, uid } => {
-                        AppMsg::DeleteContact { book_uid, uid }
-                    }
+                    ContactsPageOutput::DeleteContacts(keys) => AppMsg::DeleteContacts(keys),
+                    ContactsPageOutput::MoveContacts { to, cards } => AppMsg::MoveContacts { to, cards },
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
                     ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
                     ContactsPageOutput::ShowPhoto { name, data } => {
@@ -5692,13 +5694,14 @@ impl SimpleComponent for AppModel {
                         }
                     });
                 }
-                // HYLKI_SHOWCASE_CONTACTS=list|new|group|search:<text>[@<n>]|filter:<n>
+                // HYLKI_SHOWCASE_CONTACTS=list|new|group|search:<text>[@<n>]|filter:<n>|multi:<n>
                 // opens Contacts at 3s, and with "new" its editor for a new
                 // contact at 5s ("group": for a new group), or with "search:"
                 // types the text into its search
                 // then, so the directories are asked too (#307), and with
-                // "@<n>" picks entry n of the book filter at 6s; "filter:"
-                // turns on its nth "Show only" filter at 5s.
+                // "@<n>" shows only book n of the filter at 6s; "filter:"
+                // turns on its nth "Show only" filter at 5s; "multi:"
+                // selects the first n entries at 5s.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_CONTACTS") {
                     let s = sender.clone();
                     gtk::glib::timeout_add_seconds_local_once(3, move || s.input(AppMsg::OpenContacts));
@@ -5718,6 +5721,10 @@ impl SimpleComponent for AppModel {
                     {
                         gtk::glib::timeout_add_seconds_local_once(5, move || {
                             let _ = page.send(ContactsPageInput::SetFilter(filter, true));
+                        });
+                    } else if let Some(n) = which.strip_prefix("multi:").and_then(|n| n.parse::<u32>().ok()) {
+                        gtk::glib::timeout_add_seconds_local_once(5, move || {
+                            let _ = page.send(ContactsPageInput::SelectFirst(n));
                         });
                     } else if let Some(spec) = which.strip_prefix("search:") {
                         let (text, book) = match spec.rsplit_once('@') {
@@ -12444,16 +12451,49 @@ impl SimpleComponent for AppModel {
                 });
             }
 
-            AppMsg::DeleteContact { book_uid, uid } => {
+            AppMsg::DeleteContacts(keys) => {
                 let s = sender.clone();
                 std::thread::spawn(move || {
-                    let result = crate::contacts::delete_contact(&book_uid, &uid);
-                    s.input(AppMsg::ContactWriteDone(result.err()));
+                    // One call per book.
+                    let mut by_book: Vec<(String, Vec<String>)> = Vec::new();
+                    for (book, uid) in keys {
+                        match by_book.iter_mut().find(|(b, _)| *b == book) {
+                            Some((_, uids)) => uids.push(uid),
+                            None => by_book.push((book, vec![uid])),
+                        }
+                    }
+                    let err = by_book
+                        .iter()
+                        .filter_map(|(book, uids)| crate::contacts::delete_contacts(book, uids).err())
+                        .next();
+                    s.input(AppMsg::ContactWriteDone(err));
+                });
+            }
+
+            AppMsg::MoveContacts { to, cards } => {
+                let s = sender.clone();
+                std::thread::spawn(move || {
+                    let failed: Vec<String> = cards
+                        .iter()
+                        .filter_map(|(book, uid, vcard)| crate::contacts::move_contact(book, uid, vcard, &to).err())
+                        .collect();
+                    let err = failed.first().map(|e| {
+                        let n = failed.len() as u32;
+                        ni18n_f(
+                            "{n} contact was not moved: {e}",
+                            "{n} contacts were not moved: {e}",
+                            n,
+                            &[("n", &n.to_string()), ("e", e)],
+                        )
+                    });
+                    s.input(AppMsg::ContactWriteDone(err));
                 });
             }
 
             AppMsg::ContactWriteDone(err) => {
                 if let Some(e) = err {
+                    // What was taken off the list may still be there.
+                    self.contacts_page.emit(ContactsPageInput::WriteFailed);
                     self.notifications.emit(NotifyInput::Push {
                         text: i18n_f("Could not update contact: {e}", &[("e", &(e).to_string())]),
                         error: true,
