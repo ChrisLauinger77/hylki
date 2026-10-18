@@ -3836,16 +3836,14 @@ msgstr "El fitxer es va moure o suprimir. Torna a adjuntar-lo des d'on és ara."
 msgid "Not found"
 msgstr "No trobat"
 
-msgid "Open in GNOME Contacts"
-msgstr "Obre als contactes del GNOME"
-
 msgid "Search contacts"
 msgstr "Cerca contactes"
 
 msgid "No Contacts"
 msgstr "No hi ha contactes"
 
-msgid "Add contacts in GNOME Contacts to see them here."
+#, fuzzy
+msgid "Add contacts in the Contacts view to see them here."
 msgstr "Afegeix contactes als contactes del GNOME per veure'ls aquí."
 
 msgid "Has Photo"
@@ -3873,9 +3871,6 @@ msgstr ""
 #, fuzzy
 msgid "Not in a Group"
 msgstr "Grup esquerre"
-
-msgid "Open GNOME Contacts"
-msgstr "Obre els contactes del GNOME"
 
 #, fuzzy
 msgid "New contact or group"
@@ -3961,6 +3956,9 @@ msgstr "Edita"
 
 msgid "Add to Group"
 msgstr ""
+
+msgid "Open in GNOME Contacts"
+msgstr "Obre als contactes del GNOME"
 
 msgid "Delete…"
 msgstr "Suprimeix…"
@@ -4183,6 +4181,9 @@ msgid ""
 "The address books GNOME Contacts and Evolution keep on this computer. They "
 "are changed there, and in Hylki's Contacts."
 msgstr ""
+
+msgid "Open GNOME Contacts"
+msgstr "Obre els contactes del GNOME"
 
 #, fuzzy
 msgid "Set up in GNOME Online Accounts"

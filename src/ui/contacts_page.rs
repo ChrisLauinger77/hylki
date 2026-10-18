@@ -2,8 +2,8 @@
 //! gallery): a searchable, sortable list of every GNOME Contacts entry beside
 //! the selected contact's full card, with editing, creation and deletion done
 //! right here (writes go through EDS, so GNOME Contacts and CardDAV stay in
-//! sync). Anything Hylki doesn't do — linking, photos, address books — is one
-//! click away via "Open GNOME Contacts".
+//! sync). Anything Hylki doesn't do — linking, photos — is one click away via
+//! a contact's "Open in GNOME Contacts".
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -332,14 +332,6 @@ impl Component for ContactsPage {
                         },
                     },
                     pack_end = &gtk::Button {
-                        set_icon_name: "x-office-address-book-symbolic",
-                        set_tooltip_text: Some(i18n("Open GNOME Contacts").as_str()),
-                        add_css_class: "flat",
-                        connect_clicked => move |_| {
-                            crate::ui::contacts_browser::launch_gnome_contacts();
-                        },
-                    },
-                    pack_end = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
                         set_tooltip_text: Some(i18n("New contact or group").as_str()),
                         add_css_class: "flat",
@@ -431,7 +423,7 @@ impl Component for ContactsPage {
                         },
                         // pack_end packs right-to-left: sort and filter at the
                         // far right (matching the message list), then the
-                        // count, then the GNOME Contacts launcher, then "+".
+                        // count, then "+".
                         #[name = "filter_btn"]
                         pack_end = &gtk::MenuButton {
                             set_icon_name: "filter-symbolic",
@@ -443,14 +435,6 @@ impl Component for ContactsPage {
                         pack_end = &gtk::Label {
                             set_valign: gtk::Align::Center,
                             add_css_class: "list-count",
-                        },
-                        pack_end = &gtk::Button {
-                            set_icon_name: "x-office-address-book-symbolic",
-                            set_tooltip_text: Some(i18n("Open GNOME Contacts").as_str()),
-                            add_css_class: "flat",
-                            connect_clicked => move |_| {
-                                crate::ui::contacts_browser::launch_gnome_contacts();
-                            },
                         },
                         pack_end = &gtk::Button {
                             set_icon_name: "list-add-symbolic",

@@ -3865,16 +3865,14 @@ msgstr ""
 msgid "Not found"
 msgstr "No encontrado"
 
-msgid "Open in GNOME Contacts"
-msgstr "Abrir en Contactos de GNOME"
-
 msgid "Search contacts"
 msgstr "Buscar contactos"
 
 msgid "No Contacts"
 msgstr "No hay contactos"
 
-msgid "Add contacts in GNOME Contacts to see them here."
+#, fuzzy
+msgid "Add contacts in the Contacts view to see them here."
 msgstr "Añade contactos en Contactos de GNOME para verlos aquí."
 
 msgid "Has Photo"
@@ -3902,9 +3900,6 @@ msgstr ""
 #, fuzzy
 msgid "Not in a Group"
 msgstr "Grupo izquierdo"
-
-msgid "Open GNOME Contacts"
-msgstr "Abrir Contactos de GNOME"
 
 #, fuzzy
 msgid "New contact or group"
@@ -3990,6 +3985,9 @@ msgstr "Editar"
 
 msgid "Add to Group"
 msgstr ""
+
+msgid "Open in GNOME Contacts"
+msgstr "Abrir en Contactos de GNOME"
 
 msgid "Delete…"
 msgstr "Eliminar…"
@@ -4212,6 +4210,9 @@ msgid ""
 "The address books GNOME Contacts and Evolution keep on this computer. They "
 "are changed there, and in Hylki's Contacts."
 msgstr ""
+
+msgid "Open GNOME Contacts"
+msgstr "Abrir Contactos de GNOME"
 
 #, fuzzy
 msgid "Set up in GNOME Online Accounts"

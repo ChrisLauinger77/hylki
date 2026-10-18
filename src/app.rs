@@ -2189,6 +2189,9 @@ pub enum AppMsg {
     StatusBarShown(bool),
     ToggleNotifications,
     OpenContacts,
+    /// Contacts, asked for from a composer, which may be a window of its
+    /// own: the main window comes forward to show it.
+    ShowContactsPage,
     /// The background EDS read for the contacts view finished.
     ContactsLoaded(Vec<crate::contacts::ContactDetails>),
     /// The address books that sync with a server fetched what changed
@@ -10259,6 +10262,11 @@ impl SimpleComponent for AppModel {
                 crate::desktop::present_window(&self.window);
             }
 
+            AppMsg::ShowContactsPage => {
+                crate::desktop::present_window(&self.window);
+                sender.input(AppMsg::OpenContacts);
+            }
+
             AppMsg::OpenConsole => {
                 if self.console_mode {
                     self.notifications.emit(NotifyInput::ShowConsole);
@@ -18068,6 +18076,7 @@ impl AppModel {
                     AppMsg::Pref(PrefOutput::SetSpellcheckLangs(langs))
                 }
                 ComposeOutput::DirectoryError(text) => AppMsg::DirectoryError(text),
+                ComposeOutput::ShowContacts => AppMsg::ShowContactsPage,
             })
     }
 

@@ -48,6 +48,12 @@
   column keeps the people with a photo, an email address, a phone number, a
   street address, a birthday or a company, or those in no group.
 
+- **Changed: the composer's contacts button leads to Hylki's Contacts.** The
+  button in the header of the composer's contacts window opens the Contacts
+  view, bringing the main window forward, instead of GNOME Contacts. The
+  Contacts view's own header no longer has a GNOME Contacts button; a
+  contact's menu still has **Open in GNOME Contacts**.
+
 - **Fixed: an Evolution contact list offered as a broken recipient.** The
   composer suggested each member of a list under the list's name with the
   member's whole line as the address ("Book Club", `alice able

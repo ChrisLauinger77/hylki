@@ -737,6 +737,8 @@ pub enum ComposeOutput {
     /// A directory could not be asked (#307): for the status bar, once per
     /// composer.
     DirectoryError(String),
+    /// The contacts modal asked for Hylki's Contacts view.
+    ShowContacts,
 }
 
 #[relm4::component(pub)]
@@ -2275,9 +2277,16 @@ impl Component for Compose {
                     break 'handle;
                 };
                 let to_row = widgets.to_row.clone();
-                crate::ui::contacts_browser::present(&win, move |contact| {
-                    to_row.add_recipient(&crate::worker::format_recipient(&contact.name, &contact.email));
-                });
+                let s = sender.clone();
+                crate::ui::contacts_browser::present(
+                    &win,
+                    move |contact| {
+                        to_row.add_recipient(&crate::worker::format_recipient(&contact.name, &contact.email));
+                    },
+                    move || {
+                        let _ = s.output(ComposeOutput::ShowContacts);
+                    },
+                );
             }
 
             ComposeInput::AttachFiles => {

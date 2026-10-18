@@ -3966,16 +3966,14 @@ msgstr ""
 msgid "Not found"
 msgstr "Nem jelenik meg"
 
-msgid "Open in GNOME Contacts"
-msgstr "Megnyitás a GNOME Névjegyekben"
-
 msgid "Search contacts"
 msgstr "Névjegyek keresése"
 
 msgid "No Contacts"
 msgstr "Nincsenek névjegyek"
 
-msgid "Add contacts in GNOME Contacts to see them here."
+#, fuzzy
+msgid "Add contacts in the Contacts view to see them here."
 msgstr "Adjon hozzá névjegyeket a GNOME Névjegyekben a megtekintésükhöz."
 
 msgid "Has Photo"
@@ -4002,9 +4000,6 @@ msgstr ""
 #, fuzzy
 msgid "Not in a Group"
 msgstr "Bal oldali csoport"
-
-msgid "Open GNOME Contacts"
-msgstr "GNOME Névjegyek megnyitása"
 
 #, fuzzy
 msgid "New contact or group"
@@ -4084,6 +4079,9 @@ msgstr "Szerkesztés"
 
 msgid "Add to Group"
 msgstr ""
+
+msgid "Open in GNOME Contacts"
+msgstr "Megnyitás a GNOME Névjegyekben"
 
 msgid "Delete…"
 msgstr "Törlés…"
@@ -4307,6 +4305,9 @@ msgid ""
 "The address books GNOME Contacts and Evolution keep on this computer. They "
 "are changed there, and in Hylki's Contacts."
 msgstr ""
+
+msgid "Open GNOME Contacts"
+msgstr "GNOME Névjegyek megnyitása"
 
 #, fuzzy
 msgid "Set up in GNOME Online Accounts"

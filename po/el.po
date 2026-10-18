@@ -3896,16 +3896,14 @@ msgstr ""
 msgid "Not found"
 msgstr "Δεν βρέθηκε"
 
-msgid "Open in GNOME Contacts"
-msgstr "Άνοιγμα στις Επαφές GNOME"
-
 msgid "Search contacts"
 msgstr "Αναζήτηση επαφών"
 
 msgid "No Contacts"
 msgstr "Δεν υπάρχουν επαφές"
 
-msgid "Add contacts in GNOME Contacts to see them here."
+#, fuzzy
+msgid "Add contacts in the Contacts view to see them here."
 msgstr "Προσθέστε επαφές στις Επαφές GNOME για να τις βλέπετε εδώ."
 
 msgid "Has Photo"
@@ -3933,9 +3931,6 @@ msgstr ""
 #, fuzzy
 msgid "Not in a Group"
 msgstr "Αριστερή ομάδα"
-
-msgid "Open GNOME Contacts"
-msgstr "Άνοιγμα Επαφών GNOME"
 
 #, fuzzy
 msgid "New contact or group"
@@ -4021,6 +4016,9 @@ msgstr "Επεξεργασία"
 
 msgid "Add to Group"
 msgstr ""
+
+msgid "Open in GNOME Contacts"
+msgstr "Άνοιγμα στις Επαφές GNOME"
 
 msgid "Delete…"
 msgstr "Διαγραφή…"
@@ -4243,6 +4241,9 @@ msgid ""
 "The address books GNOME Contacts and Evolution keep on this computer. They "
 "are changed there, and in Hylki's Contacts."
 msgstr ""
+
+msgid "Open GNOME Contacts"
+msgstr "Άνοιγμα Επαφών GNOME"
 
 #, fuzzy
 msgid "Set up in GNOME Online Accounts"
