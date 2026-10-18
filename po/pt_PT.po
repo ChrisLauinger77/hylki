@@ -4206,15 +4206,6 @@ msgid ""
 msgstr ""
 
 #, fuzzy
-msgid "From your mail accounts"
-msgstr "Adicione a sua conta de e-mail"
-
-msgid ""
-"These mail accounts keep contacts too, under the same sign-in. Adding them "
-"uses the password the mail account already has."
-msgstr ""
-
-#, fuzzy
 msgid "New Contacts"
 msgstr "Novo contacto"
 
@@ -4226,14 +4217,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "A procurar uma chave para {addr}…"
-
-#, fuzzy
-msgid "Add Address Book"
-msgstr "Livro de endereços"
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
@@ -4250,6 +4233,10 @@ msgid ""
 msgstr ""
 "O diretório é removido do Evolution Data Server, pelo que deixa de aparecer "
 "no Evolution e noutras aplicações que o utilizem. Nada muda no servidor."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "A procurar uma chave para {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4291,6 +4278,10 @@ msgstr ""
 #, fuzzy
 msgid "Open Online Accounts"
 msgstr "Abrir Contas online…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Livro de endereços"
 
 #, fuzzy
 msgid "Added in GNOME Online Accounts"
@@ -4352,15 +4343,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Abrir o Hylki"
-
-msgid ""
-"{provider} contacts are synced through GNOME Online Accounts already, maybe "
-"for this account under another address."
-msgstr ""
-
-#, fuzzy
-msgid "Add Address Books"
-msgstr "Livro de endereços"
 
 #, fuzzy
 msgid "Address books"
@@ -5532,6 +5514,13 @@ msgstr "Pesquisar definições"
 
 msgid "No Results"
 msgstr "Nenhum resultado"
+
+#. Translators: words the settings search finds the Contacts page by,
+#. separated by spaces; keep "CardDAV" and "LDAP".
+msgid ""
+"address books CardDAV LDAP directory directories Online Accounts Nextcloud "
+"iCloud Google Microsoft vCard"
+msgstr ""
 
 msgid "Save the filter?"
 msgstr "Guardar o filtro?"
@@ -8144,6 +8133,14 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "From your mail accounts"
+#~ msgstr "Adicione a sua conta de e-mail"
+
+#, fuzzy
+#~ msgid "Add Address Books"
+#~ msgstr "Livro de endereços"
 
 #, fuzzy
 #~ msgid "CardDAV Accounts"

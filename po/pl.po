@@ -4241,15 +4241,6 @@ msgid ""
 msgstr ""
 
 #, fuzzy
-msgid "From your mail accounts"
-msgstr "Dodaj konto pocztowe"
-
-msgid ""
-"These mail accounts keep contacts too, under the same sign-in. Adding them "
-"uses the password the mail account already has."
-msgstr ""
-
-#, fuzzy
 msgid "New Contacts"
 msgstr "Nowy kontakt"
 
@@ -4262,14 +4253,6 @@ msgid ""
 "when it is made."
 msgstr ""
 
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "Wyszukiwanie klucza dla adresu {addr}…"
-
-#, fuzzy
-msgid "Add Address Book"
-msgstr "Książka adresowa"
-
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
 "apps that use it stop seeing it too. Nothing on the server changes."
@@ -4280,6 +4263,10 @@ msgid ""
 "Evolution and other apps that use them stop seeing them too. Nothing on the "
 "server changes."
 msgstr ""
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Wyszukiwanie klucza dla adresu {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4322,6 +4309,10 @@ msgstr ""
 #, fuzzy
 msgid "Open Online Accounts"
 msgstr "Otwórz konta online…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Książka adresowa"
 
 #, fuzzy
 msgid "Added in GNOME Online Accounts"
@@ -4383,15 +4374,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Otwórz aplikację Hylki"
-
-msgid ""
-"{provider} contacts are synced through GNOME Online Accounts already, maybe "
-"for this account under another address."
-msgstr ""
-
-#, fuzzy
-msgid "Add Address Books"
-msgstr "Książka adresowa"
 
 #, fuzzy
 msgid "Address books"
@@ -5598,6 +5580,13 @@ msgstr "Wyszukaj ustawienia"
 
 msgid "No Results"
 msgstr "Brak wyników"
+
+#. Translators: words the settings search finds the Contacts page by,
+#. separated by spaces; keep "CardDAV" and "LDAP".
+msgid ""
+"address books CardDAV LDAP directory directories Online Accounts Nextcloud "
+"iCloud Google Microsoft vCard"
+msgstr ""
 
 msgid "Save the filter?"
 msgstr "Czy zapisać filtr?"
@@ -8207,6 +8196,14 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "From your mail accounts"
+#~ msgstr "Dodaj konto pocztowe"
+
+#, fuzzy
+#~ msgid "Add Address Books"
+#~ msgstr "Książka adresowa"
 
 #, fuzzy
 #~ msgid "CardDAV Accounts"

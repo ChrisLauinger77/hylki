@@ -12,7 +12,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use relm4::prelude::*;
 
-use crate::carddav::{self, Account, MailOffer, Status};
+use crate::carddav::{self, Account, Status};
 use crate::contact_sources::{self as sources, Kind, Origin, Source};
 use crate::directory::{self, Directory, Security};
 use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
@@ -81,15 +81,12 @@ fn mark(id: &str, px: i32) -> gtk::Widget {
 
 pub struct ContactSources {
     sources: Vec<Source>,
-    offers: Vec<MailOffer>,
     /// The books new contacts can go to, the chosen default first.
     books: Vec<crate::contacts::Book>,
     local_count: usize,
     list: gtk::ListBox,
     add_btn: gtk::Button,
     no_eds: gtk::Label,
-    offers_group: adw::PreferencesGroup,
-    offers_list: gtk::ListBox,
     book_row: adw::ComboRow,
     /// Set while the book row's model is replaced, which fires its notify.
     book_guard: Rc<std::cell::Cell<bool>>,
@@ -110,7 +107,7 @@ pub struct ContactSources {
 pub enum ContactSourcesInput {
     /// Ask EDS, GNOME Online Accounts and the keyring again.
     Load,
-    Loaded { sources: Vec<Source>, offers: Vec<MailOffer>, eds: bool },
+    Loaded { sources: Vec<Source>, eds: bool },
     /// The books new contacts can go to, and the Hylki book's size, from
     /// the app.
     SetBooks(Vec<crate::contacts::Book>),
@@ -120,9 +117,6 @@ pub enum ContactSourcesInput {
     Add,
     /// The kind picked in the add page's dropdown.
     AddKind(u32),
-    AddOffer(usize),
-    /// The keyring has no password for the offered mail account.
-    OfferNeedsPassword(MailOffer),
     Toggle { index: usize, on: bool },
     ToggleBook { book: String, on: bool },
     SaveClicked,
@@ -223,17 +217,6 @@ impl SimpleComponent for ContactSources {
                                         set_visible: false,
                                     },
                                 },
-                                #[name = "offers_group"]
-                                add = &adw::PreferencesGroup {
-                                    set_title: &i18n("From your mail accounts"),
-                                    set_description: Some(&i18n("These mail accounts keep contacts too, under the same sign-in. Adding them uses the password the mail account already has.")),
-                                    set_visible: false,
-                                    #[name = "offers_list"]
-                                    gtk::ListBox {
-                                        add_css_class: "boxed-list",
-                                        set_selection_mode: gtk::SelectionMode::None,
-                                    },
-                                },
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("New Contacts"),
                                     #[name = "book_row"]
@@ -300,14 +283,11 @@ impl SimpleComponent for ContactSources {
         let widgets = view_output!();
         let model = ContactSources {
             sources: Vec::new(),
-            offers: Vec::new(),
             books: Vec::new(),
             local_count: 0,
             list: widgets.list.clone(),
             add_btn: widgets.add_btn.clone(),
             no_eds: widgets.no_eds.clone(),
-            offers_group: widgets.offers_group.clone(),
-            offers_list: widgets.offers_list.clone(),
             book_row: widgets.book_row.clone(),
             book_guard: Rc::new(std::cell::Cell::new(false)),
             toasts: widgets.toasts.clone(),
@@ -342,10 +322,9 @@ impl SimpleComponent for ContactSources {
                 let _ = out.send(ContactSourcesOutput::LoadBooks);
             });
         }
-        // HYLKI_SHOWCASE_EDIT_CONTACTS=<index>|add|add<kind>|offer<index>
-        // opens that source's page, the add page (on a kind), or presses an
-        // offer's button, for a capture (demo only), once the page has read
-        // its sources.
+        // HYLKI_SHOWCASE_EDIT_CONTACTS=<index>|add|add<kind> opens that
+        // source's page or the add page (on a kind), for a capture (demo
+        // only), once the page has read its sources.
         if let Ok(what) = std::env::var("HYLKI_SHOWCASE_EDIT_CONTACTS") {
             if std::env::var_os("HYLKI_DEMO").is_some() {
                 let s = sender.input_sender().clone();
@@ -355,8 +334,6 @@ impl SimpleComponent for ContactSources {
                         if let Ok(k) = kind.parse() {
                             let _ = s.send(ContactSourcesInput::AddKind(k));
                         }
-                    } else if let Some(i) = what.strip_prefix("offer") {
-                        let _ = s.send(ContactSourcesInput::AddOffer(i.parse().unwrap_or(0)));
                     } else {
                         let _ = s.send(ContactSourcesInput::Open(what.parse().unwrap_or(0)));
                     }
@@ -372,20 +349,11 @@ impl SimpleComponent for ContactSources {
                 let s = sender.input_sender().clone();
                 std::thread::spawn(move || {
                     let (sources, eds) = sources::list_with_eds();
-                    let accounts: Vec<Account> = sources
-                        .iter()
-                        .filter_map(|s| match &s.kind {
-                            Kind::CardDav(a) => Some(a.clone()),
-                            _ => None,
-                        })
-                        .collect();
-                    let offers = carddav::mail_offers(&accounts);
-                    let _ = s.send(ContactSourcesInput::Loaded { sources, offers, eds });
+                    let _ = s.send(ContactSourcesInput::Loaded { sources, eds });
                 });
             }
-            ContactSourcesInput::Loaded { sources, offers, eds } => {
+            ContactSourcesInput::Loaded { sources, eds } => {
                 self.sources = sources;
-                self.offers = offers;
                 // Every kind that can be added is kept by EDS.
                 self.add_btn.set_sensitive(eds);
                 self.no_eds.set_visible(!eds);
@@ -422,26 +390,6 @@ impl SimpleComponent for ContactSources {
                 if self.editing == Some(Editing::Add) {
                     self.open_add(k, &sender);
                 }
-            }
-            ContactSourcesInput::AddOffer(i) => {
-                let Some(offer) = self.offers.get(i).cloned() else { return };
-                self.toast(&i18n_f("Looking for address books on {name}…", &[("name", &offer.account().title())]));
-                let s = sender.input_sender().clone();
-                std::thread::spawn(move || match carddav::add_offer(&offer) {
-                    Some(saved) => report_carddav(&s, saved, true),
-                    None => {
-                        let _ = s.send(ContactSourcesInput::OfferNeedsPassword(offer));
-                    }
-                });
-            }
-            ContactSourcesInput::OfferNeedsPassword(offer) => {
-                // The form asks for the password, filled in otherwise.
-                self.editing = Some(Editing::Add);
-                self.editor_page.set_title(&i18n("Add Address Book"));
-                self.remove_btn.set_visible(false);
-                self.show_carddav_form(offer.account(), None, ADD_KINDS[0].what, &sender);
-                self.push_editor();
-                self.announce(&sender);
             }
             ContactSourcesInput::Toggle { index, on } => {
                 let Some(source) = self.sources.get_mut(index) else { return };
@@ -725,7 +673,7 @@ impl ContactSources {
             AddWhat::CardDav { server, .. } => {
                 let mut account = Account::empty();
                 account.url = server.unwrap_or_default().to_string();
-                self.show_carddav_form(account, Some(kind), what, sender);
+                self.show_carddav_form(account, kind, what, sender);
             }
             AddWhat::Ldap => {
                 let page = gtk::Box::new(gtk::Orientation::Vertical, 24);
@@ -754,14 +702,11 @@ impl ContactSources {
         self.announce(sender);
     }
 
-    /// The add page's CardDAV form, under the kind dropdown (`kind`), or on
-    /// its own for an offer that needs its password.
-    fn show_carddav_form(&mut self, account: Account, kind: Option<u32>, what: AddWhat, sender: &ComponentSender<Self>) {
+    /// The add page's CardDAV form, under the kind dropdown.
+    fn show_carddav_form(&mut self, account: Account, kind: u32, what: AddWhat, sender: &ComponentSender<Self>) {
         let page = gtk::Box::new(gtk::Orientation::Vertical, 24);
-        if let Some(k) = kind {
-            page.append(&kind_picker(k, sender.input_sender().clone()));
-        }
-        let (form, save) = carddav_form(account, kind, what, sender.input_sender().clone());
+        page.append(&kind_picker(kind, sender.input_sender().clone()));
+        let (form, save) = carddav_form(account, Some(kind), what, sender.input_sender().clone());
         page.append(&form);
         *self.save_action.borrow_mut() = Some(save);
         self.save_btn.set_visible(true);
@@ -886,36 +831,6 @@ impl ContactSources {
             row.set_child(Some(&hbox));
             self.list.append(&row);
         }
-
-        while let Some(child) = self.offers_list.first_child() {
-            self.offers_list.remove(&child);
-        }
-        for (i, offer) in self.offers.iter().enumerate() {
-            let row = adw::ActionRow::new();
-            row.set_title(&gtk::glib::markup_escape_text(&offer.email));
-            let host = carddav::parse_url(&offer.url).map(|u| u.host).unwrap_or_default();
-            let sub = if offer.online_accounts {
-                i18n_f(
-                    "{provider} contacts are synced through GNOME Online Accounts already, maybe for this account under another address.",
-                    &[("provider", offer.provider)],
-                )
-            } else {
-                format!("{} · {host}", offer.provider)
-            };
-            row.set_subtitle(&gtk::glib::markup_escape_text(&sub));
-            row.set_subtitle_lines(3);
-            row.add_prefix(&mark(&offer.provider.to_ascii_lowercase(), 24));
-            let add = gtk::Button::with_label(&i18n("Add Address Books"));
-            add.set_valign(gtk::Align::Center);
-            let s = sender.input_sender().clone();
-            add.connect_clicked(move |b| {
-                b.set_sensitive(false);
-                let _ = s.send(ContactSourcesInput::AddOffer(i));
-            });
-            row.add_suffix(&add);
-            self.offers_list.append(&row);
-        }
-        self.offers_group.set_visible(!self.offers.is_empty());
     }
 }
 

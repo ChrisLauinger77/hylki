@@ -1559,14 +1559,26 @@ fn build_search_index(pages: &gtk::Stack) -> Vec<SearchHit> {
         let page_title = i18n(page.title);
         let child = if page.accounts { None } else { pages.child_by_name(page.id) };
         // The category itself, for the account pages and anyone who types
-        // a page's name.
+        // a page's name, or what used to be a page of its own.
         let target = child.clone().unwrap_or_else(|| pages.clone().upcast());
-        out.push(search_hit(page.id, &page_title, "", &i18n("Settings"), &target));
+        out.push(search_hit(page.id, &page_title, &page_keywords(page.id), &i18n("Settings"), &target));
         if let Some(child) = child {
             index_widget(page.id, &child, &page_title, &mut out);
         }
     }
     out
+}
+
+/// Words a category is found by beyond its name: what is on it but out of
+/// the index, such as the Contacts page's own list of address books, which
+/// took in the CardDAV and LDAP pages (#408).
+fn page_keywords(id: &str) -> String {
+    match id {
+        // Translators: words the settings search finds the Contacts page by,
+        // separated by spaces; keep "CardDAV" and "LDAP".
+        "contacts" => i18n("address books CardDAV LDAP directory directories Online Accounts Nextcloud iCloud Google Microsoft vCard"),
+        _ => String::new(),
+    }
 }
 
 fn search_hit(page: &'static str, title: &str, subtitle: &str, place: &str, widget: &gtk::Widget) -> SearchHit {

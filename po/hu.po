@@ -4201,15 +4201,6 @@ msgid ""
 msgstr ""
 
 #, fuzzy
-msgid "From your mail accounts"
-msgstr "E-mail-fiók hozzáadása"
-
-msgid ""
-"These mail accounts keep contacts too, under the same sign-in. Adding them "
-"uses the password the mail account already has."
-msgstr ""
-
-#, fuzzy
 msgid "New Contacts"
 msgstr "Új névjegy"
 
@@ -4221,14 +4212,6 @@ msgid ""
 "The address book a contact made in Hylki goes to, unless another is picked "
 "when it is made."
 msgstr ""
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "Kulcs keresése ehhez: {addr}…"
-
-#, fuzzy
-msgid "Add Address Book"
-msgstr "Címjegyzék"
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
@@ -4247,6 +4230,10 @@ msgstr ""
 "A könyvtár eltávolításra kerül az Evolution Data Server-ről, így az "
 "Evolution és az azt használó egyéb alkalmazások sem látják többé. A "
 "kiszolgálón semmi sem változik."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Kulcs keresése ehhez: {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4288,6 +4275,10 @@ msgstr ""
 #, fuzzy
 msgid "Open Online Accounts"
 msgstr "Internetes Fiókok megnyitása…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Címjegyzék"
 
 #, fuzzy
 msgid "Added in GNOME Online Accounts"
@@ -4349,15 +4340,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Hylki megnyitása"
-
-msgid ""
-"{provider} contacts are synced through GNOME Online Accounts already, maybe "
-"for this account under another address."
-msgstr ""
-
-#, fuzzy
-msgid "Add Address Books"
-msgstr "Címjegyzék"
 
 #, fuzzy
 msgid "Address books"
@@ -5549,6 +5531,13 @@ msgstr "Keresési beállítások"
 
 msgid "No Results"
 msgstr "Nincs találat"
+
+#. Translators: words the settings search finds the Contacts page by,
+#. separated by spaces; keep "CardDAV" and "LDAP".
+msgid ""
+"address books CardDAV LDAP directory directories Online Accounts Nextcloud "
+"iCloud Google Microsoft vCard"
+msgstr ""
 
 msgid "Save the filter?"
 msgstr "Elmented a szűrőt?"
@@ -8183,6 +8172,14 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "From your mail accounts"
+#~ msgstr "E-mail-fiók hozzáadása"
+
+#, fuzzy
+#~ msgid "Add Address Books"
+#~ msgstr "Címjegyzék"
 
 #, fuzzy
 #~ msgid "CardDAV Accounts"

@@ -4135,15 +4135,6 @@ msgid ""
 "again."
 msgstr ""
 
-#, fuzzy
-msgid "From your mail accounts"
-msgstr "Προσθέστε τον λογαριασμό email σας"
-
-msgid ""
-"These mail accounts keep contacts too, under the same sign-in. Adding them "
-"uses the password the mail account already has."
-msgstr ""
-
 msgid "New Contacts"
 msgstr "Νέες επαφές"
 
@@ -4156,14 +4147,6 @@ msgid ""
 msgstr ""
 "Το βιβλίο διευθύνσεων όπου αποθηκεύεται μια επαφή που δημιουργείται στο "
 "Hylki, εκτός αν επιλεγεί άλλο κατά τη δημιουργία της."
-
-#, fuzzy
-msgid "Looking for address books on {name}…"
-msgstr "Αναζήτηση κλειδιού για {addr}…"
-
-#, fuzzy
-msgid "Add Address Book"
-msgstr "Όλα τα βιβλία διευθύνσεων"
 
 msgid ""
 "The directory is removed from Evolution Data Server, so Evolution and other "
@@ -4182,6 +4165,10 @@ msgstr ""
 "Ο κατάλογος αφαιρείται από τον Evolution Data Server, οπότε το Evolution και "
 "οι άλλες εφαρμογές που τον χρησιμοποιούν παύουν επίσης να τον βλέπουν. "
 "Τίποτα στον διακομιστή δεν αλλάζει."
+
+#, fuzzy
+msgid "Looking for address books on {name}…"
+msgstr "Αναζήτηση κλειδιού για {addr}…"
 
 #, fuzzy
 msgid "{name}: {problem}"
@@ -4223,6 +4210,10 @@ msgstr ""
 #, fuzzy
 msgid "Open Online Accounts"
 msgstr "Άνοιγμα Διαδικτυακών λογαριασμών…"
+
+#, fuzzy
+msgid "Add Address Book"
+msgstr "Όλα τα βιβλία διευθύνσεων"
 
 #, fuzzy
 msgid "Added in GNOME Online Accounts"
@@ -4291,15 +4282,6 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Άνοιγμα Hylki"
-
-msgid ""
-"{provider} contacts are synced through GNOME Online Accounts already, maybe "
-"for this account under another address."
-msgstr ""
-
-#, fuzzy
-msgid "Add Address Books"
-msgstr "Όλα τα βιβλία διευθύνσεων"
 
 #, fuzzy
 msgid "Address books"
@@ -5461,6 +5443,13 @@ msgstr "Αναζήτηση ρυθμίσεων"
 
 msgid "No Results"
 msgstr "Δεν βρέθηκαν αποτελέσματα"
+
+#. Translators: words the settings search finds the Contacts page by,
+#. separated by spaces; keep "CardDAV" and "LDAP".
+msgid ""
+"address books CardDAV LDAP directory directories Online Accounts Nextcloud "
+"iCloud Google Microsoft vCard"
+msgstr ""
 
 msgid "Save the filter?"
 msgstr "Αποθήκευση του φίλτρου;"
@@ -8113,6 +8102,14 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "From your mail accounts"
+#~ msgstr "Προσθέστε τον λογαριασμό email σας"
+
+#, fuzzy
+#~ msgid "Add Address Books"
+#~ msgstr "Όλα τα βιβλία διευθύνσεων"
 
 #, fuzzy
 #~ msgid "CardDAV Accounts"
