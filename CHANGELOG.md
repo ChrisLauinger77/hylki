@@ -38,14 +38,14 @@
   saved as Evolution lists. Evolution's lists in the Evolution Data Server
   books are shown, offered and editable too, their "Hide addresses" option
   being Send as Bcc. In a CardDAV book, iCloud's among them, a group is made
-  and changed in Apple's format, which names contacts of the same book;
-  someone added who is not in the book is added to it first, and its people
-  with no email address are listed too, mail going to the others. New Group
-  asks which book; Google and Microsoft 365 books keep no groups and are not
-  offered. vCard 4 groups are shown and offered but not edited. A `.vcf`
-  import keeps its lists as groups instead of skipping them. The Contacts
-  view lists groups apart from people, with a **Contacts** | **Groups**
-  switch above the search.
+  and changed in Apple's format, which names contacts of the same book; a
+  contact of another book added to it is copied to the book first, whole,
+  unless the book has them already, and its people with no email address are
+  listed too, mail going to the others. New Group asks which book; Google
+  and Microsoft 365 books keep no groups and are not offered. vCard 4 groups
+  are shown and offered but not edited. A `.vcf` import keeps its lists as
+  groups instead of skipping them. The Contacts view lists groups apart from
+  people, with a **Contacts** | **Groups** switch above the search.
 
 - **Changed: the Contacts search works as the message list's.** The search
   button in the list's header, Ctrl+F or / show the search field, and Esc

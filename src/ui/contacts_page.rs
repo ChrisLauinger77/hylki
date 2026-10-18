@@ -1022,7 +1022,7 @@ impl Component for ContactsPage {
                 let Some(format) = group.group else { return };
                 let mut members = group.members.clone();
                 for p in self.chosen() {
-                    if let Some(m) = member_for(group, &self.contacts[p]) {
+                    if let Some(m) = member_for(group, &self.contacts[p], true) {
                         if !members.iter().any(|x| x.same(&m)) {
                             members.push(m);
                         }
@@ -1200,7 +1200,7 @@ impl Component for ContactsPage {
 
             ContactsPageInput::AddToGroup { group, person } => {
                 let (Some(g), Some(p)) = (self.contacts.get(group), self.contacts.get(person)) else { return };
-                let Some(member) = member_for(g, p) else { return };
+                let Some(member) = member_for(g, p, true) else { return };
                 let mut members = g.members.clone();
                 members.push(member);
                 let edit = GroupEdit {
@@ -1869,7 +1869,7 @@ impl ContactsPage {
         // A person can go in a group they are not in, by name.
         if !group {
             let mut groups: Vec<(usize, &str)> = (0..self.contacts.len())
-                .filter(|&g| member_for(&self.contacts[g], c).is_some())
+                .filter(|&g| member_for(&self.contacts[g], c, false).is_some())
                 .map(|g| (g, self.contacts[g].name.as_str()))
                 .collect();
             groups.sort_by_key(|(_, name)| name.to_lowercase());
@@ -1910,7 +1910,7 @@ impl ContactsPage {
     fn bulk_choices(&self) -> BulkChoices {
         let chosen = self.chosen();
         let mut groups: Vec<(usize, String)> = (0..self.contacts.len())
-            .filter(|&g| chosen.iter().any(|&p| member_for(&self.contacts[g], &self.contacts[p]).is_some()))
+            .filter(|&g| chosen.iter().any(|&p| member_for(&self.contacts[g], &self.contacts[p], false).is_some()))
             .map(|g| (g, self.contacts[g].name.clone()))
             .collect();
         groups.sort_by_key(|(_, name)| name.to_lowercase());
@@ -2462,25 +2462,32 @@ fn render_group_card(detail: &gtk::Box, sender: &ComponentSender<ContactsPage>, 
 }
 
 /// `person` as a new member of `group`, when the group can take them and
-/// does not have them. An Apple group names its members by their card, so
-/// it can take someone of its own book with no address; anyone else needs
-/// one.
-fn member_for(group: &ContactDetails, person: &ContactDetails) -> Option<Member> {
+/// does not have them. An Apple group names its members by their card in
+/// its own book, so someone of another book is copied there, whole, when
+/// they join (unless the book has them by address already); an Evolution
+/// list holds addresses, so it takes only someone with one. The copy, with
+/// its photo, is made only `with_card`, for the save: a menu only asks.
+fn member_for(group: &ContactDetails, person: &ContactDetails, with_card: bool) -> Option<Member> {
     if !group.group_editable() || person.is_group() {
         return None;
     }
-    let own_card = group.group == Some(GroupFormat::Apple) && person.book_uid == group.book_uid;
+    let apple = group.group == Some(GroupFormat::Apple);
+    let own_card = apple && person.book_uid == group.book_uid && !person.eds_uid.is_empty();
     let member = Member {
         name: person.name.clone(),
         email: person.primary_email().unwrap_or_default().to_string(),
         uid: if own_card { person.eds_uid.clone() } else { String::new() },
+        card: if apple && !own_card && with_card { crate::contacts::moved_vcard(person) } else { String::new() },
         ..Member::default()
     };
-    if member.email.is_empty() && member.uid.is_empty() {
+    if member.email.is_empty() && member.uid.is_empty() && !(apple && !own_card) {
         return None;
     }
     let present = group.members.iter().any(|m| m.same(&member))
-        || person.emails.iter().any(|e| group.members.iter().any(|m| m.email.eq_ignore_ascii_case(&e.value)));
+        || person.emails.iter().any(|e| group.members.iter().any(|m| m.email.eq_ignore_ascii_case(&e.value)))
+        || (member.email.is_empty()
+            && !own_card
+            && group.members.iter().any(|m| m.email.is_empty() && m.name.eq_ignore_ascii_case(&member.name)));
     (!present).then_some(member)
 }
 

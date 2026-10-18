@@ -601,13 +601,17 @@ A group in the Hylki book or on this computer is saved as an Evolution list,
 so **Export as a vCard file** carries it to Evolution, and back. A group in
 a CardDAV book is saved as Apple Contacts and iCloud save theirs, which
 the Apple apps, Fastmail and DAVx⁵ read as groups too. Such a group holds
-contacts of its own book, so someone added to it who is not in that book is
-added to the book as a contact with their name and address. The groups
-made by Apple Contacts and iCloud can be changed in Hylki the same way. Such a
-group can hold people with no email address, known by a phone number for
-example: they are listed in it as having none, and mail to the group goes to
-the others. **Add to Group** puts someone with no address only in a group of
-their own book.
+contacts of its own book. A contact of another book put in it with **Add
+to Group** is copied to the group's book first, whole: phone numbers,
+photo and all, and the original stays where it was. Someone the book
+already has, by address (or, with no address, by name), is not copied
+again. Someone added in the group's form by typing an address is added to
+the book as a contact with their name and address. The groups made by Apple
+Contacts and iCloud can be changed in Hylki the same way. Such a group can
+hold people with no email address, known by a phone number for example:
+they are listed in it as having none, and mail to the group goes to the
+others. An Evolution list holds addresses, so a contact with none cannot
+join one.
 Send as Bcc is kept in the group, where other apps pass it over. A vCard 4
 group (`KIND:group`) is shown and offered with the people it names in the
 same book, but is changed in the app it came from. Groups are not counted as contacts in **Settings →

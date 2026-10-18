@@ -1536,6 +1536,10 @@ pub struct Member {
     /// The UID of the member's own card in the group's book, for an Apple
     /// group, which names its members by it. Empty when not known yet.
     pub(crate) uid: String,
+    /// The card of a contact of another book, copied into an Apple group's
+    /// book when they join it ([`moved_vcard`]); empty for someone added by
+    /// address, who gets a card with their name and address.
+    pub(crate) card: String,
 }
 
 impl Member {
@@ -1959,7 +1963,7 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
                 if lower.starts_with("mailto:") {
                     let email = value[7..].trim().to_string();
                     if email.contains('@') && !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                        c.members.push(Member { name: String::new(), email, line: line.to_string(), uid: String::new() });
+                        c.members.push(Member { email, line: line.to_string(), ..Member::default() });
                     }
                 } else {
                     let uid = if lower.starts_with("urn:uuid:") { &value[9..] } else { value.as_str() };
@@ -2018,7 +2022,7 @@ pub(crate) fn parse_vcard_fields(vcard: &str) -> Option<ContactDetails> {
             for (line, params, value) in email_lines {
                 let Some((name, email)) = evolution_member(&params, &value) else { continue };
                 if !c.members.iter().any(|m| m.email.eq_ignore_ascii_case(&email)) {
-                    c.members.push(Member { name, email, line, uid: String::new() });
+                    c.members.push(Member { name, email, line, ..Member::default() });
                 }
             }
         } else {
@@ -2068,7 +2072,7 @@ pub(crate) fn resolve_members(c: &mut ContactDetails, lookup: impl Fn(&str) -> O
         });
         match found {
             Some((name, email)) if !c.members.iter().any(|m| m.uid == uid) => {
-                c.members.push(Member { name, email, line, uid });
+                c.members.push(Member { name, email, line, uid, ..Member::default() });
             }
             _ => c.hidden_members.push(line),
         }
@@ -2456,11 +2460,12 @@ pub fn save_group(book_uid: &str, format: GroupFormat, original: Option<&str>, m
     let vcard = match format {
         GroupFormat::Evolution => patched_group_vcard(original, &edit),
         GroupFormat::Apple => {
-            let cardless = |m: &Member| m.uid.is_empty() && m.line.is_empty() && !m.email.is_empty();
+            let cardless =
+                |m: &Member| m.uid.is_empty() && m.line.is_empty() && (!m.email.is_empty() || !m.card.is_empty());
             if edit.members.iter().any(cardless) {
                 let mut cards = BookCards::open(book_uid)?;
                 for m in edit.members.iter_mut().filter(|m| cardless(m)) {
-                    m.uid = cards.card_for(&m.name, &m.email)?;
+                    m.uid = cards.card_for(&m.name, &m.email, &m.card)?;
                 }
             }
             patched_apple_group(original, &edit)
@@ -2491,32 +2496,48 @@ impl BookCards {
         Ok(Self::Eds { conn, bus, path })
     }
 
-    /// The UID of the person in the book with `email`, after making them
-    /// a card when there is none.
-    fn card_for(&mut self, name: &str, email: &str) -> Result<String, String> {
-        let card = new_vcard(&ContactEdit {
-            name: if name.trim().is_empty() { email.to_string() } else { name.trim().to_string() },
-            emails: vec![Labeled { label: String::new(), value: email.to_string() }],
-            ..ContactEdit::default()
-        });
+    /// The UID of the person in the book with `email` (or, with none, of
+    /// that name), after making them a card when there is none: `copy`, the
+    /// card of another book, else one with their name and address.
+    fn card_for(&mut self, name: &str, email: &str, copy: &str) -> Result<String, String> {
+        let card = if copy.is_empty() {
+            new_vcard(&ContactEdit {
+                name: if name.trim().is_empty() { email.to_string() } else { name.trim().to_string() },
+                emails: vec![Labeled { label: String::new(), value: email.to_string() }],
+                ..ContactEdit::default()
+            })
+        } else {
+            copy.to_string()
+        };
+        // Someone with no address is known by name alone.
+        let (field, value) = if email.trim().is_empty() { ("full_name", name.trim()) } else { ("email", email.trim()) };
         match self {
             Self::Local => {
                 let found = crate::local_contacts::list_vcards()?.into_iter().find_map(|v| {
                     let c = parse_vcard_fields(&v).filter(|c| !c.is_group())?;
-                    c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(email)).then_some(c.eds_uid)
+                    let same = if field == "email" {
+                        c.emails.iter().any(|e| e.value.eq_ignore_ascii_case(value))
+                    } else {
+                        c.emails.is_empty() && c.name.trim().eq_ignore_ascii_case(value)
+                    };
+                    same.then_some(c.eds_uid)
                 });
                 if let Some(uid) = found.filter(|u| !u.is_empty()) {
                     return Ok(uid);
                 }
                 let uid = format!("hylki-{}", crate::rng::token(24).map_err(|e| e.to_string())?);
-                let card = card.replacen("VERSION:3.0\r\n", &format!("VERSION:3.0\r\nUID:{uid}\r\n"), 1);
+                let card = insert_after_version(&card, &format!("UID:{uid}"));
                 write_local(crate::local_contacts::create(&card))?;
                 Ok(uid)
             }
             Self::Eds { conn, bus, path } => {
-                let query = format!("(is \"email\" \"{}\")", sexpr_escape(email.trim()));
+                let query = format!("(is \"{field}\" \"{}\")", sexpr_escape(value));
                 for uid in book_get_uids(conn, bus, path, &query)? {
-                    if !is_group_vcard(&book_get_contact(conn, bus, path, &uid)?) {
+                    let found = book_get_contact(conn, bus, path, &uid)?;
+                    // By name, only someone else with no address either.
+                    let fits = parse_vcard_fields(&found)
+                        .is_some_and(|c| !c.is_group() && (field == "email" || c.emails.is_empty()));
+                    if fits {
                         return Ok(uid);
                     }
                 }
@@ -2526,6 +2547,23 @@ impl BookCards {
             }
         }
     }
+}
+
+/// `line` put after a card's VERSION line (first, when it has none).
+fn insert_after_version(card: &str, line: &str) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut put = false;
+    for l in card.split("\r\n").flat_map(|l| l.split('\n')) {
+        out.push(l.to_string());
+        if !put && l.to_ascii_uppercase().starts_with("VERSION:") {
+            out.push(line.to_string());
+            put = true;
+        }
+    }
+    if !put {
+        out.insert(1.min(out.len()), line.to_string());
+    }
+    out.join("\r\n")
 }
 
 /// Tell the photo index and the UI about a finished local write.
@@ -3191,5 +3229,70 @@ mod tests {
         println!("=== in the second book:\n{there}");
         assert!(super::parse_vcard_details(&there).unwrap().photo.is_some());
         super::delete_contact(to, &new_uid).unwrap();
+    }
+
+    /// MOVE_LIVE=1: a contact with only a phone number, in one book, joins
+    /// a new Apple group in another: copied there whole, then named in it.
+    #[test]
+    #[ignore]
+    fn live_copy_into_group() {
+        if std::env::var_os("MOVE_LIVE").is_none() {
+            return;
+        }
+        let books: Vec<String> = super::writable_books()
+            .into_iter()
+            .filter(|b| b.groups == Some(super::GroupFormat::Apple))
+            .map(|b| b.uid)
+            .collect();
+        let (from, to) = (&books[0], &books[1]);
+        let card = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Hylki Phone Only\r\nN:Only;Hylki Phone;;;\r\n\
+                    TEL;TYPE=CELL:+1 555 0199\r\nNOTE:copied whole\r\nEND:VCARD\r\n";
+        let dest = super::factory_dest().unwrap();
+        let conn = zbus::blocking::Connection::session().unwrap();
+        let find = |book: &str, q: &str| {
+            let (bus, path) = super::open_book(&conn, &dest, book).unwrap();
+            super::book_get_uids(&conn, &bus, &path, q)
+                .unwrap()
+                .into_iter()
+                .map(|u| (u.clone(), super::book_get_contact(&conn, &bus, &path, &u).unwrap()))
+                .collect::<Vec<_>>()
+        };
+        let by_name = "(is \"full_name\" \"Hylki Phone Only\")";
+        // What an earlier run left.
+        for book in [from, to] {
+            for q in [by_name, "(beginswith \"full_name\" \"Hylki copy test\")"] {
+                for (uid, _) in find(book, q) {
+                    super::delete_contact(book, &uid).unwrap();
+                }
+            }
+        }
+        super::create_contact(from, card).unwrap();
+        let (src_uid, stored) = find(from, by_name).pop().expect("made");
+        let mut c = super::parse_vcard_details(&stored).unwrap();
+        c.raw_vcard = stored;
+        let member = super::Member { name: c.name.clone(), card: super::moved_vcard(&c), ..Default::default() };
+        let edit = super::GroupEdit { name: "Hylki copy test".into(), members: vec![member], ..Default::default() };
+        super::save_group(to, super::GroupFormat::Apple, None, edit.clone()).unwrap();
+        let (copy_uid, copy) = find(to, by_name).pop().expect("copied to the group's book");
+        println!("=== the copy:\n{copy}");
+        assert!(copy.contains("+1 555 0199") && copy.contains("copied whole"));
+        let (group_uid, group) = find(to, "(is \"full_name\" \"Hylki copy test\")").pop().expect("the group");
+        let refs = super::parse_vcard_fields(&group).unwrap().member_refs;
+        assert_eq!(refs.iter().map(|(u, _)| u.as_str()).collect::<Vec<_>>(), vec![copy_uid.as_str()], "{group}");
+        // Joining another group finds the copy, by name, and makes none.
+        super::save_group(to, super::GroupFormat::Apple, None, super::GroupEdit { name: "Hylki copy test 2".into(), ..edit }).unwrap();
+        assert_eq!(find(to, by_name).len(), 1);
+        let (group2, _) = find(to, "(is \"full_name\" \"Hylki copy test 2\")").pop().unwrap();
+        for (book, uid) in [(to, &group_uid), (to, &group2), (to, &copy_uid), (from, &src_uid)] {
+            super::delete_contact(book, uid).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_line_goes_after_the_version() {
+        assert_eq!(
+            super::insert_after_version("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:A\r\nEND:VCARD\r\n", "UID:x"),
+            "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:x\r\nFN:A\r\nEND:VCARD\r\n"
+        );
     }
 }
