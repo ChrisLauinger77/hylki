@@ -127,11 +127,14 @@ pub fn show_context_menu_popover(
     popover.add_css_class("menu");
 
     // Pages: the menu itself, and one per submenu, slid between. Each page
-    // keeps its own size, so the popover fits whichever is showing.
+    // keeps its own height, so the popover fits whichever is showing, but
+    // all take the widest one's width, as GTK's own menus do: a popover
+    // that grew wider as a submenu slid in was closed by the compositor,
+    // so a submenu of long names (address books) never opened.
     let stack = gtk::Stack::new();
     stack.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
     stack.set_transition_duration(150);
-    stack.set_hhomogeneous(false);
+    stack.set_hhomogeneous(true);
     stack.set_vhomogeneous(false);
     stack.set_interpolate_size(true);
 
@@ -222,6 +225,9 @@ fn popup_after_release(popover: &gtk::Popover, parent: &gtk::Widget) {
     });
     root.upcast_ref::<gtk::Widget>().add_controller(watch);
 }
+
+/// The most of an entry's label a menu shows before cutting it short.
+const MAX_LABEL_CHARS: i32 = 40;
 
 /// Room left between a menu and the window's edges.
 const MENU_MARGIN: i32 = 12;
@@ -337,13 +343,21 @@ fn build_page(
                 img.set_pixel_size(16);
                 row.append(&img);
             }
+            // A long name (an address book's account) is cut short, so
+            // one entry does not make every page of the menu wide; the
+            // whole of it shows on hover.
             let lbl = gtk::Label::new(Some(&label));
             lbl.set_xalign(0.0);
             lbl.set_hexpand(true);
+            lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            lbl.set_max_width_chars(MAX_LABEL_CHARS);
             row.append(&lbl);
 
             let btn = gtk::Button::new();
             btn.set_child(Some(&row));
+            if label.chars().count() > MAX_LABEL_CHARS as usize {
+                btn.set_tooltip_text(Some(&label));
+            }
             btn.add_css_class("flat");
             btn.add_css_class("context-menu-item");
             btn.set_halign(gtk::Align::Fill);
