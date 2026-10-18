@@ -275,6 +275,11 @@ msgstr ""
 msgid "No address book available"
 msgstr ""
 
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] ""
@@ -3560,9 +3565,6 @@ msgstr ""
 msgid "Edit contact"
 msgstr ""
 
-msgid "Groups"
-msgstr ""
-
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] ""
@@ -3629,6 +3631,9 @@ msgstr ""
 msgid "Delete Contact?"
 msgstr ""
 
+msgid "Directories"
+msgstr ""
+
 msgid "Move Contact?"
 msgstr ""
 
@@ -3656,12 +3661,6 @@ msgstr[1] ""
 msgid "Move"
 msgstr ""
 
-msgid "Search groups"
-msgstr ""
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
 msgid "In Directories"
 msgstr ""
 
@@ -3669,6 +3668,9 @@ msgid "Type three letters or more to search the directory."
 msgstr ""
 
 msgid "Nobody in the directory matches."
+msgstr ""
+
+msgid "Remove from Group"
 msgstr ""
 
 msgid "Add to Group"
@@ -3810,9 +3812,6 @@ msgid "First name"
 msgstr ""
 
 msgid "Last name"
-msgstr ""
-
-msgid "Address books"
 msgstr ""
 
 msgid "Import Contacts"
@@ -4045,6 +4044,9 @@ msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
 msgstr ""
 
 msgid "Use in Hylki"
+msgstr ""
+
+msgid "Address books"
 msgstr ""
 
 msgid "Switch off an address book to leave it out of Hylki."
@@ -6656,6 +6658,12 @@ msgid "Insert Link"
 msgstr ""
 
 msgid "Insert"
+msgstr ""
+
+msgid "All Contacts"
+msgstr ""
+
+msgid "Delete Group…"
 msgstr ""
 
 msgid "Favorites"

@@ -2331,6 +2331,8 @@ fn demo_group(name: &str, hide_addresses: bool, people: &[(&str, &str)]) -> Cont
         members,
         hide_addresses,
         raw_vcard: new_group_vcard(&edit),
+        // A group is told apart by its UID, as a real one is.
+        eds_uid: format!("demo-{name}"),
         ..ContactDetails::default()
     }
 }

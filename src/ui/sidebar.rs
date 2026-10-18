@@ -365,6 +365,16 @@ pub struct Sidebar {
     /// The pinned footer's single list box (Contacts + Attachments rows) and
     /// the rows themselves, for selection management.
     footer_list: Option<gtk::ListBox>,
+    /// Contacts is open: the address books and groups are listed in place
+    /// of the accounts, and the footer leads back to mail.
+    contacts_mode: bool,
+    contact_tree: Option<crate::ui::contacts_page::ContactTree>,
+    /// The tree's rows, by the scope each picks.
+    tree_rows: Vec<(crate::ui::contacts_page::ContactScope, gtk::ListBoxRow)>,
+    /// What mail showed before Contacts opened, which the Mail row opens.
+    before_contacts: Sel,
+    /// The footer's Mail row, shown while Contacts is open.
+    mail_row: Option<gtk::ListBoxRow>,
     attachments_row: Option<gtk::ListBoxRow>,
     contacts_row: Option<gtk::ListBoxRow>,
     /// Refresh/spinner stack + spinner beside the "New Message" button.
@@ -548,6 +558,22 @@ pub enum SidebarInput {
     AttachmentsRowSelected,
     /// The "Contacts" row was clicked (it acts as a launcher, not a selection).
     ContactsRowClicked,
+    /// Contacts opened or closed: the sidebar lists its books, or mail.
+    SetContactsMode(bool),
+    /// The address books and groups to list while Contacts is open.
+    SetContactTree(crate::ui::contacts_page::ContactTree),
+    /// A book or group (or every contact) was picked in that list.
+    ContactTreeSelected(crate::ui::contacts_page::ContactScope),
+    /// Contacts were dropped on a book or group there.
+    ContactTreeDrop {
+        keys: Vec<(String, String)>,
+        on: crate::ui::contacts_page::DropOn,
+        moving: bool,
+    },
+    /// A right-click choice on a book or group there.
+    ContactTreeMenu(crate::ui::contacts_page::TreeAction),
+    /// The footer's Mail row: back to what mail showed.
+    MailRowClicked,
     FolderRowSelected { account_id: u32, index: i32 },
     /// Select a folder row programmatically — the app navigated there itself
     /// ("Go to Message" from the gallery, a notification click) and the
@@ -662,6 +688,16 @@ pub enum SidebarOutput {
     StatusBarRequested,
     /// Right-click on the Contacts row: open the GNOME Contacts app.
     OpenGnomeContacts,
+    /// What the contact list shows, picked in the sidebar.
+    ContactScope(crate::ui::contacts_page::ContactScope),
+    /// Contacts dropped on a book or group in the sidebar.
+    ContactDrop {
+        keys: Vec<(String, String)>,
+        on: crate::ui::contacts_page::DropOn,
+        moving: bool,
+    },
+    /// A right-click choice on a book or group in the sidebar.
+    ContactTreeAction(crate::ui::contacts_page::TreeAction),
     /// A folder-tree node was collapsed or expanded (#51) — for persistence.
     FolderNodeCollapsed { account_id: u32, path: String, collapsed: bool },
     /// A folder was dropped onto a new parent ("" = the account's top level).
@@ -795,9 +831,21 @@ impl Component for Sidebar {
                         // split view's min/max sidebar widths govern instead.
                         set_hscrollbar_policy: gtk::PolicyType::External,
 
-                        #[name = "normal_box"]
                         gtk::Box {
                             set_orientation: gtk::Orientation::Vertical,
+
+                            #[name = "normal_box"]
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                            },
+
+                            // While Contacts is open: its address books
+                            // and groups, in place of the accounts.
+                            #[name = "contacts_box"]
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_visible: false,
+                            },
                         },
                     },
 
@@ -859,6 +907,11 @@ impl Component for Sidebar {
             custom_chevrons: HashMap::new(),
             unified_list: None,
             footer_list: None,
+            contacts_mode: false,
+            contact_tree: None,
+            tree_rows: Vec::new(),
+            before_contacts: Sel::None,
+            mail_row: None,
             attachments_row: None,
             contacts_row: None,
             sync_stack: None,
@@ -989,6 +1042,9 @@ impl Sidebar {
             }
 
             SidebarInput::MirrorSelection(sel) => {
+                if sel == Sel::Contacts {
+                    self.remember_mail_view();
+                }
                 if self.selected != sel {
                     self.selected = sel.clone();
                     self.quiet.set(true);
@@ -1208,9 +1264,62 @@ impl Sidebar {
                 if self.selected == Sel::Contacts {
                     return;
                 }
+                self.remember_mail_view();
                 self.selected = Sel::Contacts;
                 self.clear_other_selections(Sel::Contacts);
                 let _ = sender.output(SidebarOutput::ContactsClicked);
+            }
+
+            SidebarInput::SetContactsMode(on) => {
+                if self.contacts_mode == on {
+                    return;
+                }
+                self.contacts_mode = on;
+                widgets.pinned_box.set_visible(!on);
+                widgets.normal_box.set_visible(!on);
+                widgets.contacts_box.set_visible(on);
+                // The footer gains, or loses, its Mail row.
+                self.rebuild_normal(&widgets.pinned_box, &widgets.normal_box, &widgets.footer_box, &sender);
+                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
+                self.restore_selection();
+            }
+
+            SidebarInput::SetContactTree(tree) => {
+                if self.contact_tree.as_ref() == Some(&tree) {
+                    return;
+                }
+                self.contact_tree = Some(tree);
+                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
+            }
+
+            SidebarInput::ContactTreeSelected(scope) => {
+                if self.contact_tree.as_ref().is_some_and(|t| t.scope == scope) {
+                    return;
+                }
+                if let Some(tree) = &mut self.contact_tree {
+                    tree.scope = scope.clone();
+                }
+                let _ = sender.output(SidebarOutput::ContactScope(scope));
+            }
+
+            SidebarInput::ContactTreeDrop { keys, on, moving } => {
+                let _ = sender.output(SidebarOutput::ContactDrop { keys, on, moving });
+            }
+
+            SidebarInput::ContactTreeMenu(action) => {
+                let _ = sender.output(SidebarOutput::ContactTreeAction(action));
+            }
+
+            SidebarInput::MailRowClicked => {
+                // The view mail had, picked again: its row announces it.
+                // With none, the usual first view.
+                match self.before_contacts.clone() {
+                    Sel::None => {
+                        self.selected = Sel::None;
+                        self.restore_selection();
+                    }
+                    sel => self.select_sel(sel),
+                }
             }
 
             SidebarInput::OutboxRowSelected => {
@@ -1760,6 +1869,7 @@ impl Sidebar {
                         &widgets.footer_box,
                         &sender,
                     );
+                    self.rebuild_contact_tree(&widgets.contacts_box, &sender);
                     self.restore_selection();
                 }
             }
@@ -1774,6 +1884,7 @@ impl Sidebar {
                     &widgets.footer_box,
                     &sender,
                 );
+                self.rebuild_contact_tree(&widgets.contacts_box, &sender);
                 self.restore_selection();
                 let _ = sender.output(SidebarOutput::CollapsedChanged(self.collapsed));
             }
@@ -2353,6 +2464,36 @@ impl Sidebar {
             list.set_selection_mode(gtk::SelectionMode::Single);
             list.add_css_class("navigation-sidebar");
 
+            // "Mail" row — while Contacts is open, the way back to mail,
+            // where its folders were.
+            self.mail_row = None;
+            if self.contacts_mode {
+                let row = gtk::ListBoxRow::new();
+                let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+                hbox.add_css_class("folder-row");
+                let img = gtk::Image::from_icon_name("mail-unread-symbolic");
+                img.add_css_class("folder-icon");
+                pin_icon_size(&img);
+                if self.collapsed {
+                    hbox.set_halign(gtk::Align::Center);
+                    row.set_tooltip_text(Some(i18n("Mail").as_str()));
+                    hbox.append(&img);
+                } else {
+                    if self.chevrons_left {
+                        img.set_margin_start(ROW_LEFT_INSET);
+                    }
+                    hbox.append(&img);
+                    let label = gtk::Label::new(Some(i18n("Mail").as_str()));
+                    label.set_hexpand(true);
+                    label.set_halign(gtk::Align::Start);
+                    label.add_css_class("account-name");
+                    hbox.append(&label);
+                }
+                row.set_child(Some(&hbox));
+                list.append(&row);
+                self.mail_row = Some(row);
+            }
+
             // "Contacts" row — shows the in-app contacts view. Right-click
             // offers a jump straight to the GNOME Contacts app.
             if self.show_contacts {
@@ -2433,13 +2574,16 @@ impl Sidebar {
             let s = sender.clone();
             let contacts_row = self.contacts_row.clone();
             let attachments_row = self.attachments_row.clone();
+            let mail_row = self.mail_row.clone();
             let quiet = self.quiet.clone();
             list.connect_row_selected(move |_, row| {
                 if quiet.get() {
                     return;
                 }
                 let Some(row) = row else { return };
-                if Some(row) == contacts_row.as_ref() {
+                if Some(row) == mail_row.as_ref() {
+                    s.input(SidebarInput::MailRowClicked);
+                } else if Some(row) == contacts_row.as_ref() {
                     s.input(SidebarInput::ContactsRowClicked);
                 } else if Some(row) == attachments_row.as_ref() {
                     s.input(SidebarInput::AttachmentsRowSelected);
@@ -4392,6 +4536,31 @@ impl Sidebar {
 
     /// Deselect every list except the one owning `keep` (whose own list keeps its
     /// selection). Used when a selection moves between sections.
+    /// Keep the mail view on screen as Contacts opens, for the Mail row.
+    fn remember_mail_view(&mut self) {
+        if !matches!(self.selected, Sel::Contacts | Sel::Attachments) {
+            self.before_contacts = self.selected.clone();
+        }
+    }
+
+    /// List the address books and groups, the scope shown picked.
+    fn rebuild_contact_tree(&mut self, container: &gtk::Box, sender: &ComponentSender<Self>) {
+        while let Some(child) = container.first_child() {
+            container.remove(&child);
+        }
+        self.tree_rows.clear();
+        let Some(tree) = self.contact_tree.as_ref().filter(|_| self.contacts_mode) else { return };
+        let (list, rows) = crate::ui::contact_tree::build(tree, self.collapsed, sender.input_sender());
+        // Picked quietly: the list already shows it.
+        if let Some((_, row)) = rows.iter().find(|(scope, _)| *scope == tree.scope) {
+            self.quiet.set(true);
+            list.select_row(Some(row));
+            self.quiet.set(false);
+        }
+        container.append(&list);
+        self.tree_rows = rows;
+    }
+
     fn clear_other_selections(&self, keep: Sel) {
         if keep != Sel::Unified {
             if let Some(l) = &self.unified_list {
@@ -5762,7 +5931,7 @@ fn build_unified_sub_row(
 /// `set_size_request` — `Align::Center` then centres that slightly-off box
 /// exactly as asked, reading as the icon column drifting right of the
 /// avatar column (PR #95).
-fn pin_icon_size(icon: &gtk::Image) {
+pub(crate) fn pin_icon_size(icon: &gtk::Image) {
     icon.set_pixel_size(16);
     icon.set_halign(gtk::Align::Center);
     icon.set_valign(gtk::Align::Center);

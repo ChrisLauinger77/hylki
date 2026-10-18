@@ -24,12 +24,71 @@ const DIRECTORY: usize = usize::MAX / 2;
 /// At most this many directory entries are listed for one search.
 const DIRECTORY_LIMIT: usize = 50;
 
-/// Which side of the list shows: the people, or the groups.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContactsView {
-    People,
-    Groups,
+/// What the list shows, picked in the sidebar: every contact, one address
+/// book's, or one group's people (the group first).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum ContactScope {
+    #[default]
+    All,
+    Book(String),
+    Group { book: String, uid: String },
 }
+
+/// The address books and their groups, as the sidebar lists them while
+/// Contacts is open.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ContactTree {
+    /// Every contact, groups left out.
+    pub total: usize,
+    pub books: Vec<TreeBook>,
+    pub scope: ContactScope,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeBook {
+    pub uid: String,
+    /// The account the book is in ("CardDAV — a@b.org"); empty for a book
+    /// that is an account of its own (the Hylki book).
+    pub account: String,
+    pub name: String,
+    pub count: usize,
+    /// Hylki can write to it, so contacts can be copied or moved in.
+    pub writable: bool,
+    pub takes_groups: bool,
+    /// An LDAP directory, searched rather than listed.
+    pub directory: bool,
+    pub groups: Vec<TreeGroup>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeGroup {
+    pub book: String,
+    pub uid: String,
+    pub name: String,
+    pub count: usize,
+    pub editable: bool,
+}
+
+/// Where contacts dragged to the sidebar land.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DropOn {
+    Book(String),
+    Group { book: String, uid: String },
+}
+
+/// What a right-click on the sidebar's book or group asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TreeAction {
+    NewContact(String),
+    NewGroup(String),
+    EditGroup { book: String, uid: String },
+    DeleteGroup { book: String, uid: String },
+    ComposeGroup { book: String, uid: String },
+}
+
+/// The start of what a contact row carries when dragged, before a line of
+/// book and UID per contact.
+pub const DRAG_MARK: &str = "hylki-contacts";
 
 /// The "Show only" filters of the sort and filter button, as the message
 /// list has for mail. They narrow the people; groups are not filtered.
@@ -137,8 +196,13 @@ pub struct ContactsPage {
     contacts: Vec<ContactDetails>,
     query: String,
     sort: ContactSort,
-    /// People or groups: the switch above the list.
-    view: ContactsView,
+    /// What the list shows, picked in the sidebar.
+    scope: ContactScope,
+    /// The tree last handed to the sidebar, so an unchanged one is not.
+    tree: Option<ContactTree>,
+    /// What a row being dragged carries: each contact's book and UID, by
+    /// index, and the indexes selected together.
+    drag: Rc<RefCell<DragKeys>>,
     /// The "Show only" filters on, by [`ContactFilter::bit`].
     filters: u8,
     /// The sort and filter button's popover, kept in step with `sort`,
@@ -186,10 +250,7 @@ pub struct ContactsPage {
     /// The books new contacts can go to, the chosen default first; the
     /// Hylki book is always among them.
     books: Vec<crate::contacts::Book>,
-    /// The books unticked in the filter popover, whose entries are not
-    /// listed. A book seen for the first time is listed.
-    hidden_books: std::collections::HashSet<String>,
-    /// The books the filter popover offers: (book UID, name).
+    /// The books the sidebar lists: (book UID, name).
     filter_books: Vec<(String, String)>,
     /// The people the LDAP directories hold for the search (#307), listed
     /// after the contacts under their own heading. Read-only: they can be
@@ -225,8 +286,15 @@ pub enum ContactsPageInput {
     SetLoading,
     Query(String),
     SetSort(ContactSort),
-    /// The switch above the list moved to people or groups.
-    SetView(ContactsView),
+    /// The sidebar picked what the list shows.
+    SetScope(ContactScope),
+    /// Contacts, by book and UID, dropped on a book or group in the
+    /// sidebar: copied there, or moved (Ctrl held) after a question.
+    DropContacts { keys: Vec<(String, String)>, on: DropOn, moving: bool },
+    /// A right-click choice on the sidebar's book or group.
+    Tree(TreeAction),
+    /// Take these people (indexes into `contacts`) out of the group shown.
+    RemoveFromGroup(Vec<usize>),
     /// A "Show only" filter turned on or off.
     SetFilter(ContactFilter, bool),
     ClearFilters,
@@ -287,8 +355,6 @@ pub enum ContactsPageInput {
     OpenPhoto { name: String, data: Vec<u8> },
     /// The books new contacts can go to, freshly read, default first.
     SetBooks(Vec<crate::contacts::Book>),
-    /// A book ticked or unticked in the filter popover.
-    ShowBook { uid: String, on: bool },
     /// The LDAP directories switched on, as (UID, name).
     DirectoriesKnown(Vec<(String, String)>),
     /// The search paused: ask the directories, unless it changed since.
@@ -300,8 +366,8 @@ pub enum ContactsPageInput {
     SetSearch(String),
     /// The composer's suggestions, freshly read for a group form.
     SuggestionsLoaded(Vec<crate::contacts::Suggestion>),
-    /// Show only the book at this place in the filter popover (1 is the
-    /// first), or every book (0).
+    /// Show the book at this place in the sidebar (1 is the first), or
+    /// every book (0).
     PickBook(u32),
     /// More list photos are decoded and cached.
     PhotosDecoded,
@@ -332,6 +398,10 @@ pub enum ContactsPageOutput {
     /// Move these people to the book `to`: (book, UID, the card for the
     /// new book), confirmed.
     MoveContacts { to: String, cards: Vec<(String, String, String)> },
+    /// Copy these cards (made for the book) into the book `to`.
+    CopyContacts { to: String, cards: Vec<String> },
+    /// The books and groups changed: the sidebar lists them anew.
+    Tree(ContactTree),
     /// `.vcf` files chosen for import into the local Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// Show the contact's photo in the app lightbox.
@@ -532,16 +602,6 @@ impl Component for ContactsPage {
                             },
                         },
 
-                        // People and groups, each a list of its own. The
-                        // toggles are added in `init`.
-                        #[name = "view_switch"]
-                        adw::ToggleGroup {
-                            set_homogeneous: true,
-                            set_margin_bottom: 6,
-                            set_margin_start: 10,
-                            set_margin_end: 10,
-                        },
-
                         gtk::ScrolledWindow {
                             set_vexpand: true,
                             set_hscrollbar_policy: gtk::PolicyType::Never,
@@ -618,7 +678,9 @@ impl Component for ContactsPage {
             contacts: Vec::new(),
             query: String::new(),
             sort: ContactSort::FirstName,
-            view: ContactsView::People,
+            scope: ContactScope::All,
+            tree: None,
+            drag: Rc::new(RefCell::new(DragKeys::default())),
             filters: 0,
             filter_menu: None,
             search_open: false,
@@ -636,7 +698,6 @@ impl Component for ContactsPage {
             editing_target: None,
             deleted: std::collections::HashSet::new(),
             books: Vec::new(),
-            hidden_books: std::collections::HashSet::new(),
             filter_books: Vec::new(),
             directory_hits: Vec::new(),
             directory_generation: 0,
@@ -667,21 +728,6 @@ impl Component for ContactsPage {
 
         model.filter_menu = Some(FilterMenu::new(&widgets.filter_btn, sender.input_sender()));
 
-        for (name, label) in [("people", i18n("Contacts")), ("groups", i18n("Groups"))] {
-            widgets.view_switch.add(adw::Toggle::builder().name(name).label(label.as_str()).build());
-        }
-        widgets.view_switch.set_active_name(Some("people"));
-        {
-            let s = sender.input_sender().clone();
-            widgets.view_switch.connect_active_name_notify(move |group| {
-                let view = match group.active_name().as_deref() {
-                    Some("groups") => ContactsView::Groups,
-                    _ => ContactsView::People,
-                };
-                let _ = s.send(ContactsPageInput::SetView(view));
-            });
-        }
-
         model.selection.set_model(Some(&model.store));
         {
             let s = sender.input_sender().clone();
@@ -690,7 +736,7 @@ impl Component for ContactsPage {
             });
         }
         widgets.list.set_model(Some(&model.selection));
-        widgets.list.set_factory(Some(&row_factory(&model.rows, sender.input_sender())));
+        widgets.list.set_factory(Some(&row_factory(&model.rows, sender.input_sender(), &model.drag)));
 
         ComponentParts { model, widgets }
     }
@@ -856,9 +902,8 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::ClearFilters => {
-                if self.filters != 0 || !self.hidden_books.is_empty() {
+                if self.filters != 0 {
                     self.filters = 0;
-                    self.hidden_books.clear();
                     self.sync_filter_menu();
                     self.rebuild(widgets, &sender);
                 }
@@ -869,25 +914,11 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::PickBook(n) => {
-                let only = (n as usize).checked_sub(1).and_then(|i| self.filter_books.get(i)).map(|(uid, _)| uid);
-                self.hidden_books =
-                    self.filter_books.iter().map(|(uid, _)| uid).filter(|uid| Some(*uid) != only).cloned().collect();
-                if only.is_none() {
-                    self.hidden_books.clear();
-                }
-                self.sync_filter_menu();
-                self.rebuild(widgets, &sender);
-            }
-
-            ContactsPageInput::ShowBook { uid, on } => {
-                let changed = if on { self.hidden_books.remove(&uid) } else { self.hidden_books.insert(uid) };
-                if changed {
-                    if self.editor.is_none() {
-                        self.selected = None;
-                    }
-                    self.sync_filter_menu();
-                    self.rebuild(widgets, &sender);
-                }
+                let scope = match (n as usize).checked_sub(1).and_then(|i| self.filter_books.get(i)) {
+                    Some((uid, _)) => ContactScope::Book(uid.clone()),
+                    None => ContactScope::All,
+                };
+                sender.input(ContactsPageInput::SetScope(scope));
             }
 
             ContactsPageInput::DirectoriesKnown(directories) => {
@@ -896,6 +927,7 @@ impl Component for ContactsPage {
                 }
                 self.directories = directories;
                 self.refresh_book_filter();
+                self.publish_tree(&sender);
                 if !self.directories.is_empty() && self.contacts.is_empty() && !self.loading {
                     widgets.page_stack.set_visible_child_name("browser");
                 }
@@ -972,14 +1004,116 @@ impl Component for ContactsPage {
                 }
             }
 
-            ContactsPageInput::SetView(view) => {
-                if self.view != view {
-                    self.show_view(widgets, view);
-                    // Moving to the other side abandons an open editor.
+            ContactsPageInput::SetScope(scope) => {
+                if self.scope != scope {
+                    self.scope = scope;
+                    // Another list abandons an open editor and what was
+                    // selected in this one.
                     self.editor = None;
                     self.editing_target = None;
+                    self.selected = None;
+                    self.multi.clear();
                     self.rebuild(widgets, &sender);
                 }
+            }
+
+            ContactsPageInput::DropContacts { keys, on, moving } => {
+                let people: Vec<usize> = keys
+                    .iter()
+                    .filter_map(|(book, uid)| {
+                        self.contacts.iter().position(|c| !c.is_group() && c.book_uid == *book && c.eds_uid == *uid)
+                    })
+                    .collect();
+                match on {
+                    DropOn::Book(to) if moving => {
+                        let keys: Vec<(String, String)> = people
+                            .iter()
+                            .map(|&i| &self.contacts[i])
+                            .filter(|c| self.can_move(c, &to))
+                            .map(|c| (c.book_uid.clone(), c.eds_uid.clone()))
+                            .collect();
+                        self.ask_move(widgets, &sender, keys, to, None);
+                    }
+                    // A copy leaves the contact where it was: no question.
+                    DropOn::Book(to) => {
+                        let writable = self.books.iter().any(|b| b.uid == to);
+                        let cards: Vec<String> = people
+                            .iter()
+                            .map(|&i| &self.contacts[i])
+                            .filter(|c| writable && c.book_uid != to)
+                            .map(crate::contacts::moved_vcard)
+                            .collect();
+                        if !cards.is_empty() {
+                            let _ = sender.output(ContactsPageOutput::CopyContacts { to, cards });
+                        }
+                    }
+                    DropOn::Group { book, uid } => {
+                        let Some(g) = self.contacts.iter().position(|c| c.is_group() && c.book_uid == book && c.eds_uid == uid)
+                        else {
+                            return;
+                        };
+                        self.add_to_group(&sender, g, &people);
+                    }
+                }
+            }
+
+            ContactsPageInput::Tree(action) => {
+                let group = |book: &str, uid: &str| {
+                    self.contacts.iter().position(|c| c.is_group() && c.book_uid == book && c.eds_uid == uid)
+                };
+                match action {
+                    TreeAction::NewContact(book) => {
+                        sender.input(ContactsPageInput::SetScope(ContactScope::Book(book)));
+                        sender.input(ContactsPageInput::NewContact);
+                    }
+                    TreeAction::NewGroup(book) => {
+                        sender.input(ContactsPageInput::SetScope(ContactScope::Book(book)));
+                        sender.input(ContactsPageInput::NewGroup);
+                    }
+                    TreeAction::EditGroup { book, uid } => {
+                        if let Some(idx) = group(&book, &uid) {
+                            sender.input(ContactsPageInput::SetScope(ContactScope::Group { book, uid }));
+                            sender.input(ContactsPageInput::EditIndex(idx));
+                        }
+                    }
+                    TreeAction::DeleteGroup { book, uid } => {
+                        if let Some(idx) = group(&book, &uid) {
+                            sender.input(ContactsPageInput::DeleteRequest(idx));
+                        }
+                    }
+                    TreeAction::ComposeGroup { book, uid } => {
+                        if let Some(idx) = group(&book, &uid) {
+                            sender.input(ContactsPageInput::ComposeGroup(idx));
+                        }
+                    }
+                }
+            }
+
+            ContactsPageInput::RemoveFromGroup(people) => {
+                let ContactScope::Group { book, uid } = &self.scope else { return };
+                let Some(g) = self.contacts.iter().find(|c| c.is_group() && c.book_uid == *book && c.eds_uid == *uid)
+                else {
+                    return;
+                };
+                let Some(format) = g.group else { return };
+                let gone: Vec<&ContactDetails> = people.iter().filter_map(|&i| self.contacts.get(i)).collect();
+                let members: Vec<Member> =
+                    g.members.iter().filter(|m| !gone.iter().any(|p| is_member(g, m, p))).cloned().collect();
+                if members.len() == g.members.len() {
+                    return;
+                }
+                let edit = GroupEdit {
+                    name: g.name.clone(),
+                    members,
+                    hide_addresses: g.hide_addresses,
+                    kept: g.hidden_members.clone(),
+                };
+                let _ = sender.output(ContactsPageOutput::SaveGroup {
+                    book_uid: g.book_uid.clone(),
+                    format,
+                    original: Some(g.raw_vcard.clone()),
+                    edit,
+                });
             }
 
             ContactsPageInput::SelectionChanged => {
@@ -1034,31 +1168,8 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::BulkAddToGroup(g) => {
-                let Some(group) = self.contacts.get(g) else { return };
-                let Some(format) = group.group else { return };
-                let mut members = group.members.clone();
-                for p in self.chosen() {
-                    if let Some(m) = member_for(group, &self.contacts[p], true) {
-                        if !members.iter().any(|x| x.same(&m)) {
-                            members.push(m);
-                        }
-                    }
-                }
-                if members.len() == group.members.len() {
-                    return;
-                }
-                let edit = GroupEdit {
-                    name: group.name.clone(),
-                    members,
-                    hide_addresses: group.hide_addresses,
-                    kept: group.hidden_members.clone(),
-                };
-                let _ = sender.output(ContactsPageOutput::SaveGroup {
-                    book_uid: group.book_uid.clone(),
-                    format,
-                    original: Some(group.raw_vcard.clone()),
-                    edit,
-                });
+                let chosen = self.chosen();
+                self.add_to_group(&sender, g, &chosen);
             }
 
             ContactsPageInput::BulkMoveRequest(to) => {
@@ -1187,12 +1298,12 @@ impl Component for ContactsPage {
             }
 
             ContactsPageInput::NewContact => {
-                self.new_on_side(widgets, &sender, ContactsView::People);
+                self.new_form(widgets);
                 self.render_editor(widgets, &sender);
             }
 
             ContactsPageInput::NewGroup => {
-                self.new_on_side(widgets, &sender, ContactsView::Groups);
+                self.new_form(widgets);
                 self.render_group_editor(widgets, &sender);
             }
 
@@ -1421,6 +1532,7 @@ impl Component for ContactsPage {
             ContactsPageInput::SetBooks(books) => {
                 self.books = books;
                 self.refresh_book_filter();
+                self.publish_tree(&sender);
             }
 
             ContactsPageInput::PhotosDecoded => {
@@ -1466,13 +1578,124 @@ impl Component for ContactsPage {
 impl ContactsPage {
     /// Whether a contact matches the active search.
     fn matches(&self, c: &ContactDetails) -> bool {
-        if c.is_group() != (self.view == ContactsView::Groups) {
-            return false;
+        self.in_scope(c) && matches_query(c, &self.query)
+    }
+
+    /// Whether the list's scope takes `c`, the search aside.
+    fn in_scope(&self, c: &ContactDetails) -> bool {
+        match &self.scope {
+            ContactScope::All => !c.is_group(),
+            ContactScope::Book(book) => !c.is_group() && c.book_uid == *book,
+            // The group itself, first, then its people.
+            ContactScope::Group { book, uid } => match self.scope_group() {
+                Some(g) if c.is_group() => c.book_uid == *book && c.eds_uid == *uid && std::ptr::eq(g, c),
+                Some(g) => g.members.iter().any(|m| is_member(g, m, c)),
+                None => false,
+            },
         }
-        if self.hidden_books.contains(&c.book_uid) {
-            return false;
+    }
+
+    /// The group the list shows, in group scope.
+    fn scope_group(&self) -> Option<&ContactDetails> {
+        let ContactScope::Group { book, uid } = &self.scope else { return None };
+        self.contacts.iter().find(|c| c.is_group() && c.book_uid == *book && c.eds_uid == *uid)
+    }
+
+    /// The book a new contact or group starts in: the one the list shows,
+    /// when it can take it, else the default (first).
+    fn scope_book(&self, books: &[crate::contacts::Book]) -> usize {
+        let shown = match &self.scope {
+            ContactScope::All => None,
+            ContactScope::Book(book) | ContactScope::Group { book, .. } => Some(book),
+        };
+        shown.and_then(|b| books.iter().position(|x| x.uid == *b)).unwrap_or(0)
+    }
+
+    /// Put these people (indexes into `contacts`) in the group at `g`,
+    /// those it can take and does not have.
+    fn add_to_group(&self, sender: &ComponentSender<Self>, g: usize, people: &[usize]) {
+        let Some(group) = self.contacts.get(g) else { return };
+        let Some(format) = group.group else { return };
+        let mut members = group.members.clone();
+        for &p in people {
+            if let Some(m) = self.contacts.get(p).and_then(|p| member_for(group, p, true)) {
+                if !members.iter().any(|x| x.same(&m)) {
+                    members.push(m);
+                }
+            }
         }
-        matches_query(c, &self.query)
+        if members.len() == group.members.len() {
+            return;
+        }
+        let edit = GroupEdit {
+            name: group.name.clone(),
+            members,
+            hide_addresses: group.hide_addresses,
+            kept: group.hidden_members.clone(),
+        };
+        let _ = sender.output(ContactsPageOutput::SaveGroup {
+            book_uid: group.book_uid.clone(),
+            format,
+            original: Some(group.raw_vcard.clone()),
+            edit,
+        });
+    }
+
+    /// The books and groups for the sidebar, handed over when they change.
+    fn publish_tree(&mut self, sender: &ComponentSender<Self>) {
+        let directories: std::collections::HashSet<&String> = self.directories.iter().map(|(uid, _)| uid).collect();
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for c in self.contacts.iter().filter(|c| !c.is_group()) {
+            *counts.entry(c.book_uid.as_str()).or_default() += 1;
+        }
+        let books = self
+            .filter_books
+            .iter()
+            .map(|(uid, name)| {
+                let directory = directories.contains(uid);
+                let (account, own) = if directory {
+                    (i18n("Directories"), name.trim_start_matches("LDAP — ").to_string())
+                } else {
+                    match name.split_once(" · ") {
+                        Some((account, own)) => (account.to_string(), own.to_string()),
+                        None => (String::new(), name.clone()),
+                    }
+                };
+                let book = self.books.iter().find(|b| b.uid == *uid);
+                let mut groups: Vec<TreeGroup> = self
+                    .contacts
+                    .iter()
+                    .filter(|c| c.is_group() && c.book_uid == *uid)
+                    .map(|g| TreeGroup {
+                        book: uid.clone(),
+                        uid: g.eds_uid.clone(),
+                        name: g.name.clone(),
+                        count: g.members.len(),
+                        editable: g.group_editable() && book.is_some(),
+                    })
+                    .collect();
+                groups.sort_by_key(|g| g.name.to_lowercase());
+                TreeBook {
+                    uid: uid.clone(),
+                    account,
+                    name: own,
+                    count: counts.get(uid.as_str()).copied().unwrap_or(0),
+                    writable: book.is_some(),
+                    takes_groups: book.is_some_and(|b| b.groups.is_some()),
+                    directory,
+                    groups,
+                }
+            })
+            .collect();
+        let tree = ContactTree {
+            total: self.contacts.iter().filter(|c| !c.is_group()).count(),
+            books,
+            scope: self.scope.clone(),
+        };
+        if self.tree.as_ref() != Some(&tree) {
+            self.tree = Some(tree.clone());
+            let _ = sender.output(ContactsPageOutput::Tree(tree));
+        }
     }
 
     /// Whether `c` passes the "Show only" filters on; groups always do.
@@ -1497,7 +1720,7 @@ impl ContactsPage {
 
     fn sync_filter_menu(&self) {
         if let Some(menu) = &self.filter_menu {
-            menu.sync(self.sort, self.filters, &self.hidden_books);
+            menu.sync(self.sort, self.filters);
         }
     }
 
@@ -1696,39 +1919,21 @@ impl ContactsPage {
             return;
         }
         self.filter_books = books;
-        // A book that went is no longer narrowing anything.
-        let known: std::collections::HashSet<&String> = self.filter_books.iter().map(|(uid, _)| uid).collect();
-        self.hidden_books.retain(|uid| known.contains(uid));
-        if let Some(menu) = &self.filter_menu {
-            menu.set_books(&self.filter_books);
-        }
-        self.sync_filter_menu();
-    }
-
-    /// Put the switch, the search's hint and the sort button in step with
-    /// `view`. The switch notifies after the fact; `SetView` then finds the
-    /// side already shown.
-    fn show_view(&mut self, widgets: &ContactsPageWidgets, view: ContactsView) {
-        self.view = view;
-        let groups = view == ContactsView::Groups;
-        widgets.view_switch.set_active_name(Some(if groups { "groups" } else { "people" }));
-        widgets.search.set_placeholder_text(Some(&if groups { i18n("Search groups") } else { i18n("Search contacts") }));
-        // Groups go by name, and the "Show only" filters are a person's;
-        // the books are both's.
-        if let Some(menu) = &self.filter_menu {
-            menu.set_people(!groups);
+        // A book that went is no longer shown alone.
+        let gone = match &self.scope {
+            ContactScope::All => false,
+            ContactScope::Book(b) | ContactScope::Group { book: b, .. } => !self.filter_books.iter().any(|(u, _)| u == b),
+        };
+        if gone {
+            self.scope = ContactScope::All;
         }
     }
 
-    /// Ready the list for a new contact or group: the side it will be on,
-    /// with nothing selected, so the form is what the pane shows.
-    fn new_on_side(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>, view: ContactsView) {
+    /// Ready the pane for a new contact or group: nothing selected, so the
+    /// form is what it shows.
+    fn new_form(&mut self, widgets: &ContactsPageWidgets) {
         self.editing_target = None;
         widgets.page_stack.set_visible_child_name("browser");
-        if self.view != view {
-            self.show_view(widgets, view);
-            self.rebuild(widgets, sender);
-        }
         self.selected = None;
         self.multi.clear();
         self.selection.unselect_all();
@@ -1745,6 +1950,13 @@ impl ContactsPage {
     /// the selection, and render its detail card.
     fn rebuild(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
         let started = std::time::Instant::now();
+        self.publish_tree(sender);
+        // What a row dragged from the list carries.
+        self.drag.borrow_mut().keys = self
+            .contacts
+            .iter()
+            .map(|c| (!c.is_group() && !c.eds_uid.is_empty()).then(|| (c.book_uid.clone(), c.eds_uid.clone())))
+            .collect();
         let empty = self.contacts.is_empty() && self.directories.is_empty();
         widgets.page_stack.set_visible_child_name(if empty { "none" } else { "browser" });
 
@@ -1756,7 +1968,8 @@ impl ContactsPage {
             let c = &self.contacts[i];
             let name = c.name.to_lowercase();
             match self.sort {
-                _ if c.is_group() => name,
+                // A group shown with its people heads them.
+                _ if c.is_group() => String::new(),
                 ContactSort::FirstName => name,
                 // Sort by the final word of the name (then the whole name for
                 // ties) — how an address book orders by surname.
@@ -1768,27 +1981,27 @@ impl ContactsPage {
                 }
             }
         });
-        let groups = self.view == ContactsView::Groups;
-        let total = self.contacts.iter().filter(|c| c.is_group() == groups).count();
-        let narrowed = !self.query.is_empty() || !self.hidden_books.is_empty() || (!groups && self.filters != 0);
+        // People in what the list shows, and of them those it lists.
+        let total = self.contacts.iter().filter(|c| !c.is_group() && self.in_scope(c)).count();
+        let shown = people.iter().filter(|&&i| !self.contacts[i].is_group()).count();
+        let narrowed = !self.query.is_empty() || self.filters != 0;
         widgets.count_label.set_label(&if !narrowed {
             total.to_string()
         } else {
-            i18n_f("{shown} of {total}", &[("shown", &people.len().to_string()), ("total", &total.to_string())])
+            i18n_f("{shown} of {total}", &[("shown", &shown.to_string()), ("total", &total.to_string())])
         });
         let mut lines: Vec<Line> = Vec::new();
-        if groups && total == 0 {
-            lines.push(Line::other(
-                LineKind::Note,
-                i18n("No groups yet. Make one with New Group, under the + button."),
-                String::new(),
-            ));
-        }
+        // Directories are searched with every book, or alone; a group has
+        // none of their people.
+        let groups = matches!(self.scope, ContactScope::Group { .. });
 
         // The directories' answers, after the contacts and by name whatever
         // the sort, under a heading of their own so nobody takes them for
-        // contacts. The book filter keeps those of the directory it names.
-        let in_filter = |uid: &str| !self.hidden_books.contains(uid);
+        // contacts. A book picked keeps those of the directory it is.
+        let in_filter = |uid: &str| match &self.scope {
+            ContactScope::Book(b) => b == uid,
+            _ => true,
+        };
         let mut listed = std::collections::HashSet::new();
         let mut hits = Vec::new();
         for (i, c) in self.directory_hits.iter().enumerate() {
@@ -1818,15 +2031,11 @@ impl ContactsPage {
             lines.push(Line::other(LineKind::Failure, f.name.clone(), f.message.clone()));
         }
 
-        // A directory, the only book ticked in the filter, is empty until
-        // searched.
-        let directory_picked = !self.hidden_books.is_empty()
-            && self
-                .filter_books
-                .iter()
-                .filter(|(uid, _)| !self.hidden_books.contains(uid))
-                .all(|(uid, _)| self.directories.iter().any(|(d, _)| d == uid))
-            && self.filter_books.iter().any(|(uid, _)| !self.hidden_books.contains(uid));
+        // A directory picked in the sidebar is empty until searched.
+        let directory_picked = match &self.scope {
+            ContactScope::Book(b) => self.directories.iter().any(|(d, _)| d == b),
+            _ => false,
+        };
         if directory_picked && !groups && people.is_empty() && lines.is_empty() {
             let text = if self.query.trim().chars().count() < crate::directory::MIN_QUERY {
                 i18n("Type three letters or more to search the directory.")
@@ -1982,6 +2191,18 @@ impl ContactsPage {
         if self.multi.contains(&idx) {
             let choices = self.bulk_choices();
             let mut first = Vec::new();
+            if let Some(g) = self.scope_group().filter(|g| g.group_editable()) {
+                let chosen = self.chosen();
+                if chosen.iter().any(|&i| g.members.iter().any(|m| is_member(g, m, &self.contacts[i]))) {
+                    let sr = s.clone();
+                    first.push(
+                        MenuEntry::new(i18n("Remove from Group"), move || {
+                            let _ = sr.send(ContactsPageInput::RemoveFromGroup(chosen.clone()));
+                        })
+                        .icon("list-remove-symbolic"),
+                    );
+                }
+            }
             if !choices.groups.is_empty() {
                 first.push(MenuEntry::submenu(i18n("Add to Group"), vec![choices.group_entries(s)]).icon("system-users-symbolic"));
             }
@@ -2035,6 +2256,18 @@ impl ContactsPage {
                     })
                     .collect();
                 first.push(MenuEntry::submenu(i18n("Add to Group"), vec![entries]).icon("system-users-symbolic"));
+            }
+        }
+        // Out of the group the list shows.
+        if let Some(g) = self.scope_group().filter(|g| !group && g.group_editable()) {
+            if g.members.iter().any(|m| is_member(g, m, c)) {
+                let sr = s.clone();
+                first.push(
+                    MenuEntry::new(i18n("Remove from Group"), move || {
+                        let _ = sr.send(ContactsPageInput::RemoveFromGroup(vec![idx]));
+                    })
+                    .icon("list-remove-symbolic"),
+                );
             }
         }
         // Another book, with a question first.
@@ -2101,7 +2334,7 @@ impl ContactsPage {
         let chosen = self.chosen();
         let n = chosen.len() as u32;
         let count = n.to_string();
-        let groups = self.view == ContactsView::Groups;
+        let groups = !chosen.is_empty() && chosen.iter().all(|&i| self.contacts[i].is_group());
 
         let icon = gtk::Image::from_icon_name(if groups { "system-users-symbolic" } else { "edit-select-all-symbolic" });
         icon.set_pixel_size(64);
@@ -2128,6 +2361,15 @@ impl ContactsPage {
             b.add_css_class("pill");
             b
         };
+        if let Some(g) = self.scope_group().filter(|g| !groups && g.group_editable()) {
+            let remove = pill(&i18n("Remove from Group"));
+            remove.set_sensitive(chosen.iter().any(|&i| g.members.iter().any(|m| is_member(g, m, &self.contacts[i]))));
+            let (s, people) = (sender.input_sender().clone(), chosen.clone());
+            remove.connect_clicked(move |_| {
+                let _ = s.send(ContactsPageInput::RemoveFromGroup(people.clone()));
+            });
+            actions.append(&remove);
+        }
         if !groups {
             let add = pill(&i18n("Add to Group"));
             add.set_sensitive(!choices.groups.is_empty());
@@ -2168,6 +2410,7 @@ impl ContactsPage {
 
     /// Fill the right-hand pane with the selected contact's card.
     fn render_detail(&mut self, widgets: &ContactsPageWidgets, sender: &ComponentSender<Self>) {
+        self.drag.borrow_mut().multi = self.multi.clone();
         self.editor = None;
         let detail = &widgets.detail_box;
         while let Some(child) = detail.first_child() {
@@ -2391,7 +2634,7 @@ impl ContactsPage {
         let at = if editing {
             books.iter().position(|b| b.uid == c.book_uid).unwrap_or(0)
         } else {
-            books.iter().position(|b| !self.hidden_books.contains(&b.uid)).unwrap_or(0)
+            self.scope_book(&books)
         };
         row.set_selected(at as u32);
         row.set_sensitive(books.len() > 1);
@@ -2542,10 +2785,7 @@ impl ContactsPage {
             row.set_model(Some(&gtk::StringList::new(&labels)));
             // Its own book, or for a new one the first book the list shows,
             // else the default (first).
-            let at = own
-                .filter(|_| editing)
-                .or_else(|| self.books.iter().position(|b| !self.hidden_books.contains(&b.uid)))
-                .unwrap_or(0);
+            let at = own.filter(|_| editing).unwrap_or_else(|| self.scope_book(&self.books));
             row.set_selected(at as u32);
             row.set_sensitive(self.books.len() > 1);
             if editing {
@@ -2749,12 +2989,6 @@ struct FilterMenu {
     sorts: Vec<(ContactSort, gtk::CheckButton)>,
     filters: Vec<(ContactFilter, gtk::CheckButton)>,
     clear: gtk::Button,
-    /// The sort and "Show only" columns, a person's, off on Groups.
-    people_cols: [gtk::Box; 2],
-    /// A tick per book, made again when the books change.
-    book_col: gtk::Box,
-    books: RefCell<Vec<(String, gtk::CheckButton)>>,
-    input: relm4::Sender<ContactsPageInput>,
 }
 
 impl FilterMenu {
@@ -2811,74 +3045,21 @@ impl FilterMenu {
         });
         filter_col.append(&clear);
 
-        // Which address books are listed: all, until some are unticked.
-        let book_col = column(&i18n("Address books"));
-        let book_scroll = gtk::ScrolledWindow::new();
-        book_scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
-        book_scroll.set_propagate_natural_height(true);
-        book_scroll.set_propagate_natural_width(true);
-        book_scroll.set_max_content_height(360);
-        book_scroll.set_child(Some(&book_col));
-
         let columns = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         columns.add_css_class("sort-filter-popover");
         columns.append(&sort_col);
         columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
         columns.append(&filter_col);
-        columns.append(&gtk::Separator::new(gtk::Orientation::Vertical));
-        columns.append(&book_scroll);
         let popover = gtk::Popover::new();
         popover.set_child(Some(&columns));
         button.set_popover(Some(&popover));
-        FilterMenu {
-            button: button.clone(),
-            sorts,
-            filters,
-            clear,
-            people_cols: [sort_col, filter_col],
-            book_col,
-            books: RefCell::new(Vec::new()),
-            input: input.clone(),
-        }
-    }
-
-    /// Offer these books, (UID, name), each ticked until `sync` says.
-    fn set_books(&self, books: &[(String, String)]) {
-        for (_, check) in self.books.borrow_mut().drain(..) {
-            self.book_col.remove(&check);
-        }
-        let mut made = Vec::new();
-        for (uid, name) in books {
-            let label = gtk::Label::new(Some(name));
-            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            label.set_max_width_chars(30);
-            label.set_xalign(0.0);
-            let check = gtk::CheckButton::new();
-            check.set_child(Some(&label));
-            check.set_tooltip_text(Some(name));
-            check.set_active(true);
-            let (s, uid) = (self.input.clone(), uid.clone());
-            let id = uid.clone();
-            check.connect_toggled(move |c| {
-                let _ = s.send(ContactsPageInput::ShowBook { uid: id.clone(), on: c.is_active() });
-            });
-            self.book_col.append(&check);
-            made.push((uid, check));
-        }
-        self.books.replace(made);
-    }
-
-    /// The sort and "Show only" columns are a person's: off on Groups.
-    fn set_people(&self, on: bool) {
-        for col in &self.people_cols {
-            col.set_sensitive(on);
-        }
+        FilterMenu { button: button.clone(), sorts, filters, clear }
     }
 
     /// Show the order and the filters on the rows, and tint the button
     /// while any filter is on, so a narrowed list never passes for a short
     /// one.
-    fn sync(&self, sort: ContactSort, on: u8, hidden: &std::collections::HashSet<String>) {
+    fn sync(&self, sort: ContactSort, on: u8) {
         for (s, radio) in &self.sorts {
             if *s == sort && !radio.is_active() {
                 radio.set_active(true);
@@ -2890,23 +3071,14 @@ impl FilterMenu {
                 check.set_active(active);
             }
         }
-        for (uid, check) in self.books.borrow().iter() {
-            let shown = !hidden.contains(uid);
-            if check.is_active() != shown {
-                check.set_active(shown);
-            }
-        }
-        self.clear.set_sensitive(on != 0 || !hidden.is_empty());
-        if on == 0 && hidden.is_empty() {
+        self.clear.set_sensitive(on != 0);
+        if on == 0 {
             self.button.remove_css_class("list-filter-active");
             self.button.set_tooltip_text(Some(&i18n("Sort and filter contacts")));
         } else {
             self.button.add_css_class("list-filter-active");
-            let mut names: Vec<String> =
+            let names: Vec<String> =
                 ContactFilter::ALL.iter().filter(|f| on & f.bit() != 0).map(|f| f.label()).collect();
-            if !hidden.is_empty() {
-                names.push(i18n("Address books"));
-            }
             self.button.set_tooltip_text(Some(&i18n_f("Filtered: {names}", &[("names", &names.join(", "))])));
         }
     }
@@ -3966,14 +4138,57 @@ impl ListRow {
 
 /// The list view's rows: made for the lines on screen and bound to each
 /// line scrolled to.
+/// What a contact row carries when dragged to the sidebar: the book and
+/// UID of each contact by its index (`None` for a group, or a card EDS
+/// has not named), and the indexes selected together, which go as one.
+#[derive(Default)]
+struct DragKeys {
+    keys: Vec<Option<(String, String)>>,
+    multi: Vec<usize>,
+}
+
+impl DragKeys {
+    /// The drag's text for the row of contact `idx`: [`DRAG_MARK`], then a
+    /// line of book and UID, tab apart, per contact.
+    fn payload(&self, idx: usize) -> Option<String> {
+        let idxs: Vec<usize> = if self.multi.contains(&idx) { self.multi.clone() } else { vec![idx] };
+        let lines: Vec<String> = idxs
+            .iter()
+            .filter_map(|&i| self.keys.get(i).cloned().flatten())
+            .map(|(book, uid)| format!("{book}\t{uid}"))
+            .collect();
+        (!lines.is_empty()).then(|| format!("{DRAG_MARK}\n{}", lines.join("\n")))
+    }
+}
+
+/// The contacts in a drag's text, by book and UID; `None` when it is not
+/// a drag of contacts (a message, a folder).
+pub fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
+    let mut lines = payload.lines();
+    (lines.next()? == DRAG_MARK).then(|| {
+        lines
+            .filter_map(|l| l.split_once('\t'))
+            .map(|(book, uid)| (book.to_string(), uid.to_string()))
+            .collect()
+    })
+}
+
+/// Whether member `m` of group `g` is the contact `p`: the card the group
+/// names, in its own book, or an address of theirs.
+fn is_member(g: &ContactDetails, m: &Member, p: &ContactDetails) -> bool {
+    (!m.uid.is_empty() && p.book_uid == g.book_uid && p.eds_uid == m.uid)
+        || (!m.email.is_empty() && p.emails.iter().any(|e| e.value.eq_ignore_ascii_case(&m.email)))
+}
+
 fn row_factory(
     rows: &Rc<RefCell<HashMap<usize, Rc<ListRow>>>>,
     input: &relm4::Sender<ContactsPageInput>,
+    drag: &Rc<RefCell<DragKeys>>,
 ) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
     let key = |obj: &gtk::glib::Object| obj.as_ptr() as usize;
     {
-        let (rows, input) = (Rc::downgrade(rows), input.clone());
+        let (rows, input, drag) = (Rc::downgrade(rows), input.clone(), Rc::downgrade(drag));
         factory.connect_setup(move |_, obj| {
             let (Some(rows), Some(item)) = (rows.upgrade(), obj.downcast_ref::<gtk::ListItem>()) else {
                 return;
@@ -3993,6 +4208,27 @@ fn row_factory(
                 let _ = input.send(ContactsPageInput::RowMenu { idx, x: at.x().into(), y: at.y().into() });
             });
             row.root.add_controller(right_click);
+            // Dragged to a book or group in the sidebar: this contact, or
+            // every contact selected with it.
+            let source = gtk::DragSource::new();
+            source.set_actions(gtk::gdk::DragAction::COPY | gtk::gdk::DragAction::MOVE);
+            {
+                let (weak, drag) = (Rc::downgrade(&row), drag.clone());
+                source.connect_prepare(move |_, _, _| {
+                    let (row, drag) = (weak.upgrade()?, drag.upgrade()?);
+                    let payload = drag.borrow().payload(row.idx()?)?;
+                    Some(gtk::gdk::ContentProvider::for_value(&payload.to_value()))
+                });
+            }
+            {
+                let weak = Rc::downgrade(&row);
+                source.connect_drag_begin(move |src, _| {
+                    if let Some(row) = weak.upgrade() {
+                        src.set_icon(Some(&gtk::WidgetPaintable::new(Some(&row.root))), 0, 0);
+                    }
+                });
+            }
+            row.root.add_controller(source);
             item.set_child(Some(&row.root));
             rows.borrow_mut().insert(key(obj), row);
         });

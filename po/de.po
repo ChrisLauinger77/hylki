@@ -294,6 +294,12 @@ msgid "No address book available"
 msgstr "Kein Adressbuch verfügbar"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "{n} Kontakt nach {path} exportiert"
+msgstr[1] "{n} Kontakte nach {path} exportiert"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "{n} Kontakt nach {path} exportiert"
@@ -3934,9 +3940,6 @@ msgstr "Nachrichten sortieren und filtern"
 msgid "Edit contact"
 msgstr "Kontakt bearbeiten"
 
-msgid "Groups"
-msgstr ""
-
 #, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
@@ -4029,6 +4032,10 @@ msgid "Delete Contact?"
 msgstr "Kontakt löschen?"
 
 #, fuzzy
+msgid "Directories"
+msgstr "In Verzeichnissen"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Kontakte öffnen"
 
@@ -4066,13 +4073,6 @@ msgstr[1] ""
 msgid "Move"
 msgstr "Verschieben nach"
 
-#, fuzzy
-msgid "Search groups"
-msgstr "Suchfilter"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
 msgid "In Directories"
 msgstr "In Verzeichnissen"
 
@@ -4082,6 +4082,10 @@ msgstr ""
 
 msgid "Nobody in the directory matches."
 msgstr "Keine passenden Einträge im Verzeichnis gefunden."
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Aus Favoriten entfernen"
 
 msgid "Add to Group"
 msgstr ""
@@ -4229,9 +4233,6 @@ msgstr "Vorname"
 
 msgid "Last name"
 msgstr "Nachname"
-
-msgid "Address books"
-msgstr ""
 
 msgid "Import Contacts"
 msgstr "Kontakte importieren"
@@ -4478,6 +4479,9 @@ msgid "Kept by Evolution Data Server, set up in Evolution or GNOME Contacts"
 msgstr ""
 
 msgid "Use in Hylki"
+msgstr ""
+
+msgid "Address books"
 msgstr ""
 
 msgid "Switch off an address book to leave it out of Hylki."
@@ -7488,6 +7492,14 @@ msgstr "Link einfügen"
 msgid "Insert"
 msgstr "Einfügen"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Kontakte"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "{n} Nachrichten löschen"
+
 msgid "Favorites"
 msgstr "Favoriten"
 
@@ -8241,6 +8253,10 @@ msgstr "Der gemeinsame Posteingang im hellen Modus."
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Suchfilter"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"

@@ -45,17 +45,25 @@
   editing a group can move it to another, its people with it; Google and
   Microsoft 365 books keep no groups and are not offered. vCard 4 groups are
   shown and offered but not edited. A `.vcf` import keeps its lists as
-  groups instead of skipping them. The Contacts view lists groups apart from
-  people, with a **Contacts** | **Groups** switch above the search.
+  groups instead of skipping them. The sidebar lists each book's groups
+  under it while Contacts is open.
 
 - **Changed: the Contacts search works as the message list's.** The search
   button in the list's header, Ctrl+F or / show the search field, and Esc
   hides it and clears it. The sort button became a sort and filter button,
   whose **Show only** column keeps the people with a photo, an email
   address, a phone number, a street address, a birthday or a company, or
-  those in no group, and whose **Address books** column leaves out the
-  books unticked, several at once. It replaces the address book menu that
-  was beside the search.
+  those in no group.
+
+- **Added: the sidebar lists the address books while Contacts is open.**
+  All Contacts, then each book under its account with its groups under it,
+  in place of the mail accounts; picking one lists its contacts, or a
+  group's people, and **Mail** at the foot goes back to mail. Contacts
+  dragged onto a book are copied there, or moved with Ctrl held after a
+  question, and dragged onto a group join it. A book's menu makes a contact
+  or a group in it, and a group's writes to it, edits or deletes it. This
+  replaces the address book menu beside the search and the Contacts |
+  Groups switch.
 
 - **Changed: Contacts manages every contact, not only those with an email
   address.** The contact form edits postal addresses, the birthday and the
@@ -72,10 +80,10 @@
   has **Add to Group**, **Move to…** another address book and **Delete…**
   for them all, as has a right-click on one of them; Delete asks to delete
   them too. A move adds each contact to the new book, photo included, and
-  removes it from the old one. Several groups can be deleted together. One
-  contact moves from its edit form, whose address book can be changed, or
-  from **Move to Address Book** in its right-click menu; every move asks
-  first, naming the book it leaves and the one it goes to.
+  removes it from the old one. One contact moves from its edit form, whose
+  address book can be changed, or from **Move to Address Book** in its
+  right-click menu; every move asks first, naming the book it leaves and the
+  one it goes to.
 
 - **Changed: the composer's contacts button leads to Hylki's Contacts.** The
   button in the header of the composer's contacts window opens the Contacts

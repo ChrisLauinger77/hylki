@@ -299,6 +299,13 @@ msgid "No address book available"
 msgstr "Адресная книга недоступна"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "Журнал экспортирован в {display}"
+msgstr[1] "Журнал экспортирован в {display}"
+msgstr[2] "Журнал экспортирован в {display}"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "Журнал экспортирован в {display}"
@@ -4026,10 +4033,6 @@ msgid "Edit contact"
 msgstr "Редактировать контакт"
 
 #, fuzzy
-msgid "Groups"
-msgstr "Левая группа"
-
-#, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] "Удалить ваш ключ?"
@@ -4105,6 +4108,10 @@ msgid "Delete Contact?"
 msgstr "Удалить контакт?"
 
 #, fuzzy
+msgid "Directories"
+msgstr "Каталоги LDAP"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Открыть «Контакты»"
 
@@ -4137,13 +4144,6 @@ msgid "Move"
 msgstr "Переместить в"
 
 #, fuzzy
-msgid "Search groups"
-msgstr "Поиск фильтров"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
-#, fuzzy
 msgid "In Directories"
 msgstr "Каталоги LDAP"
 
@@ -4152,6 +4152,10 @@ msgstr ""
 
 msgid "Nobody in the directory matches."
 msgstr ""
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Удалить из избранного"
 
 msgid "Add to Group"
 msgstr ""
@@ -4308,10 +4312,6 @@ msgstr "Имя"
 
 msgid "Last name"
 msgstr "Фамилия"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Адресная книга"
 
 #, fuzzy
 msgid "Import Contacts"
@@ -4580,6 +4580,10 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Открыть Hylki"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Адресная книга"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -7607,6 +7611,14 @@ msgstr "Вставить ссылку"
 msgid "Insert"
 msgstr "Вставить"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Контакты"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "Удалить ваш ключ?"
+
 msgid "Favorites"
 msgstr "Избранное"
 
@@ -8365,6 +8377,14 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Groups"
+#~ msgstr "Левая группа"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Поиск фильтров"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"

@@ -294,6 +294,12 @@ msgid "No address book available"
 msgstr "Nessuna rubrica disponibile"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "{n} contatto esportato in {path}"
+msgstr[1] "{n} contatti esportati in {path}"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "{n} contatto esportato in {path}"
@@ -3966,10 +3972,6 @@ msgid "Edit contact"
 msgstr "Modifica contatto"
 
 #, fuzzy
-msgid "Groups"
-msgstr "Gruppo sinistra"
-
-#, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] "Eliminare la tua chiave?"
@@ -4068,6 +4070,10 @@ msgid "Delete Contact?"
 msgstr "Eliminare il contatto?"
 
 #, fuzzy
+msgid "Directories"
+msgstr "Directory LDAP"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Apri Contatti"
 
@@ -4106,13 +4112,6 @@ msgid "Move"
 msgstr "Sposta in"
 
 #, fuzzy
-msgid "Search groups"
-msgstr "Filtri di ricerca"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
-#, fuzzy
 msgid "In Directories"
 msgstr "Directory LDAP"
 
@@ -4121,6 +4120,10 @@ msgstr ""
 
 msgid "Nobody in the directory matches."
 msgstr ""
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Rimuovi dai preferiti"
 
 msgid "Add to Group"
 msgstr ""
@@ -4273,10 +4276,6 @@ msgstr "Nome"
 
 msgid "Last name"
 msgstr "Cognome"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Rubrica"
 
 msgid "Import Contacts"
 msgstr "Importa contatti"
@@ -4551,6 +4550,10 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Apri Hylki"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Rubrica"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -7569,6 +7572,14 @@ msgstr "Inserisci link"
 msgid "Insert"
 msgstr "Inserisci"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Contatti"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "Eliminare la tua chiave?"
+
 msgid "Favorites"
 msgstr "Preferiti"
 
@@ -8322,6 +8333,14 @@ msgstr "La posta in arrivo unificata in modalità chiara"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Groups"
+#~ msgstr "Gruppo sinistra"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Filtri di ricerca"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"

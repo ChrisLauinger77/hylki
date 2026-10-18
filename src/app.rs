@@ -2228,6 +2228,16 @@ pub enum AppMsg {
     MoveContacts { to: String, cards: Vec<(String, String, String)> },
     /// A contact write finished (`Some` = the error to show).
     ContactWriteDone(Option<String>),
+    /// The Contacts page's books and groups, for the sidebars.
+    ContactTree(crate::ui::contacts_page::ContactTree),
+    /// Picked in the sidebar: what the contact list shows.
+    ContactScope(crate::ui::contacts_page::ContactScope),
+    /// Contacts dropped on a book or group in the sidebar.
+    ContactDrop { keys: Vec<(String, String)>, on: crate::ui::contacts_page::DropOn, moving: bool },
+    /// A right-click choice on a book or group in the sidebar.
+    ContactTreeAction(crate::ui::contacts_page::TreeAction),
+    /// Copy these cards into the book `to`.
+    CopyContacts { to: String, cards: Vec<String> },
     /// `.vcf` files chosen in the Contacts page, to import into the Hylki book.
     ImportContacts(Vec<std::path::PathBuf>),
     /// The import finished.
@@ -3260,6 +3270,8 @@ impl SimpleComponent for AppModel {
                         AppMsg::MoveGroup { from, uid, to, format, edit }
                     }
                     ContactsPageOutput::MoveContacts { to, cards } => AppMsg::MoveContacts { to, cards },
+                    ContactsPageOutput::CopyContacts { to, cards } => AppMsg::CopyContacts { to, cards },
+                    ContactsPageOutput::Tree(tree) => AppMsg::ContactTree(tree),
                     ContactsPageOutput::ImportContacts(paths) => AppMsg::ImportContacts(paths),
                     ContactsPageOutput::WantSuggestions => AppMsg::ContactSuggestions,
                     ContactsPageOutput::ShowPhoto { name, data } => {
@@ -6013,7 +6025,7 @@ impl SimpleComponent for AppModel {
                 // server request is ever aimed at it.
                 self.showing_outbox = true;
                 self.leave_gallery();
-                self.showing_contacts = false;
+                self.set_showing_contacts(false);
                 self.unified = false;
                 self.tag_view = None;
                 self.smart_view = None;
@@ -6110,7 +6122,7 @@ impl SimpleComponent for AppModel {
                 self.mirror_selection(crate::ui::sidebar::Sel::Attachments);
                 self.showing_outbox = false;
                 self.showing_gallery = true;
-                self.showing_contacts = false;
+                self.set_showing_contacts(false);
                 self.gallery.emit(GalleryInput::SetLoading(true));
                 // Handing over the folder list is what starts the load: the
                 // gallery asks for its first page once it knows the scope, so
@@ -6190,7 +6202,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::OpenAttachmentMessage { account_id, folder_path, uid } => {
                 self.leave_gallery();
-                self.showing_contacts = false;
+                self.set_showing_contacts(false);
                 self.showing_outbox = false;
                 if let Some(folder) = self
                     .folders
@@ -10373,7 +10385,7 @@ impl SimpleComponent for AppModel {
                     None => crate::ui::sidebar::Sel::UnifiedTags,
                 });
                 self.leave_gallery();
-                self.showing_contacts = false;
+                self.set_showing_contacts(false);
                 self.showing_outbox = false;
                 self.unified = false;
                 self.selected = None;
@@ -10407,7 +10419,7 @@ impl SimpleComponent for AppModel {
                 self.close_sidebar_peek();
                 self.mirror_selection(crate::ui::sidebar::Sel::Smart(id.clone()));
                 self.leave_gallery();
-                self.showing_contacts = false;
+                self.set_showing_contacts(false);
                 self.showing_outbox = false;
                 self.unified = false;
                 self.selected = None;
@@ -12370,7 +12382,7 @@ impl SimpleComponent for AppModel {
                 self.mirror_selection(crate::ui::sidebar::Sel::Contacts);
                 self.showing_outbox = false;
                 self.leave_gallery();
-                self.showing_contacts = true;
+                self.set_showing_contacts(true);
                 // Read EDS off the UI thread (SQLite + photo decoding); the
                 // page shows its loading face until the list lands.
                 self.contacts_page.emit(ContactsPageInput::SetLoading);
@@ -12486,6 +12498,43 @@ impl SimpleComponent for AppModel {
                 std::thread::spawn(move || {
                     let result = crate::contacts::move_group(&from, &uid, &to, format, edit);
                     s.input(AppMsg::ContactWriteDone(result.err()));
+                });
+            }
+
+            AppMsg::ContactTree(tree) => {
+                self.sidebar.emit(SidebarInput::SetContactTree(tree.clone()));
+                self.peek_sidebar.emit(SidebarInput::SetContactTree(tree));
+            }
+
+            AppMsg::ContactScope(scope) => {
+                self.close_sidebar_peek();
+                self.contacts_page.emit(ContactsPageInput::SetScope(scope));
+            }
+
+            AppMsg::ContactDrop { keys, on, moving } => {
+                self.contacts_page.emit(ContactsPageInput::DropContacts { keys, on, moving });
+            }
+
+            AppMsg::ContactTreeAction(action) => {
+                self.close_sidebar_peek();
+                self.contacts_page.emit(ContactsPageInput::Tree(action));
+            }
+
+            AppMsg::CopyContacts { to, cards } => {
+                let s = sender.clone();
+                std::thread::spawn(move || {
+                    let failed: Vec<String> =
+                        cards.iter().filter_map(|card| crate::contacts::create_contact(&to, card).err()).collect();
+                    let err = failed.first().map(|e| {
+                        let n = failed.len() as u32;
+                        ni18n_f(
+                            "{n} contact was not copied: {e}",
+                            "{n} contacts were not copied: {e}",
+                            n,
+                            &[("n", &n.to_string()), ("e", e)],
+                        )
+                    });
+                    s.input(AppMsg::ContactWriteDone(err));
                 });
             }
 
@@ -15286,6 +15335,16 @@ impl AppModel {
     /// overlay mode. The docked rail is not involved: it keeps its rows,
     /// header and width throughout and stays clickable beside the panel.
     /// `animate` is advisory — libadwaita animates the overlay itself.
+    /// Show Contacts or not; the sidebars list its address books while it
+    /// shows, and mail's accounts otherwise.
+    fn set_showing_contacts(&mut self, on: bool) {
+        if self.showing_contacts != on {
+            self.showing_contacts = on;
+            self.sidebar.emit(SidebarInput::SetContactsMode(on));
+            self.peek_sidebar.emit(SidebarInput::SetContactsMode(on));
+        }
+    }
+
     fn set_sidebar_peek(&mut self, open: bool, animate: bool) {
         let Some(peek) = self.peek_split.clone() else { return };
         tracing::info!(
@@ -16456,7 +16515,7 @@ impl AppModel {
             UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
         });
         self.leave_gallery();
-        self.showing_contacts = false;
+        self.set_showing_contacts(false);
         self.showing_outbox = false;
         // Another view's slices are another view's: start afresh
         // (the loads below refill them).
@@ -16838,7 +16897,7 @@ impl AppModel {
             config::save_last_view(config::LastView { email, path: path.clone() });
         }
         self.leave_gallery();
-        self.showing_contacts = false;
+        self.set_showing_contacts(false);
         self.showing_outbox = false;
         // Mirror the selection in the sidebar. Navigation that starts in the
         // sidebar hits its already-selected guard; navigation from anywhere
@@ -25655,6 +25714,9 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::RefreshRequested => AppMsg::Refresh,
         SidebarOutput::StatusBarRequested => AppMsg::ToggleNotifications,
         SidebarOutput::OpenGnomeContacts => AppMsg::LaunchGnomeContacts,
+        SidebarOutput::ContactScope(scope) => AppMsg::ContactScope(scope),
+        SidebarOutput::ContactDrop { keys, on, moving } => AppMsg::ContactDrop { keys, on, moving },
+        SidebarOutput::ContactTreeAction(action) => AppMsg::ContactTreeAction(action),
         SidebarOutput::OutboxSelected => AppMsg::ShowOutbox,
         SidebarOutput::FolderSelected { account_id, folder_id, name, path } => {
             AppMsg::FolderSelected { account_id, folder_id, name, path }

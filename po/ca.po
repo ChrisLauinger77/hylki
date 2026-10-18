@@ -290,6 +290,12 @@ msgid "No address book available"
 msgstr "No hi ha cap llibreta d'adreces disponible"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "{n} contacte exportat a {path}"
+msgstr[1] "{n} contactes exportats a {path}"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "{n} contacte exportat a {path}"
@@ -3913,10 +3919,6 @@ msgid "Edit contact"
 msgstr "Edita el contacte"
 
 #, fuzzy
-msgid "Groups"
-msgstr "Grup esquerre"
-
-#, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] "Vols suprimir la teva clau?"
@@ -4015,6 +4017,10 @@ msgid "Delete Contact?"
 msgstr "Vols suprimir el contacte?"
 
 #, fuzzy
+msgid "Directories"
+msgstr "Als directoris"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Obre els contactes"
 
@@ -4052,13 +4058,6 @@ msgstr[1] ""
 msgid "Move"
 msgstr "Mou a"
 
-#, fuzzy
-msgid "Search groups"
-msgstr "Cerca filtres"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
 msgid "In Directories"
 msgstr "Als directoris"
 
@@ -4067,6 +4066,10 @@ msgstr ""
 
 msgid "Nobody in the directory matches."
 msgstr ""
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Treu de preferits"
 
 msgid "Add to Group"
 msgstr ""
@@ -4218,10 +4221,6 @@ msgstr "Nom"
 
 msgid "Last name"
 msgstr "Cognom"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Llibreta d'adreces"
 
 msgid "Import Contacts"
 msgstr "Importa contactes"
@@ -4499,6 +4498,10 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Obre l'Hylki"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Llibreta d'adreces"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -7502,6 +7505,14 @@ msgstr "Insereix un enllaç"
 msgid "Insert"
 msgstr "Insereix"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Contactes"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "Vols suprimir la teva clau?"
+
 msgid "Favorites"
 msgstr "Preferits"
 
@@ -8252,6 +8263,14 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Groups"
+#~ msgstr "Grup esquerre"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Cerca filtres"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"

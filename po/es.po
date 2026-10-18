@@ -296,6 +296,12 @@ msgid "No address book available"
 msgstr "No hay ninguna libreta de direcciones disponible"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "{n} contacto exportado a {path}"
+msgstr[1] "{n} contactos exportados a {path}"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "{n} contacto exportado a {path}"
@@ -3942,10 +3948,6 @@ msgid "Edit contact"
 msgstr "Editar contacto"
 
 #, fuzzy
-msgid "Groups"
-msgstr "Grupo izquierdo"
-
-#, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] "¿Eliminar tu clave?"
@@ -4044,6 +4046,10 @@ msgid "Delete Contact?"
 msgstr "¿Eliminar contacto?"
 
 #, fuzzy
+msgid "Directories"
+msgstr "En directorios"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Abrir Contactos"
 
@@ -4081,13 +4087,6 @@ msgstr[1] ""
 msgid "Move"
 msgstr "Mover a"
 
-#, fuzzy
-msgid "Search groups"
-msgstr "Buscar filtros"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
 msgid "In Directories"
 msgstr "En directorios"
 
@@ -4096,6 +4095,10 @@ msgstr "Escribe al menos tres letras para buscar en el directorio."
 
 msgid "Nobody in the directory matches."
 msgstr "No hay personas en el directorio que coincidan con la búsqueda."
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Eliminar de Favoritos"
 
 msgid "Add to Group"
 msgstr ""
@@ -4247,10 +4250,6 @@ msgstr "Nombre"
 
 msgid "Last name"
 msgstr "Apellidos"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Libreta de direcciones"
 
 msgid "Import Contacts"
 msgstr "Importar contactos"
@@ -4526,6 +4525,10 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Abrir Hylki"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Libreta de direcciones"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -7548,6 +7551,14 @@ msgstr "Insertar enlace"
 msgid "Insert"
 msgstr "Insertar"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Contactos"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "¿Eliminar tu clave?"
+
 msgid "Favorites"
 msgstr "Favoritos"
 
@@ -8303,6 +8314,14 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Groups"
+#~ msgstr "Grupo izquierdo"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Buscar filtros"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"

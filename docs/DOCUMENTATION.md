@@ -513,12 +513,27 @@ and <kbd>Esc</kbd>, or leaving the field empty, hides it and clears the
 search. The button at the right of the header sorts the people by first
 name, last name or email. Its **Show only** column keeps those with a photo,
 an email address, a phone number, a street address, a birthday or a
-company, or those in no group, and its **Address books** column lists
-every book, the Hylki book and the LDAP directories included: unticking a
-book leaves its contacts and groups out of the list until it is ticked
-again, and a directory, the only book ticked, is searched by typing. The
-button turns the accent color while a filter is on, and **Clear Filters**
-shows everything again.
+company, or those in no group. The button turns the accent color while a
+filter is on, and **Clear Filters** shows everything again.
+
+While Contacts is open, the sidebar lists the address books in place of
+the mail accounts: **All Contacts** first, then each book, under the
+account it belongs to, with how many contacts it holds, and its groups
+under it. Picking a book lists its contacts alone; picking a group lists
+the group and then its people, with **Remove from Group** in their
+right-click menu. An LDAP directory, under **Directories**, is searched by
+typing. A book's right-click menu has **New Contact** and **New Group**,
+made in that book, and a group's has **New Message**, **Edit Group** and
+**Delete Group…**. **Mail**, at the foot of the sidebar, goes back to the
+mail that was open.
+
+Contacts dragged from the list onto a book in the sidebar are copied
+there, and stay where they were. With <kbd>Ctrl</kbd> held as they are
+dropped they move instead, after a question that names both books.
+Dropped onto a group, they join it, copied first into the group's book
+when it needs them (see [Contact groups](#contact-groups)). A drag takes
+every contact selected with the one dragged. A book Hylki cannot write
+to, and a group it cannot change, take no drop.
 
 Several contacts are selected together with <kbd>Ctrl</kbd> or
 <kbd>Shift</kbd> and a click, or <kbd>Ctrl+A</kbd> for the whole list. The
@@ -528,14 +543,15 @@ to…**, which moves them to another address book, and **Delete…**; a
 right-click on one of them offers the same. A move adds each contact to the
 book picked and removes it from the one it was in, locally and on the
 server, with its photo; a group that names it by its card in the old book
-loses it. Contacts in a book Hylki cannot write to are not moved. Several
-groups selected together can be deleted the same way. **Settings → Message List → Keep the
-search field open** keeps the Contacts search open too.
+loses it. Contacts in a book Hylki cannot write to are not moved. With a
+group picked in the sidebar, the pane has **Remove from Group** for them
+too. **Settings → Message List → Keep the search field open** keeps the
+Contacts search open too.
 
 A new contact, made with the **+** button, has an **Address
 book** row at the top of its form that picks where it is saved; it starts on
-the default book, or on the first book the list shows when the default one
-is unticked in the filter. A contact being edited can move to another book
+the book picked in the sidebar, or on the default book when every book is
+shown. A contact being edited can move to another book
 from the same row, which then names the one it is in: saving asks first,
 and moves it with its changes. A contact's right-click menu has **Move to
 Address Book** too, and several selected together move with **Move to…**
@@ -593,9 +609,8 @@ A group can be set to **Send as Bcc**. Picking it in any field then puts its
 people in Bcc, and opens the Bcc row, so they do not see each other's
 addresses. To still needs at least one address, your own for example.
 
-The Contacts view lists groups apart from people: **Contacts** and **Groups**,
-above the search, switch between the two. Groups are listed by name, and the
-search and the filter's **Address books** work on whichever is shown.
+A group is listed in the sidebar under its address book, and picking it
+lists its people (see [The Hylki address book](#the-hylki-address-book)).
 
 **New Group**, under the **+** button in the Contacts view, makes a group in
 the address book picked at the top of the form: the Hylki book, a book on

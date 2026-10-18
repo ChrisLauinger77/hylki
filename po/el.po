@@ -297,6 +297,12 @@ msgid "No address book available"
 msgstr "Δεν υπάρχει διαθέσιμο βιβλίο διευθύνσεων"
 
 #, fuzzy
+msgid "{n} contact was not copied: {e}"
+msgid_plural "{n} contacts were not copied: {e}"
+msgstr[0] "Εξήχθη {n} επαφή στο {path}"
+msgstr[1] "Εξήχθησαν {n} επαφές στο {path}"
+
+#, fuzzy
 msgid "{n} contact was not moved: {e}"
 msgid_plural "{n} contacts were not moved: {e}"
 msgstr[0] "Εξήχθη {n} επαφή στο {path}"
@@ -3973,10 +3979,6 @@ msgid "Edit contact"
 msgstr "Επεξεργασία επαφής"
 
 #, fuzzy
-msgid "Groups"
-msgstr "Αριστερή ομάδα"
-
-#, fuzzy
 msgid "Delete {n} Group?"
 msgid_plural "Delete {n} Groups?"
 msgstr[0] "Διαγραφή του κλειδιού σας;"
@@ -4075,6 +4077,10 @@ msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
 
 #, fuzzy
+msgid "Directories"
+msgstr "Στους καταλόγους"
+
+#, fuzzy
 msgid "Move Contact?"
 msgstr "Άνοιγμα Επαφών"
 
@@ -4112,13 +4118,6 @@ msgstr[1] ""
 msgid "Move"
 msgstr "Μετακίνηση σε"
 
-#, fuzzy
-msgid "Search groups"
-msgstr "Αναζήτηση φίλτρων"
-
-msgid "No groups yet. Make one with New Group, under the + button."
-msgstr ""
-
 msgid "In Directories"
 msgstr "Στους καταλόγους"
 
@@ -4127,6 +4126,10 @@ msgstr ""
 
 msgid "Nobody in the directory matches."
 msgstr ""
+
+#, fuzzy
+msgid "Remove from Group"
+msgstr "Αφαίρεση από τα Αγαπημένα"
 
 msgid "Add to Group"
 msgstr ""
@@ -4278,10 +4281,6 @@ msgstr "Όνομα"
 
 msgid "Last name"
 msgstr "Επώνυμο"
-
-#, fuzzy
-msgid "Address books"
-msgstr "Βιβλίο διευθύνσεων"
 
 msgid "Import Contacts"
 msgstr "Εισαγωγή επαφών"
@@ -4559,6 +4558,10 @@ msgstr ""
 #, fuzzy
 msgid "Use in Hylki"
 msgstr "Άνοιγμα Hylki"
+
+#, fuzzy
+msgid "Address books"
+msgstr "Βιβλίο διευθύνσεων"
 
 msgid "Switch off an address book to leave it out of Hylki."
 msgstr ""
@@ -7600,6 +7603,14 @@ msgstr "Εισαγωγή συνδέσμου"
 msgid "Insert"
 msgstr "Εισαγωγή"
 
+#, fuzzy
+msgid "All Contacts"
+msgstr "Επαφές"
+
+#, fuzzy
+msgid "Delete Group…"
+msgstr "Διαγραφή του κλειδιού σας;"
+
 msgid "Favorites"
 msgstr "Αγαπημένα"
 
@@ -8372,6 +8383,14 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Groups"
+#~ msgstr "Αριστερή ομάδα"
+
+#, fuzzy
+#~ msgid "Search groups"
+#~ msgstr "Αναζήτηση φίλτρων"
 
 #, fuzzy
 #~ msgid "Choose which address book to search"
