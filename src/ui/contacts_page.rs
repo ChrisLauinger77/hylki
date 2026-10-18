@@ -1138,13 +1138,24 @@ impl Component for ContactsPage {
                 let Some(c) = self.contacts.get(idx) else { return };
                 let win = widgets.page_stack.root().and_downcast::<gtk::Window>();
                 let (heading, body) = if c.is_group() {
-                    (
-                        i18n("Delete Group?"),
+                    // Books on this computer keep groups as Evolution
+                    // lists; the rest sync with a server.
+                    let synced = !crate::contacts::is_local_book(&c.book_uid)
+                        && self
+                            .books
+                            .iter()
+                            .find(|b| b.uid == c.book_uid)
+                            .is_none_or(|b| b.groups != Some(GroupFormat::Evolution));
+                    let name = [("name", c.name.as_str())];
+                    let body = if synced {
                         i18n_f(
-                            "{name} is removed from your address book, and for a synced book, from the server too. The people in it are not.",
-                            &[("name", &c.name)],
-                        ),
-                    )
+                            "This will remove the group {name} from your address book locally and on the server. The contacts are not removed.",
+                            &name,
+                        )
+                    } else {
+                        i18n_f("This will remove the group {name} from your address book. The contacts are not removed.", &name)
+                    };
+                    (i18n("Delete Group?"), body)
                 } else {
                     (
                         i18n("Delete Contact?"),

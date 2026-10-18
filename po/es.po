@@ -3943,16 +3943,21 @@ msgid "Groups"
 msgstr "Grupo izquierdo"
 
 #, fuzzy
-msgid "Delete Group?"
-msgstr "¿Eliminar tu clave?"
-
-#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too. The people in it are not."
+"This will remove the group {name} from your address book locally and on the "
+"server. The contacts are not removed."
 msgstr ""
 "Se eliminará a {name} de tu libreta de direcciones y, si está sincronizada, "
 "también del servidor."
+
+msgid ""
+"This will remove the group {name} from your address book. The contacts are "
+"not removed."
+msgstr ""
+
+#, fuzzy
+msgid "Delete Group?"
+msgstr "¿Eliminar tu clave?"
 
 msgid "Delete Contact?"
 msgstr "¿Eliminar contacto?"

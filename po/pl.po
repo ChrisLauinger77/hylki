@@ -4079,14 +4079,19 @@ msgstr "Modyfikuj kontakt"
 msgid "Groups"
 msgstr "Lewa grupa"
 
+msgid ""
+"This will remove the group {name} from your address book locally and on the "
+"server. The contacts are not removed."
+msgstr ""
+
+msgid ""
+"This will remove the group {name} from your address book. The contacts are "
+"not removed."
+msgstr ""
+
 #, fuzzy
 msgid "Delete Group?"
 msgstr "Czy usunąć własny klucz?"
-
-msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too. The people in it are not."
-msgstr ""
 
 msgid "Delete Contact?"
 msgstr "Czy usunąć kontakt?"

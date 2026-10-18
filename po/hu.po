@@ -4039,14 +4039,19 @@ msgstr "Névjegy szerkesztése"
 msgid "Groups"
 msgstr "Bal oldali csoport"
 
+msgid ""
+"This will remove the group {name} from your address book locally and on the "
+"server. The contacts are not removed."
+msgstr ""
+
+msgid ""
+"This will remove the group {name} from your address book. The contacts are "
+"not removed."
+msgstr ""
+
 #, fuzzy
 msgid "Delete Group?"
 msgstr "Törli a kulcsát?"
-
-msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too. The people in it are not."
-msgstr ""
 
 msgid "Delete Contact?"
 msgstr "Törli a névjegyet?"

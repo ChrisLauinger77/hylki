@@ -3974,16 +3974,21 @@ msgid "Groups"
 msgstr "Αριστερή ομάδα"
 
 #, fuzzy
-msgid "Delete Group?"
-msgstr "Διαγραφή του κλειδιού σας;"
-
-#, fuzzy
 msgid ""
-"{name} is removed from your address book, and for a synced book, from the "
-"server too. The people in it are not."
+"This will remove the group {name} from your address book locally and on the "
+"server. The contacts are not removed."
 msgstr ""
 "Το {name} αφαιρείται από το βιβλίο διευθύνσεών σας και, για συγχρονισμένο "
 "βιβλίο, και από τον διακομιστή."
+
+msgid ""
+"This will remove the group {name} from your address book. The contacts are "
+"not removed."
+msgstr ""
+
+#, fuzzy
+msgid "Delete Group?"
+msgstr "Διαγραφή του κλειδιού σας;"
 
 msgid "Delete Contact?"
 msgstr "Διαγραφή επαφής;"
