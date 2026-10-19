@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS messages (
     PRIMARY KEY (account_id, folder_path, uid)
 );
 CREATE INDEX IF NOT EXISTS messages_by_message_id ON messages (message_id);
+-- Starred mail across an account's folders (the unified Starred view, #482,
+-- and smart folders asking for stars): a few rows out of a whole mailbox.
+CREATE INDEX IF NOT EXISTS messages_starred ON messages (account_id, ts) WHERE starred = 1;
 CREATE TABLE IF NOT EXISTS local_tags (
     account_id  INTEGER NOT NULL,
     message_id  TEXT    NOT NULL,

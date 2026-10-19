@@ -1168,6 +1168,10 @@ pub struct AppModel {
     /// another is owed when it lands.
     unified_starred_loading: bool,
     unified_starred_dirty: bool,
+    /// The starred mail of the accounts with no Starred folder, by account,
+    /// with the folder path each message sits in: kept for the session, so
+    /// the unified Starred view opens at once (#482).
+    unified_starred_rows: HashMap<u32, Vec<(String, Message)>>,
     /// A count of the smart folders' unread mail is waiting to run, or
     /// running: syncs come in bursts, and one count covers a burst.
     smart_counts_due: bool,
@@ -2082,7 +2086,7 @@ pub enum AppMsg {
     SmartViewLoaded { id: String, rows: Vec<(u32, String, Message)> },
     /// The starred mail of the accounts with no Starred folder, read from
     /// the index for the unified Starred view (#482).
-    UnifiedStarredLoaded { rows: Vec<(u32, String, Message)> },
+    UnifiedStarredLoaded { rows: HashMap<u32, Vec<(String, Message)>> },
     /// Count every smart folder's unread mail now (the debounce ran out).
     CountSmartFolders,
     SmartCounts(HashMap<String, u32>),
@@ -3724,6 +3728,7 @@ impl SimpleComponent for AppModel {
             smart_view_dirty: false,
             unified_starred_loading: false,
             unified_starred_dirty: false,
+            unified_starred_rows: HashMap::new(),
             smart_counts_due: false,
             smart_counts_running: false,
             keyword_sync_at: HashMap::new(),
@@ -10507,7 +10512,11 @@ impl SimpleComponent for AppModel {
 
             AppMsg::UnifiedStarredLoaded { rows } => {
                 self.unified_starred_loading = false;
-                self.take_unified_starred(rows, &sender);
+                self.unified_starred_rows.extend(rows);
+                if self.fill_unified_starred() {
+                    self.unified_dirty.set(true);
+                    self.queue_unified_emit(&sender);
+                }
                 if std::mem::take(&mut self.unified_starred_dirty) {
                     self.refresh_unified_starred(&sender);
                 }
@@ -11374,7 +11383,7 @@ impl SimpleComponent for AppModel {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
-                if self.starred_by_flag().contains(&account_id) {
+                if self.flag_starred_accounts().contains(&account_id) {
                     self.refresh_unified_starred(&sender);
                 }
                 self.index_sent_folders(account_id);
@@ -11797,9 +11806,6 @@ impl SimpleComponent for AppModel {
                             self.unified_dirty.set(true);
                             self.queue_unified_emit(&sender);
                         }
-                    } else if !unchanged && self.starred_by_flag().contains(&account_id) {
-                        // The index just took this folder's flags.
-                        self.refresh_unified_starred(&sender);
                     }
                 } else if let Some(sel) = self.selected.as_ref() {
                     if sel.account_id == account_id && sel.folder_id == folder_id && !unchanged {
@@ -11812,6 +11818,10 @@ impl SimpleComponent for AppModel {
                     self.refresh_tag_view(&sender);
                 } else if self.smart_view.is_some() {
                     self.refresh_smart_view(&sender);
+                }
+                if !unchanged && self.flag_starred_accounts().contains(&account_id) {
+                    // The index just took this folder's flags.
+                    self.refresh_unified_starred(&sender);
                 }
                 self.schedule_smart_counts(&sender);
                 // The reader's message was removed by this sync (deleted/moved on
@@ -16681,6 +16691,7 @@ impl AppModel {
         let live: std::collections::HashSet<(u32, u32)> =
             reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
         self.unified_slices.retain(|k, _| live.contains(k));
+        self.fill_unified_starred();
         if self.unified_slices.is_empty() {
             self.message_list
                 .emit(MessageListInput::SetLoading);
@@ -22443,6 +22454,7 @@ impl AppModel {
         let Some(path) = self.resolve_folder_path(m) else {
             return;
         };
+        self.note_flag_star(m, &path, starred);
         self.send_to(m.account_id, MailRequest::SetFlagged { path, uid: m.uid, flagged: starred });
         self.message_list
             .emit(MessageListInput::SetStarred { slot: (m.account_id, m.folder_id, m.id), starred });
@@ -22711,6 +22723,11 @@ impl AppModel {
         }
         if let Some(msgs) = self.message_cache.get_mut(&(m.account_id, m.folder_id)) {
             msgs.retain(|x| x.uid != m.uid);
+        }
+        if let Some(path) = self.folder_path(m.account_id, m.folder_id) {
+            if let Some(rows) = self.unified_starred_rows.get_mut(&m.account_id) {
+                rows.retain(|(p, x)| *p != path || x.uid != m.uid);
+            }
         }
         // The Drafts chip counts every draft, so leaving that folder always
         // drops it by one; elsewhere only unread mail is counted.
@@ -24005,29 +24022,40 @@ impl AppModel {
         }
     }
 
-    /// The accounts whose starred mail the open unified Starred view reads
-    /// from the index (#482): most servers keep no Starred folder (Gmail and
-    /// Proton Bridge do), only a flag on each message, wherever it is filed.
-    /// An account whose folders are not known yet waits for them: it may
-    /// turn out to have one.
-    fn starred_by_flag(&self) -> Vec<u32> {
-        if !self.unified || self.unified_view != UnifiedView::Kind(FolderKind::Starred) {
+    /// The accounts in the unified section that keep a star as a flag on
+    /// each message, wherever it is filed, with no Starred folder (#482):
+    /// most servers (Gmail and Proton Bridge have one). An account whose
+    /// folders are not known yet waits for them: it may turn out to have one.
+    fn flag_starred_accounts(&self) -> Vec<u32> {
+        if !self.unified_kinds.has(FolderKind::Starred) {
             return Vec::new();
         }
         self.accounts
             .iter()
-            .filter(|a| self.in_unified_view(a.id))
+            .filter(|a| self.in_unified(a.id))
             .filter(|a| self.folders.get(&a.id).is_some_and(|f| !f.is_empty()))
             .filter(|a| self.folder_of_kind(a.id, FolderKind::Starred).is_none())
             .map(|a| a.id)
             .collect()
     }
 
-    /// Read the starred mail of the accounts in [`starred_by_flag`] from the
-    /// on-disk index off the main thread, every folder but Trash and Junk,
-    /// answering with [`AppMsg::UnifiedStarredLoaded`].
+    /// Those of [`flag_starred_accounts`] the open unified Starred view
+    /// lists, none when another view is open.
+    fn starred_by_flag(&self) -> Vec<u32> {
+        if !self.unified || self.unified_view != UnifiedView::Kind(FolderKind::Starred) {
+            return Vec::new();
+        }
+        let mut ids = self.flag_starred_accounts();
+        ids.retain(|a| self.unified_account.is_none_or(|x| x == *a));
+        ids
+    }
+
+    /// Read the starred mail of every account in [`flag_starred_accounts`]
+    /// from the on-disk index off the main thread, every folder but Trash
+    /// and Junk, answering with [`AppMsg::UnifiedStarredLoaded`]. It runs
+    /// whether or not the view is open, so opening it lists the mail at once.
     fn refresh_unified_starred(&mut self, sender: &ComponentSender<Self>) {
-        let accounts = self.starred_by_flag();
+        let accounts = self.flag_starred_accounts();
         if accounts.is_empty() || demo_mode() && self.config.is_empty() {
             return;
         }
@@ -24046,36 +24074,51 @@ impl AppModel {
             .collect();
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
-            let mut rows: Vec<(u32, String, Message)> = Vec::new();
+            let t = std::time::Instant::now();
+            let mut rows: HashMap<u32, Vec<(String, Message)>> = HashMap::new();
             if let Ok(cache) = crate::cache::Cache::open() {
                 let starred = config::SmartPrefilter { starred: Some(true), ..Default::default() };
                 for (account_id, exclude) in scope {
                     let found = cache.smart_scan(account_id, None, &exclude, starred, SMART_VIEW_LIMIT, |_| true);
-                    rows.extend(found.into_iter().map(|(path, m)| (account_id, path, m)));
+                    rows.insert(account_id, found);
                 }
             }
+            tracing::debug!("unified starred: read the index in {:?}", t.elapsed());
             let _ = s.send(AppMsg::UnifiedStarredLoaded { rows });
         });
     }
 
-    /// Put the starred mail read by [`refresh_unified_starred`] in the
-    /// unified slices, under the folder each message sits in, so starring,
-    /// moving and reading it go through that folder as anywhere else.
-    fn take_unified_starred(&mut self, rows: Vec<(u32, String, Message)>, sender: &ComponentSender<Self>) {
+    /// Fill the open unified Starred view's slices from
+    /// `unified_starred_rows`, under the folder each message sits in, so
+    /// starring, moving and reading it go through that folder as anywhere
+    /// else. Whether the slices changed.
+    fn fill_unified_starred(&mut self) -> bool {
         let flagged = self.starred_by_flag();
         if flagged.is_empty() {
-            return;
+            return false;
         }
         let mut found: Vec<Message> = Vec::new();
-        for (account_id, path, mut m) in rows {
-            if !flagged.contains(&account_id) {
-                continue;
+        for account_id in &flagged {
+            let Some(folders) = self.folders.get(account_id) else { continue };
+            for (path, m) in self.unified_starred_rows.get(account_id).into_iter().flatten() {
+                if !m.starred {
+                    continue;
+                }
+                let Some(f) = folders.iter().find(|f| f.path == *path) else { continue };
+                let mut m = m.clone();
+                m.folder_id = f.id;
+                // A folder open this session knows better what was read,
+                // replied to or tagged since the index was read; the star
+                // is this list's own, which starring keeps.
+                if let Some(c) = self.message_cache.get(&(m.account_id, f.id)).and_then(|ms| ms.iter().find(|c| c.uid == m.uid)) {
+                    m.unread = c.unread;
+                    m.answered = c.answered;
+                    m.forwarded = c.forwarded;
+                    m.keywords = c.keywords.clone();
+                    m.labels = c.labels.clone();
+                }
+                found.push(m);
             }
-            let Some(f) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)) else {
-                continue;
-            };
-            m.folder_id = f.id;
-            found.push(m);
         }
         // One row for a message filed twice, the inbox copy where there is one.
         let inbox_first = |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
@@ -24086,15 +24129,36 @@ impl AppModel {
         for m in found {
             slices.entry((m.account_id, m.folder_id)).or_default().push(m);
         }
-        self.unified_slices.retain(|(a, _), _| !flagged.contains(a));
+        let mut fresh: HashMap<(u32, u32), Vec<Message>> = HashMap::new();
         for ((account_id, folder_id), messages) in slices {
             let messages = self.apply_pending_seen(account_id, folder_id, messages);
             let messages = self.apply_pending_answers(account_id, folder_id, messages);
             let messages = self.apply_pending_tags(account_id, folder_id, messages);
-            self.unified_slices.insert((account_id, folder_id), messages);
+            fresh.insert((account_id, folder_id), messages);
         }
-        self.unified_dirty.set(true);
-        self.queue_unified_emit(sender);
+        let held = self.unified_slices.iter().filter(|((a, _), _)| flagged.contains(a));
+        let same = held.clone().count() == fresh.len() && held.into_iter().all(|(k, v)| fresh.get(k) == Some(v));
+        if same {
+            return false;
+        }
+        self.unified_slices.retain(|(a, _), _| !flagged.contains(a));
+        self.unified_slices.extend(fresh);
+        true
+    }
+
+    /// Keep a star set or taken off here in `unified_starred_rows`, so the
+    /// unified Starred view opens with it before the index is read again.
+    fn note_flag_star(&mut self, m: &Message, path: &str, starred: bool) {
+        let Some(rows) = self.unified_starred_rows.get_mut(&m.account_id) else { return };
+        match rows.iter_mut().find(|(p, r)| p == path && r.uid == m.uid) {
+            Some((_, r)) => r.starred = starred,
+            None if starred => {
+                let mut r = m.clone();
+                r.starred = true;
+                rows.push((path.to_string(), r));
+            }
+            None => {}
+        }
     }
 
     /// Whether a folder is one the open unified view merges.
@@ -24398,6 +24462,13 @@ impl AppModel {
         for cache in [&mut self.message_cache, &mut self.unified_slices] {
             if let Some(msgs) = cache.get_mut(&(account_id, folder_id)) {
                 if let Some(m) = msgs.iter_mut().find(|m| m.id == message_id) {
+                    m.unread = unread;
+                }
+            }
+        }
+        if let Some(path) = self.folder_path(account_id, folder_id) {
+            if let Some(rows) = self.unified_starred_rows.get_mut(&account_id) {
+                if let Some((_, m)) = rows.iter_mut().find(|(p, m)| *p == path && m.id == message_id) {
                     m.unread = unread;
                 }
             }
