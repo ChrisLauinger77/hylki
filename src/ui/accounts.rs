@@ -822,7 +822,7 @@ impl Component for AccountsWindow {
                                         add_css_class: "boxed-list",
                                         set_selection_mode: gtk::SelectionMode::None,
                                         connect_row_activated[sender] => move |_, row| {
-                                            sender.input(AccountsInput::EditAccount(row.index() as usize));
+                                            sender.input_sender().emit(AccountsInput::EditAccount(row.index() as usize));
                                         },
                                     },
                                 },
@@ -939,7 +939,7 @@ impl Component for AccountsWindow {
                                     gtk::SearchEntry {
                                         set_placeholder_text: Some(i18n("Search filters").as_str()),
                                         connect_search_changed[sender] => move |entry| {
-                                            sender.input(AccountsInput::SearchFilters(entry.text().to_string()));
+                                            sender.input_sender().emit(AccountsInput::SearchFilters(entry.text().to_string()));
                                         },
                                     },
                                 },
@@ -1013,7 +1013,7 @@ impl Component for AccountsWindow {
                                     gtk::SearchEntry {
                                         set_placeholder_text: Some(i18n("Search senders").as_str()),
                                         connect_search_changed[sender] => move |entry| {
-                                            sender.input(AccountsInput::SearchSenders(entry.text().to_string()));
+                                            sender.input_sender().emit(AccountsInput::SearchSenders(entry.text().to_string()));
                                         },
                                     },
                                 },
@@ -1031,7 +1031,7 @@ impl Component for AccountsWindow {
                                         set_input_purpose: gtk::InputPurpose::Email,
                                         set_show_apply_button: false,
                                         connect_entry_activated[sender] => move |row| {
-                                            sender.input(AccountsInput::AddSenderText(row.text().to_string()));
+                                            sender.input_sender().emit(AccountsInput::AddSenderText(row.text().to_string()));
                                             row.set_text("");
                                         },
 
@@ -1041,7 +1041,7 @@ impl Component for AccountsWindow {
                                             set_valign: gtk::Align::Center,
                                             add_css_class: "flat",
                                             connect_clicked[sender, add_sender_row] => move |_| {
-                                                sender.input(AccountsInput::AddSenderText(
+                                                sender.input_sender().emit(AccountsInput::AddSenderText(
                                                     add_sender_row.text().to_string(),
                                                 ));
                                                 add_sender_row.set_text("");
@@ -1071,7 +1071,7 @@ impl Component for AccountsWindow {
                                         set_title: &i18n("Address or domain"),
                                         set_show_apply_button: false,
                                         connect_entry_activated[sender] => move |row| {
-                                            sender.input(AccountsInput::AddBlacklistText(row.text().to_string()));
+                                            sender.input_sender().emit(AccountsInput::AddBlacklistText(row.text().to_string()));
                                             row.set_text("");
                                         },
 
@@ -1081,7 +1081,7 @@ impl Component for AccountsWindow {
                                             set_valign: gtk::Align::Center,
                                             add_css_class: "flat",
                                             connect_clicked[sender, add_blacklist_row] => move |_| {
-                                                sender.input(AccountsInput::AddBlacklistText(
+                                                sender.input_sender().emit(AccountsInput::AddBlacklistText(
                                                     add_blacklist_row.text().to_string(),
                                                 ));
                                                 add_blacklist_row.set_text("");
@@ -1164,7 +1164,7 @@ impl Component for AccountsWindow {
                                     set_subtitle: &i18n("Switching this off returns the account to the \
                                                    import list — it stays in GNOME Online Accounts."),
                                     connect_active_notify[sender] => move |row| {
-                                        sender.input(AccountsInput::ToggleCurrentEnabled(row.is_active()));
+                                        sender.input_sender().emit(AccountsInput::ToggleCurrentEnabled(row.is_active()));
                                     },
                                 },
 
@@ -1480,7 +1480,7 @@ impl Component for AccountsWindow {
                                         set_valign: gtk::Align::Center,
                                         set_dialog: &gtk::ColorDialog::new(),
                                         connect_rgba_notify[sender] => move |_| {
-                                            sender.input(AccountsInput::RefreshPreview);
+                                            sender.input_sender().emit(AccountsInput::RefreshPreview);
                                         },
                                     },
                                 },
@@ -1497,7 +1497,7 @@ impl Component for AccountsWindow {
                                                    if there is none, the circle falls back to the \
                                                    choice below."),
                                     connect_active_notify[sender] => move |row| {
-                                        sender.input(AccountsInput::SetOwnGravatar(row.is_active()));
+                                        sender.input_sender().emit(AccountsInput::SetOwnGravatar(row.is_active()));
                                     },
                                 },
 
@@ -1519,7 +1519,7 @@ impl Component for AccountsWindow {
                                             set_label: &i18n("Picture"),
                                             set_group: Some(&mode_glyph_btn),
                                             connect_toggled[sender] => move |b| {
-                                                sender.input(AccountsInput::SetPictureMode(b.is_active()));
+                                                sender.input_sender().emit(AccountsInput::SetPictureMode(b.is_active()));
                                             },
                                         },
                                     },
@@ -1537,7 +1537,7 @@ impl Component for AccountsWindow {
                                         #[wrap(Some)]
                                         set_popover = &gtk::EmojiChooser {
                                             connect_emoji_picked[sender] => move |_, text| {
-                                                sender.input(AccountsInput::SetEmoji(text.to_string()));
+                                                sender.input_sender().emit(AccountsInput::SetEmoji(text.to_string()));
                                             },
                                         },
                                     },
@@ -1603,7 +1603,7 @@ impl Component for AccountsWindow {
                                     add_css_class: "boxed-list",
                                     set_selection_mode: gtk::SelectionMode::None,
                                     connect_row_activated[sender] => move |_, row| {
-                                        sender.input(AccountsInput::AliasEdit(row.index() as usize));
+                                        sender.input_sender().emit(AccountsInput::AliasEdit(row.index() as usize));
                                     },
                                 },
                             },
@@ -1726,7 +1726,7 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Search the organization directory"),
                                     set_subtitle: &i18n("Suggest people from your organization as you type a recipient."),
                                     connect_active_notify[sender] => move |row| {
-                                        sender.input(AccountsInput::SetGraphDirectory(row.is_active()));
+                                        sender.input_sender().emit(AccountsInput::SetGraphDirectory(row.is_active()));
                                     },
                                 },
                                 #[name = "directory_only_row"]
@@ -1742,7 +1742,7 @@ impl Component for AccountsWindow {
                                     set_subtitle: &i18n("Name a message's label from your organization's list \
                                                    when the message gives only its ID."),
                                     connect_active_notify[sender] => move |row| {
-                                        sender.input(AccountsInput::SetGraphLabels(row.is_active()));
+                                        sender.input_sender().emit(AccountsInput::SetGraphLabels(row.is_active()));
                                     },
                                 },
                                 // How the last request for access went.
@@ -1816,7 +1816,7 @@ impl Component for AccountsWindow {
                                     set_subtitle: &i18n("For Gmail and others that file sent mail \
                                                    themselves. Disables both Save a copy rows above."),
                                     connect_active_notify[sender] => move |row| {
-                                        sender.input(AccountsInput::SetServerSavesSent(row.is_active()));
+                                        sender.input_sender().emit(AccountsInput::SetServerSavesSent(row.is_active()));
                                     },
                                 },
                                 #[name = "folder_drafts_row"]
@@ -2036,7 +2036,7 @@ impl Component for AccountsWindow {
             let s = sender.clone();
             widgets.nav.connect_popped(move |_, page| {
                 if page.tag().is_some_and(|t| t == "editor") {
-                    s.input(AccountsInput::ReleaseSignatureEditor);
+                    s.input_sender().emit(AccountsInput::ReleaseSignatureEditor);
                 }
             });
         }
@@ -2121,7 +2121,7 @@ impl Component for AccountsWindow {
 
         // Auto-fill the label from the email as it's typed (until customized).
         let es = sender.clone();
-        widgets.email_row.connect_changed(move |_| es.input(AccountsInput::EmailChanged));
+        widgets.email_row.connect_changed(move |_| es.input_sender().emit(AccountsInput::EmailChanged));
 
         // The preview circle follows the name, label and email (its
         // initials) as they are typed; its color is a stylesheet.
@@ -2139,7 +2139,7 @@ impl Component for AccountsWindow {
         }
         for row in [&widgets.name_row, &widgets.label_row, &widgets.email_row] {
             let s = sender.clone();
-            row.connect_changed(move |_| s.input(AccountsInput::RefreshPreview));
+            row.connect_changed(move |_| s.input_sender().emit(AccountsInput::RefreshPreview));
         }
 
         // Tell the combined settings window when the editor subpage is up —
@@ -2222,20 +2222,20 @@ impl Component for AccountsWindow {
                     // asked, so that answer arrives separately.
                     Some("editor") => {
                         if self.editor_touched(widgets) {
-                            sender.input(AccountsInput::LeaveVerdict { page, touched: true });
+                            sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: true });
                         } else {
                             let s = sender.clone();
                             self.sig_editor(widgets).is_dirty(move |touched| {
-                                s.input(AccountsInput::LeaveVerdict { page, touched });
+                                s.input_sender().emit(AccountsInput::LeaveVerdict { page, touched });
                             });
                         }
                     }
                     // Nothing records what a filter or a tag was opened with,
                     // so those are always worth asking about.
                     Some("filter") | Some("tag") => {
-                        sender.input(AccountsInput::LeaveVerdict { page, touched: true })
+                        sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: true })
                     }
-                    _ => sender.input(AccountsInput::LeaveVerdict { page, touched: false }),
+                    _ => sender.input_sender().emit(AccountsInput::LeaveVerdict { page, touched: false }),
                 }
             }
 
@@ -2245,13 +2245,13 @@ impl Component for AccountsWindow {
                     return;
                 }
                 // Nothing to lose: close the editor and let the window move on.
-                sender.input(AccountsInput::CloseEditor);
+                sender.input_sender().emit(AccountsInput::CloseEditor);
                 let _ = sender.output(AccountsOutput::LeftEditor(page));
             }
 
             AccountsInput::SaveOpenPage => {
                 match widgets.nav.visible_page().and_then(|p| p.tag()).as_deref() {
-                    Some("editor") => sender.input(AccountsInput::Save),
+                    Some("editor") => sender.input_sender().emit(AccountsInput::Save),
                     Some("filter") | Some("tag") => {
                         let saved = self.form_save.borrow().as_ref().is_some_and(|f| f());
                         if saved {
@@ -2323,7 +2323,7 @@ impl Component for AccountsWindow {
                     // since a page can't be pushed while it is in the stack.
                     widgets.nav.pop();
                 }
-                sender.input(AccountsInput::EditAccount(i));
+                sender.input_sender().emit(AccountsInput::EditAccount(i));
             }
 
             AccountsInput::EditAccount(i) => {
@@ -2597,7 +2597,7 @@ impl Component for AccountsWindow {
                     let Ok(file) = res else { return };
                     let Some(path) = file.path() else { return };
                     match import_avatar_file(&path) {
-                        Ok(name) => s.input(AccountsInput::SetAvatar(name)),
+                        Ok(name) => s.input_sender().emit(AccountsInput::SetAvatar(name)),
                         Err(e) => tracing::warn!("could not import avatar {}: {e}", path.display()),
                     }
                 });
@@ -2741,7 +2741,7 @@ impl Component for AccountsWindow {
                 // Pull the signature HTML out of the editor first (async), then
                 // finish saving in SaveWithSig.
                 let s = sender.clone();
-                self.read_signature(widgets, move |html| s.input(AccountsInput::SaveWithSig(html)));
+                self.read_signature(widgets, move |html| s.input_sender().emit(AccountsInput::SaveWithSig(html)));
             }
 
             AccountsInput::SetFolderChoices(map) => {
@@ -2755,12 +2755,12 @@ impl Component for AccountsWindow {
                 // The view loads a new document either way, which forgets
                 // that the old one was edited.
                 let s = sender.clone();
-                self.sig_editor(widgets).is_dirty(move |dirty| s.input(AccountsInput::SigTextTouched(dirty)));
+                self.sig_editor(widgets).is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
                 let s = sender.clone();
                 if self.sig_editor(widgets).source_kind().is_some() {
-                    self.sig_editor(widgets).extract_source(move |text| s.input(AccountsInput::SignatureToRich(text)));
+                    self.sig_editor(widgets).extract_source(move |text| s.input_sender().emit(AccountsInput::SignatureToRich(text)));
                 } else {
-                    self.sig_editor(widgets).extract_html(move |html| s.input(AccountsInput::SignatureToSource(html)));
+                    self.sig_editor(widgets).extract_html(move |html| s.input_sender().emit(AccountsInput::SignatureToSource(html)));
                 }
             }
             AccountsInput::SignatureToSource(html) => {
@@ -3066,7 +3066,7 @@ impl Component for AccountsWindow {
                 let s = sender.clone();
                 dialog.connect_response(None, move |_, resp| {
                     if resp == "remove" {
-                        s.input(AccountsInput::ConfirmRemove);
+                        s.input_sender().emit(AccountsInput::ConfirmRemove);
                     }
                 });
                 dialog.present();
@@ -3446,7 +3446,7 @@ impl Component for AccountsWindow {
                     .is_some_and(|tag| tag == "editor");
                 // Queued, so it runs once the fields below are filled.
                 if std::mem::take(&mut self.save_waiting) && editor_up {
-                    sender.input(AccountsInput::Save);
+                    sender.input_sender().emit(AccountsInput::Save);
                 }
                 // Still editing that account: fill in what the user hasn't
                 // typed over meanwhile.
@@ -3683,9 +3683,9 @@ impl AccountsWindow {
     fn read_back_signature(&mut self, widgets: &AccountsWindowWidgets, sender: &ComponentSender<Self>, add: bool) {
         self.sig_reading = true;
         let s = sender.clone();
-        self.sig_editor(widgets).is_dirty(move |dirty| s.input(AccountsInput::SigTextTouched(dirty)));
+        self.sig_editor(widgets).is_dirty(move |dirty| s.input_sender().emit(AccountsInput::SigTextTouched(dirty)));
         let s = sender.clone();
-        self.read_signature(widgets, move |html| s.input(AccountsInput::SigStored { html, add }));
+        self.read_signature(widgets, move |html| s.input_sender().emit(AccountsInput::SigStored { html, add }));
     }
 
     /// The signatures Save writes: the empty ones left out, a missing name
@@ -5694,7 +5694,7 @@ impl AccountsWindow {
             // as the alias rows do.
             row.set_activatable(true);
             let s = sender.clone();
-            row.connect_activated(move |_| s.input(AccountsInput::EditFilter(i)));
+            row.connect_activated(move |_| s.input_sender().emit(AccountsInput::EditFilter(i)));
             // Every condition, joined the way the rule combines them (#192).
             let joiner = if r.any { i18n(" or ") } else { i18n(" and ") };
             let conditions: Vec<String> = r.conditions().iter().map(Self::condition_label).collect();
@@ -5741,7 +5741,7 @@ impl AccountsWindow {
             rm.set_valign(gtk::Align::Center);
             rm.set_tooltip_text(Some(i18n("Remove filter").as_str()));
             let s = sender.clone();
-            rm.connect_clicked(move |_| s.input(AccountsInput::RemoveFilter(i)));
+            rm.connect_clicked(move |_| s.input_sender().emit(AccountsInput::RemoveFilter(i)));
             row.add_suffix(&rm);
             let next = gtk::Image::from_icon_name("go-next-symbolic");
             next.add_css_class("dim-label");
@@ -5873,7 +5873,7 @@ impl AccountsWindow {
                 _ => return,
             };
             if !tags.is_empty() {
-                s.input(AccountsInput::ImportTags(tags));
+                s.input_sender().emit(AccountsInput::ImportTags(tags));
             }
         });
         dialog.present();
@@ -5891,7 +5891,7 @@ impl AccountsWindow {
             let row = adw::ActionRow::new();
             row.set_activatable(true);
             let s = sender.clone();
-            row.connect_activated(move |_| s.input(AccountsInput::EditSmartFolder(i)));
+            row.connect_activated(move |_| s.input_sender().emit(AccountsInput::EditSmartFolder(i)));
             row.set_title(&gtk::glib::markup_escape_text(&f.name));
             let account = if f.account_email.is_empty() { i18n("All accounts") } else { f.account_email.clone() };
             let folder = f.folder.map_or_else(|| i18n("All but Trash and Junk"), Self::smart_kind_label);
@@ -5902,7 +5902,7 @@ impl AccountsWindow {
             rm.set_valign(gtk::Align::Center);
             rm.set_tooltip_text(Some(i18n("Remove smart folder").as_str()));
             let s = sender.clone();
-            rm.connect_clicked(move |_| s.input(AccountsInput::RemoveSmartFolder(i)));
+            rm.connect_clicked(move |_| s.input_sender().emit(AccountsInput::RemoveSmartFolder(i)));
             row.add_suffix(&rm);
             list.append(&row);
         }
@@ -6230,7 +6230,7 @@ impl AccountsWindow {
                 any: combine_row.selected() == 1,
                 conditions,
             };
-            s.input(AccountsInput::SmartFolderSaved(edit_index, folder));
+            s.input_sender().emit(AccountsInput::SmartFolderSaved(edit_index, folder));
             true
         });
     }
@@ -6247,7 +6247,7 @@ impl AccountsWindow {
             let row = adw::ActionRow::new();
             row.set_activatable(true);
             let s = sender.clone();
-            row.connect_activated(move |_| s.input(AccountsInput::EditTag(i)));
+            row.connect_activated(move |_| s.input_sender().emit(AccountsInput::EditTag(i)));
             row.set_title(&gtk::glib::markup_escape_text(&t.name));
             row.set_subtitle(&gtk::glib::markup_escape_text(&t.keyword));
             let handle = gtk::Image::from_icon_name("list-drag-handle-symbolic");
@@ -6290,7 +6290,7 @@ impl AccountsWindow {
             rm.set_valign(gtk::Align::Center);
             rm.set_tooltip_text(Some(i18n("Remove tag").as_str()));
             let s = sender.clone();
-            rm.connect_clicked(move |_| s.input(AccountsInput::RemoveTag(i)));
+            rm.connect_clicked(move |_| s.input_sender().emit(AccountsInput::RemoveTag(i)));
             row.add_suffix(&rm);
             // A chevron says the row opens the tag's editor, as the
             // account and cloud rows do.
@@ -6504,7 +6504,7 @@ impl AccountsWindow {
                 keyword = "Tag".to_string();
             }
             let tag = Tag { name, keyword, color: chosen.borrow().clone() };
-            s.input(match edit_index {
+            s.input_sender().emit(match edit_index {
                 Some(i) => AccountsInput::TagEdited(i, tag),
                 None => AccountsInput::TagAdded(tag),
             });
@@ -7011,7 +7011,7 @@ impl AccountsWindow {
                 count_unread: count_row.is_active(),
             };
             rule.set_conditions(conditions);
-            s.input(match edit_index {
+            s.input_sender().emit(match edit_index {
                 Some(i) => AccountsInput::FilterEdited(i, rule),
                 None => AccountsInput::FilterAdded(rule),
             });

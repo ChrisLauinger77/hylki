@@ -814,7 +814,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n("Save as Template"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::SaveAsTemplate);
+                                                sender.input_sender().emit(ComposeInput::SaveAsTemplate);
                                             },
                                         },
                                         // Only while editing an existing draft: the
@@ -831,7 +831,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n("Delete Draft"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::DeleteDraft);
+                                                sender.input_sender().emit(ComposeInput::DeleteDraft);
                                             },
                                         },
                                     },
@@ -875,8 +875,8 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n("Send now"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::ClearSendAt);
-                                                sender.input(ComposeInput::Send);
+                                                sender.input_sender().emit(ComposeInput::ClearSendAt);
+                                                sender.input_sender().emit(ComposeInput::Send);
                                             },
                                         },
                                         gtk::Separator {},
@@ -887,7 +887,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n_f("Tomorrow morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::SendAt(preset_time(1, 8)));
+                                                sender.input_sender().emit(ComposeInput::SendAt(preset_time(1, 8)));
                                             },
                                         },
                                         gtk::Button {
@@ -897,7 +897,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n_f("Tomorrow afternoon ({time})", &[("time", &crate::datefmt::clock_label(13))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::SendAt(preset_time(1, 13)));
+                                                sender.input_sender().emit(ComposeInput::SendAt(preset_time(1, 13)));
                                             },
                                         },
                                         gtk::Button {
@@ -907,7 +907,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n_f("Monday morning ({time})", &[("time", &crate::datefmt::clock_label(8))]), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::SendAt(next_monday(8)));
+                                                sender.input_sender().emit(ComposeInput::SendAt(next_monday(8)));
                                             },
                                         },
                                         gtk::Separator {},
@@ -918,7 +918,7 @@ impl Component for Compose {
                                             set_child = &gtk::Label { set_label: &i18n("Pick a date and time…"), set_halign: gtk::Align::Start },
                                             connect_clicked[sender] => move |b| {
                                                 b.ancestor(gtk::Popover::static_type()).and_downcast::<gtk::Popover>().map(|p| p.popdown());
-                                                sender.input(ComposeInput::PickSendTime);
+                                                sender.input_sender().emit(ComposeInput::PickSendTime);
                                             },
                                         },
                                     },
@@ -943,7 +943,7 @@ impl Component for Compose {
                             #[watch]
                             set_visible: crate::pgp::available() && !model.narrow,
                             connect_toggled[sender] => move |b| {
-                                sender.input(ComposeInput::ToggleEncrypt(b.is_active()));
+                                sender.input_sender().emit(ComposeInput::ToggleEncrypt(b.is_active()));
                             },
                         },
                         #[name = "sign_btn"]
@@ -953,7 +953,7 @@ impl Component for Compose {
                             #[watch]
                             set_visible: crate::pgp::available() && !model.narrow,
                             connect_toggled[sender] => move |b| {
-                                sender.input(ComposeInput::ToggleSign(b.is_active()));
+                                sender.input_sender().emit(ComposeInput::ToggleSign(b.is_active()));
                             },
                         },
                         pack_end = &gtk::Button {
@@ -1000,7 +1000,7 @@ impl Component for Compose {
                             #[watch]
                             set_visible: model.compact && !model.windowed,
                             connect_toggled[sender] => move |b| {
-                                sender.input(ComposeInput::ShowFields(b.is_active()));
+                                sender.input_sender().emit(ComposeInput::ShowFields(b.is_active()));
                             },
                         },
                     },
@@ -1474,9 +1474,9 @@ impl Component for Compose {
                     adw::LengthUnit::Px,
                 ));
                 let s1 = s.clone();
-                bp.connect_apply(move |_| s1.input(ComposeInput::SetNarrow(true)));
+                bp.connect_apply(move |_| s1.input_sender().emit(ComposeInput::SetNarrow(true)));
                 let s2 = s.clone();
-                bp.connect_unapply(move |_| s2.input(ComposeInput::SetNarrow(false)));
+                bp.connect_unapply(move |_| s2.input_sender().emit(ComposeInput::SetNarrow(false)));
                 root.add_breakpoint(bp);
             });
         }
@@ -1637,7 +1637,7 @@ impl Component for Compose {
             let s = sender.clone();
             let paths = prefill.cloud_uploads.clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                s.input(ComposeInput::CloudPicked(paths));
+                s.input_sender().emit(ComposeInput::CloudPicked(paths));
             });
         }
 
@@ -1647,7 +1647,7 @@ impl Component for Compose {
         if std::env::var_os("HYLKI_SHOWCASE_CLOUD_DIALOG").is_some() && std::env::var_os("HYLKI_DEMO").is_some() {
             let s = sender.clone();
             gtk::glib::timeout_add_seconds_local_once(2, move || {
-                s.input(ComposeInput::CloudPicked(vec![std::path::PathBuf::from("/tmp/Q3 report.pdf")]));
+                s.input_sender().emit(ComposeInput::CloudPicked(vec![std::path::PathBuf::from("/tmp/Q3 report.pdf")]));
             });
         }
 
@@ -1727,14 +1727,14 @@ impl Component for Compose {
             let s = sender.clone();
             row.connect_changed(move |row| {
                 row.remove_css_class("error");
-                s.input(ComposeInput::Suggest(field));
-                s.input(ComposeInput::MarkFieldsDirty);
+                s.input_sender().emit(ComposeInput::Suggest(field));
+                s.input_sender().emit(ComposeInput::MarkFieldsDirty);
             });
 
             // Close the popover when the field loses focus.
             let focus = gtk::EventControllerFocus::new();
             let s = sender.clone();
-            focus.connect_leave(move |_| s.input(ComposeInput::CompletionClose));
+            focus.connect_leave(move |_| s.input_sender().emit(ComposeInput::CompletionClose));
             row.add_controller(focus);
         }
         widgets.reply_to_row.connect_changed(|row| row.remove_css_class("error"));
@@ -1742,7 +1742,7 @@ impl Component for Compose {
         let s = sender.clone();
         widgets
             .subject_row
-            .connect_changed(move |_| s.input(ComposeInput::MarkFieldsDirty));
+            .connect_changed(move |_| s.input_sender().emit(ComposeInput::MarkFieldsDirty));
         // The subject gets the body's red underlines too (#114): every edit
         // re-checks the line through enchant directly and paints error
         // underlines onto the row's inner GtkText — the row itself exposes
@@ -1811,7 +1811,7 @@ impl Component for Compose {
             // is the one the user means.
             if let Some(redo) = rich_editor::history_key(keyval, state) {
                 if !focus_is_entry(&key_root) {
-                    s.input(ComposeInput::History { redo });
+                    s.input_sender().emit(ComposeInput::History { redo });
                     return Propagation::Stop;
                 }
                 return Propagation::Proceed;
@@ -1833,7 +1833,7 @@ impl Component for Compose {
             // get there first and pass them on (app.rs).
             if let Some(step) = zoom_key(keyval, state) {
                 if zoomable.get() {
-                    s.input(ComposeInput::Zoom(step));
+                    s.input_sender().emit(ComposeInput::Zoom(step));
                     return Propagation::Stop;
                 }
                 return Propagation::Proceed;
@@ -1846,7 +1846,7 @@ impl Component for Compose {
             if state.contains(gtk::gdk::ModifierType::CONTROL_MASK)
                 && (keyval == gtk::gdk::Key::Return || keyval == gtk::gdk::Key::KP_Enter)
             {
-                s.input(ComposeInput::Send);
+                s.input_sender().emit(ComposeInput::Send);
                 return Propagation::Stop;
             }
             if !open.get() {
@@ -1855,23 +1855,23 @@ impl Component for Compose {
                 // (#290). Only once the suggestion list is closed, which
                 // Escape dismisses first (below), so one press never does both.
                 if keyval == gtk::gdk::Key::Escape {
-                    s.input(ComposeInput::Cancel);
+                    s.input_sender().emit(ComposeInput::Cancel);
                     return Propagation::Stop;
                 }
                 return Propagation::Proceed;
             }
             // Compare by value (the const-as-pattern match wasn't matching).
             if keyval == gtk::gdk::Key::Down {
-                s.input(ComposeInput::CompletionMove(1));
+                s.input_sender().emit(ComposeInput::CompletionMove(1));
                 Propagation::Stop
             } else if keyval == gtk::gdk::Key::Up {
-                s.input(ComposeInput::CompletionMove(-1));
+                s.input_sender().emit(ComposeInput::CompletionMove(-1));
                 Propagation::Stop
             } else if keyval == gtk::gdk::Key::Return || keyval == gtk::gdk::Key::KP_Enter {
-                s.input(ComposeInput::CompletionAccept);
+                s.input_sender().emit(ComposeInput::CompletionAccept);
                 Propagation::Stop
             } else if keyval == gtk::gdk::Key::Escape {
-                s.input(ComposeInput::CompletionClose);
+                s.input_sender().emit(ComposeInput::CompletionClose);
                 Propagation::Stop
             } else {
                 Propagation::Proceed
@@ -1909,11 +1909,11 @@ impl Component for Compose {
                     break 'handle;
                 }
                 if self.fields_dirty {
-                    sender.input(ComposeInput::ConfirmDiscard);
+                    sender.input_sender().emit(ComposeInput::ConfirmDiscard);
                 } else {
                     let s = sender.clone();
                     self.editor.is_dirty(move |body_dirty| {
-                        s.input(if body_dirty { ComposeInput::ConfirmDiscard } else { ComposeInput::Discard });
+                        s.input_sender().emit(if body_dirty { ComposeInput::ConfirmDiscard } else { ComposeInput::Discard });
                     });
                 }
             }
@@ -1944,7 +1944,7 @@ impl Component for Compose {
 
             ComposeInput::SendAt(at) => {
                 self.send_at = Some(at);
-                sender.input(ComposeInput::Send);
+                sender.input_sender().emit(ComposeInput::Send);
             }
 
             ComposeInput::ClearSendAt => {
@@ -1977,7 +1977,7 @@ impl Component for Compose {
             ComposeInput::OverflowMenu => {
                 let entry = |label: String, icon: &str, msg: fn() -> ComposeInput| {
                     let s = sender.clone();
-                    MenuEntry::new(&label, move || s.input(msg()))
+                    MenuEntry::new(&label, move || s.input_sender().emit(msg()))
                         .icon(&format!("{icon}-symbolic"))
                 };
                 // Save Draft, Save as Template and Delete Draft are not here:
@@ -2043,9 +2043,9 @@ impl Component for Compose {
             }
 
             ComposeInput::DroppedFiles(choice, paths) => match choice {
-                DropChoice::Attach => sender.input(ComposeInput::AddAttachments(paths)),
+                DropChoice::Attach => sender.input_sender().emit(ComposeInput::AddAttachments(paths)),
                 DropChoice::Inline => self.editor.insert_files(&paths),
-                DropChoice::Cloud => sender.input(ComposeInput::CloudPicked(paths)),
+                DropChoice::Cloud => sender.input_sender().emit(ComposeInput::CloudPicked(paths)),
             },
 
             ComposeInput::CloudPicked(paths) => {
@@ -2055,7 +2055,7 @@ impl Component for Compose {
 
             ComposeInput::CloudUpload { paths, account, link_password } => {
                 if !account.has_secret() {
-                    sender.input(ComposeInput::CloudUploadSignedIn { paths, account, link_password, password: Some(String::new()) });
+                    sender.input_sender().emit(ComposeInput::CloudUploadSignedIn { paths, account, link_password, password: Some(String::new()) });
                     break 'handle;
                 }
                 // Off the main thread: the keyring may wait on its user.
@@ -2257,13 +2257,13 @@ impl Component for Compose {
                 // Save only if the user actually edited something, so navigating
                 // away from a pristine quote-only reply doesn't litter Drafts.
                 if self.fields_dirty {
-                    sender.input(ComposeInput::SaveDraft);
+                    sender.input_sender().emit(ComposeInput::SaveDraft);
                 } else {
                     let s = sender.clone();
                     let id = self.compose_id;
                     self.editor.is_dirty(move |body_dirty| {
                         if body_dirty {
-                            s.input(ComposeInput::SaveDraft);
+                            s.input_sender().emit(ComposeInput::SaveDraft);
                         } else {
                             let _ = s.output(ComposeOutput::Close(id));
                         }
@@ -2436,7 +2436,7 @@ impl Component for Compose {
                     break 'handle;
                 };
                 if account.signatures.len() < 2 {
-                    sender.input(ComposeInput::InsertSignature(SigPlace::Cursor));
+                    sender.input_sender().emit(ComposeInput::InsertSignature(SigPlace::Cursor));
                     break 'handle;
                 }
                 // The one in the message is drawn as chosen; a body that
@@ -2448,12 +2448,12 @@ impl Component for Compose {
                     .enumerate()
                     .map(|(i, sig)| {
                         let s = sender.clone();
-                        MenuEntry::new(&sig.name, move || s.input(ComposeInput::UseSignature(Some(i))))
+                        MenuEntry::new(&sig.name, move || s.input_sender().emit(ComposeInput::UseSignature(Some(i))))
                             .selected(!self.current_sig.is_empty() && sig.html == self.current_sig)
                     })
                     .collect();
                 let s = sender.clone();
-                let none = MenuEntry::new(i18n("No Signature"), move || s.input(ComposeInput::UseSignature(None)))
+                let none = MenuEntry::new(i18n("No Signature"), move || s.input_sender().emit(ComposeInput::UseSignature(None)))
                     .selected(self.current_sig.is_empty());
                 let btn = &self.signature_btn;
                 show_context_menu(btn, (btn.width() / 2) as f64, btn.height() as f64, vec![list, vec![none]]);
@@ -2476,7 +2476,7 @@ impl Component for Compose {
             ComposeInput::SignatureMenu => {
                 let entry = |label: String, place: SigPlace| {
                     let s = sender.clone();
-                    MenuEntry::new(&label, move || s.input(ComposeInput::InsertSignature(place)))
+                    MenuEntry::new(&label, move || s.input_sender().emit(ComposeInput::InsertSignature(place)))
                 };
                 let btn = &self.signature_btn;
                 show_context_menu(
@@ -2664,7 +2664,7 @@ impl Component for Compose {
                 let quoted = v["q"].as_str().unwrap_or_default().to_string();
                 let entry = |code: String, label: String| {
                     let s = sender.clone();
-                    MenuEntry::new(label, move || s.input(ComposeInput::TranslateTo(code.clone())))
+                    MenuEntry::new(label, move || s.input_sender().emit(ComposeInput::TranslateTo(code.clone())))
                 };
                 // Back to what was written, or to the translation again,
                 // while the translation is still the last thing done to the
@@ -2676,7 +2676,7 @@ impl Component for Compose {
                 };
                 let toggle = toggle.map(|(label, original)| {
                     let s = sender.clone();
-                    vec![MenuEntry::new(label, move || s.input(ComposeInput::TranslateToggle { original }))]
+                    vec![MenuEntry::new(label, move || s.input_sender().emit(ComposeInput::TranslateToggle { original }))]
                 });
                 // First what the conversation suggests: the language of the
                 // message being answered, then the one last used.
@@ -2860,7 +2860,7 @@ impl Component for Compose {
                     self.editor.eval(
                         "String(!!(window.__hylkiPlainLoses&&window.__hylkiPlainLoses()))",
                         move |loses| {
-                            s.input(if loses == "true" {
+                            s.input_sender().emit(if loses == "true" {
                                 ComposeInput::AskPlain
                             } else {
                                 ComposeInput::ApplyFormat(ComposeFormat::Plain)
@@ -2869,7 +2869,7 @@ impl Component for Compose {
                     );
                     break 'handle;
                 }
-                sender.input(ComposeInput::ApplyFormat(to));
+                sender.input_sender().emit(ComposeInput::ApplyFormat(to));
             }
 
             ComposeInput::AskPlain => {
@@ -2927,7 +2927,7 @@ impl Component for Compose {
                 // cannot share the rich document's undo history.
                 let s = sender.clone();
                 self.read_body_as(from, false, move |body, _| {
-                    s.input(ComposeInput::LoadAs { from, to, body });
+                    s.input_sender().emit(ComposeInput::LoadAs { from, to, body });
                 });
             }
 
@@ -2969,7 +2969,7 @@ impl Component for Compose {
                 }
                 let s = sender.clone();
                 self.read_body_as(self.format, false, move |body, _| {
-                    s.input(ComposeInput::ShowPreview(body));
+                    s.input_sender().emit(ComposeInput::ShowPreview(body));
                 });
             }
 
@@ -2992,7 +2992,7 @@ impl Component for Compose {
                 match result {
                     Ok(()) => {
                         self.pgp_cleared = Some(checked);
-                        sender.input(ComposeInput::Send);
+                        sender.input_sender().emit(ComposeInput::Send);
                     }
                     Err(problem) => {
                         let parent = widgets.to_row.root().and_downcast::<gtk::Window>();
@@ -3098,7 +3098,7 @@ impl Component for Compose {
                                 })
                                 .await
                                 .unwrap_or_else(|_| Err("task failed".into()));
-                                s.input(ComposeInput::PgpChecked { checked, result });
+                                s.input_sender().emit(ComposeInput::PgpChecked { checked, result });
                             });
                         }
                         break 'handle;
@@ -3123,7 +3123,7 @@ impl Component for Compose {
                 // `outgoing_body` converts.
                 let s = sender.clone();
                 self.read_body_as(self.format, true, move |html, text| {
-                    s.input(ComposeInput::SendBody {
+                    s.input_sender().emit(ComposeInput::SendBody {
                         html,
                         text,
                         to: to.clone(),
@@ -3167,7 +3167,7 @@ impl Component for Compose {
                     .unwrap_or_else(|_| self.accounts.get(idx).and_then(|a| a.alias_from.clone()));
                 let s = sender.clone();
                 self.read_body_as(self.format, false, move |html, text| {
-                    s.input(ComposeInput::SaveDraftBody {
+                    s.input_sender().emit(ComposeInput::SaveDraftBody {
                         html,
                         text,
                         to: to.clone(),
@@ -3215,12 +3215,12 @@ impl Component for Compose {
                 // Not before anything was written: an untouched reply is
                 // no draft.
                 if self.fields_dirty {
-                    sender.input(ComposeInput::AutoSaveRead);
+                    sender.input_sender().emit(ComposeInput::AutoSaveRead);
                 } else {
                     let s = sender.clone();
                     self.editor.is_dirty(move |dirty| {
                         if dirty {
-                            s.input(ComposeInput::AutoSaveRead);
+                            s.input_sender().emit(ComposeInput::AutoSaveRead);
                         }
                     });
                 }
@@ -3242,7 +3242,7 @@ impl Component for Compose {
                     .unwrap_or_else(|_| self.accounts.get(idx).and_then(|a| a.alias_from.clone()));
                 let s = sender.clone();
                 self.read_body_as(self.format, false, move |html, text| {
-                    s.input(ComposeInput::AutoSaveBody {
+                    s.input_sender().emit(ComposeInput::AutoSaveBody {
                         html,
                         text,
                         to: to.clone(),
@@ -3597,7 +3597,7 @@ window.__hylkiDirty=true;})()"#
         .map(|format| {
             let s = sender.clone();
             let label = format!("{} — {}", format_label(format), format_hint(format));
-            MenuEntry::new(&label, move || s.input(ComposeInput::SetFormat(format)))
+            MenuEntry::new(&label, move || s.input_sender().emit(ComposeInput::SetFormat(format)))
                 .icon(format_icon(format))
                 .selected(format == self.format)
         })
@@ -3997,7 +3997,7 @@ window.__hylkiDirty=true;})()"#
         let attach = |sender: &ComponentSender<Self>| {
             let path = std::env::temp_dir().join("hylki-undo-probe.txt");
             let _ = std::fs::write(&path, b"probe");
-            sender.input(ComposeInput::AddAttachments(vec![path]));
+            sender.input_sender().emit(ComposeInput::AddAttachments(vec![path]));
         };
         if step == 0 {
             // The widget has to hold focus, not just the document, or the
@@ -4013,8 +4013,8 @@ window.__hylkiDirty=true;})()"#
                 0 => type_in(&self.editor, "ONETWO"),
                 1..=3 => self.editor.editing_command("DeleteBackward"),
                 4 => attach(&sender),
-                5..=9 => sender.input(ComposeInput::History { redo: false }),
-                10..=12 => sender.input(ComposeInput::History { redo: true }),
+                5..=9 => sender.input_sender().emit(ComposeInput::History { redo: false }),
+                10..=12 => sender.input_sender().emit(ComposeInput::History { redo: true }),
                 _ => {}
             }
         } else if pausing {
@@ -4022,8 +4022,8 @@ window.__hylkiDirty=true;})()"#
                 0 => type_in(&self.editor, "ONE"),
                 1 => {}                       // the long wait below
                 2 => type_in(&self.editor, "TWO"),
-                3..=6 => sender.input(ComposeInput::History { redo: false }),
-                7..=9 => sender.input(ComposeInput::History { redo: true }),
+                3..=6 => sender.input_sender().emit(ComposeInput::History { redo: false }),
+                7..=9 => sender.input_sender().emit(ComposeInput::History { redo: true }),
                 _ => {}
             }
         } else {
@@ -4031,8 +4031,8 @@ window.__hylkiDirty=true;})()"#
                 0 => type_in(&self.editor, "ONE"),
                 1 => attach(&sender),
                 2 => type_in(&self.editor, "TWO"),
-                3..=8 => sender.input(ComposeInput::History { redo: false }),
-                9..=11 => sender.input(ComposeInput::History { redo: true }),
+                3..=8 => sender.input_sender().emit(ComposeInput::History { redo: false }),
+                9..=11 => sender.input_sender().emit(ComposeInput::History { redo: true }),
                 _ => {}
             }
         }
@@ -4045,7 +4045,7 @@ window.__hylkiDirty=true;})()"#
         gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(gap), move || {
             let report = move |body: String| {
                 tracing::info!(target: "hylki::compose::undo", "step {step}: body {body:?}");
-                s.input(ComposeInput::ShowcaseHistory(step + 1));
+                s.input_sender().emit(ComposeInput::ShowcaseHistory(step + 1));
             };
             if editor.source_kind().is_some() {
                 editor.extract_source(report);

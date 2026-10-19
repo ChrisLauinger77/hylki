@@ -890,7 +890,7 @@ impl MessageView {
                 let input = std::cell::RefCell::new(Some(input));
                 button.connect_clicked(move |_| {
                     if let Some(i) = input.borrow_mut().take() {
-                        s.input(i);
+                        s.input_sender().emit(i);
                     }
                     p.popdown();
                 });
@@ -1844,19 +1844,19 @@ impl Component for MessageView {
                             set_hexpand: true,
                             set_placeholder_text: Some(i18n("Find in message").as_str()),
                             connect_search_changed[sender] => move |entry| {
-                                sender.input(MessageViewInput::FindChanged(entry.text().to_string()));
+                                sender.input_sender().emit(MessageViewInput::FindChanged(entry.text().to_string()));
                             },
                             connect_activate[sender] => move |_| {
-                                sender.input(MessageViewInput::FindNext);
+                                sender.input_sender().emit(MessageViewInput::FindNext);
                             },
                             connect_stop_search[sender] => move |_| {
-                                sender.input(MessageViewInput::CloseFind);
+                                sender.input_sender().emit(MessageViewInput::CloseFind);
                             },
                             add_controller = gtk::EventControllerFocus {
                                 connect_leave[sender] => move |ctl| {
                                     let Some(entry) = ctl.widget().and_downcast::<gtk::SearchEntry>() else { return };
                                     let sender = sender.clone();
-                                    crate::ui::close_if_focus_left_row(&entry, move || sender.input(MessageViewInput::CloseFind));
+                                    crate::ui::close_if_focus_left_row(&entry, move || sender.input_sender().emit(MessageViewInput::CloseFind));
                                 },
                             },
                         },
@@ -1982,7 +1982,7 @@ impl Component for MessageView {
                                 // Setting it to what is already shown (a new
                                 // message, a theme change) does nothing.
                                 connect_active_notify[sender] => move |sw| {
-                                    sender.input(MessageViewInput::SetMessageFlipped(sw.is_active()));
+                                    sender.input_sender().emit(MessageViewInput::SetMessageFlipped(sw.is_active()));
                                 },
                             },
                         },
@@ -2225,7 +2225,7 @@ impl Component for MessageView {
                 page_fade.release(view);
                 let s = ready_sender.clone();
                 gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(600), move || {
-                    s.input(MessageViewInput::Rendered);
+                    s.input_sender().emit(MessageViewInput::Rendered);
                 });
                 if click_link && !clicked.get() {
                     let view = view.clone();
@@ -2306,7 +2306,7 @@ impl Component for MessageView {
                         if selected {
                             target.selection = text;
                         }
-                        s.input(MessageViewInput::CardMenuAt { key, x, y, hit: target });
+                        s.input_sender().emit(MessageViewInput::CardMenuAt { key, x, y, hit: target });
                     },
                 );
                 true
@@ -2334,9 +2334,9 @@ impl Component for MessageView {
                 match verb {
                     // Every message frame has loaded and been sized: the layout
                     // has settled, so there is something worth revealing.
-                    "ready" => open_sender.input(MessageViewInput::Rendered),
-                    "desel" => open_sender.input(MessageViewInput::ClearCards),
-                    "selall" => open_sender.input(MessageViewInput::SelectAllCards),
+                    "ready" => open_sender.input_sender().emit(MessageViewInput::Rendered),
+                    "desel" => open_sender.input_sender().emit(MessageViewInput::ClearCards),
+                    "selall" => open_sender.input_sender().emit(MessageViewInput::SelectAllCards),
                     // Ctrl+C over a body frame the engine would not copy from
                     // itself: the selected text, for the clipboard.
                     "copy" => {
@@ -2350,13 +2350,13 @@ impl Component for MessageView {
                     // little menu) — compose to it. `extra` is the bare address.
                     "composeto" => {
                         if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender.input(MessageViewInput::ComposeTo(addr.to_string()));
+                            open_sender.input_sender().emit(MessageViewInput::ComposeTo(addr.to_string()));
                         }
                     }
                     // "Add to Contacts" from the address menu.
                     "addcontact" => {
                         if let Some(addr) = extra.map(str::trim).filter(|a| !a.is_empty()) {
-                            open_sender.input(MessageViewInput::AddContact(addr.to_string()));
+                            open_sender.input_sender().emit(MessageViewInput::AddContact(addr.to_string()));
                         }
                     }
                     // "Copy Address" from the address menu.
@@ -2378,7 +2378,7 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, w, h, vw] = nums[..] {
-                            open_sender.input(MessageViewInput::SenderInfoAt {
+                            open_sender.input_sender().emit(MessageViewInput::SenderInfoAt {
                                 account_id,
                                 id,
                                 rect: (x, y, w, h),
@@ -2392,7 +2392,7 @@ impl Component for MessageView {
                             Some("r") => SelectMode::Range,
                             _ => SelectMode::Plain,
                         };
-                        open_sender.input(MessageViewInput::CardClicked {
+                        open_sender.input_sender().emit(MessageViewInput::CardClicked {
                             account_id,
                             id,
                             mode,
@@ -2400,18 +2400,18 @@ impl Component for MessageView {
                     }
                     "size" => {
                         if let Some(Ok(height)) = extra.map(|h| h.parse::<u32>()) {
-                            open_sender.input(MessageViewInput::FrameSized {
+                            open_sender.input_sender().emit(MessageViewInput::FrameSized {
                                 account_id,
                                 id,
                                 height,
                             });
                         }
                     }
-                    "open" => open_sender.input(MessageViewInput::OpenHeader { account_id, id }),
-                    "seen" => open_sender.input(MessageViewInput::MarkSeen { account_id, id }),
-                    "unsub" => open_sender.input(MessageViewInput::Unsubscribe { account_id, id }),
+                    "open" => open_sender.input_sender().emit(MessageViewInput::OpenHeader { account_id, id }),
+                    "seen" => open_sender.input_sender().emit(MessageViewInput::MarkSeen { account_id, id }),
+                    "unsub" => open_sender.input_sender().emit(MessageViewInput::Unsubscribe { account_id, id }),
                     // A card's template banner (#360); `extra` is the button.
-                    "tpl" => open_sender.input(MessageViewInput::TemplateAction {
+                    "tpl" => open_sender.input_sender().emit(MessageViewInput::TemplateAction {
                         account_id,
                         id,
                         edit: extra.map(str::trim) == Some("edit"),
@@ -2428,7 +2428,7 @@ impl Component for MessageView {
                             _ => None,
                         };
                         if let Some(action) = action {
-                            open_sender.input(MessageViewInput::InviteAction {
+                            open_sender.input_sender().emit(MessageViewInput::InviteAction {
                                 account_id,
                                 id,
                                 action,
@@ -2438,7 +2438,7 @@ impl Component for MessageView {
                     // A card's attachment chip (#213); `extra` is the index.
                     "attopen" | "attsave" => {
                         let index = extra.and_then(|x| x.trim().parse::<usize>().ok()).unwrap_or(0);
-                        open_sender.input(MessageViewInput::AttachmentAction {
+                        open_sender.input_sender().emit(MessageViewInput::AttachmentAction {
                             account_id,
                             id,
                             index,
@@ -2451,37 +2451,37 @@ impl Component for MessageView {
                             .and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)))
                             .unwrap_or((0, 0));
                         open_sender
-                            .input(MessageViewInput::FindCounted { current: cur, total });
+                            .input_sender().emit(MessageViewInput::FindCounted { current: cur, total });
                     }
-                    "reply" => open_sender.input(MessageViewInput::CardAction {
+                    "reply" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::Reply,
                         account_id,
                         id,
                     }),
-                    "replyall" => open_sender.input(MessageViewInput::CardAction {
+                    "replyall" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::ReplyAll,
                         account_id,
                         id,
                     }),
-                    "forward" => open_sender.input(MessageViewInput::CardAction {
+                    "forward" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::Forward,
                         account_id,
                         id,
                     }),
-                    "star" => open_sender.input(MessageViewInput::CardAction {
+                    "star" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::ToggleStar,
                         account_id,
                         id,
                     }),
-                    "spam" => open_sender.input(MessageViewInput::CardAction {
+                    "spam" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::Spam,
                         account_id,
                         id,
                     }),
                     "remote" => {
-                        open_sender.input(MessageViewInput::ToggleRemote { account_id, id })
+                        open_sender.input_sender().emit(MessageViewInput::ToggleRemote { account_id, id })
                     }
-                    "archive" => open_sender.input(MessageViewInput::CardAction {
+                    "archive" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::Archive,
                         account_id,
                         id,
@@ -2493,7 +2493,7 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, vw] = nums[..] {
-                            open_sender.input(MessageViewInput::CardMenuFrom {
+                            open_sender.input_sender().emit(MessageViewInput::CardMenuFrom {
                                 account_id,
                                 id,
                                 x,
@@ -2509,7 +2509,7 @@ impl Component for MessageView {
                             .map(|e| e.split(',').filter_map(|n| n.parse().ok()).collect())
                             .unwrap_or_default();
                         if let [x, y, vw] = nums[..] {
-                            open_sender.input(MessageViewInput::CardMoveAt {
+                            open_sender.input_sender().emit(MessageViewInput::CardMoveAt {
                                 account_id,
                                 id,
                                 x,
@@ -2518,39 +2518,39 @@ impl Component for MessageView {
                             });
                         }
                     }
-                    "delete" => open_sender.input(MessageViewInput::CardAction {
+                    "delete" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::Delete,
                         account_id,
                         id,
                     }),
-                    "toggleread" => open_sender.input(MessageViewInput::CardAction {
+                    "toggleread" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::ToggleRead,
                         account_id,
                         id,
                     }),
                     // Translate on a card, or its banner's button (#327).
-                    "translate" | "tr" => open_sender.input(MessageViewInput::Translate { account_id, id }),
+                    "translate" | "tr" => open_sender.input_sender().emit(MessageViewInput::Translate { account_id, id }),
                     // A header folded or opened its card (#326).
-                    "fold" => open_sender.input(MessageViewInput::Folded {
+                    "fold" => open_sender.input_sender().emit(MessageViewInput::Folded {
                         account_id,
                         id,
                         folded: extra == Some("1"),
                     }),
-                    "viewsource" => open_sender.input(MessageViewInput::CardAction {
+                    "viewsource" => open_sender.input_sender().emit(MessageViewInput::CardAction {
                         action: RowAction::ViewSource,
                         account_id,
                         id,
                     }),
                     "contact" => {
-                        open_sender.input(MessageViewInput::CardContact { account_id, id })
+                        open_sender.input_sender().emit(MessageViewInput::CardContact { account_id, id })
                     }
                     "senderfmt" => {
-                        open_sender.input(MessageViewInput::ToggleSenderStyle { account_id, id })
+                        open_sender.input_sender().emit(MessageViewInput::ToggleSenderStyle { account_id, id })
                     }
                     // "scrollat:<aid>:<id>:<offset>" — the topmost visible card.
                     "scrollat" => {
                         if let Some(Ok(offset)) = extra.map(|o| o.parse::<u32>()) {
-                            open_sender.input(MessageViewInput::ScrollAnchor {
+                            open_sender.input_sender().emit(MessageViewInput::ScrollAnchor {
                                 account_id,
                                 id,
                                 offset,
@@ -2564,30 +2564,35 @@ impl Component for MessageView {
 
         // Re-render the body when the light/dark preference changes so unstyled
         // content tracks the theme live.
-        let style_manager = adw::StyleManager::default();
-        let theme_sender = sender.clone();
         {
             let s = sender.input_sender().clone();
             model.webview.connect_map(move |_| {
                 let _ = s.send(MessageViewInput::Mapped);
             });
         }
-        style_manager.connect_dark_notify(move |_| {
-            theme_sender.input(MessageViewInput::ThemeChanged);
-        });
-        // The same for an appearance theme, which moves the colors without
-        // touching the light/dark preference. The watcher holds the reader's
-        // view weakly, so a closed message window stops being told.
+        // The style manager outlives a message window's reader, so the
+        // handler takes itself off once the reader is gone (#488).
         {
-            let theme_sender = sender.clone();
-            let weak = model.webview.downgrade();
-            crate::theme::connect_changed(move || {
-                if weak.upgrade().is_none() {
-                    return false;
+            let s = sender.input_sender().clone();
+            let handler = std::rc::Rc::new(std::cell::Cell::new(None));
+            let id = adw::StyleManager::default().connect_dark_notify({
+                let handler = handler.clone();
+                move |manager| {
+                    if s.send(MessageViewInput::ThemeChanged).is_err() {
+                        if let Some(id) = handler.take() {
+                            manager.disconnect(id);
+                        }
+                    }
                 }
-                theme_sender.input(MessageViewInput::ThemeChanged);
-                true
             });
+            handler.set(Some(id));
+        }
+        // The same for an appearance theme, which moves the colors without
+        // touching the light/dark preference. A closed message window's
+        // reader drops its watcher the next time the theme changes.
+        {
+            let s = sender.input_sender().clone();
+            crate::theme::connect_changed(move || s.send(MessageViewInput::ThemeChanged).is_ok());
         }
 
         let header_tags = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -3466,7 +3471,7 @@ impl Component for MessageView {
                 // CSS pixels → widget pixels (the page may be zoomed); from
                 // there it is the same menu the right-click path opens.
                 let ratio = self.webview.width() as f64 / page_width.max(1.0);
-                sender.input(MessageViewInput::CardMenuAt {
+                sender.input_sender().emit(MessageViewInput::CardMenuAt {
                     key: Some((account_id, id)),
                     x: x * ratio,
                     y: y * ratio,
@@ -3552,7 +3557,7 @@ impl Component for MessageView {
             MessageViewInput::OpenFind => {
                 // The toolbar button toggles: a second press collapses the bar.
                 if self.find_open {
-                    sender.input(MessageViewInput::CloseFind);
+                    sender.input_sender().emit(MessageViewInput::CloseFind);
                     return;
                 }
                 if self
@@ -5613,7 +5618,7 @@ fn confirm_trust(
     let fingerprint = key.fingerprint.clone();
     dialog.connect_response(None, move |_, resp| {
         if resp == "trust" {
-            sender.input(MessageViewInput::PgpTrustConfirmed { account_id, id, fingerprint: fingerprint.clone() });
+            sender.input_sender().emit(MessageViewInput::PgpTrustConfirmed { account_id, id, fingerprint: fingerprint.clone() });
         }
     });
     dialog.present();

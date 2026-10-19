@@ -452,15 +452,15 @@ impl Component for MessageWindow {
                 if state.contains(gtk::gdk::ModifierType::CONTROL_MASK) {
                     // Shift+P is the preview; the keyval arrives capitalised.
                     if keyval == gtk::gdk::Key::P {
-                        s.input(MessageWindowInput::PrintPreview);
+                        s.input_sender().emit(MessageWindowInput::PrintPreview);
                         return gtk::glib::Propagation::Stop;
                     }
                     if keyval == gtk::gdk::Key::p {
-                        s.input(MessageWindowInput::Print);
+                        s.input_sender().emit(MessageWindowInput::Print);
                         return gtk::glib::Propagation::Stop;
                     }
                     if keyval == gtk::gdk::Key::f {
-                        s.input(MessageWindowInput::Find);
+                        s.input_sender().emit(MessageWindowInput::Find);
                         return gtk::glib::Propagation::Stop;
                     }
                 }

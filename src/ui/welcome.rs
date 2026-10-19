@@ -458,7 +458,7 @@ impl Component for Welcome {
         lang.set_selected(choices.iter().position(|(_, c)| *c == current).unwrap_or(0) as u32);
         {
             let s = sender.clone();
-            lang.connect_selected_notify(move |d| s.input(WelcomeInput::LanguageChanged(d.selected())));
+            lang.connect_selected_notify(move |d| s.input_sender().emit(WelcomeInput::LanguageChanged(d.selected())));
         }
         lang_row.append(&lang);
         // Fair warning: a pick restarts the app.
@@ -475,7 +475,7 @@ impl Component for Welcome {
         start.set_margin_top(10);
         {
             let s = sender.clone();
-            start.connect_clicked(move |_| s.input(WelcomeInput::Next));
+            start.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::Next));
         }
         hero.append(&tag);
         hero.append(&lang_row);
@@ -544,9 +544,9 @@ impl Component for Welcome {
         }
         {
             let s = sender.clone();
-            open_goa.connect_clicked(move |_| s.input(WelcomeInput::OpenOnlineAccounts));
+            open_goa.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::OpenOnlineAccounts));
             let s = sender.clone();
-            rescan.connect_clicked(move |_| s.input(WelcomeInput::RescanGoa));
+            rescan.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::RescanGoa));
         }
         goa_links.append(&open_goa);
         goa_links.append(&rescan);
@@ -570,7 +570,7 @@ impl Component for Welcome {
         provider_row.set_selected(manual as u32);
         {
             let s = sender.clone();
-            provider_row.connect_selected_notify(move |_| s.input(WelcomeInput::ProviderChanged));
+            provider_row.connect_selected_notify(move |_| s.input_sender().emit(WelcomeInput::ProviderChanged));
         }
         let name_row = adw::EntryRow::new();
         name_row.set_title(&i18n("Your name"));
@@ -639,7 +639,7 @@ impl Component for Welcome {
         add_btn.set_margin_top(4);
         {
             let s = sender.clone();
-            add_btn.connect_clicked(move |_| s.input(WelcomeInput::TestAndAdd));
+            add_btn.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::TestAndAdd));
         }
         acct.append(&add_btn);
         // The result line sits under the button, account name and verdict
@@ -773,7 +773,7 @@ impl Component for Welcome {
         back_btn.set_visible(false);
         {
             let s = sender.clone();
-            back_btn.connect_clicked(move |_| s.input(WelcomeInput::Back));
+            back_btn.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::Back));
         }
         hb.pack_start(&back_btn);
         tv.add_top_bar(&hb);
@@ -789,7 +789,7 @@ impl Component for Welcome {
         footer_next.set_margin_bottom(8);
         {
             let s = sender.clone();
-            footer_next.connect_clicked(move |_| s.input(WelcomeInput::Next));
+            footer_next.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::Next));
         }
         content.append(&footer_next);
         let dots = adw::CarouselIndicatorDots::new();
@@ -802,7 +802,7 @@ impl Component for Welcome {
             carousel.connect_position_notify(move |car| {
                 let r = car.position().round() as u32;
                 btn.set_visible(r >= 1);
-                s.input(WelcomeInput::RefreshFooter);
+                s.input_sender().emit(WelcomeInput::RefreshFooter);
             });
         }
         // Typing in the manual form turns its Skip into Continue.
@@ -819,7 +819,7 @@ impl Component for Welcome {
             oauth_scope_row.upcast_ref(),
         ] {
             let s = sender.clone();
-            entry.connect_changed(move |_| s.input(WelcomeInput::RefreshFooter));
+            entry.connect_changed(move |_| s.input_sender().emit(WelcomeInput::RefreshFooter));
         }
         tv.set_content(Some(&content));
         root.set_content(Some(&tv));
@@ -883,7 +883,7 @@ impl Component for Welcome {
                     let s = s.clone();
                     gtk::glib::timeout_add_local_once(
                         std::time::Duration::from_millis(700 * i as u64),
-                        move || s.input(WelcomeInput::Next),
+                        move || s.input_sender().emit(WelcomeInput::Next),
                     );
                 }
                 let win = win.clone();
@@ -918,7 +918,7 @@ impl Component for Welcome {
                 let pos = widgets.carousel.position().round() as u32;
                 if pos + 1 >= widgets.carousel.n_pages() {
                     // The footer button on the last page is Finish.
-                    sender.input(WelcomeInput::Finish);
+                    sender.input_sender().emit(WelcomeInput::Finish);
                     return;
                 }
                 let next = widgets.carousel.nth_page(pos + 1);
@@ -1320,7 +1320,7 @@ fn rebuild_goa_rows(
         btn.add_css_class("suggested-action");
         btn.set_valign(gtk::Align::Center);
         let s = sender.clone();
-        btn.connect_clicked(move |_| s.input(WelcomeInput::ImportGoa(i)));
+        btn.connect_clicked(move |_| s.input_sender().emit(WelcomeInput::ImportGoa(i)));
         row.add_suffix(&btn);
         list.append(&row);
     }

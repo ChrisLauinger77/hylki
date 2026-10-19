@@ -135,6 +135,14 @@
   member's whole line as the address ("Book Club", `alice able
   <alice@example.org>`), which made an invalid recipient.
 
+- **Fixed: closing a message window just after it opened could crash
+  Hylki** (#488, reported and traced by XRayAdams). A message for the
+  window's reader that arrived after the window had closed (its page saying
+  it was ready, the timer behind it, a change between light and dark) went
+  to a part of the app that was gone, which stopped the program. Such
+  messages are now dropped, in message windows, composers, the Accounts
+  window and the welcome assistant alike.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a
