@@ -125,9 +125,7 @@ fn select_msg(row: UnifiedRow) -> SidebarInput {
     match row {
         UnifiedRow::Kind(FolderKind::Inbox) => SidebarInput::UnifiedRowSelected,
         UnifiedRow::Kind(kind) => SidebarInput::UnifiedKindRowSelected(kind),
-        // Folders of different accounts and kinds make no list together:
-        // the header only opens and folds them.
-        UnifiedRow::Favorites => SidebarInput::ToggleFavoritesExpand,
+        UnifiedRow::Favorites => SidebarInput::UnifiedFavoritesSelected,
         UnifiedRow::Filtered => SidebarInput::UnifiedFilteredSelected,
         UnifiedRow::Tags => SidebarInput::UnifiedTagsSelected,
         // Each smart folder is a view of its own; the header holds them.
@@ -275,6 +273,8 @@ pub enum Sel {
     UnifiedKind(FolderKind),
     /// The unified Filtered Folders row: every rule's folder, merged.
     UnifiedFiltered,
+    /// The Favorites row: every favorite folder, merged.
+    UnifiedFavorites,
     /// The unified Tags row: every tagged message.
     UnifiedTags,
     /// An account's folder picked in a unified Starred / Sent / Drafts
@@ -562,6 +562,8 @@ pub enum SidebarInput {
     UnifiedKindRowSelected(FolderKind),
     /// The unified Filtered Folders row was chosen (every rule's folder).
     UnifiedFilteredSelected,
+    /// The Favorites row was chosen (every favorite folder).
+    UnifiedFavoritesSelected,
     /// The unified Tags row was chosen (every tagged message).
     UnifiedTagsSelected,
     /// A row in a unified Starred / Sent / Drafts row's account list.
@@ -691,6 +693,8 @@ pub enum SidebarOutput {
     UnifiedKindSelected(FolderKind),
     /// The unified Filtered Folders row: every rule's folder, merged.
     UnifiedFilteredSelected,
+    /// The Favorites row: every favorite folder, merged.
+    UnifiedFavoritesSelected,
     /// The unified Tags row: every tagged message.
     UnifiedTagsSelected,
     /// A smart folder (#417), by its id.
@@ -1162,6 +1166,9 @@ impl Sidebar {
                 if self.selected == Sel::UnifiedFiltered && self.unified_folders.is_empty() {
                     self.selected = Sel::None;
                 }
+                if self.selected == Sel::UnifiedFavorites && !self.favorites_shown() {
+                    self.selected = Sel::None;
+                }
                 // All Inboxes gone (one account or none left in the unified
                 // section, #267): the usual first view is picked again.
                 if self.selected == Sel::Unified && !self.show_unified {
@@ -1483,16 +1490,6 @@ impl Sidebar {
 
             SidebarInput::ToggleFavoritesExpand => {
                 self.toggle_row(UnifiedRow::Favorites, &sender);
-                // The header is a toggle, not a view: it never stays picked.
-                if let Some(w) = self.kind_widgets.get(&UnifiedRow::Favorites) {
-                    let header = w.header.clone();
-                    let quiet = self.quiet.clone();
-                    gtk::glib::idle_add_local_once(move || {
-                        quiet.set(true);
-                        header.unselect_all();
-                        quiet.set(false);
-                    });
-                }
             }
 
             SidebarInput::ToggleSmartExpand => {
@@ -1585,6 +1582,15 @@ impl Sidebar {
                 self.selected = key.clone();
                 self.clear_other_selections(key);
                 let _ = sender.output(SidebarOutput::UnifiedKindSelected(kind));
+            }
+
+            SidebarInput::UnifiedFavoritesSelected => {
+                if self.selected == Sel::UnifiedFavorites {
+                    return;
+                }
+                self.selected = Sel::UnifiedFavorites;
+                self.clear_other_selections(Sel::UnifiedFavorites);
+                let _ = sender.output(SidebarOutput::UnifiedFavoritesSelected);
             }
 
             SidebarInput::UnifiedFilteredSelected => {
@@ -3548,9 +3554,9 @@ impl Sidebar {
 
         // A double click on the row opens or folds the list too, as the
         // chevron does; its first click selects the merged view as any
-        // click does. Favorites and Smart Folders fold on one click
-        // already, which a second would undo.
-        if !matches!(row_kind, UnifiedRow::Favorites | UnifiedRow::Smart) {
+        // click does. Smart Folders fold on one click already, which a
+        // second would undo.
+        if row_kind != UnifiedRow::Smart {
             let double = gtk::GestureClick::new();
             double.set_button(gtk::gdk::BUTTON_PRIMARY);
             let cs = sender.input_sender().clone();
@@ -4565,7 +4571,8 @@ impl Sidebar {
         for (row, w) in &self.kind_widgets {
             let keep_header = match row {
                 UnifiedRow::Kind(k) => keep == Sel::UnifiedKind(*k),
-                UnifiedRow::Favorites | UnifiedRow::Smart => false,
+                UnifiedRow::Favorites => keep == Sel::UnifiedFavorites,
+                UnifiedRow::Smart => false,
                 UnifiedRow::Filtered => keep == Sel::UnifiedFiltered,
                 UnifiedRow::Tags => keep == Sel::UnifiedTags,
                 UnifiedRow::Contacts => keep == Sel::Contacts,
@@ -4760,6 +4767,7 @@ impl Sidebar {
             Sel::Tag(acc, kw) => self.select_tag(acc, &kw),
             Sel::UnifiedKind(kind) => self.select_row_header(UnifiedRow::Kind(kind)),
             Sel::UnifiedFiltered => self.select_row_header(UnifiedRow::Filtered),
+            Sel::UnifiedFavorites => self.select_row_header(UnifiedRow::Favorites),
             Sel::UnifiedTags => self.select_row_header(UnifiedRow::Tags),
             Sel::Smart(id) => {
                 if let Some(w) = self.kind_widgets.get(&UnifiedRow::Smart) {

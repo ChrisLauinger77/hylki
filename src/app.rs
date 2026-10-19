@@ -1458,6 +1458,8 @@ pub enum UnifiedView {
     Kind(FolderKind),
     /// Every filter rule's folder listed under All Inboxes.
     Filtered,
+    /// Every favorite folder.
+    Favorites,
 }
 
 /// One attachment of one message on the server, to be removed (#289).
@@ -5157,6 +5159,7 @@ impl SimpleComponent for AppModel {
                         "junk" => SidebarInput::UnifiedKindRowSelected(FolderKind::Junk),
                         "trash" => SidebarInput::UnifiedKindRowSelected(FolderKind::Trash),
                         "filtered" => SidebarInput::UnifiedFilteredSelected,
+                        "favorites" => SidebarInput::UnifiedFavoritesSelected,
                         "tags" => SidebarInput::UnifiedTagsSelected,
                         "smart" => SidebarInput::SmartRowSelected(0),
                         _ => SidebarInput::UnifiedKindRowSelected(FolderKind::Sent),
@@ -16523,6 +16526,7 @@ impl AppModel {
             UnifiedView::Kind(FolderKind::Inbox) => self.unified_inboxes_shown(),
             UnifiedView::Kind(kind) => self.multi_account() && self.unified_kinds.has(kind),
             UnifiedView::Filtered => self.filtered_shown(),
+            UnifiedView::Favorites => self.favorites_placement.shown() && !self.favorites.is_empty(),
         };
         if listed {
             // A reconnect has emptied the account list; each account's
@@ -16545,6 +16549,7 @@ impl AppModel {
             UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
             UnifiedView::Kind(kind) => crate::ui::sidebar::Sel::UnifiedKind(kind),
             UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
+            UnifiedView::Favorites => crate::ui::sidebar::Sel::UnifiedFavorites,
         });
         self.leave_gallery();
         self.showing_contacts = false;
@@ -23938,6 +23943,11 @@ impl AppModel {
                 .into_iter()
                 .map(|r| (r.account_id, r.folder.id, r.folder.path))
                 .collect(),
+            UnifiedView::Favorites => self
+                .favorite_folder_refs()
+                .into_iter()
+                .map(|r| (r.account_id, r.folder.id, r.folder.path))
+                .collect(),
         }
     }
 
@@ -23950,6 +23960,10 @@ impl AppModel {
             }
             UnifiedView::Filtered => self
                 .unified_folder_refs()
+                .iter()
+                .any(|r| r.account_id == account_id && r.folder.id == folder_id),
+            UnifiedView::Favorites => self
+                .favorite_folder_refs()
                 .iter()
                 .any(|r| r.account_id == account_id && r.folder.id == folder_id),
         }
@@ -25737,6 +25751,9 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         }
         SidebarOutput::UnifiedFilteredSelected => {
             AppMsg::UnifiedSelected(UnifiedView::Filtered)
+        }
+        SidebarOutput::UnifiedFavoritesSelected => {
+            AppMsg::UnifiedSelected(UnifiedView::Favorites)
         }
         SidebarOutput::UnifiedTagsSelected => {
             AppMsg::TagSelected { keyword: None, account: None }

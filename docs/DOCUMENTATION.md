@@ -168,8 +168,8 @@ The chevrons open and close the items in the sidebar. Clicking a folder
 opens it and leaves its sub-folders as they were. Clicking the name of the
 Folders or Tags heading of an account does nothing; the chevron beside it
 opens or closes the section. Clicking Inboxes, Starred, Sent, Drafts,
-Archive, Junk or Trash in the unified section, or Filters, Tags or
-Contacts, opens the combined list without showing each account's folder under it, and
+Archive, Junk or Trash in the unified section, or Favorites, Filters, Tags
+or Contacts, opens the combined list without showing each account's folder under it, and
 double-clicking it opens or closes that list as its chevron does. An
 account's header works the same way: its chevron, or a double click on the
 header, opens or closes its folders, and a single click elsewhere on it
@@ -198,10 +198,11 @@ the list.
 ### Favorites
 
 Right-click any folder in the sidebar and choose **Add to Favorites** to list
-it in a Favorites row at the top of the sidebar, under Inboxes. Favorites can
-come from any account, keep the order they were added in, and show their
-unread counts; the folder's glyph takes its account's color. Clicking
-Favorites opens or closes the list. **Remove from Favorites**, in the same
+it in a Favorites row above the accounts (**Settings → Sidebar → Sections**
+can move it). Favorites can come from any account, keep the order they were
+added in, and show their unread counts; the folder's glyph takes its
+account's color. Clicking Favorites lists the mail of every favorite folder
+together; its chevron, or a double click, opens or closes the list. **Remove from Favorites**, in the same
 menu or on the favorite itself, takes it out, and the row goes when the last
 one does. Favorites show with a single account too, and for an account left
 out of All Inboxes.

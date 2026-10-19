@@ -55,6 +55,11 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Changed: Favorites lists every favorite folder's mail.** A click on
+  the Favorites row shows the mail of all of them together, as Filters
+  does for its folders; the chevron or a double click opens and closes
+  the list, where a click used to.
+
 - **Changed: Filters, Tags, Favorites and Contacts left the unified
   section.** Settings → Sidebar → Sections places each above the accounts,
   below them, or Off, out of the sidebar; wherever they are, they are rows
@@ -75,8 +80,8 @@
   with one click.
 
 - **Added: a double click opens or closes a unified row.** Inboxes,
-  Starred, Sent, Drafts, Archive, Junk, Trash, Filters, Tags and Contacts
-  in the sidebar open or close their list on a double click, as with their chevron; the first click still opens the combined
+  Starred, Sent, Drafts, Archive, Junk, Trash, Favorites, Filters, Tags and
+  Contacts in the sidebar open or close their list on a double click, as with their chevron; the first click still opens the combined
   view.
 
 - **Changed: Contacts is a row of the sidebar.** It opens
