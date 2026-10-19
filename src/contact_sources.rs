@@ -429,7 +429,10 @@ fn list_own() -> Vec<Source> {
             status: None,
         });
     }
-    accounts.sort_by_key(|s| s.title.to_lowercase());
+    // By name, and two of one name (an address used for iCloud and for
+    // Microsoft 365) always in the same order: the books are read from a
+    // map, whose order changes from one read to the next.
+    accounts.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()).then_with(|| a.id.cmp(&b.id)));
     out.extend(accounts);
     out
 }

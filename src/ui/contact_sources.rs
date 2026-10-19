@@ -18,9 +18,11 @@ use crate::directory::{self, Directory, Security};
 use crate::i18n::{i18n, i18n_f, i18n_noop, ni18n_f};
 
 /// What the editor page shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Editing {
-    Source(usize),
+    /// A source's page, by its ID: its place in the list can change as
+    /// the list is read again.
+    Source(String),
     Add,
 }
 
@@ -361,12 +363,15 @@ impl SimpleComponent for ContactSources {
                 self.add_btn.set_sensitive(eds);
                 self.no_eds.set_visible(!eds);
                 self.rebuild(&sender);
-                // An open page about a source follows it, unless it holds a
-                // form being typed in.
-                if let Some(Editing::Source(i)) = self.editing {
-                    if self.save_action.borrow().is_none() && i < self.sources.len() {
-                        self.open_source(i, &sender);
-                    }
+                // An open page about a source follows it, wherever it is
+                // listed now, unless it holds a form being typed in.
+                let at = match &self.editing {
+                    Some(Editing::Source(id)) => self.sources.iter().position(|s| s.id == *id),
+                    _ => None,
+                };
+                let typing = self.save_action.borrow().is_some();
+                if let (Some(i), false) = (at, typing) {
+                    self.open_source(i, &sender);
                 }
             }
             ContactSourcesInput::SetBooks(books) => {
@@ -432,8 +437,10 @@ impl SimpleComponent for ContactSources {
                 self.close_editor();
             }
             ContactSourcesInput::RemoveCurrent => {
-                if let Some(Editing::Source(i)) = self.editing {
-                    sender.input(ContactSourcesInput::ConfirmRemove(i));
+                if let Some(Editing::Source(id)) = &self.editing {
+                    if let Some(i) = self.sources.iter().position(|s| s.id == *id) {
+                        sender.input(ContactSourcesInput::ConfirmRemove(i));
+                    }
                 }
             }
             ContactSourcesInput::ConfirmRemove(i) => {
@@ -618,7 +625,7 @@ impl ContactSources {
     /// The page about one source.
     fn open_source(&mut self, index: usize, sender: &ComponentSender<Self>) {
         let Some(source) = self.sources.get(index).cloned() else { return };
-        self.editing = Some(Editing::Source(index));
+        self.editing = Some(Editing::Source(source.id.clone()));
         *self.save_action.borrow_mut() = None;
         self.editor_page.set_title(&source.title);
         let removable = matches!(source.kind, Kind::CardDav(_) | Kind::Ldap(_));
