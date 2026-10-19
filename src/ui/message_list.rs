@@ -10,7 +10,7 @@ use relm4::prelude::*;
 use crate::models::{Message, ThreadSummary};
 use crate::ui::context_menu::{show_context_menu_popover, MenuEntry};
 use crate::i18n::i18n;
-use crate::ui::message_row::{DaySection, RowData, RowMeta, RowShared};
+use crate::ui::message_row::{DaySection, RowData, RowMeta, RowShared, Slot};
 pub use crate::ui::message_row::{tag_menu_entries, RowAction};
 
 /// The message-list pane's floor: exactly what a conversation-member card
@@ -1556,8 +1556,10 @@ pub enum MessageListOutput {
     /// only that message — so the reader must not go looking for its siblings.
     Selected { message: Message, thread: Vec<Message>, solo: bool },
     /// Every selected message, whenever that changes — the reader outlines the
-    /// matching cards.
-    SelectionKeys(Vec<(u32, u32)>),
+    /// matching cards. Each comes with its folder: a view of several folders
+    /// can hold one UID twice in an account, and the app has to act on the
+    /// row selected, not another folder's message (#481).
+    SelectionKeys(Vec<Slot>),
     /// Gmail's o or Enter opened a row (#392); `already_open` when it was
     /// the one already in the reader, so no new selection follows.
     OpenedByKey { already_open: bool },
@@ -2628,7 +2630,8 @@ impl SimpleComponent for MessageList {
                 sender.input(MessageListInput::SelectionChanged);
             }
             MessageListInput::SelectionChanged => {
-                let keys = self.keys_at(&self.selected_positions());
+                let positions = self.selected_positions();
+                let keys = self.keys_at(&positions);
                 self.selection_count = keys.len();
                 // Set from the reader, which is already showing these messages:
                 // mirror the selection but leave the reader alone. Reporting it
@@ -2648,7 +2651,7 @@ impl SimpleComponent for MessageList {
                 if !keys.is_empty() {
                     self.late_select = None;
                 }
-                let _ = sender.output(MessageListOutput::SelectionKeys(keys.clone()));
+                let _ = sender.output(MessageListOutput::SelectionKeys(self.slots_at(&positions)));
                 if self.checking {
                     // Checked rows are not opened, one or many (#392).
                     self.selected_id = None;
@@ -3274,7 +3277,7 @@ impl SimpleComponent for MessageList {
                 }
                 if self.checking {
                     self.selection_count = self.selected_ids.len();
-                    let _ = sender.output(MessageListOutput::SelectionKeys(self.selected_ids.clone()));
+                    let _ = sender.output(MessageListOutput::SelectionKeys(self.slots_at(&self.selected_positions())));
                     let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
                 }
 
@@ -3391,7 +3394,7 @@ impl SimpleComponent for MessageList {
                 }
                 self.selection_count = self.selected_ids.len();
                 if self.checking {
-                    let _ = sender.output(MessageListOutput::SelectionKeys(self.selected_ids.clone()));
+                    let _ = sender.output(MessageListOutput::SelectionKeys(self.slots_at(&self.selected_positions())));
                     let _ = sender.output(MessageListOutput::Checked(Some(self.selection_count)));
                 }
                 // Keep the header count honest; no rebuild follows.
@@ -3601,8 +3604,8 @@ pub struct SelectionProbe {
 }
 
 impl SelectionProbe {
-    /// `(account_id, id)` of each selected row, in list order.
-    pub fn keys(&self) -> Vec<(u32, u32)> {
+    /// Where each selected row's message sits, in list order.
+    pub fn slots(&self) -> Vec<Slot> {
         let set = self.selection.selection();
         let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else {
             return Vec::new();
@@ -3610,7 +3613,7 @@ impl SelectionProbe {
         std::iter::once(first)
             .chain(iter)
             .filter_map(|p| self.model.row(p as usize))
-            .map(|r| (r.msg.account_id, r.msg.id))
+            .map(|r| thread_slot(&r.msg))
             .collect()
     }
 }
@@ -4269,6 +4272,10 @@ impl MessageList {
 
     fn keys_at(&self, positions: &[usize]) -> Vec<(u32, u32)> {
         positions.iter().filter_map(|&p| self.shown.get(p).map(|m| (m.account_id, m.id))).collect()
+    }
+
+    fn slots_at(&self, positions: &[usize]) -> Vec<Slot> {
+        positions.iter().filter_map(|&p| self.shown.get(p).map(|m| thread_slot(m))).collect()
     }
 
     /// Select exactly these rows, telling GTK only if that changes anything.

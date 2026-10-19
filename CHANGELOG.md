@@ -165,6 +165,14 @@
   account has a row of its own under Starred that lists only its starred
   mail.
 
+- **Fixed: a star or tag key reached only some of the selected messages in
+  Filters** (#481, reported by amadeusp). With several messages selected,
+  `s` and the tag number keys looked each one up by its UID, which only one
+  folder keeps unique. The Filters view lists several folders of an account
+  at once, so a message with the same UID in another folder could be found
+  instead, and the selected one was left as it was. Each selected message is
+  now looked up in its own folder.
+
 - **Fixed: the unified views were slow to open.** Every visit to Inboxes,
   Starred, Sent, Drafts, Archive, Junk or Trash copied and merged every
   account's folder, grouped all of it into conversations and described each

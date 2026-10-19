@@ -1378,6 +1378,11 @@ pub struct AppModel {
     /// Every message currently selected (list rows or reader cards), newest
     /// report wins. Lets the toolbar's Delete act on the whole multi-selection.
     list_selection: Vec<(u32, u32)>,
+    /// The folder of each message in `list_selection` when the list made
+    /// it, `(account_id, folder_id, id)`. The id is a UID, which several
+    /// folders of the Filters view can share, so it is these that say which
+    /// message each row is (#481). Empty for cards picked in the reader.
+    list_slots: Vec<crate::ui::message_row::Slot>,
     /// How many rows Gmail's x has checked, while it is checking them
     /// (#392): they are acted on, not opened.
     checked: Option<usize>,
@@ -1578,7 +1583,7 @@ pub enum AppMsg {
     /// so what is on screen groups with what was found.
     RefsRepaired { account_id: u32, folder_id: u32 },
     /// The list's selection changed; the reader outlines the matching cards.
-    SelectionKeys(Vec<(u32, u32)>),
+    SelectionKeys(Vec<crate::ui::message_row::Slot>),
     /// Gmail's x checked rows, this many, or stopped checking (#392).
     ListChecked(Option<usize>),
     /// A composer asked for, built now that the busy pointer is drawn.
@@ -2140,7 +2145,7 @@ pub enum AppMsg {
     ToggleTagCurrent(String),
     /// A tag's number key, with the list rows selected when it was pressed
     /// (#416).
-    TagKey { n: u8, keys: Vec<(u32, u32)> },
+    TagKey { n: u8, slots: Vec<crate::ui::message_row::Slot> },
     /// Put the reader's target back in its Inbox (from Trash or Junk, #138).
     MoveToInbox,
     /// Pop the tag menu on the reader toolbar's tag button.
@@ -3571,6 +3576,7 @@ impl SimpleComponent for AppModel {
             listed_thread: Vec::new(),
             reader_focus_pending: false,
             list_selection: Vec::new(),
+            list_slots: Vec::new(),
             checked: None,
             compose_waiting: false,
             compose_now: false,
@@ -4729,7 +4735,7 @@ impl SimpleComponent for AppModel {
             let probe = model.message_list.model().selection_probe();
             // A tag key carries the rows selected as it is pressed (#416).
             let shortcut = move |action: Shortcut| match action {
-                Shortcut::Tag(n) => AppMsg::TagKey { n, keys: probe.keys() },
+                Shortcut::Tag(n) => AppMsg::TagKey { n, slots: probe.slots() },
                 action => AppMsg::Shortcut(action),
             };
             // The first key of a Gmail sequence (g or *) and when it came.
@@ -10748,7 +10754,7 @@ impl SimpleComponent for AppModel {
                 self.toggle_tag(keyword, &targets);
             }
 
-            AppMsg::TagKey { n, keys } => {
+            AppMsg::TagKey { n, slots } => {
                 // Settings order, first nine. A number past the list does
                 // nothing rather than something surprising.
                 let Some(keyword) = self.tags.get(usize::from(n).saturating_sub(1)).map(|t| t.keyword.clone()) else {
@@ -10758,11 +10764,9 @@ impl SimpleComponent for AppModel {
                 // heard the list moved: the rows selected at the key press are
                 // the ones meant, or the tag lands on the row before and the
                 // next press takes it back off (#416).
+                let keys: Vec<(u32, u32)> = slots.iter().map(|&(a, _, id)| (a, id)).collect();
                 let targets = if !keys.is_empty() && keys != self.list_heard && keys != self.list_selection {
-                    keys.iter()
-                        .filter_map(|&(account_id, id)| self.shown_copy(account_id, id))
-                        .filter(|m| self.outbox_item(m.account_id, m.id).is_none())
-                        .collect()
+                    self.rows_at(&slots)
                 } else {
                     self.selected_targets()
                 };
@@ -12265,7 +12269,9 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::SelectionKeys(keys) => {
+            AppMsg::SelectionKeys(slots) => {
+                let keys: Vec<(u32, u32)> = slots.iter().map(|&(a, _, id)| (a, id)).collect();
+                self.list_slots = slots;
                 self.list_heard = keys.clone();
                 self.list_selection = keys.clone();
                 self.selection_from_cards = false;
@@ -12287,6 +12293,7 @@ impl SimpleComponent for AppModel {
 
             AppMsg::SelectCards(keys) => {
                 self.list_selection = keys.clone();
+                self.list_slots.clear();
                 self.selection_from_cards = !keys.is_empty();
                 // Reading is click-driven: scrolling past a conversation
                 // message no longer marks it, so an arriving reply stays
@@ -15075,12 +15082,45 @@ impl AppModel {
         if !self.many_selected() {
             return Vec::new();
         }
+        if !self.selection_from_cards && self.list_slots.len() == self.list_selection.len() {
+            return self.rows_at(&self.list_slots);
+        }
         self.list_selection
             .iter()
             .filter_map(|&(account_id, id)| self.shown_copy(account_id, id))
             // A queued message has no server flags to set.
             .filter(|m| self.outbox_item(m.account_id, m.id).is_none())
             .collect()
+    }
+
+    /// The messages of these list rows, each from its own folder: a UID
+    /// alone could find another folder's message, and in the Filters view
+    /// every selected row but the open one did (#481).
+    fn rows_at(&self, slots: &[crate::ui::message_row::Slot]) -> Vec<Message> {
+        slots
+            .iter()
+            .filter_map(|&(account_id, folder_id, id)| self.shown_copy_in(account_id, folder_id, id))
+            // A queued message has no server flags to set.
+            .filter(|m| self.outbox_item(m.account_id, m.id).is_none())
+            .collect()
+    }
+
+    /// `shown_copy`, held to one folder.
+    fn shown_copy_in(&self, account_id: u32, folder_id: u32, id: u32) -> Option<Message> {
+        let same = |m: &&Message| m.account_id == account_id && m.folder_id == folder_id && m.id == id;
+        self.current
+            .iter()
+            .chain(self.current_thread.iter())
+            .find(same)
+            .or_else(|| {
+                self.message_cache
+                    .get(&(account_id, folder_id))
+                    .into_iter()
+                    .chain(self.unified_slices.get(&(account_id, folder_id)))
+                    .flatten()
+                    .find(same)
+            })
+            .cloned()
     }
 
     /// The freshest copy of a message the window is showing: the open one,
@@ -23157,6 +23197,7 @@ impl AppModel {
         self.current_thread.remove(pos);
         self.listed_thread.retain(|k| *k != key);
         self.list_selection.retain(|k| *k != key);
+        self.list_slots.retain(|&(a, f, id)| (a, f, id) != (m.account_id, m.folder_id, m.id));
         self.list_heard.retain(|k| *k != key);
         let was_current = self.current.as_ref().is_some_and(|c| (c.account_id, c.id) == key);
         if was_current {
@@ -23168,6 +23209,7 @@ impl AppModel {
         // toolbar still has a message to act on.
         if let Some(c) = self.current.as_ref().filter(|_| self.list_selection.is_empty()) {
             self.list_selection = vec![(c.account_id, c.id)];
+            self.list_slots = vec![(c.account_id, c.folder_id, c.id)];
             self.list_heard = self.list_selection.clone();
             self.selection_from_cards = false;
             self.message_view.emit(MessageViewInput::SetSelectedCards(self.list_selection.clone()));
