@@ -191,8 +191,9 @@ a confirmation that lists them.
 Contacts **Above the accounts**, **Below the accounts** or **Off**, which
 leaves it out of the sidebar. Wherever they are, they are rows like the
 unified section's, with a chevron that opens their list. **Section style**
-set to **Like the accounts** draws all four as headings instead, like an
-account's Tags: a caret that opens and closes the list, and the name.
+set to **Tree style** draws all four as a tree instead: the caret that
+opens and closes the list stands where the icon was, and the row has no
+chevron at its end. Clicking the name opens the combined view either way.
 
 ### Favorites
 

@@ -69,8 +69,8 @@
   below them, or Off, out of the sidebar; wherever they are, they are rows
   like the unified section's, with a chevron on the right, and their items
   sit in from the row as the address books under Contacts do. Section
-  style, Like the accounts, draws all four as headings instead, as Filters
-  and Tags were above or below the accounts before. A setting that
+  style, Tree style, draws all four as a tree instead, the caret in the
+  icon's place and the name still opening the combined view. A setting that
   had one in the unified section now has it above the accounts, or Off
   where its switch was off. Their switches among the unified rows, the
   Contacts in the sidebar switch and the Filters unread-count switch are

@@ -7205,8 +7205,12 @@ msgid "Software"
 msgstr "Software"
 
 #, fuzzy
-msgid "Like the accounts"
-msgstr "Sopra gli account"
+msgid "Unified style"
+msgstr "Unificato"
+
+#, fuzzy
+msgid "Tree style"
+msgstr "Azioni"
 
 msgid "Above the accounts"
 msgstr "Sopra gli account"
@@ -7665,9 +7669,6 @@ msgstr "Modifica cartella smart…"
 
 msgid "Delete Smart Folder…"
 msgstr "Elimina cartella smart…"
-
-msgid "Show or hide filters"
-msgstr "Mostra o nascondi i filtri"
 
 msgid "Show or hide tags"
 msgstr "Mostra o nascondi le etichette"
@@ -8329,6 +8330,13 @@ msgstr "La posta in arrivo unificata in modalità chiara"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Like the accounts"
+#~ msgstr "Sopra gli account"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Mostra o nascondi i filtri"
 
 #~ msgid ""
 #~ "A unified inbox combining every account, at the top of the sidebar. Only "

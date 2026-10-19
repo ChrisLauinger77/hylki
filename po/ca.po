@@ -7141,8 +7141,12 @@ msgid "Software"
 msgstr "Programari"
 
 #, fuzzy
-msgid "Like the accounts"
-msgstr "A sobre dels comptes"
+msgid "Unified style"
+msgstr "Unificat"
+
+#, fuzzy
+msgid "Tree style"
+msgstr "Accions"
 
 msgid "Above the accounts"
 msgstr "A sobre dels comptes"
@@ -7599,9 +7603,6 @@ msgstr "Edita la carpeta intel·ligent…"
 
 msgid "Delete Smart Folder…"
 msgstr "Suprimeix la carpeta intel·ligent…"
-
-msgid "Show or hide filters"
-msgstr "Mostra o amaga els filtres"
 
 msgid "Show or hide tags"
 msgstr "Mostra o amaga les etiquetes"
@@ -8260,6 +8261,13 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Like the accounts"
+#~ msgstr "A sobre dels comptes"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Mostra o amaga els filtres"
 
 #~ msgid ""
 #~ "A unified inbox combining every account, at the top of the sidebar. Only "

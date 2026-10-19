@@ -2361,9 +2361,10 @@ pub enum SectionStyle {
     /// combined view, with a chevron on the right.
     #[default]
     Unified,
-    /// As an account's Tags heading: a caret and a label that opens and
-    /// closes the list.
-    Headings,
+    /// As a tree: the caret that opens and closes the list in the icon's
+    /// place, no chevron at the row's end; the name still opens the view.
+    #[serde(alias = "headings")]
+    Tree,
 }
 
 impl SectionPlacement {

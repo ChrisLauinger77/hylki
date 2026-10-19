@@ -7244,8 +7244,12 @@ msgid "Software"
 msgstr ""
 
 #, fuzzy
-msgid "Like the accounts"
-msgstr "Над учётными записями"
+msgid "Unified style"
+msgstr "Общие"
+
+#, fuzzy
+msgid "Tree style"
+msgstr "Действия"
 
 msgid "Above the accounts"
 msgstr "Над учётными записями"
@@ -7710,9 +7714,6 @@ msgstr "Редактировать фильтр…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Удалить папку…"
-
-msgid "Show or hide filters"
-msgstr "Показать или скрыть фильтры"
 
 msgid "Show or hide tags"
 msgstr "Показать или скрыть метки"
@@ -8374,6 +8375,13 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Like the accounts"
+#~ msgstr "Над учётными записями"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Показать или скрыть фильтры"
 
 #~ msgid ""
 #~ "A unified inbox combining every account, at the top of the sidebar. Only "

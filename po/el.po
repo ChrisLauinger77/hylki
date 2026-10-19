@@ -7235,8 +7235,12 @@ msgid "Software"
 msgstr "Λογισμικό"
 
 #, fuzzy
-msgid "Like the accounts"
-msgstr "Πάνω από τους λογαριασμούς"
+msgid "Unified style"
+msgstr "Ενοποιημένα"
+
+#, fuzzy
+msgid "Tree style"
+msgstr "Ενέργειες"
 
 msgid "Above the accounts"
 msgstr "Πάνω από τους λογαριασμούς"
@@ -7694,9 +7698,6 @@ msgstr "Επεξεργασία έξυπνου φακέλου…"
 
 msgid "Delete Smart Folder…"
 msgstr "Διαγραφή έξυπνου φακέλου…"
-
-msgid "Show or hide filters"
-msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 msgid "Show or hide tags"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
@@ -8377,6 +8378,13 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Like the accounts"
+#~ msgstr "Πάνω από τους λογαριασμούς"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 #~ msgid ""
 #~ "A unified inbox combining every account, at the top of the sidebar. Only "

@@ -4210,12 +4210,12 @@ impl Component for Preferences {
         widgets.unified_junk_row.set_active(init.unified_kinds.junk);
         widgets.unified_trash_row.set_active(init.unified_kinds.trash);
         widgets.section_style_row.set_model(Some(&gtk::StringList::new(&[
-            i18n("Unified").as_str(),
-            i18n("Like the accounts").as_str(),
+            i18n("Unified style").as_str(),
+            i18n("Tree style").as_str(),
         ])));
         widgets
             .section_style_row
-            .set_selected(u32::from(init.section_style == crate::config::SectionStyle::Headings));
+            .set_selected(u32::from(init.section_style == crate::config::SectionStyle::Tree));
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
@@ -5412,7 +5412,7 @@ impl Component for Preferences {
             }
             PrefInput::ChangeSectionStyle(idx) => {
                 let style = if idx == 1 {
-                    crate::config::SectionStyle::Headings
+                    crate::config::SectionStyle::Tree
                 } else {
                     crate::config::SectionStyle::Unified
                 };

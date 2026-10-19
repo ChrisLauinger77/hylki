@@ -6315,7 +6315,10 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
-msgid "Like the accounts"
+msgid "Unified style"
+msgstr ""
+
+msgid "Tree style"
 msgstr ""
 
 msgid "Above the accounts"
@@ -6762,9 +6765,6 @@ msgid "Edit Smart Folder…"
 msgstr ""
 
 msgid "Delete Smart Folder…"
-msgstr ""
-
-msgid "Show or hide filters"
 msgstr ""
 
 msgid "Show or hide tags"

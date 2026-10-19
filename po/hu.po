@@ -7251,8 +7251,12 @@ msgid "Software"
 msgstr ""
 
 #, fuzzy
-msgid "Like the accounts"
-msgstr "A fiókok felett"
+msgid "Unified style"
+msgstr "Egységes"
+
+#, fuzzy
+msgid "Tree style"
+msgstr "Műveletek"
 
 msgid "Above the accounts"
 msgstr "A fiókok felett"
@@ -7736,9 +7740,6 @@ msgstr "Szűrő szerkesztése…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Mappa törlése…"
-
-msgid "Show or hide filters"
-msgstr "Szűrők megjelenítése vagy elrejtése"
 
 msgid "Show or hide tags"
 msgstr "Címkék megjelenítése vagy elrejtése"
@@ -8410,6 +8411,13 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#, fuzzy
+#~ msgid "Like the accounts"
+#~ msgstr "A fiókok felett"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Szűrők megjelenítése vagy elrejtése"
 
 #~ msgid ""
 #~ "A unified inbox combining every account, at the top of the sidebar. Only "
