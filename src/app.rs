@@ -18612,7 +18612,7 @@ impl AppModel {
             prefill,
             accounts,
             selected,
-            suggestions: crate::contacts::suggestions(&own),
+            own_addresses: own,
             windowed,
             can_toggle,
             compact: false,

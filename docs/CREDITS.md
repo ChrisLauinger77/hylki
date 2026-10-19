@@ -130,6 +130,9 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
 - [**Konstantin Adamov**](https://github.com/XRayAdams) ([#487](https://github.com/hyprlab/hylki/issues/487)):
   a message body shown before its remote images have loaded, instead of
   staying blank until the window was resized.
+- [**Artur Heinze**](https://github.com/aheinze) ([#484](https://github.com/hyprlab/hylki/pull/484)):
+  Reply and New Message opening while the contact service hangs, with
+  recipient suggestions loaded in the background.
 
 
 ## Reports, design and ideas
