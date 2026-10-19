@@ -761,6 +761,9 @@ pub struct AppModel {
     /// Inboxes, its Starred / Sent / Drafts for those rows, or every
     /// filter rule's folder for the Filtered Folders row.
     unified_view: UnifiedView,
+    /// The one account the unified view is narrowed to: an account's row
+    /// under the unified Starred row, for one with no Starred folder (#482).
+    unified_account: Option<u32>,
     /// (account, folder) → that folder's latest messages, for the unified
     /// view's merge.
     unified_slices: HashMap<(u32, u32), Vec<Message>>,
@@ -1492,6 +1495,9 @@ pub enum AppMsg {
     /// / Sent / Drafts row (every account's folder of that kind), or its
     /// Filtered Folders row (every rule's folder).
     UnifiedSelected(UnifiedView),
+    /// An account's starred mail, for an account with no Starred folder
+    /// (#482): the unified Starred view narrowed to it.
+    AccountStarredSelected(u32),
     /// Show the attachments gallery (sidebar "Attachments" row).
     ShowAttachments,
     /// Show the Outbox (queued, unsent messages).
@@ -3490,6 +3496,7 @@ impl SimpleComponent for AppModel {
             attachment_cache: crate::ram_cache::RamCache::new(ATTACHMENT_CACHE_BUDGET),
             unified: false,
             unified_view: UnifiedView::Kind(FolderKind::Inbox),
+            unified_account: None,
             unified_slices: HashMap::new(),
             unified_boot_requested: HashSet::new(),
             sent_index_requested: HashSet::new(),
@@ -5158,9 +5165,14 @@ impl SimpleComponent for AppModel {
                 }
                 // HYLKI_SHOWCASE_UNIFIED=sent|starred|drafts|archive|junk|trash|smart opens that unified
                 // row at 3s, All Inboxes at 6s and the row again at 9s, so the
-                // timing logs show a cold and a warm open.
+                // timing logs show a cold and a warm open. starred@N picks the
+                // Nth account's row under Starred instead.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_UNIFIED") {
+                    let sub = which.strip_prefix("starred@").and_then(|n| n.parse::<i32>().ok());
                     let pick = move || match which.as_str() {
+                        _ if let Some(index) = sub => {
+                            SidebarInput::KindSubRowSelected { kind: FolderKind::Starred, index }
+                        }
                         "starred" => SidebarInput::UnifiedKindRowSelected(FolderKind::Starred),
                         "drafts" => SidebarInput::UnifiedKindRowSelected(FolderKind::Drafts),
                         "archive" => SidebarInput::UnifiedKindRowSelected(FolderKind::Archive),
@@ -6243,6 +6255,10 @@ impl SimpleComponent for AppModel {
 
             AppMsg::UnifiedSelected(view) => {
                 self.open_unified(view, &sender);
+            }
+
+            AppMsg::AccountStarredSelected(account_id) => {
+                self.open_unified_in(UnifiedView::Kind(FolderKind::Starred), Some(account_id), &sender);
             }
 
             AppMsg::FolderSelected { account_id, folder_id, name, path } => {
@@ -16555,7 +16571,8 @@ impl AppModel {
             // A reconnect has emptied the account list; each account's
             // folders asks for its slice again as they arrive.
             self.unified_boot_requested.clear();
-            self.open_unified(view, &sender);
+            let account = self.unified_account.filter(|a| self.in_unified(*a));
+            self.open_unified_in(view, account, sender);
         }
     }
 
@@ -16563,12 +16580,18 @@ impl AppModel {
     /// list of every account's folder of that kind. What clicking the
     /// sidebar row does; a notification click lands here too.
     fn open_unified(&mut self, view: UnifiedView, sender: &ComponentSender<Self>) {
+        self.open_unified_in(view, None, sender);
+    }
+
+    /// Open a unified view, narrowed to one account when `account` names one.
+    fn open_unified_in(&mut self, view: UnifiedView, account: Option<u32>, sender: &ComponentSender<Self>) {
         let t_open = std::time::Instant::now();
         if view == UnifiedView::Kind(FolderKind::Inbox) && !demo_mode() {
             config::save_last_view(config::LastView::default());
         }
         self.close_sidebar_peek();
         self.mirror_selection(match view {
+            UnifiedView::Kind(kind) if let Some(acc) = account => crate::ui::sidebar::Sel::UnifiedKindRow(kind, acc),
             UnifiedView::Kind(FolderKind::Inbox) => crate::ui::sidebar::Sel::Unified,
             UnifiedView::Kind(kind) => crate::ui::sidebar::Sel::UnifiedKind(kind),
             UnifiedView::Filtered => crate::ui::sidebar::Sel::UnifiedFiltered,
@@ -16579,11 +16602,12 @@ impl AppModel {
         self.showing_outbox = false;
         // Another view's slices are another view's: start afresh
         // (the loads below refill them).
-        if self.unified_view != view {
+        if self.unified_view != view || self.unified_account != account {
             self.unified_slices.clear();
             self.unified_boot_requested.clear();
         }
         self.unified_view = view;
+        self.unified_account = account;
         self.unified = true;
         self.tag_view = None;
         self.smart_view = None;
@@ -16600,7 +16624,7 @@ impl AppModel {
         self.message_list.emit(MessageListInput::SetSelected(None));
         self.message_list.emit(MessageListInput::ResetPaging);
         self.message_list.emit(MessageListInput::SetScope(default_scope(view == UnifiedView::Kind(FolderKind::Inbox))));
-        self.message_list.emit(MessageListInput::SetColorize(true));
+        self.message_list.emit(MessageListInput::SetColorize(account.is_none()));
         // A Sent view's rows all come from you — name the recipients.
         self.message_list.emit(MessageListInput::SetShowRecipient(
             view == UnifiedView::Kind(FolderKind::Sent),
@@ -23953,13 +23977,19 @@ impl AppModel {
         self.folders.get(&account_id)?.iter().find(|f| f.kind == kind)
     }
 
+    /// Whether an account's mail belongs in the open unified view: it is in
+    /// the unified section, and the view is not narrowed to another one.
+    fn in_unified_view(&self, account_id: u32) -> bool {
+        self.in_unified(account_id) && self.unified_account.is_none_or(|a| a == account_id)
+    }
+
     /// The folders the open unified view merges: (account, folder id, path).
     fn unified_targets(&self) -> Vec<(u32, u32, String)> {
         match self.unified_view {
             UnifiedView::Kind(kind) => self
                 .accounts
                 .iter()
-                .filter(|a| self.in_unified(a.id))
+                .filter(|a| self.in_unified_view(a.id))
                 .filter_map(|a| self.folder_of_kind(a.id, kind).map(|f| (a.id, f.id, f.path.clone())))
                 .collect(),
             UnifiedView::Filtered => self
@@ -23986,7 +24016,7 @@ impl AppModel {
         }
         self.accounts
             .iter()
-            .filter(|a| self.in_unified(a.id))
+            .filter(|a| self.in_unified_view(a.id))
             .filter(|a| self.folders.get(&a.id).is_some_and(|f| !f.is_empty()))
             .filter(|a| self.folder_of_kind(a.id, FolderKind::Starred).is_none())
             .map(|a| a.id)
@@ -24071,7 +24101,7 @@ impl AppModel {
     fn is_unified_target(&self, account_id: u32, folder_id: u32) -> bool {
         match self.unified_view {
             UnifiedView::Kind(kind) => {
-                self.in_unified(account_id)
+                self.in_unified_view(account_id)
                     && self.folder_of_kind(account_id, kind).is_some_and(|f| f.id == folder_id)
             }
             UnifiedView::Filtered => self
@@ -25865,6 +25895,7 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::UnifiedKindSelected(kind) => {
             AppMsg::UnifiedSelected(UnifiedView::Kind(kind))
         }
+        SidebarOutput::AccountStarredSelected(account_id) => AppMsg::AccountStarredSelected(account_id),
         SidebarOutput::UnifiedFilteredSelected => {
             AppMsg::UnifiedSelected(UnifiedView::Filtered)
         }

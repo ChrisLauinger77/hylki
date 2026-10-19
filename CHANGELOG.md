@@ -161,7 +161,9 @@
   and Proton Mail Bridge have; an iCloud, Outlook, Fastmail or other IMAP
   account keeps a star as a flag on the message, wherever it is filed, and
   contributed nothing. For an account without a Starred folder, the view now
-  lists its starred mail from every folder but Trash and Junk.
+  lists its starred mail from every folder but Trash and Junk, and the
+  account has a row of its own under Starred that lists only its starred
+  mail.
 
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow

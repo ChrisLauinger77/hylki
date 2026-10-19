@@ -684,6 +684,9 @@ pub enum SidebarOutput {
     /// A unified Starred / Sent / Drafts row was chosen: every account's
     /// folder of that kind, merged.
     UnifiedKindSelected(FolderKind),
+    /// An account's row under the unified Starred row, for an account with
+    /// no Starred folder: its starred mail, wherever it is filed (#482).
+    AccountStarredSelected(u32),
     /// The unified Filtered Folders row: every rule's folder, merged.
     UnifiedFilteredSelected,
     /// The Favorites row: every favorite folder, merged.
@@ -1599,6 +1602,10 @@ impl Sidebar {
                 }
                 self.selected = key.clone();
                 self.clear_other_selections(key);
+                if r.path.is_empty() {
+                    let _ = sender.output(SidebarOutput::AccountStarredSelected(r.account_id));
+                    return;
+                }
                 let _ = sender.output(SidebarOutput::FolderSelected {
                     account_id: r.account_id,
                     folder_id: r.folder_id,
@@ -3574,17 +3581,35 @@ impl Sidebar {
         match row_kind {
             UnifiedRow::Kind(kind) => {
                 for section in sections {
-                    let Some(folder) = section.folders.iter().find(|f| f.kind == kind) else {
-                        continue;
+                    // Most accounts keep a star as a flag, with no Starred
+                    // folder (#482): theirs is a row with no path, which
+                    // opens the account's starred mail wherever it is filed.
+                    let flagged;
+                    let folder = match section.folders.iter().find(|f| f.kind == kind) {
+                        Some(f) => f,
+                        None if kind == FolderKind::Starred && !section.folders.is_empty() => {
+                            flagged = Folder {
+                                id: u32::MAX,
+                                account_id: section.account.id,
+                                name: kind_label(kind),
+                                path: String::new(),
+                                kind,
+                                unread: 0,
+                            };
+                            &flagged
+                        }
+                        None => continue,
                     };
                     let aid = section.account.id;
                     let (row, badge) =
                         build_unified_inbox_row(section, folder, self.collapsed, self.chevrons_left);
                     // A message dropped here moves to that account's folder
                     // (the app declines mail from other accounts, #23).
-                    row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
+                    if !folder.path.is_empty() {
+                        row.add_controller(folder_drop_target(aid, folder.path.clone(), sender));
+                    }
                     sub.append(&row);
-                    if counted {
+                    if counted && !folder.path.is_empty() {
                         row_badges.insert((aid, folder.id), badge);
                     } else {
                         badge.set_visible(false);
@@ -3622,6 +3647,11 @@ impl Sidebar {
                         .row_at_y(y as i32)
                         .and_then(|row| refs.get(row.index() as usize))
                     {
+                        if r.path.is_empty() {
+                            let items = vec![(i18n_noop("Account Settings…"), CtxAction::OpenAccountSettings(r.account_id))];
+                            show_sidebar_menu(&sub_w, x, y, items, &cs);
+                            return;
+                        }
                         let mut items = vec![
                             (i18n_noop("Mark as Read"), CtxAction::MarkFolderRead {
                                 account_id: r.account_id,
