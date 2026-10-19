@@ -6213,6 +6213,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Műveletek"
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr "A szűrők elhelyezése"
 
@@ -7246,6 +7249,10 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
+#, fuzzy
+msgid "Like the accounts"
+msgstr "A fiókok felett"
+
 msgid "Above the accounts"
 msgstr "A fiókok felett"
 
@@ -7728,6 +7735,9 @@ msgstr "Szűrő szerkesztése…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Mappa törlése…"
+
+msgid "Show or hide filters"
+msgstr "Szűrők megjelenítése vagy elrejtése"
 
 msgid "Show or hide tags"
 msgstr "Címkék megjelenítése vagy elrejtése"
@@ -8466,9 +8476,6 @@ msgstr "Hyprlab"
 
 #~ msgid "In the unified section"
 #~ msgstr "Az összevont részben"
-
-#~ msgid "Show or hide filters"
-#~ msgstr "Szűrők megjelenítése vagy elrejtése"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Névjegyek az oldalsávban"

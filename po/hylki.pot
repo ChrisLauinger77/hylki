@@ -5487,6 +5487,9 @@ msgstr ""
 msgid "Sections"
 msgstr ""
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr ""
 
@@ -6312,6 +6315,9 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
+msgid "Like the accounts"
+msgstr ""
+
 msgid "Above the accounts"
 msgstr ""
 
@@ -6756,6 +6762,9 @@ msgid "Edit Smart Folder…"
 msgstr ""
 
 msgid "Delete Smart Folder…"
+msgstr ""
+
+msgid "Show or hide filters"
 msgstr ""
 
 msgid "Show or hide tags"

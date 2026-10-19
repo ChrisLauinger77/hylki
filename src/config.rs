@@ -1838,6 +1838,9 @@ pub(crate) struct PrivacyFile {
     /// section alone, for those who only ever work from it.
     #[serde(default = "default_on")]
     pub(crate) show_accounts: bool,
+    /// How Filters and Tags are drawn wherever they sit.
+    #[serde(default)]
+    pub(crate) section_style: SectionStyle,
     /// Where the Filters section sits (#71 follow-up): above or below the
     /// accounts, or nowhere.
     #[serde(default)]
@@ -1974,6 +1977,7 @@ impl Default for PrivacyFile {
             unified_chips: UnifiedChips::default(),
             unified_kinds: UnifiedKinds::default(),
             show_accounts: true,
+            section_style: SectionStyle::default(),
             filtered_placement: SectionPlacement::AboveAccounts,
             tags_placement: SectionPlacement::AboveAccounts,
             favorites_placement: SectionPlacement::AboveAccounts,
@@ -2347,6 +2351,19 @@ pub enum SectionPlacement {
     BelowAccounts,
     /// Not in the sidebar at all.
     Off,
+}
+
+/// How Filters and Tags are drawn (Settings → Sidebar → Sections).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionStyle {
+    /// As the unified section's rows: a pill whose header opens the
+    /// combined view, with a chevron on the right.
+    #[default]
+    Unified,
+    /// As an account's Tags heading: a caret and a label that opens and
+    /// closes the list.
+    Headings,
 }
 
 impl SectionPlacement {

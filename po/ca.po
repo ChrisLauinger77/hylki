@@ -6097,6 +6097,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Accions"
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr "Col·locació dels filtres"
 
@@ -7136,6 +7139,10 @@ msgstr ""
 msgid "Software"
 msgstr "Programari"
 
+#, fuzzy
+msgid "Like the accounts"
+msgstr "A sobre dels comptes"
+
 msgid "Above the accounts"
 msgstr "A sobre dels comptes"
 
@@ -7591,6 +7598,9 @@ msgstr "Edita la carpeta intel·ligent…"
 
 msgid "Delete Smart Folder…"
 msgstr "Suprimeix la carpeta intel·ligent…"
+
+msgid "Show or hide filters"
+msgstr "Mostra o amaga els filtres"
 
 msgid "Show or hide tags"
 msgstr "Mostra o amaga les etiquetes"
@@ -8313,9 +8323,6 @@ msgstr "Hyprlab"
 
 #~ msgid "In the unified section"
 #~ msgstr "A la secció unificada"
-
-#~ msgid "Show or hide filters"
-#~ msgstr "Mostra o amaga els filtres"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Contactes a la barra lateral"

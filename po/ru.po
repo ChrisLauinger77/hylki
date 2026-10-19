@@ -6208,6 +6208,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Действия"
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr "Расположение фильтров"
 
@@ -7239,6 +7242,10 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
+#, fuzzy
+msgid "Like the accounts"
+msgstr "Над учётными записями"
+
 msgid "Above the accounts"
 msgstr "Над учётными записями"
 
@@ -7702,6 +7709,9 @@ msgstr "Редактировать фильтр…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Удалить папку…"
+
+msgid "Show or hide filters"
+msgstr "Показать или скрыть фильтры"
 
 msgid "Show or hide tags"
 msgstr "Показать или скрыть метки"
@@ -8430,9 +8440,6 @@ msgstr "Hyprlab"
 
 #~ msgid "In the unified section"
 #~ msgstr "В общем разделе"
-
-#~ msgid "Show or hide filters"
-#~ msgstr "Показать или скрыть фильтры"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Контакты на боковой панели"

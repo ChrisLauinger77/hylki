@@ -6171,6 +6171,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Ενέργειες"
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr "Τοποθέτηση φίλτρων"
 
@@ -7230,6 +7233,10 @@ msgstr ""
 msgid "Software"
 msgstr "Λογισμικό"
 
+#, fuzzy
+msgid "Like the accounts"
+msgstr "Πάνω από τους λογαριασμούς"
+
 msgid "Above the accounts"
 msgstr "Πάνω από τους λογαριασμούς"
 
@@ -7686,6 +7693,9 @@ msgstr "Επεξεργασία έξυπνου φακέλου…"
 
 msgid "Delete Smart Folder…"
 msgstr "Διαγραφή έξυπνου φακέλου…"
+
+msgid "Show or hide filters"
+msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 msgid "Show or hide tags"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
@@ -8433,9 +8443,6 @@ msgstr "Hyprlab"
 
 #~ msgid "In the unified section"
 #~ msgstr "Στην ενοποιημένη ενότητα"
-
-#~ msgid "Show or hide filters"
-#~ msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Επαφές στην πλευρική στήλη"

@@ -1095,7 +1095,8 @@ pub struct AppModel {
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
     unified_chips: config::UnifiedChips,
     /// Where the Filters, Tags, Favorites and Contacts sections sit
-    /// (Settings → Sidebar).
+    /// (Settings → Sidebar), and how Filters and Tags are drawn.
+    section_style: config::SectionStyle,
     filtered_placement: config::SectionPlacement,
     tags_placement: config::SectionPlacement,
     favorites_placement: config::SectionPlacement,
@@ -3666,6 +3667,7 @@ impl SimpleComponent for AppModel {
             pgp_labels: prefs.pgp_labels,
             show_unified_pref: prefs.show_unified,
             unified_chips: config::load_unified_chips(),
+            section_style: prefs.section_style,
             filtered_placement: prefs.filtered_placement,
             tags_placement: prefs.tags_placement,
             favorites_placement: prefs.favorites_placement,
@@ -8715,6 +8717,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetSectionStyle(style)) => {
+                if pref!(self.section_style = style) {
+                    self.rebuild_sidebar();
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetFilteredPlacement(p)) => {
                 if pref!(self.filtered_placement = p) {
                     self.rebuild_sidebar();
@@ -13050,6 +13058,7 @@ impl AppModel {
             unified_chips: self.unified_chips,
             unified_kinds: self.unified_kinds,
             show_accounts: self.show_accounts,
+            section_style: self.section_style,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
@@ -15797,6 +15806,7 @@ impl AppModel {
             unified_folders,
             favorite_folders,
             tags: self.tags.clone(),
+            section_style: self.section_style,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
@@ -21719,6 +21729,7 @@ impl AppModel {
             unified_chips: self.unified_chips,
             unified_kinds: self.unified_kinds,
             show_accounts: self.show_accounts,
+            section_style: self.section_style,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,

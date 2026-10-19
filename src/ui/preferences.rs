@@ -145,6 +145,7 @@ pub struct PrefInit {
     pub unified_chips: crate::config::UnifiedChips,
     pub unified_kinds: crate::config::UnifiedKinds,
     pub show_accounts: bool,
+    pub section_style: crate::config::SectionStyle,
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
     pub favorites_placement: crate::config::SectionPlacement,
@@ -1118,6 +1119,7 @@ pub enum PrefInput {
     ChangeChevronSide(u32),
     ChangeStartView(u32),
     ChangeFolderSort(u32),
+    ChangeSectionStyle(u32),
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
     ChangeFavoritesPlacement(u32),
@@ -1281,6 +1283,7 @@ pub enum PrefOutput {
     SetAccountClickFolds(bool),
     SetStartView(crate::config::StartView),
     SetFolderSort(crate::config::FolderSort),
+    SetSectionStyle(crate::config::SectionStyle),
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
     SetFavoritesPlacement(crate::config::SectionPlacement),
@@ -2628,6 +2631,14 @@ impl Component for Preferences {
 
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Sections"),
+
+                                    #[name = "section_style_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Filters and Tags style"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeSectionStyle(row.selected()));
+                                        },
+                                    },
 
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
@@ -4114,6 +4125,7 @@ impl Component for Preferences {
             &widgets.language_row,
             &widgets.renderer_row,
             &widgets.chevron_side_row,
+            &widgets.section_style_row,
             &widgets.filtered_placement_row,
             &widgets.tags_placement_row,
             &widgets.favorites_placement_row,
@@ -4197,6 +4209,13 @@ impl Component for Preferences {
         widgets.unified_archive_row.set_active(init.unified_kinds.archive);
         widgets.unified_junk_row.set_active(init.unified_kinds.junk);
         widgets.unified_trash_row.set_active(init.unified_kinds.trash);
+        widgets.section_style_row.set_model(Some(&gtk::StringList::new(&[
+            i18n("Unified").as_str(),
+            i18n("Like the accounts").as_str(),
+        ])));
+        widgets
+            .section_style_row
+            .set_selected(u32::from(init.section_style == crate::config::SectionStyle::Headings));
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
@@ -5376,6 +5395,14 @@ impl Component for Preferences {
             }
             PrefInput::SetShowAccounts(on) => {
                 self.show_accounts = on;
+            }
+            PrefInput::ChangeSectionStyle(idx) => {
+                let style = if idx == 1 {
+                    crate::config::SectionStyle::Headings
+                } else {
+                    crate::config::SectionStyle::Unified
+                };
+                let _ = sender.output(PrefOutput::SetSectionStyle(style));
             }
             PrefInput::ChangeFilteredPlacement(idx) => {
                 let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));

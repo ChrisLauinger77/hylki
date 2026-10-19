@@ -6070,6 +6070,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Aktionen"
 
+msgid "Filters and Tags style"
+msgstr ""
+
 msgid "Filters placement"
 msgstr "Position der Filter"
 
@@ -7125,6 +7128,10 @@ msgstr ""
 msgid "Software"
 msgstr "Software"
 
+#, fuzzy
+msgid "Like the accounts"
+msgstr "Über den Konten"
+
 msgid "Above the accounts"
 msgstr "Über den Konten"
 
@@ -7580,6 +7587,9 @@ msgstr "Bearbeite Smart Folder…"
 
 msgid "Delete Smart Folder…"
 msgstr "Lösche Smart Folder…"
+
+msgid "Show or hide filters"
+msgstr "Filter ein- oder ausblenden"
 
 msgid "Show or hide tags"
 msgstr "Tags ein- oder ausblenden"
@@ -8304,9 +8314,6 @@ msgstr "Hyprlab"
 
 #~ msgid "In the unified section"
 #~ msgstr "Im gemeinsamen Bereich"
-
-#~ msgid "Show or hide filters"
-#~ msgstr "Filter ein- oder ausblenden"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Kontakte in der Seitenleiste"
