@@ -1161,6 +1161,10 @@ pub struct AppModel {
     smart_view_cache: HashMap<String, Vec<Message>>,
     smart_view_loading: bool,
     smart_view_dirty: bool,
+    /// The unified Starred view's read of the index (#482) is running, and
+    /// another is owed when it lands.
+    unified_starred_loading: bool,
+    unified_starred_dirty: bool,
     /// A count of the smart folders' unread mail is waiting to run, or
     /// running: syncs come in bursts, and one count covers a burst.
     smart_counts_due: bool,
@@ -2070,6 +2074,9 @@ pub enum AppMsg {
     SmartSelected(String),
     /// A smart folder's rows, read from the index off the main thread.
     SmartViewLoaded { id: String, rows: Vec<(u32, String, Message)> },
+    /// The starred mail of the accounts with no Starred folder, read from
+    /// the index for the unified Starred view (#482).
+    UnifiedStarredLoaded { rows: Vec<(u32, String, Message)> },
     /// Count every smart folder's unread mail now (the debounce ran out).
     CountSmartFolders,
     SmartCounts(HashMap<String, u32>),
@@ -3708,6 +3715,8 @@ impl SimpleComponent for AppModel {
             smart_view_cache: HashMap::new(),
             smart_view_loading: false,
             smart_view_dirty: false,
+            unified_starred_loading: false,
+            unified_starred_dirty: false,
             smart_counts_due: false,
             smart_counts_running: false,
             keyword_sync_at: HashMap::new(),
@@ -6233,7 +6242,7 @@ impl SimpleComponent for AppModel {
             }
 
             AppMsg::UnifiedSelected(view) => {
-                self.open_unified(view);
+                self.open_unified(view, &sender);
             }
 
             AppMsg::FolderSelected { account_id, folder_id, name, path } => {
@@ -6294,7 +6303,7 @@ impl SimpleComponent for AppModel {
                         && self.unified_inboxes_shown()
                         && self.in_unified(account_id)
                     {
-                        self.open_unified(UnifiedView::Kind(FolderKind::Inbox));
+                        self.open_unified(UnifiedView::Kind(FolderKind::Inbox), &sender);
                     } else {
                         self.select_folder(account_id, folder_id, name, path);
                     }
@@ -7803,6 +7812,7 @@ impl SimpleComponent for AppModel {
                     for (account_id, folder_id, path) in reqs {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
+                    self.refresh_unified_starred(&sender);
                 } else {
                     match self.selected.clone() {
                         Some(sel) => self.send_to(sel.account_id, MailRequest::LoadMessages {
@@ -10479,6 +10489,14 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::UnifiedStarredLoaded { rows } => {
+                self.unified_starred_loading = false;
+                self.take_unified_starred(rows, &sender);
+                if std::mem::take(&mut self.unified_starred_dirty) {
+                    self.refresh_unified_starred(&sender);
+                }
+            }
+
             AppMsg::CountSmartFolders => {
                 self.smart_counts_due = false;
                 self.count_smart_folders(&sender);
@@ -11340,6 +11358,9 @@ impl SimpleComponent for AppModel {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
+                if self.starred_by_flag().contains(&account_id) {
+                    self.refresh_unified_starred(&sender);
+                }
                 self.index_sent_folders(account_id);
                 // A unified view merges one folder per account, and this
                 // account's folders may only now have arrived — so the set the
@@ -11760,6 +11781,9 @@ impl SimpleComponent for AppModel {
                             self.unified_dirty.set(true);
                             self.queue_unified_emit(&sender);
                         }
+                    } else if !unchanged && self.starred_by_flag().contains(&account_id) {
+                        // The index just took this folder's flags.
+                        self.refresh_unified_starred(&sender);
                     }
                 } else if let Some(sel) = self.selected.as_ref() {
                     if sel.account_id == account_id && sel.folder_id == folder_id && !unchanged {
@@ -13179,7 +13203,7 @@ impl AppModel {
                     _ => self.unified_kinds.has(kind),
                 };
                 if merged {
-                    self.open_unified(UnifiedView::Kind(kind));
+                    self.open_unified(UnifiedView::Kind(kind), sender);
                 } else {
                     sender.input(AppMsg::ShowcaseFolder { kind, account: None });
                 }
@@ -16531,14 +16555,14 @@ impl AppModel {
             // A reconnect has emptied the account list; each account's
             // folders asks for its slice again as they arrive.
             self.unified_boot_requested.clear();
-            self.open_unified(view);
+            self.open_unified(view, &sender);
         }
     }
 
     /// Open a unified view (Inboxes, Starred, Sent, …, Filtered): the merged
     /// list of every account's folder of that kind. What clicking the
     /// sidebar row does; a notification click lands here too.
-    fn open_unified(&mut self, view: UnifiedView) {
+    fn open_unified(&mut self, view: UnifiedView, sender: &ComponentSender<Self>) {
         let t_open = std::time::Instant::now();
         if view == UnifiedView::Kind(FolderKind::Inbox) && !demo_mode() {
             config::save_last_view(config::LastView::default());
@@ -16644,6 +16668,7 @@ impl AppModel {
         for (account_id, folder_id, path) in reqs {
             self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
         }
+        self.refresh_unified_starred(sender);
         self.push_index_complete();
         tracing::info!(
             "unified {view:?}: opened in {:?} with {} cached messages",
@@ -23948,6 +23973,98 @@ impl AppModel {
                 .map(|r| (r.account_id, r.folder.id, r.folder.path))
                 .collect(),
         }
+    }
+
+    /// The accounts whose starred mail the open unified Starred view reads
+    /// from the index (#482): most servers keep no Starred folder (Gmail and
+    /// Proton Bridge do), only a flag on each message, wherever it is filed.
+    /// An account whose folders are not known yet waits for them: it may
+    /// turn out to have one.
+    fn starred_by_flag(&self) -> Vec<u32> {
+        if !self.unified || self.unified_view != UnifiedView::Kind(FolderKind::Starred) {
+            return Vec::new();
+        }
+        self.accounts
+            .iter()
+            .filter(|a| self.in_unified(a.id))
+            .filter(|a| self.folders.get(&a.id).is_some_and(|f| !f.is_empty()))
+            .filter(|a| self.folder_of_kind(a.id, FolderKind::Starred).is_none())
+            .map(|a| a.id)
+            .collect()
+    }
+
+    /// Read the starred mail of the accounts in [`starred_by_flag`] from the
+    /// on-disk index off the main thread, every folder but Trash and Junk,
+    /// answering with [`AppMsg::UnifiedStarredLoaded`].
+    fn refresh_unified_starred(&mut self, sender: &ComponentSender<Self>) {
+        let accounts = self.starred_by_flag();
+        if accounts.is_empty() || demo_mode() && self.config.is_empty() {
+            return;
+        }
+        if self.unified_starred_loading {
+            self.unified_starred_dirty = true;
+            return;
+        }
+        self.unified_starred_loading = true;
+        let scope: Vec<(u32, Vec<String>)> = accounts
+            .into_iter()
+            .map(|id| {
+                let skip = self.folders.get(&id).into_iter().flatten();
+                let skip = skip.filter(|f| matches!(f.kind, FolderKind::Trash | FolderKind::Junk));
+                (id, skip.map(|f| f.path.clone()).collect())
+            })
+            .collect();
+        let s = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let mut rows: Vec<(u32, String, Message)> = Vec::new();
+            if let Ok(cache) = crate::cache::Cache::open() {
+                let starred = config::SmartPrefilter { starred: Some(true), ..Default::default() };
+                for (account_id, exclude) in scope {
+                    let found = cache.smart_scan(account_id, None, &exclude, starred, SMART_VIEW_LIMIT, |_| true);
+                    rows.extend(found.into_iter().map(|(path, m)| (account_id, path, m)));
+                }
+            }
+            let _ = s.send(AppMsg::UnifiedStarredLoaded { rows });
+        });
+    }
+
+    /// Put the starred mail read by [`refresh_unified_starred`] in the
+    /// unified slices, under the folder each message sits in, so starring,
+    /// moving and reading it go through that folder as anywhere else.
+    fn take_unified_starred(&mut self, rows: Vec<(u32, String, Message)>, sender: &ComponentSender<Self>) {
+        let flagged = self.starred_by_flag();
+        if flagged.is_empty() {
+            return;
+        }
+        let mut found: Vec<Message> = Vec::new();
+        for (account_id, path, mut m) in rows {
+            if !flagged.contains(&account_id) {
+                continue;
+            }
+            let Some(f) = self.folders.get(&account_id).and_then(|fs| fs.iter().find(|f| f.path == path)) else {
+                continue;
+            };
+            m.folder_id = f.id;
+            found.push(m);
+        }
+        // One row for a message filed twice, the inbox copy where there is one.
+        let inbox_first = |m: &Message| self.folder_kind(m.account_id, m.folder_id) != Some(FolderKind::Inbox);
+        found.sort_by(|a, b| b.timestamp.cmp(&a.timestamp).then_with(|| inbox_first(a).cmp(&inbox_first(b))));
+        let mut seen: std::collections::HashSet<(u32, String)> = std::collections::HashSet::new();
+        found.retain(|m| m.message_id.is_empty() || seen.insert((m.account_id, m.message_id.clone())));
+        let mut slices: HashMap<(u32, u32), Vec<Message>> = HashMap::new();
+        for m in found {
+            slices.entry((m.account_id, m.folder_id)).or_default().push(m);
+        }
+        self.unified_slices.retain(|(a, _), _| !flagged.contains(a));
+        for ((account_id, folder_id), messages) in slices {
+            let messages = self.apply_pending_seen(account_id, folder_id, messages);
+            let messages = self.apply_pending_answers(account_id, folder_id, messages);
+            let messages = self.apply_pending_tags(account_id, folder_id, messages);
+            self.unified_slices.insert((account_id, folder_id), messages);
+        }
+        self.unified_dirty.set(true);
+        self.queue_unified_emit(sender);
     }
 
     /// Whether a folder is one the open unified view merges.

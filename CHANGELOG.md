@@ -156,6 +156,13 @@
   or did not answer left the card empty for up to a minute. A body is now
   shown as soon as its text is in, and the images fill in as they arrive.
 
+- **Fixed: the unified Starred view was empty** (#482, reported by
+  repsorp). It listed the Starred folder of each account, which only Gmail
+  and Proton Mail Bridge have; an iCloud, Outlook, Fastmail or other IMAP
+  account keeps a star as a flag on the message, wherever it is filed, and
+  contributed nothing. For an account without a Starred folder, the view now
+  lists its starred mail from every folder but Trash and Junk.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a
