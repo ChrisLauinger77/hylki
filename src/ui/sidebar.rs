@@ -3640,7 +3640,7 @@ impl Sidebar {
                     let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
                     let counted = r.folder.kind != FolderKind::Sent;
                     let (row, badge) = build_unified_sub_row(
-                        &icon,
+                        &tree_indent(&icon, self.collapsed),
                         &r.folder.name,
                         &tip,
                         if counted { r.folder.unread } else { 0 },
@@ -3765,7 +3765,7 @@ impl Sidebar {
                     pin_icon_size(&icon);
                     let tip = format!("{} \u{2014} {}", r.folder.name, section.account.label);
                     let (row, badge) = build_unified_sub_row(
-                        &icon,
+                        &tree_indent(&icon, self.collapsed),
                         &r.folder.name,
                         &tip,
                         r.folder.unread,
@@ -3815,7 +3815,7 @@ impl Sidebar {
                 for t in &self.tags {
                     let disc = crate::ui::context_menu::swatch_widget(&t.color, true);
                     let (row, badge) = build_unified_sub_row(
-                        &disc,
+                        &tree_indent(&disc, self.collapsed),
                         &t.name,
                         &t.name,
                         0,
@@ -5661,6 +5661,21 @@ pub(crate) fn build_unified_sub_row(
 
     row.set_child(Some(&hbox));
     (row, badge)
+}
+
+/// `lead` behind a spacer as wide as a tree caret, so a list's items sit
+/// in from their row as the address books under Contacts do. The rail has
+/// no room for it.
+fn tree_indent(lead: &impl IsA<gtk::Widget>, collapsed: bool) -> gtk::Widget {
+    if collapsed {
+        return lead.clone().upcast();
+    }
+    let indented = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    spacer.set_width_request(TREE_EXPANDER_WIDTH);
+    indented.append(&spacer);
+    indented.append(lead);
+    indented.upcast()
 }
 
 /// Pins a symbolic icon to an exact, deterministic 16px box so it centres on

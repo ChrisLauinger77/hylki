@@ -58,7 +58,8 @@
 - **Changed: Filters, Tags, Favorites and Contacts left the unified
   section.** Settings → Sidebar → Sections places each above the accounts,
   below them, or Off, out of the sidebar; wherever they are, they are rows
-  like the unified section's, with a chevron on the right. A setting that
+  like the unified section's, with a chevron on the right, and their items
+  sit in from the row as the address books under Contacts do. A setting that
   had one in the unified section now has it above the accounts, or Off
   where its switch was off. Their switches among the unified rows, the
   Contacts in the sidebar switch and the Filters unread-count switch are
