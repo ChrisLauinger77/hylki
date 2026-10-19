@@ -1691,7 +1691,8 @@ fn registry_books() -> Option<HashMap<String, String>> {
             && crate::contact_sources::book_used(uid, &sources, &off)
         {
             let name = book_display_name(data, &sources);
-            books.insert(uid.clone(), with_given_name(&name, names.get(uid)));
+            let account = names.get(&crate::contact_sources::group_of(uid, &sources));
+            books.insert(uid.clone(), with_given_name(&with_account_name(&name, account), names.get(uid)));
         }
     }
     Some(books)
@@ -1733,6 +1734,19 @@ pub(crate) fn registry_sources() -> Option<Vec<(String, String, String)>> {
 /// A book's friendly name: which account it belongs to and over what — walked
 /// up the source's parent chain to the account collection, whose backend
 /// (google / microsoft365 / webdav) and identity say it best.
+/// A book's name with the one given to its account in Hylki, if any, in
+/// place of the account's own ("Work · Family" for "CardDAV — a@b.org ·
+/// Family"); a book that is its account alone keeps its address as its own
+/// name ("Work · a@b.org").
+fn with_account_name(name: &str, account: Option<&String>) -> String {
+    match (account, name.split_once(" · "), name.split_once(" — ")) {
+        (None, _, _) => name.to_string(),
+        (Some(account), Some((_, own)), _) => format!("{account} · {own}"),
+        (Some(account), None, Some((_, own))) => format!("{account} · {own}"),
+        (Some(account), None, None) => account.clone(),
+    }
+}
+
 /// A book's name with the one given to it in Hylki, if any, in place of the
 /// book's own: after its account's ("CardDAV — a@b.org · Family"), or alone
 /// for a book that is no account's.
@@ -3574,6 +3588,21 @@ mod tests {
         };
         let out = super::new_vcard(&edit);
         assert!(out.contains("\r\nFN:Acme\r\n") && out.contains("TEL;TYPE=WORK:+1 555 0100"), "{out}");
+    }
+
+    #[test]
+    fn an_account_named_in_hylki_names_its_books_account() {
+        let work = "Work".to_string();
+        assert_eq!(super::with_account_name("CardDAV — a@b.org · card", Some(&work)), "Work · card");
+        assert_eq!(super::with_account_name("CardDAV — a@b.org", Some(&work)), "Work · a@b.org");
+        assert_eq!(super::with_account_name("On This Computer · Personal", Some(&work)), "Work · Personal");
+        assert_eq!(super::with_account_name("CardDAV — a@b.org · card", None), "CardDAV — a@b.org · card");
+        // And a book named too.
+        let family = "Family".to_string();
+        assert_eq!(
+            super::with_given_name(&super::with_account_name("CardDAV — a@b.org · card", Some(&work)), Some(&family)),
+            "Work · Family"
+        );
     }
 
     #[test]

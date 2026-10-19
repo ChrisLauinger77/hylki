@@ -145,7 +145,10 @@ pub enum Kind {
 #[derive(Debug, Clone)]
 pub struct Book {
     pub uid: String,
+    /// The book's own name; [`Book::shown`] is the one Hylki uses.
     pub name: String,
+    /// The name given to it in Hylki, if any.
+    pub given: Option<String>,
     /// Switched on for Hylki (its own switch; the source's is apart).
     pub on: bool,
 }
@@ -156,7 +159,12 @@ pub struct Source {
     /// The ID its switch is kept under.
     pub id: String,
     pub kind: Kind,
+    /// The name it is listed by: the one given to it in Hylki, else its own.
     pub title: String,
+    /// Its own name, which the given one stands in for.
+    pub own_title: String,
+    /// The name given to it in Hylki, if any.
+    pub given: Option<String>,
     /// The second line: what it is and holds.
     pub detail: String,
     /// The brand mark, or an icon name when there is none.
@@ -225,11 +233,38 @@ pub fn list_with_eds() -> (Vec<Source>, bool) {
     (sources, eds)
 }
 
-/// [`list_with_eds`] without the answer.
+impl Book {
+    /// The name Hylki uses: the one given to it, else its own.
+    pub fn shown(&self) -> &str {
+        self.given.as_deref().unwrap_or(if self.name.is_empty() { &self.uid } else { &self.name })
+    }
+}
+
+/// [`list_with_eds`] with the names given in Hylki to the accounts and
+/// books in place of their own.
 pub fn list() -> Vec<Source> {
+    let names = names();
+    let mut sources = list_own();
+    for s in &mut sources {
+        s.own_title = s.title.clone();
+        s.given = names.get(&s.id).cloned();
+        if let Some(given) = &s.given {
+            s.title = given.clone();
+        }
+        for b in &mut s.books {
+            b.given = names.get(&b.uid).cloned();
+        }
+    }
+    sources
+}
+
+/// The sources as EDS and GNOME Online Accounts name them.
+fn list_own() -> Vec<Source> {
     let off = off();
     let count = crate::local_contacts::count();
     let mut out = vec![Source {
+                own_title: String::new(),
+                given: None,
         id: HYLKI.to_string(),
         kind: Kind::Hylki,
         title: i18n("Hylki Address Book"),
@@ -257,7 +292,7 @@ pub fn list() -> Vec<Source> {
         }
         let name = kf.string("Data Source", "DisplayName").map(|s| s.to_string()).unwrap_or_default();
         let eds_on = kf.boolean("Data Source", "Enabled").unwrap_or(true);
-        let book = Book { uid: uid.clone(), name, on: !off.contains(uid) };
+        let book = Book { uid: uid.clone(), name, given: None, on: !off.contains(uid) };
         groups.entry(group_of(uid, &sources)).or_default().push((book, eds_on));
     }
     // A CardDAV account still looking for its books is listed all the same.
@@ -273,6 +308,8 @@ pub fn list() -> Vec<Source> {
         let on = !off.contains(&id);
         if id == THIS_COMPUTER {
             out.push(Source {
+                own_title: String::new(),
+                given: None,
                 id,
                 kind: Kind::ThisComputer,
                 title: i18n("On This Computer"),
@@ -316,6 +353,8 @@ pub fn list() -> Vec<Source> {
             let paused = (goa.is_some_and(|g| g.contacts_disabled) || all_eds_off)
                 .then(|| i18n("Contacts is switched off for this account in GNOME Online Accounts."));
             accounts.push(Source {
+                own_title: String::new(),
+                given: None,
                 detail: format!("{provider} · {}", books_line(&books)),
                 mark,
                 id,
@@ -338,6 +377,8 @@ pub fn list() -> Vec<Source> {
             };
             let origin = if is_hylki_made(&data) { Origin::Hylki } else { Origin::Evolution };
             accounts.push(Source {
+                own_title: String::new(),
+                given: None,
                 title: account.title(),
                 detail,
                 mark: carddav_mark(&account.url),
@@ -353,6 +394,8 @@ pub fn list() -> Vec<Source> {
         }
         let title = if display.is_empty() { books.first().map(|b| b.name.clone()).unwrap_or_default() } else { display };
         accounts.push(Source {
+                own_title: String::new(),
+                given: None,
             title,
             detail: books_line(&books),
             mark: "x-office-address-book-symbolic",
@@ -372,6 +415,8 @@ pub fn list() -> Vec<Source> {
             detail.push_str(&format!(" · {}", dir.base_dn));
         }
         accounts.push(Source {
+                own_title: String::new(),
+                given: None,
             id: dir.uid.clone(),
             title: dir.title(),
             detail: failed.unwrap_or(detail),

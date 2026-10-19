@@ -484,9 +484,14 @@ Hylki's own; GNOME Contacts and Evolution go on using the book. An account
 whose Contacts are switched off in GNOME Online Accounts has its switch
 greyed out, and says so.
 
-The arrow at the end of a row opens the address book's page. An account's
-page lists its address books, each with a switch of its own, under the
-account's switch. The Hylki book's page holds its import and export. A
+The arrow at the end of a row opens the address book's page. Its **Name**
+field gives the account a name of its own in Hylki: in this list, and
+under its address books in the sidebar's Contacts list, while GNOME
+Contacts and Evolution keep the account's. An account's page lists its
+address books, each with a name that can be changed the same way, as
+**Rename…** in the sidebar does, and a switch of its own, under the
+account's switch. A name left blank, applied, is the account's or the
+book's own again. The Hylki book's page holds its import and export. A
 GNOME Online Accounts account's page has **Open Online Accounts**, where its
 sign-in is changed; a CardDAV account's and a directory's page is their form,
 with **Remove**.

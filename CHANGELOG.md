@@ -62,9 +62,10 @@
   group's people. Contacts dragged onto a book are copied there, or moved
   with Ctrl held after a question, and dragged onto a group join it. A
   book's menu makes a contact or a group in it and renames it, in Hylki
-  only, wherever Hylki names it, and a group's writes to it, edits or
-  deletes it. The Contacts row left the sidebar's foot, and this replaces
-  the address book menu beside the search and the Contacts | Groups switch.
+  only, wherever Hylki names it (Settings → Contacts renames books and
+  accounts too), and a group's writes to it, edits or deletes it. The
+  Contacts row left the sidebar's foot, and this replaces the address book
+  menu beside the search and the Contacts | Groups switch.
 
 - **Changed: Contacts manages every contact, not only those with an email
   address.** The contact form edits postal addresses, the birthday and the
