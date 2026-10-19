@@ -2582,7 +2582,7 @@ impl Component for Preferences {
                                         set_subtitle: &i18n("Which unified rows show their combined unread \
                                                        chip while folded up. Expanded, the rows beneath \
                                                        carry the counts. Sent never shows one."),
-                                        set_expanded: true,
+                                        set_expanded: false,
 
                                         #[name = "unified_chip_all_inboxes_row"]
                                         add_row = &adw::SwitchRow {
@@ -2699,7 +2699,7 @@ impl Component for Preferences {
                                                        rail still expands or collapses any of them, and the \
                                                        full sidebar comes back exactly as you left it."),
                                         set_show_enable_switch: true,
-                                        set_expanded: true,
+                                        set_expanded: false,
                                         connect_enable_expansion_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleRailFoldEnabled(row.enables_expansion()));
                                         },
@@ -4252,6 +4252,20 @@ impl Component for Preferences {
         widgets.rail_dots_row.set_active(init.rail_dots);
         widgets.seen_counts_row.set_active(init.seen_counts);
         widgets.rail_fold_row.set_enable_expansion(init.rail_fold.enabled);
+        // Unread counts and Fold up expanded items start folded each
+        // launch and stay as they are left for the rest of the session,
+        // a rebuilt Settings window included. Switching expansion on opens
+        // a row, so its state is set after that.
+        for (row, i) in [(&widgets.unified_chips_row, 0), (&widgets.rail_fold_row, 1)] {
+            row.set_expanded(SESSION_OPEN.with(|o| o.get()[i]));
+            row.connect_expanded_notify(move |row| {
+                SESSION_OPEN.with(|o| {
+                    let mut open = o.get();
+                    open[i] = row.is_expanded();
+                    o.set(open);
+                });
+            });
+        }
         widgets.rail_fold_accounts_row.set_active(init.rail_fold.accounts);
         widgets.rail_fold_all_inboxes_row.set_active(init.rail_fold.all_inboxes);
         widgets.rail_fold_starred_row.set_active(init.rail_fold.starred);
@@ -5795,6 +5809,12 @@ fn collect_named(root: &gtk::Widget, name: &str, out: &mut Vec<gtk::Widget>) {
         collect_named(&c, name, out);
         child = c.next_sibling();
     }
+}
+
+thread_local! {
+    /// Whether Settings → Sidebar's Unread counts and Fold up expanded
+    /// items rows are open, for this run of the app only.
+    static SESSION_OPEN: std::cell::Cell<[bool; 2]> = const { std::cell::Cell::new([false; 2]) };
 }
 
 /// The placement combos' rows. The unified section is not one: loading

@@ -55,6 +55,10 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Changed: two Settings → Sidebar rows start folded.** Unread counts
+  and Fold up expanded items are closed each time Hylki starts, and stay
+  as they are left until it quits.
+
 - **Changed: Favorites lists every favorite folder's mail.** A click on
   the Favorites row shows the mail of all of them together, as Filters
   does for its folders; the chevron or a double click opens and closes
