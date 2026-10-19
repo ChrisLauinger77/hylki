@@ -1172,6 +1172,7 @@ pub struct AppModel {
     /// with the folder path each message sits in: kept for the session, so
     /// the unified Starred view opens at once (#482).
     unified_starred_rows: HashMap<u32, Vec<(String, Message)>>,
+    unified_starred_due: bool,
     /// A count of the smart folders' unread mail is waiting to run, or
     /// running: syncs come in bursts, and one count covers a burst.
     smart_counts_due: bool,
@@ -1334,6 +1335,14 @@ pub struct AppModel {
     unified_dirty: std::cell::Cell<bool>,
     thread_links_due: std::cell::Cell<bool>,
     unified_emitted_at: std::cell::Cell<std::time::Instant>,
+    /// The fingerprint of the unified view's content the list has, when it
+    /// has the open view's: a merge that would hand it the same is skipped.
+    list_fp: std::cell::Cell<Option<u64>>,
+    /// The open unified view's folders whose slice is not copied from the
+    /// folder's cache yet: a view the list kept is shown first, and the
+    /// copies (tens of thousands of messages for an Archive) made after.
+    /// Until then the folder's cache stands for the slice.
+    unified_unfilled: std::collections::HashSet<(u32, u32)>,
     /// Gallery items per account inbox, merged for display.
     /// How many attachments the gallery's current query matches, carried
     /// between pages so only the first one pays for the COUNT.
@@ -2087,6 +2096,18 @@ pub enum AppMsg {
     /// The starred mail of the accounts with no Starred folder, read from
     /// the index for the unified Starred view (#482).
     UnifiedStarredLoaded { rows: HashMap<u32, Vec<(String, Message)>> },
+    /// Read the starred mail of accounts with no Starred folder again (the
+    /// debounce ran out).
+    RefreshUnifiedStarred,
+    /// Merge the unified view for the list now: the list had not kept it.
+    EmitUnifiedNow,
+    /// Copy the unified view's folders into its slices (`unified_unfilled`).
+    FillUnifiedSlices,
+    /// Folders of the unified view `key` not seen this session, read from
+    /// the index off the main thread.
+    UnifiedFoldersLoaded { key: u64, lists: Vec<((u32, u32), Vec<Message>)> },
+    /// Push the sidebar's unread counts, put off from a view switch.
+    PushUnreadCounts,
     /// Count every smart folder's unread mail now (the debounce ran out).
     CountSmartFolders,
     SmartCounts(HashMap<String, u32>),
@@ -3138,6 +3159,7 @@ impl SimpleComponent for AppModel {
                     }
                     MessageListOutput::SelectionKeys(keys) => AppMsg::SelectionKeys(keys),
                     MessageListOutput::Checked(count) => AppMsg::ListChecked(count),
+                    MessageListOutput::ViewMissed => AppMsg::EmitUnifiedNow,
                     MessageListOutput::MoveMessages { account_id, dest, messages } => {
                         AppMsg::MoveMessagesTo { account_id, dest, messages }
                     }
@@ -3729,6 +3751,7 @@ impl SimpleComponent for AppModel {
             unified_starred_loading: false,
             unified_starred_dirty: false,
             unified_starred_rows: HashMap::new(),
+            unified_starred_due: false,
             smart_counts_due: false,
             smart_counts_running: false,
             keyword_sync_at: HashMap::new(),
@@ -3817,6 +3840,8 @@ impl SimpleComponent for AppModel {
             unified_dirty: std::cell::Cell::new(false),
             thread_links_due: std::cell::Cell::new(false),
             unified_emitted_at: std::cell::Cell::new(std::time::Instant::now()),
+            list_fp: std::cell::Cell::new(None),
+            unified_unfilled: std::collections::HashSet::new(),
             gallery_total: 0,
             gallery_scan_left: HashMap::new(),
         };
@@ -5172,7 +5197,13 @@ impl SimpleComponent for AppModel {
                 // row at 3s, All Inboxes at 6s and the row again at 9s, so the
                 // timing logs show a cold and a warm open. starred@N picks the
                 // Nth account's row under Starred instead.
+                // HYLKI_SHOWCASE_UNIFIED_AT=<s> starts that at s seconds rather
+                // than 3, once a real profile's accounts have loaded.
                 if let Ok(which) = std::env::var("HYLKI_SHOWCASE_UNIFIED") {
+                    let at: u32 = std::env::var("HYLKI_SHOWCASE_UNIFIED_AT")
+                        .ok()
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(3);
                     let sub = which.strip_prefix("starred@").and_then(|n| n.parse::<i32>().ok());
                     let pick = move || match which.as_str() {
                         _ if let Some(index) = sub => {
@@ -5191,15 +5222,15 @@ impl SimpleComponent for AppModel {
                     };
                     let sb = model.sidebar.sender().clone();
                     let p = pick.clone();
-                    gtk::glib::timeout_add_seconds_local_once(3, move || {
+                    gtk::glib::timeout_add_seconds_local_once(at, move || {
                         let _ = sb.send(p());
                     });
                     let sb = model.sidebar.sender().clone();
-                    gtk::glib::timeout_add_seconds_local_once(6, move || {
+                    gtk::glib::timeout_add_seconds_local_once(at + 3, move || {
                         let _ = sb.send(SidebarInput::SelectUnifiedRow);
                     });
                     let sb = model.sidebar.sender().clone();
-                    gtk::glib::timeout_add_seconds_local_once(9, move || {
+                    gtk::glib::timeout_add_seconds_local_once(at + 6, move || {
                         let _ = sb.send(pick());
                     });
                 }
@@ -9954,6 +9985,42 @@ impl SimpleComponent for AppModel {
                 self.send_to(account_id, MailRequest::SaveDraft { message: out, folder_id, path, autosave: None, template: true });
             }
 
+            AppMsg::FillUnifiedSlices => self.fill_unified_slices(),
+
+            AppMsg::UnifiedFoldersLoaded { key, lists } => {
+                let open = self.unified && self.unified_view_key() == key;
+                let mut landed = false;
+                for ((account_id, folder_id), messages) in lists {
+                    // The worker's own answer may have come first.
+                    if messages.is_empty() || self.message_cache.get(&(account_id, folder_id)).is_some_and(|c| !c.is_empty()) {
+                        continue;
+                    }
+                    let messages = self.merge_local_tags(account_id, messages);
+                    let messages = self.apply_pending_seen(account_id, folder_id, messages);
+                    let messages = self.apply_pending_answers(account_id, folder_id, messages);
+                    let messages = self.apply_pending_tags(account_id, folder_id, messages);
+                    if open && self.is_unified_target(account_id, folder_id) {
+                        self.unified_unfilled.remove(&(account_id, folder_id));
+                        self.unified_slices.insert((account_id, folder_id), messages.clone());
+                        landed = true;
+                    }
+                    self.message_cache.insert((account_id, folder_id), messages);
+                }
+                if landed {
+                    self.emit_unified();
+                    self.push_index_complete();
+                }
+            }
+
+            AppMsg::PushUnreadCounts => self.push_unread_counts(),
+
+            AppMsg::EmitUnifiedNow => {
+                self.list_fp.set(None);
+                if self.unified {
+                    self.emit_unified();
+                }
+            }
+
             AppMsg::EmitUnified => {
                 self.unified_emit_queued.set(false);
                 if self.thread_links_due.replace(false) {
@@ -10508,6 +10575,11 @@ impl SimpleComponent for AppModel {
                 if std::mem::take(&mut self.smart_view_dirty) {
                     self.refresh_smart_view(&sender);
                 }
+            }
+
+            AppMsg::RefreshUnifiedStarred => {
+                self.unified_starred_due = false;
+                self.refresh_unified_starred(&sender);
             }
 
             AppMsg::UnifiedStarredLoaded { rows } => {
@@ -11799,6 +11871,7 @@ impl SimpleComponent for AppModel {
                                 .get(&(account_id, folder_id))
                                 .is_some_and(|s| *s == messages);
                         if !same_slice {
+                            self.unified_unfilled.remove(&(account_id, folder_id));
                             self.unified_slices.insert((account_id, folder_id), messages);
                             // Accounts answer one after another, a large or
                             // slow one in several goes: one merge for the lot
@@ -11820,8 +11893,14 @@ impl SimpleComponent for AppModel {
                     self.refresh_smart_view(&sender);
                 }
                 if !unchanged && self.flag_starred_accounts().contains(&account_id) {
-                    // The index just took this folder's flags.
-                    self.refresh_unified_starred(&sender);
+                    // The index just took this folder's flags: read them
+                    // again now for the view on show, else once a sync's
+                    // burst of folders has passed.
+                    if self.starred_by_flag().is_empty() {
+                        self.refresh_unified_starred_soon(&sender);
+                    } else {
+                        self.refresh_unified_starred(&sender);
+                    }
                 }
                 self.schedule_smart_counts(&sender);
                 // The reader's message was removed by this sync (deleted/moved on
@@ -15532,6 +15611,15 @@ impl AppModel {
 
     /// Update the sidebar's unread badges in place (no rebuild), derived from the
     /// loaded message lists. Cheap enough to call on every read/sync.
+    /// `push_unread_counts` once the view switch has been drawn: it walks
+    /// every folder, and the counts can wait a frame where the list cannot.
+    fn push_unread_counts_later(&self, sender: &ComponentSender<Self>) {
+        let s = sender.input_sender().clone();
+        gtk::glib::idle_add_local_once(move || {
+            let _ = s.send(AppMsg::PushUnreadCounts);
+        });
+    }
+
     fn push_unread_counts(&self) {
         let folders = self.folder_unread.clone();
         let unified = self.unified_unread();
@@ -16613,9 +16701,13 @@ impl AppModel {
         // Another view's slices are another view's: start afresh
         // (the loads below refill them).
         if self.unified_view != view || self.unified_account != account {
-            self.unified_slices.clear();
+            // Freed after the switch is drawn: an Archive's slices are tens
+            // of thousands of messages.
+            let mut old = Some(std::mem::take(&mut self.unified_slices));
+            gtk::glib::idle_add_local_once(move || drop(old.take()));
             self.unified_boot_requested.clear();
         }
+        self.unified_unfilled.clear();
         self.unified_view = view;
         self.unified_account = account;
         self.unified = true;
@@ -16623,7 +16715,7 @@ impl AppModel {
         self.smart_view = None;
         self.selected = None;
         if self.seen_counts {
-            self.push_unread_counts();
+            self.push_unread_counts_later(sender);
         }
         self.current = None;
         self.current_thread.clear();
@@ -16657,6 +16749,7 @@ impl AppModel {
         // offline — was simply absent from "All Inboxes", while its own
         // Inbox, served from cache, still listed its mail. Each account's
         // slice is replaced when its load lands.
+        let mut unseen: Vec<(u32, u32, String)> = Vec::new();
         for (account_id, folder_id, path) in &reqs {
             // A folder not seen since launch (only inboxes are primed
             // at startup): the on-disk index has it as last synced,
@@ -16666,44 +16759,68 @@ impl AppModel {
                 .message_cache
                 .get(&(*account_id, *folder_id))
                 .is_some_and(|c| !c.is_empty());
+            // Read off the main thread: an Archive is tens of thousands of
+            // rows, and the click would wait on all of them.
             if !seen {
-                let from_disk = self
-                    .cache
-                    .as_ref()
-                    .map(|c| c.load_messages(*account_id, path, *folder_id))
-                    .unwrap_or_default();
-                if !from_disk.is_empty() {
-                    let from_disk = self.merge_local_tags(*account_id, from_disk);
-                    let from_disk = self.apply_pending_seen(*account_id, *folder_id, from_disk);
-                    let from_disk = self.apply_pending_answers(*account_id, *folder_id, from_disk);
-                    let from_disk = self.apply_pending_tags(*account_id, *folder_id, from_disk);
-                    self.message_cache.insert((*account_id, *folder_id), from_disk);
-                }
+                unseen.push((*account_id, *folder_id, path.clone()));
             }
-            if let Some(cached) = self.message_cache.get(&(*account_id, *folder_id)) {
-                if !cached.is_empty() {
-                    self.unified_slices.insert((*account_id, *folder_id), cached.clone());
-                }
-            }
+            // Copied from the folder's cache below, or after the frame when
+            // the list has the view kept.
+            self.unified_unfilled.insert((*account_id, *folder_id));
         }
         // Forget folders that no longer contribute (an account
         // removed or disabled, a rule gone, since the last visit).
         let live: std::collections::HashSet<(u32, u32)> =
             reqs.iter().map(|(a, f, _)| (*a, *f)).collect();
         self.unified_slices.retain(|k, _| live.contains(k));
+        self.unified_unfilled.retain(|k| self.message_cache.get(k).is_some_and(|c| !c.is_empty()));
         self.fill_unified_starred();
-        if self.unified_slices.is_empty() {
+        // The list keeps the views it showed as built: one whose content is
+        // the same as then comes back at once, without a merge or a regroup.
+        let key = self.unified_view_key();
+        self.list_fp.set(None);
+        if self.unified_slices.is_empty() && self.unified_unfilled.is_empty() {
+            self.message_list.emit(MessageListInput::SetView { key: Some(key), fp: 0, restore: false });
             self.message_list
                 .emit(MessageListInput::SetLoading);
         } else {
-            self.emit_unified();
+            let fp = self.unified_fp();
+            let kept = self.message_list.model().has_view(key, fp);
+            self.message_list.emit(MessageListInput::SetView { key: Some(key), fp, restore: kept });
+            if kept {
+                self.list_fp.set(Some(fp));
+                let s = sender.input_sender().clone();
+                gtk::glib::idle_add_local_once(move || {
+                    let _ = s.send(AppMsg::FillUnifiedSlices);
+                });
+            } else {
+                self.fill_unified_slices();
+                self.emit_unified();
+            }
         }
         // Request every account's inbox; each result replaces that
         // account's slice as it arrives.
         for (account_id, folder_id, path) in reqs {
             self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
         }
-        self.refresh_unified_starred(sender);
+        if view == UnifiedView::Kind(FolderKind::Starred) {
+            self.refresh_unified_starred(sender);
+        }
+        if !unseen.is_empty() && self.cache.is_some() {
+            let s = sender.input_sender().clone();
+            std::thread::spawn(move || {
+                let t = std::time::Instant::now();
+                let lists: Vec<((u32, u32), Vec<Message>)> = match crate::cache::Cache::open() {
+                    Ok(cache) => unseen
+                        .into_iter()
+                        .map(|(a, f, path)| ((a, f), cache.load_messages(a, &path, f)))
+                        .collect(),
+                    Err(_) => Vec::new(),
+                };
+                tracing::debug!("unified: {} folders read from the index in {:?}", lists.len(), t.elapsed());
+                let _ = s.send(AppMsg::UnifiedFoldersLoaded { key, lists });
+            });
+        }
         self.push_index_complete();
         tracing::info!(
             "unified {view:?}: opened in {:?} with {} cached messages",
@@ -21085,11 +21202,75 @@ impl AppModel {
         });
     }
 
+    /// The open unified view, as one number: which view, and for which
+    /// account when narrowed to one.
+    fn unified_view_key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        format!("{:?}{:?}", self.unified_view, self.unified_account).hash(&mut h);
+        h.finish()
+    }
+
+    /// What the unified view holds, as one number: every message's place,
+    /// state and tags, whatever order the slices are in. A few milliseconds
+    /// for tens of thousands of messages, against a merge and a regrouping
+    /// many times that.
+    fn unified_fp(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut sum = 0u64;
+        let mut n = 0u64;
+        for m in self.unified_content() {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            (m.account_id, m.folder_id, m.uid, m.id, m.timestamp).hash(&mut h);
+            (m.unread, m.starred, m.answered, m.forwarded).hash(&mut h);
+            (&m.keywords, &m.labels, m.subject.len(), m.preview.len(), m.from_addr.len()).hash(&mut h);
+            (m.message_id.len(), m.references.len()).hash(&mut h);
+            sum = sum.wrapping_add(h.finish());
+            n += 1;
+        }
+        sum ^ n.rotate_left(32)
+    }
+
+    /// Every message of the open unified view: its slices, and for a folder
+    /// not copied yet, the folder's cache.
+    fn unified_content(&self) -> impl Iterator<Item = &Message> {
+        let filled = self
+            .unified_slices
+            .iter()
+            .filter(|(k, _)| !self.unified_unfilled.contains(k))
+            .flat_map(|(_, v)| v.iter());
+        let unfilled = self.unified_unfilled.iter().filter_map(|k| self.message_cache.get(k)).flat_map(|v| v.iter());
+        filled.chain(unfilled)
+    }
+
+    /// Copy the folders `open_unified_in` left to the folder caches into
+    /// the unified slices.
+    fn fill_unified_slices(&mut self) {
+        let t = std::time::Instant::now();
+        for key in std::mem::take(&mut self.unified_unfilled) {
+            match self.message_cache.get(&key) {
+                Some(c) if !c.is_empty() => {
+                    self.unified_slices.insert(key, c.clone());
+                }
+                _ => {
+                    self.unified_slices.remove(&key);
+                }
+            }
+        }
+        tracing::debug!("unified: slices filled in {:?}", t.elapsed());
+    }
+
     fn emit_unified(&self) {
         let t = std::time::Instant::now();
+        let fp = self.unified_fp();
+        if self.list_fp.get() == Some(fp) && self.message_list.model().view_key() == Some(self.unified_view_key()) {
+            tracing::debug!("unified: unchanged, not merged ({:?})", t.elapsed());
+            return;
+        }
+        self.list_fp.set(Some(fp));
+        self.message_list.emit(MessageListInput::SetViewFp(fp));
         self.unified_emitted_at.set(t);
-        let mut merged: Vec<Message> =
-            self.unified_slices.values().flatten().cloned().collect();
+        let mut merged: Vec<Message> = self.unified_content().cloned().collect();
         merged.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
         tracing::debug!("unified: merged {} messages in {:?}", merged.len(), t.elapsed());
         self.message_list.emit(MessageListInput::SetMessages { messages: merged });
@@ -24085,6 +24266,18 @@ impl AppModel {
             }
             tracing::debug!("unified starred: read the index in {:?}", t.elapsed());
             let _ = s.send(AppMsg::UnifiedStarredLoaded { rows });
+        });
+    }
+
+    /// `refresh_unified_starred` a few seconds from now, once for however
+    /// many folders sync meanwhile.
+    fn refresh_unified_starred_soon(&mut self, sender: &ComponentSender<Self>) {
+        if std::mem::replace(&mut self.unified_starred_due, true) {
+            return;
+        }
+        let s = sender.input_sender().clone();
+        gtk::glib::timeout_add_seconds_local_once(5, move || {
+            let _ = s.send(AppMsg::RefreshUnifiedStarred);
         });
     }
 

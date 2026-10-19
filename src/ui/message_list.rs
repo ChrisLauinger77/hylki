@@ -302,9 +302,40 @@ fn unasked_threads(
 /// window, so covering the whole mailbox costs no more than covering a day of
 /// it; what a conversation costs to *open* is bounded separately, by
 /// `THREAD_MEMBER_LIMIT`.
+/// A list as a rebuild left it (see `MessageList::keep_view`).
+struct ViewSnapshot {
+    key: u64,
+    fp: u64,
+    sig: u64,
+    all: Vec<Rc<Message>>,
+    threads: Option<std::rc::Rc<SourceThreads>>,
+    rows: Vec<Rc<RowData>>,
+    shown: Vec<Rc<Message>>,
+    tail: Vec<Rc<RowData>>,
+    groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>>,
+    msg_thread: std::collections::HashMap<(u32, u32), (u32, String)>,
+    thread_members: std::collections::HashMap<(u32, String), Vec<(u32, u32)>>,
+    nested: std::collections::HashMap<(u32, u32), Rc<Message>>,
+    listed_folders: std::collections::HashSet<(u32, u32)>,
+    total_matches: usize,
+    thread_drag: crate::ui::message_row::ThreadDragKeys,
+    window: usize,
+}
+
+/// How many views the list keeps as built. Each holds its messages, which
+/// for a large Archive is tens of megabytes.
+const KEPT_VIEWS: usize = 3;
+
+/// Free `held` once the main loop is idle, not inside the pass that let go
+/// of it.
+fn later_drop<T: 'static>(held: T) {
+    let mut held = Some(held);
+    glib::idle_add_local_once(move || drop(held.take()));
+}
+
 /// How many rows a large list puts on screen at once, and adds each time it
 /// is scrolled near the end of them.
-const LIST_WINDOW: usize = 1200;
+const LIST_WINDOW: usize = 300;
 
 /// What working out conversations reads of a message: from the message
 /// itself, or from the copy of just these fields that a large list hands to
@@ -545,6 +576,14 @@ pub struct MessageList {
     /// copy, fresh thread links, a view switch's flag changes) collapse into
     /// one rebuild instead of one each.
     rebuild_queued: Option<bool>,
+    /// The view on show, as the app named it (`SetView`), and its content's
+    /// fingerprint: a unified view is kept as built when left, and shown
+    /// again from that if nothing in it changed.
+    view_key: Option<u64>,
+    view_fp: u64,
+    views: std::collections::VecDeque<ViewSnapshot>,
+    /// A kept view to show at the next queued rebuild, in place of one.
+    pending_restore: Option<ViewSnapshot>,
     /// Another view was opened: its first rebuild waits for a frame, and
     /// fills the rows for the new look in passing (#401).
     switched: bool,
@@ -1196,6 +1235,13 @@ pub enum MessageListInput {
         contacts: Option<std::sync::Arc<std::collections::HashSet<String>>>,
     },
     SetMessages { messages: Vec<Message> },
+    /// The view now on show (`None` for any other), and its content's
+    /// fingerprint. With `restore`, the list shows the view as kept when it
+    /// was last left (the app checked with `has_view`) and no messages
+    /// follow.
+    SetView { key: Option<u64>, fp: u64, restore: bool },
+    /// The fingerprint of the content about to be set for the view on show.
+    SetViewFp(u64),
     /// Merge more indexed messages into the current list (background backfill),
     /// preserving the current search query and view.
     AppendMessages { messages: Vec<Message> },
@@ -1462,6 +1508,9 @@ pub enum MessageListInput {
 
 #[derive(Debug)]
 pub enum MessageListOutput {
+    /// The view the app asked to be shown as kept was not: send its
+    /// messages.
+    ViewMissed,
     /// A message was selected. `thread` holds the whole conversation (newest
     /// first) when the newest/head row was chosen, so the reader can show it as a
     /// scrollable conversation; otherwise it's just `[message]`.
@@ -1822,6 +1871,7 @@ impl SimpleComponent for MessageList {
         );
         shared.view.set(Some(&list_view));
         Self::wire_list(&list_view, &shared, sender.input_sender());
+        crate::ui::message_row::make_spare_rows(&shared);
 
         let color_provider = crate::ui::DisplayCss::new();
 
@@ -1830,6 +1880,10 @@ impl SimpleComponent for MessageList {
             shared,
             input: sender.input_sender().clone(),
             rebuild_queued: None,
+            view_key: None,
+            view_fp: 0,
+            views: std::collections::VecDeque::new(),
+            pending_restore: None,
             switched: false,
             look_stale: Default::default(),
             pending_select: None,
@@ -1998,7 +2052,25 @@ impl SimpleComponent for MessageList {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
+            MessageListInput::SetView { key, fp, restore } => {
+                let kept = if restore { self.take_view(key, fp) } else { None };
+                self.trim_views();
+                self.view_key = key;
+                self.view_fp = fp;
+                match kept {
+                    Some(snap) => {
+                        self.pending_restore = Some(snap);
+                        self.queue_rebuild(false);
+                    }
+                    None if restore => {
+                        let _ = sender.output(MessageListOutput::ViewMissed);
+                    }
+                    None => {}
+                }
+            }
+            MessageListInput::SetViewFp(fp) => self.view_fp = fp,
             MessageListInput::SetMessages { messages } => {
+                self.pending_restore = None;
                 let t = std::time::Instant::now();
                 let n = messages.len();
                 self.all = messages.into_iter().map(Rc::new).collect();
@@ -2011,6 +2083,7 @@ impl SimpleComponent for MessageList {
                 tracing::debug!("list: set {n} messages in {:?}", t.elapsed());
             }
             MessageListInput::AppendMessages { messages } => {
+                self.pending_restore = None;
                 // Grow the searchable index in place. Dedup by (account, uid) since
                 // UIDs collide across accounts in the unified inbox.
                 let existing: std::collections::HashSet<(u32, u32)> =
@@ -2028,6 +2101,7 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::SetLoading => {
+                self.pending_restore = None;
                 self.all.clear();
                 self.drop_threads();
                 self.loaded = false;
@@ -2038,6 +2112,9 @@ impl SimpleComponent for MessageList {
                 self.queue_rebuild(false);
             }
             MessageListInput::ResetPaging => {
+                // The view being left is kept as built, to come back to.
+                self.keep_view();
+                self.view_key = None;
                 // Folder switch: drop any active search, scrolled to the top.
                 self.switched = true;
                 self.window = LIST_WINDOW;
@@ -2095,7 +2172,10 @@ impl SimpleComponent for MessageList {
             MessageListInput::RunQueuedRebuild => {
                 self.switched = false;
                 if let Some(preserve) = self.rebuild_queued.take() {
-                    self.rebuild();
+                    match self.pending_restore.take() {
+                        Some(snap) => self.restore_view(snap),
+                        None => self.rebuild(),
+                    }
                     if !preserve {
                         self.scroll_top();
                     }
@@ -4177,13 +4257,31 @@ impl MessageList {
         }
     }
 
+    /// Describe in full the head rows `rebuild_rows` left pending past the
+    /// window, now that they come on screen.
+    fn finish_rows(&mut self, rows: &mut [Rc<RowData>]) {
+        if !rows.iter().any(|r| r.meta.pending.is_some()) {
+            return;
+        }
+        let passes = self.filter();
+        for row in rows.iter_mut() {
+            let Some(key) = row.meta.pending.clone() else { continue };
+            let own = self.groups.get(&key).cloned().unwrap_or_else(|| vec![row.msg.clone()]);
+            let (meta, _) = self.describe_group(&key, &own, &passes, true);
+            let mut data = RowData::clone(row);
+            data.meta = RowMeta { appear: data.meta.appear, ..meta };
+            *row = Rc::new(data);
+        }
+    }
+
     /// Put up to `n` more rows on screen from the tail.
     fn grow_window(&mut self, n: usize) {
         if self.tail.is_empty() {
             return;
         }
         let n = n.min(self.tail.len());
-        let more: Vec<Rc<RowData>> = self.tail.drain(..n).collect();
+        let mut more: Vec<Rc<RowData>> = self.tail.drain(..n).collect();
+        self.finish_rows(&mut more);
         self.shown.extend(more.iter().map(|r| r.msg.clone()));
         let at = self.shared.model.len();
         self.shared.model.splice(at, 0, more);
@@ -4344,6 +4442,143 @@ impl MessageList {
 
     /// The source changed: its conversations are to be worked out again,
     /// and an answer still on its way from a background thread is stale.
+    /// What a rebuild reads besides the messages, as one number: a kept view
+    /// is shown again only under the settings it was built with.
+    fn rows_signature(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let mut expanded: Vec<&(u32, String)> = self.expanded_threads.iter().collect();
+        expanded.sort();
+        let mut own: Vec<&String> = self.own_addresses.iter().collect();
+        own.sort();
+        let mut graph: Vec<&u32> = self.graph_accounts.iter().collect();
+        graph.sort();
+        format!(
+            "{:?}{}{}{}{}{}{:?}{:?}{}{:?}{:?}{:?}{}",
+            self.sort,
+            self.sort_reversed,
+            self.threading,
+            self.thread_expansion,
+            self.default_expanded,
+            self.group_by_date,
+            self.columns,
+            self.quick,
+            self.thread_row_newest,
+            expanded,
+            own,
+            graph,
+            self.contact_addresses.as_ref().map_or(0, |c| c.len()),
+        )
+        .hash(&mut h);
+        self.thread_links.hash(&mut h);
+        crate::datefmt::day_key(crate::datefmt::now()).hash(&mut h);
+        h.finish()
+    }
+
+    /// Keep the view on show as built, when it is one the app named and
+    /// nothing but its own list is on screen: no search, no conversations
+    /// still being worked out.
+    fn keep_view(&mut self) {
+        let Some(key) = self.view_key else { return };
+        if !self.loaded || !self.query.is_empty() || self.all.is_empty() {
+            return;
+        }
+        let threads = self.source_threads.borrow().clone();
+        if self.threading && self.all.len() >= THREADS_OFF_MAIN && threads.as_ref().is_none_or(|t| t.pool) {
+            return;
+        }
+        let snap = ViewSnapshot {
+            key,
+            fp: self.view_fp,
+            sig: self.rows_signature(),
+            all: std::mem::take(&mut self.all),
+            threads,
+            rows: self.shared.model.rows(),
+            shown: std::mem::take(&mut self.shown),
+            tail: std::mem::take(&mut self.tail),
+            groups: std::mem::take(&mut self.groups),
+            msg_thread: std::mem::take(&mut self.msg_thread),
+            thread_members: std::mem::take(&mut self.thread_members),
+            nested: std::mem::take(&mut self.nested),
+            listed_folders: std::mem::take(&mut self.listed_folders),
+            total_matches: self.total_matches,
+            thread_drag: std::mem::take(&mut *self.shared.thread_drag.borrow_mut()),
+            window: self.window,
+        };
+        self.views.retain(|v| v.key != key);
+        self.views.push_front(snap);
+    }
+
+    /// Keep no more than `KEPT_VIEWS`, the oldest going first. Not in
+    /// `keep_view`: the view being left is kept before the one being opened
+    /// is taken out, and must not push that one out.
+    fn trim_views(&mut self) {
+        while self.views.len() > KEPT_VIEWS {
+            later_drop(self.views.pop_back());
+        }
+    }
+
+    /// Whether the view `key` is kept with this content, under the
+    /// settings the list has now: the app shows it with `SetView { restore }`
+    /// rather than sending its messages.
+    pub fn has_view(&self, key: u64, fp: u64) -> bool {
+        let sig = self.rows_signature();
+        self.views.iter().any(|v| v.key == key && v.fp == fp && v.sig == sig)
+    }
+
+    /// The view the app named as on show, if any.
+    pub fn view_key(&self) -> Option<u64> {
+        self.view_key
+    }
+
+    fn take_view(&mut self, key: Option<u64>, fp: u64) -> Option<ViewSnapshot> {
+        let key = key?;
+        let sig = self.rows_signature();
+        let at = self.views.iter().position(|v| v.key == key && v.fp == fp && v.sig == sig)?;
+        self.views.remove(at)
+    }
+
+    /// Show a kept view as it was built: what `rebuild_rows` would make of
+    /// the same messages under the same settings, without the work.
+    fn restore_view(&mut self, snap: ViewSnapshot) {
+        let t = std::time::Instant::now();
+        later_drop((
+            std::mem::replace(&mut self.all, snap.all),
+            std::mem::replace(&mut self.groups, snap.groups),
+            std::mem::replace(&mut self.msg_thread, snap.msg_thread),
+            std::mem::replace(&mut self.thread_members, snap.thread_members),
+            std::mem::replace(&mut self.nested, snap.nested),
+            std::mem::replace(&mut self.tail, snap.tail),
+        ));
+        self.drop_threads();
+        *self.source_threads.borrow_mut() = snap.threads;
+        self.loaded = true;
+        self.listed_folders = snap.listed_folders;
+        let graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
+        if graph_in_view != self.graph_in_view {
+            self.graph_in_view = graph_in_view;
+            self.sync_look();
+        }
+        self.total_matches = snap.total_matches;
+        *self.shared.thread_drag.borrow_mut() = snap.thread_drag;
+        self.shown = snap.shown;
+        self.window = snap.window;
+        let stale = self.look_stale.take();
+        if !self.shared.model.replace(snap.rows, stale) && stale {
+            self.shared.refresh_all();
+        }
+        let by_date = self.group_by_date && matches!(self.sort, SortOrder::DateNewest | SortOrder::DateOldest);
+        if by_date != self.day_headings {
+            self.day_headings = by_date;
+            let factory = by_date.then(|| crate::ui::message_row::header_factory(&self.shared));
+            self.list_view.set_header_factory(factory.as_ref());
+        } else if by_date {
+            self.shared.refresh_headers();
+        }
+        self.select_current();
+        tracing::debug!("list: kept view shown, {} rows of {}, in {:?}", self.shown.len(), self.total_matches, t.elapsed());
+    }
+
     fn drop_threads(&self) {
         self.source_threads.take();
         self.threads_gen.set(self.threads_gen.get() + 1);
@@ -4478,11 +4713,14 @@ impl MessageList {
     /// head first, the parts filed in other folders included (#309). `own`
     /// is the folder's own members, oldest first. Records the conversation's
     /// membership for the whole-conversation actions as it goes.
+    /// `full`: work out what the row shows too, not only the conversation
+    /// maps; a row described without it is filled in by `grow_window`.
     fn describe_group(
         &mut self,
         key: &(u32, String),
         own: &[Rc<Message>],
         passes: &impl Fn(&Message) -> bool,
+        full: bool,
     ) -> (RowMeta, Vec<Rc<Message>>) {
         let mut msgs = own.to_vec();
         let summary = self.threading.then(|| self.thread_summaries.get(key)).flatten();
@@ -4507,6 +4745,37 @@ impl MessageList {
         // Never less than what is on screen: a stale or partial answer from
         // the cache must not make the badge contradict the rows under it.
         let total = if self.threading { summary.map(|s| s.count).unwrap_or(0).max(count) } else { count };
+        let expanded =
+            count > 1 && self.thread_expansion && (self.expanded_threads.contains(key) != self.default_expanded);
+        if !full {
+            if !extras.is_empty() {
+                for m in &extras {
+                    self.nested.insert((m.account_id, m.id), m.clone());
+                }
+                let head = msgs.remove(0);
+                msgs.extend(extras);
+                msgs.sort_by(|a, b| a.timestamp.cmp(&b.timestamp).then(a.uid.cmp(&b.uid)));
+                msgs.insert(0, head);
+            }
+            if count > 1 {
+                let members: Vec<(u32, u32)> = msgs.iter().map(|m| (m.account_id, m.id)).collect();
+                for k in &members {
+                    self.msg_thread.insert(*k, key.clone());
+                }
+                self.thread_members.insert(key.clone(), members);
+            }
+            let meta = RowMeta {
+                count: total,
+                expandable: count > 1,
+                expanded,
+                key: (count > 1).then(|| key.clone()),
+                revealed: true,
+                group: self.threading.then(|| key.clone()),
+                pending: Some(key.clone()),
+                ..Default::default()
+            };
+            return (meta, msgs);
+        }
         // The newest member this folder holds, and the newer one the cache
         // found in another folder — the reply you sent, filed in Sent (#236).
         let newest_here = msgs.last().expect("a group holds at least one message").clone();
@@ -4515,8 +4784,6 @@ impl MessageList {
         // `expanded_threads` stores toggles away from the default state. With
         // expansion disabled no thread ever opens in the list; the stored
         // toggles survive for when it is re-enabled.
-        let expanded =
-            count > 1 && self.thread_expansion && (self.expanded_threads.contains(key) != self.default_expanded);
         // The head stays marked unread while ANY message in its conversation
         // is unread, hidden replies included, but only this folder's own: an
         // archived message still unread is not new mail here.
@@ -4625,7 +4892,7 @@ impl MessageList {
                 self.queue_rebuild(true);
                 return;
             }
-            let (meta, _) = self.describe_group(&key, &own, &passes);
+            let (meta, _) = self.describe_group(&key, &own, &passes, true);
             if meta.expanded {
                 self.queue_rebuild(true);
                 return;
@@ -4749,11 +5016,18 @@ impl MessageList {
         let mut shown: Vec<Rc<Message>> = Vec::new();
         let mut rows: Vec<Rc<RowData>> = Vec::new();
         let mut thread_drag = crate::ui::message_row::ThreadDragKeys::new();
-        self.msg_thread.clear();
-        self.thread_members.clear();
-        self.nested.clear();
-        self.groups.clear();
+        // The last rebuild's maps go after the frame: for a large folder,
+        // freeing them is tens of milliseconds of the switch.
+        later_drop((
+            std::mem::take(&mut self.msg_thread),
+            std::mem::take(&mut self.thread_members),
+            std::mem::take(&mut self.nested),
+            std::mem::take(&mut self.groups),
+        ));
         let mut any_expanded = false;
+        let full_rows = self.window.max(LIST_WINDOW);
+        let mut unseen: std::collections::HashSet<(u32, u32)> =
+            self.selected_ids.iter().copied().chain(self.selected_id).collect();
         for key in &order {
             let mut msgs = groups.remove(key).unwrap();
             let section = day_starts.as_ref().map_or(DaySection::None, |d| DaySection::of(msgs[0].timestamp, d));
@@ -4772,7 +5046,15 @@ impl MessageList {
                     msgs.iter().map(|m| (m.account_id, m.folder_id, m.uid, m.id)).collect(),
                 );
             }
-            let (meta, members) = self.describe_group(key, &msgs, &passes);
+            // Past the window, and the selection, a row is described in
+            // full only when it comes on screen.
+            let full = rows.len() < full_rows || !unseen.is_empty();
+            let (meta, members) = self.describe_group(key, &msgs, &passes, full);
+            if !unseen.is_empty() {
+                for m in &members {
+                    unseen.remove(&(m.account_id, m.id));
+                }
+            }
             if self.threading {
                 self.groups.insert(key.clone(), msgs);
             }
@@ -4846,7 +5128,7 @@ impl MessageList {
             .rposition(|m| self.selected_ids.contains(&(m.account_id, m.id)) || self.selected_id == Some((m.account_id, m.id)))
             .map_or(0, |i| i + 1);
         let limit = self.window.max(LIST_WINDOW).max(selected_at).min(rows.len());
-        self.tail = rows.split_off(limit);
+        later_drop(std::mem::replace(&mut self.tail, rows.split_off(limit)));
         shown.truncate(limit);
         self.window = limit.max(LIST_WINDOW);
         self.shown = shown;

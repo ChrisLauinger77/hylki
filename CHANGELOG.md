@@ -165,6 +165,18 @@
   account has a row of its own under Starred that lists only its starred
   mail.
 
+- **Fixed: the unified views were slow to open.** Every visit to Inboxes,
+  Starred, Sent, Drafts, Archive, Junk or Trash copied and merged every
+  account's folder, grouped all of it into conversations and described each
+  one, then made the list's rows again; an Archive of 80,000 messages took
+  more than half a second each time. The list now keeps the last three
+  views it showed as they were built and shows one again at once when its
+  mail has not changed, describes only the rows on screen until it is
+  scrolled to the rest, reuses its rows rather than making new ones, and no
+  longer reads the disk for sender logos each time a row is filled. A
+  folder not yet read this session is read in the background, and a
+  refresh that brings nothing new leaves the list as it is.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a
