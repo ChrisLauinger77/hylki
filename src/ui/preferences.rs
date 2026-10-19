@@ -151,6 +151,7 @@ pub struct PrefInit {
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
     pub chevrons_left: bool,
+    pub account_click_folds: bool,
     pub start_view: crate::config::StartView,
     pub folder_sort: crate::config::FolderSort,
     pub console_mode: bool,
@@ -1280,6 +1281,7 @@ pub enum PrefOutput {
     SetUnifiedTags(bool),
     SetShowAccounts(bool),
     SetChevronsLeft(bool),
+    SetAccountClickFolds(bool),
     SetStartView(crate::config::StartView),
     SetFolderSort(crate::config::FolderSort),
     SetFilteredPlacement(crate::config::SectionPlacement),
@@ -2441,6 +2443,16 @@ impl Component for Preferences {
                                                        their expand/collapse chevrons sit on."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeChevronSide(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "account_click_row"]
+                                    adw::SwitchRow {
+                                        set_title: &i18n("Fold accounts with one click"),
+                                        set_subtitle: &i18n("A click anywhere on an account's name opens or closes \
+                                                       its folders. Off, only its chevron or a double click does."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetAccountClickFolds(row.is_active()));
                                         },
                                     },
 
@@ -4243,6 +4255,7 @@ impl Component for Preferences {
         widgets.folder_sort_row.set_selected(init.folder_sort.index());
         widgets.chevron_side_row.set_model(Some(&gtk::StringList::new(&[i18n("Left").as_str(), i18n("Right").as_str()])));
         widgets.chevron_side_row.set_selected(if init.chevrons_left { 0 } else { 1 });
+        widgets.account_click_row.set_active(init.account_click_folds);
         widgets.sidebar_hover_expand_row.set_active(init.sidebar_hover_expand);
         widgets.remember_sidebar_row.set_active(init.remember_sidebar);
         widgets.remember_rail_row.set_active(init.remember_rail);

@@ -1123,6 +1123,8 @@ pub struct AppModel {
     list_header_widgets: std::cell::OnceCell<ListHeaderWidgets>,
     /// Whether the sidebar's disclosure chevrons lead their rows.
     chevrons_left: bool,
+    /// Whether a click anywhere on an account's header folds it.
+    account_click_folds: bool,
     /// What the window shows at launch (#256).
     start_view: config::StartView,
     /// How accounts' folders are sorted, unless an account chooses
@@ -3684,6 +3686,7 @@ impl SimpleComponent for AppModel {
             focus_action,
             list_header_widgets: std::cell::OnceCell::new(),
             chevrons_left: prefs.chevrons_left,
+            account_click_folds: prefs.account_click_folds,
             start_view,
             folder_sort: prefs.folder_sort,
             console_mode: prefs.console_mode,
@@ -8774,6 +8777,12 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetAccountClickFolds(on)) => {
+                if pref!(self.account_click_folds = on) {
+                    self.rebuild_sidebar();
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetThreading(on)) => {
                 if pref!(self.threading = on) {
                     self.message_list.emit(MessageListInput::SetThreading(on));
@@ -13075,6 +13084,7 @@ impl AppModel {
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
+            account_click_folds: self.account_click_folds,
             console_mode: self.console_mode,
             status_bar_top: self.status_bar_top,
             read_mark: self.read_mark,
@@ -15811,6 +15821,7 @@ impl AppModel {
             show_accounts: self.show_accounts,
             unified_chips: self.unified_chips,
             chevrons_left: self.chevrons_left,
+            account_click_folds: self.account_click_folds,
             rail_dots: self.rail_dots_now(),
             rail_fold: self.rail_fold,
             unified_unread,
@@ -21743,6 +21754,7 @@ impl AppModel {
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             chevrons_left: self.chevrons_left,
+            account_click_folds: self.account_click_folds,
             start_view: self.start_view,
             folder_sort: self.folder_sort,
             console_mode: self.console_mode,

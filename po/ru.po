@@ -6120,6 +6120,14 @@ msgstr ""
 "С какой стороны от строк «Входящие» и учётных записей находятся стрелки "
 "раскрытия и сворачивания."
 
+msgid "Fold accounts with one click"
+msgstr ""
+
+msgid ""
+"A click anywhere on an account's name opens or closes its folders. Off, only "
+"its chevron or a double click does."
+msgstr ""
+
 msgid "Attachments in the sidebar"
 msgstr "Вложения на боковой панели"
 

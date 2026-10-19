@@ -6091,6 +6091,14 @@ msgstr ""
 "De quel côté des lignes Boîtes de réception et des comptes se trouvent leurs "
 "chevrons de dépliage/repliage."
 
+msgid "Fold accounts with one click"
+msgstr ""
+
+msgid ""
+"A click anywhere on an account's name opens or closes its folders. Off, only "
+"its chevron or a double click does."
+msgstr ""
+
 msgid "Attachments in the sidebar"
 msgstr "Pièces jointes dans la barre latérale"
 

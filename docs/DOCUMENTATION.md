@@ -170,10 +170,13 @@ Folders, Filters or Tags heading does nothing; the chevron beside it opens
 or closes the section. Clicking Inboxes, Starred, Sent, Drafts, Archive,
 Junk, Trash, Filters, Tags or Contacts in the unified section opens the
 combined list without showing each account's folder under it, and
-double-clicking it opens or closes that list as its chevron does. In the
-icon rail, which has no chevrons, a click on a section's icon opens or
-closes it, and a long press or a double click opens or closes the unified
-rows.
+double-clicking it opens or closes that list as its chevron does. An
+account's header works the same way: its chevron, or a double click on the
+header, opens or closes its folders, and a single click elsewhere on it
+does nothing. **Settings → Sidebar → Fold accounts with one click** brings
+back the single click anywhere on the header. In the icon rail, which has
+no chevrons, a click on a section's icon opens or closes it, and a long
+press or a double click opens or closes the unified rows.
 
 **Settings → Sidebar → Unified** chooses the unified section's rows.
 Inboxes, Starred, Sent, Drafts and Archive are on until switched off; Junk

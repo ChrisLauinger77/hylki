@@ -55,6 +55,13 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Changed: an account opens and closes with its chevron.** A click on an
+  account's header in the sidebar folded or opened it wherever it landed;
+  now its chevron does, or a double click on the header, as with the
+  unified rows. **Settings → Sidebar → Fold accounts with one click**
+  brings the old way back. The icon rail's avatars still open and close
+  with one click.
+
 - **Added: a double click opens or closes a unified row.** Inboxes,
   Starred, Sent, Drafts, Archive, Junk, Trash, Filters, Tags and Contacts
   in the sidebar's unified section open or close their list on a double

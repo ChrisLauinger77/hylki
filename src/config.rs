@@ -1861,6 +1861,10 @@ pub(crate) struct PrivacyFile {
     /// headers) LEAD their rows; off puts them back at the row's end.
     #[serde(default = "default_chevrons_left")]
     pub(crate) chevrons_left: bool,
+    /// Whether a click anywhere on an account's header folds it, as it
+    /// once did. Off (the default): its chevron, or a double click.
+    #[serde(default)]
+    pub(crate) account_click_folds: bool,
     /// Console mode (#status-bar): the verbose activity console is offered in
     /// the status bar. Off by default.
     #[serde(default)]
@@ -1981,6 +1985,7 @@ impl Default for PrivacyFile {
             filtered_placement: SectionPlacement::default(),
             tags_placement: SectionPlacement::default(),
             chevrons_left: default_chevrons_left(),
+            account_click_folds: false,
             console_mode: false,
             status_bar_top: false,
             read_mark: ReadMark::default(),

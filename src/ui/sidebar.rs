@@ -332,6 +332,9 @@ pub struct Sidebar {
     /// Whether the disclosure chevrons LEAD their rows (Settings: Chevron
     /// placement). Off restores the classic trailing position.
     chevrons_left: bool,
+    /// Whether a click anywhere on an account's header folds it (Settings →
+    /// Sidebar); off, its chevron or a double click does.
+    account_click_folds: bool,
     /// Icon rail: a dot for unread mail in place of the count.
     rail_dots: bool,
     /// Icon rail: the sections that fold up by themselves when the sidebar
@@ -524,6 +527,8 @@ pub enum SidebarInput {
         show_accounts: bool,
         unified_chips: crate::config::UnifiedChips,
         chevrons_left: bool,
+        /// A click anywhere on an account's header folds it.
+        account_click_folds: bool,
         rail_dots: bool,
         rail_fold: crate::config::RailFold,
         unified_unread: u32,
@@ -891,6 +896,7 @@ impl Component for Sidebar {
             show_unified: false,
             unified_chips: crate::config::UnifiedChips::default(),
             chevrons_left: false,
+            account_click_folds: false,
             rail_dots: false,
             rail_fold: crate::config::RailFold::default(),
             revealers: HashMap::new(),
@@ -1063,6 +1069,7 @@ impl Sidebar {
                 show_accounts,
                 unified_chips,
                 chevrons_left,
+                account_click_folds,
                 rail_dots,
                 rail_fold,
                 unified_unread,
@@ -1093,6 +1100,7 @@ impl Sidebar {
                 self.show_unified = show_unified;
                 self.unified_chips = unified_chips;
                 self.chevrons_left = chevrons_left;
+                self.account_click_folds = account_click_folds;
                 self.rail_dots = rail_dots;
                 // "Fold up expanded items" is a view of the rail, not a
                 // change to what is saved: the rebuild below draws the
@@ -2749,10 +2757,39 @@ impl Sidebar {
             if header.child().is_none() {
                 header.set_child(Some(&hbox));
             }
-            let s = sender.input_sender().clone();
-            header.connect_clicked(move |_| {
-                let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
-            });
+            if self.collapsed || self.account_click_folds {
+                // The rail's avatar, or every header by choice: a click
+                // anywhere opens or folds the account.
+                let s = sender.input_sender().clone();
+                header.connect_clicked(move |_| {
+                    let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
+                });
+            } else {
+                // As the unified rows: the chevron (with a little room
+                // around it) opens or folds the account, and so does a
+                // double click anywhere on the header; a plain click
+                // elsewhere does nothing. Seen before the button's own
+                // click, which no longer folds anything.
+                let press = gtk::GestureClick::new();
+                press.set_button(gtk::gdk::BUTTON_PRIMARY);
+                press.set_propagation_phase(gtk::PropagationPhase::Capture);
+                let s = sender.input_sender().clone();
+                let (head, chev) = (header.downgrade(), chevron.downgrade());
+                press.connect_pressed(move |_, presses, x, y| {
+                    let (Some(head), Some(chev)) = (head.upgrade(), chev.upgrade()) else { return };
+                    let on_chevron = chev.compute_bounds(&head).is_some_and(|b| {
+                        let slack = 10.0;
+                        (b.x() - slack..=b.x() + b.width() + slack).contains(&(x as f32))
+                            && (b.y() - slack..=b.y() + b.height() + slack).contains(&(y as f32))
+                    });
+                    // The chevron folds at its first click; the header at
+                    // its second, wherever the second lands.
+                    if (on_chevron && presses == 1) || (!on_chevron && presses == 2) {
+                        let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
+                    }
+                });
+                header.add_controller(press);
+            }
             // Right-click an account: act on the account / its inbox.
             let inbox_id = section.folders.iter().find(|f| f.kind == FolderKind::Inbox).map(|f| f.id);
             let own_order = !section.folder_order.is_empty();
