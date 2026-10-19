@@ -6054,64 +6054,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Posteingänge"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Ein gemeinsamer Posteingang, der jedes Konto in der oberen Seitenleiste "
-"kombiniert. Wird nur mit mehr als einem Konto angezeigt."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Der \"Markiert\" Ordner jedes Kontos als eine Liste, die sich für jedes "
-"Konto öffnet."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Jede E-Mail eines Kontos wird als eine Liste verschickt, die sich für jedes "
-"Konto öffnet."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr "Entwürfe jedes Kontos als eine Liste, die sich für jedes Konto öffnet."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Das Archiv jedes Kontos als eine Liste, die sich für jedes Konto öffnet."
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Unerwünschte E-Mails aller Konten als eine gemeinsame Liste, die sich im "
-"jeweiligen Konto öffnet."
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"Führt den Papierkorb aller Konten in einer gemeinsamen Liste zusammen, beim "
-"Öffnen wird jedoch das jeweilige Konto angezeigt."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Ordner mit aktiven Filterregeln in einem ausklappbaren Bereich der "
-"gemeinsamen Ansicht anzeigen."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Die Tags, die jeweils die E-Mails aller Konten mit diesem Tag anzeigen. "
-"Jedes Konto behält seinen eigenen Tags-Bereich unabhängig davon bei."
-
-msgid "Favorites"
-msgstr "Favoriten"
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Zähler ungelesener Nachrichten"
 
@@ -6124,16 +6066,12 @@ msgstr ""
 "darunter liegenden Zeilen die Zähler. Für Gesendet wird nie ein Zähler "
 "angezeigt."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Aktionen"
+
 msgid "Filters placement"
 msgstr "Position der Filter"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Auswahl zwischen der Anzeige in einem gemeinsamen Bereich oder als Liste "
-"oberhalb oder unterhalb der Konten."
 
 msgid "Tags placement"
 msgstr "Position der Tags"
@@ -7187,9 +7125,6 @@ msgstr ""
 msgid "Software"
 msgstr "Software"
 
-msgid "In the unified section"
-msgstr "Im gemeinsamen Bereich"
-
 msgid "Above the accounts"
 msgstr "Über den Konten"
 
@@ -7552,6 +7487,9 @@ msgstr "{n} Nachrichten löschen"
 msgid "Show or hide"
 msgstr "Tags ein- oder ausblenden"
 
+msgid "Favorites"
+msgstr "Favoriten"
+
 msgid "Folder"
 msgstr "Ordner"
 
@@ -7642,9 +7580,6 @@ msgstr "Bearbeite Smart Folder…"
 
 msgid "Delete Smart Folder…"
 msgstr "Lösche Smart Folder…"
-
-msgid "Show or hide filters"
-msgstr "Filter ein- oder ausblenden"
 
 msgid "Show or hide tags"
 msgstr "Tags ein- oder ausblenden"
@@ -8306,6 +8241,72 @@ msgstr "Der gemeinsame Posteingang im hellen Modus."
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Ein gemeinsamer Posteingang, der jedes Konto in der oberen Seitenleiste "
+#~ "kombiniert. Wird nur mit mehr als einem Konto angezeigt."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Der \"Markiert\" Ordner jedes Kontos als eine Liste, die sich für jedes "
+#~ "Konto öffnet."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Jede E-Mail eines Kontos wird als eine Liste verschickt, die sich für "
+#~ "jedes Konto öffnet."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Entwürfe jedes Kontos als eine Liste, die sich für jedes Konto öffnet."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Das Archiv jedes Kontos als eine Liste, die sich für jedes Konto öffnet."
+
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Unerwünschte E-Mails aller Konten als eine gemeinsame Liste, die sich im "
+#~ "jeweiligen Konto öffnet."
+
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Führt den Papierkorb aller Konten in einer gemeinsamen Liste zusammen, "
+#~ "beim Öffnen wird jedoch das jeweilige Konto angezeigt."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Ordner mit aktiven Filterregeln in einem ausklappbaren Bereich der "
+#~ "gemeinsamen Ansicht anzeigen."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Die Tags, die jeweils die E-Mails aller Konten mit diesem Tag anzeigen. "
+#~ "Jedes Konto behält seinen eigenen Tags-Bereich unabhängig davon bei."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Auswahl zwischen der Anzeige in einem gemeinsamen Bereich oder als Liste "
+#~ "oberhalb oder unterhalb der Konten."
+
+#~ msgid "In the unified section"
+#~ msgstr "Im gemeinsamen Bereich"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Filter ein- oder ausblenden"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Kontakte in der Seitenleiste"

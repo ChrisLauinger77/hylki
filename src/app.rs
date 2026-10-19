@@ -982,8 +982,6 @@ pub struct AppModel {
     notification_buttons: config::NotificationButtons,
     /// Whether the sidebar's footer shows the "Attachments" row.
     show_attachments: bool,
-    /// Whether the sidebar's footer shows the "Contacts" shortcut row.
-    show_contacts: bool,
     /// Whether the settings window opens on Accounts (vs Preferences).
     settings_open_accounts: bool,
     /// The Settings category last shown this session, to reopen on.
@@ -1096,22 +1094,15 @@ pub struct AppModel {
     show_unified_pref: bool,
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
     unified_chips: config::UnifiedChips,
-    /// Whether All Inboxes lists the folders that opted-in filter rules file
-    /// into, in its "Filtered Folders" section (Settings → Sidebar).
-    unified_filtered: bool,
-    /// Where the Filtered Folders and Tags sections sit (Settings → Sidebar).
+    /// Where the Filters, Tags, Favorites and Contacts sections sit
+    /// (Settings → Sidebar).
     filtered_placement: config::SectionPlacement,
     tags_placement: config::SectionPlacement,
-    /// And where Favorites and Contacts sit, and whether Favorites are
-    /// listed in the unified section.
     favorites_placement: config::SectionPlacement,
     contacts_placement: config::SectionPlacement,
-    unified_favorites: bool,
     /// The unified section's Starred / Sent / Drafts rows (Settings →
     /// Sidebar → Unified).
     unified_kinds: config::UnifiedKinds,
-    /// Whether the unified section lists the tags.
-    unified_tags: bool,
     /// Whether the account sections are shown at all.
     show_accounts: bool,
     /// The main menu's "Show Accounts" check item, kept in step with the
@@ -1785,9 +1776,8 @@ pub enum AppMsg {
     /// The ⋯ of the message list header (Focus Mode): search, filters and
     /// sort as a menu.
     ListOverflowMenu,
-    /// An account's own Filtered Folders / Tags section was opened or
-    /// folded — record it with the layout.
-    ToggleAccountFiltered(u32),
+    /// An account's own Tags section was opened or folded: record it with
+    /// the layout.
     ToggleAccountTags(u32),
     /// The message list's visible-count text changed.
     ListCount(String),
@@ -3053,7 +3043,6 @@ impl SimpleComponent for AppModel {
         // decided after the GOA reconcile, which can add accounts.
         let demo_data = demo_mode() && config.is_empty();
         let show_attachments = prefs.show_attachments;
-        let show_contacts = prefs.show_contacts;
         let start_view = prefs.start_view;
         let start = {
             use crate::ui::sidebar::StartTarget;
@@ -3087,7 +3076,6 @@ impl SimpleComponent for AppModel {
                 contacts_expanded,
                 contacts_folded: contacts_folded.clone(),
                 show_attachments,
-                show_contacts,
                 start,
             })
             .forward(sender.input_sender(), sidebar_output_msg);
@@ -3118,7 +3106,6 @@ impl SimpleComponent for AppModel {
                 contacts_expanded,
                 contacts_folded: contacts_folded.clone(),
                 show_attachments,
-                show_contacts,
                 start: None,
             })
             .forward(sender.input_sender(), sidebar_output_msg);
@@ -3630,7 +3617,6 @@ impl SimpleComponent for AppModel {
             notification_content: prefs.notification_content,
             notification_buttons: config::load_notification_buttons(),
             show_attachments,
-            show_contacts,
             settings_open_accounts: prefs.settings_open_accounts,
             last_settings_page: None,
             list_count: String::new(),
@@ -3680,14 +3666,11 @@ impl SimpleComponent for AppModel {
             pgp_labels: prefs.pgp_labels,
             show_unified_pref: prefs.show_unified,
             unified_chips: config::load_unified_chips(),
-            unified_filtered: prefs.unified_filtered,
             filtered_placement: prefs.filtered_placement,
             tags_placement: prefs.tags_placement,
             favorites_placement: prefs.favorites_placement,
             contacts_placement: prefs.contacts_placement,
-            unified_favorites: prefs.unified_favorites,
             unified_kinds: prefs.unified_kinds,
-            unified_tags: prefs.unified_tags,
             show_accounts,
             show_accounts_action,
             focus,
@@ -8689,12 +8672,6 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Pref(PrefOutput::SetContactsRow(show)) => {
-                if pref!(self.show_contacts = show) {
-                    self.sidebars_emit(SidebarInput::SetContactsRow(show));
-                }
-            }
-
             AppMsg::Pref(PrefOutput::SetShowUnified(show)) => {
                 if pref!(self.show_unified_pref = show) {
                     // Rebuilds the sidebar with or without the unified section.
@@ -8708,21 +8685,8 @@ impl SimpleComponent for AppModel {
                 }
             }
 
-            AppMsg::Pref(PrefOutput::SetUnifiedFiltered(show)) => {
-                if pref!(self.unified_filtered = show) {
-                    // Adds or removes the Filtered Folders section.
-                    self.rebuild_sidebar();
-                }
-            }
-
             AppMsg::Pref(PrefOutput::SetUnifiedKinds(kinds)) => {
                 if pref!(self.unified_kinds = kinds) {
-                    self.rebuild_sidebar();
-                }
-            }
-
-            AppMsg::Pref(PrefOutput::SetUnifiedTags(show)) => {
-                if pref!(self.unified_tags = show) {
                     self.rebuild_sidebar();
                 }
             }
@@ -8737,18 +8701,6 @@ impl SimpleComponent for AppModel {
                 }
                 if let Some(p) = &self.prefs {
                     p.emit(PrefInput::SetShowAccounts(show));
-                }
-            }
-
-            AppMsg::ToggleAccountFiltered(account_id) => {
-                // The sidebar animated the toggle locally; record the state.
-                if let Some(email) = self.email_of(account_id) {
-                    if let Some(pos) = self.filtered_expanded_accounts.iter().position(|e| *e == email) {
-                        self.filtered_expanded_accounts.remove(pos);
-                    } else {
-                        self.filtered_expanded_accounts.push(email);
-                    }
-                    self.save_sidebar_state();
                 }
             }
 
@@ -8783,12 +8735,6 @@ impl SimpleComponent for AppModel {
 
             AppMsg::Pref(PrefOutput::SetContactsPlacement(p)) => {
                 if pref!(self.contacts_placement = p) {
-                    self.rebuild_sidebar();
-                }
-            }
-
-            AppMsg::Pref(PrefOutput::SetUnifiedFavorites(show)) => {
-                if pref!(self.unified_favorites = show) {
                     self.rebuild_sidebar();
                 }
             }
@@ -13037,7 +12983,6 @@ impl AppModel {
             notification_content: self.notification_content,
             notification_buttons: self.notification_buttons.to_list(),
             show_attachments: self.show_attachments,
-            show_contacts: self.show_contacts,
             settings_open_accounts: self.settings_open_accounts,
             card_actions_hover: self.card_actions_hover,
             card_actions_auto: self.card_actions_auto,
@@ -13103,15 +13048,12 @@ impl AppModel {
             show_unified: self.show_unified_pref,
             unified_chip: self.unified_chips.all_inboxes,
             unified_chips: self.unified_chips,
-            unified_filtered: self.unified_filtered,
             unified_kinds: self.unified_kinds,
-            unified_tags: self.unified_tags,
             show_accounts: self.show_accounts,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
             contacts_placement: self.contacts_placement,
-            unified_favorites: self.unified_favorites,
             chevrons_left: self.chevrons_left,
             account_click_folds: self.account_click_folds,
             console_mode: self.console_mode,
@@ -15811,7 +15753,6 @@ impl AppModel {
                     has_filters,
                     collapsed: self.collapsed.contains(email),
                     custom_expanded: self.folders_expanded.contains(email),
-                    filtered_expanded: self.filtered_expanded_accounts.contains(email),
                     tags_expanded: self.tags_expanded_accounts.contains(email),
                     color,
                     emoji,
@@ -15846,7 +15787,6 @@ impl AppModel {
             sections,
             show_unified,
             unified_kinds,
-            unified_tags: self.unified_tags,
             show_accounts: self.show_accounts,
             unified_chips: self.unified_chips,
             chevrons_left: self.chevrons_left,
@@ -15861,7 +15801,6 @@ impl AppModel {
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
             contacts_placement: self.contacts_placement,
-            unified_favorites: self.unified_favorites,
             smart_folders: self.smart_folders.iter().map(|f| (f.id.clone(), f.name.clone())).collect(),
         });
 
@@ -21776,18 +21715,14 @@ impl AppModel {
             notification_content: self.notification_content,
             notification_buttons: self.notification_buttons,
             show_attachments: self.show_attachments,
-            show_contacts: self.show_contacts,
             show_unified: self.show_unified_pref,
             unified_chips: self.unified_chips,
-            unified_filtered: self.unified_filtered,
             unified_kinds: self.unified_kinds,
-            unified_tags: self.unified_tags,
             show_accounts: self.show_accounts,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
             favorites_placement: self.favorites_placement,
             contacts_placement: self.contacts_placement,
-            unified_favorites: self.unified_favorites,
             chevrons_left: self.chevrons_left,
             account_click_folds: self.account_click_folds,
             start_view: self.start_view,
@@ -24081,14 +24016,9 @@ impl AppModel {
             .collect()
     }
 
-    /// Whether the Filters section is in the sidebar: off when placed
-    /// nowhere, and in the unified section only with its switch on.
+    /// Whether the Filters section is in the sidebar.
     fn filtered_shown(&self) -> bool {
-        match self.filtered_placement {
-            config::SectionPlacement::Off => false,
-            config::SectionPlacement::AllInboxes => self.unified_filtered,
-            _ => true,
-        }
+        self.filtered_placement.shown()
     }
 
     fn unified_folder_refs(&self) -> Vec<UnifiedFolderRef> {
@@ -25804,7 +25734,6 @@ fn sidebar_output_msg(out: SidebarOutput) -> AppMsg {
         SidebarOutput::TagSelected { keyword, account } => {
             AppMsg::TagSelected { keyword: Some(keyword), account }
         }
-        SidebarOutput::ToggleAccountFiltered(id) => AppMsg::ToggleAccountFiltered(id),
         SidebarOutput::ToggleAccountTags(id) => AppMsg::ToggleAccountTags(id),
         SidebarOutput::AttachmentsSelected => AppMsg::ShowAttachments,
         SidebarOutput::ContactsClicked => AppMsg::OpenContacts,

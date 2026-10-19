@@ -6165,67 +6165,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Boîtes de réception"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Une boîte de réception unifiée regroupant chaque compte, en haut de la barre "
-"latérale. Affichée uniquement si vous avez plusieurs comptes."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Le dossier favoris de chaque compte réuni en une seule liste, qui s'ouvre "
-"sur celui du compte concerné."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Le courrier envoyé de chaque compte réuni en une seule liste, qui s'ouvre "
-"sur celui du compte concerné."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Les brouillons de chaque compte réunis en une seule liste, qui s'ouvre sur "
-"ceux du compte concerné."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Les archives de chaque compte réunies en une seule liste, qui s'ouvre sur "
-"celles du compte concerné."
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Les indésirables de chaque compte réunis en une seule liste, qui s'ouvre sur "
-"ceux du compte concerné."
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"La corbeille de chaque compte réunie en une seule liste, qui s'ouvre sur "
-"celle du compte concerné."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Lister tous les dossiers dans lesquels vos règles de filtrage classent le "
-"courrier, dans une section repliable de la vue unifiée."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Les tags, chacun affichant le courrier de tous les comptes qui le porte. "
-"Chaque compte conserve dans tous les cas sa propre section Tags."
-
-msgid "Favorites"
-msgstr "Favoris"
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Compteurs de non-lus"
 
@@ -6237,16 +6176,12 @@ msgstr ""
 "repliées. Dépliées, ce sont les lignes en dessous qui portent les compteurs. "
 "La ligne Envoyés n'en affiche jamais."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Actions"
+
 msgid "Filters placement"
 msgstr "Emplacement des filtres"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Choisissez entre apparaître dans une section unifiée, ou une liste au-dessus "
-"ou en dessous des comptes."
 
 msgid "Tags placement"
 msgstr "Emplacement des tags"
@@ -7307,9 +7242,6 @@ msgstr ""
 msgid "Software"
 msgstr "Logiciel"
 
-msgid "In the unified section"
-msgstr "Dans la section unifiée"
-
 msgid "Above the accounts"
 msgstr "Au-dessus des comptes"
 
@@ -7673,6 +7605,9 @@ msgstr "Supprimer votre clé ?"
 msgid "Show or hide"
 msgstr "Afficher ou masquer les tags"
 
+msgid "Favorites"
+msgstr "Favoris"
+
 msgid "Folder"
 msgstr "Dossier"
 
@@ -7763,9 +7698,6 @@ msgstr "Modifier le dossier intelligent…"
 
 msgid "Delete Smart Folder…"
 msgstr "Supprimer le dossier intelligent…"
-
-msgid "Show or hide filters"
-msgstr "Afficher ou masquer les filtres"
 
 msgid "Show or hide tags"
 msgstr "Afficher ou masquer les tags"
@@ -8432,6 +8364,74 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Une boîte de réception unifiée regroupant chaque compte, en haut de la "
+#~ "barre latérale. Affichée uniquement si vous avez plusieurs comptes."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Le dossier favoris de chaque compte réuni en une seule liste, qui s'ouvre "
+#~ "sur celui du compte concerné."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Le courrier envoyé de chaque compte réuni en une seule liste, qui s'ouvre "
+#~ "sur celui du compte concerné."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Les brouillons de chaque compte réunis en une seule liste, qui s'ouvre "
+#~ "sur ceux du compte concerné."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Les archives de chaque compte réunies en une seule liste, qui s'ouvre sur "
+#~ "celles du compte concerné."
+
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Les indésirables de chaque compte réunis en une seule liste, qui s'ouvre "
+#~ "sur ceux du compte concerné."
+
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "La corbeille de chaque compte réunie en une seule liste, qui s'ouvre sur "
+#~ "celle du compte concerné."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Lister tous les dossiers dans lesquels vos règles de filtrage classent le "
+#~ "courrier, dans une section repliable de la vue unifiée."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Les tags, chacun affichant le courrier de tous les comptes qui le porte. "
+#~ "Chaque compte conserve dans tous les cas sa propre section Tags."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Choisissez entre apparaître dans une section unifiée, ou une liste au-"
+#~ "dessus ou en dessous des comptes."
+
+#~ msgid "In the unified section"
+#~ msgstr "Dans la section unifiée"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Afficher ou masquer les filtres"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Contacts dans la barre latérale"

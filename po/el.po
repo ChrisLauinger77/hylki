@@ -6156,69 +6156,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Εισερχόμενα"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Ενοποιημένα εισερχόμενα που συνδυάζουν όλους τους λογαριασμούς, στην κορυφή "
-"της πλευρικής στήλης. Εμφανίζονται μόνο με περισσότερους από έναν "
-"λογαριασμούς."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Οι φάκελοι με αστέρι όλων των λογαριασμών σε μία λίστα, με άνοιγμα στον "
-"αντίστοιχο φάκελο κάθε λογαριασμού."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Τα απεσταλμένα όλων των λογαριασμών σε μία λίστα, με άνοιγμα στα απεσταλμένα "
-"κάθε λογαριασμού."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Τα πρόχειρα όλων των λογαριασμών σε μία λίστα, με άνοιγμα στα πρόχειρα κάθε "
-"λογαριασμού."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Το αρχείο όλων των λογαριασμών σε μία λίστα, με άνοιγμα στο αρχείο κάθε "
-"λογαριασμού."
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Τα ανεπιθύμητα όλων των λογαριασμών ως μία λίστα, με άνοιγμα στα ανεπιθύμητα "
-"κάθε λογαριασμού."
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"Ο κάδος όλων των λογαριασμών ως μία λίστα, με άνοιγμα στον κάδο κάθε "
-"λογαριασμού."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Εμφάνιση κάθε φακέλου στον οποίο αρχειοθετούν μηνύματα οι κανόνες φίλτρων "
-"σας, σε μια πτυσσόμενη ενότητα της ενοποιημένης προβολής."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Οι ετικέτες, καθεμία από τις οποίες εμφανίζει τα μηνύματα όλων των "
-"λογαριασμών που τη φέρουν. Κάθε λογαριασμός διατηρεί τη δική του ενότητα "
-"Ετικέτες ούτως ή άλλως."
-
-msgid "Favorites"
-msgstr "Αγαπημένα"
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Πλήθος μη αναγνωσμένων"
 
@@ -6230,16 +6167,12 @@ msgstr ""
 "όταν είναι συμπτυγμένες. Όταν αναπτυχθούν, οι υποκείμενες σειρές εμφανίζουν "
 "τα πλήθη. Τα Απεσταλμένα δεν εμφανίζουν ποτέ ένδειξη."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Ενέργειες"
+
 msgid "Filters placement"
 msgstr "Τοποθέτηση φίλτρων"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Επιλέξτε αν θα εμφανίζονται σε ενοποιημένη ενότητα ή σε λίστα πάνω ή κάτω "
-"από τους λογαριασμούς."
 
 msgid "Tags placement"
 msgstr "Τοποθέτηση ετικετών"
@@ -7297,9 +7230,6 @@ msgstr ""
 msgid "Software"
 msgstr "Λογισμικό"
 
-msgid "In the unified section"
-msgstr "Στην ενοποιημένη ενότητα"
-
 msgid "Above the accounts"
 msgstr "Πάνω από τους λογαριασμούς"
 
@@ -7663,6 +7593,9 @@ msgstr "Διαγραφή του κλειδιού σας;"
 msgid "Show or hide"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
 
+msgid "Favorites"
+msgstr "Αγαπημένα"
+
 msgid "Folder"
 msgstr "Φάκελος"
 
@@ -7753,9 +7686,6 @@ msgstr "Επεξεργασία έξυπνου φακέλου…"
 
 msgid "Delete Smart Folder…"
 msgstr "Διαγραφή έξυπνου φακέλου…"
-
-msgid "Show or hide filters"
-msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 msgid "Show or hide tags"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
@@ -8436,6 +8366,76 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Ενοποιημένα εισερχόμενα που συνδυάζουν όλους τους λογαριασμούς, στην "
+#~ "κορυφή της πλευρικής στήλης. Εμφανίζονται μόνο με περισσότερους από έναν "
+#~ "λογαριασμούς."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Οι φάκελοι με αστέρι όλων των λογαριασμών σε μία λίστα, με άνοιγμα στον "
+#~ "αντίστοιχο φάκελο κάθε λογαριασμού."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Τα απεσταλμένα όλων των λογαριασμών σε μία λίστα, με άνοιγμα στα "
+#~ "απεσταλμένα κάθε λογαριασμού."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Τα πρόχειρα όλων των λογαριασμών σε μία λίστα, με άνοιγμα στα πρόχειρα "
+#~ "κάθε λογαριασμού."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Το αρχείο όλων των λογαριασμών σε μία λίστα, με άνοιγμα στο αρχείο κάθε "
+#~ "λογαριασμού."
+
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Τα ανεπιθύμητα όλων των λογαριασμών ως μία λίστα, με άνοιγμα στα "
+#~ "ανεπιθύμητα κάθε λογαριασμού."
+
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Ο κάδος όλων των λογαριασμών ως μία λίστα, με άνοιγμα στον κάδο κάθε "
+#~ "λογαριασμού."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Εμφάνιση κάθε φακέλου στον οποίο αρχειοθετούν μηνύματα οι κανόνες φίλτρων "
+#~ "σας, σε μια πτυσσόμενη ενότητα της ενοποιημένης προβολής."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Οι ετικέτες, καθεμία από τις οποίες εμφανίζει τα μηνύματα όλων των "
+#~ "λογαριασμών που τη φέρουν. Κάθε λογαριασμός διατηρεί τη δική του ενότητα "
+#~ "Ετικέτες ούτως ή άλλως."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Επιλέξτε αν θα εμφανίζονται σε ενοποιημένη ενότητα ή σε λίστα πάνω ή κάτω "
+#~ "από τους λογαριασμούς."
+
+#~ msgid "In the unified section"
+#~ msgstr "Στην ενοποιημένη ενότητα"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Εμφάνιση ή απόκρυψη φίλτρων"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Επαφές στην πλευρική στήλη"

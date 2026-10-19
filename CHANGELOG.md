@@ -55,13 +55,14 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
-- **Added: placements for Favorites and Contacts, and Off for all four.**
-  Settings → Sidebar → Unified places Favorites and Contacts as it does
-  Filters and Tags: in the unified section, above the accounts or below
-  them, and each of the four can be Off, out of the sidebar. Favorites and
-  Contacts have switches among the unified rows, where Contacts' replaces
-  the Contacts in the sidebar switch; a section's switch counts, and can
-  be changed, only while it is placed in the unified section.
+- **Changed: Filters, Tags, Favorites and Contacts left the unified
+  section.** Settings → Sidebar → Sections places each above the accounts,
+  below them, or Off, out of the sidebar; wherever they are, they are rows
+  like the unified section's, with a chevron on the right. A setting that
+  had one in the unified section now has it above the accounts, or Off
+  where its switch was off. Their switches among the unified rows, the
+  Contacts in the sidebar switch and the Filters unread-count switch are
+  gone, and the unified rows' settings lost their descriptions.
 
 - **Changed: an account opens and closes with its chevron.** A click on an
   account's header in the sidebar folded or opened it wherever it landed;
@@ -72,11 +73,10 @@
 
 - **Added: a double click opens or closes a unified row.** Inboxes,
   Starred, Sent, Drafts, Archive, Junk, Trash, Filters, Tags and Contacts
-  in the sidebar's unified section open or close their list on a double
-  click, as with their chevron; the first click still opens the combined
+  in the sidebar open or close their list on a double click, as with their chevron; the first click still opens the combined
   view.
 
-- **Changed: Contacts is a row of the sidebar's unified section.** It opens
+- **Changed: Contacts is a row of the sidebar.** It opens
   every contact, and its chevron lists every address book, its account under
   its name, an account of several books as one row with its books under it,
   and each book's groups under the book, each folding with a caret as a

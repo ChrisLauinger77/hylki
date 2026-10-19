@@ -54,15 +54,12 @@ impl Slot {
     }
 }
 
-/// One folding section's widgets (a Filtered Folders or Tags section, in
-/// one slot): rebuilt with the sidebar, toggled in place between rebuilds.
+/// An account's Tags section's widgets: rebuilt with the sidebar, toggled
+/// in place between rebuilds.
 struct SectionWidgets {
     revealer: gtk::Revealer,
     chevron: gtk::Image,
-    toggle: gtk::Widget,
     list: gtk::ListBox,
-    /// The header's folded-up total chip (Filtered Folders only).
-    badge: Option<gtk::Label>,
 }
 
 /// One unified row — All Inboxes, or the unified section's Starred / Sent /
@@ -93,16 +90,6 @@ enum UnifiedRow {
     /// Contacts: every contact, and under it each account's address
     /// books with their groups.
     Contacts,
-}
-
-/// Whether a section placed `at` is in the sidebar: never when off, in the
-/// unified section only with its switch there (`unified`) on.
-fn placed(at: crate::config::SectionPlacement, unified: bool) -> bool {
-    match at {
-        crate::config::SectionPlacement::Off => false,
-        crate::config::SectionPlacement::AllInboxes => unified,
-        _ => true,
-    }
 }
 
 /// What a unified row is called.
@@ -205,10 +192,9 @@ pub struct SectionData {
     pub folder_sort: crate::config::FolderSort,
     pub own_folder_sort: Option<crate::config::FolderSort>,
     pub default_folder_sort: crate::config::FolderSort,
-    /// The folders this account's own "Filtered Folders" section lists
-    /// (every rule's destination), and whether that section is open.
+    /// The folders this account's filter rules file into (every rule's
+    /// destination).
     pub filtered: Vec<Folder>,
-    pub filtered_expanded: bool,
     /// Whether this account has any filter rule at all: only then is
     /// "Apply Filters" worth offering on its folders (#198).
     pub has_filters: bool,
@@ -248,8 +234,6 @@ pub struct SidebarInit {
     pub contacts_folded: Vec<String>,
     /// Whether the "Attachments" row is shown.
     pub show_attachments: bool,
-    /// Whether the "Contacts" row is shown.
-    pub show_contacts: bool,
     /// Where the first pick lands instead of All Inboxes (#256).
     pub start: Option<StartTarget>,
 }
@@ -431,8 +415,6 @@ pub struct Sidebar {
     reannounce: Option<(Sel, Option<String>)>,
     /// Whether the "Attachments" row is shown (in the pinned footer).
     show_attachments: bool,
-    /// Whether the "Contacts" row is shown (in the pinned footer).
-    show_contacts: bool,
     /// How many messages are waiting in the Outbox across all accounts. The row
     /// only exists while this is non-zero — an empty Outbox is the normal state
     /// and does not deserve permanent furniture.
@@ -478,7 +460,6 @@ pub struct Sidebar {
     /// The rows of every Filtered Folders section (the unified one and each
     /// account's own), in row order, with the sections' widgets and badges.
     filtered_rows: HashMap<Slot, Vec<UnifiedFolderRef>>,
-    filtered_sections: HashMap<Slot, SectionWidgets>,
     filtered_badges: HashMap<Slot, HashMap<(u32, u32), gtk::Label>>,
     /// Inbox unread badge overlaid on each account's avatar circle, shown only
     /// while that account's section is collapsed (its Inbox row — and normal
@@ -502,18 +483,14 @@ pub struct Sidebar {
     unified_kinds: crate::config::UnifiedKinds,
     kind_expanded: HashMap<FolderKind, bool>,
     kind_widgets: HashMap<UnifiedRow, KindWidgets>,
-    /// Whether the unified Tags section is shown at all.
-    unified_tags: bool,
     /// Whether the account sections are shown at all.
     show_accounts: bool,
     /// Where the Filters, Tags, Favorites and Contacts sections sit
-    /// (Settings → Sidebar), and whether Favorites are listed while placed
-    /// in the unified section.
+    /// (Settings → Sidebar).
     filtered_placement: crate::config::SectionPlacement,
     tags_placement: crate::config::SectionPlacement,
     favorites_placement: crate::config::SectionPlacement,
     contacts_placement: crate::config::SectionPlacement,
-    unified_favorites: bool,
     /// Focus Mode: the account sections are hidden.
     focus_hide_accounts: bool,
     /// Focus Mode: the unified rows show folded, whatever their saved
@@ -536,8 +513,6 @@ pub enum SidebarInput {
         /// The unified Starred / Sent / Drafts rows to show (already
         /// narrowed by the app to a multi-account setup).
         unified_kinds: crate::config::UnifiedKinds,
-        /// Whether the unified Tags section is shown.
-        unified_tags: bool,
         /// Whether the account sections are shown at all.
         show_accounts: bool,
         unified_chips: crate::config::UnifiedChips,
@@ -554,12 +529,12 @@ pub enum SidebarInput {
         favorite_folders: Vec<UnifiedFolderRef>,
         /// The tags (#71), for the Tags section.
         tags: Vec<crate::config::Tag>,
-        /// Where the Filtered Folders and Tags sections are drawn.
+        /// Where the Filters, Tags, Favorites and Contacts sections are
+        /// drawn.
         filtered_placement: crate::config::SectionPlacement,
         tags_placement: crate::config::SectionPlacement,
         favorites_placement: crate::config::SectionPlacement,
         contacts_placement: crate::config::SectionPlacement,
-        unified_favorites: bool,
         /// The smart folders (#417) as (id, name).
         smart_folders: Vec<(String, String)>,
     },
@@ -660,7 +635,6 @@ pub enum SidebarInput {
     /// Show/hide the "Attachments" row in the pinned footer.
     SetAttachmentsRow(bool),
     /// Show/hide the "Contacts" row in the pinned footer.
-    SetContactsRow(bool),
     /// Whether any account is syncing — spins the refresh button.
     SetBusy(bool),
     /// Whether the network is down: the refresh button turns orange (#442).
@@ -711,8 +685,7 @@ pub enum SidebarOutput {
     UnifiedTagsSelected,
     /// A smart folder (#417), by its id.
     SmartSelected(String),
-    /// The user toggled an account's own Filtered Folders / Tags section.
-    ToggleAccountFiltered(u32),
+    /// The user toggled an account's own Tags section.
     ToggleAccountTags(u32),
     /// The "New message" row at the top of the sidebar.
     ComposeRequested,
@@ -952,7 +925,6 @@ impl Component for Sidebar {
             start: if init.mirror { None } else { init.start },
             reannounce: None,
             show_attachments: init.show_attachments,
-            show_contacts: init.show_contacts,
             outbox_count: 0,
             unified_unread: 0,
             fresh: None,
@@ -977,7 +949,6 @@ impl Component for Sidebar {
             smart_unread: HashMap::new(),
             smart_badges: HashMap::new(),
             filtered_rows: HashMap::new(),
-            filtered_sections: HashMap::new(),
             filtered_badges: HashMap::new(),
             account_circle_badges: HashMap::new(),
             tags: Vec::new(),
@@ -995,13 +966,11 @@ impl Component for Sidebar {
             kind_widgets: HashMap::new(),
             rail_open: HashMap::new(),
             rail_open_accounts: HashMap::new(),
-            unified_tags: true,
             show_accounts: true,
-            filtered_placement: crate::config::SectionPlacement::default(),
-            tags_placement: crate::config::SectionPlacement::default(),
-            favorites_placement: crate::config::SectionPlacement::default(),
-            contacts_placement: crate::config::SectionPlacement::default(),
-            unified_favorites: true,
+            filtered_placement: crate::config::SectionPlacement::AboveAccounts,
+            tags_placement: crate::config::SectionPlacement::AboveAccounts,
+            favorites_placement: crate::config::SectionPlacement::AboveAccounts,
+            contacts_placement: crate::config::SectionPlacement::AboveAccounts,
             focus_hide_accounts: false,
             focus_fold_unified: false,
             accounts_revealer: None,
@@ -1086,7 +1055,6 @@ impl Sidebar {
                 mut sections,
                 show_unified,
                 unified_kinds,
-                unified_tags,
                 show_accounts,
                 unified_chips,
                 chevrons_left,
@@ -1101,7 +1069,6 @@ impl Sidebar {
                 tags_placement,
                 favorites_placement,
                 contacts_placement,
-                unified_favorites,
                 smart_folders,
             } => {
                 // Order each account's folders essential-first, then custom, so
@@ -1139,7 +1106,6 @@ impl Sidebar {
                 self.tags_placement = tags_placement;
                 self.favorites_placement = favorites_placement;
                 self.contacts_placement = contacts_placement;
-                self.unified_favorites = unified_favorites;
                 self.smart_folders = smart_folders;
                 // The open smart folder was deleted: fall back to the
                 // default view.
@@ -1149,7 +1115,6 @@ impl Sidebar {
                     }
                 }
                 self.unified_kinds = unified_kinds;
-                self.unified_tags = unified_tags;
                 self.show_accounts = show_accounts;
                 // Every Filtered Folders section's rows: the unified one's
                 // (narrowed by the app to the rules that opted in) and each
@@ -1209,6 +1174,10 @@ impl Sidebar {
                     self.selected = path.map_or(Sel::None, |p| Sel::Folder(acc, p));
                 }
                 if self.selected == Sel::UnifiedTags && !self.unified_tags_shown() {
+                    self.selected = Sel::None;
+                }
+                // Contacts placed off takes its selection with it.
+                if matches!(self.selected, Sel::Contacts | Sel::ContactScope(_)) && !self.contacts_shown() {
                     self.selected = Sel::None;
                 }
                 // A folder picked in a switched-off row's account list is
@@ -1480,20 +1449,15 @@ impl Sidebar {
                 }
             }
 
-            // The unified slot is a unified row when placed in the unified
-            // section, a heading (like an account's own) above or below the
-            // accounts.
+            // The unified slot is a unified row; an account's is a heading.
             SidebarInput::ToggleTagsExpand(slot) => {
-                if slot == Slot::Unified && self.kind_widgets.contains_key(&UnifiedRow::Tags) {
+                if slot == Slot::Unified {
                     self.toggle_row(UnifiedRow::Tags, &sender);
                 } else {
                     let open = !self.tags_open(slot);
                     self.set_tags_open(slot, open, &sender);
                     if let Some(w) = self.tag_sections.get(&slot) {
                         w.revealer.set_reveal_child(open);
-                        if slot == Slot::Unified {
-                            w.toggle.set_margin_bottom(tags_toggle_gap(open));
-                        }
                         w.chevron.set_icon_name(Some(chevron_icon(open)));
                     }
                 }
@@ -1575,24 +1539,8 @@ impl Sidebar {
             }
 
             SidebarInput::ToggleFilteredExpand(slot) => {
-                if slot == Slot::Unified && self.kind_widgets.contains_key(&UnifiedRow::Filtered) {
+                if slot == Slot::Unified {
                     self.toggle_row(UnifiedRow::Filtered, &sender);
-                } else {
-                    let open = !self.filtered_open(slot);
-                    self.set_filtered_open(slot, open, &sender);
-                    let unread = self.filtered_unread(slot);
-                    if let Some(w) = self.filtered_sections.get(&slot) {
-                        w.revealer.set_reveal_child(open);
-                        if slot == Slot::Unified {
-                            w.toggle.set_margin_bottom(unified_folders_toggle_gap(open));
-                        }
-                        // Folded: the header wears the section's total;
-                        // open, each row carries its own count.
-                        if let Some(b) = &w.badge {
-                            b.set_visible(unread > 0 && !open);
-                        }
-                        w.chevron.set_icon_name(Some(chevron_icon(open)));
-                    }
                 }
             }
 
@@ -1755,13 +1703,6 @@ impl Sidebar {
                             && self.unified_chips.all_inboxes,
                     );
                 }
-                for (slot, badges) in &self.filtered_badges {
-                    let total: u32 = badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
-                    if let Some(b) = self.filtered_sections.get(slot).and_then(|w| w.badge.as_ref()) {
-                        b.set_text(&total.to_string());
-                        b.set_visible(total > 0 && !self.filtered_open(*slot) && self.unified_chips.filtered);
-                    }
-                }
                 for (row, w) in &self.kind_widgets {
                     let total: u32 = w.row_badges.keys().map(|k| folders.get(k).copied().unwrap_or(0)).sum();
                     if let Some(b) = &w.badge {
@@ -1807,22 +1748,6 @@ impl Sidebar {
                 // The row is about to disappear from under the selection; fall
                 // back the same way an emptied selection does.
                 if !show && self.selected == Sel::Attachments {
-                    self.selected = Sel::None;
-                }
-                self.rebuild_normal(
-                    &widgets.pinned_box,
-                    &widgets.normal_box,
-                    &widgets.footer_box,
-                    &sender,
-                );
-                self.restore_selection();
-            }
-
-            SidebarInput::SetContactsRow(show) => {
-                self.show_contacts = show;
-                // The row is about to disappear from under the selection; fall
-                // back the same way an emptied selection does.
-                if !show && self.selected == Sel::Contacts {
                     self.selected = Sel::None;
                 }
                 self.rebuild_normal(
@@ -2118,7 +2043,7 @@ impl Sidebar {
         footer: &gtk::Box,
         sender: &ComponentSender<Self>,
     ) {
-        use crate::config::SectionPlacement::{self, AboveAccounts, AllInboxes, BelowAccounts};
+        use crate::config::SectionPlacement::{AboveAccounts, BelowAccounts};
         // A list about to go keeps no keyboard focus: GTK would hand it to
         // the first list left, All Inboxes, and a list selects the row it
         // focuses, opening All Inboxes over the folder on screen. A folder's
@@ -2255,7 +2180,6 @@ impl Sidebar {
         self.unified_inbox_list = None;
         self.unified_inboxes.clear();
         self.unified_inbox_badges.clear();
-        self.filtered_sections.clear();
         self.filtered_badges.clear();
         self.account_circle_badges.clear();
         self.tag_sections.clear();
@@ -2466,11 +2390,10 @@ impl Sidebar {
             pinned.append(&bar);
         }
 
-        // The unified section: the "All Inboxes" row, the Starred / Sent /
-        // Drafts rows (Settings → Sidebar → Unified), then — placed here —
-        // the Filtered Folders and Tags rows, all built alike: a header
-        // row that opens the merged view and a caret that opens the list
-        // beneath. It heads the scrolling sidebar rather than the pinned
+        // The unified section: the "All Inboxes" row and the Starred / Sent /
+        // Drafts rows (Settings → Sidebar → Unified), all built alike: a
+        // header row that opens the merged view and a caret that opens the
+        // list beneath. It heads the scrolling sidebar rather than the pinned
         // area: with several lists open at once it can stand taller than a
         // short window, and pinned it would have forced the window taller
         // than the screen.
@@ -2479,26 +2402,10 @@ impl Sidebar {
             unified_rows.push(UnifiedRow::Kind(FolderKind::Inbox));
         }
         unified_rows.extend(self.unified_kinds.listed().into_iter().map(UnifiedRow::Kind));
-        let unified_shown = !unified_rows.is_empty();
-        // Favorites (#367) head the section under All Inboxes, and stand
-        // alone with a single account, where the rest is not shown.
-        if self.favorites_shown() && self.favorites_placement == AllInboxes {
-            unified_rows.insert(usize::from(self.show_unified), UnifiedRow::Favorites);
-        }
-        if unified_shown && !self.unified_folders.is_empty() && self.filtered_placement == AllInboxes {
-            unified_rows.push(UnifiedRow::Filtered);
-        }
-        if unified_shown && self.unified_tags_shown() && self.tags_placement == AllInboxes {
-            unified_rows.push(UnifiedRow::Tags);
-        }
-        // Smart folders (#417) close the section, and like Favorites stand
-        // alone with a single account.
+        // Smart folders (#417) close the section, and stand alone with a
+        // single account.
         if !self.smart_folders.is_empty() {
             unified_rows.push(UnifiedRow::Smart);
-        }
-        // Contacts last, its address books and groups beneath it.
-        if self.contacts_shown() && self.contacts_placement == AllInboxes {
-            unified_rows.push(UnifiedRow::Contacts);
         }
         let unified_sections: Vec<SectionData> =
             sections.iter().filter(|s| s.in_unified).cloned().collect();
@@ -2616,25 +2523,11 @@ impl Sidebar {
             self.outbox_list = Some(list);
         }
 
-        // The sections placed in the scrolling sidebar above the accounts —
-        // including those meant for All Inboxes when it is hidden (a single
-        // account), which would otherwise have nowhere to be.
-        let no_unified = !self.show_unified && !self.unified_kinds.any();
-        let above = |p: SectionPlacement| p == AboveAccounts || (p == AllInboxes && no_unified);
-        // These placements keep the heading style (a caret heading and its
-        // rows); "in the unified section" draws them as unified rows.
-        let filtered_above = !self.unified_folders.is_empty() && above(self.filtered_placement);
-        let tags_above = self.unified_tags_shown() && above(self.tags_placement);
-        if filtered_above {
-            self.build_filtered_section(container, Slot::Unified, &sections, sender);
-        }
-        if tags_above {
-            self.build_tags_section(container, Slot::Unified, filtered_above, sender);
-        }
-        // Favorites and Contacts placed here keep the unified rows' shape.
+        // Favorites, Filters, Tags and Contacts placed above the accounts,
+        // drawn like the unified rows.
         let rows_above = self.placed_rows(AboveAccounts);
         if !rows_above.is_empty() {
-            self.build_unified_run(container, &rows_above, &[], sender);
+            self.build_unified_run(container, &rows_above, &sections, sender);
         }
 
         // The account sections — unless Settings (or the main menu) has
@@ -3268,7 +3161,7 @@ impl Sidebar {
             // section shows. (Its filtered folders are marked in place in
             // the hierarchy instead — see `filter_icon`.)
             if !self.tags.is_empty() {
-                self.build_tags_section(&wrap, Slot::Account(id), false, sender);
+                self.build_tags_section(&wrap, Slot::Account(id), sender);
             }
             if !custom.is_empty() {
                 if let Some(h) = &folders_heading {
@@ -3302,18 +3195,10 @@ impl Sidebar {
         }
         self.accounts_revealer = any_accounts.then_some(accounts_revealer);
 
-        // And the sections placed after the last account.
-        let filtered_below =
-            !self.unified_folders.is_empty() && self.filtered_placement == BelowAccounts;
-        if filtered_below {
-            self.build_filtered_section(container, Slot::Unified, &sections, sender);
-        }
-        if self.unified_tags_shown() && self.tags_placement == BelowAccounts {
-            self.build_tags_section(container, Slot::Unified, filtered_below, sender);
-        }
+        // And those placed after the last account.
         let rows_below = self.placed_rows(BelowAccounts);
         if !rows_below.is_empty() {
-            self.build_unified_run(container, &rows_below, &[], sender);
+            self.build_unified_run(container, &rows_below, &sections, sender);
         }
 
         // Per-account avatar colors (background + readable text), and the
@@ -3344,7 +3229,6 @@ impl Sidebar {
                 .chain(self.tree_row_revealers.values().flatten())
                 .cloned()
                 .chain(self.unified_revealer.clone())
-                .chain(self.filtered_sections.values().map(|w| w.revealer.clone()))
                 .chain(self.tag_sections.values().map(|w| w.revealer.clone()))
                 .chain(self.kind_widgets.values().map(|w| w.revealer.clone()))
                 .collect();
@@ -3420,11 +3304,6 @@ impl Sidebar {
         }
         if let Some(label) = &self.unified_badge {
             mark(label, seen(&mut self.unified_inbox_badges.keys()));
-        }
-        for (slot, badges) in &self.filtered_badges {
-            if let Some(b) = self.filtered_sections.get(slot).and_then(|w| w.badge.as_ref()) {
-                mark(b, seen(&mut badges.keys()));
-            }
         }
         for w in self.kind_widgets.values() {
             if let Some(b) = &w.badge {
@@ -4085,10 +3964,6 @@ impl Sidebar {
                 ch.set_icon_name(Some(chevron_icon(false)));
             }
         }
-        for w in self.filtered_sections.get(&Slot::Unified).into_iter().chain(self.tag_sections.get(&Slot::Unified)) {
-            w.revealer.set_reveal_child(false);
-            w.chevron.set_icon_name(Some(chevron_icon(false)));
-        }
     }
 
     /// The unread total a unified row's folded chip shows.
@@ -4181,203 +4056,13 @@ impl Sidebar {
         }
     }
 
-    /// A Filtered Folders section — the unified one, or an account's own:
-    /// a toggle header and, under an animated revealer, one row per folder
-    /// (the filter-folder glyph in the account's color, the folder name,
-    /// its unread chip). In the rail the header is a glyph button and the
-    /// rows are glyphs. The unified heading reads like the All Inboxes row
-    /// (full-strength label); an account's reads like its "Folders" heading.
-    fn build_filtered_section(
-        &mut self,
-        parent: &gtk::Box,
-        slot: Slot,
-        sections: &[SectionData],
-        sender: &ComponentSender<Self>,
-    ) {
-        let rows = self.filtered_rows.get(&slot).cloned().unwrap_or_default();
-        let open = self.filtered_open(slot);
-        let unread: u32 = rows.iter().map(|r| r.folder.unread).sum();
-        let unified = slot == Slot::Unified;
-        let chevron = gtk::Image::from_icon_name(chevron_icon(open));
-        let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        hb.add_css_class("folder-row");
-        let mut tip: Option<String> = None;
-        // The header's unread chip — the section's total — shows only while
-        // the section is folded up, as All Inboxes' does, and only with its
-        // switch on (Settings → Sidebar → Unread counts).
-        let show_chip = unread > 0 && !open && self.unified_chips.filtered;
-        let badge: gtk::Label;
-        let mut chevron_btn: Option<gtk::Button> = None;
-        if self.collapsed {
-            // The rail has no room for a label: Jason's filter-folder glyph
-            // (a folder with a funnel's bars) carries the toggle alone.
-            let icon = gtk::Image::from_icon_name("filter-folder-symbolic");
-            hb.set_halign(gtk::Align::Center);
-            let (overlay, b) = with_unread_overlay(&icon, unread);
-            b.set_visible(show_chip);
-            hb.append(&overlay);
-            badge = b;
-            tip = Some(if unread > 0 { format!("{} ({unread})", i18n("Filters")) } else { i18n("Filters") });
-        } else {
-            // A leading caret and the label, like the accounts' "Folders"
-            // heading; the glyph belongs to the rows beneath.
-            if self.chevrons_left {
-                // Same nudge as that heading: a chevron's ink sits deeper
-                // in its canvas than an icon's.
-                chevron.set_margin_start(2);
-            }
-            let btn = heading_chevron(&chevron);
-            btn.set_tooltip_text(Some(i18n("Show or hide filters").as_str()));
-            hb.append(&btn);
-            chevron_btn = Some(btn);
-            let lbl = gtk::Label::new(Some(i18n("Filters").as_str()));
-            if unified {
-                lbl.add_css_class("account-name");
-            }
-            lbl.set_halign(gtk::Align::Start);
-            lbl.set_hexpand(true);
-            lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
-            hb.append(&lbl);
-            let b = gtk::Label::new(Some(&unread.to_string()));
-            style_badge(&b, 5);
-            b.set_visible(show_chip);
-            hb.append(&b);
-            badge = b;
-        }
-        let toggle = section_heading(
-            &hb,
-            chevron_btn.as_ref(),
-            if unified { &["unified-folders-toggle"] } else { &[] },
-            SidebarInput::ToggleFilteredExpand(slot),
-            sender,
-        );
-        toggle.set_tooltip_text(tip.as_deref());
-        if unified {
-            toggle.set_margin_bottom(unified_folders_toggle_gap(open));
-        }
-        parent.append(&toggle);
-
-        let list = gtk::ListBox::new();
-        list.set_selection_mode(gtk::SelectionMode::Single);
-        list.add_css_class("navigation-sidebar");
-        list.add_css_class("section-child-list");
-        // The gap to the first account section below (the inbox sub-list
-        // carries 14 when this section is absent; the folder rows' own
-        // bottom padding makes 10 read the same here). With a Tags section
-        // beneath, 10px keeps these rows off its heading (Jason,
-        // 2026-09-07); folded up, the list takes the gap away with it.
-        if unified {
-            list.set_margin_bottom(10);
-        }
-        let mut badges: HashMap<(u32, u32), gtk::Label> = HashMap::new();
-        for r in &rows {
-            let Some(section) = sections.iter().find(|s| s.account.id == r.account_id) else {
-                continue;
-            };
-            let tip = if unified {
-                format!("{} \u{2014} {}", r.folder.name, section.account.label)
-            } else {
-                r.folder.name.clone()
-            };
-            // Laid out exactly like a folder under an account's "Folders"
-            // heading — same builder, same leaf expander slot — so folders
-            // read the same wherever they sit in the sidebar. Only the
-            // color differs: the account's, which says whose folder this is.
-            let icon = filtered_folder_icon(&r.folder, section.account.id);
-            let lead: Option<gtk::Widget> = if self.collapsed {
-                None
-            } else {
-                let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-                spacer.set_width_request(TREE_EXPANDER_WIDTH);
-                Some(spacer.upcast())
-            };
-            let (row, badge) = build_folder_row(
-                &r.folder,
-                self.collapsed,
-                0,
-                lead.as_ref(),
-                self.chevrons_left,
-                FolderGlyph::Icon(icon),
-            );
-            let Some(badge) = badge else { continue };
-            // Name the account too: the tint alone is a hint.
-            row.set_tooltip_text(Some(&if self.collapsed && r.folder.unread > 0 {
-                format!("{tip} ({})", r.folder.unread)
-            } else {
-                tip.clone()
-            }));
-            // Filtered folders take drops like any folder of their account.
-            row.add_controller(folder_drop_target(r.account_id, r.folder.path.clone(), sender));
-            list.append(&row);
-            badges.insert((r.account_id, r.folder.id), badge);
-        }
-        let ss = sender.input_sender().clone();
-        let quiet = self.quiet.clone();
-        list.connect_row_selected(move |_, row| {
-            if quiet.get() {
-                return;
-            }
-            if let Some(row) = row {
-                let _ = ss.send(SidebarInput::FilteredRowSelected { slot, index: row.index() });
-            }
-        });
-        // Right-click a filtered folder: the same menu it has under its
-        // account.
-        let click = gtk::GestureClick::new();
-        click.set_button(gtk::gdk::BUTTON_SECONDARY);
-        let cs = sender.clone();
-        let list_w = list.clone();
-        let refs = rows.clone();
-        let favorites = self.favorite_keys();
-        click.connect_pressed(move |_, _, x, y| {
-            if let Some(r) = list_w
-                .row_at_y(y as i32)
-                .and_then(|row| refs.get(row.index() as usize))
-            {
-                let favorite = favorites.iter().any(|(a, p)| *a == r.account_id && *p == r.folder.path);
-                let items = folder_menu_items(r.account_id, &r.folder, true, true, favorite);
-                show_sidebar_menu(&list_w, x, y, items, &cs);
-            }
-        });
-        list.add_controller(click);
-
-        let revealer = gtk::Revealer::new();
-        revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
-        revealer.set_transition_duration(0);
-        revealer.set_reveal_child(open);
-        revealer.set_child(Some(&list));
-        parent.append(&revealer);
-        self.filtered_badges.insert(slot, badges);
-        self.filtered_sections.insert(
-            slot,
-            SectionWidgets { revealer, chevron, toggle, list, badge: Some(badge) },
-        );
-    }
-
-    /// A Tags section (#71) — the unified one, or an account's own: a
-    /// toggle header and, under an animated revealer, one row per tag
-    /// (color disc, its name). From the unified section a tag shows every
-    /// account's mail with it; from an account's, that account's alone.
-    /// In the rail the header is a tag glyph and the rows are discs.
-    fn build_tags_section(
-        &mut self,
-        parent: &gtk::Box,
-        slot: Slot,
-        after_filtered: bool,
-        sender: &ComponentSender<Self>,
-    ) {
+    /// An account's Tags section (#71): a toggle header and, under an
+    /// animated revealer, one row per tag (color disc, its name) showing
+    /// that account's mail with it. In the rail the header is a tag glyph
+    /// and the rows are discs.
+    fn build_tags_section(&mut self, parent: &gtk::Box, slot: Slot, sender: &ComponentSender<Self>) {
         let open = self.tags_open(slot);
-        let unified = slot == Slot::Unified;
         let chevron = gtk::Image::from_icon_name(chevron_icon(open));
-        let mut classes: Vec<&str> = Vec::new();
-        if unified {
-            classes.push("unified-folders-toggle");
-            // Rides 16px up onto the Filtered Folders rows (Jason,
-            // 2026-09-07) when that section sits right above.
-            if after_filtered {
-                classes.push("tags-toggle");
-            }
-        }
         let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         hb.add_css_class("folder-row");
         let mut chevron_btn: Option<gtk::Button> = None;
@@ -4395,21 +4080,14 @@ impl Sidebar {
             hb.append(&btn);
             chevron_btn = Some(btn);
             let lbl = gtk::Label::new(Some(i18n("Tags").as_str()));
-            if unified {
-                lbl.add_css_class("account-name");
-            }
             lbl.set_halign(gtk::Align::Start);
             lbl.set_hexpand(true);
             lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
             hb.append(&lbl);
         }
-        let toggle =
-            section_heading(&hb, chevron_btn.as_ref(), &classes, SidebarInput::ToggleTagsExpand(slot), sender);
+        let toggle = section_heading(&hb, chevron_btn.as_ref(), &[], SidebarInput::ToggleTagsExpand(slot), sender);
         if self.collapsed {
             toggle.set_tooltip_text(Some(i18n("Tags").as_str()));
-        }
-        if unified {
-            toggle.set_margin_bottom(tags_toggle_gap(open));
         }
         parent.append(&toggle);
 
@@ -4417,9 +4095,6 @@ impl Sidebar {
         list.set_selection_mode(gtk::SelectionMode::Single);
         list.add_css_class("navigation-sidebar");
         list.add_css_class("section-child-list");
-        if unified {
-            list.set_margin_bottom(10);
-        }
         for t in &self.tags {
             let row = gtk::ListBoxRow::new();
             let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 12);
@@ -4469,7 +4144,7 @@ impl Sidebar {
         revealer.set_reveal_child(open);
         revealer.set_child(Some(&list));
         parent.append(&revealer);
-        self.tag_sections.insert(slot, SectionWidgets { revealer, chevron, toggle, list, badge: None });
+        self.tag_sections.insert(slot, SectionWidgets { revealer, chevron, list });
     }
 
     /// Whether a unified row's total-unread chip is switched on (Settings →
@@ -4477,23 +4152,28 @@ impl Sidebar {
     fn chip_shown(&self, row: UnifiedRow) -> bool {
         match row {
             UnifiedRow::Kind(kind) => self.unified_chips.has(kind),
-            UnifiedRow::Favorites | UnifiedRow::Smart => true,
-            UnifiedRow::Filtered => self.unified_chips.filtered,
+            UnifiedRow::Favorites | UnifiedRow::Filtered | UnifiedRow::Smart => true,
             UnifiedRow::Tags | UnifiedRow::Contacts => false,
         }
     }
 
     /// Whether the unified Tags section has anything to show.
     fn unified_tags_shown(&self) -> bool {
-        !self.tags.is_empty() && placed(self.tags_placement, self.unified_tags)
+        !self.tags.is_empty() && self.tags_placement.shown()
     }
 
-    /// The Favorites and Contacts rows placed `at`, above or below the
-    /// accounts.
+    /// The Favorites, Filters, Tags and Contacts rows placed `at`, above or
+    /// below the accounts.
     fn placed_rows(&self, at: crate::config::SectionPlacement) -> Vec<UnifiedRow> {
         let mut rows = Vec::new();
         if self.favorites_shown() && self.favorites_placement == at {
             rows.push(UnifiedRow::Favorites);
+        }
+        if !self.unified_folders.is_empty() && self.filtered_placement == at {
+            rows.push(UnifiedRow::Filtered);
+        }
+        if self.unified_tags_shown() && self.tags_placement == at {
+            rows.push(UnifiedRow::Tags);
         }
         if self.contacts_shown() && self.contacts_placement == at {
             rows.push(UnifiedRow::Contacts);
@@ -4503,38 +4183,12 @@ impl Sidebar {
 
     /// Whether Favorites are in the sidebar at all.
     fn favorites_shown(&self) -> bool {
-        !self.favorite_folders.is_empty() && placed(self.favorites_placement, self.unified_favorites)
+        !self.favorite_folders.is_empty() && self.favorites_placement.shown()
     }
 
     /// Whether Contacts is in the sidebar at all.
     fn contacts_shown(&self) -> bool {
-        placed(self.contacts_placement, self.show_contacts)
-    }
-
-    /// Whether a Filtered Folders section is open: the unified one keeps its
-    /// own state, an account's lives with the account.
-    fn filtered_open(&self, slot: Slot) -> bool {
-        match slot {
-            Slot::Unified => self.unified_folders_expanded,
-            Slot::Account(id) => {
-                self.sections.iter().find(|s| s.account.id == id).is_some_and(|s| s.filtered_expanded)
-            }
-        }
-    }
-
-    fn set_filtered_open(&mut self, slot: Slot, open: bool, sender: &ComponentSender<Self>) {
-        match slot {
-            Slot::Unified => {
-                self.unified_folders_expanded = open;
-                self.report_sections(sender);
-            }
-            Slot::Account(id) => {
-                if let Some(s) = self.sections.iter_mut().find(|s| s.account.id == id) {
-                    s.filtered_expanded = open;
-                }
-                let _ = sender.output(SidebarOutput::ToggleAccountFiltered(id));
-            }
-        }
+        self.contacts_placement.shown()
     }
 
     fn tags_open(&self, slot: Slot) -> bool {
@@ -4608,11 +4262,7 @@ impl Sidebar {
             return;
         };
         let list = match account {
-            None => self
-                .kind_widgets
-                .get(&UnifiedRow::Tags)
-                .map(|w| w.list.clone())
-                .or_else(|| self.tag_sections.get(&Slot::Unified).map(|w| w.list.clone())),
+            None => self.kind_widgets.get(&UnifiedRow::Tags).map(|w| w.list.clone()),
             Some(id) => self.tag_sections.get(&Slot::Account(id)).map(|w| w.list.clone()),
         };
         if let Some(list) = list {
@@ -4683,15 +4333,6 @@ impl Sidebar {
         }
         for (slot, w) in &self.tag_sections {
             if !matches!(&keep, Sel::Tag(acc, _) if *acc == slot.account()) {
-                w.list.unselect_all();
-            }
-        }
-        for (slot, w) in &self.filtered_sections {
-            let keep_here = match slot {
-                Slot::Unified => matches!(keep, Sel::UnifiedFolder(..)),
-                Slot::Account(id) => matches!(&keep, Sel::AccountFiltered(a, _) if a == id),
-            };
-            if !keep_here {
                 w.list.unselect_all();
             }
         }
@@ -4966,12 +4607,8 @@ impl Sidebar {
     /// account's own section.
     fn select_filtered_row(&self, slot: Slot, account_id: u32, path: &str) {
         let list = match slot {
-            Slot::Unified => self
-                .kind_widgets
-                .get(&UnifiedRow::Filtered)
-                .map(|w| w.list.clone())
-                .or_else(|| self.filtered_sections.get(&slot).map(|w| w.list.clone())),
-            Slot::Account(_) => self.filtered_sections.get(&slot).map(|w| w.list.clone()),
+            Slot::Unified => self.kind_widgets.get(&UnifiedRow::Filtered).map(|w| w.list.clone()),
+            Slot::Account(_) => None,
         };
         let Some(list) = list else { return };
         if let Some(idx) = self
@@ -6037,19 +5674,6 @@ pub(crate) fn pin_icon_size(icon: &gtk::Image) {
     icon.set_pixel_size(16);
     icon.set_halign(gtk::Align::Center);
     icon.set_valign(gtk::Align::Center);
-}
-
-/// Room under the "Filtered Folders" heading: folded up, its list (and the
-/// list's gap to the first account section) is gone, so the heading itself
-/// keeps the accounts at a balanced distance; open, the list carries it.
-fn unified_folders_toggle_gap(expanded: bool) -> i32 {
-    if expanded { 0 } else { 16 }
-}
-
-/// Room under the "Tags" heading: 5px when folded up (Jason, 2026-09-07);
-/// open, its list carries the gap to the accounts.
-fn tags_toggle_gap(expanded: bool) -> i32 {
-    if expanded { 0 } else { 5 }
 }
 
 /// Extra left inset on every expanded row's leading icon in the leading-

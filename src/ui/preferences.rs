@@ -141,18 +141,14 @@ pub struct PrefInit {
     pub notification_content: bool,
     pub notification_buttons: crate::config::NotificationButtons,
     pub show_attachments: bool,
-    pub show_contacts: bool,
     pub show_unified: bool,
     pub unified_chips: crate::config::UnifiedChips,
-    pub unified_filtered: bool,
     pub unified_kinds: crate::config::UnifiedKinds,
-    pub unified_tags: bool,
     pub show_accounts: bool,
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
     pub favorites_placement: crate::config::SectionPlacement,
     pub contacts_placement: crate::config::SectionPlacement,
-    pub unified_favorites: bool,
     pub chevrons_left: bool,
     pub account_click_folds: bool,
     pub start_view: crate::config::StartView,
@@ -348,10 +344,6 @@ pub struct Preferences {
     /// Mirrors the notifications switch, so the "show sender and subject" row
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
-    /// Where Filters, Tags, Favorites and Contacts sit in the sidebar, so
-    /// their switches in the Unified group grey out when that is not the
-    /// unified section.
-    placements: [crate::config::SectionPlacement; 4],
     /// The notification buttons, kept whole so each switch can hand the
     /// app the full set (#244).
     notification_buttons: crate::config::NotificationButtons,
@@ -1110,7 +1102,6 @@ pub enum PrefInput {
     ToggleUnifiedChipArchive(bool),
     ToggleUnifiedChipJunk(bool),
     ToggleUnifiedChipTrash(bool),
-    ToggleUnifiedChipFiltered(bool),
     ToggleUnifiedStarred(bool),
     ToggleUnifiedSent(bool),
     ToggleUnifiedDrafts(bool),
@@ -1281,13 +1272,10 @@ pub enum PrefOutput {
     SetNotificationContent(bool),
     SetNotificationButtons(crate::config::NotificationButtons),
     SetAttachmentsRow(bool),
-    SetContactsRow(bool),
     SetShowUnified(bool),
     SetUnifiedChips(crate::config::UnifiedChips),
     SetPrintOptions(crate::config::PrintOptions),
-    SetUnifiedFiltered(bool),
     SetUnifiedKinds(crate::config::UnifiedKinds),
-    SetUnifiedTags(bool),
     SetShowAccounts(bool),
     SetChevronsLeft(bool),
     SetAccountClickFolds(bool),
@@ -1297,7 +1285,6 @@ pub enum PrefOutput {
     SetTagsPlacement(crate::config::SectionPlacement),
     SetFavoritesPlacement(crate::config::SectionPlacement),
     SetContactsPlacement(crate::config::SectionPlacement),
-    SetUnifiedFavorites(bool),
     SetConsoleMode(bool),
     SetStatusBarTop(bool),
     SetReadMark(crate::config::ReadMark),
@@ -2533,9 +2520,6 @@ impl Component for Preferences {
                                     #[name = "show_unified_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Inboxes"),
-                                        set_subtitle: &i18n("A unified inbox combining every account, at the top \
-                                                       of the sidebar. Only shown with more than one \
-                                                       account."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleShowUnified(row.is_active()));
                                         },
@@ -2544,7 +2528,6 @@ impl Component for Preferences {
                                     #[name = "unified_starred_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Starred"),
-                                        set_subtitle: &i18n("Every account's starred folder as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedStarred(row.is_active()));
                                         },
@@ -2553,7 +2536,6 @@ impl Component for Preferences {
                                     #[name = "unified_sent_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Sent"),
-                                        set_subtitle: &i18n("Every account's sent mail as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedSent(row.is_active()));
                                         },
@@ -2562,7 +2544,6 @@ impl Component for Preferences {
                                     #[name = "unified_drafts_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Drafts"),
-                                        set_subtitle: &i18n("Every account's drafts as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedDrafts(row.is_active()));
                                         },
@@ -2571,7 +2552,6 @@ impl Component for Preferences {
                                     #[name = "unified_archive_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Archive"),
-                                        set_subtitle: &i18n("Every account's archive as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedArchive(row.is_active()));
                                         },
@@ -2580,7 +2560,6 @@ impl Component for Preferences {
                                     #[name = "unified_junk_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Junk"),
-                                        set_subtitle: &i18n("Every account's junk mail as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedJunk(row.is_active()));
                                         },
@@ -2589,55 +2568,8 @@ impl Component for Preferences {
                                     #[name = "unified_trash_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Trash"),
-                                        set_subtitle: &i18n("Every account's trash as one list, opening to each account's own."),
                                         connect_active_notify[sender] => move |row| {
                                             sender.input(PrefInput::ToggleUnifiedTrash(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "unified_filtered_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.placements[0] == crate::config::SectionPlacement::AllInboxes,
-                                        set_title: &i18n("Filters"),
-                                        set_subtitle: &i18n("List every folder your filter rules file into in a \
-                                                       collapsible section of the unified view."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetUnifiedFiltered(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "unified_tags_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.placements[1] == crate::config::SectionPlacement::AllInboxes,
-                                        set_title: &i18n("Tags"),
-                                        set_subtitle: &i18n("The tags, each showing every account's mail with it. Each account keeps its own Tags \
-                                                       section either way."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetUnifiedTags(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "unified_favorites_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.placements[2] == crate::config::SectionPlacement::AllInboxes,
-                                        set_title: &i18n("Favorites"),
-                                        set_subtitle: &i18n("The folders picked with Add to Favorites, from any account."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetUnifiedFavorites(row.is_active()));
-                                        },
-                                    },
-
-                                    #[name = "show_contacts_row"]
-                                    adw::SwitchRow {
-                                        #[watch]
-                                        set_sensitive: model.placements[3] == crate::config::SectionPlacement::AllInboxes,
-                                        set_title: &i18n("Contacts"),
-                                        set_subtitle: &i18n("Opens your contacts, with your address books and groups beneath it."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetContactsRow(row.is_active()));
                                         },
                                     },
 
@@ -2691,20 +2623,15 @@ impl Component for Preferences {
                                                 sender.input(PrefInput::ToggleUnifiedChipTrash(row.is_active()));
                                             },
                                         },
-                                        #[name = "unified_chip_filtered_row"]
-                                        add_row = &adw::SwitchRow {
-                                            set_title: &i18n("Filters"),
-                                            connect_active_notify[sender] => move |row| {
-                                                sender.input(PrefInput::ToggleUnifiedChipFiltered(row.is_active()));
-                                            },
-                                        },
                                     },
+                                },
+
+                                add = &adw::PreferencesGroup {
+                                    set_title: &i18n("Sections"),
 
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Filters placement"),
-                                        set_subtitle: &i18n("In the unified section, in a list above or below \
-                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
                                         },
@@ -2713,8 +2640,6 @@ impl Component for Preferences {
                                     #[name = "tags_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Tags placement"),
-                                        set_subtitle: &i18n("In the unified section, in a list above or below \
-                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
                                         },
@@ -2723,8 +2648,6 @@ impl Component for Preferences {
                                     #[name = "favorites_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Favorites placement"),
-                                        set_subtitle: &i18n("In the unified section, in a list above or below \
-                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFavoritesPlacement(row.selected()));
                                         },
@@ -2733,8 +2656,6 @@ impl Component for Preferences {
                                     #[name = "contacts_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Contacts placement"),
-                                        set_subtitle: &i18n("In the unified section, in a list above or below \
-                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeContactsPlacement(row.selected()));
                                         },
@@ -4100,7 +4021,6 @@ impl Component for Preferences {
             spell_langs: None,
             browsers: crate::ui::launch::browsers(),
             notifications: init.notifications,
-            placements: [init.filtered_placement, init.tags_placement, init.favorites_placement, init.contacts_placement],
             notification_buttons: init.notification_buttons,
             sound: crate::config::load_new_mail_sound(),
             custom_sound: crate::config::custom_sound(),
@@ -4264,7 +4184,6 @@ impl Component for Preferences {
         widgets.notify_forward_row.set_active(init.notification_buttons.forward);
         widgets.notify_spam_row.set_active(init.notification_buttons.spam);
         widgets.show_attachments_row.set_active(init.show_attachments);
-        widgets.show_contacts_row.set_active(init.show_contacts);
         widgets.show_unified_row.set_active(init.show_unified);
         widgets.unified_chip_all_inboxes_row.set_active(init.unified_chips.all_inboxes);
         widgets.unified_chip_starred_row.set_active(init.unified_chips.starred);
@@ -4272,16 +4191,12 @@ impl Component for Preferences {
         widgets.unified_chip_archive_row.set_active(init.unified_chips.archive);
         widgets.unified_chip_junk_row.set_active(init.unified_chips.junk);
         widgets.unified_chip_trash_row.set_active(init.unified_chips.trash);
-        widgets.unified_chip_filtered_row.set_active(init.unified_chips.filtered);
-        widgets.unified_filtered_row.set_active(init.unified_filtered);
         widgets.unified_starred_row.set_active(init.unified_kinds.starred);
         widgets.unified_sent_row.set_active(init.unified_kinds.sent);
         widgets.unified_drafts_row.set_active(init.unified_kinds.drafts);
         widgets.unified_archive_row.set_active(init.unified_kinds.archive);
         widgets.unified_junk_row.set_active(init.unified_kinds.junk);
         widgets.unified_trash_row.set_active(init.unified_kinds.trash);
-        widgets.unified_tags_row.set_active(init.unified_tags);
-        widgets.unified_favorites_row.set_active(init.unified_favorites);
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
@@ -4289,7 +4204,6 @@ impl Component for Preferences {
             (&widgets.contacts_placement_row, init.contacts_placement),
         ] {
             row.set_model(Some(&gtk::StringList::new(&[
-                i18n("In the unified section").as_str(),
                 i18n("Above the accounts").as_str(),
                 i18n("Below the accounts").as_str(),
                 i18n("Off").as_str(),
@@ -5388,10 +5302,6 @@ impl Component for Preferences {
                 self.unified_chips.trash = on;
                 let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
             }
-            PrefInput::ToggleUnifiedChipFiltered(on) => {
-                self.unified_chips.filtered = on;
-                let _ = sender.output(PrefOutput::SetUnifiedChips(self.unified_chips));
-            }
             PrefInput::ToggleUnifiedStarred(on) => {
                 self.unified_kinds.starred = on;
                 let _ = sender.output(PrefOutput::SetUnifiedKinds(self.unified_kinds));
@@ -5468,20 +5378,16 @@ impl Component for Preferences {
                 self.show_accounts = on;
             }
             PrefInput::ChangeFilteredPlacement(idx) => {
-                self.placements[0] = placement_from_index(idx);
-                let _ = sender.output(PrefOutput::SetFilteredPlacement(self.placements[0]));
+                let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeTagsPlacement(idx) => {
-                self.placements[1] = placement_from_index(idx);
-                let _ = sender.output(PrefOutput::SetTagsPlacement(self.placements[1]));
+                let _ = sender.output(PrefOutput::SetTagsPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeFavoritesPlacement(idx) => {
-                self.placements[2] = placement_from_index(idx);
-                let _ = sender.output(PrefOutput::SetFavoritesPlacement(self.placements[2]));
+                let _ = sender.output(PrefOutput::SetFavoritesPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeContactsPlacement(idx) => {
-                self.placements[3] = placement_from_index(idx);
-                let _ = sender.output(PrefOutput::SetContactsPlacement(self.placements[3]));
+                let _ = sender.output(PrefOutput::SetContactsPlacement(placement_from_index(idx)));
             }
             PrefInput::ChangeStartView(idx) => {
                 use crate::config::StartView;
@@ -5864,24 +5770,23 @@ fn collect_named(root: &gtk::Widget, name: &str, out: &mut Vec<gtk::Widget>) {
     }
 }
 
-/// The placement combos' rows, in the order [`SectionPlacement`] lists them.
+/// The placement combos' rows. The unified section is not one: loading
+/// moves it above the accounts.
 fn placement_index(p: crate::config::SectionPlacement) -> u32 {
     use crate::config::SectionPlacement::*;
     match p {
-        AllInboxes => 0,
-        AboveAccounts => 1,
-        BelowAccounts => 2,
-        Off => 3,
+        AllInboxes | AboveAccounts => 0,
+        BelowAccounts => 1,
+        Off => 2,
     }
 }
 
 fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
     use crate::config::SectionPlacement::*;
     match idx {
-        1 => AboveAccounts,
-        2 => BelowAccounts,
-        3 => Off,
-        _ => AllInboxes,
+        1 => BelowAccounts,
+        2 => Off,
+        _ => AboveAccounts,
     }
 }
 

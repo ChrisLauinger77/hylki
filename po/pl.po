@@ -6258,69 +6258,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Skrzynki odbiorcze"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Zbiorcza skrzynka odbiorcza łącząca wszystkie konta, u góry panelu bocznego. "
-"Wyświetlana tylko przy więcej niż jednym koncie."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Oznaczone gwiazdką wiadomości ze wszystkich kont na jednej liście, z "
-"możliwością rozwinięcia do katalogów poszczególnych kont."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Wysłana poczta ze wszystkich kont na jednej liście, z możliwością "
-"rozwinięcia do katalogów poszczególnych kont."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Szkice ze wszystkich kont na jednej liście, z możliwością rozwinięcia do "
-"katalogów poszczególnych kont."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Archiwum wszystkich kont na jednej liście, z możliwością rozwinięcia do "
-"katalogów poszczególnych kont."
-
-#, fuzzy
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Wysłana poczta ze wszystkich kont na jednej liście, z możliwością "
-"rozwinięcia do katalogów poszczególnych kont."
-
-#, fuzzy
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"Szkice ze wszystkich kont na jednej liście, z możliwością rozwinięcia do "
-"katalogów poszczególnych kont."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Wyświetla w zwijanej sekcji widoków zbiorczych wszystkie katalogi, do "
-"których reguły filtrów przenoszą pocztę."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Etykiety, z których każda wyświetla pocztę ze wszystkich kont. Każde konto i "
-"tak zachowuje własną sekcję „Etykiety”."
-
-msgid "Favorites"
-msgstr ""
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Liczniki nieprzeczytanych"
 
@@ -6332,16 +6269,12 @@ msgstr ""
 "wiadomości, gdy są zwinięte. Po rozwinięciu liczniki są wyświetlane w "
 "wierszach poniżej. Widok „Wysłane” nigdy go nie wyświetla."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Działania"
+
 msgid "Filters placement"
 msgstr "Położenie filtrów"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Wybór między wyświetlaniem w sekcji widoków zbiorczych a listą powyżej lub "
-"poniżej kont."
 
 msgid "Tags placement"
 msgstr "Położenie etykiet"
@@ -7355,9 +7288,6 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
-msgid "In the unified section"
-msgstr "W sekcji widoków zbiorczych"
-
 msgid "Above the accounts"
 msgstr "Nad kontami"
 
@@ -7745,6 +7675,9 @@ msgstr "Czy usunąć własny klucz?"
 msgid "Show or hide"
 msgstr "Wyświetl lub ukryj etykiety"
 
+msgid "Favorites"
+msgstr ""
+
 msgid "Folder"
 msgstr "Katalog"
 
@@ -7840,9 +7773,6 @@ msgstr "Modyfikuj filtr…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Usuń katalog…"
-
-msgid "Show or hide filters"
-msgstr "Wyświetl lub ukryj filtry"
 
 msgid "Show or hide tags"
 msgstr "Wyświetl lub ukryj etykiety"
@@ -8507,6 +8437,76 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Zbiorcza skrzynka odbiorcza łącząca wszystkie konta, u góry panelu "
+#~ "bocznego. Wyświetlana tylko przy więcej niż jednym koncie."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Oznaczone gwiazdką wiadomości ze wszystkich kont na jednej liście, z "
+#~ "możliwością rozwinięcia do katalogów poszczególnych kont."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Wysłana poczta ze wszystkich kont na jednej liście, z możliwością "
+#~ "rozwinięcia do katalogów poszczególnych kont."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Szkice ze wszystkich kont na jednej liście, z możliwością rozwinięcia do "
+#~ "katalogów poszczególnych kont."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Archiwum wszystkich kont na jednej liście, z możliwością rozwinięcia do "
+#~ "katalogów poszczególnych kont."
+
+#, fuzzy
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Wysłana poczta ze wszystkich kont na jednej liście, z możliwością "
+#~ "rozwinięcia do katalogów poszczególnych kont."
+
+#, fuzzy
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Szkice ze wszystkich kont na jednej liście, z możliwością rozwinięcia do "
+#~ "katalogów poszczególnych kont."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Wyświetla w zwijanej sekcji widoków zbiorczych wszystkie katalogi, do "
+#~ "których reguły filtrów przenoszą pocztę."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Etykiety, z których każda wyświetla pocztę ze wszystkich kont. Każde "
+#~ "konto i tak zachowuje własną sekcję „Etykiety”."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Wybór między wyświetlaniem w sekcji widoków zbiorczych a listą powyżej "
+#~ "lub poniżej kont."
+
+#~ msgid "In the unified section"
+#~ msgstr "W sekcji widoków zbiorczych"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Wyświetl lub ukryj filtry"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Kontakty w panelu bocznym"

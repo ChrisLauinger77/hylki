@@ -166,10 +166,10 @@ what was dragged. The item is there only once something has been.
 
 The chevrons open and close the items in the sidebar. Clicking a folder
 opens it and leaves its sub-folders as they were. Clicking the name of the
-Folders, Filters or Tags heading does nothing; the chevron beside it opens
-or closes the section. Clicking Inboxes, Starred, Sent, Drafts, Archive,
-Junk, Trash, Filters, Tags or Contacts in the unified section opens the
-combined list without showing each account's folder under it, and
+Folders or Tags heading of an account does nothing; the chevron beside it
+opens or closes the section. Clicking Inboxes, Starred, Sent, Drafts,
+Archive, Junk or Trash in the unified section, or Filters, Tags or
+Contacts, opens the combined list without showing each account's folder under it, and
 double-clicking it opens or closes that list as its chevron does. An
 account's header works the same way: its chevron, or a double click on the
 header, opens or closes its folders, and a single click elsewhere on it
@@ -187,11 +187,10 @@ or **Empty Trash…**. The same item on the unified Junk or Trash row itself
 empties that folder in every account in the unified section at once, after
 a confirmation that lists them.
 
-Filters, Tags, Favorites and Contacts each have a placement in the same
-group: **In the unified section**, **Above the accounts**, **Below the
-accounts** or **Off**, which leaves it out of the sidebar. Each also has a
-switch among the unified rows, which counts only while it is placed in the
-unified section: placed anywhere else, it is greyed out.
+**Settings → Sidebar → Sections** places Filters, Tags, Favorites and
+Contacts **Above the accounts**, **Below the accounts** or **Off**, which
+leaves it out of the sidebar. Wherever they are, they are rows like the
+unified section's, with a chevron that opens their list.
 
 ### Favorites
 
@@ -532,8 +531,8 @@ an email address, a phone number, a street address, a birthday or a
 company, or those in no group. The button turns the accent color while a
 filter is on, and **Clear Filters** shows everything again.
 
-**Contacts** is a row of the sidebar's unified section, under the merged
-mail rows, and opens every contact. Its chevron opens the list beneath:
+**Contacts** is a row of the sidebar, above the accounts unless **Settings
+→ Sidebar → Sections** places it elsewhere, and opens every contact. Its chevron opens the list beneath:
 the Hylki book first, then each account. An account with one address
 book is that book's row, with the account or server it is kept by in
 small type under its name; an account with several is a row of its own,

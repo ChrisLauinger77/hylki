@@ -6193,68 +6193,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Входящие"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Общий ящик «Входящие», объединяющий все учётные записи в верхней части "
-"боковой панели. Отображается только при наличии двух и более учётных записей."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Избранное со всех учётных записей в одном списке, раскрывающемся в отдельные "
-"папки для каждого аккаунта."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Почта из «Отправленных» всех учётных записей одним списком, раскрывающимся "
-"по своим учётным записям."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Черновики всех учётных записей одним списком, раскрывающимся по своим "
-"учётным записям."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Архив всех учётных записей одним списком, раскрывающимся по своим учётным "
-"записям."
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Нежелательная почта всех учётных записей одним списком, раскрывающимся по "
-"своим учётным записям."
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"Корзина всех учётных записей одним списком, раскрывающимся по своим учётным "
-"записям."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Показывать свёртываемый раздел с папками, в которые раскладываются письма по "
-"правилам фильтрации. Каждое правило определяет, появляется ли в нём папка; "
-"этот переключатель полностью скрывает весь раздел."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Теги, каждый из которых содержит письма всех учётных записей. В любом случае "
-"у каждого аккаунта остаётся собственный раздел «Теги»."
-
-msgid "Favorites"
-msgstr "Избранное"
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Счётчики непрочитанного"
 
@@ -6266,16 +6204,12 @@ msgstr ""
 "состоянии. В развёрнутом виде счётчики отображаются у строк внутри. В папке "
 "«Отправленные» счётчик не выводится."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Действия"
+
 msgid "Filters placement"
 msgstr "Расположение фильтров"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Выберите между отображением в объединённом разделе либо в виде списка выше "
-"или ниже учётных записей."
 
 msgid "Tags placement"
 msgstr "Расположение тегов"
@@ -7305,9 +7239,6 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
-msgid "In the unified section"
-msgstr "В общем разделе"
-
 msgid "Above the accounts"
 msgstr "Над учётными записями"
 
@@ -7673,6 +7604,9 @@ msgstr "Удалить ваш ключ?"
 msgid "Show or hide"
 msgstr "Показать или скрыть метки"
 
+msgid "Favorites"
+msgstr "Избранное"
+
 msgid "Folder"
 msgstr "Папка"
 
@@ -7768,9 +7702,6 @@ msgstr "Редактировать фильтр…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Удалить папку…"
-
-msgid "Show or hide filters"
-msgstr "Показать или скрыть фильтры"
 
 msgid "Show or hide tags"
 msgstr "Показать или скрыть метки"
@@ -8432,6 +8363,76 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Общий ящик «Входящие», объединяющий все учётные записи в верхней части "
+#~ "боковой панели. Отображается только при наличии двух и более учётных "
+#~ "записей."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Избранное со всех учётных записей в одном списке, раскрывающемся в "
+#~ "отдельные папки для каждого аккаунта."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Почта из «Отправленных» всех учётных записей одним списком, "
+#~ "раскрывающимся по своим учётным записям."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Черновики всех учётных записей одним списком, раскрывающимся по своим "
+#~ "учётным записям."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Архив всех учётных записей одним списком, раскрывающимся по своим учётным "
+#~ "записям."
+
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Нежелательная почта всех учётных записей одним списком, раскрывающимся по "
+#~ "своим учётным записям."
+
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Корзина всех учётных записей одним списком, раскрывающимся по своим "
+#~ "учётным записям."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Показывать свёртываемый раздел с папками, в которые раскладываются письма "
+#~ "по правилам фильтрации. Каждое правило определяет, появляется ли в нём "
+#~ "папка; этот переключатель полностью скрывает весь раздел."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Теги, каждый из которых содержит письма всех учётных записей. В любом "
+#~ "случае у каждого аккаунта остаётся собственный раздел «Теги»."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Выберите между отображением в объединённом разделе либо в виде списка "
+#~ "выше или ниже учётных записей."
+
+#~ msgid "In the unified section"
+#~ msgstr "В общем разделе"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Показать или скрыть фильтры"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Контакты на боковой панели"

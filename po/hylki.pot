@@ -5476,49 +5476,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr ""
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-
-msgid "Favorites"
-msgstr ""
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr ""
 
@@ -5527,12 +5484,10 @@ msgid ""
 "Expanded, the rows beneath carry the counts. Sent never shows one."
 msgstr ""
 
-msgid "Filters placement"
+msgid "Sections"
 msgstr ""
 
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
+msgid "Filters placement"
 msgstr ""
 
 msgid "Tags placement"
@@ -6357,9 +6312,6 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
-msgid "In the unified section"
-msgstr ""
-
 msgid "Above the accounts"
 msgstr ""
 
@@ -6713,6 +6665,9 @@ msgstr ""
 msgid "Show or hide"
 msgstr ""
 
+msgid "Favorites"
+msgstr ""
+
 msgid "Folder"
 msgstr ""
 
@@ -6801,9 +6756,6 @@ msgid "Edit Smart Folder…"
 msgstr ""
 
 msgid "Delete Smart Folder…"
-msgstr ""
-
-msgid "Show or hide filters"
 msgstr ""
 
 msgid "Show or hide tags"

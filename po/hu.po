@@ -6198,69 +6198,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Beérkezett üzenetek"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Egységes beérkezett nézet, amely minden fiókot egyesít az oldalsáv tetején. "
-"Csak egynél több fiók esetén jelenik meg."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"Minden fiók „Kiemelt” mappája egyetlen listaként jelenik meg, amelyből az "
-"egyes fiókok saját listája nyitható meg."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"Minden fiók elküldött levelei egyetlen listában jelennek meg, amely az egyes "
-"fiókok saját listájára nyílik."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Minden fiók vázlatai egyetlen listában jelennek meg, amely az egyes fiókok "
-"saját vázlataihoz nyílik."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"Minden fiók archívuma egyetlen listában jelenik meg, amelyből az egyes "
-"fiókok saját archívumai nyithatók meg."
-
-#, fuzzy
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"Minden fiók elküldött levelei egyetlen listában jelennek meg, amely az egyes "
-"fiókok saját listájára nyílik."
-
-#, fuzzy
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"Minden fiók vázlatai egyetlen listában jelennek meg, amely az egyes fiókok "
-"saját vázlataihoz nyílik."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Sorold fel az összes mappát, amelybe a szűrőszabály-fájl bejegyzéseket "
-"helyez el, az egységes nézet összecsukható szakaszában."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"A címkék, amelyek mindegyike az adott fiók összes e-mailjét tartalmazza. "
-"Minden fióknak mindkét esetben megvan a saját „Címkék” szakasza."
-
-msgid "Favorites"
-msgstr ""
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Olvasatlanok száma"
 
@@ -6272,16 +6209,12 @@ msgstr ""
 "össze vannak hajtva. Kinyitva az alatta lévő sorok tartalmazzák a számokat. "
 "A „Küldve” állapot soha nem jelenít meg ilyet."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Műveletek"
+
 msgid "Filters placement"
 msgstr "A szűrők elhelyezése"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Választhat, hogy a bejegyzés egy egységes szakaszban jelenjen-e meg, vagy a "
-"fiókok felett vagy alatt található listában."
 
 msgid "Tags placement"
 msgstr "Címkék elhelyezése"
@@ -7313,9 +7246,6 @@ msgstr ""
 msgid "Software"
 msgstr ""
 
-msgid "In the unified section"
-msgstr "Az összevont részben"
-
 msgid "Above the accounts"
 msgstr "A fiókok felett"
 
@@ -7700,6 +7630,9 @@ msgstr "Törli a kulcsát?"
 msgid "Show or hide"
 msgstr "Címkék megjelenítése vagy elrejtése"
 
+msgid "Favorites"
+msgstr ""
+
 msgid "Folder"
 msgstr "Mappa"
 
@@ -7795,9 +7728,6 @@ msgstr "Szűrő szerkesztése…"
 #, fuzzy
 msgid "Delete Smart Folder…"
 msgstr "Mappa törlése…"
-
-msgid "Show or hide filters"
-msgstr "Szűrők megjelenítése vagy elrejtése"
 
 msgid "Show or hide tags"
 msgstr "Címkék megjelenítése vagy elrejtése"
@@ -8469,6 +8399,76 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Egységes beérkezett nézet, amely minden fiókot egyesít az oldalsáv "
+#~ "tetején. Csak egynél több fiók esetén jelenik meg."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók „Kiemelt” mappája egyetlen listaként jelenik meg, amelyből az "
+#~ "egyes fiókok saját listája nyitható meg."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók elküldött levelei egyetlen listában jelennek meg, amely az "
+#~ "egyes fiókok saját listájára nyílik."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók vázlatai egyetlen listában jelennek meg, amely az egyes "
+#~ "fiókok saját vázlataihoz nyílik."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók archívuma egyetlen listában jelenik meg, amelyből az egyes "
+#~ "fiókok saját archívumai nyithatók meg."
+
+#, fuzzy
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók elküldött levelei egyetlen listában jelennek meg, amely az "
+#~ "egyes fiókok saját listájára nyílik."
+
+#, fuzzy
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Minden fiók vázlatai egyetlen listában jelennek meg, amely az egyes "
+#~ "fiókok saját vázlataihoz nyílik."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Sorold fel az összes mappát, amelybe a szűrőszabály-fájl bejegyzéseket "
+#~ "helyez el, az egységes nézet összecsukható szakaszában."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "A címkék, amelyek mindegyike az adott fiók összes e-mailjét tartalmazza. "
+#~ "Minden fióknak mindkét esetben megvan a saját „Címkék” szakasza."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Választhat, hogy a bejegyzés egy egységes szakaszban jelenjen-e meg, vagy "
+#~ "a fiókok felett vagy alatt található listában."
+
+#~ msgid "In the unified section"
+#~ msgstr "Az összevont részben"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Szűrők megjelenítése vagy elrejtése"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Névjegyek az oldalsávban"

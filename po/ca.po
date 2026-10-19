@@ -6082,66 +6082,6 @@ msgstr ""
 msgid "Inboxes"
 msgstr "Bústies d'entrada"
 
-msgid ""
-"A unified inbox combining every account, at the top of the sidebar. Only "
-"shown with more than one account."
-msgstr ""
-"Una bústia d'entrada unificada que combina tots els comptes, a la part "
-"superior de la barra lateral. Només es mostra amb més d'un compte."
-
-msgid ""
-"Every account's starred folder as one list, opening to each account's own."
-msgstr ""
-"La carpeta de destacats de cada compte com una sola llista, que s'obre a la "
-"de cada compte."
-
-msgid "Every account's sent mail as one list, opening to each account's own."
-msgstr ""
-"El correu enviat de cada compte com una sola llista, que s'obre al de cada "
-"compte."
-
-msgid "Every account's drafts as one list, opening to each account's own."
-msgstr ""
-"Els esborranys de cada compte com una sola llista, que s'obre als de cada "
-"compte."
-
-msgid "Every account's archive as one list, opening to each account's own."
-msgstr ""
-"L'arxiu de cada compte com una sola llista, que s'obre al de cada compte."
-
-msgid "Every account's junk mail as one list, opening to each account's own."
-msgstr ""
-"El correu brossa de cada compte com una sola llista, que s'obre al de cada "
-"compte."
-
-msgid "Every account's trash as one list, opening to each account's own."
-msgstr ""
-"La paperera de cada compte com una sola llista, que s'obre a la de cada "
-"compte."
-
-msgid ""
-"List every folder your filter rules file into in a collapsible section of "
-"the unified view."
-msgstr ""
-"Llista totes les carpetes on arxiven les teves regles de filtre en una "
-"secció plegable de la vista unificada."
-
-msgid ""
-"The tags, each showing every account's mail with it. Each account keeps its "
-"own Tags section either way."
-msgstr ""
-"Les etiquetes, cadascuna mostrant el correu de cada compte que la porta. "
-"Cada compte manté la seva pròpia secció d'etiquetes de totes maneres."
-
-msgid "Favorites"
-msgstr "Preferits"
-
-msgid "The folders picked with Add to Favorites, from any account."
-msgstr ""
-
-msgid "Opens your contacts, with your address books and groups beneath it."
-msgstr ""
-
 msgid "Unread counts"
 msgstr "Recomptes de no llegits"
 
@@ -6153,16 +6093,12 @@ msgstr ""
 "estan replegades. Expandides, les files de sota porten els recomptes. "
 "Enviats mai no en mostra cap."
 
+#, fuzzy
+msgid "Sections"
+msgstr "Accions"
+
 msgid "Filters placement"
 msgstr "Col·locació dels filtres"
-
-#, fuzzy
-msgid ""
-"In the unified section, in a list above or below the accounts, or Off, out "
-"of the sidebar."
-msgstr ""
-"Tria entre aparèixer en una secció unificada, o en una llista per sobre o "
-"per sota dels comptes."
 
 msgid "Tags placement"
 msgstr "Col·locació de les etiquetes"
@@ -7200,9 +7136,6 @@ msgstr ""
 msgid "Software"
 msgstr "Programari"
 
-msgid "In the unified section"
-msgstr "A la secció unificada"
-
 msgid "Above the accounts"
 msgstr "A sobre dels comptes"
 
@@ -7565,6 +7498,9 @@ msgstr "Vols suprimir la teva clau?"
 msgid "Show or hide"
 msgstr "Mostra o amaga les etiquetes"
 
+msgid "Favorites"
+msgstr "Preferits"
+
 msgid "Folder"
 msgstr "Carpeta"
 
@@ -7655,9 +7591,6 @@ msgstr "Edita la carpeta intel·ligent…"
 
 msgid "Delete Smart Folder…"
 msgstr "Suprimeix la carpeta intel·ligent…"
-
-msgid "Show or hide filters"
-msgstr "Mostra o amaga els filtres"
 
 msgid "Show or hide tags"
 msgstr "Mostra o amaga les etiquetes"
@@ -8316,6 +8249,73 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid ""
+#~ "A unified inbox combining every account, at the top of the sidebar. Only "
+#~ "shown with more than one account."
+#~ msgstr ""
+#~ "Una bústia d'entrada unificada que combina tots els comptes, a la part "
+#~ "superior de la barra lateral. Només es mostra amb més d'un compte."
+
+#~ msgid ""
+#~ "Every account's starred folder as one list, opening to each account's own."
+#~ msgstr ""
+#~ "La carpeta de destacats de cada compte com una sola llista, que s'obre a "
+#~ "la de cada compte."
+
+#~ msgid ""
+#~ "Every account's sent mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "El correu enviat de cada compte com una sola llista, que s'obre al de "
+#~ "cada compte."
+
+#~ msgid "Every account's drafts as one list, opening to each account's own."
+#~ msgstr ""
+#~ "Els esborranys de cada compte com una sola llista, que s'obre als de cada "
+#~ "compte."
+
+#~ msgid "Every account's archive as one list, opening to each account's own."
+#~ msgstr ""
+#~ "L'arxiu de cada compte com una sola llista, que s'obre al de cada compte."
+
+#~ msgid ""
+#~ "Every account's junk mail as one list, opening to each account's own."
+#~ msgstr ""
+#~ "El correu brossa de cada compte com una sola llista, que s'obre al de "
+#~ "cada compte."
+
+#~ msgid "Every account's trash as one list, opening to each account's own."
+#~ msgstr ""
+#~ "La paperera de cada compte com una sola llista, que s'obre a la de cada "
+#~ "compte."
+
+#~ msgid ""
+#~ "List every folder your filter rules file into in a collapsible section of "
+#~ "the unified view."
+#~ msgstr ""
+#~ "Llista totes les carpetes on arxiven les teves regles de filtre en una "
+#~ "secció plegable de la vista unificada."
+
+#~ msgid ""
+#~ "The tags, each showing every account's mail with it. Each account keeps "
+#~ "its own Tags section either way."
+#~ msgstr ""
+#~ "Les etiquetes, cadascuna mostrant el correu de cada compte que la porta. "
+#~ "Cada compte manté la seva pròpia secció d'etiquetes de totes maneres."
+
+#, fuzzy
+#~ msgid ""
+#~ "In the unified section, in a list above or below the accounts, or Off, "
+#~ "out of the sidebar."
+#~ msgstr ""
+#~ "Tria entre aparèixer en una secció unificada, o en una llista per sobre o "
+#~ "per sota dels comptes."
+
+#~ msgid "In the unified section"
+#~ msgstr "A la secció unificada"
+
+#~ msgid "Show or hide filters"
+#~ msgstr "Mostra o amaga els filtres"
 
 #~ msgid "Contacts in the sidebar"
 #~ msgstr "Contactes a la barra lateral"
