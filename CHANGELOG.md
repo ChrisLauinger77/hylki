@@ -55,6 +55,9 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Changed: Contacts opens and closes without a fade.** The mail and
+  Contacts swap at once; the attachments gallery keeps its crossfade.
+
 - **Changed: two Settings → Sidebar rows start folded.** Unread counts
   and Fold up expanded items are closed each time Hylki starts, and stay
   as they are left until it quits.
