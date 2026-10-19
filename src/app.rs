@@ -1308,9 +1308,6 @@ pub struct AppModel {
     contacts_page: Controller<ContactsPage>,
     /// Whether the content area shows the contacts view.
     showing_contacts: bool,
-    /// Whether the content stack last showed Contacts: a switch into or
-    /// out of it has no crossfade (see `content_transition`).
-    contacts_on_screen: std::cell::Cell<bool>,
     /// True when the attachments gallery replaces the mail panes.
     showing_gallery: bool,
     /// Whether the Outbox is showing instead of the mail panes.
@@ -2412,10 +2409,7 @@ impl SimpleComponent for AppModel {
                     gtk::Stack {
                         set_hexpand: true,
                         // Swap the mail panes for the attachments gallery or
-                        // the contacts view. The transition is set first, in
-                        // the same pass, for the switch it governs.
-                        #[watch]
-                        set_transition_type: model.content_transition(),
+                        // the contacts view, at once: no transition.
                         #[watch]
                         set_visible_child_name: if model.showing_gallery {
                             "gallery"
@@ -3795,7 +3789,6 @@ impl SimpleComponent for AppModel {
             showing_gallery: false,
             contacts_page,
             showing_contacts: false,
-            contacts_on_screen: std::cell::Cell::new(false),
             showing_outbox: false,
             outbox_by_account: HashMap::new(),
             server_identities: HashMap::new(),
@@ -15370,18 +15363,6 @@ impl AppModel {
     /// header and width throughout and stays clickable beside the panel.
     /// `animate` is advisory — libadwaita animates the overlay itself.
     /// Show Contacts in place of the mail panes, read afresh.
-    /// The content stack's transition for the switch about to happen: none
-    /// into or out of Contacts, which should be there at once, a crossfade
-    /// between the mail and the attachments gallery.
-    fn content_transition(&self) -> gtk::StackTransitionType {
-        let was = self.contacts_on_screen.replace(self.showing_contacts);
-        if was || self.showing_contacts {
-            gtk::StackTransitionType::None
-        } else {
-            gtk::StackTransitionType::Crossfade
-        }
-    }
-
     fn show_contacts_view(&mut self, sender: &ComponentSender<Self>) {
         self.close_sidebar_peek();
         self.showing_outbox = false;
