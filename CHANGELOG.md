@@ -175,7 +175,11 @@
   scrolled to the rest, reuses its rows rather than making new ones, and no
   longer reads the disk for sender logos each time a row is filled. A
   folder not yet read this session is read in the background, and a
-  refresh that brings nothing new leaves the list as it is.
+  refresh that brings nothing new leaves the list as it is. After a start,
+  the folders the unified rows list are read in the background and the
+  rows built ahead, so the first visit is as quick as the next; a row or
+  folder opened before that shows its newest mail at once and the rest
+  when it is read.
 
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow

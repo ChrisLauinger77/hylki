@@ -510,6 +510,14 @@ const CARRIED_BODY_LIMIT: usize = 64;
 /// Most messages one smart folder (#417) lists per account.
 const SMART_VIEW_LIMIT: usize = 5000;
 
+/// How many of a folder's newest messages a list not in memory shows at
+/// once, read from the index while the rest of the folder is.
+const LIST_NEWEST: usize = 300;
+
+/// How long after an account's folders arrive the unified rows' folders are
+/// read into memory: past the start's own rush of work.
+const PRELOAD_AFTER_SECS: u32 = 5;
+
 /// What a smart folder's conditions need besides the message itself, made
 /// on the main thread and taken to the one that reads the index.
 struct SmartContext {
@@ -1173,6 +1181,11 @@ pub struct AppModel {
     /// the unified Starred view opens at once (#482).
     unified_starred_rows: HashMap<u32, Vec<(String, Message)>>,
     unified_starred_due: bool,
+    /// A read of the unified rows' folders into memory is due (`Preload`).
+    preload_due: bool,
+    /// Unified rows still to build ahead for the message list (`PrebuildNext`).
+    prebuild_queue: Vec<UnifiedView>,
+    prebuild_due: bool,
     /// A count of the smart folders' unread mail is waiting to run, or
     /// running: syncs come in bursts, and one count covers a burst.
     smart_counts_due: bool,
@@ -2103,9 +2116,15 @@ pub enum AppMsg {
     EmitUnifiedNow,
     /// Copy the unified view's folders into its slices (`unified_unfilled`).
     FillUnifiedSlices,
-    /// Folders of the unified view `key` not seen this session, read from
-    /// the index off the main thread.
-    UnifiedFoldersLoaded { key: u64, lists: Vec<((u32, u32), Vec<Message>)> },
+    /// Folders not in memory yet, read whole from the index off the main
+    /// thread: for the unified view being opened, or ahead of it (`Preload`).
+    UnifiedFoldersLoaded { lists: Vec<((u32, u32), Vec<Message>)> },
+    /// Read the folders the unified rows list into memory, off the main
+    /// thread, so the first visit after a start finds them there.
+    Preload,
+    /// Build the unified rows ahead for the message list, one at a time.
+    PrebuildViews,
+    PrebuildNext,
     /// Push the sidebar's unread counts, put off from a view switch.
     PushUnreadCounts,
     /// Count every smart folder's unread mail now (the debounce ran out).
@@ -3752,6 +3771,9 @@ impl SimpleComponent for AppModel {
             unified_starred_dirty: false,
             unified_starred_rows: HashMap::new(),
             unified_starred_due: false,
+            preload_due: false,
+            prebuild_queue: Vec::new(),
+            prebuild_due: false,
             smart_counts_due: false,
             smart_counts_running: false,
             keyword_sync_at: HashMap::new(),
@@ -3759,8 +3781,9 @@ impl SimpleComponent for AppModel {
             // Demo mode gets a cache that never touches disk, seeded with the
             // sample mail: the gallery's paging, search and sort are database
             // queries, so the demo has to run them against a real database or
-            // it would be exercising nothing.
-            cache: if demo_mode() {
+            // it would be exercising nothing. Not with real accounts: their
+            // workers keep the real one, and the lists read it.
+            cache: if demo_data {
                 let c = crate::cache::Cache::in_memory().ok();
                 if let Some(c) = c.as_ref() {
                     crate::backend::seed_demo_cache(c);
@@ -9987,12 +10010,48 @@ impl SimpleComponent for AppModel {
 
             AppMsg::FillUnifiedSlices => self.fill_unified_slices(),
 
-            AppMsg::UnifiedFoldersLoaded { key, lists } => {
-                let open = self.unified && self.unified_view_key() == key;
+            AppMsg::Preload => {
+                self.preload_due = false;
+                self.preload(&sender);
+            }
+
+            AppMsg::PrebuildViews => {
+                self.prebuild_due = false;
+                let mut views: Vec<UnifiedView> = Vec::new();
+                if self.multi_account() {
+                    if self.unified_inboxes_shown() {
+                        views.push(UnifiedView::Kind(FolderKind::Inbox));
+                    }
+                    // Starred is built from the flags of every folder, and
+                    // is small: its first visit builds it.
+                    views.extend(
+                        self.unified_kinds
+                            .listed()
+                            .into_iter()
+                            .filter(|k| *k != FolderKind::Starred)
+                            .map(UnifiedView::Kind),
+                    );
+                }
+                // Taken from the end: the Inboxes first.
+                views.reverse();
+                self.prebuild_queue = views;
+                self.prebuild_next(&sender);
+            }
+
+            AppMsg::PrebuildNext => self.prebuild_next(&sender),
+
+            AppMsg::UnifiedFoldersLoaded { lists } => {
+                let open = self.unified;
                 let mut landed = false;
                 for ((account_id, folder_id), messages) in lists {
-                    // The worker's own answer may have come first.
-                    if messages.is_empty() || self.message_cache.get(&(account_id, folder_id)).is_some_and(|c| !c.is_empty()) {
+                    // The worker's own answer may have come first. An empty
+                    // folder is recorded as read too: building a unified row
+                    // ahead waits on all of its folders.
+                    if self.message_cache.get(&(account_id, folder_id)).is_some_and(|c| !c.is_empty()) {
+                        continue;
+                    }
+                    if messages.is_empty() {
+                        self.message_cache.entry((account_id, folder_id)).or_default();
                         continue;
                     }
                     let messages = self.merge_local_tags(account_id, messages);
@@ -10003,6 +10062,11 @@ impl SimpleComponent for AppModel {
                         self.unified_unfilled.remove(&(account_id, folder_id));
                         self.unified_slices.insert((account_id, folder_id), messages.clone());
                         landed = true;
+                    } else if !open
+                        && self.selected.as_ref().is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
+                    {
+                        // The folder on show had only its newest so far.
+                        self.message_list.emit(MessageListInput::SetMessages { messages: messages.clone() });
                     }
                     self.message_cache.insert((account_id, folder_id), messages);
                 }
@@ -10010,6 +10074,7 @@ impl SimpleComponent for AppModel {
                     self.emit_unified();
                     self.push_index_complete();
                 }
+                self.schedule_prebuild(&sender);
             }
 
             AppMsg::PushUnreadCounts => self.push_unread_counts(),
@@ -11455,6 +11520,7 @@ impl SimpleComponent for AppModel {
                         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
                     }
                 }
+                self.schedule_preload(&sender);
                 if self.flag_starred_accounts().contains(&account_id) {
                     self.refresh_unified_starred(&sender);
                 }
@@ -16759,10 +16825,25 @@ impl AppModel {
                 .message_cache
                 .get(&(*account_id, *folder_id))
                 .is_some_and(|c| !c.is_empty());
-            // Read off the main thread: an Archive is tens of thousands of
-            // rows, and the click would wait on all of them.
+            // Its newest messages now, from the index, and the rest off the
+            // main thread: an Archive is tens of thousands of rows, and the
+            // click would wait on all of them. The newest are this view's
+            // alone; the folder's own list is only ever the whole folder.
             if !seen {
-                unseen.push((*account_id, *folder_id, path.clone()));
+                let newest = self
+                    .cache
+                    .as_ref()
+                    .map(|c| c.load_newest(*account_id, path, *folder_id, LIST_NEWEST))
+                    .unwrap_or_default();
+                // Nothing newest is nothing at all.
+                if !newest.is_empty() {
+                    let newest = self.merge_local_tags(*account_id, newest);
+                    let newest = self.apply_pending_seen(*account_id, *folder_id, newest);
+                    let newest = self.apply_pending_answers(*account_id, *folder_id, newest);
+                    let newest = self.apply_pending_tags(*account_id, *folder_id, newest);
+                    self.unified_slices.insert((*account_id, *folder_id), newest);
+                    unseen.push((*account_id, *folder_id, path.clone()));
+                }
             }
             // Copied from the folder's cache below, or after the frame when
             // the list has the view kept.
@@ -16786,6 +16867,9 @@ impl AppModel {
         } else {
             let fp = self.unified_fp();
             let kept = self.message_list.model().has_view(key, fp);
+            if !kept {
+                tracing::debug!("unified: not kept by the list ({})", self.message_list.model().view_miss(key, fp));
+            }
             self.message_list.emit(MessageListInput::SetView { key: Some(key), fp, restore: kept });
             if kept {
                 self.list_fp.set(Some(fp));
@@ -16818,7 +16902,7 @@ impl AppModel {
                     Err(_) => Vec::new(),
                 };
                 tracing::debug!("unified: {} folders read from the index in {:?}", lists.len(), t.elapsed());
-                let _ = s.send(AppMsg::UnifiedFoldersLoaded { key, lists });
+                let _ = s.send(AppMsg::UnifiedFoldersLoaded { lists });
             });
         }
         self.push_index_complete();
@@ -17168,7 +17252,24 @@ impl AppModel {
             Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
                 messages: cached.clone(),
             }),
-            None => self.message_list.emit(MessageListInput::SetLoading),
+            None => {
+                // Not in memory: the folder's newest from the index at once,
+                // the whole of it when the account answers.
+                let newest = self
+                    .cache
+                    .as_ref()
+                    .map(|c| c.load_newest(account_id, &path, folder_id, LIST_NEWEST))
+                    .unwrap_or_default();
+                if newest.is_empty() {
+                    self.message_list.emit(MessageListInput::SetLoading);
+                } else {
+                    let newest = self.merge_local_tags(account_id, newest);
+                    let newest = self.apply_pending_seen(account_id, folder_id, newest);
+                    let newest = self.apply_pending_answers(account_id, folder_id, newest);
+                    let newest = self.apply_pending_tags(account_id, folder_id, newest);
+                    self.message_list.emit(MessageListInput::SetMessages { messages: newest });
+                }
+            }
         }
         self.push_index_complete();
         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
@@ -21202,13 +21303,111 @@ impl AppModel {
         });
     }
 
+    /// `PrebuildViews` shortly, once for however many folder reads land
+    /// meanwhile.
+    fn schedule_prebuild(&mut self, sender: &ComponentSender<Self>) {
+        if std::mem::replace(&mut self.prebuild_due, true) {
+            return;
+        }
+        let s = sender.input_sender().clone();
+        gtk::glib::timeout_add_seconds_local_once(2, move || {
+            let _ = s.send(AppMsg::PrebuildViews);
+        });
+    }
+
+    /// Hand the message list the next unified row to build ahead: one whose
+    /// folders are all in memory, not on show, and not kept as it is. The
+    /// next follows a moment later, so the window keeps drawing between.
+    fn prebuild_next(&mut self, sender: &ComponentSender<Self>) {
+        while let Some(view) = self.prebuild_queue.pop() {
+            let UnifiedView::Kind(kind) = view else { continue };
+            let key = view_key_of(view, None);
+            if self.unified && self.unified_view_key() == key {
+                continue;
+            }
+            let targets: Vec<(u32, u32)> = self
+                .accounts
+                .iter()
+                .filter(|a| self.in_unified(a.id))
+                .filter_map(|a| self.folder_of_kind(a.id, kind).map(|f| (a.id, f.id)))
+                .collect();
+            if targets.is_empty() || targets.iter().any(|k| !self.message_cache.contains_key(k)) {
+                continue;
+            }
+            let content = || targets.iter().filter_map(|k| self.message_cache.get(k)).flatten();
+            let fp = content_fp(content());
+            if self.message_list.model().has_view(key, fp) {
+                continue;
+            }
+            let mut messages: Vec<Message> = content().cloned().collect();
+            messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+            tracing::debug!("prebuild: {view:?}, {} messages", messages.len());
+            self.message_list.emit(MessageListInput::Prebuild { key, fp, messages });
+            let s = sender.input_sender().clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                let _ = s.send(AppMsg::PrebuildNext);
+            });
+            return;
+        }
+    }
+
+    /// `preload` a few seconds from now, once for however many accounts'
+    /// folders arrive meanwhile.
+    fn schedule_preload(&mut self, sender: &ComponentSender<Self>) {
+        if std::mem::replace(&mut self.preload_due, true) {
+            return;
+        }
+        let s = sender.input_sender().clone();
+        gtk::glib::timeout_add_seconds_local_once(PRELOAD_AFTER_SECS, move || {
+            let _ = s.send(AppMsg::Preload);
+        });
+    }
+
+    /// Read the folders the unified rows merge (Inboxes, Sent, Drafts,
+    /// Archive and the rest switched on, every account in the unified
+    /// section) into memory off the main thread, those not there yet. The
+    /// first visit to a row after a start then opens from memory as later
+    /// ones do; the folders were going to be held from that visit on anyway.
+    fn preload(&mut self, sender: &ComponentSender<Self>) {
+        if self.cache.is_none() || demo_mode() && self.config.is_empty() {
+            return;
+        }
+        let mut kinds = self.unified_kinds.listed();
+        kinds.push(FolderKind::Inbox);
+        let wanted: Vec<(u32, u32, String)> = self
+            .accounts
+            .iter()
+            .filter(|a| self.in_unified(a.id))
+            .flat_map(|a| self.folders.get(&a.id).into_iter().flatten())
+            .filter(|f| kinds.contains(&f.kind))
+            .filter(|f| !self.message_cache.contains_key(&(f.account_id, f.id)))
+            .map(|f| (f.account_id, f.id, f.path.clone()))
+            .collect();
+        if wanted.is_empty() {
+            self.schedule_prebuild(sender);
+            return;
+        }
+        let s = sender.input_sender().clone();
+        std::thread::spawn(move || {
+            let t = std::time::Instant::now();
+            let lists: Vec<((u32, u32), Vec<Message>)> = match crate::cache::Cache::open() {
+                Ok(cache) => wanted.into_iter().map(|(a, f, path)| ((a, f), cache.load_messages(a, &path, f))).collect(),
+                Err(_) => Vec::new(),
+            };
+            tracing::debug!(
+                "preload: {} folders, {} messages, read in {:?}",
+                lists.len(),
+                lists.iter().map(|(_, l)| l.len()).sum::<usize>(),
+                t.elapsed()
+            );
+            let _ = s.send(AppMsg::UnifiedFoldersLoaded { lists });
+        });
+    }
+
     /// The open unified view, as one number: which view, and for which
     /// account when narrowed to one.
     fn unified_view_key(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        format!("{:?}{:?}", self.unified_view, self.unified_account).hash(&mut h);
-        h.finish()
+        view_key_of(self.unified_view, self.unified_account)
     }
 
     /// What the unified view holds, as one number: every message's place,
@@ -21216,19 +21415,7 @@ impl AppModel {
     /// for tens of thousands of messages, against a merge and a regrouping
     /// many times that.
     fn unified_fp(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut sum = 0u64;
-        let mut n = 0u64;
-        for m in self.unified_content() {
-            let mut h = std::collections::hash_map::DefaultHasher::new();
-            (m.account_id, m.folder_id, m.uid, m.id, m.timestamp).hash(&mut h);
-            (m.unread, m.starred, m.answered, m.forwarded).hash(&mut h);
-            (&m.keywords, &m.labels, m.subject.len(), m.preview.len(), m.from_addr.len()).hash(&mut h);
-            (m.message_id.len(), m.references.len()).hash(&mut h);
-            sum = sum.wrapping_add(h.finish());
-            n += 1;
-        }
-        sum ^ n.rotate_left(32)
+        content_fp(self.unified_content())
     }
 
     /// Every message of the open unified view: its slices, and for a folder
@@ -25660,6 +25847,34 @@ fn follow_motion_setting() {
 /// Whether things on screen should move (see [`follow_motion_setting`]).
 fn motion_wanted() -> bool {
     gtk::Settings::default().is_some_and(|s| s.is_gtk_enable_animations())
+}
+
+/// A unified view, and the account it is narrowed to, as one number: the
+/// key the message list keeps it under.
+fn view_key_of(view: UnifiedView, account: Option<u32>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    format!("{view:?}{account:?}").hash(&mut h);
+    h.finish()
+}
+
+/// What a list holds, as one number: every message's place, state and
+/// tags, whatever order they come in. A few milliseconds for tens of
+/// thousands of messages, against a merge and a regrouping many times that.
+fn content_fp<'a>(msgs: impl Iterator<Item = &'a Message>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut sum = 0u64;
+    let mut n = 0u64;
+    for m in msgs {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (m.account_id, m.folder_id, m.uid, m.id, m.timestamp).hash(&mut h);
+        (m.unread, m.starred, m.answered, m.forwarded).hash(&mut h);
+        (&m.keywords, &m.labels, m.subject.len(), m.preview.len(), m.from_addr.len()).hash(&mut h);
+        (m.message_id.len(), m.references.len()).hash(&mut h);
+        sum = sum.wrapping_add(h.finish());
+        n += 1;
+    }
+    sum ^ n.rotate_left(32)
 }
 
 fn demo_mode() -> bool {

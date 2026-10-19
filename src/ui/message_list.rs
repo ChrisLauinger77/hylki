@@ -302,6 +302,30 @@ fn unasked_threads(
 /// window, so covering the whole mailbox costs no more than covering a day of
 /// it; what a conversation costs to *open* is bounded separately, by
 /// `THREAD_MEMBER_LIMIT`.
+/// What working out conversations reads of each message, to take to a
+/// thread.
+fn thread_inputs(source: &[Rc<Message>]) -> Vec<ThreadInput> {
+    source
+        .iter()
+        .map(|m| ThreadInput {
+            account_id: m.account_id,
+            folder_id: m.folder_id,
+            id: m.id,
+            uid: m.uid,
+            message_id: m.message_id.clone(),
+            references: m.references.clone(),
+        })
+        .collect()
+}
+
+/// What `compute_rows` hands the view: the window's rows, whether they go
+/// under date headings, and whether a conversation is opened out.
+struct Built {
+    rows: Vec<Rc<RowData>>,
+    by_date: bool,
+    any_expanded: bool,
+}
+
 /// A list as a rebuild left it (see `MessageList::keep_view`).
 struct ViewSnapshot {
     key: u64,
@@ -322,9 +346,10 @@ struct ViewSnapshot {
     window: usize,
 }
 
-/// How many views the list keeps as built. Each holds its messages, which
-/// for a large Archive is tens of megabytes.
-const KEPT_VIEWS: usize = 3;
+/// How many views the list keeps as built: the unified rows built ahead
+/// after a start, and the views visited since. Each holds its messages,
+/// which for a large Archive is tens of megabytes.
+const KEPT_VIEWS: usize = 8;
 
 /// Free `held` once the main loop is idle, not inside the pass that let go
 /// of it.
@@ -584,6 +609,11 @@ pub struct MessageList {
     views: std::collections::VecDeque<ViewSnapshot>,
     /// A kept view to show at the next queued rebuild, in place of one.
     pending_restore: Option<ViewSnapshot>,
+    /// A view being built ahead (`Prebuild`) while its conversations are
+    /// worked out off the main thread: its number, key, fingerprint and
+    /// messages.
+    prebuild: Option<(u64, u64, u64, Vec<Rc<Message>>)>,
+    prebuild_gen: u64,
     /// Another view was opened: its first rebuild waits for a frame, and
     /// fills the rows for the new look in passing (#401).
     switched: bool,
@@ -1242,6 +1272,12 @@ pub enum MessageListInput {
     SetView { key: Option<u64>, fp: u64, restore: bool },
     /// The fingerprint of the content about to be set for the view on show.
     SetViewFp(u64),
+    /// Build a view that is not on show and keep it, so its first visit
+    /// is shown as kept: the unified rows, once a start has read their
+    /// folders.
+    Prebuild { key: u64, fp: u64, messages: Vec<Message> },
+    /// The conversations of the view being built ahead.
+    PrebuildThreads { gen: u64, threads: Box<SourceThreads> },
     /// Merge more indexed messages into the current list (background backfill),
     /// preserving the current search query and view.
     AppendMessages { messages: Vec<Message> },
@@ -1884,6 +1920,8 @@ impl SimpleComponent for MessageList {
             view_fp: 0,
             views: std::collections::VecDeque::new(),
             pending_restore: None,
+            prebuild: None,
+            prebuild_gen: 0,
             switched: false,
             look_stale: Default::default(),
             pending_select: None,
@@ -2069,6 +2107,35 @@ impl SimpleComponent for MessageList {
                 }
             }
             MessageListInput::SetViewFp(fp) => self.view_fp = fp,
+            MessageListInput::Prebuild { key, fp, messages } => {
+                if self.view_key == Some(key) || self.has_view(key, fp) {
+                    return;
+                }
+                let all: Vec<Rc<Message>> = messages.into_iter().map(Rc::new).collect();
+                self.prebuild_gen += 1;
+                let gen = self.prebuild_gen;
+                if !self.threading {
+                    self.prebuild_view(key, fp, all, None);
+                    return;
+                }
+                let input = thread_inputs(&all);
+                let links = self.thread_links.clone();
+                let sender = self.input.clone();
+                self.prebuild = Some((gen, key, fp, all));
+                std::thread::spawn(move || {
+                    let threads = source_threads_of(&input, &links, false);
+                    let _ = sender.send(MessageListInput::PrebuildThreads { gen, threads: Box::new(threads) });
+                });
+            }
+            MessageListInput::PrebuildThreads { gen, threads } => {
+                if let Some((g, key, fp, all)) = self.prebuild.take() {
+                    if g == gen {
+                        self.prebuild_view(key, fp, all, Some(Rc::new(*threads)));
+                    } else {
+                        self.prebuild = Some((g, key, fp, all));
+                    }
+                }
+            }
             MessageListInput::SetMessages { messages } => {
                 self.pending_restore = None;
                 let t = std::time::Instant::now();
@@ -4526,6 +4593,16 @@ impl MessageList {
         self.views.iter().any(|v| v.key == key && v.fp == fp && v.sig == sig)
     }
 
+    /// Why `has_view` said no, for the log.
+    pub fn view_miss(&self, key: u64, fp: u64) -> &'static str {
+        match self.views.iter().find(|v| v.key == key) {
+            None => "never kept",
+            Some(v) if v.fp != fp => "its mail changed",
+            Some(v) if v.sig != self.rows_signature() => "the list's settings changed",
+            Some(_) => "kept",
+        }
+    }
+
     /// The view the app named as on show, if any.
     pub fn view_key(&self) -> Option<u64> {
         self.view_key
@@ -4568,15 +4645,61 @@ impl MessageList {
             self.shared.refresh_all();
         }
         let by_date = self.group_by_date && matches!(self.sort, SortOrder::DateNewest | SortOrder::DateOldest);
-        if by_date != self.day_headings {
-            self.day_headings = by_date;
-            let factory = by_date.then(|| crate::ui::message_row::header_factory(&self.shared));
-            self.list_view.set_header_factory(factory.as_ref());
-        } else if by_date {
-            self.shared.refresh_headers();
-        }
+        self.show_headings(by_date);
         self.select_current();
+        let any_expanded = self.shared.model.rows().iter().chain(&self.tail).any(|r| r.meta.expanded);
+        self.fit_expanded(any_expanded);
         tracing::debug!("list: kept view shown, {} rows of {}, in {:?}", self.shown.len(), self.total_matches, t.elapsed());
+    }
+
+    /// Build the view `key` from `all` and keep it, leaving the view on show
+    /// as it is: its state steps aside for the build and comes back.
+    fn prebuild_view(&mut self, key: u64, fp: u64, all: Vec<Rc<Message>>, threads: Option<Rc<SourceThreads>>) {
+        // A search on show would filter the build; the visit builds it then.
+        if !self.query.is_empty() {
+            return;
+        }
+        let t = std::time::Instant::now();
+        let all = std::mem::replace(&mut self.all, all);
+        let source_threads = std::mem::replace(&mut *self.source_threads.borrow_mut(), threads.clone());
+        let shown = std::mem::take(&mut self.shown);
+        let tail = std::mem::take(&mut self.tail);
+        let groups = std::mem::take(&mut self.groups);
+        let msg_thread = std::mem::take(&mut self.msg_thread);
+        let thread_members = std::mem::take(&mut self.thread_members);
+        let nested = std::mem::take(&mut self.nested);
+        let listed_folders = std::mem::take(&mut self.listed_folders);
+        let total_matches = self.total_matches;
+        let thread_drag = std::mem::take(&mut *self.shared.thread_drag.borrow_mut());
+        let window = std::mem::replace(&mut self.window, LIST_WINDOW);
+        let selected_ids = std::mem::take(&mut self.selected_ids);
+        let selected_id = self.selected_id.take();
+
+        let built = self.compute_rows(true);
+        let snap = ViewSnapshot {
+            key,
+            fp,
+            sig: self.rows_signature(),
+            all: std::mem::replace(&mut self.all, all),
+            threads,
+            rows: built.rows,
+            shown: std::mem::replace(&mut self.shown, shown),
+            tail: std::mem::replace(&mut self.tail, tail),
+            groups: std::mem::replace(&mut self.groups, groups),
+            msg_thread: std::mem::replace(&mut self.msg_thread, msg_thread),
+            thread_members: std::mem::replace(&mut self.thread_members, thread_members),
+            nested: std::mem::replace(&mut self.nested, nested),
+            listed_folders: std::mem::replace(&mut self.listed_folders, listed_folders),
+            total_matches: std::mem::replace(&mut self.total_matches, total_matches),
+            thread_drag: std::mem::replace(&mut *self.shared.thread_drag.borrow_mut(), thread_drag),
+            window: std::mem::replace(&mut self.window, window),
+        };
+        *self.source_threads.borrow_mut() = source_threads;
+        self.selected_ids = selected_ids;
+        self.selected_id = selected_id;
+        tracing::debug!("list: built ahead, {} rows of {}, in {:?}", snap.shown.len(), snap.total_matches, t.elapsed());
+        self.views.retain(|v| v.key != key);
+        self.views.push_back(snap);
     }
 
     fn drop_threads(&self) {
@@ -4602,17 +4725,7 @@ impl MessageList {
             return true;
         }
         self.threads_job.set(Some(gen));
-        let input: Vec<ThreadInput> = source
-            .iter()
-            .map(|m| ThreadInput {
-                account_id: m.account_id,
-                folder_id: m.folder_id,
-                id: m.id,
-                uid: m.uid,
-                message_id: m.message_id.clone(),
-                references: m.references.clone(),
-            })
-            .collect();
+        let input = thread_inputs(source);
         let links = self.thread_links.clone();
         let sender = self.input.clone();
         std::thread::spawn(move || {
@@ -4915,6 +5028,54 @@ impl MessageList {
 
     fn rebuild_rows(&mut self) {
         let t_rebuild = std::time::Instant::now();
+        let Built { rows, by_date, any_expanded } = self.compute_rows(false);
+        // Only what changed reaches the view: rows that show the same message
+        // stay where they are, with whatever they were doing (#323).
+        let t_rows = std::time::Instant::now();
+        let stale = self.look_stale.take();
+        if !self.shared.model.replace(rows, stale) && stale {
+            self.shared.refresh_all();
+        }
+        self.show_headings(by_date);
+        self.select_current();
+        self.fit_expanded(any_expanded);
+        tracing::debug!(
+            "list: rebuild {} rows (+{} to come) of {} — sort+group {:?}, model {:?}",
+            self.shown.len(),
+            self.tail.len(),
+            self.total_matches,
+            t_rows.duration_since(t_rebuild),
+            t_rows.elapsed()
+        );
+    }
+
+    /// The date headings, on or off with the rows already in their sections,
+    /// so the view never asks for a section of rows built without them.
+    fn show_headings(&mut self, by_date: bool) {
+        if by_date != self.day_headings {
+            self.day_headings = by_date;
+            let factory = by_date.then(|| crate::ui::message_row::header_factory(&self.shared));
+            self.list_view.set_header_factory(factory.as_ref());
+        } else if by_date {
+            self.shared.refresh_headers();
+        }
+    }
+
+    /// Expanded conversations indent their member cards; give the pane the
+    /// extra floor that needs while any thread is open, so nothing is
+    /// clipped at the right edge (see THREAD_EXPANDED_EXTRA).
+    fn fit_expanded(&self, any_expanded: bool) {
+        if let Some(s) = &self.scroller {
+            let floor = LIST_MIN_WIDTH + if any_expanded { THREAD_EXPANDED_EXTRA } else { 0 };
+            s.set_size_request(floor, -1);
+        }
+    }
+
+    /// Sort, group and describe `all` into the rows of the window, leaving
+    /// the rest in `tail` and the conversation maps filled. `offscreen`: for
+    /// a view not on show (`prebuild_view`), which must not touch the look of
+    /// the one that is.
+    fn compute_rows(&mut self, offscreen: bool) -> Built {
         let passes = self.filter();
         let source_len = self.active_source().len();
         let mut matches: Vec<Rc<Message>> = self.active_source().iter().filter(|m| passes(m)).cloned().collect();
@@ -4929,7 +5090,7 @@ impl MessageList {
         let preview = self.threading && !filtered && self.threads_pending();
         self.listed_folders = matches.iter().map(|m| (m.account_id, m.folder_id)).collect();
         let graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
-        if graph_in_view != self.graph_in_view {
+        if !offscreen && graph_in_view != self.graph_in_view {
             self.graph_in_view = graph_in_view;
             self.sync_look();
         }
@@ -5132,39 +5293,7 @@ impl MessageList {
         shown.truncate(limit);
         self.window = limit.max(LIST_WINDOW);
         self.shown = shown;
-        // Only what changed reaches the view: rows that show the same message
-        // stay where they are, with whatever they were doing (#323).
-        let t_rows = std::time::Instant::now();
-        let stale = self.look_stale.take();
-        if !self.shared.model.replace(rows, stale) && stale {
-            self.shared.refresh_all();
-        }
-        // The headings come and go with the rows already in their sections,
-        // so the view never asks for a section of rows built without them.
-        if by_date != self.day_headings {
-            self.day_headings = by_date;
-            let factory = by_date.then(|| crate::ui::message_row::header_factory(&self.shared));
-            self.list_view.set_header_factory(factory.as_ref());
-        } else if by_date {
-            self.shared.refresh_headers();
-        }
-        self.select_current();
-
-        // Expanded conversations indent their member cards; give the pane the
-        // extra floor that needs while any thread is open, so nothing is
-        // clipped at the right edge (see THREAD_EXPANDED_EXTRA).
-        if let Some(s) = &self.scroller {
-            let floor = LIST_MIN_WIDTH + if any_expanded { THREAD_EXPANDED_EXTRA } else { 0 };
-            s.set_size_request(floor, -1);
-        }
-        tracing::debug!(
-            "list: rebuild {} rows (+{} to come) of {} — sort+group {:?}, model {:?}",
-            self.shown.len(),
-            self.tail.len(),
-            self.total_matches,
-            t_rows.duration_since(t_rebuild),
-            t_rows.elapsed()
-        );
+        Built { rows, by_date, any_expanded }
     }
 
     /// Everything the view needs wired: selection, activation and keys.
