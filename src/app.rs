@@ -1655,6 +1655,9 @@ pub enum AppMsg {
     /// A message window's Move To: the folder picker over that window, at
     /// its point (x, y). The window closes once a folder is picked.
     PopoutMoveTo { key: (u32, u32), message: Box<Message>, x: f64, y: f64 },
+    /// A message window's single-key shortcut that needs the app (#392):
+    /// the window's message and the conversation it shows.
+    PopoutShortcut { action: Shortcut, message: Box<Message>, thread: Vec<Message> },
     /// A message window's drawer: delete this file from the server (#289),
     /// asking over that window first.
     DeletePopoutAttachment { key: (u32, u32), message: Box<Message>, attachment: Box<Attachment> },
@@ -7472,6 +7475,10 @@ impl SimpleComponent for AppModel {
                     // As Archive and Delete do: the message has left.
                     closing.close();
                 });
+            }
+
+            AppMsg::PopoutShortcut { action, message, thread } => {
+                self.run_popout_shortcut(action, *message, thread, &sender);
             }
 
             AppMsg::DeletePopoutAttachment { key, message, attachment } => {
@@ -13626,6 +13633,70 @@ impl AppModel {
         }
     }
 
+    /// The keys a message window hands over (#392): what reaches past its
+    /// own message, to the rest of its conversation or to the app. Gmail's
+    /// keys take the whole conversation, as they do in the main window.
+    fn run_popout_shortcut(
+        &mut self,
+        action: Shortcut,
+        m: Message,
+        thread: Vec<Message>,
+        sender: &ComponentSender<Self>,
+    ) {
+        let whole = self.gmail_keys.get() && thread.len() > 1;
+        // The window's copies are as it opened; the flags may have moved.
+        let thread: Vec<Message> = thread
+            .into_iter()
+            .map(|t| self.shown_copy(t.account_id, t.id).unwrap_or(t))
+            .collect();
+        let row = |action| AppMsg::RowAction { action, message: Box::new(m.clone()), conversation: thread.clone() };
+        match action {
+            Shortcut::Reply | Shortcut::InWindow(WindowCompose::Reply) => sender.input(row(RowAction::Reply)),
+            Shortcut::ReplyAll | Shortcut::InWindow(WindowCompose::ReplyAll) => sender.input(row(RowAction::ReplyAll)),
+            Shortcut::Forward | Shortcut::InWindow(WindowCompose::Forward) => sender.input(row(RowAction::Forward)),
+            Shortcut::Archive | Shortcut::ArchiveAndStep(_) => {
+                if whole {
+                    // What the list row stands for: the members filed with
+                    // the window's message, not a reply kept in Sent.
+                    let members =
+                        thread.into_iter().filter(|t| (t.account_id, t.folder_id) == (m.account_id, m.folder_id)).collect();
+                    self.apply_bulk_move(BulkAction::Archive, members);
+                } else {
+                    self.move_to(m, FolderKind::Archive);
+                }
+            }
+            Shortcut::MarkRead(read) => {
+                let mut targets = match (whole, read) {
+                    (false, _) => vec![self.shown_copy(m.account_id, m.id).unwrap_or(m)],
+                    (true, true) => thread,
+                    (true, false) => thread
+                        .into_iter()
+                        .filter(|t| {
+                            !matches!(self.folder_kind(t.account_id, t.folder_id), Some(FolderKind::Sent | FolderKind::Drafts))
+                        })
+                        .collect(),
+                };
+                targets.retain(|t| t.unread == read);
+                if !targets.is_empty() {
+                    self.user_set_flags(read_label(read), &targets, FlagKind::Read, read);
+                }
+            }
+            Shortcut::MarkUnreadFrom => {
+                // The window picks no card, so the message read from is the
+                // newest, as in the main window with none picked.
+                let newest = thread.into_iter().max_by_key(|t| (t.timestamp, t.uid)).unwrap_or(m);
+                self.user_set_flags(read_label(false), &[newest], FlagKind::Read, false);
+            }
+            Shortcut::DeleteForever => self.confirm_purge(vec![m], sender),
+            Shortcut::Undo
+            | Shortcut::Compose
+            | Shortcut::InWindow(WindowCompose::New)
+            | Shortcut::Shortcuts
+            | Shortcut::Refresh => self.run_shortcut(action, sender),
+            _ => {}
+        }
+    }
+
     /// Whether the keyboard is in the reader: its message, or anything else
     /// inside the reading pane.
     fn reader_has_focus(&self) -> bool {
@@ -17670,6 +17741,8 @@ impl AppModel {
             reader_default: self.effective_reader_default(),
             tags: self.tags.clone(),
             pgp_labels: self.pgp_labels,
+            single_key: self.single_key.clone(),
+            gmail_keys: self.gmail_keys.clone(),
         };
 
         let controller = MessageWindow::builder()
@@ -17684,6 +17757,9 @@ impl AppModel {
                 }
                 MessageWindowOutput::LoadAttachments(message) => AppMsg::LoadAttachmentsFor(message),
                 MessageWindowOutput::MoveTo { message, x, y } => AppMsg::PopoutMoveTo { key, message, x, y },
+                MessageWindowOutput::Shortcut { action, message, thread } => {
+                    AppMsg::PopoutShortcut { action, message, thread }
+                }
                 MessageWindowOutput::SetTag { message, keyword, add } => AppMsg::SetTag { message, keyword, add },
                 MessageWindowOutput::DeleteAttachment { message, attachment } => {
                     AppMsg::DeletePopoutAttachment { key, message, attachment }
@@ -25286,7 +25362,7 @@ pub enum GoTarget {
 /// for them: support.google.com/mail/answer/6594. j/k move a cursor without
 /// opening, o or Enter opens, and the action keys are Gmail's. The digits
 /// still toggle tags. `g` and `*` start a sequence (`gmail_sequence`).
-fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
+pub(crate) fn gmail_shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
     use gtk::gdk::Key;
     let action = match key {
         Key::j => Shortcut::MoveCursor(1),
@@ -25351,7 +25427,7 @@ fn gmail_sequence(first: char, key: gtk::gdk::Key) -> Option<Shortcut> {
 /// Keys the reader keeps while it has focus, because they scroll it or move
 /// through its links. Letters and the rest go to the shortcuts, so a click
 /// in a message no longer turns them off (#392).
-fn reader_keeps(key: gtk::gdk::Key) -> bool {
+pub(crate) fn reader_keeps(key: gtk::gdk::Key) -> bool {
     use gtk::gdk::Key;
     matches!(
         key,
@@ -25361,7 +25437,7 @@ fn reader_keeps(key: gtk::gdk::Key) -> bool {
 }
 
 /// The shortcut for a key press, if any. `shift` distinguishes `r` from `R`.
-fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
+pub(crate) fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
     use gtk::gdk::Key;
     let action = match key {
         Key::j | Key::Down => Shortcut::NextMessage,
@@ -25574,14 +25650,14 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
 /// Whether a keystroke should be left to the widget that has focus. Typing in a
 /// search field, an address row or the composer must never archive mail, and the
 /// message view is a web view that handles its own keys (find, scrolling).
-fn focus_takes_keys(window: &adw::ApplicationWindow) -> bool {
+pub(crate) fn focus_takes_keys(window: &impl IsA<gtk::Window>) -> bool {
     focus_matches(window, true)
 }
 
 /// Whether focus is in something being typed into. Narrower than
 /// [`focus_takes_keys`]: Escape means "back out" while reading a message, but in
 /// a search field it means "clear the search", which is the field's business.
-fn focus_is_text(window: &adw::ApplicationWindow) -> bool {
+pub(crate) fn focus_is_text(window: &impl IsA<gtk::Window>) -> bool {
     focus_matches(window, false)
 }
 
@@ -25598,7 +25674,7 @@ fn focus_in_compose(window: &adw::ApplicationWindow) -> bool {
     false
 }
 
-fn focus_matches(window: &adw::ApplicationWindow, include_web_view: bool) -> bool {
+fn focus_matches(window: &impl IsA<gtk::Window>, include_web_view: bool) -> bool {
     let Some(focus) = gtk::prelude::GtkWindowExt::focus(window) else {
         return false;
     };

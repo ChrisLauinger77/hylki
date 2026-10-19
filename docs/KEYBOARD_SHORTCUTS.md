@@ -100,6 +100,13 @@ none selected says that a selection is needed.
 its own. A <kbd>g</kbd> or <kbd>*</kbd> waits a second and a half for the key
 that follows.
 
+A message window takes the same keys for its own conversation:
+<kbd>n</kbd>, <kbd>p</kbd>, <kbd>;</kbd> and <kbd>:</kbd> move through it,
+and the action keys act on it as they do on an open conversation in the main
+window. <kbd>u</kbd> and <kbd>Esc</kbd> close the window, as archiving or
+marking it unread does. The list's keys, <kbd>g</kbd> and <kbd>*</kbd> do
+nothing there.
+
 With several messages selected, in the list or as cards of a conversation,
 archive, delete, spam, star, read and tag keys act on all of them. A
 conversation's row stands for every message of it the folder holds, so

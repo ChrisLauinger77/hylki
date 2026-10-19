@@ -173,6 +173,15 @@
   instead, and the selected one was left as it was. Each selected message is
   now looked up in its own folder.
 
+- **Fixed: single-key shortcuts did nothing in a message window** (#392,
+  reported by 3v1n0). A message opened in a window of its own answered only
+  Ctrl+P and Ctrl+F. It now takes the same keys as the main window, Gmail's
+  or Hylki's: `n` and `p` step through the conversation, `;` and `:` expand
+  and collapse it, and the reply, star, read, tag, move, archive, delete and
+  spam keys act on its message, or with Gmail's keys on the whole
+  conversation as in the main window. Esc and `u` close the window, as
+  archiving it does, and with Gmail's keys marking it unread.
+
 - **Fixed: the unified views were slow to open.** Every visit to Inboxes,
   Starred, Sent, Drafts, Archive, Junk or Trash copied and merged every
   account's folder, grouped all of it into conversations and described each
