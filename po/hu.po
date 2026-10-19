@@ -6213,8 +6213,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Műveletek"
 
-msgid "Filters and Tags style"
-msgstr ""
+#, fuzzy
+msgid "Section style"
+msgstr "Műveletek"
 
 msgid "Filters placement"
 msgstr "A szűrők elhelyezése"

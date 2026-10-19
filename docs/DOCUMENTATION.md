@@ -190,10 +190,9 @@ a confirmation that lists them.
 **Settings → Sidebar → Sections** places Filters, Tags, Favorites and
 Contacts **Above the accounts**, **Below the accounts** or **Off**, which
 leaves it out of the sidebar. Wherever they are, they are rows like the
-unified section's, with a chevron that opens their list. **Filters and Tags
-style** set to **Like the accounts** draws Filters and Tags as headings
-instead, like an account's Tags: a caret and a label that open and close
-the list.
+unified section's, with a chevron that opens their list. **Section style**
+set to **Like the accounts** draws all four as headings instead, like an
+account's Tags: a caret that opens and closes the list, and the name.
 
 ### Favorites
 

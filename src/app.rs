@@ -1095,7 +1095,7 @@ pub struct AppModel {
     /// Whether the collapsed "All Inboxes" row wears its total-unread chip.
     unified_chips: config::UnifiedChips,
     /// Where the Filters, Tags, Favorites and Contacts sections sit
-    /// (Settings → Sidebar), and how Filters and Tags are drawn.
+    /// (Settings → Sidebar), and how they are drawn.
     section_style: config::SectionStyle,
     filtered_placement: config::SectionPlacement,
     tags_placement: config::SectionPlacement,

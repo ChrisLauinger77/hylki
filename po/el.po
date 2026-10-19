@@ -6171,8 +6171,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Ενέργειες"
 
-msgid "Filters and Tags style"
-msgstr ""
+#, fuzzy
+msgid "Section style"
+msgstr "Ενέργειες"
 
 msgid "Filters placement"
 msgstr "Τοποθέτηση φίλτρων"

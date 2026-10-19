@@ -71,6 +71,10 @@ struct SectionWidgets {
 /// it, and their badges.
 struct KindWidgets {
     header: gtk::ListBox,
+    /// The heading drawn instead of `header` in the heading style
+    /// (Settings → Sidebar → Sections → Style), whose gap below follows
+    /// the list.
+    heading: Option<gtk::Widget>,
     revealer: gtk::Revealer,
     chevron: Option<gtk::Image>,
     badge: Option<gtk::Label>,
@@ -493,7 +497,7 @@ pub struct Sidebar {
     /// Whether the account sections are shown at all.
     show_accounts: bool,
     /// Where the Filters, Tags, Favorites and Contacts sections sit
-    /// (Settings → Sidebar), and whether Filters and Tags are drawn as
+    /// (Settings → Sidebar), and whether they are drawn as
     /// unified rows or as headings.
     section_style: crate::config::SectionStyle,
     filtered_placement: crate::config::SectionPlacement,
@@ -539,7 +543,7 @@ pub enum SidebarInput {
         /// The tags (#71), for the Tags section.
         tags: Vec<crate::config::Tag>,
         /// Where the Filters, Tags, Favorites and Contacts sections are
-        /// drawn, and how Filters and Tags look.
+        /// drawn, and how they look.
         section_style: crate::config::SectionStyle,
         filtered_placement: crate::config::SectionPlacement,
         tags_placement: crate::config::SectionPlacement,
@@ -3414,7 +3418,7 @@ impl Sidebar {
         let img = gtk::Image::from_icon_name(row_icon(row_kind));
         img.add_css_class("folder-icon");
         let mut chevron_img: Option<gtk::Image> = None;
-        let badge: gtk::Label;
+        let mut badge: gtk::Label;
         if self.collapsed {
             hbox.set_halign(gtk::Align::Center);
             let mut tip = if unread > 0 { format!("{title} ({unread})") } else { title.clone() };
@@ -3550,7 +3554,39 @@ impl Sidebar {
             });
             list.add_controller(click);
         }
-        parent.append(&list);
+        // In the heading style, a caret and the name in place of the row,
+        // as the Filters and Tags headings have: `list` stays out of the
+        // sidebar.
+        let mut heading: Option<gtk::Widget> = None;
+        if self.as_heading(row_kind) {
+            let chevron = gtk::Image::from_icon_name(chevron_icon(expanded));
+            if self.chevrons_left {
+                chevron.set_margin_start(2);
+            }
+            let hb = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            hb.add_css_class("folder-row");
+            let btn = heading_chevron(&chevron);
+            btn.set_tooltip_text(Some(toggle_tip.as_str()));
+            hb.append(&btn);
+            let lbl = gtk::Label::new(Some(&title));
+            lbl.add_css_class("account-name");
+            lbl.set_halign(gtk::Align::Start);
+            lbl.set_hexpand(true);
+            lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
+            hb.append(&lbl);
+            let b = gtk::Label::new(Some(&unread.to_string()));
+            style_badge(&b, 5);
+            b.set_visible(show_chip);
+            hb.append(&b);
+            let toggle = section_heading(&hb, Some(&btn), &["unified-folders-toggle"], toggle_msg(row_kind), sender);
+            toggle.set_margin_bottom(unified_folders_toggle_gap(expanded));
+            parent.append(&toggle);
+            chevron_img = Some(chevron);
+            badge = b;
+            heading = Some(toggle);
+        } else {
+            parent.append(&list);
+        }
 
         // A double click on the row opens or folds the list too, as the
         // chevron does; its first click selects the merged view as any
@@ -3589,6 +3625,10 @@ impl Sidebar {
         sub.set_selection_mode(gtk::SelectionMode::Single);
         sub.add_css_class("navigation-sidebar");
         sub.add_css_class("unified-item");
+        if heading.is_some() {
+            // The Filters heading's list keeps the same gap below.
+            sub.set_margin_bottom(10);
+        }
         let mut rows: Vec<InboxRef> = Vec::new();
         let mut row_badges: HashMap<(u32, u32), gtk::Label> = HashMap::new();
         match row_kind {
@@ -3908,6 +3948,7 @@ impl Sidebar {
 
         KindWidgets {
             header: list,
+            heading,
             revealer,
             chevron: chevron_img,
             badge: Some(badge),
@@ -4070,7 +4111,19 @@ impl Sidebar {
             if let Some(ch) = &w.chevron {
                 ch.set_icon_name(Some(chevron_icon(open)));
             }
+            if let Some(h) = &w.heading {
+                h.set_margin_bottom(unified_folders_toggle_gap(open));
+            }
         }
+    }
+
+    /// Whether `row` is drawn as a heading: Favorites and Contacts in the
+    /// heading style, out of the icon rail (Filters and Tags have builders
+    /// of their own).
+    fn as_heading(&self, row: UnifiedRow) -> bool {
+        self.section_style == crate::config::SectionStyle::Headings
+            && !self.collapsed
+            && matches!(row, UnifiedRow::Favorites | UnifiedRow::Contacts)
     }
 
     /// Build a run of unified rows into `parent`, the first row keeping the
@@ -4403,12 +4456,26 @@ impl Sidebar {
         sender: &ComponentSender<Self>,
     ) {
         if self.section_style == crate::config::SectionStyle::Headings {
+            // Each one a heading, in the unified rows' order; the rail
+            // keeps Favorites and Contacts as its icons.
+            let mut own = |this: &mut Self, row: UnifiedRow| {
+                if this.as_heading(row) {
+                    let built = this.build_unified_row(parent, row, sections, sender);
+                    this.kind_widgets.insert(row, built);
+                }
+            };
+            if self.favorites_shown() && self.favorites_placement == at {
+                own(self, UnifiedRow::Favorites);
+            }
             let filtered = !self.unified_folders.is_empty() && self.filtered_placement == at;
             if filtered {
                 self.build_filtered_heading(parent, sections, sender);
             }
             if self.unified_tags_shown() && self.tags_placement == at {
                 self.build_tags_section(parent, Slot::Unified, filtered, sender);
+            }
+            if self.contacts_shown() && self.contacts_placement == at {
+                own(self, UnifiedRow::Contacts);
             }
         }
         let rows = self.placed_rows(at);
@@ -4422,7 +4489,7 @@ impl Sidebar {
     fn placed_rows(&self, at: crate::config::SectionPlacement) -> Vec<UnifiedRow> {
         let rows_style = self.section_style == crate::config::SectionStyle::Unified;
         let mut rows = Vec::new();
-        if self.favorites_shown() && self.favorites_placement == at {
+        if self.favorites_shown() && self.favorites_placement == at && !self.as_heading(UnifiedRow::Favorites) {
             rows.push(UnifiedRow::Favorites);
         }
         if rows_style && !self.unified_folders.is_empty() && self.filtered_placement == at {
@@ -4431,7 +4498,7 @@ impl Sidebar {
         if rows_style && self.unified_tags_shown() && self.tags_placement == at {
             rows.push(UnifiedRow::Tags);
         }
-        if self.contacts_shown() && self.contacts_placement == at {
+        if self.contacts_shown() && self.contacts_placement == at && !self.as_heading(UnifiedRow::Contacts) {
             rows.push(UnifiedRow::Contacts);
         }
         rows

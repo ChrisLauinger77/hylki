@@ -6160,8 +6160,9 @@ msgstr ""
 msgid "Sections"
 msgstr "Azioni"
 
-msgid "Filters and Tags style"
-msgstr ""
+#, fuzzy
+msgid "Section style"
+msgstr "Azioni"
 
 msgid "Filters placement"
 msgstr "Posizione filtri"

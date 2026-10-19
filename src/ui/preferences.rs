@@ -2634,7 +2634,7 @@ impl Component for Preferences {
 
                                     #[name = "section_style_row"]
                                     adw::ComboRow {
-                                        set_title: &i18n("Filters and Tags style"),
+                                        set_title: &i18n("Section style"),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeSectionStyle(row.selected()));
                                         },

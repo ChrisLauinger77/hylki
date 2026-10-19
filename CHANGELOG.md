@@ -64,9 +64,9 @@
   section.** Settings → Sidebar → Sections places each above the accounts,
   below them, or Off, out of the sidebar; wherever they are, they are rows
   like the unified section's, with a chevron on the right, and their items
-  sit in from the row as the address books under Contacts do. Filters and
-  Tags style, Like the accounts, draws those two as headings, as they were
-  above or below the accounts before. A setting that
+  sit in from the row as the address books under Contacts do. Section
+  style, Like the accounts, draws all four as headings instead, as Filters
+  and Tags were above or below the accounts before. A setting that
   had one in the unified section now has it above the accounts, or Off
   where its switch was off. Their switches among the unified rows, the
   Contacts in the sidebar switch and the Filters unread-count switch are

@@ -5487,7 +5487,7 @@ msgstr ""
 msgid "Sections"
 msgstr ""
 
-msgid "Filters and Tags style"
+msgid "Section style"
 msgstr ""
 
 msgid "Filters placement"

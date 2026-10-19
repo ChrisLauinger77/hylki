@@ -1838,7 +1838,7 @@ pub(crate) struct PrivacyFile {
     /// section alone, for those who only ever work from it.
     #[serde(default = "default_on")]
     pub(crate) show_accounts: bool,
-    /// How Filters and Tags are drawn wherever they sit.
+    /// How Filters, Tags, Favorites and Contacts are drawn wherever they sit.
     #[serde(default)]
     pub(crate) section_style: SectionStyle,
     /// Where the Filters section sits (#71 follow-up): above or below the
@@ -2353,7 +2353,7 @@ pub enum SectionPlacement {
     Off,
 }
 
-/// How Filters and Tags are drawn (Settings → Sidebar → Sections).
+/// How Filters, Tags, Favorites and Contacts are drawn (Settings → Sidebar → Sections).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SectionStyle {
