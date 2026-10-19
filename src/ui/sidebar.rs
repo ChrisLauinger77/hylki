@@ -3544,10 +3544,25 @@ impl Sidebar {
         }
         parent.append(&list);
 
+        // A double click on the row opens or folds the list too, as the
+        // chevron does; its first click selects the merged view as any
+        // click does. Favorites and Smart Folders fold on one click
+        // already, which a second would undo.
+        if !matches!(row_kind, UnifiedRow::Favorites | UnifiedRow::Smart) {
+            let double = gtk::GestureClick::new();
+            double.set_button(gtk::gdk::BUTTON_PRIMARY);
+            let cs = sender.input_sender().clone();
+            double.connect_pressed(move |_, presses, _, _| {
+                if presses == 2 {
+                    let _ = cs.send(toggle_msg(row_kind));
+                }
+            });
+            list.add_controller(double);
+        }
+
         // In the rail, with no room for a chevron, a long press on the row
-        // opens or folds the list (a plain click still selects the merged
-        // view). The full sidebar leaves that to the chevron alone, so no
-        // click on the row itself ever folds it.
+        // opens or folds the list too (a plain click still selects the
+        // merged view).
         if self.collapsed {
             let press = gtk::GestureLongPress::new();
             press.set_touch_only(false);

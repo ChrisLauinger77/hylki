@@ -55,6 +55,12 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Added: a double click opens or closes a unified row.** Inboxes,
+  Starred, Sent, Drafts, Archive, Junk, Trash, Filters, Tags and Contacts
+  in the sidebar's unified section open or close their list on a double
+  click, as with their chevron; the first click still opens the combined
+  view.
+
 - **Changed: Contacts is a row of the sidebar's unified section.** It opens
   every contact, and its chevron lists every address book, its account under
   its name, an account of several books as one row with its books under it,

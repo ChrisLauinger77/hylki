@@ -164,14 +164,16 @@ apps and Gmail on the web each keep their own. **Reset Folder Order**, in
 the right-click menu of the account's header or its Folders heading, forgets
 what was dragged. The item is there only once something has been.
 
-Only the chevrons open and close the items in the sidebar. Clicking a
-folder opens it and leaves its sub-folders as they were. Clicking the name
-of the Folders, Filters or Tags heading does nothing; the chevron beside it
-opens or closes the section. Clicking Inboxes, Starred, Sent, Drafts,
-Archive, Junk, Trash, Filters or Tags in the unified section opens the
-combined list without showing each account's folder under it. In the icon
-rail, which has no chevrons, a click on a section's icon opens or closes it,
-and a long press opens or closes the unified rows.
+The chevrons open and close the items in the sidebar. Clicking a folder
+opens it and leaves its sub-folders as they were. Clicking the name of the
+Folders, Filters or Tags heading does nothing; the chevron beside it opens
+or closes the section. Clicking Inboxes, Starred, Sent, Drafts, Archive,
+Junk, Trash, Filters, Tags or Contacts in the unified section opens the
+combined list without showing each account's folder under it, and
+double-clicking it opens or closes that list as its chevron does. In the
+icon rail, which has no chevrons, a click on a section's icon opens or
+closes it, and a long press or a double click opens or closes the unified
+rows.
 
 **Settings → Sidebar → Unified** chooses the unified section's rows.
 Inboxes, Starred, Sent, Drafts and Archive are on until switched off; Junk
