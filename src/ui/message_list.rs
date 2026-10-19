@@ -4558,10 +4558,13 @@ impl MessageList {
             key,
             fp: self.view_fp,
             sig: self.rows_signature(),
-            all: std::mem::take(&mut self.all),
+            // Copies, not taken: the rows stay on screen until the next view's
+            // replace them, a frame on, and an empty `shown` meanwhile drew
+            // "No Messages" over them.
+            all: self.all.clone(),
             threads,
             rows: self.shared.model.rows(),
-            shown: std::mem::take(&mut self.shown),
+            shown: self.shown.clone(),
             tail: std::mem::take(&mut self.tail),
             groups: std::mem::take(&mut self.groups),
             msg_thread: std::mem::take(&mut self.msg_thread),
