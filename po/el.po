@@ -6100,14 +6100,6 @@ msgstr ""
 "Μια συντόμευση για περιήγηση στα συνημμένα όλων των λογαριασμών, "
 "καρφιτσωμένη στο κάτω μέρος της πλευρικής στήλης."
 
-msgid "Contacts in the sidebar"
-msgstr "Επαφές στην πλευρική στήλη"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Ανάπτυξη πλευρικής στήλης κατά την αιώρηση"
 
@@ -6218,6 +6210,15 @@ msgstr ""
 "λογαριασμών που τη φέρουν. Κάθε λογαριασμός διατηρεί τη δική του ενότητα "
 "Ετικέτες ούτως ή άλλως."
 
+msgid "Favorites"
+msgstr "Αγαπημένα"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Πλήθος μη αναγνωσμένων"
 
@@ -6232,14 +6233,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Τοποθέτηση φίλτρων"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Επιλέξτε αν θα εμφανίζονται σε ενοποιημένη ενότητα ή σε λίστα πάνω ή κάτω "
 "από τους λογαριασμούς."
 
 msgid "Tags placement"
+msgstr "Τοποθέτηση ετικετών"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Τοποθέτηση φίλτρων"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Τοποθέτηση ετικετών"
 
 msgid "Icon rail"
@@ -7653,9 +7663,6 @@ msgstr "Διαγραφή του κλειδιού σας;"
 msgid "Show or hide"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
 
-msgid "Favorites"
-msgstr "Αγαπημένα"
-
 msgid "Folder"
 msgstr "Φάκελος"
 
@@ -8429,6 +8436,9 @@ msgstr "Τα ενοποιημένα εισερχόμενα σε φωτεινή �
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Επαφές στην πλευρική στήλη"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

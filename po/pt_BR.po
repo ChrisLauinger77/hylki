@@ -6107,14 +6107,6 @@ msgstr ""
 "Um atalho para consultar os anexos de todas as contas, fixado na parte "
 "inferior da barra lateral."
 
-msgid "Contacts in the sidebar"
-msgstr "Contatos na barra lateral"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Expandir a barra lateral ao passar o ponteiro"
 
@@ -6223,6 +6215,15 @@ msgstr ""
 "As etiquetas, mostrando cada uma o email correspondente de todas as contas. "
 "Cada conta mantém sempre sua própria seção Etiquetas."
 
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Contagens de mensagens não lidas"
 
@@ -6237,14 +6238,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Posição dos filtros"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Escolha entre exibir em uma seção unificada ou em uma lista acima ou abaixo "
 "das contas."
 
 msgid "Tags placement"
+msgstr "Posição das etiquetas"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Posição dos filtros"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Posição das etiquetas"
 
 msgid "Icon rail"
@@ -7634,9 +7644,6 @@ msgstr "Excluir sua chave?"
 msgid "Show or hide"
 msgstr "Mostrar ou ocultar etiquetas"
 
-msgid "Favorites"
-msgstr "Favoritos"
-
 msgid "Folder"
 msgstr "Pasta"
 
@@ -8396,6 +8403,9 @@ msgstr "A caixa de entrada unificada no modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Contatos na barra lateral"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

@@ -6056,14 +6056,6 @@ msgstr ""
 "Un acceso directo para explorar los archivos adjuntos de todas las cuentas, "
 "fijado en la parte inferior de la barra lateral."
 
-msgid "Contacts in the sidebar"
-msgstr "Contactos en la barra lateral"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Expandir la barra lateral al pasar el cursor"
 
@@ -6171,6 +6163,15 @@ msgstr ""
 "Las etiquetas, cada una mostrando el correo de todas las cuentas que la "
 "utilizan. Cada cuenta mantiene igualmente su propia sección de Etiquetas."
 
+msgid "Favorites"
+msgstr "Favoritos"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Contadores de no leídos"
 
@@ -6185,14 +6186,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Posición de los filtros"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Elige entre mostrarlos en una sección unificada o en una lista encima o "
 "debajo de las cuentas."
 
 msgid "Tags placement"
+msgstr "Posición de las etiquetas"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Posición de los filtros"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Posición de las etiquetas"
 
 msgid "Icon rail"
@@ -7601,9 +7611,6 @@ msgstr "¿Eliminar tu clave?"
 msgid "Show or hide"
 msgstr "Mostrar u ocultar etiquetas"
 
-msgid "Favorites"
-msgstr "Favoritos"
-
 msgid "Folder"
 msgstr "Carpeta"
 
@@ -8360,6 +8367,9 @@ msgstr "La bandeja de entrada unificada en modo claro"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Contactos en la barra lateral"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

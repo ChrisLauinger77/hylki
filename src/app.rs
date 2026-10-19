@@ -1102,6 +1102,11 @@ pub struct AppModel {
     /// Where the Filtered Folders and Tags sections sit (Settings → Sidebar).
     filtered_placement: config::SectionPlacement,
     tags_placement: config::SectionPlacement,
+    /// And where Favorites and Contacts sit, and whether Favorites are
+    /// listed in the unified section.
+    favorites_placement: config::SectionPlacement,
+    contacts_placement: config::SectionPlacement,
+    unified_favorites: bool,
     /// The unified section's Starred / Sent / Drafts rows (Settings →
     /// Sidebar → Unified).
     unified_kinds: config::UnifiedKinds,
@@ -3678,6 +3683,9 @@ impl SimpleComponent for AppModel {
             unified_filtered: prefs.unified_filtered,
             filtered_placement: prefs.filtered_placement,
             tags_placement: prefs.tags_placement,
+            favorites_placement: prefs.favorites_placement,
+            contacts_placement: prefs.contacts_placement,
+            unified_favorites: prefs.unified_favorites,
             unified_kinds: prefs.unified_kinds,
             unified_tags: prefs.unified_tags,
             show_accounts,
@@ -8767,6 +8775,24 @@ impl SimpleComponent for AppModel {
                 }
             }
 
+            AppMsg::Pref(PrefOutput::SetFavoritesPlacement(p)) => {
+                if pref!(self.favorites_placement = p) {
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::Pref(PrefOutput::SetContactsPlacement(p)) => {
+                if pref!(self.contacts_placement = p) {
+                    self.rebuild_sidebar();
+                }
+            }
+
+            AppMsg::Pref(PrefOutput::SetUnifiedFavorites(show)) => {
+                if pref!(self.unified_favorites = show) {
+                    self.rebuild_sidebar();
+                }
+            }
+
             AppMsg::Pref(PrefOutput::SetStartView(view)) => {
                 pref!(self.start_view = view);
             }
@@ -13083,6 +13109,9 @@ impl AppModel {
             show_accounts: self.show_accounts,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
+            favorites_placement: self.favorites_placement,
+            contacts_placement: self.contacts_placement,
+            unified_favorites: self.unified_favorites,
             chevrons_left: self.chevrons_left,
             account_click_folds: self.account_click_folds,
             console_mode: self.console_mode,
@@ -15830,6 +15859,9 @@ impl AppModel {
             tags: self.tags.clone(),
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
+            favorites_placement: self.favorites_placement,
+            contacts_placement: self.contacts_placement,
+            unified_favorites: self.unified_favorites,
             smart_folders: self.smart_folders.iter().map(|f| (f.id.clone(), f.name.clone())).collect(),
         });
 
@@ -16541,7 +16573,7 @@ impl AppModel {
         let listed = match view {
             UnifiedView::Kind(FolderKind::Inbox) => self.unified_inboxes_shown(),
             UnifiedView::Kind(kind) => self.multi_account() && self.unified_kinds.has(kind),
-            UnifiedView::Filtered => self.unified_filtered,
+            UnifiedView::Filtered => self.filtered_shown(),
         };
         if listed {
             // A reconnect has emptied the account list; each account's
@@ -21753,6 +21785,9 @@ impl AppModel {
             show_accounts: self.show_accounts,
             filtered_placement: self.filtered_placement,
             tags_placement: self.tags_placement,
+            favorites_placement: self.favorites_placement,
+            contacts_placement: self.contacts_placement,
+            unified_favorites: self.unified_favorites,
             chevrons_left: self.chevrons_left,
             account_click_folds: self.account_click_folds,
             start_view: self.start_view,
@@ -24046,9 +24081,19 @@ impl AppModel {
             .collect()
     }
 
+    /// Whether the Filters section is in the sidebar: off when placed
+    /// nowhere, and in the unified section only with its switch on.
+    fn filtered_shown(&self) -> bool {
+        match self.filtered_placement {
+            config::SectionPlacement::Off => false,
+            config::SectionPlacement::AllInboxes => self.unified_filtered,
+            _ => true,
+        }
+    }
+
     fn unified_folder_refs(&self) -> Vec<UnifiedFolderRef> {
         let mut out: Vec<UnifiedFolderRef> = Vec::new();
-        if !self.unified_filtered {
+        if !self.filtered_shown() {
             return out;
         }
         for email in self.ordered_emails() {

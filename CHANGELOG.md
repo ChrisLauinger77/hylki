@@ -55,6 +55,14 @@
   address, a phone number, a street address, a birthday or a company, or
   those in no group.
 
+- **Added: placements for Favorites and Contacts, and Off for all four.**
+  Settings → Sidebar → Unified places Favorites and Contacts as it does
+  Filters and Tags: in the unified section, above the accounts or below
+  them, and each of the four can be Off, out of the sidebar. Favorites and
+  Contacts have switches among the unified rows, where Contacts' replaces
+  the Contacts in the sidebar switch; a section's switch counts, and can
+  be changed, only while it is placed in the unified section.
+
 - **Changed: an account opens and closes with its chevron.** A click on an
   account's header in the sidebar folded or opened it wherever it landed;
   now its chevron does, or a double click on the header, as with the

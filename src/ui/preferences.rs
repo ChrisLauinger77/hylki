@@ -150,6 +150,9 @@ pub struct PrefInit {
     pub show_accounts: bool,
     pub filtered_placement: crate::config::SectionPlacement,
     pub tags_placement: crate::config::SectionPlacement,
+    pub favorites_placement: crate::config::SectionPlacement,
+    pub contacts_placement: crate::config::SectionPlacement,
+    pub unified_favorites: bool,
     pub chevrons_left: bool,
     pub account_click_folds: bool,
     pub start_view: crate::config::StartView,
@@ -345,6 +348,10 @@ pub struct Preferences {
     /// Mirrors the notifications switch, so the "show sender and subject" row
     /// below it can grey out when nothing is being posted at all.
     notifications: bool,
+    /// Where Filters, Tags, Favorites and Contacts sit in the sidebar, so
+    /// their switches in the Unified group grey out when that is not the
+    /// unified section.
+    placements: [crate::config::SectionPlacement; 4],
     /// The notification buttons, kept whole so each switch can hand the
     /// app the full set (#244).
     notification_buttons: crate::config::NotificationButtons,
@@ -1122,6 +1129,8 @@ pub enum PrefInput {
     ChangeFolderSort(u32),
     ChangeFilteredPlacement(u32),
     ChangeTagsPlacement(u32),
+    ChangeFavoritesPlacement(u32),
+    ChangeContactsPlacement(u32),
     /// A reader toolbar chip was dropped: `key` names the button, `side`
     /// the zone (None = not shown), `index` its place in that zone.
     ToolbarDrop { key: String, side: Option<ToolbarSide>, index: usize },
@@ -1286,6 +1295,9 @@ pub enum PrefOutput {
     SetFolderSort(crate::config::FolderSort),
     SetFilteredPlacement(crate::config::SectionPlacement),
     SetTagsPlacement(crate::config::SectionPlacement),
+    SetFavoritesPlacement(crate::config::SectionPlacement),
+    SetContactsPlacement(crate::config::SectionPlacement),
+    SetUnifiedFavorites(bool),
     SetConsoleMode(bool),
     SetStatusBarTop(bool),
     SetReadMark(crate::config::ReadMark),
@@ -2466,16 +2478,6 @@ impl Component for Preferences {
                                         },
                                     },
 
-                                    #[name = "show_contacts_row"]
-                                    adw::SwitchRow {
-                                        set_title: &i18n("Contacts in the sidebar"),
-                                        set_subtitle: &i18n("A row under the merged mail rows that opens your \
-                                                       contacts, with your address books and groups beneath it."),
-                                        connect_active_notify[sender] => move |row| {
-                                            let _ = sender.output(PrefOutput::SetContactsRow(row.is_active()));
-                                        },
-                                    },
-
                                     #[name = "sidebar_hover_expand_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Expand the sidebar on hover"),
@@ -2595,6 +2597,8 @@ impl Component for Preferences {
 
                                     #[name = "unified_filtered_row"]
                                     adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.placements[0] == crate::config::SectionPlacement::AllInboxes,
                                         set_title: &i18n("Filters"),
                                         set_subtitle: &i18n("List every folder your filter rules file into in a \
                                                        collapsible section of the unified view."),
@@ -2605,11 +2609,35 @@ impl Component for Preferences {
 
                                     #[name = "unified_tags_row"]
                                     adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.placements[1] == crate::config::SectionPlacement::AllInboxes,
                                         set_title: &i18n("Tags"),
                                         set_subtitle: &i18n("The tags, each showing every account's mail with it. Each account keeps its own Tags \
                                                        section either way."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetUnifiedTags(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "unified_favorites_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.placements[2] == crate::config::SectionPlacement::AllInboxes,
+                                        set_title: &i18n("Favorites"),
+                                        set_subtitle: &i18n("The folders picked with Add to Favorites, from any account."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetUnifiedFavorites(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "show_contacts_row"]
+                                    adw::SwitchRow {
+                                        #[watch]
+                                        set_sensitive: model.placements[3] == crate::config::SectionPlacement::AllInboxes,
+                                        set_title: &i18n("Contacts"),
+                                        set_subtitle: &i18n("Opens your contacts, with your address books and groups beneath it."),
+                                        connect_active_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetContactsRow(row.is_active()));
                                         },
                                     },
 
@@ -2675,8 +2703,8 @@ impl Component for Preferences {
                                     #[name = "filtered_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Filters placement"),
-                                        set_subtitle: &i18n("Choose between appearing in a unified section, \
-                                                       or a list above or below the accounts."),
+                                        set_subtitle: &i18n("In the unified section, in a list above or below \
+                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeFilteredPlacement(row.selected()));
                                         },
@@ -2685,10 +2713,30 @@ impl Component for Preferences {
                                     #[name = "tags_placement_row"]
                                     adw::ComboRow {
                                         set_title: &i18n("Tags placement"),
-                                        set_subtitle: &i18n("Choose between appearing in a unified section, \
-                                                       or a list above or below the accounts."),
+                                        set_subtitle: &i18n("In the unified section, in a list above or below \
+                                                       the accounts, or Off, out of the sidebar."),
                                         connect_selected_notify[sender] => move |row| {
                                             sender.input(PrefInput::ChangeTagsPlacement(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "favorites_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Favorites placement"),
+                                        set_subtitle: &i18n("In the unified section, in a list above or below \
+                                                       the accounts, or Off, out of the sidebar."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeFavoritesPlacement(row.selected()));
+                                        },
+                                    },
+
+                                    #[name = "contacts_placement_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Contacts placement"),
+                                        set_subtitle: &i18n("In the unified section, in a list above or below \
+                                                       the accounts, or Off, out of the sidebar."),
+                                        connect_selected_notify[sender] => move |row| {
+                                            sender.input(PrefInput::ChangeContactsPlacement(row.selected()));
                                         },
                                     },
                                 },
@@ -4052,6 +4100,7 @@ impl Component for Preferences {
             spell_langs: None,
             browsers: crate::ui::launch::browsers(),
             notifications: init.notifications,
+            placements: [init.filtered_placement, init.tags_placement, init.favorites_placement, init.contacts_placement],
             notification_buttons: init.notification_buttons,
             sound: crate::config::load_new_mail_sound(),
             custom_sound: crate::config::custom_sound(),
@@ -4145,6 +4194,10 @@ impl Component for Preferences {
             &widgets.language_row,
             &widgets.renderer_row,
             &widgets.chevron_side_row,
+            &widgets.filtered_placement_row,
+            &widgets.tags_placement_row,
+            &widgets.favorites_placement_row,
+            &widgets.contacts_placement_row,
             &widgets.start_view_row,
             &widgets.folder_sort_row,
         ] {
@@ -4228,14 +4281,18 @@ impl Component for Preferences {
         widgets.unified_junk_row.set_active(init.unified_kinds.junk);
         widgets.unified_trash_row.set_active(init.unified_kinds.trash);
         widgets.unified_tags_row.set_active(init.unified_tags);
+        widgets.unified_favorites_row.set_active(init.unified_favorites);
         for (row, placement) in [
             (&widgets.filtered_placement_row, init.filtered_placement),
             (&widgets.tags_placement_row, init.tags_placement),
+            (&widgets.favorites_placement_row, init.favorites_placement),
+            (&widgets.contacts_placement_row, init.contacts_placement),
         ] {
             row.set_model(Some(&gtk::StringList::new(&[
                 i18n("In the unified section").as_str(),
                 i18n("Above the accounts").as_str(),
                 i18n("Below the accounts").as_str(),
+                i18n("Off").as_str(),
             ])));
             row.set_selected(placement_index(placement));
         }
@@ -5411,10 +5468,20 @@ impl Component for Preferences {
                 self.show_accounts = on;
             }
             PrefInput::ChangeFilteredPlacement(idx) => {
-                let _ = sender.output(PrefOutput::SetFilteredPlacement(placement_from_index(idx)));
+                self.placements[0] = placement_from_index(idx);
+                let _ = sender.output(PrefOutput::SetFilteredPlacement(self.placements[0]));
             }
             PrefInput::ChangeTagsPlacement(idx) => {
-                let _ = sender.output(PrefOutput::SetTagsPlacement(placement_from_index(idx)));
+                self.placements[1] = placement_from_index(idx);
+                let _ = sender.output(PrefOutput::SetTagsPlacement(self.placements[1]));
+            }
+            PrefInput::ChangeFavoritesPlacement(idx) => {
+                self.placements[2] = placement_from_index(idx);
+                let _ = sender.output(PrefOutput::SetFavoritesPlacement(self.placements[2]));
+            }
+            PrefInput::ChangeContactsPlacement(idx) => {
+                self.placements[3] = placement_from_index(idx);
+                let _ = sender.output(PrefOutput::SetContactsPlacement(self.placements[3]));
             }
             PrefInput::ChangeStartView(idx) => {
                 use crate::config::StartView;
@@ -5804,6 +5871,7 @@ fn placement_index(p: crate::config::SectionPlacement) -> u32 {
         AllInboxes => 0,
         AboveAccounts => 1,
         BelowAccounts => 2,
+        Off => 3,
     }
 }
 
@@ -5812,6 +5880,7 @@ fn placement_from_index(idx: u32) -> crate::config::SectionPlacement {
     match idx {
         1 => AboveAccounts,
         2 => BelowAccounts,
+        3 => Off,
         _ => AllInboxes,
     }
 }

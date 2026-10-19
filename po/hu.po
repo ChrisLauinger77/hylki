@@ -6145,14 +6145,6 @@ msgstr ""
 "Az oldalsáv alján rögzített parancsikon, amellyel minden fiók mellékletei "
 "között böngészhet."
 
-msgid "Contacts in the sidebar"
-msgstr "Névjegyek az oldalsávban"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Oldalsáv kibontása rámutatáskor"
 
@@ -6260,6 +6252,15 @@ msgstr ""
 "A címkék, amelyek mindegyike az adott fiók összes e-mailjét tartalmazza. "
 "Minden fióknak mindkét esetben megvan a saját „Címkék” szakasza."
 
+msgid "Favorites"
+msgstr ""
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Olvasatlanok száma"
 
@@ -6274,14 +6275,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "A szűrők elhelyezése"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Választhat, hogy a bejegyzés egy egységes szakaszban jelenjen-e meg, vagy a "
 "fiókok felett vagy alatt található listában."
 
 msgid "Tags placement"
+msgstr "Címkék elhelyezése"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "A szűrők elhelyezése"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Címkék elhelyezése"
 
 msgid "Icon rail"
@@ -7690,9 +7700,6 @@ msgstr "Törli a kulcsát?"
 msgid "Show or hide"
 msgstr "Címkék megjelenítése vagy elrejtése"
 
-msgid "Favorites"
-msgstr ""
-
 msgid "Folder"
 msgstr "Mappa"
 
@@ -8462,6 +8469,9 @@ msgstr "Az egységes beérkező levelek mappa világos üzemmódban"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Névjegyek az oldalsávban"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

@@ -6138,14 +6138,6 @@ msgstr ""
 "Ярлык для просмотра вложений всех учётных записей, закреплённый внизу "
 "боковой панели."
 
-msgid "Contacts in the sidebar"
-msgstr "Контакты на боковой панели"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Раскрывать боковую панель при наведении"
 
@@ -6254,6 +6246,15 @@ msgstr ""
 "Теги, каждый из которых содержит письма всех учётных записей. В любом случае "
 "у каждого аккаунта остаётся собственный раздел «Теги»."
 
+msgid "Favorites"
+msgstr "Избранное"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Счётчики непрочитанного"
 
@@ -6268,14 +6269,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Расположение фильтров"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Выберите между отображением в объединённом разделе либо в виде списка выше "
 "или ниже учётных записей."
 
 msgid "Tags placement"
+msgstr "Расположение тегов"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Расположение фильтров"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Расположение тегов"
 
 msgid "Icon rail"
@@ -7663,9 +7673,6 @@ msgstr "Удалить ваш ключ?"
 msgid "Show or hide"
 msgstr "Показать или скрыть метки"
 
-msgid "Favorites"
-msgstr "Избранное"
-
 msgid "Folder"
 msgstr "Папка"
 
@@ -8425,6 +8432,9 @@ msgstr "Общие входящие в светлом режиме"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Контакты на боковой панели"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

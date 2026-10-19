@@ -5999,14 +5999,6 @@ msgstr ""
 "Eine Verknüpfung zum Durchsuchen der Anhänge jedes Kontos, die am unteren "
 "Rand der Seitenleiste angeheftet ist."
 
-msgid "Contacts in the sidebar"
-msgstr "Kontakte in der Seitenleiste"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Seitenleiste beim Darüberfahren ausklappen"
 
@@ -6111,6 +6103,15 @@ msgstr ""
 "Die Tags, die jeweils die E-Mails aller Konten mit diesem Tag anzeigen. "
 "Jedes Konto behält seinen eigenen Tags-Bereich unabhängig davon bei."
 
+msgid "Favorites"
+msgstr "Favoriten"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Zähler ungelesener Nachrichten"
 
@@ -6126,14 +6127,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Position der Filter"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Auswahl zwischen der Anzeige in einem gemeinsamen Bereich oder als Liste "
 "oberhalb oder unterhalb der Konten."
 
 msgid "Tags placement"
+msgstr "Position der Tags"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Position der Filter"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Position der Tags"
 
 msgid "Icon rail"
@@ -7542,9 +7552,6 @@ msgstr "{n} Nachrichten löschen"
 msgid "Show or hide"
 msgstr "Tags ein- oder ausblenden"
 
-msgid "Favorites"
-msgstr "Favoriten"
-
 msgid "Folder"
 msgstr "Ordner"
 
@@ -8299,6 +8306,9 @@ msgstr "Der gemeinsame Posteingang im hellen Modus."
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Kontakte in der Seitenleiste"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

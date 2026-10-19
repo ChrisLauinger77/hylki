@@ -95,6 +95,16 @@ enum UnifiedRow {
     Contacts,
 }
 
+/// Whether a section placed `at` is in the sidebar: never when off, in the
+/// unified section only with its switch there (`unified`) on.
+fn placed(at: crate::config::SectionPlacement, unified: bool) -> bool {
+    match at {
+        crate::config::SectionPlacement::Off => false,
+        crate::config::SectionPlacement::AllInboxes => unified,
+        _ => true,
+    }
+}
+
 /// What a unified row is called.
 fn row_title(row: UnifiedRow) -> String {
     match row {
@@ -496,9 +506,14 @@ pub struct Sidebar {
     unified_tags: bool,
     /// Whether the account sections are shown at all.
     show_accounts: bool,
-    /// Where the two sections sit (Settings → Sidebar).
+    /// Where the Filters, Tags, Favorites and Contacts sections sit
+    /// (Settings → Sidebar), and whether Favorites are listed while placed
+    /// in the unified section.
     filtered_placement: crate::config::SectionPlacement,
     tags_placement: crate::config::SectionPlacement,
+    favorites_placement: crate::config::SectionPlacement,
+    contacts_placement: crate::config::SectionPlacement,
+    unified_favorites: bool,
     /// Focus Mode: the account sections are hidden.
     focus_hide_accounts: bool,
     /// Focus Mode: the unified rows show folded, whatever their saved
@@ -542,6 +557,9 @@ pub enum SidebarInput {
         /// Where the Filtered Folders and Tags sections are drawn.
         filtered_placement: crate::config::SectionPlacement,
         tags_placement: crate::config::SectionPlacement,
+        favorites_placement: crate::config::SectionPlacement,
+        contacts_placement: crate::config::SectionPlacement,
+        unified_favorites: bool,
         /// The smart folders (#417) as (id, name).
         smart_folders: Vec<(String, String)>,
     },
@@ -981,6 +999,9 @@ impl Component for Sidebar {
             show_accounts: true,
             filtered_placement: crate::config::SectionPlacement::default(),
             tags_placement: crate::config::SectionPlacement::default(),
+            favorites_placement: crate::config::SectionPlacement::default(),
+            contacts_placement: crate::config::SectionPlacement::default(),
+            unified_favorites: true,
             focus_hide_accounts: false,
             focus_fold_unified: false,
             accounts_revealer: None,
@@ -1078,6 +1099,9 @@ impl Sidebar {
                 tags,
                 filtered_placement,
                 tags_placement,
+                favorites_placement,
+                contacts_placement,
+                unified_favorites,
                 smart_folders,
             } => {
                 // Order each account's folders essential-first, then custom, so
@@ -1113,6 +1137,9 @@ impl Sidebar {
                 self.tags = tags;
                 self.filtered_placement = filtered_placement;
                 self.tags_placement = tags_placement;
+                self.favorites_placement = favorites_placement;
+                self.contacts_placement = contacts_placement;
+                self.unified_favorites = unified_favorites;
                 self.smart_folders = smart_folders;
                 // The open smart folder was deleted: fall back to the
                 // default view.
@@ -2455,7 +2482,7 @@ impl Sidebar {
         let unified_shown = !unified_rows.is_empty();
         // Favorites (#367) head the section under All Inboxes, and stand
         // alone with a single account, where the rest is not shown.
-        if !self.favorite_folders.is_empty() {
+        if self.favorites_shown() && self.favorites_placement == AllInboxes {
             unified_rows.insert(usize::from(self.show_unified), UnifiedRow::Favorites);
         }
         if unified_shown && !self.unified_folders.is_empty() && self.filtered_placement == AllInboxes {
@@ -2470,7 +2497,7 @@ impl Sidebar {
             unified_rows.push(UnifiedRow::Smart);
         }
         // Contacts last, its address books and groups beneath it.
-        if self.show_contacts {
+        if self.contacts_shown() && self.contacts_placement == AllInboxes {
             unified_rows.push(UnifiedRow::Contacts);
         }
         let unified_sections: Vec<SectionData> =
@@ -2603,6 +2630,11 @@ impl Sidebar {
         }
         if tags_above {
             self.build_tags_section(container, Slot::Unified, filtered_above, sender);
+        }
+        // Favorites and Contacts placed here keep the unified rows' shape.
+        let rows_above = self.placed_rows(AboveAccounts);
+        if !rows_above.is_empty() {
+            self.build_unified_run(container, &rows_above, &[], sender);
         }
 
         // The account sections — unless Settings (or the main menu) has
@@ -3278,6 +3310,10 @@ impl Sidebar {
         }
         if self.unified_tags_shown() && self.tags_placement == BelowAccounts {
             self.build_tags_section(container, Slot::Unified, filtered_below, sender);
+        }
+        let rows_below = self.placed_rows(BelowAccounts);
+        if !rows_below.is_empty() {
+            self.build_unified_run(container, &rows_below, &[], sender);
         }
 
         // Per-account avatar colors (background + readable text), and the
@@ -4449,7 +4485,30 @@ impl Sidebar {
 
     /// Whether the unified Tags section has anything to show.
     fn unified_tags_shown(&self) -> bool {
-        self.unified_tags && !self.tags.is_empty()
+        !self.tags.is_empty() && placed(self.tags_placement, self.unified_tags)
+    }
+
+    /// The Favorites and Contacts rows placed `at`, above or below the
+    /// accounts.
+    fn placed_rows(&self, at: crate::config::SectionPlacement) -> Vec<UnifiedRow> {
+        let mut rows = Vec::new();
+        if self.favorites_shown() && self.favorites_placement == at {
+            rows.push(UnifiedRow::Favorites);
+        }
+        if self.contacts_shown() && self.contacts_placement == at {
+            rows.push(UnifiedRow::Contacts);
+        }
+        rows
+    }
+
+    /// Whether Favorites are in the sidebar at all.
+    fn favorites_shown(&self) -> bool {
+        !self.favorite_folders.is_empty() && placed(self.favorites_placement, self.unified_favorites)
+    }
+
+    /// Whether Contacts is in the sidebar at all.
+    fn contacts_shown(&self) -> bool {
+        placed(self.contacts_placement, self.show_contacts)
     }
 
     /// Whether a Filtered Folders section is open: the unified one keeps its

@@ -6027,14 +6027,6 @@ msgstr ""
 "Una drecera per navegar pels adjunts de cada compte, fixada a la part "
 "inferior de la barra lateral."
 
-msgid "Contacts in the sidebar"
-msgstr "Contactes a la barra lateral"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Expandeix la barra lateral en passar-hi per sobre"
 
@@ -6141,6 +6133,15 @@ msgstr ""
 "Les etiquetes, cadascuna mostrant el correu de cada compte que la porta. "
 "Cada compte manté la seva pròpia secció d'etiquetes de totes maneres."
 
+msgid "Favorites"
+msgstr "Preferits"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Recomptes de no llegits"
 
@@ -6155,14 +6156,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Col·locació dels filtres"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Tria entre aparèixer en una secció unificada, o en una llista per sobre o "
 "per sota dels comptes."
 
 msgid "Tags placement"
+msgstr "Col·locació de les etiquetes"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Col·locació dels filtres"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Col·locació de les etiquetes"
 
 msgid "Icon rail"
@@ -7555,9 +7565,6 @@ msgstr "Vols suprimir la teva clau?"
 msgid "Show or hide"
 msgstr "Mostra o amaga les etiquetes"
 
-msgid "Favorites"
-msgstr "Preferits"
-
 msgid "Folder"
 msgstr "Carpeta"
 
@@ -8309,6 +8316,9 @@ msgstr "La bústia d'entrada unificada en mode clar"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Contactes a la barra lateral"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

@@ -187,6 +187,12 @@ or **Empty Trash…**. The same item on the unified Junk or Trash row itself
 empties that folder in every account in the unified section at once, after
 a confirmation that lists them.
 
+Filters, Tags, Favorites and Contacts each have a placement in the same
+group: **In the unified section**, **Above the accounts**, **Below the
+accounts** or **Off**, which leaves it out of the sidebar. Each also has a
+switch among the unified rows, which counts only while it is placed in the
+unified section: placed anywhere else, it is greyed out.
+
 ### Favorites
 
 Right-click any folder in the sidebar and choose **Add to Favorites** to list

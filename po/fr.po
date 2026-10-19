@@ -6109,14 +6109,6 @@ msgstr ""
 "Un raccourci pour parcourir les pièces jointes de chaque compte, épinglé en "
 "bas de la barre latérale."
 
-msgid "Contacts in the sidebar"
-msgstr "Contacts dans la barre latérale"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Déplier la barre latérale au survol"
 
@@ -6225,6 +6217,15 @@ msgstr ""
 "Les tags, chacun affichant le courrier de tous les comptes qui le porte. "
 "Chaque compte conserve dans tous les cas sa propre section Tags."
 
+msgid "Favorites"
+msgstr "Favoris"
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Compteurs de non-lus"
 
@@ -6239,14 +6240,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Emplacement des filtres"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Choisissez entre apparaître dans une section unifiée, ou une liste au-dessus "
 "ou en dessous des comptes."
 
 msgid "Tags placement"
+msgstr "Emplacement des tags"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Emplacement des filtres"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Emplacement des tags"
 
 msgid "Icon rail"
@@ -7663,9 +7673,6 @@ msgstr "Supprimer votre clé ?"
 msgid "Show or hide"
 msgstr "Afficher ou masquer les tags"
 
-msgid "Favorites"
-msgstr "Favoris"
-
 msgid "Folder"
 msgstr "Dossier"
 
@@ -8425,6 +8432,9 @@ msgstr "La boîte de réception unifiée en mode clair"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Contacts dans la barre latérale"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

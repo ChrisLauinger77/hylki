@@ -6204,14 +6204,6 @@ msgstr ""
 "Skrót do przeglądania załączników ze wszystkich kont, przypięty na dole "
 "panelu bocznego."
 
-msgid "Contacts in the sidebar"
-msgstr "Kontakty w panelu bocznym"
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr "Rozwijanie panelu bocznego po najechaniu kursorem"
 
@@ -6320,6 +6312,15 @@ msgstr ""
 "Etykiety, z których każda wyświetla pocztę ze wszystkich kont. Każde konto i "
 "tak zachowuje własną sekcję „Etykiety”."
 
+msgid "Favorites"
+msgstr ""
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr "Liczniki nieprzeczytanych"
 
@@ -6334,14 +6335,23 @@ msgstr ""
 msgid "Filters placement"
 msgstr "Położenie filtrów"
 
+#, fuzzy
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 "Wybór między wyświetlaniem w sekcji widoków zbiorczych a listą powyżej lub "
 "poniżej kont."
 
 msgid "Tags placement"
+msgstr "Położenie etykiet"
+
+#, fuzzy
+msgid "Favorites placement"
+msgstr "Położenie filtrów"
+
+#, fuzzy
+msgid "Contacts placement"
 msgstr "Położenie etykiet"
 
 msgid "Icon rail"
@@ -7735,9 +7745,6 @@ msgstr "Czy usunąć własny klucz?"
 msgid "Show or hide"
 msgstr "Wyświetl lub ukryj etykiety"
 
-msgid "Favorites"
-msgstr ""
-
 msgid "Folder"
 msgstr "Katalog"
 
@@ -8500,6 +8507,9 @@ msgstr "Zbiorcza skrzynka odbiorcza w jasnym motywie"
 
 msgid "Hyprlab"
 msgstr "Hyprlab"
+
+#~ msgid "Contacts in the sidebar"
+#~ msgstr "Kontakty w panelu bocznym"
 
 #~ msgid ""
 #~ "A shortcut that opens your contacts, pinned at the bottom of the sidebar."

@@ -1854,9 +1854,18 @@ pub(crate) struct PrivacyFile {
     /// Inboxes, or in the scrolling sidebar above or below the accounts.
     #[serde(default)]
     pub(crate) filtered_placement: SectionPlacement,
-    /// Where the Tags section sits, the same three choices.
+    /// Where the Tags section sits, the same choices.
     #[serde(default)]
     pub(crate) tags_placement: SectionPlacement,
+    /// Where Favorites sit, the same choices.
+    #[serde(default)]
+    pub(crate) favorites_placement: SectionPlacement,
+    /// Where Contacts sits, the same choices.
+    #[serde(default)]
+    pub(crate) contacts_placement: SectionPlacement,
+    /// Whether Favorites are listed while placed in the unified section.
+    #[serde(default = "default_on")]
+    pub(crate) unified_favorites: bool,
     /// Whether the sidebar's disclosure chevrons (All Inboxes, account
     /// headers) LEAD their rows; off puts them back at the row's end.
     #[serde(default = "default_chevrons_left")]
@@ -1984,6 +1993,9 @@ impl Default for PrivacyFile {
             show_accounts: true,
             filtered_placement: SectionPlacement::default(),
             tags_placement: SectionPlacement::default(),
+            favorites_placement: SectionPlacement::default(),
+            contacts_placement: SectionPlacement::default(),
+            unified_favorites: true,
             chevrons_left: default_chevrons_left(),
             account_click_folds: false,
             console_mode: false,
@@ -2310,7 +2322,7 @@ impl UnifiedKinds {
 
 
 
-/// Where a sidebar section (Filtered Folders, Tags) is drawn.
+/// Where a sidebar section (Filters, Tags, Favorites, Contacts) is drawn.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SectionPlacement {
@@ -2322,6 +2334,8 @@ pub enum SectionPlacement {
     AboveAccounts,
     /// In the scrolling sidebar, after the last account.
     BelowAccounts,
+    /// Not in the sidebar at all.
+    Off,
 }
 
 /// What the main window shows at launch (#256).

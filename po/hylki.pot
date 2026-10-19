@@ -5433,14 +5433,6 @@ msgid ""
 "the sidebar."
 msgstr ""
 
-msgid "Contacts in the sidebar"
-msgstr ""
-
-msgid ""
-"A row under the merged mail rows that opens your contacts, with your address "
-"books and groups beneath it."
-msgstr ""
-
 msgid "Expand the sidebar on hover"
 msgstr ""
 
@@ -5518,6 +5510,15 @@ msgid ""
 "own Tags section either way."
 msgstr ""
 
+msgid "Favorites"
+msgstr ""
+
+msgid "The folders picked with Add to Favorites, from any account."
+msgstr ""
+
+msgid "Opens your contacts, with your address books and groups beneath it."
+msgstr ""
+
 msgid "Unread counts"
 msgstr ""
 
@@ -5530,11 +5531,17 @@ msgid "Filters placement"
 msgstr ""
 
 msgid ""
-"Choose between appearing in a unified section, or a list above or below the "
-"accounts."
+"In the unified section, in a list above or below the accounts, or Off, out "
+"of the sidebar."
 msgstr ""
 
 msgid "Tags placement"
+msgstr ""
+
+msgid "Favorites placement"
+msgstr ""
+
+msgid "Contacts placement"
 msgstr ""
 
 msgid "Icon rail"
@@ -6704,9 +6711,6 @@ msgid "Delete Group…"
 msgstr ""
 
 msgid "Show or hide"
-msgstr ""
-
-msgid "Favorites"
 msgstr ""
 
 msgid "Folder"
