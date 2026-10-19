@@ -5332,7 +5332,7 @@ impl MessageList {
             if shift && matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete) {
                 let _ = s.send(MessageListInput::Bulk(BulkAction::DeleteForever));
                 gtk::glib::Propagation::Stop
-            } else if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::BackSpace) {
+            } else if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete | gtk::gdk::Key::BackSpace) {
                 // ResolveDelete, not a straight Bulk: a lone thread-head row
                 // stands for its whole conversation (confirmed by the app).
                 let _ = s.send(MessageListInput::ResolveDelete);

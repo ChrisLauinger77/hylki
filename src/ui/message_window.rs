@@ -501,8 +501,9 @@ impl Component for MessageWindow {
                 if keyval == Key::Escape {
                     return key(Shortcut::BackToList);
                 }
-                if shift && matches!(keyval, Key::Delete | Key::KP_Delete) {
-                    return key(Shortcut::DeleteForever);
+                // Delete and Shift+Delete too, as in the list (#486).
+                if matches!(keyval, Key::Delete | Key::KP_Delete) {
+                    return key(if shift { Shortcut::DeleteForever } else { Shortcut::Delete });
                 }
                 if !single_key.get() || matches!(keyval, Key::Shift_L | Key::Shift_R) {
                     return gtk::glib::Propagation::Proceed;

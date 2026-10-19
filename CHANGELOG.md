@@ -182,6 +182,12 @@
   conversation as in the main window. Esc and `u` close the window, as
   archiving it does, and with Gmail's keys marking it unread.
 
+- **Fixed: Delete did nothing in the reader** (#486, requested by
+  XRayAdams). The key deleted mail only with the message list focused, so
+  after a click in a message, or in a message opened in a window of its
+  own, it was ignored. It now deletes the message being read there too, as
+  the toolbar's Delete does, with or without single-key shortcuts.
+
 - **Fixed: the unified views were slow to open.** Every visit to Inboxes,
   Starred, Sent, Drafts, Archive, Junk or Trash copied and merged every
   account's folder, grouped all of it into conversations and described each

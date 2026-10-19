@@ -4803,15 +4803,15 @@ impl SimpleComponent for AppModel {
                     s.input(AppMsg::Shortcut(Shortcut::BackToList));
                     return gtk::glib::Propagation::Stop;
                 }
-                // Shift+Delete erases the selection, Thunderbird's key (#471),
-                // also without single-key shortcuts. The list catches it first
-                // when it has focus; this is the reader and the rest.
-                if shift
-                    && matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete)
+                // Delete moves the selection to Trash and Shift+Delete erases
+                // it, Thunderbird's key (#471), also without single-key
+                // shortcuts. The list catches both first when it has focus;
+                // this is the reader and the rest (#486).
+                if matches!(keyval, gtk::gdk::Key::Delete | gtk::gdk::Key::KP_Delete)
                     && !focus_is_text(&window)
                     && !focus_in_compose(&window)
                 {
-                    s.input(shortcut(Shortcut::DeleteForever));
+                    s.input(shortcut(if shift { Shortcut::DeleteForever } else { Shortcut::Delete }));
                     return gtk::glib::Propagation::Stop;
                 }
                 if !enabled.get() || focus_is_text(&window) || focus_in_compose(&window) {
@@ -13290,6 +13290,11 @@ impl AppModel {
 
     /// Carry out a single-key shortcut.
     fn run_shortcut(&mut self, action: Shortcut, sender: &ComponentSender<Self>) {
+        // Contacts covers the list and the reader: a key there must not
+        // act on mail out of sight, Delete outside its list above all.
+        if self.showing_contacts && action.acts_on_selection() {
+            return;
+        }
         // Checking rows with none checked: say why the key did nothing
         // (#392).
         if self.checked == Some(0) && action.acts_on_selection() {
