@@ -127,6 +127,9 @@ shows. Want to join them? See [CONTRIBUTING.md](CONTRIBUTING.md).
 - [**Samuel Edlmeier**](https://github.com/samuel-edlmeier) ([#480](https://github.com/hyprlab/hylki/pull/480)):
   the German translation brought up to date, in the impersonal style GNOME
   uses.
+- [**Konstantin Adamov**](https://github.com/XRayAdams) ([#487](https://github.com/hyprlab/hylki/issues/487)):
+  a message body shown before its remote images have loaded, instead of
+  staying blank until the window was resized.
 
 
 ## Reports, design and ideas

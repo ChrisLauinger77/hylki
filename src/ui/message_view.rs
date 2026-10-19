@@ -7140,6 +7140,12 @@ fn ground_rgba(hex: &str) -> gtk::gdk::RGBA {
 // body's scroll sizes in the body's own unzoomed pixels, not the frame's, so
 // at 90% the body always looked wider than its frame: each pass of the widen
 // loop grew the frame by 1/zoom and centred mail drifted right (#473).
+//
+// A frame is shown once its document is parsed, not at its `load` event:
+// that waits for every remote image and stylesheet in the mail, and a slow
+// or silent image host left the card blank for up to a minute (#487).
+// Listeners on a script-less sandboxed document never fire, so it is
+// polled; `init` runs once and the later `load` only measures again.
 const SIZE_SCRIPT: &str = "\
 function zf(d){try{return parseFloat(d.defaultView.getComputedStyle(d.documentElement).zoom)||1;}catch(_){return 1;}}\
 function s(f){if(f._s)return;f._s=1;try{var d=f.contentDocument;if(!d||d.URL==='about:blank')return;\
@@ -7270,7 +7276,7 @@ function foldCard(sec){if(!sec)return;var on=!sec.classList.contains('hylki-fold
 sec.classList.toggle('hylki-folded',on);\
 try{window.webkit.messageHandlers.hylki.postMessage('fold:'+sec.dataset.key+':'+(on?1:0));}catch(_){}\
 if(!on){var f=sec.querySelector('iframe.hylki-frame');if(f){f._h=0;s(f);setTimeout(function(){s(f);},80);}}}\
-function init(f){quote(f);s(f);try{var d=f.contentDocument;if(d){if(window.ResizeObserver&&d.body){new ResizeObserver(function(){s(f);}).observe(d.body);}\
+function init(f){if(f._i){s(f);return;}f._i=1;quote(f);s(f);try{var d=f.contentDocument;if(d){if(window.ResizeObserver&&d.body){new ResizeObserver(function(){s(f);}).observe(d.body);}\
 if(f.dataset.key&&!f._c){f._c=1;d.addEventListener('click',function(e){\
 if(e.target&&e.target.closest&&e.target.closest('a'))return;pick(f.dataset.key,e);});}\
 if(!f._u){f._u=1;['wheel','touchstart','mousedown','keydown'].forEach(function(ev){\
@@ -7301,7 +7307,10 @@ if(!pend)ready();\
 for(var i=0;i<fs.length;i++){(function(f){var counted=false;\
 function tick(){if(counted)return;counted=true;if(--pend<=0)ready();}\
 if(f.contentDocument&&f.contentDocument.readyState==='complete'&&f.contentDocument.URL!=='about:blank'){init(f);tick();}\
-f.addEventListener('load',function(){init(f);tick();});})(fs[i]);}\
+f.addEventListener('load',function(){init(f);tick();});\
+var polls=0,poll=setInterval(function(){if(f._i||++polls>1200){clearInterval(poll);return;}\
+var fd=null;try{fd=f.contentDocument;}catch(_){}\
+if(fd&&fd.URL!=='about:blank'&&fd.body&&fd.readyState!=='loading'){clearInterval(poll);init(f);tick();}},30);})(fs[i]);}\
 setTimeout(ready,450);\
 var hs=document.querySelectorAll('.hylki-msg-hdr');\
 for(var j=0;j<hs.length;j++){hs[j].addEventListener('dblclick',function(){\

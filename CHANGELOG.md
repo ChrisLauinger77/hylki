@@ -150,6 +150,12 @@
   French punctuation and Outlook quotes often have. It now steps over the
   whole character.
 
+- **Fixed: a message body stayed blank until the window was resized** (#487,
+  reported and fixed by XRayAdams). With remote images allowed, a body was
+  shown only once all of them had loaded, so an image server that was slow
+  or did not answer left the card empty for up to a minute. A body is now
+  shown as soon as its text is in, and the images fill in as they arrive.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a
