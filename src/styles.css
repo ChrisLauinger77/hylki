@@ -587,10 +587,21 @@ flowbox.attach-flow > flowboxchild {
 
 /* Faint rule above the pinned Contacts/Attachments footer, just enough to
    set the utility rows apart from the account list scrolling above. */
+/* The rule over the sidebar's foot. Nothing below it: the list's own 6px
+   is the gap to the Attachments pill, as it is at the pill's sides and
+   under it. */
 .footer-separator {
   min-height: 1px;
-  margin: 4px 12px;
+  margin: 4px 12px 0 12px;
   opacity: 0.5;
+}
+/* The Attachments pill as tall as the unified rows' above (46px, their
+   chevron's 32 and the row's padding); in the icon rail, as the rail's. */
+.sidebar-footer > row {
+  min-height: 46px;
+}
+.rail-collapsed .sidebar-footer > row {
+  min-height: 0;
 }
 
 /* Collapsible "Folders" (custom folders) section header. */

@@ -2483,6 +2483,7 @@ impl Sidebar {
             let list = gtk::ListBox::new();
             list.set_selection_mode(gtk::SelectionMode::Single);
             list.add_css_class("navigation-sidebar");
+            list.add_css_class("sidebar-footer");
 
             // "Attachments" row — a gallery of every inbox attachment. The
             // very last row in the sidebar, below Contacts.
