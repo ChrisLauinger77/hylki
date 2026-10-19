@@ -7652,6 +7652,9 @@ msgstr "Ainda não existem contas"
 msgid "New Message from Template…"
 msgstr "Nova mensagem a partir de um modelo…"
 
+msgid "Show or hide folders"
+msgstr "Mostrar ou ocultar pastas"
+
 msgid "Mark Inbox as Read"
 msgstr "Marcar a Caixa de entrada como lida"
 
@@ -7676,9 +7679,6 @@ msgstr "Mostrar ou ocultar subpastas"
 #, fuzzy
 msgid "Show or hide labels"
 msgstr "Mostrar ou ocultar etiquetas"
-
-msgid "Show or hide folders"
-msgstr "Mostrar ou ocultar pastas"
 
 #, fuzzy
 msgid "Labels ({len})"

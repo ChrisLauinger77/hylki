@@ -2717,6 +2717,20 @@ impl Sidebar {
                 "pan-down-symbolic"
             });
             chevron.set_valign(gtk::Align::Center);
+            // A button of its own, as the unified rows' chevrons are: it
+            // takes its click before the header does.
+            let chev_btn = gtk::Button::new();
+            chev_btn.set_child(Some(&chevron));
+            chev_btn.add_css_class("flat");
+            chev_btn.add_css_class("chevron-btn");
+            chev_btn.set_valign(gtk::Align::Center);
+            chev_btn.set_tooltip_text(Some(i18n("Show or hide folders").as_str()));
+            {
+                let s = sender.input_sender().clone();
+                chev_btn.connect_clicked(move |_| {
+                    let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
+                });
+            }
 
             if self.collapsed {
                 hbox.append(&circle_overlay);
@@ -2742,15 +2756,16 @@ impl Sidebar {
                 vbox.append(&email);
                 hbox.append(&vbox);
                 if self.chevrons_left {
-                    chevron.add_css_class("row-disclosure-chevron");
                     chevron.set_pixel_size(15);
-                    chevron.set_halign(gtk::Align::Start);
+                    chev_btn.add_css_class("row-disclosure-chevron");
+                    chev_btn.set_halign(gtk::Align::Start);
                     let overlay = gtk::Overlay::new();
                     overlay.set_child(Some(&hbox));
-                    overlay.add_overlay(&chevron);
+                    overlay.add_overlay(&chev_btn);
                     header.set_child(Some(&overlay));
                 } else {
-                    hbox.append(&chevron);
+                    chev_btn.add_css_class("account-chevron-end");
+                    hbox.append(&chev_btn);
                 }
             }
 
@@ -2765,26 +2780,18 @@ impl Sidebar {
                     let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
                 });
             } else {
-                // As the unified rows: the chevron (with a little room
-                // around it) opens or folds the account, and so does a
-                // double click anywhere on the header; a plain click
-                // elsewhere does nothing. Seen before the button's own
-                // click, which no longer folds anything.
+                // As the unified rows: the chevron's own button opens or
+                // folds the account, and so does a double click anywhere
+                // else on the header; a plain click there does nothing.
                 let press = gtk::GestureClick::new();
                 press.set_button(gtk::gdk::BUTTON_PRIMARY);
                 press.set_propagation_phase(gtk::PropagationPhase::Capture);
                 let s = sender.input_sender().clone();
-                let (head, chev) = (header.downgrade(), chevron.downgrade());
+                let (head, chev) = (header.downgrade(), chev_btn.downgrade());
                 press.connect_pressed(move |_, presses, x, y| {
                     let (Some(head), Some(chev)) = (head.upgrade(), chev.upgrade()) else { return };
-                    let on_chevron = chev.compute_bounds(&head).is_some_and(|b| {
-                        let slack = 10.0;
-                        (b.x() - slack..=b.x() + b.width() + slack).contains(&(x as f32))
-                            && (b.y() - slack..=b.y() + b.height() + slack).contains(&(y as f32))
-                    });
-                    // The chevron folds at its first click; the header at
-                    // its second, wherever the second lands.
-                    if (on_chevron && presses == 1) || (!on_chevron && presses == 2) {
+                    let on_chevron = head.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| w == chev || w.is_ancestor(&chev));
+                    if presses == 2 && !on_chevron {
                         let _ = s.send(SidebarInput::ToggleCollapseLocal(id));
                     }
                 });

@@ -6724,6 +6724,9 @@ msgstr ""
 msgid "New Message from Template…"
 msgstr ""
 
+msgid "Show or hide folders"
+msgstr ""
+
 msgid "Mark Inbox as Read"
 msgstr ""
 
@@ -6746,9 +6749,6 @@ msgid "Show or hide sub-folders"
 msgstr ""
 
 msgid "Show or hide labels"
-msgstr ""
-
-msgid "Show or hide folders"
 msgstr ""
 
 msgid "Labels ({len})"

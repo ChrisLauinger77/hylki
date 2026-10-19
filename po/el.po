@@ -7671,6 +7671,9 @@ msgstr "Δεν υπάρχουν ακόμη λογαριασμοί"
 msgid "New Message from Template…"
 msgstr "Νέο μήνυμα από πρότυπο…"
 
+msgid "Show or hide folders"
+msgstr "Εμφάνιση ή απόκρυψη φακέλων"
+
 msgid "Mark Inbox as Read"
 msgstr "Σήμανση Εισερχομένων ως αναγνωσμένων"
 
@@ -7694,9 +7697,6 @@ msgstr "Εμφάνιση ή απόκρυψη υποφακέλων"
 
 msgid "Show or hide labels"
 msgstr "Εμφάνιση ή απόκρυψη ετικετών"
-
-msgid "Show or hide folders"
-msgstr "Εμφάνιση ή απόκρυψη φακέλων"
 
 msgid "Labels ({len})"
 msgstr "Ετικέτες ({len})"

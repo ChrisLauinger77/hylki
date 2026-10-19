@@ -7708,6 +7708,9 @@ msgstr "Még nincsenek fiókok"
 msgid "New Message from Template…"
 msgstr ""
 
+msgid "Show or hide folders"
+msgstr "Mappák megjelenítése vagy elrejtése"
+
 msgid "Mark Inbox as Read"
 msgstr "Beérkezett megjelölése olvasottként"
 
@@ -7732,9 +7735,6 @@ msgstr "Almappák megjelenítése vagy elrejtése"
 #, fuzzy
 msgid "Show or hide labels"
 msgstr "Címkék megjelenítése vagy elrejtése"
-
-msgid "Show or hide folders"
-msgstr "Mappák megjelenítése vagy elrejtése"
 
 #, fuzzy
 msgid "Labels ({len})"

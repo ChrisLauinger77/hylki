@@ -7619,6 +7619,9 @@ msgstr "Todavía no hay cuentas"
 msgid "New Message from Template…"
 msgstr "Mensaje nuevo a partir de una plantilla…"
 
+msgid "Show or hide folders"
+msgstr "Mostrar u ocultar carpetas"
+
 msgid "Mark Inbox as Read"
 msgstr "Marcar Bandeja de entrada como leída"
 
@@ -7642,9 +7645,6 @@ msgstr "Mostrar u ocultar subcarpetas"
 
 msgid "Show or hide labels"
 msgstr "Mostrar u ocultar etiquetas"
-
-msgid "Show or hide folders"
-msgstr "Mostrar u ocultar carpetas"
 
 msgid "Labels ({len})"
 msgstr "Etiquetas ({len})"

@@ -7573,6 +7573,9 @@ msgstr "Encara no hi ha comptes"
 msgid "New Message from Template…"
 msgstr "Missatge nou a partir d'una plantilla…"
 
+msgid "Show or hide folders"
+msgstr "Mostra o amaga les carpetes"
+
 msgid "Mark Inbox as Read"
 msgstr "Marca la bústia d'entrada com a llegida"
 
@@ -7596,9 +7599,6 @@ msgstr "Mostra o amaga les subcarpetes"
 
 msgid "Show or hide labels"
 msgstr "Mostra o amaga les etiquetes del servidor"
-
-msgid "Show or hide folders"
-msgstr "Mostra o amaga les carpetes"
 
 msgid "Labels ({len})"
 msgstr "Etiquetes del servidor ({len})"

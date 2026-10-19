@@ -7681,6 +7681,9 @@ msgstr "Aucun compte pour le moment"
 msgid "New Message from Template…"
 msgstr "Nouveau message à partir d'un modèle…"
 
+msgid "Show or hide folders"
+msgstr "Afficher ou masquer les dossiers"
+
 msgid "Mark Inbox as Read"
 msgstr "Marquer la boîte de réception comme lue"
 
@@ -7704,9 +7707,6 @@ msgstr "Afficher ou masquer les sous-dossiers"
 
 msgid "Show or hide labels"
 msgstr "Afficher ou masquer les tags"
-
-msgid "Show or hide folders"
-msgstr "Afficher ou masquer les dossiers"
 
 msgid "Labels ({len})"
 msgstr "Tags ({len})"

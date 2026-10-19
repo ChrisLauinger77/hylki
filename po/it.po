@@ -7640,6 +7640,9 @@ msgstr "Nessun account ancora"
 msgid "New Message from Template…"
 msgstr "Nuovo messaggio da modello…"
 
+msgid "Show or hide folders"
+msgstr "Mostra o nascondi le cartelle"
+
 msgid "Mark Inbox as Read"
 msgstr "Segna la posta in arrivo come letta"
 
@@ -7663,9 +7666,6 @@ msgstr "Mostra o nascondi le sottocartelle"
 
 msgid "Show or hide labels"
 msgstr "Mostra o nascondi le etichette"
-
-msgid "Show or hide folders"
-msgstr "Mostra o nascondi le cartelle"
 
 msgid "Labels ({len})"
 msgstr "Etichette ({len})"

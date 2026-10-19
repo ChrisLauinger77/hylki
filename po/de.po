@@ -7560,6 +7560,9 @@ msgstr "Noch keine Konten"
 msgid "New Message from Template…"
 msgstr "Aus Vorlage erstellen…"
 
+msgid "Show or hide folders"
+msgstr "Ordner anzeigen oder ausblenden"
+
 msgid "Mark Inbox as Read"
 msgstr "Posteingang als gelesen markieren"
 
@@ -7583,9 +7586,6 @@ msgstr "Unterordner ein- oder ausblenden"
 
 msgid "Show or hide labels"
 msgstr "Beschriftungen anzeigen oder ausblenden"
-
-msgid "Show or hide folders"
-msgstr "Ordner anzeigen oder ausblenden"
 
 msgid "Labels ({len})"
 msgstr "Beschriftungen ({len})"

@@ -7753,6 +7753,9 @@ msgstr "Brak kont"
 msgid "New Message from Template…"
 msgstr ""
 
+msgid "Show or hide folders"
+msgstr "Wyświetl lub ukryj katalogi"
+
 msgid "Mark Inbox as Read"
 msgstr "Oznacz skrzynkę odbiorczą jako przeczytaną"
 
@@ -7777,9 +7780,6 @@ msgstr "Wyświetl lub ukryj podkatalogi"
 #, fuzzy
 msgid "Show or hide labels"
 msgstr "Wyświetl lub ukryj etykiety"
-
-msgid "Show or hide folders"
-msgstr "Wyświetl lub ukryj katalogi"
 
 #, fuzzy
 msgid "Labels ({len})"

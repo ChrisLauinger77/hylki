@@ -242,6 +242,19 @@ headerbar.rail-header {
   margin-right: -4px;
 }
 
+/* An account's chevron at the row's end: the unified rows' 32px target,
+   its end margin sliding into the header's padding, so the two columns of
+   chevrons line up. */
+.account-header .chevron-btn.account-chevron-end {
+  min-width: 32px;
+  min-height: 32px;
+  margin-right: -8px;
+}
+.account-header .chevron-btn.account-chevron-end:dir(rtl) {
+  margin-right: 0;
+  margin-left: -8px;
+}
+
 /* Left placement: match the account headers' height below it (avatar + two-
    line name/email push those taller than this row's single line of text
    would be on its own) — content stays vertically centred. */
