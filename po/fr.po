@@ -4105,10 +4105,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "Dans les annuaires"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Ouvrir les contacts"
 
@@ -4382,6 +4378,10 @@ msgstr "Supprimer le tag"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Choisir une photo"
+
+#, fuzzy
+msgid "Directories"
+msgstr "Dans les annuaires"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."

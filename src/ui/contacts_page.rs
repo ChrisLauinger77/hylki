@@ -32,6 +32,8 @@ pub enum ContactScope {
     All,
     Book(String),
     Group { book: String, uid: String },
+    /// Every book of one account, by its [`TreeBook::key`].
+    Account(String),
 }
 
 /// The address books and their groups, as the sidebar lists them while
@@ -47,9 +49,13 @@ pub struct ContactTree {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeBook {
     pub uid: String,
-    /// The account the book is in ("CardDAV — a@b.org"); empty for a book
-    /// that is an account of its own (the Hylki book).
+    /// The account the book is in, for the line under its name ("CardDAV —
+    /// a@b.org", or the service of a book that is its account alone);
+    /// empty for the Hylki book.
     pub account: String,
+    /// What the books of one account share: the books with one key are
+    /// listed under their account.
+    pub key: String,
     pub name: String,
     pub count: usize,
     /// Hylki can write to it, so contacts can be copied or moved in.
@@ -1591,6 +1597,7 @@ impl ContactsPage {
         match &self.scope {
             ContactScope::All => !c.is_group(),
             ContactScope::Book(book) => !c.is_group() && c.book_uid == *book,
+            ContactScope::Account(key) => !c.is_group() && self.book_key(&c.book_uid) == *key,
             // The group itself, first, then its people.
             ContactScope::Group { book, uid } => match self.scope_group() {
                 Some(g) if c.is_group() => c.book_uid == *book && c.eds_uid == *uid && std::ptr::eq(g, c),
@@ -1598,6 +1605,16 @@ impl ContactsPage {
                 None => false,
             },
         }
+    }
+
+    /// The key the books of `uid`'s account share ([`TreeBook::key`]).
+    fn book_key(&self, uid: &str) -> String {
+        let directory = self.directories.iter().any(|(d, _)| d == uid);
+        self.filter_books
+            .iter()
+            .find(|(u, _)| u == uid)
+            .map(|(_, name)| split_book_name(name, directory).0)
+            .unwrap_or_default()
     }
 
     /// The group the list shows, in group scope.
@@ -1610,7 +1627,7 @@ impl ContactsPage {
     /// when it can take it, else the default (first).
     fn scope_book(&self, books: &[crate::contacts::Book]) -> usize {
         let shown = match &self.scope {
-            ContactScope::All => None,
+            ContactScope::All | ContactScope::Account(_) => None,
             ContactScope::Book(book) | ContactScope::Group { book, .. } => Some(book),
         };
         shown.and_then(|b| books.iter().position(|x| x.uid == *b)).unwrap_or(0)
@@ -1694,19 +1711,7 @@ impl ContactsPage {
             .iter()
             .map(|(uid, name)| {
                 let directory = directories.contains(uid);
-                let (account, own) = if directory {
-                    (i18n("Directories"), name.trim_start_matches("LDAP — ").to_string())
-                } else {
-                    // "Account · book", or a book that is its account
-                    // alone: "CardDAV — a@b.org", the address its name.
-                    match name.split_once(" · ") {
-                        Some((account, own)) => (account.to_string(), own.to_string()),
-                        None => match name.split_once(" — ") {
-                            Some((kind, account)) => (kind.to_string(), account.to_string()),
-                            None => (String::new(), name.clone()),
-                        },
-                    }
-                };
+                let (key, account, own) = split_book_name(name, directory);
                 let book = self.books.iter().find(|b| b.uid == *uid);
                 let mut groups: Vec<TreeGroup> = self
                     .contacts
@@ -1724,6 +1729,7 @@ impl ContactsPage {
                 TreeBook {
                     uid: uid.clone(),
                     account,
+                    key,
                     name: own,
                     count: counts.get(uid.as_str()).copied().unwrap_or(0),
                     writable: book.is_some(),
@@ -1969,6 +1975,7 @@ impl ContactsPage {
         let gone = match &self.scope {
             ContactScope::All => false,
             ContactScope::Book(b) | ContactScope::Group { book: b, .. } => !self.filter_books.iter().any(|(u, _)| u == b),
+            ContactScope::Account(key) => !self.filter_books.iter().any(|(u, _)| self.book_key(u) == *key),
         };
         if gone {
             self.scope = ContactScope::All;
@@ -2046,6 +2053,7 @@ impl ContactsPage {
         // contacts. A book picked keeps those of the directory it is.
         let in_filter = |uid: &str| match &self.scope {
             ContactScope::Book(b) => b == uid,
+            ContactScope::Account(key) => self.book_key(uid) == *key,
             _ => true,
         };
         let mut listed = std::collections::HashSet::new();
@@ -4217,6 +4225,25 @@ pub fn dragged_contacts(payload: &str) -> Option<Vec<(String, String)>> {
             .map(|(book, uid)| (book.to_string(), uid.to_string()))
             .collect()
     })
+}
+
+/// A book's name in its parts: the key its account's books share, the
+/// account for the line under the name, and the book's own name. "Account
+/// · book" is both; a book that is its account alone ("CardDAV — a@b.org")
+/// is named by its address with its service under it, and an account of
+/// its own; a directory is one of the directories.
+fn split_book_name(name: &str, directory: bool) -> (String, String, String) {
+    if directory {
+        let directories = i18n("Directories");
+        return (directories.clone(), directories, name.trim_start_matches("LDAP — ").to_string());
+    }
+    match name.split_once(" · ") {
+        Some((account, own)) => (account.to_string(), account.to_string(), own.to_string()),
+        None => match name.split_once(" — ") {
+            Some((kind, account)) => (name.to_string(), kind.to_string(), account.to_string()),
+            None => (name.to_string(), String::new(), name.to_string()),
+        },
+    }
 }
 
 /// Whether member `m` of group `g` is the contact `p`: the card the group

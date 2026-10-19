@@ -4048,10 +4048,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "In Verzeichnissen"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Kontakte öffnen"
 
@@ -4321,6 +4317,10 @@ msgstr "Tag entfernen"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Bild auswählen"
+
+#, fuzzy
+msgid "Directories"
+msgstr "In Verzeichnissen"
 
 msgid "Use an app-specific password, not your usual one."
 msgstr ""

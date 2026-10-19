@@ -4129,10 +4129,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "LDAP Mappák"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Névjegyek megnyitása"
 
@@ -4400,6 +4396,10 @@ msgstr "Címke eltávolítása"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Kép választása"
+
+#, fuzzy
+msgid "Directories"
+msgstr "LDAP Mappák"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."

@@ -4124,10 +4124,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "Каталоги LDAP"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Открыть «Контакты»"
 
@@ -4400,6 +4396,10 @@ msgstr "Удалить тег"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Выбрать картинку"
+
+#, fuzzy
+msgid "Directories"
+msgstr "Каталоги LDAP"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."

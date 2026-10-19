@@ -3645,9 +3645,6 @@ msgstr ""
 msgid "Use Its Own Name"
 msgstr ""
 
-msgid "Directories"
-msgstr ""
-
 msgid "Move Contact?"
 msgstr ""
 
@@ -3892,6 +3889,9 @@ msgid "Remove Photo"
 msgstr ""
 
 msgid "Choose a Photo"
+msgstr ""
+
+msgid "Directories"
 msgstr ""
 
 msgid "Use an app-specific password, not your usual one."

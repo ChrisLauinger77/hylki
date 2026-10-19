@@ -4033,10 +4033,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "Als directoris"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Obre els contactes"
 
@@ -4310,6 +4306,10 @@ msgstr "Treu l'etiqueta"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Tria una imatge"
+
+#, fuzzy
+msgid "Directories"
+msgstr "Als directoris"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."

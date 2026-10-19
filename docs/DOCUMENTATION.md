@@ -523,11 +523,15 @@ filter is on, and **Clear Filters** shows everything again.
 
 **Contacts** is a row of the sidebar's unified section, under the merged
 mail rows, and opens every contact. Its chevron opens the list beneath:
-every address book, the Hylki book first, each with the account or
-server it is kept by in small type under its name and how many contacts
-it holds, and each book's groups under the book. A book with groups folds
-and opens with the caret beside it, as a folder with sub-folders does;
-the list and the books stay open or folded as they were left. Picking a book opens Contacts on its contacts alone; picking a
+the Hylki book first, then each account. An account with one address
+book is that book's row, with the account or server it is kept by in
+small type under its name; an account with several is a row of its own,
+with how many contacts they hold together, and its books under it.
+Every book shows how many contacts it holds, and its groups are under
+it. An account or a book with groups folds and opens with the caret
+beside it, as a folder with sub-folders does; the list, the accounts and
+the books stay open or folded as they were left. Picking an account lists
+the contacts of all its books. Picking a book opens Contacts on its contacts alone; picking a
 group lists the group and then its people, with **Remove from Group** in
 their right-click menu. An LDAP directory, under **Directories**, is
 searched by typing. A book's right-click menu has **New Contact** and

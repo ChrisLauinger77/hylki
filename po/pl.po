@@ -4177,10 +4177,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "Dodaj filtr"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Otwórz kontakty"
 
@@ -4452,6 +4448,10 @@ msgstr "Usuń etykietę"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Wybierz obraz"
+
+#, fuzzy
+msgid "Directories"
+msgstr "Dodaj filtr"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."

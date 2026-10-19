@@ -5,7 +5,7 @@
 
 use adw::prelude::*;
 
-use crate::i18n::i18n;
+use crate::i18n::{i18n, ni18n_f};
 use crate::ui::context_menu::{show_context_menu, MenuEntry};
 use crate::ui::contacts_page::{dragged_contacts, ContactScope, ContactTree, DropOn, TreeAction, TreeBook};
 use crate::ui::sidebar::SidebarInput;
@@ -19,8 +19,8 @@ pub struct Filled {
     pub chevrons: Vec<(String, gtk::Image)>,
 }
 
-/// A row that hides while the book above it is folded, sliding as folder
-/// rows do.
+/// A row that hides while the account or book above it is folded, sliding
+/// as folder rows do.
 pub struct TreeRow {
     pub row: gtk::ListBoxRow,
     pub revealer: gtk::Revealer,
@@ -33,12 +33,13 @@ fn book_key(uid: &str) -> String {
     format!("book:{uid}")
 }
 
-/// Fill `list`, the Contacts row's list in the sidebar, with `tree`: each
-/// address book, named with its account under the name, the books that are
-/// no account's first, and each book's groups under it, a book with groups
-/// folding as a folder with sub-folders does (`folded` holds the keys of
-/// those folded). In the icon rail (`collapsed`) the books show as icons
-/// alone, with no groups.
+/// Fill `list`, the Contacts row's list in the sidebar, with `tree`: the
+/// Hylki book first, then each account: one of one book as that book's
+/// row, its account under its name; one of several as a row of its own
+/// with its books under it. Each book's groups are under the book, and an
+/// account or book folds as a folder with sub-folders does (`folded` holds
+/// the keys of those folded). In the icon rail (`collapsed`) the books
+/// show as icons alone, with no accounts or groups.
 pub fn fill(
     list: &gtk::ListBox,
     tree: &ContactTree,
@@ -49,22 +50,98 @@ pub fn fill(
 ) -> Filled {
     let mut out = Filled { rows: Vec::new(), layout: Vec::new(), chevrons: Vec::new() };
     // The Hylki book heads the list, then the books of no account; the
-    // accounts keep their order.
+    // accounts keep their order, and the books of one account go together.
     let mut books: Vec<&TreeBook> = tree.books.iter().collect();
     books.sort_by_key(|b| (b.uid != crate::local_contacts::LOCAL_BOOK_UID, !b.account.is_empty()));
+    let mut accounts: Vec<(&str, Vec<&TreeBook>)> = Vec::new();
     for book in books {
-        let mut under = Vec::new();
+        match accounts.iter_mut().find(|(key, _)| !key.is_empty() && *key == book.key) {
+            Some((_, books)) => books.push(book),
+            None => accounts.push((book.key.as_str(), vec![book])),
+        }
+    }
+    let ctx = Ctx { list, collapsed, inset, folded, input };
+    for (key, books) in accounts {
+        // An account of one book is that book's row, the account under its
+        // name; one of several is a row of its own, its books folding
+        // under it.
+        if books.len() < 2 || collapsed {
+            for book in books {
+                ctx.book(&mut out, book, 0, true, Vec::new());
+            }
+            continue;
+        }
+        let fold = account_key(key);
+        let account = &books[0].account;
+        // "Microsoft 365 — a@b.org": the address, the service under it.
+        let (name, place) = match account.split_once(" — ") {
+            Some((kind, address)) => (address.to_string(), kind.to_string()),
+            None => (
+                account.clone(),
+                ni18n_f("{n} address book", "{n} address books", books.len() as u32, &[("n", &books.len().to_string())]),
+            ),
+        };
+        let total = books.iter().filter(|b| !b.directory).map(|b| b.count).sum::<usize>();
+        let directories = books.iter().all(|b| b.directory);
+        let (button, chevron) = expander(&fold, folded, input);
+        out.chevrons.push((fold.clone(), chevron));
+        let icon = if directories { "network-server-symbolic" } else { "x-office-address-book-symbolic" };
+        let r = row(
+            &name,
+            &place,
+            account,
+            icon,
+            (!directories).then_some(total),
+            Some(button.upcast()),
+            0,
+            false,
+            inset,
+        );
+        list.append(&r);
+        out.layout.push(slider(&r, Vec::new(), folded));
+        out.rows.push((ContactScope::Account(key.to_string()), r));
+        for book in books {
+            ctx.book(&mut out, book, 1, false, vec![fold.clone()]);
+        }
+    }
+    // Built at full height in one pass, then sliding for the clicks after.
+    let revealers: Vec<gtk::Revealer> = out.layout.iter().map(|t| t.revealer.clone()).collect();
+    gtk::glib::idle_add_local_once(move || {
+        for r in revealers {
+            r.set_transition_duration(200);
+        }
+    });
+    out
+}
+
+/// What every row of one fill shares.
+struct Ctx<'a> {
+    list: &'a gtk::ListBox,
+    collapsed: bool,
+    inset: bool,
+    folded: &'a std::collections::HashSet<String>,
+    input: &'a relm4::Sender<SidebarInput>,
+}
+
+impl Ctx<'_> {
+    /// A book's row, at `depth`, with its account under its name when
+    /// `place` (not under its account's own row), and its groups under it;
+    /// hidden while a node it is `under` is folded.
+    fn book(&self, out: &mut Filled, book: &TreeBook, depth: i32, place: bool, mut under: Vec<String>) {
+        let (list, collapsed, inset, folded, input) = (self.list, self.collapsed, self.inset, self.folded, self.input);
         let icon = if book.directory { "network-server-symbolic" } else { "x-office-address-book-symbolic" };
         // Where the book is kept, under its name: a book called "card" or
         // "Contacts" says little on its own.
-        let place = if !book.account.is_empty() {
+        let place = if !place {
+            String::new()
+        } else if !book.account.is_empty() {
             book.account.clone()
         } else if book.uid == crate::local_contacts::LOCAL_BOOK_UID {
             i18n("Hylki, on this computer")
         } else {
             String::new()
         };
-        let tip = if place.is_empty() { book.name.clone() } else { format!("{} · {place}", book.name) };
+        let tip = if book.account.is_empty() { book.name.clone() } else { format!("{} · {}", book.name, book.account) };
         let count = (!book.directory).then_some(book.count);
         let key = book_key(&book.uid);
         let expander = (!collapsed && !book.groups.is_empty()).then(|| expander(&key, folded, input));
@@ -72,7 +149,7 @@ pub fn fill(
             out.chevrons.push((key.clone(), chevron.clone()));
         }
         let lead = expander.map(|(button, _)| button.upcast::<gtk::Widget>());
-        let r = row(&book.name, &place, &tip, icon, count, lead, 0, collapsed, inset);
+        let r = row(&book.name, &place, &tip, icon, count, lead, depth, collapsed, inset);
         if book.writable && !book.directory {
             drop_target(&r, DropOn::Book(book.uid.clone()), input);
         }
@@ -106,11 +183,11 @@ pub fn fill(
         out.layout.push(slider(&r, under.clone(), folded));
         out.rows.push((ContactScope::Book(book.uid.clone()), r));
         if collapsed {
-            continue;
+            return;
         }
         under.push(key);
         for g in &book.groups {
-            let r = row(&g.name, "", &g.name, "system-users-symbolic", Some(g.count), None, 1, false, inset);
+            let r = row(&g.name, "", &g.name, "system-users-symbolic", Some(g.count), None, depth + 1, false, inset);
             if g.editable {
                 drop_target(&r, DropOn::Group { book: g.book.clone(), uid: g.uid.clone() }, input);
             }
@@ -145,14 +222,11 @@ pub fn fill(
             out.rows.push((ContactScope::Group { book: g.book.clone(), uid: g.uid.clone() }, r));
         }
     }
-    // Built at full height in one pass, then sliding for the clicks after.
-    let revealers: Vec<gtk::Revealer> = out.layout.iter().map(|t| t.revealer.clone()).collect();
-    gtk::glib::idle_add_local_once(move || {
-        for r in revealers {
-            r.set_transition_duration(200);
-        }
-    });
-    out
+}
+
+/// The key that folds an account's books.
+fn account_key(key: &str) -> String {
+    format!("account:{key}")
 }
 
 /// Put `row`'s content in a revealer, shown unless a node it is `under` is

@@ -4093,10 +4093,6 @@ msgid "Use Its Own Name"
 msgstr ""
 
 #, fuzzy
-msgid "Directories"
-msgstr "Στους καταλόγους"
-
-#, fuzzy
 msgid "Move Contact?"
 msgstr "Άνοιγμα Επαφών"
 
@@ -4370,6 +4366,10 @@ msgstr "Αφαίρεση ετικέτας"
 #, fuzzy
 msgid "Choose a Photo"
 msgstr "Επιλογή εικόνας"
+
+#, fuzzy
+msgid "Directories"
+msgstr "Στους καταλόγους"
 
 #, fuzzy
 msgid "Use an app-specific password, not your usual one."
