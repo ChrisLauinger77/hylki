@@ -143,6 +143,13 @@
   messages are now dropped, in message windows, composers, the Accounts
   window and the welcome assistant alike.
 
+- **Fixed: a no-break space before an address crashed the Markdown
+  composer** (#479, reported and traced by benoitfontaine). Looking for
+  the start of an address, the link finder stepped one byte past the
+  space before it, which is two bytes when it is a no-break space, as
+  French punctuation and Outlook quotes often have. It now steps over the
+  whole character.
+
 - **Added: replied and forwarded arrows in the message list** (#454,
   requested by rhuhxx). A message that was replied to shows a reply arrow
   beside the sender, one that was forwarded a forward arrow; a
