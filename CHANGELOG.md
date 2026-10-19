@@ -59,14 +59,14 @@
   every contact, and its chevron lists every address book, its account under
   its name, an account of several books as one row with its books under it,
   and each book's groups under the book, each folding with a caret as a
-  folder does, remembered; picking one lists its contacts, or a group's
-  people. Contacts dragged onto a book are copied there, or moved with Ctrl
-  held after a question, and dragged onto a group join it. A book's menu
-  makes a contact or a group in it and renames it, in Hylki only, wherever
-  Hylki names it (Settings → Contacts renames books and accounts too), and a
-  group's writes to it, edits or deletes it. The Contacts row left the
-  sidebar's foot, and this replaces the address book menu beside the search
-  and the Contacts | Groups switch.
+  folder does, remembered; picking one lists its groups and then its
+  contacts, or a group's people. Contacts dragged onto a book are copied
+  there, or moved with Ctrl held after a question, and dragged onto a group
+  join it. A book's menu makes a contact or a group in it and renames it, in
+  Hylki only, wherever Hylki names it (Settings → Contacts renames books and
+  accounts too), and a group's writes to it, edits or deletes it. The
+  Contacts row left the sidebar's foot, and this replaces the address book
+  menu beside the search and the Contacts | Groups switch.
 
 - **Changed: Contacts manages every contact, not only those with an email
   address.** The contact form edits postal addresses, the birthday and the

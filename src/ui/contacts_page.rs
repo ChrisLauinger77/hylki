@@ -1596,8 +1596,10 @@ impl ContactsPage {
     fn in_scope(&self, c: &ContactDetails) -> bool {
         match &self.scope {
             ContactScope::All => !c.is_group(),
-            ContactScope::Book(book) => !c.is_group() && c.book_uid == *book,
-            ContactScope::Account(key) => !c.is_group() && self.book_key(&c.book_uid) == *key,
+            // A book lists its groups as well as its people, the groups
+            // first; so does an account of several books.
+            ContactScope::Book(book) => c.book_uid == *book,
+            ContactScope::Account(key) => self.book_key(&c.book_uid) == *key,
             // The group itself, first, then its people.
             ContactScope::Group { book, uid } => match self.scope_group() {
                 Some(g) if c.is_group() => c.book_uid == *book && c.eds_uid == *uid && std::ptr::eq(g, c),
@@ -2020,9 +2022,10 @@ impl ContactsPage {
         people.sort_by_key(|&i| {
             let c = &self.contacts[i];
             let name = c.name.to_lowercase();
-            match self.sort {
-                // A group shown with its people heads them.
-                _ if c.is_group() => String::new(),
+            // Groups head the people, by name: a group shown with its
+            // people, or a book's groups.
+            let key = match self.sort {
+                _ if c.is_group() => name,
                 ContactSort::FirstName => name,
                 // Sort by the final word of the name (then the whole name for
                 // ties) — how an address book orders by surname.
@@ -2032,7 +2035,8 @@ impl ContactsPage {
                 ContactSort::Email => {
                     c.primary_email().map(str::to_lowercase).unwrap_or(name)
                 }
-            }
+            };
+            (!c.is_group(), key)
         });
         // People in what the list shows, and of them those it lists.
         let total = self.contacts.iter().filter(|c| !c.is_group() && self.in_scope(c)).count();

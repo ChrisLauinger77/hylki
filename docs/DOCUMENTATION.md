@@ -530,8 +530,9 @@ with how many contacts they hold together, and its books under it.
 Every book shows how many contacts it holds, and its groups are under
 it. An account or a book with groups folds and opens with the caret
 beside it, as a folder with sub-folders does; the list, the accounts and
-the books stay open or folded as they were left. Picking an account lists
-the contacts of all its books. Picking a book opens Contacts on its contacts alone; picking a
+the books stay open or folded as they were left. Picking a book lists its
+groups, by name, and then its contacts; picking an account lists the
+groups and contacts of all its books. Picking a book opens Contacts on its contacts alone; picking a
 group lists the group and then its people, with **Remove from Group** in
 their right-click menu. An LDAP directory, under **Directories**, is
 searched by typing. A book's right-click menu has **New Contact** and
