@@ -4666,12 +4666,6 @@ msgstr "Importància alta"
 msgid "Today"
 msgstr "Avui"
 
-msgid "Choose which folders to search"
-msgstr "Tria quines carpetes cercar"
-
-msgid "Clear selection"
-msgstr "Desselecciona-ho tot"
-
 msgid "No Messages"
 msgstr "No hi ha missatges"
 
@@ -4683,6 +4677,12 @@ msgstr "Ara mateix no hi ha res aquí."
 
 msgid "No message here passes the filters."
 msgstr "Cap missatge d'aquí passa els filtres."
+
+msgid "Clear selection"
+msgstr "Desselecciona-ho tot"
+
+msgid "Choose which folders to search"
+msgstr "Tria quines carpetes cercar"
 
 msgid "Customize Columns…"
 msgstr "Personalitza les columnes…"
@@ -6161,12 +6161,21 @@ msgstr ""
 msgid "Keep the search field open"
 msgstr "Mantén obert el camp de cerca"
 
+#, fuzzy
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
 "Mostra el camp de cerca sobre la llista en tot moment, en lloc de darrere "
 "del botó de cerca."
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Cerca filtres"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Selecciona primer una conversa."
 
 msgid "Tint tagged messages"
 msgstr "Acoloreix els missatges etiquetats"
@@ -7113,6 +7122,14 @@ msgstr "Targetes"
 
 msgid "Single line"
 msgstr "Línia individual"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "A la part superior de la finestra"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "A la part inferior de la finestra"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."

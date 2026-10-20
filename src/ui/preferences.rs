@@ -175,6 +175,8 @@ pub struct PrefInit {
     pub list_group_by_date: bool,
     pub list_pills_below: bool,
     pub list_search_open: bool,
+    pub list_search_bottom: bool,
+    pub list_bulk_bar_bottom: bool,
     pub single_key_shortcuts: bool,
     pub gmail_keys: bool,
     pub keep_downloads_days: u32,
@@ -1321,6 +1323,10 @@ pub enum PrefOutput {
     SetPillsBelow(bool),
     /// Keep the list's search field open (#446).
     SetListSearchOpen(bool),
+    /// The list's search field under the rows, not above them (#496).
+    SetListSearchBottom(bool),
+    /// The list's bulk bar under the rows, not above them (#496).
+    SetListBulkBarBottom(bool),
     /// Every column back to its own width (#334).
     ResetColumnWidths,
     SetSingleKey(bool),
@@ -2863,10 +2869,26 @@ impl Component for Preferences {
                                     #[name = "list_search_open_row"]
                                     adw::SwitchRow {
                                         set_title: &i18n("Keep the search field open"),
-                                        set_subtitle: &i18n("Shows the search field above the list at all times, \
+                                        set_subtitle: &i18n("Shows the search field with the list at all times, \
                                                        instead of behind the search button."),
                                         connect_active_notify[sender] => move |row| {
                                             let _ = sender.output(PrefOutput::SetListSearchOpen(row.is_active()));
+                                        },
+                                    },
+
+                                    #[name = "list_search_place_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Search field position"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetListSearchBottom(row.selected() == 1));
+                                        },
+                                    },
+
+                                    #[name = "list_bulk_place_row"]
+                                    adw::ComboRow {
+                                        set_title: &i18n("Selection bar position"),
+                                        connect_selected_notify[sender] => move |row| {
+                                            let _ = sender.output(PrefOutput::SetListBulkBarBottom(row.selected() == 1));
                                         },
                                     },
 
@@ -4293,6 +4315,14 @@ impl Component for Preferences {
         widgets.group_by_date_row.set_active(init.list_group_by_date);
         widgets.pills_below_row.set_active(init.list_pills_below);
         widgets.list_search_open_row.set_active(init.list_search_open);
+        for (row, bottom) in [
+            (&widgets.list_search_place_row, init.list_search_bottom),
+            (&widgets.list_bulk_place_row, init.list_bulk_bar_bottom),
+        ] {
+            row.set_model(Some(&gtk::StringList::new(&[&i18n("Top of the list"), &i18n("Bottom of the list")])));
+            row.set_selected(u32::from(bottom));
+            no_truncate(row);
+        }
         widgets.list_layout_row.set_selected(match init.list_layout {
             crate::config::ListLayout::Cards => 0,
             crate::config::ListLayout::SingleLine => 1,

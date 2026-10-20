@@ -4888,12 +4888,6 @@ msgstr "Importuj klucz"
 msgid "Today"
 msgstr ""
 
-msgid "Choose which folders to search"
-msgstr "Wybierz katalogi do przeszukania"
-
-msgid "Clear selection"
-msgstr "Wyczyść zaznaczenie"
-
 msgid "No Messages"
 msgstr "Brak wiadomości"
 
@@ -4907,6 +4901,12 @@ msgstr "W tej chwili nic tu nie ma."
 #, fuzzy
 msgid "No message here passes the filters."
 msgstr "Najnowsza wiadomość na początku"
+
+msgid "Clear selection"
+msgstr "Wyczyść zaznaczenie"
+
+msgid "Choose which folders to search"
+msgstr "Wybierz katalogi do przeszukania"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -6417,9 +6417,17 @@ msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Wyszukaj filtry"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Działania"
 
 #, fuzzy
 msgid "Tint tagged messages"
@@ -7343,6 +7351,14 @@ msgstr ""
 #, fuzzy
 msgid "Single line"
 msgstr "Podkreślenie"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "Pisanie w oknie głównym"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "Pisanie w oknie głównym"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."

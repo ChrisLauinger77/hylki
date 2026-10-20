@@ -1770,6 +1770,12 @@ pub(crate) struct PrivacyFile {
     /// search button (#446). Off by default.
     #[serde(default)]
     pub(crate) list_search_open: bool,
+    /// The search field and the bulk bar open under the list instead of
+    /// above it (#496). Off by default.
+    #[serde(default)]
+    pub(crate) list_search_bottom: bool,
+    #[serde(default)]
+    pub(crate) list_bulk_bar_bottom: bool,
     /// The widths columns were dragged to, in pixels, by column name.
     #[serde(default)]
     pub(crate) list_column_widths: std::collections::BTreeMap<String, i32>,
@@ -2087,6 +2093,8 @@ impl Default for PrivacyFile {
             list_pills_below: false,
             date_groups_default_applied: true,
             list_search_open: false,
+            list_search_bottom: false,
+            list_bulk_bar_bottom: false,
             list_column_widths: Default::default(),
             single_key_shortcuts: false,
             gmail_keys: false,

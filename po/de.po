@@ -4706,12 +4706,6 @@ msgstr "Wichtigkeit: hoch"
 msgid "Today"
 msgstr "Heute"
 
-msgid "Choose which folders to search"
-msgstr "Ordner zum Durchsuchen auswählen"
-
-msgid "Clear selection"
-msgstr "Auswahl aufheben"
-
 msgid "No Messages"
 msgstr "Keine Nachrichten"
 
@@ -4723,6 +4717,12 @@ msgstr "Hier ist derzeit nichts vorhanden."
 
 msgid "No message here passes the filters."
 msgstr "Keine Nachricht an diesem Ort entspricht den Filtern."
+
+msgid "Clear selection"
+msgstr "Auswahl aufheben"
+
+msgid "Choose which folders to search"
+msgstr "Ordner zum Durchsuchen auswählen"
 
 msgid "Customize Columns…"
 msgstr "Spalten anpassen…"
@@ -6211,12 +6211,21 @@ msgstr ""
 msgid "Keep the search field open"
 msgstr "Suchfeld geöffnet lassen"
 
+#, fuzzy
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
 "Das Suchfeld dauerhaft über der Liste anzeigen, statt hinter der Suchen-"
 "Schaltfläche."
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Suchfilter"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Unterhaltung auswählen"
 
 msgid "Tint tagged messages"
 msgstr "Nachrichten mit Tags einfärben"
@@ -7173,6 +7182,14 @@ msgstr "Karten"
 
 msgid "Single line"
 msgstr "Eine Zeile"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "Am oberen Fensterrand"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "Am unteren Fensterrand"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."

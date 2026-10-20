@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Added: the search field and the selection bar can open at the bottom of
+  the list** (#496, requested by 3v1n0). **Settings → Message List → Search
+  field position** and **Selection bar position** put each one at the top of the list, as
+  before, or at the bottom, where opening it shortens the list from its foot
+  instead of pushing the messages down.
+
 - **Fixed: an encrypted message's subject stayed "..." after decrypting**
   (#493, reported by valqk). Thunderbird and other clients that protect
   headers send the real subject inside the encrypted part and "..." outside.

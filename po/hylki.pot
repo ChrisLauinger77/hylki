@@ -4273,12 +4273,6 @@ msgstr ""
 msgid "Today"
 msgstr ""
 
-msgid "Choose which folders to search"
-msgstr ""
-
-msgid "Clear selection"
-msgstr ""
-
 msgid "No Messages"
 msgstr ""
 
@@ -4289,6 +4283,12 @@ msgid "There's nothing here right now."
 msgstr ""
 
 msgid "No message here passes the filters."
+msgstr ""
+
+msgid "Clear selection"
+msgstr ""
+
+msgid "Choose which folders to search"
 msgstr ""
 
 msgid "Customize Columns…"
@@ -5613,8 +5613,14 @@ msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
+msgstr ""
+
+msgid "Search field position"
+msgstr ""
+
+msgid "Selection bar position"
 msgstr ""
 
 msgid "Tint tagged messages"
@@ -6361,6 +6367,12 @@ msgid "Cards"
 msgstr ""
 
 msgid "Single line"
+msgstr ""
+
+msgid "Top of the list"
+msgstr ""
+
+msgid "Bottom of the list"
 msgstr ""
 
 msgid ""

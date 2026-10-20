@@ -724,13 +724,23 @@ flowbox.attach-flow > flowboxchild {
 
 /* ---- Message list ---- */
 
+/* The boxes above and below the rows that hold search and the bulk bar,
+   wherever each is set to open (#496). No padding of their own: both bars
+   hide by default (#102), and dead padding here floated the first row
+   ~32px low. Each revealed bar carries its own inset instead; the negative
+   margin buys the rows two more pixels. */
 .list-toolbar {
-  /* No padding of its own: search hides by default (#102), and dead
-     padding here floated the first row ~32px low. The revealed search row
-     carries its own inset instead; the negative margin buys the rows two
-     more pixels. */
   padding: 0;
   margin-bottom: 2px;
+}
+
+.list-footer {
+  padding: 0;
+}
+
+.list-footer .list-search-row {
+  padding: 8px 12px 8px 12px;
+  border-top: 1px solid alpha(currentColor, 0.08);
 }
 
 .list-search-row {
@@ -754,6 +764,12 @@ flowbox.attach-flow > flowboxchild {
 }
 .bulk-bar:dir(rtl) {
   padding: 4px 12px 6px 8px;
+}
+.list-footer .bulk-bar {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-bottom: none;
+  border-top: 1px solid alpha(currentColor, 0.08);
 }
 
 .bulk-count {

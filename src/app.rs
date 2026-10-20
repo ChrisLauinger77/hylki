@@ -1016,6 +1016,9 @@ pub struct AppModel {
     list_pills_below: bool,
     /// The list's search field stays open (#446).
     list_search_open: bool,
+    /// The list's search field and bulk bar open under the rows (#496).
+    list_search_bottom: bool,
+    list_bulk_bar_bottom: bool,
     /// The widths columns were dragged to by their headings (#334).
     list_column_widths: std::collections::HashMap<config::ListColumn, i32>,
     /// The list pane is wide enough for one line per message, which
@@ -3698,6 +3701,8 @@ impl SimpleComponent for AppModel {
             list_group_by_date: config::load_privacy().list_group_by_date,
             list_pills_below: config::load_privacy().list_pills_below,
             list_search_open: config::load_privacy().list_search_open,
+            list_search_bottom: config::load_privacy().list_search_bottom,
+            list_bulk_bar_bottom: config::load_privacy().list_bulk_bar_bottom,
             list_column_widths: config::load_list_column_widths(),
             list_wide: config::load_list_pane_width() >= LIST_WIDE_ON,
             shortcuts_win: None,
@@ -4020,6 +4025,7 @@ impl SimpleComponent for AppModel {
         model.message_list.emit(MessageListInput::SetHeadings(model.list_headings));
         model.message_list.emit(MessageListInput::SetColumnScroll(model.list_column_scroll));
         model.message_list.emit(MessageListInput::SetSearchPinned(model.list_search_open));
+        model.push_list_bars();
         model.contacts_page.emit(ContactsPageInput::SetSearchPinned(model.list_search_open));
         model.message_list.emit(MessageListInput::SetColumnWidths(model.list_column_widths.clone()));
         model.sidebars_emit(SidebarInput::SetFocus {
@@ -8709,6 +8715,16 @@ impl SimpleComponent for AppModel {
                     self.contacts_page.emit(ContactsPageInput::SetSearchPinned(on));
                 }
             }
+            AppMsg::Pref(PrefOutput::SetListSearchBottom(on)) => {
+                if pref!(self.list_search_bottom = on) {
+                    self.push_list_bars();
+                }
+            }
+            AppMsg::Pref(PrefOutput::SetListBulkBarBottom(on)) => {
+                if pref!(self.list_bulk_bar_bottom = on) {
+                    self.push_list_bars();
+                }
+            }
             AppMsg::Pref(PrefOutput::SetGroupByDate(on)) => {
                 if pref!(self.list_group_by_date = on) {
                     self.message_list.emit(MessageListInput::SetGroupByDate(on));
@@ -13242,6 +13258,8 @@ impl AppModel {
             list_pills_below: self.list_pills_below,
             date_groups_default_applied: true,
             list_search_open: self.list_search_open,
+            list_search_bottom: self.list_search_bottom,
+            list_bulk_bar_bottom: self.list_bulk_bar_bottom,
             list_column_widths: config::list_column_widths_to(&self.list_column_widths),
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
@@ -16521,6 +16539,14 @@ impl AppModel {
             self.animate_sidebar(want);
             self.compact_sidebar_header(want);
         }
+    }
+
+    /// Where the list's search field and bulk bar open (#496).
+    fn push_list_bars(&self) {
+        self.message_list.emit(MessageListInput::SetBarsPlacement {
+            search_bottom: self.list_search_bottom,
+            bulk_bottom: self.list_bulk_bar_bottom,
+        });
     }
 
     /// Hand the list its look; `animate` slides the avatars away or back
@@ -22344,6 +22370,8 @@ impl AppModel {
             list_group_by_date: self.list_group_by_date,
             list_pills_below: self.list_pills_below,
             list_search_open: self.list_search_open,
+            list_search_bottom: self.list_search_bottom,
+            list_bulk_bar_bottom: self.list_bulk_bar_bottom,
             single_key_shortcuts: self.single_key.get(),
             gmail_keys: self.gmail_keys.get(),
             keep_downloads_days: self.keep_downloads_days,

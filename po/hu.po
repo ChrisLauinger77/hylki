@@ -4838,12 +4838,6 @@ msgstr "Kulcs importálása"
 msgid "Today"
 msgstr ""
 
-msgid "Choose which folders to search"
-msgstr "Válassza ki a keresendő mappákat"
-
-msgid "Clear selection"
-msgstr "Kijelölés törlése"
-
 msgid "No Messages"
 msgstr "Nincsenek üzenetek"
 
@@ -4857,6 +4851,12 @@ msgstr "Itt jelenleg nincs semmi."
 #, fuzzy
 msgid "No message here passes the filters."
 msgstr "Legújabb üzenet elöl"
+
+msgid "Clear selection"
+msgstr "Kijelölés törlése"
+
+msgid "Choose which folders to search"
+msgstr "Válassza ki a keresendő mappákat"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -6360,9 +6360,17 @@ msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Keresési szűrők"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Műveletek"
 
 #, fuzzy
 msgid "Tint tagged messages"
@@ -7301,6 +7309,14 @@ msgstr ""
 #, fuzzy
 msgid "Single line"
 msgstr "Aláhúzott"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "Levélírás a főablakban"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "Levélírás a főablakban"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."

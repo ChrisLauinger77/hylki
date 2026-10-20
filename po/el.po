@@ -4810,12 +4810,6 @@ msgstr ""
 msgid "Today"
 msgstr "Σήμερα"
 
-msgid "Choose which folders to search"
-msgstr "Επιλέξτε τους φακέλους αναζήτησης"
-
-msgid "Clear selection"
-msgstr "Εκκαθάριση επιλογής"
-
 msgid "No Messages"
 msgstr "Δεν υπάρχουν μηνύματα"
 
@@ -4827,6 +4821,12 @@ msgstr "Δεν υπάρχει τίποτα εδώ αυτήν τη στιγμή."
 
 msgid "No message here passes the filters."
 msgstr ""
+
+msgid "Clear selection"
+msgstr "Εκκαθάριση επιλογής"
+
+msgid "Choose which folders to search"
+msgstr "Επιλέξτε τους φακέλους αναζήτησης"
 
 msgid "Customize Columns…"
 msgstr "Προσαρμογή στηλών…"
@@ -6321,9 +6321,17 @@ msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Αναζήτηση φίλτρων"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Ενέργειες"
 
 msgid "Tint tagged messages"
 msgstr "Χρωματισμός μηνυμάτων με ετικέτα"
@@ -7284,6 +7292,14 @@ msgstr "Κάρτες"
 
 msgid "Single line"
 msgstr "Μία γραμμή"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "Στο επάνω μέρος του παραθύρου"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "Στο κάτω μέρος του παραθύρου"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."

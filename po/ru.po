@@ -4844,12 +4844,6 @@ msgstr "Высокая важность"
 msgid "Today"
 msgstr ""
 
-msgid "Choose which folders to search"
-msgstr "Выберите папки для поиска"
-
-msgid "Clear selection"
-msgstr "Снять выделение"
-
 msgid "No Messages"
 msgstr "Нет сообщений"
 
@@ -4863,6 +4857,12 @@ msgstr "Здесь пока ничего нет."
 #, fuzzy
 msgid "No message here passes the filters."
 msgstr "Новое сообщение из шаблона"
+
+msgid "Clear selection"
+msgstr "Снять выделение"
+
+msgid "Choose which folders to search"
+msgstr "Выберите папки для поиска"
 
 #, fuzzy
 msgid "Customize Columns…"
@@ -6353,9 +6353,17 @@ msgid "Keep the search field open"
 msgstr ""
 
 msgid ""
-"Shows the search field above the list at all times, instead of behind the "
+"Shows the search field with the list at all times, instead of behind the "
 "search button."
 msgstr ""
+
+#, fuzzy
+msgid "Search field position"
+msgstr "Поиск фильтров"
+
+#, fuzzy
+msgid "Selection bar position"
+msgstr "Действия"
 
 #, fuzzy
 msgid "Tint tagged messages"
@@ -7293,6 +7301,14 @@ msgstr "Карточки"
 
 msgid "Single line"
 msgstr "Одна строка"
+
+#, fuzzy
+msgid "Top of the list"
+msgstr "Создание писем в основном окне"
+
+#, fuzzy
+msgid "Bottom of the list"
+msgstr "Создание писем в основном окне"
 
 msgid ""
 "The launcher shows an icon set outside Hylki. Picking one here replaces it."
