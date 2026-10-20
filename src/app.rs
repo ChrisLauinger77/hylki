@@ -18321,7 +18321,10 @@ impl AppModel {
     /// in `pending_forward`, and the reply re-enters here. `inline` says
     /// the composer opens where a reply does; otherwise in a window.
     fn forward(&mut self, m: Message, inline: bool, sender: &ComponentSender<Self>) {
-        let m = self.with_cached_body(m);
+        let mut m = self.with_cached_body(m);
+        if let Some(subject) = self.decrypted_subject(&m) {
+            m.subject = subject;
+        }
         if m.body.is_empty() {
             if let Some(path) = self.resolve_folder_path(&m) {
                 self.send_to(
@@ -23923,7 +23926,17 @@ impl AppModel {
             .get(&body_key(m))
             .and_then(|c| c.pgp.as_ref())
             .is_some_and(|p| p.encrypted);
+        if let Some(subject) = self.decrypted_subject(m) {
+            prefill.subject = reply_subject(&subject);
+        }
         self.quoting(m, prefill)
+    }
+
+    /// The subject inside `m` once it has been decrypted (#493), where its
+    /// own is a placeholder. Only answers use it: a reply to an encrypted
+    /// message starts encrypted, and its subject travels inside again.
+    fn decrypted_subject(&self, m: &Message) -> Option<String> {
+        self.sender_cache.get(&body_key(m))?.pgp.as_ref()?.subject.clone()
     }
 
     /// A composer quoting or copying `m` loads its remote pictures only
@@ -27251,12 +27264,17 @@ fn window_drop_target(sender: &ComponentSender<AppModel>, phase: gtk::Propagatio
     drop
 }
 
-fn reply_prefill(m: &Message) -> ComposePrefill {
-    let subject = if m.subject.to_lowercase().starts_with("re:") {
-        m.subject.clone()
+/// A reply's subject: the original's, with one "Re:" in front.
+fn reply_subject(subject: &str) -> String {
+    if subject.to_lowercase().starts_with("re:") {
+        subject.to_string()
     } else {
-        format!("Re: {}", m.subject)
-    };
+        format!("Re: {subject}")
+    }
+}
+
+fn reply_prefill(m: &Message) -> ComposePrefill {
+    let subject = reply_subject(&m.subject);
     let attribution = format!("On {}, {} wrote:", m.date, m.from_name);
     ComposePrefill {
         // A Reply-To header is the sender saying "answer me here instead" —
