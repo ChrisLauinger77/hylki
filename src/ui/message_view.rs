@@ -390,8 +390,18 @@ impl MessageView {
     fn shown_subject(&self, m: &Message) -> String {
         match self.translations.get(&(m.account_id, m.id)) {
             Some(TrState::Shown(t)) => t.subject.clone().unwrap_or_else(|| m.subject.clone()),
-            _ => m.subject.clone(),
+            _ => self.real_subject(m),
         }
+    }
+
+    /// A message's subject, the one inside it once it is decrypted (#493):
+    /// the outer one of an encrypted message can be a placeholder.
+    fn real_subject(&self, m: &Message) -> String {
+        self.member_checks
+            .get(&(m.account_id, m.id))
+            .and_then(|c| c.pgp.as_ref())
+            .and_then(|p| p.subject.clone())
+            .unwrap_or_else(|| m.subject.clone())
     }
 
     /// What a card's translation banner holds right now (#327): where a
@@ -5132,7 +5142,7 @@ impl MessageView {
     fn job_name(&self) -> String {
         self.current
             .as_ref()
-            .map(|m| m.subject.clone())
+            .map(|m| self.real_subject(m))
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| i18n("Message"))
     }
@@ -5187,7 +5197,11 @@ impl MessageView {
 
     /// The header block that only appears on paper (see [`print_header_html`]).
     fn print_header_html(&self) -> String {
-        print_header_html(self.thread.first().or(self.current.as_ref()))
+        let first = self.thread.first().or(self.current.as_ref()).map(|m| Message {
+            subject: self.real_subject(m),
+            ..m.clone()
+        });
+        print_header_html(first.as_ref())
     }
 
     /// The reader's two grounds for `dark` (see [`theme_grounds_for`]).

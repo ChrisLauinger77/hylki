@@ -17792,6 +17792,11 @@ impl AppModel {
         controller.emit(MessageWindowInput::SetUnsubscribed(self.unsubscribed_map()));
         controller.emit(MessageWindowInput::SetIdentities(self.identities_map()));
         controller.emit(MessageWindowInput::SetInviteAnswers(self.invite_answers_map()));
+        // A verdict already in hand reaches the window now, not only one that
+        // arrives later: its seal, and a decrypted message's subject (#493).
+        if let Some(check) = self.sender_cache.get(&body_key(&m)) {
+            controller.emit(MessageWindowInput::SetSenderCheck(check.clone()));
+        }
 
         self.popouts.insert(key, PopOut { window, controller, message: body_key(&m), members });
     }

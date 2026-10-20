@@ -599,6 +599,10 @@ impl Component for MessageWindow {
             }
             MessageWindowInput::SetPgpLabels(on) => self.view.emit(MessageViewInput::SetPgpLabels(on)),
             MessageWindowInput::SetSenderCheck(check) => {
+                // Decrypted, the window is named by the subject inside (#493).
+                if let Some(subject) = check.pgp.as_ref().and_then(|p| p.subject.as_deref()) {
+                    root.set_title(Some(subject));
+                }
                 // Light the popout's header seal too (#88).
                 self.view.emit(MessageViewInput::SenderCheckFor {
                     account_id: self.msg.account_id,

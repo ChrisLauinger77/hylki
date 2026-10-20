@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Fixed: an encrypted message's subject stayed "..." after decrypting**
+  (#493, reported by valqk). Thunderbird and other clients that protect
+  headers send the real subject inside the encrypted part and "..." outside.
+  The reader, a message window's title and a printout now show the subject
+  inside once the message is decrypted, and the part that repeats it as
+  "Subject: …" for older clients is no longer shown in the body or listed as
+  a file. The decrypted subject is kept in memory only, like the body, so the
+  message list still shows "...".
+
 - **Fixed: Reply and New Message froze when the contact service stopped
   answering** (PR #484 by Artur Heinze). The composer opens before loading
   recipient suggestions. Contact lookups run in the background and give up

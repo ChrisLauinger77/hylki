@@ -3997,7 +3997,11 @@ fn attachment_parts(
 ) -> Vec<(usize, crate::models::Attachment)> {
     use mail_parser::MimeHeaders;
     let mut out = Vec::new();
+    let legacy = crate::pgp::legacy_display_part(parsed);
     for (i, &id) in parsed.attachments.iter().enumerate() {
+        if Some(id) == legacy {
+            continue;
+        }
         let Some(part) = parsed.parts.get(id) else { continue };
         // What is left where an attachment was removed, here or by
         // Thunderbird (#289): a note, not a file.
@@ -10991,7 +10995,14 @@ pub fn extract_body(raw: &[u8]) -> String {
         return wrap_plain(&String::from_utf8_lossy(raw));
     };
 
-    let bodies: Vec<_> = parsed.html_bodies().collect();
+    // The protected-headers stand-in that only repeats the Subject (#493).
+    let legacy = crate::pgp::legacy_display_part(&parsed);
+    let bodies: Vec<_> = parsed
+        .html_body
+        .iter()
+        .filter(|&&id| Some(id) != legacy)
+        .filter_map(|&id| parsed.part(id))
+        .collect();
     let mut budget = INLINE_IMAGE_BUDGET;
     // Content-IDs rendered in place by `inline_cid_images`, so the loop below
     // doesn't also append them as standalone images.
@@ -13847,6 +13858,31 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         let graph = graph_before_date(30);
         assert!(chrono::DateTime::parse_from_rfc3339(&graph).is_ok(), "{graph}");
         assert!(graph < chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
+    }
+
+    /// A decrypted entity with protected headers (#493): the part that only
+    /// repeats the Subject is neither shown nor listed as a file.
+    #[test]
+    fn protected_headers_legacy_part_is_hidden() {
+        let entity = |legacy_type: &str| {
+            format!(
+                "Content-Type: multipart/mixed; boundary=\"pp\"; protected-headers=\"v1\"\r\n\
+                 Subject: Plans\r\n\r\n\
+                 --pp\r\nContent-Type: {legacy_type}; protected-headers=\"v1\"\r\n\
+                 Content-Disposition: inline\r\n\r\nSubject: Plans\r\n\r\n\
+                 --pp\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nSee you there.\r\n--pp--\r\n"
+            )
+        };
+        for legacy_type in ["text/plain; charset=UTF-8", "text/rfc822-headers"] {
+            let raw = entity(legacy_type);
+            let body = extract_body(raw.as_bytes());
+            assert!(body.contains("See you there."), "{body}");
+            assert!(!body.contains("Subject: Plans"), "{legacy_type}: {body}");
+            assert!(extract_attachments(raw.as_bytes()).is_empty(), "{legacy_type}");
+        }
+        // The same first part without the flag on the root is ordinary text.
+        let raw = entity("text/plain; charset=UTF-8").replacen("; protected-headers=\"v1\"", "", 1);
+        assert!(extract_body(raw.as_bytes()).contains("Subject: Plans"));
     }
 
     #[test]
