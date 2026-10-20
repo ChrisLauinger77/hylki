@@ -5112,8 +5112,10 @@ fn build_message(
     // server assigns it on the way out — so the copy filed in Sent has no id at
     // all, and nothing that replies to it can ever be linked back. Setting it
     // here means the copy we keep and the copy that arrives share the same id.
-    // Encrypted, the real subject travels inside (#493); see `protect_headers`.
-    let subject = if msg.encrypt { PROTECTED_SUBJECT.to_string() } else { msg.subject.clone() };
+    // Encrypted, the real subject travels inside unless the account says
+    // otherwise (#493); see `protect_headers`.
+    let protect = msg.encrypt && !account.plain_subject;
+    let subject = if protect { PROTECTED_SUBJECT.to_string() } else { msg.subject.clone() };
     let mut builder = builder
         .subject(subject)
         .message_id(Some(new_message_id(&from_addr)));
@@ -5196,7 +5198,7 @@ fn build_message(
         } else {
             PgpEntity::Multi(attachments_multipart(content, msg)?)
         };
-        let entity = if msg.encrypt { protect_headers(entity, msg, &from_mailbox)? } else { entity };
+        let entity = if protect { protect_headers(entity, msg, &from_mailbox)? } else { entity };
         let wrapped = pgp_wrap(account, msg, &from_addr, entity)?;
         return Ok(builder.multipart(wrapped)?);
     }
@@ -11499,6 +11501,7 @@ pub(super) fn sample_account() -> AccountConfig {
         in_unified: true,
         folder_sort: None,
         sign_by_default: false,
+        plain_subject: false,
         graph_directory: false,
         graph_directory_only: false,
         graph_label_names: false,
@@ -12482,6 +12485,15 @@ NIL NIL NIL NIL NIL NIL NIL))\r\n";
         assert!(!inner.contains("Hidden"), "Bcc must stay out of what every recipient reads: {inner}");
         assert_eq!(extract_body(inner.as_bytes()).matches("secret body text").count(), 1);
         msg.bcc.clear();
+        // An account that leaves the subject readable (#493) sends it outside.
+        account.plain_subject = true;
+        let raw = build_email(&account, &msg).expect("builds").formatted();
+        let text = String::from_utf8_lossy(&raw);
+        assert!(text.contains("Subject: Secret plans\r\n"), "{text}");
+        assert!(!text.contains("secret body text"), "plaintext must not appear: {text}");
+        let u = crate::pgp::unwrap_message(&raw, &gpg).expect("recognised");
+        assert!(u.status.decrypted && u.status.subject.is_none(), "{:?}", u.status);
+        account.plain_subject = false;
 
         // A recipient without a key is refused by name; a From without a key too.
         msg.cc = "nobody@hylki.invalid".into();

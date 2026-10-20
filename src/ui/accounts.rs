@@ -1880,6 +1880,13 @@ impl Component for AccountsWindow {
                                     set_title: &i18n("Sign messages by default"),
                                     set_subtitle: &i18n("New messages, replies and forwards start with signing on."),
                                 },
+                                // Protected headers (#493): on, an encrypted
+                                // message says "..." where its subject would be.
+                                #[name = "hide_subject_row"]
+                                adw::SwitchRow {
+                                    set_title: &i18n("Hide the subject of encrypted mail"),
+                                    set_subtitle: &i18n("Only the recipients see the subject. Others see \"...\"."),
+                                },
                             },
 
                             // For a GOA-imported account this removes it from
@@ -5009,6 +5016,7 @@ fn read_account(
             .checked_sub(1)
             .and_then(|i| crate::config::FolderSort::ALL.get(i as usize).copied()),
         sign_by_default: widgets.sign_default_row.is_active(),
+        plain_subject: !widgets.hide_subject_row.is_active(),
         graph_directory: protocol == Protocol::Graph && widgets.graph_directory_row.is_active(),
         graph_directory_only: protocol == Protocol::Graph && widgets.directory_only_row.is_active(),
         graph_label_names: protocol == Protocol::Graph && widgets.graph_labels_row.is_active(),
@@ -5234,6 +5242,7 @@ fn fill_editor(widgets: &AccountsWindowWidgets, acc: &AccountConfig) {
     widgets.in_unified_row.set_active(acc.in_unified);
     widgets.folder_sort_row.set_selected(acc.folder_sort.map_or(0, |s| s.index() + 1));
     widgets.sign_default_row.set_active(acc.sign_by_default);
+    widgets.hide_subject_row.set_active(!acc.plain_subject);
     widgets.reply_copies_row.set_selected(acc.reply_copies.index());
     // Show the effective label (custom, or the email address).
     widgets
@@ -5330,6 +5339,7 @@ fn clear_editor(widgets: &AccountsWindowWidgets) {
     widgets.in_unified_row.set_active(true);
     widgets.folder_sort_row.set_selected(0);
     widgets.sign_default_row.set_active(false);
+    widgets.hide_subject_row.set_active(true);
     widgets.reply_copies_row.set_selected(0);
     widgets.graph_directory_row.set_active(false);
     widgets.directory_only_row.set_active(false);

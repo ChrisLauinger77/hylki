@@ -2512,6 +2512,13 @@ msgstr "Üzenetek aláírása alapértelmezetten"
 msgid "New messages, replies and forwards start with signing on."
 msgstr "Az új üzenetek, válaszok és továbbítások aláírással kezdődnek."
 
+#, fuzzy
+msgid "Hide the subject of encrypted mail"
+msgstr "A tárgy elrejtése"
+
+msgid "Only the recipients see the subject. Others see \"...\"."
+msgstr ""
+
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
 "plain text on disk."

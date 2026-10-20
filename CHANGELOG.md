@@ -15,7 +15,8 @@
   on carries its subject, From, To, Cc and Reply-To inside the encrypted part
   and "..." as its outer subject, the protected headers Thunderbird sends
   (RFC 9788). Bcc stays out of the encrypted part, which every recipient can
-  read.
+  read. **Hide the subject of encrypted mail**, under an account's OpenPGP
+  settings, turns it off for that account.
 
 - **Fixed: Reply and New Message froze when the contact service stopped
   answering** (PR #484 by Artur Heinze). The composer opens before loading

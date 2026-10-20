@@ -25896,6 +25896,7 @@ fn demo_account_configs() -> Vec<AccountConfig> {
         in_unified: true,
         folder_sort: None,
         sign_by_default: false,
+        plain_subject: false,
         graph_directory: false,
         graph_directory_only: false,
         graph_label_names: false,

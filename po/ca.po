@@ -2425,6 +2425,13 @@ msgstr ""
 "Els missatges nous, les respostes i els reenviaments comencen amb la "
 "signatura activada."
 
+#, fuzzy
+msgid "Hide the subject of encrypted mail"
+msgstr "Amaga l'assumpte"
+
+msgid "Only the recipients see the subject. Others see \"...\"."
+msgstr ""
+
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
 "plain text on disk."

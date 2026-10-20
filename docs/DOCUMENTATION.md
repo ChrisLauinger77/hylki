@@ -1264,7 +1264,11 @@ with Encrypt on.
 An encrypted message carries its subject inside, where only the recipients
 can read it, and "..." as the subject anyone else sees, as Thunderbird does.
 Hylki and other mail programs that read subjects from there show the real one
-once the message is decrypted. The message list shows "..." for encrypted
+once the message is decrypted. For recipients whose mail program shows only
+"...", turn off **Hide the subject of encrypted mail** under the account's
+*OpenPGP* group; that account's encrypted mail then goes with its subject
+readable outside. Stored on the account as `plain_subject = true` in
+`accounts.toml`. The message list shows "..." for encrypted
 mail, because nothing decrypted is kept between visits; the reader, a message
 window and a printout show the subject inside.
 

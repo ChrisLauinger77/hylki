@@ -2459,6 +2459,13 @@ msgstr ""
 "Los mensajes nuevos, las respuestas y los reenvíos empiezan con la firma "
 "criptográfica activada."
 
+#, fuzzy
+msgid "Hide the subject of encrypted mail"
+msgstr "Ocultar el asunto"
+
+msgid "Only the recipients see the subject. Others see \"...\"."
+msgstr ""
+
 msgid ""
 "Your password is stored in the system keyring (secret-service), never in "
 "plain text on disk."
