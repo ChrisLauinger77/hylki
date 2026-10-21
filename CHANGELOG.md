@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Changed: shorter text in Settings.** Subtitles that repeated their
+  title are gone, and the descriptions, setup steps and dialogs left say
+  only what the row doesn't. The Blacklist group under Senders is now
+  Blocked Senders, and the note shown when no spelling dictionary is found
+  can be translated.
+
 - **Added: the search field and the selection bar can open at the bottom of
   the list** (#496, requested by 3v1n0). **Settings → Message List → Search
   field position** and **Selection bar position** put each one at the top of the list, as
