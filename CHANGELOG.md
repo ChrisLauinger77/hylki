@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Fixed: the beta used about 300 MB more memory than 1.44.0 at idle**
+  (#504). The unified rows built ahead at a start held a second copy of
+  every message in them, the Archive's included, and the Contacts list held
+  every contact's full-size photo. A unified row of more than 20,000
+  messages is no longer read or built ahead: it shows its newest messages at
+  once and the rest a moment later, as any large folder does. The Contacts
+  list keeps only its small photos and reads a full one when a contact is
+  opened. On a mailbox of 92,000 messages and 1,150 contacts the app went
+  from 936 MB to 655 MB. The exported log's memory section now counts the
+  views kept as built and the Contacts list.
+
 - **Changed: shorter text in Settings.** Subtitles that repeated their
   title are gone, and the descriptions, setup steps and dialogs left say
   only what the row doesn't. The Blacklist group under Senders is now

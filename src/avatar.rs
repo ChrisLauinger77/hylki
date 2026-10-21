@@ -599,6 +599,12 @@ static PHOTO_THUMBS: OnceLock<Mutex<HashMap<u64, Option<gtk::gdk::Texture>>>> = 
 /// Longest side of a list photo: a 34 px avatar at twice the scale, with room.
 const PHOTO_THUMB_EDGE: i32 = 96;
 
+/// The list photos decoded, and their pixel bytes, for the memory report.
+pub fn photo_thumb_stats() -> (usize, u64) {
+    let Some(Ok(map)) = PHOTO_THUMBS.get().map(Mutex::lock) else { return (0, 0) };
+    (map.len(), map.values().flatten().map(crate::memory_report::texture_bytes).sum())
+}
+
 /// A photo's list avatar, if [`decode_photo_thumbnails`] has been at it.
 pub fn photo_thumbnail(key: u64) -> Option<Option<gtk::gdk::Texture>> {
     PHOTO_THUMBS.get()?.lock().ok()?.get(&key).cloned()

@@ -13029,6 +13029,13 @@ impl AppModel {
             count(shown),
             count(pool)
         ));
+        let (views, kept, maps) = self.message_list.model().kept_view_stats();
+        out.push_str(&format!(
+            "  list views kept as built ({views} of {}): {}, conversations {}\n",
+            crate::ui::message_list::KEPT_VIEWS,
+            count(kept),
+            human_bytes(maps as u64)
+        ));
 
         out.push_str("Session caches (follow use; each is bounded unless noted):\n");
         out.push_str(&format!(
@@ -13100,6 +13107,16 @@ impl AppModel {
             human_bytes(contact_bytes),
             human_count(gravatars),
             human_bytes(gravatar_bytes)
+        ));
+        let (entries, entry_bytes, photo_bytes) = self.contacts_page.model().memory_stats();
+        let (thumbs, thumb_bytes) = crate::avatar::photo_thumb_stats();
+        out.push_str(&format!(
+            "  Contacts list: {} entries, {} (of which photos {}); list photos {} ({} of pixels)\n",
+            human_count(entries),
+            human_bytes(entry_bytes as u64),
+            human_bytes(photo_bytes as u64),
+            human_count(thumbs),
+            human_bytes(thumb_bytes)
         ));
         let (pictures, picture_bytes, circles, circle_bytes) = crate::ui::initials::cache_stats();
         out.push_str(&format!(
@@ -21490,6 +21507,9 @@ impl AppModel {
                 continue;
             }
             let content = || targets.iter().filter_map(|k| self.message_cache.get(k)).flatten();
+            if content().count() > crate::ui::message_list::KEEP_AT_MOST {
+                continue;
+            }
             let fp = content_fp(content());
             if self.message_list.model().has_view(key, fp) {
                 continue;
@@ -21529,14 +21549,14 @@ impl AppModel {
         }
         let mut kinds = self.unified_kinds.listed();
         kinds.push(FolderKind::Inbox);
-        let wanted: Vec<(u32, u32, String)> = self
+        let wanted: Vec<(u32, u32, String, FolderKind)> = self
             .accounts
             .iter()
             .filter(|a| self.in_unified(a.id))
             .flat_map(|a| self.folders.get(&a.id).into_iter().flatten())
             .filter(|f| kinds.contains(&f.kind))
             .filter(|f| !self.message_cache.contains_key(&(f.account_id, f.id)))
-            .map(|f| (f.account_id, f.id, f.path.clone()))
+            .map(|f| (f.account_id, f.id, f.path.clone(), f.kind))
             .collect();
         if wanted.is_empty() {
             self.schedule_prebuild(sender);
@@ -21546,7 +21566,19 @@ impl AppModel {
         std::thread::spawn(move || {
             let t = std::time::Instant::now();
             let lists: Vec<((u32, u32), Vec<Message>)> = match crate::cache::Cache::open() {
-                Ok(cache) => wanted.into_iter().map(|(a, f, path)| ((a, f), cache.load_messages(a, &path, f))).collect(),
+                Ok(cache) => {
+                    // A row too large to be built ahead is not read ahead
+                    // either: it is read at its visit, as any folder is (#504).
+                    let mut sizes: HashMap<FolderKind, usize> = HashMap::new();
+                    for (a, _, path, kind) in &wanted {
+                        *sizes.entry(*kind).or_default() += cache.count_messages(*a, path);
+                    }
+                    wanted
+                        .into_iter()
+                        .filter(|(.., kind)| sizes[kind] <= crate::ui::message_list::KEEP_AT_MOST)
+                        .map(|(a, f, path, _)| ((a, f), cache.load_messages(a, &path, f)))
+                        .collect()
+                }
                 Err(_) => Vec::new(),
             };
             tracing::debug!(

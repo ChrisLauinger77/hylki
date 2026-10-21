@@ -1578,6 +1578,22 @@ pub struct ContactDetails {
 }
 
 impl ContactDetails {
+    /// Whether the card has a photo, held here or let go by the Contacts
+    /// list once it made the list's thumbnail.
+    pub fn has_photo(&self) -> bool {
+        self.photo.is_some() || self.photo_key != 0
+    }
+
+    /// The photo's bytes: those held, or read again from the card. The
+    /// Contacts list keeps only thumbnails, since iCloud's megapixel photos
+    /// came to some 40 MB held for the whole session (#504).
+    pub fn photo_bytes(&self) -> Option<Vec<u8>> {
+        if self.photo.is_some() || self.photo_key == 0 {
+            return self.photo.clone();
+        }
+        vcard_photo_with(&self.raw_vcard, self.book_uid != crate::local_contacts::LOCAL_BOOK_UID)
+    }
+
     /// The address used for avatars and as the compose default.
     pub fn primary_email(&self) -> Option<&str> {
         self.emails.first().map(|e| e.value.as_str())
@@ -2849,7 +2865,7 @@ pub fn moved_vcard(c: &ContactDetails) -> String {
             || prop.starts_with("X-EVOLUTION-GOOGLE")
             || prop.starts_with("X-EVOLUTION-M365")
     });
-    if let Some(photo) = &c.photo {
+    if let Some(photo) = &c.photo_bytes() {
         let kind = crate::models::image_ext(photo).to_ascii_uppercase();
         let kind = if kind == "JPG" { "JPEG".to_string() } else { kind };
         out.push(format!(

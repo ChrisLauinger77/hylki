@@ -987,6 +987,17 @@ impl Cache {
         self.load_folder(account_id, folder_path, folder_id, "ORDER BY uid DESC")
     }
 
+    /// How many messages a folder holds.
+    pub fn count_messages(&self, account_id: u32, folder_path: &str) -> usize {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM messages WHERE account_id = ?1 AND folder_path = ?2",
+                params![account_id, folder_path],
+                |r| r.get::<_, i64>(0),
+            )
+            .map_or(0, |n| n as usize)
+    }
+
     /// A folder's `limit` newest messages, newest first: what a list shows
     /// at once while the whole folder is read.
     pub fn load_newest(&self, account_id: u32, folder_path: &str, folder_id: u32, limit: usize) -> Vec<Message> {

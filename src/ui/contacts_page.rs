@@ -142,7 +142,7 @@ impl ContactFilter {
     /// lower case, and the cards members are named by.
     fn passes(self, c: &ContactDetails, grouped: &std::collections::HashSet<String>) -> bool {
         match self {
-            ContactFilter::Photo => c.photo.is_some(),
+            ContactFilter::Photo => c.has_photo(),
             ContactFilter::Email => !c.emails.is_empty(),
             ContactFilter::Phone => !c.phones.is_empty(),
             ContactFilter::Address => !c.addresses.is_empty(),
@@ -789,6 +789,8 @@ impl Component for ContactsPage {
                     // fresh cards (an edit patches them) without new rows.
                     self.contacts = contacts;
                     self.loading = false;
+                    // Their photos too, which the rows have as thumbnails.
+                    self.decode_photos(Default::default(), &sender);
                     self.update_view(widgets, sender);
                     return;
                 }
@@ -998,7 +1000,7 @@ impl Component for ContactsPage {
                     urls: c.urls.clone(),
                     addresses: c.postal.clone(),
                     birthday: c.birthday_raw.clone(),
-                    photo: c.photo.clone().map_or(crate::contacts::PhotoEdit::Keep, crate::contacts::PhotoEdit::Set),
+                    photo: c.photo_bytes().map_or(crate::contacts::PhotoEdit::Keep, crate::contacts::PhotoEdit::Set),
                 };
                 let _ = sender.output(ContactsPageOutput::CreateContact {
                     book_uid: None,
@@ -1457,10 +1459,11 @@ impl Component for ContactsPage {
                         let mut moved = c.clone();
                         moved.raw_vcard = crate::contacts::patched_vcard(&c.raw_vcard, &edit);
                         moved.photo = match &edit.photo {
-                            crate::contacts::PhotoEdit::Keep => c.photo.clone(),
+                            crate::contacts::PhotoEdit::Keep => c.photo_bytes(),
                             crate::contacts::PhotoEdit::Remove => None,
                             crate::contacts::PhotoEdit::Set(bytes) => Some(bytes.clone()),
                         };
+                        moved.photo_key = moved.photo.as_deref().map_or(0, crate::contacts::photo_key);
                         let vcard = crate::contacts::moved_vcard(&moved);
                         let key = (c.book_uid.clone(), c.eds_uid.clone());
                         self.ask_move(widgets, &sender, vec![key], to, Some(vcard));
@@ -1587,6 +1590,28 @@ impl Component for ContactsPage {
 }
 
 impl ContactsPage {
+    /// The entries held, their bytes (the floor: strings, vCards and photos)
+    /// and how much of that is photos, for the memory report.
+    pub fn memory_stats(&self) -> (usize, usize, usize) {
+        let entries = self.contacts.iter().chain(self.pending.iter().flatten()).chain(&self.directory_hits);
+        let (mut n, mut bytes, mut photos) = (0, 0, 0);
+        for c in entries {
+            let photo = c.photo.as_ref().map_or(0, Vec::len);
+            let labeled = |l: &[crate::contacts::Labeled]| l.iter().map(|x| 48 + x.label.len() + x.value.len()).sum::<usize>();
+            n += 1;
+            photos += photo;
+            bytes += std::mem::size_of::<ContactDetails>()
+                + photo
+                + c.raw_vcard.len()
+                + c.name.len()
+                + c.note.len()
+                + labeled(&c.emails)
+                + labeled(&c.phones)
+                + labeled(&c.addresses);
+        }
+        (n, bytes, photos)
+    }
+
     /// Whether a contact matches the active search.
     fn matches(&self, c: &ContactDetails) -> bool {
         self.in_scope(c) && matches_query(c, &self.query)
@@ -2198,22 +2223,47 @@ impl ContactsPage {
     /// Decode these photos on other threads; the rows waiting for them show
     /// each as it lands.
     fn decode_photos(&mut self, mut keys: std::collections::HashSet<u64>, sender: &ComponentSender<Self>) {
-        // Each photo once, however many people share it.
-        let photos: Vec<(u64, Vec<u8>)> = self
+        // Each photo once, however many people share it. The address books'
+        // photos go to the thread, or are let go when not wanted now: the
+        // list draws thumbnails, and the rest read a photo again from its
+        // card (`photo_bytes`) when they need it (#504).
+        let mut photos: Vec<(u64, Vec<u8>)> = Vec::new();
+        for c in &mut self.contacts {
+            let key = line_photo_key(c);
+            c.photo_key = key;
+            if let Some(bytes) = c.photo.take() {
+                if keys.remove(&key) {
+                    photos.push((key, bytes));
+                }
+            }
+        }
+        for c in &self.directory_hits {
+            let key = line_photo_key(c);
+            if keys.remove(&key) {
+                photos.extend(c.photo.clone().map(|bytes| (key, bytes)));
+            }
+        }
+        // A photo let go earlier and wanted now (a search or filter brought
+        // its contact in) is read from its card on the thread.
+        let cards: Vec<ContactDetails> = self
             .contacts
             .iter()
-            .chain(&self.directory_hits)
-            .filter_map(|c| {
-                let key = line_photo_key(c);
-                keys.remove(&key).then(|| Some((key, c.photo.clone()?))).flatten()
+            .filter(|c| keys.remove(&c.photo_key))
+            .map(|c| ContactDetails {
+                raw_vcard: c.raw_vcard.clone(),
+                book_uid: c.book_uid.clone(),
+                photo_key: c.photo_key,
+                ..Default::default()
             })
             .collect();
-        if photos.is_empty() {
+        if photos.is_empty() && cards.is_empty() {
             return;
         }
         self.decoding.extend(photos.iter().map(|(key, _)| *key));
+        self.decoding.extend(cards.iter().map(|c| c.photo_key));
         let s = sender.input_sender().clone();
         std::thread::spawn(move || {
+            photos.extend(cards.iter().filter_map(|c| Some((c.photo_key, c.photo_bytes()?))));
             crate::avatar::decode_photo_thumbnails(photos, || {
                 let _ = s.send(ContactsPageInput::PhotosDecoded);
             });
@@ -2489,8 +2539,9 @@ impl ContactsPage {
         }
 
         // ---- identity header: photo, name, who they are ----
-        let avatar = avatar_for(c, 96);
-        if let Some(photo) = &c.photo {
+        let photo = c.photo_bytes();
+        let avatar = avatar_with(c, 96, photo.as_deref());
+        if let Some(photo) = &photo {
             // A real photo expands to the lightbox on click.
             let btn = gtk::Button::new();
             btn.set_child(Some(&avatar));
@@ -3902,7 +3953,7 @@ fn photo_editor(detail: &gtk::Box, c: &ContactDetails, photo: Rc<RefCell<crate::
     change.add_css_class("pill");
     let remove = gtk::Button::with_label(&i18n("Remove Photo"));
     remove.add_css_class("pill");
-    remove.set_visible(c.photo.is_some());
+    remove.set_visible(c.has_photo());
     buttons.append(&change);
     buttons.append(&remove);
     detail.append(&buttons);
@@ -4358,12 +4409,25 @@ fn same_contacts(shown: &[ContactDetails], read: &[ContactDetails]) -> bool {
 /// The contact's avatar: their GNOME Contacts photo when they have one, the
 /// usual initials disc when not.
 fn avatar_for(c: &ContactDetails, size: i32) -> adw::Avatar {
+    // The list's thumbnail does for a small face, without reading the photo.
+    if size <= 48 {
+        if let Some(Some(texture)) = crate::avatar::photo_thumbnail(line_photo_key(c)) {
+            let avatar = avatar_with(c, size, None);
+            avatar.set_custom_image(Some(&texture));
+            return avatar;
+        }
+    }
+    avatar_with(c, size, c.photo_bytes().as_deref())
+}
+
+/// [`avatar_for`] with the photo already in hand.
+fn avatar_with(c: &ContactDetails, size: i32, photo: Option<&[u8]>) -> adw::Avatar {
     let avatar = adw::Avatar::new(size, Some(&c.name), !c.is_group());
     if c.is_group() {
         avatar.set_icon_name(Some("system-users-symbolic"));
     }
-    if let Some(photo) = &c.photo {
-        let bytes = gtk::glib::Bytes::from(photo.as_slice());
+    if let Some(photo) = photo {
+        let bytes = gtk::glib::Bytes::from(photo);
         if let Ok(texture) = gtk::gdk::Texture::from_bytes(&bytes) {
             avatar.set_custom_image(Some(&texture));
         }

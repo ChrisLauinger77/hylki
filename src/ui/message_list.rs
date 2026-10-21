@@ -349,7 +349,14 @@ struct ViewSnapshot {
 /// How many views the list keeps as built: the unified rows built ahead
 /// after a start, and the views visited since. Each holds its messages,
 /// which for a large Archive is tens of megabytes.
-const KEPT_VIEWS: usize = 8;
+pub const KEPT_VIEWS: usize = 8;
+
+/// The most messages a view may hold and still be kept as built, or built
+/// ahead. A kept view holds its own copy of every message and its
+/// conversation maps besides: an 81,000-message unified Archive came to
+/// some 150 MB for a click made once a session, if at all (#504). Larger
+/// views are built at each visit, the newest first.
+pub const KEEP_AT_MOST: usize = 20_000;
 
 /// Free `held` once the main loop is idle, not inside the pass that let go
 /// of it.
@@ -2154,7 +2161,7 @@ impl SimpleComponent for MessageList {
             }
             MessageListInput::SetViewFp(fp) => self.view_fp = fp,
             MessageListInput::Prebuild { key, fp, messages } => {
-                if self.view_key == Some(key) || self.has_view(key, fp) {
+                if self.view_key == Some(key) || self.has_view(key, fp) || messages.len() > KEEP_AT_MOST {
                     return;
                 }
                 let all: Vec<Rc<Message>> = messages.into_iter().map(Rc::new).collect();
@@ -3687,6 +3694,36 @@ impl MessageList {
         ]
     }
 
+    /// The views kept as built: how many, their messages and bytes (records
+    /// not shared with the view on show), and what their conversation maps
+    /// add on top.
+    pub fn kept_view_stats(&self) -> (usize, (usize, usize), usize) {
+        use crate::memory_report::message_bytes;
+        let mut seen = std::collections::HashSet::new();
+        for m in &self.all {
+            seen.insert(Rc::as_ptr(m));
+        }
+        let (mut n, mut bytes, mut maps) = (0, 0, 0);
+        let key = |s: &String| 8 + std::mem::size_of::<String>() + s.len();
+        for v in &self.views {
+            for m in &v.all {
+                if seen.insert(Rc::as_ptr(m)) {
+                    n += 1;
+                    bytes += message_bytes(m);
+                }
+            }
+            if let Some(t) = &v.threads {
+                maps += t.keys.values().map(|(_, s)| 12 + key(s)).sum::<usize>();
+                maps += t.members.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
+            }
+            maps += v.groups.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
+            maps += v.msg_thread.values().map(|(_, s)| 8 + key(s)).sum::<usize>();
+            maps += v.thread_members.iter().map(|((_, s), m)| key(s) + 24 + m.len() * 8).sum::<usize>();
+            maps += (v.rows.len() + v.tail.len()) * std::mem::size_of::<RowData>();
+        }
+        (self.views.len(), (n, bytes), maps)
+    }
+
     /// Build and pop up the right-click menu for `msg` at the click location.
     fn show_context_menu(
         &self,
@@ -4638,7 +4675,7 @@ impl MessageList {
     /// still being worked out.
     fn keep_view(&mut self) {
         let Some(key) = self.view_key else { return };
-        if !self.loaded || !self.query.is_empty() || self.all.is_empty() {
+        if !self.loaded || !self.query.is_empty() || self.all.is_empty() || self.all.len() > KEEP_AT_MOST {
             return;
         }
         let threads = self.source_threads.borrow().clone();
