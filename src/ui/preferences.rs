@@ -216,7 +216,7 @@ const TRAY_ICONS: &[(&str, TrayIcon)] = &[
 const LAUNCHER_BADGES: &[(&str, LauncherBadge)] = &[
     (i18n_noop("Off"), LauncherBadge::Off),
     (i18n_noop("All unread inbox mail"), LauncherBadge::AllUnread),
-    (i18n_noop("New since last in front"), LauncherBadge::NewSinceFront),
+    (i18n_noop("New since the window was last in front"), LauncherBadge::NewSinceFront),
 ];
 
 const APP_THEMES: &[(&str, AppTheme)] = &[
@@ -936,15 +936,11 @@ fn link_browser_index(browsers: &[crate::ui::launch::Browser], choice: &str) -> 
 fn link_group_description(browsers: &[crate::ui::launch::Browser]) -> String {
     if browsers.is_empty() {
         i18n(
-            "Which browser a link in a message opens in. Inside its Flatpak sandbox Hylki \
-             cannot see the applications installed on the system, so links leave through \
-             the desktop portal: choose \"Ask each time\" to pick the browser as each link \
-             is opened — the desktop's chooser can remember the choice.",
+            "Inside the Flatpak sandbox, links open through the desktop's chooser. \"Ask each time\" picks the browser per link with the option to remember it.",
         )
     } else {
         i18n(
-            "Which browser a link in a message opens in. \"System default\" follows the \
-             desktop's own choice; \"Ask each time\" lets the desktop ask before each one.",
+            "\"Ask each time\" lets the desktop ask before each link.",
         )
     }
 }
@@ -964,13 +960,12 @@ fn nautilus_status_text(state: &crate::nautilus_ext::State) -> String {
         Status::NotInstalled => i18n("Not installed"),
         Status::Installed if state.loaded => i18n("Installed and loaded by Files"),
         Status::Installed if state.loader == Some(false) => {
-            i18n("Installed, but the nautilus-python package is missing, so Files cannot load it")
+            i18n("Installed, but nautilus-python is missing")
         }
         Status::Installed => i18n(
-            "Installed. Files has not loaded it yet: restart Files, and make sure the \
-             nautilus-python package is installed",
+            "Installed. Restart Files to load it; it needs nautilus-python",
         ),
-        Status::Outdated => i18n("Installed, but not this version's copy"),
+        Status::Outdated => i18n("Installed, but from another version"),
     };
     let state = state_text;
     match crate::nautilus_ext::path() {
@@ -1016,7 +1011,7 @@ fn storage_text(storage: Option<(u64, u64, u64)>) -> String {
     match storage {
         None => i18n("Measuring…"),
         Some((bodies, files, total)) => i18n_f(
-            "Messages {bodies}, attachments {files}. The cache, message list included, is {total}.",
+            "Messages {bodies}, attachments {files}. {total} in all, with the message list.",
             &[
                 ("bodies", gtk::glib::format_size(bodies).as_str()),
                 ("files", gtk::glib::format_size(files).as_str()),
@@ -1715,23 +1710,23 @@ impl Preferences {
         let (heading, body) = match self.editor_page {
             "filters" => (
                 i18n("Save the filter?"),
-                i18n("The filter editor is open. Save what you changed, or discard it, before moving on."),
+                i18n("Your changes are lost if you discard them."),
             ),
             "smart" => (
                 i18n("Save the smart folder?"),
-                i18n("The smart folder editor is open. Save what you changed, or discard it, before moving on."),
+                i18n("Your changes are lost if you discard them."),
             ),
             "tags" => (
                 i18n("Save the tag?"),
-                i18n("The tag editor is open. Save what you changed, or discard it, before moving on."),
+                i18n("Your changes are lost if you discard them."),
             ),
             "contacts" => (
                 i18n("Save the address book?"),
-                i18n("The address book editor is open. Save what you changed, or discard it, before moving on."),
+                i18n("Your changes are lost if you discard them."),
             ),
             _ => (
                 i18n("Save the account?"),
-                i18n("The account editor is open. Save what you changed, or discard it, before moving on."),
+                i18n("Your changes are lost if you discard them."),
             ),
         };
         let dialog = adw::MessageDialog::new(parent.as_ref(), Some(&heading), Some(&body));
@@ -4122,7 +4117,7 @@ impl Component for Preferences {
             // so, and ring no tile, since none of them is what shows.
             let custom = crate::app_icon::custom_icon().is_some();
             let note = gtk::Label::new(Some(
-                i18n("The launcher shows an icon set outside Hylki. Picking one here replaces it.")
+                i18n("The launcher shows an icon set elsewhere. Picking one here replaces it.")
                     .as_str(),
             ));
             note.add_css_class("dim-label");
@@ -4468,10 +4463,9 @@ impl Component for Preferences {
                 rows.show(&current);
                 if dicts.is_empty() {
                     rows.expander.set_sensitive(false);
-                    spelling_group.set_description(Some(
-                        "No dictionaries are visible to the app. On Flatpak, add your \
-                         language with: flatpak config --set extra-languages <code>",
-                    ));
+                    spelling_group.set_description(Some(&i18n(
+                        "No dictionaries found. On Flatpak, add a language with: flatpak config --set extra-languages <code>",
+                    )));
                 }
                 // Connected after the switches show the saved choice, and
                 // guarded besides, so showing it never saves it again.
@@ -4821,8 +4815,7 @@ impl Component for Preferences {
             PrefInput::RemoveDownloads => {
                 let dialog = adw::AlertDialog::new(
                     Some(&i18n("Remove downloaded mail?")),
-                    Some(&i18n("Every message and attachment kept on this computer is removed, and fetched \
-                               again from the server when it is opened. Nothing on the server changes.")),
+                    Some(&i18n("Mail and attachments on this computer are removed and fetched again when opened. Nothing on the server changes.")),
                 );
                 dialog.add_response("cancel", &i18n("Cancel"));
                 dialog.add_response("remove", &i18n("Remove"));

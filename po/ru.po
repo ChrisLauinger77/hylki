@@ -5495,7 +5495,7 @@ msgstr "Символическая"
 msgid "All unread inbox mail"
 msgstr "Учитывать непрочитанную почту"
 
-msgid "New since last in front"
+msgid "New since the window was last in front"
 msgstr ""
 
 msgid "Follow system"
@@ -5604,24 +5604,12 @@ msgid "Backup"
 msgstr "Резервное копирование"
 
 msgid ""
-"Which browser a link in a message opens in. Inside its Flatpak sandbox Hylki "
-"cannot see the applications installed on the system, so links leave through "
-"the desktop portal: choose \"Ask each time\" to pick the browser as each "
-"link is opened — the desktop's chooser can remember the choice."
+"Inside the Flatpak sandbox, links open through the desktop's chooser. \"Ask "
+"each time\" picks the browser per link with the option to remember it."
 msgstr ""
-"Браузер, в котором открываются ссылки из писем. Внутри изолированной среды "
-"Flatpak приложение Hylki не видит программы, установленные в системе, "
-"поэтому ссылки передаются через системный портал: выберите «Запрашивать "
-"каждый раз», чтобы выбирать браузер при открытии каждой ссылки — системный "
-"диалог выбора может запомнить решение."
 
-msgid ""
-"Which browser a link in a message opens in. \"System default\" follows the "
-"desktop's own choice; \"Ask each time\" lets the desktop ask before each one."
+msgid "\"Ask each time\" lets the desktop ask before each link."
 msgstr ""
-"Браузер, в котором открываются ссылки из писем. Значение «Системное по "
-"умолчанию» использует выбор рабочей среды; «Запрашивать каждый раз» "
-"позволяет системе выводить запрос перед открытием каждой ссылки."
 
 msgid "Not installed"
 msgstr "Не установлено"
@@ -5629,22 +5617,15 @@ msgstr "Не установлено"
 msgid "Installed and loaded by Files"
 msgstr "Установлено и загружено приложением «Файлы»"
 
-msgid ""
-"Installed, but the nautilus-python package is missing, so Files cannot load "
-"it"
-msgstr ""
-"Установлено, но пакет nautilus-python отсутствует, поэтому приложение "
-"«Файлы» не может его загрузить"
+#, fuzzy
+msgid "Installed, but nautilus-python is missing"
+msgstr "Сначала установите пакет nautilus-python: вставьте это в терминал"
 
-msgid ""
-"Installed. Files has not loaded it yet: restart Files, and make sure the "
-"nautilus-python package is installed"
+msgid "Installed. Restart Files to load it; it needs nautilus-python"
 msgstr ""
-"Установлено. Приложение «Файлы» ещё не загрузило расширение: перезапустите "
-"«Файлы» и убедитесь, что пакет nautilus-python установлен"
 
 #, fuzzy
-msgid "Installed, but not this version's copy"
+msgid "Installed, but from another version"
 msgstr "Установлено, но используется копия от другой версии"
 
 #, fuzzy
@@ -5652,8 +5633,8 @@ msgid "Measuring…"
 msgstr "Поиск…"
 
 msgid ""
-"Messages {bodies}, attachments {files}. The cache, message list included, is "
-"{total}."
+"Messages {bodies}, attachments {files}. {total} in all, with the message "
+"list."
 msgstr ""
 
 msgid "Search Settings"
@@ -5675,56 +5656,22 @@ msgstr ""
 msgid "Save the filter?"
 msgstr "Сохранить фильтр?"
 
-msgid ""
-"The filter editor is open. Save what you changed, or discard it, before "
-"moving on."
+msgid "Your changes are lost if you discard them."
 msgstr ""
-"Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
-"продолжить."
 
 #, fuzzy
 msgid "Save the smart folder?"
 msgstr "Сохранить фильтр?"
 
-#, fuzzy
-msgid ""
-"The smart folder editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-"Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
-"продолжить."
-
 msgid "Save the tag?"
 msgstr "Сохранить метку?"
-
-msgid ""
-"The tag editor is open. Save what you changed, or discard it, before moving "
-"on."
-msgstr ""
-"Редактор тега открыт. Сохраните изменения или отмените их, прежде чем "
-"продолжить."
 
 #, fuzzy
 msgid "Save the address book?"
 msgstr "Сохранить каталог?"
 
-#, fuzzy
-msgid ""
-"The address book editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-"Редактор каталогов открыт. Сохраните изменения или отмените их, прежде чем "
-"продолжить."
-
 msgid "Save the account?"
 msgstr "Сохранить учётную запись?"
-
-msgid ""
-"The account editor is open. Save what you changed, or discard it, before "
-"moving on."
-msgstr ""
-"Редактор учётной записи открыт. Сохраните изменения или отмените их, прежде "
-"чем продолжить."
 
 #, fuzzy
 msgid "Microsoft 365 accounts check at the interval above."
@@ -6599,8 +6546,7 @@ msgid "Bottom of the list"
 msgstr "Создание писем в основном окне"
 
 #, fuzzy
-msgid ""
-"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgid "The launcher shows an icon set elsewhere. Picking one here replaces it."
 msgstr ""
 "Ярлык использует значок, заданный вне Hylki. Выбор значка здесь заменит его."
 
@@ -6705,6 +6651,11 @@ msgstr "Соответствует порядку чтения"
 msgid "System language"
 msgstr "Системный язык"
 
+msgid ""
+"No dictionaries found. On Flatpak, add a language with: flatpak config --set "
+"extra-languages <code>"
+msgstr ""
+
 msgid "Add a word"
 msgstr "Добавить слово"
 
@@ -6719,8 +6670,8 @@ msgstr ""
 
 #, fuzzy
 msgid ""
-"Every message and attachment kept on this computer is removed, and fetched "
-"again from the server when it is opened. Nothing on the server changes."
+"Mail and attachments on this computer are removed and fetched again when "
+"opened. Nothing on the server changes."
 msgstr ""
 "Каталог будет удалён из Evolution Data Server, поэтому Evolution и другие "
 "использующие его приложения также перестанут его видеть. На самом сервере "
@@ -7695,9 +7646,77 @@ msgstr "Общие входящие в светлом режиме"
 msgid "Hyprlab"
 msgstr "Hyprlab"
 
+#~ msgid ""
+#~ "Which browser a link in a message opens in. Inside its Flatpak sandbox "
+#~ "Hylki cannot see the applications installed on the system, so links leave "
+#~ "through the desktop portal: choose \"Ask each time\" to pick the browser "
+#~ "as each link is opened — the desktop's chooser can remember the choice."
+#~ msgstr ""
+#~ "Браузер, в котором открываются ссылки из писем. Внутри изолированной "
+#~ "среды Flatpak приложение Hylki не видит программы, установленные в "
+#~ "системе, поэтому ссылки передаются через системный портал: выберите "
+#~ "«Запрашивать каждый раз», чтобы выбирать браузер при открытии каждой "
+#~ "ссылки — системный диалог выбора может запомнить решение."
+
+#~ msgid ""
+#~ "Which browser a link in a message opens in. \"System default\" follows "
+#~ "the desktop's own choice; \"Ask each time\" lets the desktop ask before "
+#~ "each one."
+#~ msgstr ""
+#~ "Браузер, в котором открываются ссылки из писем. Значение «Системное по "
+#~ "умолчанию» использует выбор рабочей среды; «Запрашивать каждый раз» "
+#~ "позволяет системе выводить запрос перед открытием каждой ссылки."
+
+#~ msgid ""
+#~ "Installed, but the nautilus-python package is missing, so Files cannot "
+#~ "load it"
+#~ msgstr ""
+#~ "Установлено, но пакет nautilus-python отсутствует, поэтому приложение "
+#~ "«Файлы» не может его загрузить"
+
+#~ msgid ""
+#~ "Installed. Files has not loaded it yet: restart Files, and make sure the "
+#~ "nautilus-python package is installed"
+#~ msgstr ""
+#~ "Установлено. Приложение «Файлы» ещё не загрузило расширение: "
+#~ "перезапустите «Файлы» и убедитесь, что пакет nautilus-python установлен"
+
+#~ msgid ""
+#~ "The filter editor is open. Save what you changed, or discard it, before "
+#~ "moving on."
+#~ msgstr ""
+#~ "Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
+#~ "продолжить."
+
 #, fuzzy
-#~ msgid "Installed, but nautilus-python is missing"
-#~ msgstr "Сначала установите пакет nautilus-python: вставьте это в терминал"
+#~ msgid ""
+#~ "The smart folder editor is open. Save what you changed, or discard it, "
+#~ "before moving on."
+#~ msgstr ""
+#~ "Редактор фильтра открыт. Сохраните изменения или отмените их, прежде чем "
+#~ "продолжить."
+
+#~ msgid ""
+#~ "The tag editor is open. Save what you changed, or discard it, before "
+#~ "moving on."
+#~ msgstr ""
+#~ "Редактор тега открыт. Сохраните изменения или отмените их, прежде чем "
+#~ "продолжить."
+
+#, fuzzy
+#~ msgid ""
+#~ "The address book editor is open. Save what you changed, or discard it, "
+#~ "before moving on."
+#~ msgstr ""
+#~ "Редактор каталогов открыт. Сохраните изменения или отмените их, прежде "
+#~ "чем продолжить."
+
+#~ msgid ""
+#~ "The account editor is open. Save what you changed, or discard it, before "
+#~ "moving on."
+#~ msgstr ""
+#~ "Редактор учётной записи открыт. Сохраните изменения или отмените их, "
+#~ "прежде чем продолжить."
 
 #~ msgid ""
 #~ "Enter your JMAP server's address, or the URL of its session resource. "

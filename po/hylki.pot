@@ -4874,7 +4874,7 @@ msgstr ""
 msgid "All unread inbox mail"
 msgstr ""
 
-msgid "New since last in front"
+msgid "New since the window was last in front"
 msgstr ""
 
 msgid "Follow system"
@@ -4983,15 +4983,11 @@ msgid "Backup"
 msgstr ""
 
 msgid ""
-"Which browser a link in a message opens in. Inside its Flatpak sandbox Hylki "
-"cannot see the applications installed on the system, so links leave through "
-"the desktop portal: choose \"Ask each time\" to pick the browser as each "
-"link is opened — the desktop's chooser can remember the choice."
+"Inside the Flatpak sandbox, links open through the desktop's chooser. \"Ask "
+"each time\" picks the browser per link with the option to remember it."
 msgstr ""
 
-msgid ""
-"Which browser a link in a message opens in. \"System default\" follows the "
-"desktop's own choice; \"Ask each time\" lets the desktop ask before each one."
+msgid "\"Ask each time\" lets the desktop ask before each link."
 msgstr ""
 
 msgid "Not installed"
@@ -5000,25 +4996,21 @@ msgstr ""
 msgid "Installed and loaded by Files"
 msgstr ""
 
-msgid ""
-"Installed, but the nautilus-python package is missing, so Files cannot load "
-"it"
+msgid "Installed, but nautilus-python is missing"
 msgstr ""
 
-msgid ""
-"Installed. Files has not loaded it yet: restart Files, and make sure the "
-"nautilus-python package is installed"
+msgid "Installed. Restart Files to load it; it needs nautilus-python"
 msgstr ""
 
-msgid "Installed, but not this version's copy"
+msgid "Installed, but from another version"
 msgstr ""
 
 msgid "Measuring…"
 msgstr ""
 
 msgid ""
-"Messages {bodies}, attachments {files}. The cache, message list included, is "
-"{total}."
+"Messages {bodies}, attachments {files}. {total} in all, with the message "
+"list."
 msgstr ""
 
 msgid "Search Settings"
@@ -5040,41 +5032,19 @@ msgstr ""
 msgid "Save the filter?"
 msgstr ""
 
-msgid ""
-"The filter editor is open. Save what you changed, or discard it, before "
-"moving on."
+msgid "Your changes are lost if you discard them."
 msgstr ""
 
 msgid "Save the smart folder?"
 msgstr ""
 
-msgid ""
-"The smart folder editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-
 msgid "Save the tag?"
-msgstr ""
-
-msgid ""
-"The tag editor is open. Save what you changed, or discard it, before moving "
-"on."
 msgstr ""
 
 msgid "Save the address book?"
 msgstr ""
 
-msgid ""
-"The address book editor is open. Save what you changed, or discard it, "
-"before moving on."
-msgstr ""
-
 msgid "Save the account?"
-msgstr ""
-
-msgid ""
-"The account editor is open. Save what you changed, or discard it, before "
-"moving on."
 msgstr ""
 
 msgid "Microsoft 365 accounts check at the interval above."
@@ -5881,8 +5851,7 @@ msgstr ""
 msgid "Bottom of the list"
 msgstr ""
 
-msgid ""
-"The launcher shows an icon set outside Hylki. Picking one here replaces it."
+msgid "The launcher shows an icon set elsewhere. Picking one here replaces it."
 msgstr ""
 
 msgid "Always"
@@ -5980,6 +5949,11 @@ msgstr ""
 msgid "System language"
 msgstr ""
 
+msgid ""
+"No dictionaries found. On Flatpak, add a language with: flatpak config --set "
+"extra-languages <code>"
+msgstr ""
+
 msgid "Add a word"
 msgstr ""
 
@@ -5993,8 +5967,8 @@ msgid "Remove downloaded mail?"
 msgstr ""
 
 msgid ""
-"Every message and attachment kept on this computer is removed, and fetched "
-"again from the server when it is opened. Nothing on the server changes."
+"Mail and attachments on this computer are removed and fetched again when "
+"opened. Nothing on the server changes."
 msgstr ""
 
 msgid "Could not remove the extension"
