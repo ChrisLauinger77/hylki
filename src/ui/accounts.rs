@@ -135,7 +135,7 @@ impl Provider {
     }
 }
 
-const APP_PW: &str = i18n_noop("Requires an app-specific password (not your normal login password).");
+const APP_PW: &str = i18n_noop("Needs an app password, not your login password.");
 
 /// The Provider dropdown, in display order. The plain IMAP/POP3 entry first
 /// (the default) with custom OAuth and any JMAP server under it, the
@@ -145,15 +145,15 @@ const APP_PW: &str = i18n_noop("Requires an app-specific password (not your norm
 pub(crate) const PROVIDERS: &[Provider] = &[
     Provider { label: "IMAP/POP3 Account", brand: "mail", kind: ProviderKind::Manual, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your server details manually.") },
     Provider { label: "Custom (OAuth)…", brand: "mail-oauth", kind: ProviderKind::CustomOAuth, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your provider's OAuth endpoints, then sign in.") },
-    Provider { label: "JMAP Server", brand: "mail-jmap", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your JMAP server's address, or the URL of its session resource. Mail is read and sent over JMAP; no SMTP settings are needed.") },
-    Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
-    Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Sign in with your browser — no password needed.") },
+    Provider { label: "JMAP Server", brand: "mail-jmap", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Your JMAP server's address or session URL. No SMTP settings needed.") },
+    Provider { label: "Google (Gmail) — sign in", brand: "gmail", kind: ProviderKind::Google, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in through your browser. No password needed.") },
+    Provider { label: "Microsoft 365 / Outlook", brand: "outlook", kind: ProviderKind::Microsoft, imap_host: "", imap_port: 0, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in through your browser. No password needed.") },
     Provider { label: "iCloud", brand: "icloud", kind: ProviderKind::Preset, imap_host: "imap.mail.me.com", imap_port: 993, smtp_host: "smtp.mail.me.com", smtp_port: 587, hint: APP_PW },
     Provider { label: "Yahoo Mail", brand: "yahoo", kind: ProviderKind::Preset, imap_host: "imap.mail.yahoo.com", imap_port: 993, smtp_host: "smtp.mail.yahoo.com", smtp_port: 465, hint: APP_PW },
     Provider { label: "Proton Mail (Bridge)", brand: "proton", kind: ProviderKind::Preset, imap_host: "127.0.0.1", imap_port: 1143, smtp_host: "127.0.0.1", smtp_port: 1025, hint: i18n_noop("Requires Proton Mail Bridge running locally.") },
     Provider { label: "Fastmail", brand: "fastmail", kind: ProviderKind::Preset, imap_host: "imap.fastmail.com", imap_port: 993, smtp_host: "smtp.fastmail.com", smtp_port: 465, hint: APP_PW },
-    Provider { label: "Fastmail (JMAP)", brand: "fastmail", kind: ProviderKind::Jmap, imap_host: "https://api.fastmail.com/jmap/session", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in with an API token, not your password. Make one in Fastmail's settings, under Privacy & Security, with access to mail and to sending it. Mail is read and sent over JMAP.") },
-    Provider { label: "Stalwart (JMAP)", brand: "stalwart", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Enter your Stalwart server's address. Mail is read and sent over JMAP; no SMTP settings are needed.") },
+    Provider { label: "Fastmail (JMAP)", brand: "fastmail", kind: ProviderKind::Jmap, imap_host: "https://api.fastmail.com/jmap/session", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Signs in with an API token made in Fastmail under Privacy & Security, with access to mail and sending.") },
+    Provider { label: "Stalwart (JMAP)", brand: "stalwart", kind: ProviderKind::Jmap, imap_host: "", imap_port: 443, smtp_host: "", smtp_port: 0, hint: i18n_noop("Your Stalwart server's address. No SMTP settings needed.") },
     Provider { label: "AOL Mail", brand: "aol", kind: ProviderKind::Preset, imap_host: "imap.aol.com", imap_port: 993, smtp_host: "smtp.aol.com", smtp_port: 465, hint: APP_PW },
     Provider { label: "Zoho Mail", brand: "zoho", kind: ProviderKind::Preset, imap_host: "imap.zoho.com", imap_port: 993, smtp_host: "smtp.zoho.com", smtp_port: 465, hint: "" },
     Provider { label: "GMX", brand: "gmx", kind: ProviderKind::Preset, imap_host: "imap.gmx.com", imap_port: 993, smtp_host: "mail.gmx.com", smtp_port: 587, hint: i18n_noop("Enable POP/IMAP access in GMX settings first.") },
@@ -790,7 +790,7 @@ impl Component for AccountsWindow {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Mail Accounts"),
                                     set_description: Some(
-                                        i18n("Drag to set the order they appear in the sidebar.").as_str()
+                                        i18n("Drag to reorder them in the sidebar.").as_str()
                                     ),
                                     // At the header's end, as the Tags and
                                     // Cloud Storage panels place theirs.
@@ -831,8 +831,7 @@ impl Component for AccountsWindow {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("GNOME Online Accounts"),
                                     set_description: Some(
-                                        i18n("Mail accounts from GNOME Settings. Toggle one on to \
-                                         use it in Hylki.").as_str()
+                                        i18n("Mail accounts from GNOME Settings. Switch one on to use it.").as_str()
                                     ),
                                     set_visible: false,
 
@@ -849,11 +848,7 @@ impl Component for AccountsWindow {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Tags"),
                                     set_description: Some(
-                                        i18n("Label messages with one or more colored tags. \
-                                         Tags are stored on the mail server as IMAP keywords, \
-                                         so Thunderbird and other clients show the same tags.\n\n\
-                                         Drag a tag to reorder: the order here is the sidebar's, \
-                                         and the first nine answer to the 1–9 keys.").as_str()
+                                        i18n("Tags are stored on the server as IMAP keywords, so Thunderbird and other clients show them too.\n\nDrag to reorder. The first nine are mapped to the 1–9 keys.").as_str()
                                     ),
                                     #[wrap(Some)]
                                     // Stacked like the Cloud Storage panel's
@@ -910,10 +905,7 @@ impl Component for AccountsWindow {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Smart Folders"),
                                     set_description: Some(
-                                        i18n("A smart folder lists the messages that match its conditions, \
-                                         from every folder or one kind of folder, in one account or all \
-                                         of them. It searches the mail on this computer and appears in \
-                                         the sidebar under the unified rows.").as_str()
+                                        i18n("Lists the messages that match its conditions. Shown in the sidebar under the unified rows.").as_str()
                                     ),
                                     #[wrap(Some)]
                                     set_header_suffix = &gtk::Button {
@@ -949,11 +941,7 @@ impl Component for AccountsWindow {
                                 add = &adw::PreferencesGroup {
                                     set_title: &i18n("Filters"),
                                     set_description: Some(
-                                        i18n("File incoming mail into folders or tag it automatically, \
-                                         by sender, subject or recipients. Applied to each \
-                                         account's Inbox as Hylki syncs it, or to the mail already \
-                                         there with Apply Now; a folder's right-click menu runs \
-                                         them over that one folder.").as_str()
+                                        i18n("File or tag incoming mail automatically. Filters run on each Inbox as it syncs; Apply Now runs them over the mail already there.").as_str()
                                     ),
                                     // At the header's end, like the other
                                     // panels' buttons.
@@ -1058,12 +1046,9 @@ impl Component for AccountsWindow {
                                 },
 
                                 add = &adw::PreferencesGroup {
-                                    set_title: &i18n("Blacklist"),
+                                    set_title: &i18n("Blocked Senders"),
                                     set_description: Some(
-                                        i18n("Incoming mail from these senders is deleted \
-                                         automatically (moved to Trash). Enter an email \
-                                         address, or a whole domain like \"example.com\" \
-                                         to block every sender there.").as_str()
+                                        i18n("Their mail is moved to Trash on arrival. Enter an address, or a domain like \"example.com\" to apply to all senders from that domain.").as_str()
                                     ),
 
                                     #[name = "add_blacklist_row"]
@@ -1161,8 +1146,7 @@ impl Component for AccountsWindow {
                                 #[name = "goa_enabled_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Show in Hylki"),
-                                    set_subtitle: &i18n("Switching this off returns the account to the \
-                                                   import list — it stays in GNOME Online Accounts."),
+                                    set_subtitle: &i18n("Off returns it to the import list. It stays in GNOME Online Accounts."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input_sender().emit(AccountsInput::ToggleCurrentEnabled(row.is_active()));
                                     },
@@ -1175,7 +1159,7 @@ impl Component for AccountsWindow {
                                     set_margin_top: 12,
 
                                     gtk::Label {
-                                        set_label: &i18n("This account is managed by GNOME Online Accounts.\nIts address, servers and password are changed in Settings \u{2192} Online Accounts."),
+                                        set_label: &i18n("Managed by GNOME Online Accounts. Its address, servers and password are changed in Settings \u{2192} Online Accounts."),
                                         set_xalign: 0.0,
                                         set_halign: gtk::Align::Start,
                                         set_wrap: true,
@@ -1223,7 +1207,7 @@ impl Component for AccountsWindow {
                                 // other rows carry their hints.
                                 #[name = "label_row"]
                                 adw::EntryRow {
-                                    set_title: &i18n("Nickname (shown in the sidebar and the Mail Accounts list)"),
+                                    set_title: &i18n("Nickname"),
                                 },
 
                                 // Then the provider; the rest of the form
@@ -1231,7 +1215,6 @@ impl Component for AccountsWindow {
                                 #[name = "provider_row"]
                                 adw::ComboRow {
                                     set_title: &i18n("Provider"),
-                                    set_subtitle: &i18n("Choose your email provider."),
                                     connect_selected_notify => AccountsInput::ProviderChanged,
                                 },
                                 #[name = "name_row"]
@@ -1269,7 +1252,7 @@ impl Component for AccountsWindow {
                                 #[name = "jmap_token_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Sign in with an API token"),
-                                    set_subtitle: &i18n("For servers that take a token in place of the password, as Fastmail does."),
+                                    set_subtitle: &i18n("For servers, like Fastmail, that take a token instead of a password."),
                                     set_visible: false,
                                     connect_active_notify => AccountsInput::ProtocolChanged,
                                 },
@@ -1361,12 +1344,7 @@ impl Component for AccountsWindow {
                                         set_wrap: true,
                                         set_xalign: 0.0,
                                         add_css_class: "dim-label",
-                                        set_label: &i18n("Google and Microsoft sign-in use GNOME Online \
-                                            Accounts.\n\n\
-                                            1. Open Online Accounts and sign in there.\n\
-                                            2. Come back to Hylki and reopen this window — the \
-                                            account then appears under “GNOME Online \
-                                            Accounts” at the top of this window. Enable it there."),
+                                        set_label: &i18n("Google and Microsoft sign in through GNOME Online Accounts. Sign in there, then reopen this window and switch the account on under GNOME Online Accounts."),
                                     },
                                     gtk::Button {
                                         set_label: &i18n("Open Online Accounts…"),
@@ -1379,8 +1357,7 @@ impl Component for AccountsWindow {
                                 #[name = "smtp_separate_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Separate SMTP credentials"),
-                                    set_subtitle: &i18n("Use a different username and password for \
-                                                   sending. Off = use the credentials above."),
+                                    set_subtitle: &i18n("Off uses the credentials above."),
                                 },
                                 #[name = "smtp_user_row"]
                                 adw::EntryRow { set_title: &i18n("SMTP Username") },
@@ -1389,7 +1366,7 @@ impl Component for AccountsWindow {
                                 #[name = "tls_mismatch_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Accept a certificate for another name"),
-                                    set_subtitle: &i18n("The server's certificate must still be valid and signed, but may be issued for a different host name than the one entered, as on shared hosting. Turn on only when the connection test says the names differ."),
+                                    set_subtitle: &i18n("For shared hosting. Turn on only when the connection test says the names differ."),
                                 },
 
                                 // Off keeps a mailbox read on its own out of
@@ -1398,9 +1375,7 @@ impl Component for AccountsWindow {
                                 #[name = "in_unified_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Show in All Inboxes"),
-                                    set_subtitle: &i18n("Include this account's mail in the unified Inboxes, \
-                                                   Starred, Sent, Drafts and Archive, and in the unified \
-                                                   Filters and Tags."),
+                                    set_subtitle: &i18n("Also in the unified Starred, Sent, Drafts, Archive, Filters and Tags."),
                                     set_active: true,
                                 },
 
@@ -1431,10 +1406,6 @@ impl Component for AccountsWindow {
 
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Appearance"),
-                                set_description: Some(
-                                    i18n("How this account is shown in the sidebar and \
-                                     the Inboxes view.").as_str()
-                                ),
 
                                 // The sidebar circle as it will look, as the
                                 // group's first row (a non-row child would
@@ -1473,8 +1444,6 @@ impl Component for AccountsWindow {
                                 // folders and mail elsewhere.
                                 adw::ActionRow {
                                     set_title: &i18n("Account accent color"),
-                                    set_subtitle: &i18n("The account circle background, and this account's \
-                                                   marks in the sidebar and lists"),
                                     #[name = "color_btn"]
                                     add_suffix = &gtk::ColorDialogButton {
                                         set_valign: gtk::Align::Center,
@@ -1492,10 +1461,7 @@ impl Component for AccountsWindow {
                                 #[name = "gravatar_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Use my Gravatar"),
-                                    set_subtitle: &i18n("Show the picture this address has at gravatar.com. \
-                                                   Looking it up sends them a hash of the address, and \
-                                                   if there is none, the circle falls back to the \
-                                                   choice below."),
+                                    set_subtitle: &i18n("Sends gravatar.com a hash of the address."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input_sender().emit(AccountsInput::SetOwnGravatar(row.is_active()));
                                     },
@@ -1528,7 +1494,7 @@ impl Component for AccountsWindow {
                                 #[name = "emoji_row"]
                                 adw::ActionRow {
                                     set_title: &i18n("Emoji"),
-                                    set_subtitle: &i18n("Shown in the circle instead of the initials"),
+                                    set_subtitle: &i18n("Instead of initials."),
 
                                     #[name = "emoji_btn"]
                                     add_suffix = &gtk::MenuButton {
@@ -1553,7 +1519,6 @@ impl Component for AccountsWindow {
                                 #[name = "picture_row"]
                                 adw::ActionRow {
                                     set_title: &i18n("Picture"),
-                                    set_subtitle: &i18n("A photo or logo from this computer"),
                                     set_visible: false,
                                     add_suffix = &gtk::Button {
                                         set_valign: gtk::Align::Center,
@@ -1578,8 +1543,7 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Send-as aliases"),
                                 set_description: Some(
-                                    i18n("Extra addresses this account can send as. An alias \
-                                     can use this account's SMTP server, or bring its own.").as_str()
+                                    i18n("Extra addresses this account can send as.").as_str()
                                 ),
 
                                 // At the header's end, styled like the Add
@@ -1611,8 +1575,7 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Signatures"),
                                 set_description: Some(
-                                    i18n("Put in messages sent from this account. With more than one, \
-                                          the composer's signature button lists them.")
+                                    i18n("With more than one, the composer's signature button allows you to pick between them.")
                                         .as_str()
                                 ),
                                 // A designed signature usually exists as HTML
@@ -1691,23 +1654,17 @@ impl Component for AccountsWindow {
                                 #[name = "empty_junk_row"]
                                 adw::ComboRow {
                                     set_title: &i18n("Empty Junk automatically"),
-                                    set_subtitle: &i18n("Delete junk mail older than this for good, \
-                                                   checked at each sync."),
                                 },
                                 #[name = "empty_trash_row"]
                                 adw::ComboRow {
                                     set_title: &i18n("Empty Trash automatically"),
-                                    set_subtitle: &i18n("Delete mail in the Trash older than this for \
-                                                   good, checked at each sync."),
                                 },
                                 // Mailing-list mail past the chosen age goes
                                 // to the Trash (#407).
                                 #[name = "clean_lists_row"]
                                 adw::ComboRow {
                                     set_title: &i18n("Move list mail to Trash"),
-                                    set_subtitle: &i18n("Inbox mail from mailing lists and newsletters \
-                                                   (anything with an unsubscribe link) older than this, \
-                                                   unless starred. Checked at each sync."),
+                                    set_subtitle: &i18n("Inbox mail with an unsubscribe link older than this gets trashed unless it's starred."),
                                 },
                             },
 
@@ -1724,7 +1681,7 @@ impl Component for AccountsWindow {
                                 #[name = "graph_directory_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Search the organization directory"),
-                                    set_subtitle: &i18n("Suggest people from your organization as you type a recipient."),
+                                    set_subtitle: &i18n("Suggests people from your organization as you type."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input_sender().emit(AccountsInput::SetGraphDirectory(row.is_active()));
                                     },
@@ -1732,15 +1689,12 @@ impl Component for AccountsWindow {
                                 #[name = "directory_only_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Suggest only from this account"),
-                                    set_subtitle: &i18n("Writing from this account, suggest people from the \
-                                                   directory and from its own mail, not from Contacts, \
-                                                   LDAP directories or other accounts."),
+                                    set_subtitle: &i18n("Suggestions come from the directory and this account's mail only."),
                                 },
                                 #[name = "graph_labels_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Show sensitivity label names"),
-                                    set_subtitle: &i18n("Name a message's label from your organization's list \
-                                                   when the message gives only its ID."),
+                                    set_subtitle: &i18n("Shows a label's name when a message gives only its ID."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input_sender().emit(AccountsInput::SetGraphLabels(row.is_active()));
                                     },
@@ -1761,8 +1715,7 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Folder Order"),
                                 set_description: Some(
-                                    i18n("How this account's folders are sorted in the sidebar. Also \
-                                          in the right-click menu of its Folders heading.").as_str()
+                                    i18n("Also in the right-click menu of its Folders heading.").as_str()
                                 ),
 
                                 #[name = "folder_sort_row"]
@@ -1783,10 +1736,7 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("Special Folders"),
                                 set_description: Some(
-                                    i18n("Which of this account's folders hold each role. Automatically \
-                                          follows the server's own markings; pick a folder when a role \
-                                          isn't detected or lands wrong. Nothing already on the server \
-                                          moves: a role says where mail goes from now on.").as_str()
+                                    i18n("Follows the server's own markings unless you pick a folder. Nothing already on the server moves.").as_str()
                                 ),
 
                                 #[name = "folder_sent_row"]
@@ -1813,8 +1763,7 @@ impl Component for AccountsWindow {
                                 #[name = "server_saves_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Server saves its own copy of sent mail"),
-                                    set_subtitle: &i18n("For Gmail and others that file sent mail \
-                                                   themselves. Disables both Save a copy rows above."),
+                                    set_subtitle: &i18n("For Gmail and others that file sent mail themselves."),
                                     connect_active_notify[sender] => move |row| {
                                         sender.input_sender().emit(AccountsInput::SetServerSavesSent(row.is_active()));
                                     },
@@ -1840,10 +1789,7 @@ impl Component for AccountsWindow {
                             adw::PreferencesGroup {
                                 set_title: &i18n("Hidden Folders"),
                                 set_description: Some(
-                                    i18n("Folders kept out of the sidebar and left unsynced. Hide one \
-                                          from its right-click menu in the sidebar; Show brings it \
-                                          back. An Exchange server's calendar, contacts and task \
-                                          folders are hidden here from the start.").as_str()
+                                    i18n("Hidden folders are not synced. Hide one from its right-click menu in the sidebar.").as_str()
                                 ),
                                 #[name = "hidden_list"]
                                 gtk::ListBox {
@@ -1863,9 +1809,7 @@ impl Component for AccountsWindow {
                             add = &adw::PreferencesGroup {
                                 set_title: &i18n("OpenPGP"),
                                 set_description: Some(
-                                    i18n("The key that signs mail sent from this account and opens \
-                                     what is encrypted to it. Keys are managed under OpenPGP in \
-                                     the sidebar.").as_str()
+                                    i18n("Keys are managed under OpenPGP in the sidebar.").as_str()
                                 ),
                                 #[name = "pgp_key_row"]
                                 adw::ComboRow {
@@ -1878,7 +1822,6 @@ impl Component for AccountsWindow {
                                 #[name = "sign_default_row"]
                                 adw::SwitchRow {
                                     set_title: &i18n("Sign messages by default"),
-                                    set_subtitle: &i18n("New messages, replies and forwards start with signing on."),
                                 },
                                 // Protected headers (#493): on, an encrypted
                                 // message says "..." where its subject would be.
@@ -1901,8 +1844,7 @@ impl Component for AccountsWindow {
                                     set_xalign: 0.0,
                                     add_css_class: "dim-label",
                                     add_css_class: "caption",
-                                    set_label: &i18n("Your password is stored in the system keyring \
-                                                (secret-service), never in plain text on disk."),
+                                    set_label: &i18n("Your password is kept in the system keyring, never in plain text."),
                                 },
                             },
                         },
@@ -3534,7 +3476,7 @@ impl Component for AccountsWindow {
                             }
                         }
                         widgets.oauth_status.set_css_classes(&["success"]);
-                        widgets.oauth_status.set_label(&i18n("✓ Signed in — save the account to finish"));
+                        widgets.oauth_status.set_label(&i18n("✓ Signed in. Save the account to finish."));
                     }
                     Err(e) => {
                         widgets.oauth_status.set_css_classes(&["error"]);
@@ -3800,7 +3742,7 @@ impl AccountsWindow {
                 format!("{name} <{addr}>")
             };
             row.set_title(&gtk::glib::markup_escape_text(&title));
-            row.set_subtitle(&i18n("Kept on the server; change it through your provider's webmail interface."));
+            row.set_subtitle(&i18n("Kept on the server; change it in your provider's webmail."));
             list.append(&row);
         }
     }
@@ -4394,9 +4336,9 @@ impl AccountsWindow {
         widgets.graph_directory_row.set_sensitive(!from_goa);
         widgets.graph_labels_row.set_sensitive(!from_goa);
         widgets.graph_group.set_description(Some(&if from_goa {
-            i18n("Only for an account signed in within Hylki. To use these, add this account with Microsoft 365 / Outlook as the provider, instead of from GNOME Online Accounts.")
+            i18n("Only for an account added in Hylki with Microsoft 365 / Outlook as the provider, not from GNOME Online Accounts.")
         } else {
-            i18n("Turning one of these on asks Microsoft for access; some organizations need an administrator to approve it.")
+            i18n("Asks Microsoft for access. Some organizations need an administrator to approve it.")
         }));
     }
 
@@ -5799,7 +5741,7 @@ impl AccountsWindow {
             let dialog = adw::MessageDialog::new(
                 parent,
                 Some(i18n("No New Tags").as_str()),
-                Some(i18n("No tags were found in your mailboxes that are not already set up here.").as_str()),
+                Some(i18n("Every tag in your mailboxes is already set up here.").as_str()),
             );
             dialog.add_response("ok", &i18n("OK"));
             dialog.set_default_response(Some("ok"));
@@ -5814,9 +5756,7 @@ impl AccountsWindow {
             Some(i18n("Tags Found").as_str()),
             Some(
                 i18n_f(
-                    "{n} tags are in use in your mailboxes but not set up here. \
-                     Import them all, or choose which to add. Names and colors \
-                     can be changed afterwards.",
+                    "{n} tags are in use in your mailboxes but not set up here.",
                     &[("n", &n.to_string())],
                 )
                 .as_str(),
@@ -5987,7 +5927,7 @@ impl AccountsWindow {
             names.extend(emails.iter().map(|e| e.as_str()));
             account_row.set_model(Some(&gtk::StringList::new(&names)));
         }
-        account_row.set_subtitle(&i18n("All accounts means those in the unified section"));
+        account_row.set_subtitle(&i18n("Those in the unified section."));
         where_group.add(&account_row);
         let folder_row = adw::ComboRow::new();
         folder_row.set_title(&i18n("Folders"));
@@ -6022,7 +5962,7 @@ impl AccountsWindow {
                 field.set_model(Some(&gtk::StringList::new(&refs)));
                 let matcher = adw::ComboRow::new();
                 matcher.set_title(&i18n("Match"));
-                matcher.set_subtitle(&i18n("Commas separate alternatives; any one of them counts"));
+                matcher.set_subtitle(&i18n("Separate alternatives with commas."));
                 let refs: Vec<&str> = match_names.iter().map(|s| s.as_str()).collect();
                 matcher.set_model(Some(&gtk::StringList::new(&refs)));
                 let value = adw::EntryRow::new();
@@ -6271,7 +6211,7 @@ impl AccountsWindow {
                 key.add_css_class("shortcut-key");
                 key.set_valign(gtk::Align::Center);
                 key.set_tooltip_text(Some(
-                    i18n("Press this key on a message to add or remove the tag (with single-key shortcuts on)").as_str(),
+                    i18n("Toggles the tag on a message (with single-key shortcuts on)").as_str(),
                 ));
                 row.add_suffix(&key);
             }
@@ -6339,8 +6279,7 @@ impl AccountsWindow {
         let keyword_row = adw::EntryRow::new();
         keyword_row.set_title(&i18n("Keyword"));
         keyword_row.set_tooltip_text(Some(
-            i18n("How the tag is stored on the server: letters, digits and most punctuation, \
-                  no spaces. Thunderbird's built-in tags are $label1 to $label5.")
+            i18n("How the server stores the tag, without spaces. Thunderbird's built-in tags are $label1 to $label5.")
                 .as_str(),
         ));
 
@@ -6674,7 +6613,7 @@ impl AccountsWindow {
                 field.set_model(Some(&gtk::StringList::new(&refs)));
                 let matcher = adw::ComboRow::new();
                 matcher.set_title(&i18n("Match"));
-                matcher.set_subtitle(&i18n("Commas separate alternatives; any one of them counts"));
+                matcher.set_subtitle(&i18n("Separate alternatives with commas."));
                 let refs: Vec<&str> = match_names.iter().map(|s| s.as_str()).collect();
                 matcher.set_model(Some(&gtk::StringList::new(&refs)));
                 let value = adw::EntryRow::new();
