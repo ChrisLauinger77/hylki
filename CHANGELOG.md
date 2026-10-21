@@ -12,6 +12,13 @@
   opened. On a mailbox of 92,000 messages and 1,150 contacts the app went
   from 936 MB to 655 MB. The exported log's memory section now counts the
   views kept as built and the Contacts list.
+  A visit to such a row also kept its messages for the rest of the session,
+  and so did a move into its folders: they are now let go when the row is
+  left, and the freed memory is handed back a few seconds later. While it is
+  open the row reads the folders where they are rather than from a copy,
+  and the other rows kept as built are no longer built again on each visit.
+  Four visits to an 81,000-message Archive used to leave the app at about
+  1 GB; it now comes back to about 730 MB.
 
 - **Changed: shorter text in Settings.** Subtitles that repeated their
   title are gone, and the descriptions, setup steps and dialogs left say

@@ -10088,8 +10088,13 @@ impl SimpleComponent for AppModel {
                     let messages = self.apply_pending_answers(account_id, folder_id, messages);
                     let messages = self.apply_pending_tags(account_id, folder_id, messages);
                     if open && self.is_unified_target(account_id, folder_id) {
-                        self.unified_unfilled.remove(&(account_id, folder_id));
-                        self.unified_slices.insert((account_id, folder_id), messages.clone());
+                        if self.unified_reads_through() {
+                            self.unified_slices.remove(&(account_id, folder_id));
+                            self.unified_unfilled.insert((account_id, folder_id));
+                        } else {
+                            self.unified_unfilled.remove(&(account_id, folder_id));
+                            self.unified_slices.insert((account_id, folder_id), messages.clone());
+                        }
                         landed = true;
                     } else if !open
                         && self.selected.as_ref().is_some_and(|s| (s.account_id, s.folder_id) == (account_id, folder_id))
@@ -10099,6 +10104,8 @@ impl SimpleComponent for AppModel {
                     }
                     self.message_cache.insert((account_id, folder_id), messages);
                 }
+                // A view left before its folders landed.
+                self.shed_large_folders();
                 if landed {
                     self.emit_unified();
                     self.push_index_complete();
@@ -11891,8 +11898,21 @@ impl SimpleComponent for AppModel {
                         crate::notify::withdraw_mail(account_id);
                     }
                 }
-                self.message_cache
-                    .insert((account_id, folder_id), messages.clone());
+                // An Archive answers each visit with the same tens of
+                // thousands of messages: copying them over themselves only
+                // churned the heap (#504).
+                if !unchanged {
+                    // Nor is a large folder off screen taken in: the worker
+                    // lists a folder again after every move into it.
+                    let key = (account_id, folder_id);
+                    let on_show = self.folders_on_show();
+                    if self.message_cache.contains_key(&key)
+                        || !self.too_large_off_screen(key, messages.len(), &on_show)
+                    {
+                        self.message_cache.insert(key, messages.clone());
+                    }
+                    self.shed_large_folders();
+                }
                 // A draft picker waiting on this folder's list (Send with
                 // Hylki → Continue a Draft…) opens once every Drafts folder
                 // has answered.
@@ -11958,14 +11978,22 @@ impl SimpleComponent for AppModel {
                 if self.unified {
                     // Accept only the folders the view merges, by recency.
                     if self.is_unified_target(account_id, folder_id) {
+                        let key = (account_id, folder_id);
+                        let through = self.unified_reads_through();
                         let same_slice = unchanged
-                            && self
-                                .unified_slices
-                                .get(&(account_id, folder_id))
-                                .is_some_and(|s| *s == messages);
+                            && if through {
+                                self.unified_unfilled.contains(&key)
+                            } else {
+                                self.unified_slices.get(&key).is_some_and(|s| *s == messages)
+                            };
                         if !same_slice {
-                            self.unified_unfilled.remove(&(account_id, folder_id));
-                            self.unified_slices.insert((account_id, folder_id), messages);
+                            if through {
+                                self.unified_slices.remove(&key);
+                                self.unified_unfilled.insert(key);
+                            } else {
+                                self.unified_unfilled.remove(&key);
+                                self.unified_slices.insert(key, messages);
+                            }
                             // Accounts answer one after another, a large or
                             // slow one in several goes: one merge for the lot
                             // that lands together, not one each.
@@ -12067,10 +12095,13 @@ impl SimpleComponent for AppModel {
                 // Feed the visible list so search covers the new messages live.
                 if self.unified {
                     if self.is_unified_target(account_id, folder_id) {
-                        self.unified_slices
-                            .entry((account_id, folder_id))
-                            .or_default()
-                            .extend(fresh.iter().cloned());
+                        // A folder read where it is has them already.
+                        if !self.unified_unfilled.contains(&(account_id, folder_id)) {
+                            self.unified_slices
+                                .entry((account_id, folder_id))
+                                .or_default()
+                                .extend(fresh.iter().cloned());
+                        }
                         self.message_list
                             .emit(MessageListInput::AppendMessages { messages: fresh });
                     }
@@ -17065,6 +17096,7 @@ impl AppModel {
             });
         }
         self.push_index_complete();
+        self.shed_large_folders();
         tracing::info!(
             "unified {view:?}: opened in {:?} with {} cached messages",
             t_open.elapsed(),
@@ -17431,6 +17463,7 @@ impl AppModel {
             }
         }
         self.push_index_complete();
+        self.shed_large_folders();
         self.send_to(account_id, MailRequest::LoadMessages { folder_id, path });
     }
 
@@ -21403,10 +21436,15 @@ impl AppModel {
         // put every message's reply headers here, to be cloned on each sync and
         // walked on each rebuild. A conversation is joined by mail near it in
         // time, so the newest links are the ones that do the joining.
+        // Not from the folders of a view too large to keep, held only while
+        // it is on show: they would change every list's links as they come
+        // and go, and every row kept as built with them (#504).
+        let nowhere = HashSet::new();
         let mut recent: Vec<&Message> = self
             .message_cache
-            .values()
-            .flatten()
+            .iter()
+            .filter(|(k, l)| !self.too_large_off_screen(**k, l.len(), &nowhere))
+            .flat_map(|(_, l)| l)
             .filter(|m| !(m.message_id.is_empty() && m.references.is_empty()))
             .collect();
         // The newest few, picked without sorting the lot: across every
@@ -21465,7 +21503,7 @@ impl AppModel {
         // account that keeps sending batches (a large folder catching up)
         // must not keep the window busy regrouping. A second for a small
         // view, up to five for one of tens of thousands of messages.
-        let size: usize = self.unified_slices.values().map(Vec::len).sum();
+        let size = self.unified_content().count();
         let gap = std::time::Duration::from_millis((size as u64 / 16).clamp(1000, 5000));
         let since = self.unified_emitted_at.get().elapsed();
         let wait = std::time::Duration::from_millis(150).max(gap.saturating_sub(since));
@@ -21516,7 +21554,7 @@ impl AppModel {
             }
             let mut messages: Vec<Message> = content().cloned().collect();
             messages.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-            tracing::debug!("prebuild: {view:?}, {} messages", messages.len());
+            tracing::debug!("prebuild: {view:?}, {} messages ({})", messages.len(), self.message_list.model().view_miss(key, fp));
             self.message_list.emit(MessageListInput::Prebuild { key, fp, messages });
             let s = sender.input_sender().clone();
             gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
@@ -21617,10 +21655,88 @@ impl AppModel {
         filled.chain(unfilled)
     }
 
+    /// Whether the open unified view reads its folders from the folder
+    /// caches rather than from copies. A row of whole folders has nothing a
+    /// copy would add, and an Archive's copy was tens of megabytes (#504).
+    /// Starred keeps its slices: they are a folder's starred messages, not
+    /// the folder.
+    fn unified_reads_through(&self) -> bool {
+        matches!(self.unified_view, UnifiedView::Kind(kind) if kind != FolderKind::Starred)
+    }
+
+    /// The folders on show: the open unified view's, or the open folder.
+    fn folders_on_show(&self) -> HashSet<(u32, u32)> {
+        if self.unified {
+            self.unified_targets().into_iter().map(|(a, f, _)| (a, f)).collect()
+        } else {
+            self.selected.iter().map(|s| (s.account_id, s.folder_id)).collect()
+        }
+    }
+
+    /// Whether a folder of `len` messages is too large to keep in memory
+    /// off screen: alone, or with the other folders of its unified row,
+    /// more than [`crate::ui::message_list::KEEP_AT_MOST`]. Inboxes and the
+    /// folders whose unread mail is counted are always kept: what arrives
+    /// next is compared with them.
+    fn too_large_off_screen(&self, key: (u32, u32), len: usize, on_show: &HashSet<(u32, u32)>) -> bool {
+        use crate::ui::message_list::KEEP_AT_MOST;
+        let kind_of = |k: &(u32, u32)| self.folder_kind(k.0, k.1).unwrap_or(FolderKind::Custom);
+        let kind = kind_of(&key);
+        if kind == FolderKind::Inbox || on_show.contains(&key) {
+            return false;
+        }
+        let row = match kind {
+            FolderKind::Custom => len,
+            _ => {
+                len + self
+                    .message_cache
+                    .iter()
+                    .filter(|(k, _)| **k != key && kind_of(k) == kind)
+                    .map(|(_, l)| l.len())
+                    .sum::<usize>()
+            }
+        };
+        row > KEEP_AT_MOST && !self.counted_folders(key.0).iter().any(|c| c.id == key.1)
+    }
+
+    /// Let go of the folders [`Self::too_large_off_screen`] picks out, once
+    /// their view is left. Read for one visit, an Archive of 81,000 messages
+    /// stayed for the rest of the session, with the heap it was copied
+    /// through (#504). Its next visit reads the index, as its first did.
+    fn shed_large_folders(&mut self) {
+        let on_show = self.folders_on_show();
+        let shed: Vec<(u32, u32)> = self
+            .message_cache
+            .iter()
+            .filter(|(k, l)| self.too_large_off_screen(**k, l.len(), &on_show))
+            .map(|(k, _)| *k)
+            .collect();
+        if shed.is_empty() {
+            return;
+        }
+        let n: usize = shed.iter().filter_map(|k| self.message_cache.remove(k)).map(|l| l.len()).sum();
+        tracing::debug!("let go of {} folders off screen, {n} messages", shed.len());
+        // Handed back once the list has let go of its rows too, a frame or
+        // so on, rather than at the next half-minute trim: a system monitor
+        // watched over the switch should see the memory go.
+        gtk::glib::timeout_add_seconds_local_once(3, || {
+            if let Some(held) = crate::memory_report::trim_if_worthwhile() {
+                tracing::debug!(target: "hylki::memory", "trimmed the heap: {} was freed but held", crate::memory_report::human_bytes(held as u64));
+            }
+        });
+    }
+
     /// Copy the folders `open_unified_in` left to the folder caches into
     /// the unified slices.
     fn fill_unified_slices(&mut self) {
         let t = std::time::Instant::now();
+        if self.unified_reads_through() {
+            // Read where they are; only a newest-first slice goes.
+            for key in &self.unified_unfilled {
+                self.unified_slices.remove(key);
+            }
+            return;
+        }
         for key in std::mem::take(&mut self.unified_unfilled) {
             match self.message_cache.get(&key) {
                 Some(c) if !c.is_empty() => {
