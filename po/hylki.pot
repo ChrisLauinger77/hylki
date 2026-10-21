@@ -5196,18 +5196,13 @@ msgid ""
 "moving on."
 msgstr ""
 
-msgid ""
-"Receives messages the moment they arrive. Microsoft 365 accounts check at "
-"the interval above."
+msgid "Microsoft 365 accounts check at the interval above."
 msgstr ""
 
 msgid "Save data on metered connections"
 msgstr ""
 
-msgid ""
-"On a metered connection, new mail still arrives, but Hylki does not download "
-"messages and attachments ahead of time, index older mail, watch folders "
-"other than the Inbox or fetch sender logos."
+msgid "New mail still arrives. Nothing else is fetched ahead."
 msgstr ""
 
 msgid "Notifications"
@@ -5216,9 +5211,7 @@ msgstr ""
 msgid "Desktop notifications"
 msgstr ""
 
-msgid ""
-"Show system notifications for new mail and error alerts when Hylki isn't "
-"focused."
+msgid "For new mail and errors, while the window is in the background."
 msgstr ""
 
 msgid "Show sender and subject"
@@ -5239,88 +5232,50 @@ msgstr ""
 msgid "Also play while Hylki is in front"
 msgstr ""
 
-msgid ""
-"Otherwise the sound comes only with the notification, when the window is in "
-"the background or closed."
-msgstr ""
-
 msgid "Notification Buttons"
 msgstr ""
 
 msgid "Up to three buttons on a notification about one message."
 msgstr ""
 
-msgid "Moves the message to Trash."
-msgstr ""
-
-msgid "Opens the message with a reply started."
-msgstr ""
-
-msgid "Opens the message with a forward started."
-msgstr ""
-
-msgid "Moves the message to Junk."
-msgstr ""
-
 msgid "Style"
 msgstr ""
 
-msgid "The app itself. Message content has its own setting under Reading."
+msgid "Messages have their own setting under Reading."
 msgstr ""
 
 msgid "Text size"
 msgstr ""
 
-msgid ""
-"All of Hylki's text, messages included, against the desktop's text size. "
-"Icons keep their size."
+msgid "Adjusts the interface and message text size."
 msgstr ""
 
 msgid "Theme"
 msgstr ""
 
-msgid "Use the desktop's icons"
-msgstr ""
-
-msgid ""
-"Draw icons from the desktop's icon theme instead of Hylki's own, so the app "
-"may look different on another desktop."
+msgid "Use your desktop environment's icon set"
 msgstr ""
 
 msgid "This window opens to"
-msgstr ""
-
-msgid "The view shown first when Settings is opened from the menu."
 msgstr ""
 
 msgid "Toolbar"
 msgstr ""
 
 msgid ""
-"The buttons above the reading pane. Drag them between the groups and into "
-"the order you want. The left group always stays on the toolbar; the right "
-"group folds into a ⋯ menu when the reading pane is narrow. Changes apply at "
-"once."
+"Drag buttons between the groups. The right group folds into ⋯ when the pane "
+"is narrow."
 msgstr ""
 
 msgid "Restore Defaults"
 msgstr ""
 
 msgid ""
-"A quieter layout for reading. The parts ticked below slide away when Focus "
-"Mode is on and come back when it is off. Also in the main menu, and "
-"Ctrl+Shift+F."
-msgstr ""
-
-msgid "Strip the parts below away for reading."
+"The parts switched on below hide while Focus Mode is on. Activated by "
+"Ctrl+Shift+F or the main menu."
 msgstr ""
 
 msgid "Start in Focus Mode"
-msgstr ""
-
-msgid ""
-"Every launch opens in the mode. Off, the app opens as normal, whichever way "
-"the last session was left."
 msgstr ""
 
 msgid "Fold the reading pane's toolbar"
@@ -5332,9 +5287,7 @@ msgstr ""
 msgid "Fold the message list's header"
 msgstr ""
 
-msgid ""
-"Search, the unread and starred filters, the count and the sort order go into "
-"a ⋯ menu. Only the sidebar toggle stays."
+msgid "Everything but the sidebar toggle goes into ⋯."
 msgstr ""
 
 msgid "Hide the accounts in the sidebar"
@@ -5346,137 +5299,87 @@ msgstr ""
 msgid "Fold up the unified rows"
 msgstr ""
 
-msgid ""
-"Inboxes, Starred and the rest show folded. A click still opens one for the "
-"while; the full layout comes back as you left it."
-msgstr ""
-
 msgid "Hide sender avatars"
-msgstr ""
-
-msgid "The message list's circles go, and the room they took comes back."
 msgstr ""
 
 msgid "Hide the preview text"
 msgstr ""
 
-msgid ""
-"Rows show the sender, the subject and the date alone. The preview is only "
-"hidden: it is back the moment Focus Mode ends."
-msgstr ""
-
 msgid "One line of preview text"
-msgstr ""
-
-msgid "Rows show at most one line of a message's text."
 msgstr ""
 
 msgid "Hide the subject"
 msgstr ""
 
-msgid ""
-"Rows show who wrote and when, and nothing else. Tag chips ride on the "
-"subject line, so they go with it."
+msgid "Tag chips hide with it."
 msgstr ""
 
 msgid "Fold the sidebar to the icon rail"
 msgstr ""
 
-msgid ""
-"The sidebar shows as icons, with a dot for unread mail in place of the "
-"counts. Hovering it still slides the full sidebar out."
+msgid "Hovering it slides the full sidebar out."
 msgstr ""
 
-msgid ""
-"Every message opens in Reader View. The header's switch still changes the "
-"one on screen."
+msgid "Open messages in Reader View."
 msgstr ""
 
 msgid "Open at startup"
-msgstr ""
-
-msgid "What the window shows when Hylki starts."
 msgstr ""
 
 msgid "Accounts in the sidebar"
 msgstr ""
 
 msgid ""
-"Each account's own section: its folders, filtered folders and tags. Off "
-"leaves the unified section alone. Also in the main menu, and Ctrl+Shift+A."
+"Off leaves only the unified section. Toggle with Ctrl+Shift+A or the main "
+"menu."
 msgstr ""
 
 msgid "Folder order"
 msgstr ""
 
-msgid ""
-"How each account's folders are sorted. Dragging a folder puts that account "
-"in Custom Order. An account can choose its own in its settings, or from the "
-"right-click menu of its Folders heading."
+msgid "Dragging a folder switches to Custom Order."
 msgstr ""
 
 msgid "Chevron placement"
 msgstr ""
 
-msgid ""
-"Which side of Inboxes and the account rows their expand/collapse chevrons "
-"sit on."
-msgstr ""
-
 msgid "Fold accounts with one click"
 msgstr ""
 
-msgid ""
-"A click anywhere on an account's name opens or closes its folders. Off, only "
-"its chevron or a double click does."
+msgid "When off, only its chevron or a double click activates the fold."
 msgstr ""
 
-msgid "Attachments in the sidebar"
+msgid "Show Attachments Browser"
 msgstr ""
 
-msgid ""
-"A shortcut for browsing every account's attachments, pinned at the bottom of "
-"the sidebar."
+msgid "Browse every account's attachments in one place."
 msgstr ""
 
 msgid "Expand the sidebar on hover"
 msgstr ""
 
-msgid ""
-"Whenever the sidebar is collapsed to its icon rail, hovering it floats the "
-"full sidebar out over the panes; it stays out until you click outside it."
+msgid "Hovering the icon rail floats the full sidebar out."
 msgstr ""
 
 msgid "Remember the sidebar layout"
 msgstr ""
 
-msgid ""
-"Reopen with the accounts, folders and sections as you left them. Off starts "
-"every launch with everything folded up."
+msgid "Off starts every launch folded up."
 msgstr ""
 
 msgid "Remember icon rail state"
 msgstr ""
 
-msgid ""
-"Reopen with icon rail in the last used state. Off starts every launch with "
-"the full sidebar."
-msgstr ""
-
 msgid "Highlight only new unread mail"
 msgstr ""
 
-msgid ""
-"A folder's unread count is in the accent color while mail has arrived since "
-"you last looked at it, and grey once you have, however much is still unread."
+msgid "A count turns grey once you have looked at the folder."
 msgstr ""
 
 msgid "Unified"
 msgstr ""
 
-msgid ""
-"The section at the top of the sidebar that combines every account. Only "
-"shown with more than one account."
+msgid "Shown only with more than one account."
 msgstr ""
 
 msgid "Inboxes"
@@ -5485,9 +5388,7 @@ msgstr ""
 msgid "Unread counts"
 msgstr ""
 
-msgid ""
-"Which unified rows show their combined unread chip while folded up. "
-"Expanded, the rows beneath carry the counts. Sent never shows one."
+msgid "Shown on the unified rows while they are folded up."
 msgstr ""
 
 msgid "Sections"
@@ -5511,110 +5412,49 @@ msgstr ""
 msgid "Icon rail"
 msgstr ""
 
-msgid "The sidebar collapsed to icons, by its button or in a narrow window."
-msgstr ""
-
 msgid "Unread dots instead of counts"
 msgstr ""
 
-msgid ""
-"Mark folders and accounts that have unread mail with a dot in the accent "
-"color rather than the number of messages. The count stays in the tooltip."
+msgid "The count stays in the tooltip."
 msgstr ""
 
 msgid "Fold up expanded items"
 msgstr ""
 
-msgid ""
-"When the sidebar collapses to the icon rail, the items switched on below "
-"start folded up. A long-press in the rail still expands or collapses any of "
-"them, and the full sidebar comes back exactly as you left it."
+msgid "The items below start folded up in the rail. Long-press to open one."
 msgstr ""
 
-msgid "Every account's folder list."
-msgstr ""
-
-msgid "The account list under the unified Inboxes row."
-msgstr ""
-
-msgid "The account list under the unified Starred row."
-msgstr ""
-
-msgid "The account list under the unified Sent row."
-msgstr ""
-
-msgid "The account list under the unified Drafts row."
-msgstr ""
-
-msgid "The account list under the unified Archive row."
-msgstr ""
-
-msgid "The account list under the unified Junk row."
-msgstr ""
-
-msgid "The account list under the unified Trash row."
-msgstr ""
-
-msgid "The folders under the Filters row."
-msgstr ""
-
-msgid "The tags under the Tags row."
-msgstr ""
-
-msgid "Sender avatars"
-msgstr ""
-
-msgid ""
-"The sender's avatar beside each message, in the list and above the message. "
-"Turning it off gives the sender and subject more room."
+msgid "Show sender avatars"
 msgstr ""
 
 msgid "Sent mail uses your account circle"
 msgstr ""
 
-msgid ""
-"Messages you sent wear the account's Gravatar, picture or emoji, as its "
-"circle in the sidebar does."
+msgid "The account's picture or emoji, as in the sidebar."
 msgstr ""
 
 msgid "Layout"
 msgstr ""
 
-msgid ""
-"Cards or single lines. Automatic shows cards at narrow widths and single "
-"lines in columns at wider widths."
+msgid "Automatic uses single lines in wide windows."
 msgstr ""
 
 msgid "Preview lines"
 msgstr ""
 
-msgid ""
-"How much of each message to show under its subject. Off also stops previews "
-"being downloaded."
+msgid "Off also stops downloading previews."
 msgstr ""
 
 msgid "Group by date"
 msgstr ""
 
-msgid ""
-"Headings divide a list sorted by date into Today, Yesterday, Last 7 days, "
-"Last 14 days and Older."
-msgstr ""
-
 msgid "Tags and labels under the text"
 msgstr ""
 
-msgid ""
-"Puts a card's tags and labels on a line of their own under its text, where "
-"they leave the subject its full width."
+msgid "Gives the subject its full width."
 msgstr ""
 
 msgid "Keep the search field open"
-msgstr ""
-
-msgid ""
-"Shows the search field with the list at all times, instead of behind the "
-"search button."
 msgstr ""
 
 msgid "Search field position"
@@ -5626,122 +5466,79 @@ msgstr ""
 msgid "Tint tagged messages"
 msgstr ""
 
-msgid "Wash the row of a tagged message with the color of its first tag."
+msgid "In the color of its first tag."
 msgstr ""
 
 msgid "Actions palette in the message list"
 msgstr ""
 
-msgid ""
-"The ⋯ action row under each message summary. Turning it off returns its "
-"space to the row; messages are still acted on from their cards and the right-"
-"click menu."
+msgid "The ⋯ row under each message."
 msgstr ""
 
 msgid "Open the actions palette on hover"
-msgstr ""
-
-msgid ""
-"The message list's ⋯ actions palette slides open by itself while the pointer "
-"rests on a row."
 msgstr ""
 
 msgid "Swipe actions"
 msgstr ""
 
 msgid ""
-"Drag a message sideways with the mouse, or swipe it with two fingers on a "
-"trackpad, to archive or delete it. Default is left to delete, right to "
-"archive."
+"Left deletes, right archives. Drag with the mouse or swipe with two fingers."
 msgstr ""
 
 msgid "Reverse swipe directions"
 msgstr ""
 
-msgid ""
-"Turning this on swaps the swipe actions to: left archives, right deletes."
-msgstr ""
-
 msgid "Trackpad swipe sensitivity"
 msgstr ""
 
-msgid ""
-"How readily a two-finger trackpad swipe moves a message. Raise it if a swipe "
-"never gets far enough to archive or delete, lower it if messages slide when "
-"you did not mean them to. Mouse drags are unaffected."
+msgid "Raise it if swipes stop short. Mouse drags are unaffected."
 msgstr ""
 
 msgid "Actions palette timeout"
 msgstr ""
 
-msgid ""
-"Seconds the message list's actions palette stays open after the cursor "
-"leaves it."
+msgid "Seconds it stays open after the pointer leaves."
 msgstr ""
 
 msgid "Columns"
 msgstr ""
 
 msgid ""
-"What a message shows when the layout is displayed in one line format. Drag "
-"the columns into the order you want, or out of the list. The subject always "
-"stays. Due Date appears only in lists with Microsoft 365 mail. Changes apply "
-"at once."
+"For the single-line layout. Drag columns to reorder them or out to remove "
+"them. Due Date shows only for Microsoft 365 mail."
 msgstr ""
 
-msgid "Column headings"
-msgstr ""
-
-msgid ""
-"Names the columns above the list. Click one to sort the list by it, and "
-"again to reverse the order."
+msgid "Show column headings"
 msgstr ""
 
 msgid "Fit columns to the list"
 msgstr ""
 
-msgid ""
-"The name and tag columns narrow as the list does. Off, every column keeps "
-"its width and a list too narrow for them scrolls sideways."
+msgid "Off, a narrow list scrolls sideways."
 msgstr ""
 
 msgid "Group messages by conversation"
 msgstr ""
 
-msgid "Collapse replies into a single threaded conversation."
-msgstr ""
-
 msgid "Expandable conversations"
 msgstr ""
 
-msgid ""
-"Allow a conversation to expand/collapse its messages in the list. When off, "
-"the row keeps its count chip but the messages are displayed only as cards in "
-"the reading pane."
+msgid "Off, a conversation's messages show only in the reading pane."
 msgstr ""
 
 msgid "Expand conversations by default"
 msgstr ""
 
-msgid ""
-"Show every message of a conversation in the list. When off, conversations "
-"start collapsed to their newest message."
-msgstr ""
-
 msgid "Newest message first"
 msgstr ""
 
-msgid ""
-"Show a conversation's latest message at the top of the reading pane. Off "
-"reads oldest to newest, downward."
+msgid "In the reading pane."
 msgstr ""
 
 msgid "Fold earlier messages"
 msgstr ""
 
-msgid ""
-"Which messages of a conversation open folded to their sender and first "
-"lines. The newest always opens, and a click on a folded message opens it."
+msgid "The newest always opens."
 msgstr ""
 
 msgid "Show your own replies in the message list"
@@ -5750,72 +5547,43 @@ msgstr ""
 msgid "Off shows the last message that arrived."
 msgstr ""
 
-msgid "Reply editor"
+msgid "Reply editor position"
 msgstr ""
 
-msgid ""
-"Where a reply or forward opens in the reading pane. Following the reading "
-"order puts it above the messages with newest first, and below them "
-"otherwise, so it continues the conversation where it ends."
+msgid "Following the reading order puts it where the conversation ends."
 msgstr ""
 
 msgid "Attachments on each message"
 msgstr ""
 
-msgid ""
-"List a message's attachments beneath it in a conversation, so which file "
-"came with which message is clear. Click one to open it."
-msgstr ""
-
 msgid "Attachment drawer"
-msgstr ""
-
-msgid ""
-"Gather every attachment in the open conversation in a drawer beneath the "
-"messages."
 msgstr ""
 
 msgid "Confirm conversation deletion"
 msgstr ""
 
-msgid ""
-"Warn before deleting when a whole conversation is selected, since every "
-"message in the thread goes with it."
-msgstr ""
-
-msgid ""
-"When an opened message counts as read. Conversations mark each message as it "
-"comes into view."
+msgid "Conversations mark each message as it comes into view."
 msgstr ""
 
 msgid "Message appearance"
 msgstr ""
 
-msgid "Theme for email content only, not the app itself."
-msgstr ""
-
 msgid "Light / Dark Mode switch"
 msgstr ""
 
-msgid ""
-"Show a switch in the message header that draws the message on screen light "
-"or dark, for that message alone."
+msgid "Displays in the message header for each message."
 msgstr ""
 
 msgid "Default zoom"
 msgstr ""
 
-msgid ""
-"How large every message is shown. Ctrl+ and Ctrl- change it until Hylki is "
-"next started; Ctrl+0 comes back to this."
+msgid "Ctrl+0 returns to the default."
 msgstr ""
 
 msgid "Use my own font"
 msgstr ""
 
-msgid ""
-"Show every message in the font and size chosen below instead of the "
-"sender's. Headings keep their relative size; code stays monospaced."
+msgid "The font below replaces the sender's."
 msgstr ""
 
 msgid "Message font"
@@ -5827,18 +5595,13 @@ msgstr ""
 msgid "Use my own colors"
 msgstr ""
 
-msgid ""
-"Ignore the text and background colors senders set, so every message reads in "
-"the same black or white on the reader's ground. Pictures are kept; links "
-"take the accent color."
+msgid "Ignores the sender's colors. Pictures stay; links use the accent color."
 msgstr ""
 
 msgid "Plain-text messages in monospace"
 msgstr ""
 
-msgid ""
-"Show messages sent as plain text in a fixed-width font, so columns and code "
-"line up. Formatted messages are not affected."
+msgid "Formatted messages are not affected."
 msgstr ""
 
 msgid "Monospace font"
@@ -5850,59 +5613,40 @@ msgstr ""
 msgid "Message card actions palette"
 msgstr ""
 
-msgid "How each message's action icons show in the reader, single or threaded."
-msgstr ""
-
 msgid "Message card actions palette timeout"
-msgstr ""
-
-msgid "Seconds a card's actions palette stays open after the cursor leaves it."
 msgstr ""
 
 msgid "Message card actions palette as a menu"
 msgstr ""
 
-msgid ""
-"The ⋯ opens the message's menu, the same one a right-click shows, instead of "
-"sliding the actions palette out."
+msgid "The ⋯ opens the right-click menu instead."
 msgstr ""
 
 msgid "Single messages as cards"
 msgstr ""
 
-msgid ""
-"Show a lone message as an inset card with the same border as a "
-"conversation's messages. Off fills the pane edge to edge."
+msgid "Off fills the pane edge to edge."
 msgstr ""
 
 msgid "Always show recipients"
 msgstr ""
 
-msgid ""
-"Show who each message went to under its sender, without clicking the "
-"recipients chip. With one recipient the chip is dropped entirely."
-msgstr ""
-
 msgid "Name the OpenPGP result"
 msgstr ""
 
-msgid ""
-"Beside the sender, say in words whether a message is signed or encrypted and "
-"whether it checks out. Off shows the lock and shield icons alone."
+msgid "Off shows the icons alone."
 msgstr ""
 
-msgid "Reader View switch"
+msgid "A message's text alone, without the sender's layout, colors and fonts."
 msgstr ""
 
-msgid "Show the switch in the message header, beside the account name."
+msgid "Show Reader View switch in message header"
 msgstr ""
 
 msgid "When a message is opened"
 msgstr ""
 
-msgid ""
-"Keep the switch where it was last set, or start every message in Reader View "
-"or as sent. The switch still changes the message on screen."
+msgid "The header's switch still changes the open message."
 msgstr ""
 
 msgid "Printing"
@@ -5911,76 +5655,52 @@ msgstr ""
 msgid "Page numbers"
 msgstr ""
 
-msgid ""
-"Print the page number and the number of pages at the foot of every page."
-msgstr ""
-
 msgid "Date printed"
-msgstr ""
-
-msgid "Print the date and time of printing at the foot of every page."
 msgstr ""
 
 msgid "Wider left margin"
 msgstr ""
 
-msgid "Leave 25 mm at the left of every page, so punched holes miss the text."
+msgid "25 mm, so punched holes miss the text."
 msgstr ""
 
 msgid "Compose in the main window"
 msgstr ""
 
-msgid ""
-"New message slides down over the reading pane, like a reply — pop it out to "
-"a window from its header. Off = open a separate window directly."
+msgid "Off opens new messages in their own window."
 msgstr ""
 
 msgid "Reply and forward in the main window"
 msgstr ""
 
-msgid ""
-"A reply or a forward opens in the reading pane, beside the message it "
-"answers. Off = open a separate window."
-msgstr ""
-
 msgid "Show From, To and Subject in the reply panel"
 msgstr ""
 
-msgid ""
-"The inline reply opens with its address and subject rows showing. Off, they "
-"stay folded away behind a button in the panel's header."
+msgid "Off folds them behind a button."
 msgstr ""
 
 msgid "Send new messages from"
 msgstr ""
 
-msgid "Replies still answer from the address the original was sent to."
+msgid "Replies answer from the address they were sent to."
 msgstr ""
 
 msgid "Paste as plain text"
 msgstr ""
 
-msgid ""
-"Pasting into a message strips the clipboard's formatting. Off, a paste keeps "
-"its formatting. Right-clicking the editor always offers both."
+msgid "Right-clicking the editor offers both either way."
 msgstr ""
 
 msgid "Return starts a new paragraph"
 msgstr ""
 
-msgid ""
-"Return ends the paragraph with a hard return and leaves space before the "
-"next. Off, Return starts a new line in the same paragraph. Shift+Return "
-"always does the other."
+msgid "Shift+Return does the other."
 msgstr ""
 
 msgid "Formatting toolbar"
 msgstr ""
 
-msgid ""
-"Whether a new message shows the extra tools (paragraph styles, fonts, "
-"colors, indents, emoji and pictures). The chevron in the toolbar shows or "
-"hides them at any time."
+msgid "For new messages. The toolbar's chevron toggles it."
 msgstr ""
 
 msgid "Always collapsed"
@@ -5989,61 +5709,40 @@ msgstr ""
 msgid "Always expanded"
 msgstr ""
 
-msgid "Write messages in"
-msgstr ""
-
-msgid ""
-"What new messages, replies and forwards start as. Rich text is formatted as "
-"you type and sent as HTML. Markdown and HTML source are written as source "
-"and sent as formatted mail; plain text is sent without formatting. The "
-"composer's format button switches any one message."
+msgid "Start new messages in"
 msgstr ""
 
 msgid "Font"
 msgstr ""
 
-msgid ""
-"The font rich-text messages are written and sent in. Default leaves it to "
-"the recipient's own font."
+msgid "For rich text. Default leaves it to the recipient's own font."
 msgstr ""
 
 msgid "Font size"
 msgstr ""
 
-msgid "The size, in points, rich-text messages are written and sent in."
+msgid "For rich text, in points."
 msgstr ""
 
 msgid "Reply in the original's format"
 msgstr ""
 
-msgid ""
-"Replies to and forwards of mail sent as plain text are written in plain "
-"text. Other mail starts in the format above."
+msgid "Plain-text mail is answered in plain text."
 msgstr ""
 
 msgid "Signature in replies"
 msgstr ""
 
-msgid ""
-"Where the signature goes in a reply or forward. Above the quoted message it "
-"closes what you wrote; below, it follows the whole conversation."
-msgstr ""
-
 msgid "Separator line above the signature"
 msgstr ""
 
-msgid ""
-"Puts the standard “-- ” line above the signature. Thunderbird, Evolution and "
-"Mutt use it to dim the signature and to leave it out when they quote your "
-"message."
+msgid "The standard “-- ” line, which other mail apps recognize."
 msgstr ""
 
 msgid "Undo Send"
 msgstr ""
 
-msgid ""
-"How long a sent message waits before it goes, with Undo on offer to bring it "
-"back to the composer."
+msgid "How long Undo is offered after sending."
 msgstr ""
 
 msgid "Spelling"
@@ -6052,9 +5751,7 @@ msgstr ""
 msgid "Check spelling as you type"
 msgstr ""
 
-msgid ""
-"Misspelled words in the message body are underlined; right-click a word for "
-"corrections."
+msgid "Right-click a word for corrections."
 msgstr ""
 
 msgid "Languages"
@@ -6063,65 +5760,46 @@ msgstr ""
 msgid "Added words"
 msgstr ""
 
-msgid ""
-"Words the spell checker was taught. The message body applies changes after a "
-"restart."
+msgid "Changes apply after a restart."
 msgstr ""
 
-msgid ""
-"Hylki collects no telemetry and sends no analytics. Remote content (images, "
-"trackers) is blocked by default. Allow it per message, trust a sender to "
-"always load it, or turn on \"Always load remote content\" below."
+msgid "Hylki collects no telemetry and sends no analytics."
 msgstr ""
 
 msgid "Always load remote content"
 msgstr ""
 
-msgid ""
-"Show images and other remote content in every new message without asking. "
-"Off by default, since remote content can be used to track when and where you "
-"read a message."
+msgid "Remote content can tell a sender when and where you read."
 msgstr ""
 
 msgid "Warn when remote content is blocked"
 msgstr ""
 
-msgid ""
-"Shows the banner offering to load it. Turning this off only hides the notice "
-"— remote content is still blocked just the same."
+msgid "Off hides the banner. Remote content stays blocked."
 msgstr ""
 
 msgid "Warn when the addressing doesn't match"
 msgstr ""
 
 msgid ""
-"Shows the red banner over a message marked \"Check this sender\", such as "
-"one whose replies go to another domain. The badge beside the sender still "
-"marks it, and a possible forgery always shows the banner."
+"The badge beside the sender stays. A possible forgery always shows the "
+"banner."
 msgstr ""
 
 msgid "Use Gravatar when a contact has no photo"
 msgstr ""
 
-msgid ""
-"Local GNOME Contacts photos are always preferred. Gravatar sends a hash of "
-"the sender's email."
+msgid "Sends a hash of the sender's address to Gravatar."
 msgstr ""
 
 msgid "Show sender logos"
 msgstr ""
 
 msgid ""
-"Fills the sender's avatar with the brand's logo: the one the sender "
-"publishes for mail (BIMI), one bundled with Hylki, or the site's own icon. "
-"All but the bundled ones are fetched from the sender's domain, which then "
-"learns your IP address, as blocking remote content otherwise avoids."
+"Most are fetched from the sender's domain, which learns your IP address."
 msgstr ""
 
-msgid ""
-"By default dates follow the system's own arrangement — its field order, "
-"month names and clock. Choose a format here to override what your system is "
-"set to."
+msgid "Dates follow the system unless a format is chosen here."
 msgstr ""
 
 msgid "Date format"
@@ -6133,104 +5811,67 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
-msgid ""
-"The language Hylki is shown in. \"System\" follows the desktop, with English "
-"where no translation exists. A change applies the next time Hylki starts."
+msgid "Applies after a restart."
 msgstr ""
 
 msgid "Renderer"
 msgstr ""
 
-msgid ""
-"How the windows are drawn. OpenGL or Software can help on older graphics "
-"hardware where Vulkan is incomplete. A change applies the next time Hylki "
-"starts."
+msgid "Try OpenGL or Software on older graphics. Applies after a restart."
 msgstr ""
 
 msgid "Keep running in the background"
 msgstr ""
 
-msgid ""
-"Closing the window hides it instead of quitting, so new mail still arrives. "
-"Hylki then appears under Background Apps in the system menu, where it can be "
-"quit."
+msgid "Closing the window hides it. Quit from Background Apps."
 msgstr ""
 
 msgid "Start at login"
 msgstr ""
 
-msgid ""
-"Start checking for mail when you log in. Hylki starts without a window and "
-"waits in the system menu."
+msgid "Starts hidden."
 msgstr ""
 
 msgid "Show a tray icon"
 msgstr ""
 
-msgid ""
-"An icon in the system tray, with a red dot while any inbox has unread mail. "
-"Click it to open Hylki. GNOME needs the AppIndicator extension; other "
-"desktops show it as they are."
+msgid "To use on GNOME, install an AppIndicator extension."
 msgstr ""
 
 msgid "Tray icon"
 msgstr ""
 
-msgid ""
-"The app icon in full color, or its symbolic outline, which the panel draws "
-"in its own color."
-msgstr ""
-
 msgid "Unread mail in the tray menu"
-msgstr ""
-
-msgid ""
-"List the newest unread inbox messages in the icon's menu; click one to open "
-"it."
 msgstr ""
 
 msgid "Unread count on the app icon"
 msgstr ""
 
-msgid ""
-"A number on Hylki's icon in the dock or task manager: every unread inbox "
-"message, or only those that arrived while Hylki was not in front. KDE Plasma "
-"shows it; GNOME needs a dock extension such as Dash to Dock."
+msgid "To use on GNOME, install a dock extension such as Dash to Dock."
 msgstr ""
 
 msgid "Single-key shortcuts"
 msgstr ""
 
-msgid ""
-"Act on mail with one key and no modifier — j/k to move, r to reply, a to "
-"archive. Press Ctrl+? for the full list."
+msgid "Press Ctrl+? to list all shortcuts."
 msgstr ""
 
 msgid "Gmail keys"
 msgstr ""
 
-msgid ""
-"Needs single-key shortcuts on. Swaps in the keys Gmail has: j/k move without "
-"opening, o opens, e archives, # deletes, g then a letter goes to a folder."
+msgid "Swaps the single-key shortcuts for Gmail equivalents."
 msgstr ""
 
 msgid "Status bar"
 msgstr ""
 
-msgid "Where the bar with errors and the console opens"
-msgstr ""
-
 msgid "Console mode"
 msgstr ""
 
-msgid ""
-"A verbose live console in the status bar showing everything Hylki is doing "
-"under the hood."
+msgid "Shows a console in the status bar."
 msgstr ""
 
-msgid ""
-"Save everything the console has recorded since Hylki started, to attach to a "
-"bug report. Email addresses are shortened to their domain."
+msgid "For bug reports. Addresses are cut to their domain for privacy."
 msgstr ""
 
 msgid "Downloaded mail"
@@ -6242,20 +5883,12 @@ msgstr ""
 msgid "Keep downloaded mail"
 msgstr ""
 
-msgid ""
-"Older messages and their attachments are removed from this computer and "
-"fetched again when opened."
-msgstr ""
-
 msgid "GNOME Files Integration"
 msgstr ""
 
 msgid ""
-"Add \"Send with Hylki\" to the right-click menu in Files (Nautilus): the "
-"selected files open in a new message, attached. This installs a small "
-"extension in your home folder. It also needs the nautilus-python package "
-"(python3-nautilus on Debian and Ubuntu), and Files has to be restarted "
-"before the entry appears."
+"Adds “Send with Hylki” to the right-click menu in Files. Needs the nautilus-"
+"python package and a restart of Files."
 msgstr ""
 
 msgid "Right-click menu entry"
@@ -6267,15 +5900,13 @@ msgstr ""
 msgid "Install"
 msgstr ""
 
-msgid "Install the nautilus-python package first: paste this in a terminal"
+msgid "Install nautilus-python first"
 msgstr ""
 
 msgid "Restart Files"
 msgstr ""
 
-msgid ""
-"Closes every Files window, the same as \"nautilus -q\". The next one opens "
-"with the entry, or without it once removed."
+msgid "Closes every Files window, like “nautilus -q”."
 msgstr ""
 
 msgid "Restart"
@@ -6287,9 +5918,7 @@ msgstr ""
 msgid "Default large attachments behavior"
 msgstr ""
 
-msgid ""
-"Upload to cloud storage needs a cloud storage account (Settings → Cloud "
-"Storage) otherwise the files are attached by default."
+msgid "Without a cloud storage account, files are attached."
 msgstr ""
 
 msgid "Size limit"
@@ -6305,11 +5934,8 @@ msgid "Open links in"
 msgstr ""
 
 msgid ""
-"Everything Hylki keeps, as one file: mail and cloud storage accounts, "
-"preferences, filters, tags, the sidebar and window layout, the app icon "
-"choice and the words taught to the spell checker. Passwords and sign-ins "
-"stay in the system keyring and are never exported; OpenPGP keys stay in "
-"GnuPG."
+"Accounts, preferences, filters, tags and layout, in one file. Passwords and "
+"OpenPGP keys are not included."
 msgstr ""
 
 msgid "Export settings"
@@ -6319,9 +5945,8 @@ msgid "Import settings"
 msgstr ""
 
 msgid ""
-"Replaces the current accounts and preferences in place. Don't remove "
-"accounts first: removal also deletes their keyring passwords, which no "
-"backup carries."
+"Replaces everything in place. Don't remove accounts first: that deletes "
+"their passwords."
 msgstr ""
 
 msgid "Software"
@@ -6913,6 +6538,9 @@ msgid "A few popular choices — everything can be changed later in Settings."
 msgstr ""
 
 msgid "Message text shown under each subject"
+msgstr ""
+
+msgid "Sender avatars"
 msgstr ""
 
 msgid "Colorful initials beside each message"
