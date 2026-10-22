@@ -4738,6 +4738,9 @@ impl SimpleComponent for AppModel {
         relm4::main_application()
             .set_accelerators_for_action::<StatusBarAction>(&["<Ctrl><Shift>s"]);
         relm4::main_application().set_accelerators_for_action::<FindAction>(&["<Ctrl>f"]);
+        // On the menu's action, so the menu shows the keys beside Settings
+        // (#513).
+        relm4::main_application().set_accelerators_for_action::<AccountsAction>(&["<Ctrl>comma"]);
         relm4::main_application().set_accelerators_for_action::<ShortcutsAction>(&[
             "<Ctrl>question",
             "<Ctrl><Shift>question",
@@ -13636,7 +13639,7 @@ impl AppModel {
         add(i18n("Check for New Mail"), &action, "", || AppMsg::Refresh);
         add(i18n("Search Messages"), &action, "Ctrl+F", || AppMsg::OpenListSearch);
         add(i18n("Show or Hide the Sidebar"), &action, "", || AppMsg::ToggleSidebar);
-        add(i18n("Settings"), &action, "Ctrl+,", || AppMsg::OpenPreferences);
+        add(i18n("Settings"), &action, "Ctrl+,", || AppMsg::OpenSettings);
         add(i18n("Mail Accounts"), &action, "", || AppMsg::OpenAccounts);
         add(i18n("New Smart Folder…"), &action, "", || AppMsg::SidebarContext(CtxAction::NewSmartFolder));
         add(i18n("Keyboard Shortcuts"), &action, "Ctrl+?", || AppMsg::ShowShortcuts);
@@ -25915,6 +25918,7 @@ const SHORTCUT_HELP: &[(&str, &[(&str, &str)])] = &[
             ("Ctrl+Shift+F", i18n_noop("Focus Mode on or off")),
             ("Ctrl++  /  Ctrl+-", i18n_noop("Message zoom in or out")),
             ("Ctrl+0", i18n_noop("Message zoom back to the default")),
+            ("Ctrl+,", i18n_noop("Settings")),
             ("Ctrl+F", i18n_noop("Search the Settings window, when it is open")),
             ("Ctrl+Shift+C", i18n_noop("Console mode (when enabled in Settings)")),
             ("Ctrl+W", i18n_noop("Close the window (background sync keeps running)")),

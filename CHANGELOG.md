@@ -16,6 +16,12 @@
   still running, and a search keeps the list's conversations instead of
   working them out again from the matches.
 
+- **Fixed: Ctrl+, did not open Settings** (#513, reported by 3v1n0). The
+  command palette listed the keys but nothing was bound to them. They now
+  open Settings, and the main menu shows them beside its Settings item.
+  Closing the Settings window also ends a search left open in it, so the
+  next open shows the categories again.
+
 ## 1.45.0 — 2026-10-22
 
 Everything from 1.45.0-beta.1 to 1.45.0-beta.4: a Debian package with its

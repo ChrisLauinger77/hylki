@@ -1477,6 +1477,10 @@ impl SettingsSearch {
             })),
         ));
         window.add_controller(shortcuts);
+        // The window is only hidden on close and kept for the next open,
+        // which should not come back to an old search (#513).
+        let b = bar.clone();
+        window.connect_hide(move |_| b.set_search_mode(false));
 
         Self {
             bar,
