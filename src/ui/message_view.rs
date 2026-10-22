@@ -6038,7 +6038,7 @@ pub(crate) fn hit_menu_entries(
     }
     let mut out = Vec::new();
     if let Some(text) = &hit.selection {
-        out.push(MenuEntry::new(i18n("Copy"), copy(text.clone())).icon("edit-copy-symbolic"));
+        out.push(MenuEntry::new(i18n("Copy"), copy(text.clone())).icon("edit-copy-symbolic").accel("<Control>c"));
     }
     if let Some(uri) = &hit.link {
         let (open, w) = (uri.clone(), window.clone());

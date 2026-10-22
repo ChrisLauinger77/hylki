@@ -32,6 +32,8 @@ pub struct MenuEntry {
     /// tick. A tick costs the icon that says what the entry *is*, which is
     /// the part worth keeping in a list of alternatives.
     selected: bool,
+    /// The keys that do the same, shown dim at the end of the row (#497).
+    accel: Option<String>,
     activate: Box<dyn Fn()>,
     /// Sections of a nested page this entry opens instead of acting.
     submenu: Option<Vec<Vec<MenuEntry>>>,
@@ -45,6 +47,7 @@ impl MenuEntry {
             swatch: None,
             enabled: true,
             selected: false,
+            accel: None,
             activate: Box::new(activate),
             submenu: None,
         }
@@ -60,6 +63,7 @@ impl MenuEntry {
             swatch: None,
             enabled: !empty,
             selected: false,
+            accel: None,
             activate: Box::new(|| {}),
             submenu: Some(sections),
         }
@@ -81,6 +85,13 @@ impl MenuEntry {
 
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
+        self
+    }
+
+    /// The keys that do the same, as a GTK accelerator (`<Control>c`),
+    /// shown the way GTK's own menus show them.
+    pub fn accel(mut self, accel: &str) -> Self {
+        self.accel = gtk::accelerator_parse(accel).map(|(key, mods)| gtk::accelerator_get_label(key, mods).to_string());
         self
     }
 
@@ -355,7 +366,7 @@ fn build_page(
         first = false;
 
         for entry in entries {
-            let MenuEntry { label, icon, swatch, enabled, selected, activate, submenu } = entry;
+            let MenuEntry { label, icon, swatch, enabled, selected, accel, activate, submenu } = entry;
 
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
             if selected {
@@ -380,6 +391,12 @@ fn build_page(
             lbl.set_ellipsize(gtk::pango::EllipsizeMode::End);
             lbl.set_max_width_chars(MAX_LABEL_CHARS);
             row.append(&lbl);
+            if let Some(accel) = accel {
+                let keys = gtk::Label::new(Some(&accel));
+                keys.add_css_class("dim-label");
+                keys.set_margin_start(12);
+                row.append(&keys);
+            }
 
             let btn = gtk::Button::new();
             btn.set_child(Some(&row));
