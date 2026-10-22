@@ -469,6 +469,7 @@ impl Component for MessageWindow {
             let sequence: std::rc::Rc<std::cell::Cell<Option<std::time::Instant>>> = Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
                 use gtk::gdk::Key;
+                let keyval = crate::app::without_caps_lock(keyval, state);
                 let key = |action| {
                     s.input_sender().emit(MessageWindowInput::Key(action));
                     gtk::glib::Propagation::Stop

@@ -4766,6 +4766,7 @@ impl SimpleComponent for AppModel {
             // The first key of a Gmail sequence (g or *) and when it came.
             let pending: std::rc::Rc<std::cell::Cell<Option<(char, std::time::Instant)>>> = Default::default();
             keys.connect_key_pressed(move |_, keyval, _, state| {
+                let keyval = without_caps_lock(keyval, state);
                 let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
                 let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
                 // Ctrl+? opens the reference whether or not the shortcuts
@@ -25671,6 +25672,16 @@ pub(crate) fn reader_keeps(key: gtk::gdk::Key) -> bool {
     )
 }
 
+/// The key as it would read with Caps Lock off. Caps Lock capitalises the
+/// letters, so `j` arrived as `J` and no single key worked while it was on
+/// (#392). Shift alone decides the case of a letter here.
+pub(crate) fn without_caps_lock(key: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> gtk::gdk::Key {
+    if !state.contains(gtk::gdk::ModifierType::LOCK_MASK) || key.is_upper() == key.is_lower() {
+        return key;
+    }
+    if state.contains(gtk::gdk::ModifierType::SHIFT_MASK) { key.to_upper() } else { key.to_lower() }
+}
+
 /// The shortcut for a key press, if any. `shift` distinguishes `r` from `R`.
 pub(crate) fn shortcut_for(key: gtk::gdk::Key, shift: bool) -> Option<Shortcut> {
     use gtk::gdk::Key;
@@ -28928,6 +28939,18 @@ mod tests {
         // The reader keeps what scrolls it, and only that.
         assert!(reader_keeps(Key::space) && reader_keeps(Key::Down));
         assert!(!reader_keeps(Key::r) && !reader_keeps(Key::j));
+    }
+
+    #[test]
+    fn caps_lock_leaves_the_keys_alone() {
+        use gtk::gdk::{Key, ModifierType as M};
+        assert_eq!(without_caps_lock(Key::J, M::LOCK_MASK), Key::j);
+        assert_eq!(without_caps_lock(Key::r, M::LOCK_MASK | M::SHIFT_MASK), Key::R);
+        assert_eq!(without_caps_lock(Key::R, M::LOCK_MASK | M::SHIFT_MASK), Key::R);
+        assert_eq!(without_caps_lock(Key::numbersign, M::LOCK_MASK | M::SHIFT_MASK), Key::numbersign);
+        assert_eq!(without_caps_lock(Key::_3, M::LOCK_MASK), Key::_3);
+        // Without Caps Lock the key is as typed.
+        assert_eq!(without_caps_lock(Key::J, M::empty()), Key::J);
     }
 
     #[test]
