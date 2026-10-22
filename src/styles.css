@@ -1656,6 +1656,29 @@ headerbar.compose-toolbar button.image-button {
   color: @error_color;
 }
 
+/* A pill selected for the keyboard (#492). */
+.recipient-pill:focus {
+  background-color: @accent_bg_color;
+  color: @accent_fg_color;
+}
+
+.recipient-pill.invalid:focus {
+  background-color: @error_bg_color;
+  color: @error_fg_color;
+}
+
+/* The pill being dragged stays in place, faded, until it is let go. */
+.recipient-pill.dragged {
+  opacity: 0.35;
+}
+
+/* Where a dragged pill would go. */
+.pill-drop-marker {
+  min-width: 2px;
+  border-radius: 1px;
+  background-color: @accent_color;
+}
+
 .compose-body {
   font-size: 1.02em;
   line-height: 1.5;

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Added: recipient pills move between To, Cc and Bcc** (#492, requested by
+  warpedwood). A pill drags to another place in its field or into another
+  field, with a line marking where it will go; Cc and Bcc show while a pill
+  is dragged if they were hidden. A pill's right-click menu moves it to
+  another field, edits it or removes it. A click or **Left** from the start
+  of the field selects a pill; then the arrow keys move between pills,
+  **Delete** removes it, **Return** edits it, and **Menu** or **Shift+F10**
+  opens its menu.
+
 - **Added: Thunderbird's composer keys** (#490, #491, requested by
   warpedwood). In a composer, **Ctrl+Shift+A** attaches files, and
   **Ctrl+Shift+T**, **Ctrl+Shift+C** and **Ctrl+Shift+B** put the cursor in

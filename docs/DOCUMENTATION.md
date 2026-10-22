@@ -1039,6 +1039,18 @@ edit, until the next space, <kbd>Return</kbd> or comma. A double click does the
 same for any pill, and its × removes it. A pill that is not an email address
 is red.
 
+A pill can be dragged to another place in its field, or into another field.
+While one is dragged, Cc and Bcc show if they were hidden, and a line marks
+where it will go; a field it was not dropped in hides again. Its right-click
+menu moves it to the end of another field, edits it or removes it.
+
+From the keyboard, <kbd>Left</kbd> at the start of a field selects the last
+pill, and <kbd>Left</kbd> and <kbd>Right</kbd> move between pills and back to
+the text. On a selected pill, <kbd>Delete</kbd> or <kbd>Backspace</kbd>
+removes it, <kbd>Return</kbd> edits it, and <kbd>Menu</kbd> or
+<kbd>Shift+F10</kbd> opens its menu. <kbd>Tab</kbd> passes over the pills to
+the next field.
+
 ### The From address
 
 The From row lists each account's address and the aliases set up for it.

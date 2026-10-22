@@ -4,6 +4,10 @@
 //! a comma. Backspace on an empty line turns the last pill back into text to
 //! edit, until the next space, Return or comma.
 //!
+//! A pill drags to another place in its field or to another field, and
+//! takes the keyboard (arrows from the start of the text, Delete, Return,
+//! the menu key), whose menu moves it to another field too (#492).
+//!
 //! Built from libadwaita's own entry-row markup and class names (`row.entry`,
 //! `.editable-area`, `.title`, `.subtitle`, `.edit-icon`, `.focused`), so the
 //! row looks, focuses and turns red on an error the way the Subject row under
@@ -14,7 +18,7 @@ use std::sync::OnceLock;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::glib;
+use gtk::{gdk, glib};
 use gtk::glib::subclass::Signal;
 
 use crate::i18n::{i18n, i18n_f};
@@ -44,6 +48,9 @@ mod imp {
         /// for typing.
         pub busy: Cell<bool>,
         pub focused: Cell<bool>,
+        /// The other recipient fields of the composer, which a pill's menu
+        /// offers to move it to.
+        pub peers: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
     }
 
     #[glib::object_subclass]
@@ -56,7 +63,13 @@ mod imp {
     impl ObjectImpl for RecipientRow {
         fn signals() -> &'static [Signal] {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
-            SIGNALS.get_or_init(|| vec![Signal::builder("changed").build()])
+            SIGNALS.get_or_init(|| {
+                vec![
+                    Signal::builder("changed").build(),
+                    // A pill of this row starts (true) or ends (false) a drag.
+                    Signal::builder("pill-drag").param_types([bool::static_type()]).build(),
+                ]
+            })
         }
 
         fn constructed(&self) {
@@ -116,6 +129,7 @@ mod imp {
             self.edit_icon.set_can_target(false);
             self.edit_icon.set_accessible_role(gtk::AccessibleRole::Presentation);
             area.append(&self.edit_icon);
+            obj.wire_focus(&area);
 
             self.header.append(&area);
             self.suffixes.add_css_class("suffixes");
@@ -284,6 +298,91 @@ impl RecipientRow {
             row.emit_changed();
         });
 
+        // Left from the start of the text goes to the last pill, to move
+        // through them with the keyboard.
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak = self.downgrade();
+        keys.connect_key_pressed(move |_, key, _, state| {
+            let Some(row) = weak.upgrade() else { return glib::Propagation::Proceed };
+            let text = &row.imp().text;
+            let towards = if row.direction() == gtk::TextDirection::Rtl { gdk::Key::Right } else { gdk::Key::Left };
+            let plain = !state.intersects(gdk::ModifierType::SHIFT_MASK | gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+            if key != towards || !plain || text.position() != 0 || text.selection_bounds().is_some() {
+                return glib::Propagation::Proceed;
+            }
+            let last = row.imp().pills.borrow().last().map(|(p, _)| p.clone());
+            match last {
+                Some(pill) => {
+                    pill.grab_focus();
+                    glib::Propagation::Stop
+                }
+                None => glib::Propagation::Proceed,
+            }
+        });
+        text.add_controller(keys);
+
+        // A click anywhere on the row, pills aside, types into it.
+        let click = gtk::GestureClick::new();
+        let weak = self.downgrade();
+        click.connect_released(move |gesture, _, x, y| {
+            let Some(row) = weak.upgrade() else { return };
+            let header = gesture.widget();
+            let on_pill = header
+                .and_then(|h| h.pick(x, y, gtk::PickFlags::DEFAULT))
+                .is_some_and(|w| is_in_pill(&w));
+            if !on_pill {
+                row.imp().text.grab_focus();
+            }
+        });
+        imp.header.add_controller(click);
+
+        // A pill dragged here, from this field or another. In the capture
+        // phase, ahead of the text's own target, which would take the pill
+        // as typed text.
+        let target = gtk::DropTarget::new(gtk::Widget::static_type(), gdk::DragAction::MOVE);
+        target.set_propagation_phase(gtk::PropagationPhase::Capture);
+        target.set_preload(true);
+        let weak = self.downgrade();
+        target.connect_accept(move |_, drop| {
+            weak.upgrade().is_some()
+                && drop.formats().contains_type(gtk::Widget::static_type())
+                && drop.actions().contains(gdk::DragAction::MOVE)
+        });
+        let weak = self.downgrade();
+        target.connect_motion(move |target, x, y| {
+            let Some(row) = weak.upgrade() else { return gdk::DragAction::empty() };
+            let dragged = target.value().and_then(|v| v.get::<gtk::Widget>().ok());
+            let at = row.drop_index(x, y);
+            // No marker where the pill already is, since letting go there
+            // leaves it as it was, nor in a field with no pills, where the
+            // field's own highlight says enough.
+            let stays = dragged.as_ref().and_then(|p| row.index_of(p)).is_some_and(|i| at == i || at == i + 1);
+            let empty = row.imp().pills.borrow().is_empty();
+            row.imp().flow.set_marker((!stays && !empty).then_some(at));
+            gdk::DragAction::MOVE
+        });
+        let weak = self.downgrade();
+        target.connect_leave(move |_| {
+            if let Some(row) = weak.upgrade() {
+                row.imp().flow.set_marker(None);
+            }
+        });
+        let weak = self.downgrade();
+        target.connect_drop(move |_, value, x, y| {
+            let Some(row) = weak.upgrade() else { return false };
+            row.imp().flow.set_marker(None);
+            let Ok(pill) = value.get::<gtk::Widget>() else { return false };
+            let Some(from) = pill.ancestor(Self::static_type()).and_downcast::<Self>() else { return false };
+            from.move_pill(&pill, &row, row.drop_index(x, y));
+            true
+        });
+        self.add_controller(target);
+    }
+
+    /// The field looks focused while its text or one of its pills has the
+    /// focus, as an entry row does while its text has.
+    fn wire_focus(&self, area: &gtk::Box) {
         let focus = gtk::EventControllerFocus::new();
         let weak = self.downgrade();
         focus.connect_enter(move |_| {
@@ -298,9 +397,10 @@ impl RecipientRow {
             row.imp().focused.set(false);
             row.update_state();
             // A whole address left behind becomes a pill like the rest, once
-            // the focus has gone to another field. Not when the window loses
-            // it: someone who switched away to look the rest of an address
-            // up comes back to the text as they left it.
+            // the focus has gone to another field (a pill of this one keeps
+            // it here). Not when the window loses it: someone who switched
+            // away to look the rest of an address up comes back to the text
+            // as they left it.
             let weak = row.downgrade();
             glib::idle_add_local_once(move || {
                 let Some(row) = weak.upgrade() else { return };
@@ -311,41 +411,46 @@ impl RecipientRow {
                 }
             });
         });
-        text.add_controller(focus);
-
-        // A click anywhere on the row, pills aside, types into it.
-        let click = gtk::GestureClick::new();
-        let weak = self.downgrade();
-        click.connect_released(move |_, _, _, _| {
-            if let Some(row) = weak.upgrade() {
-                row.imp().text.grab_focus();
-            }
-        });
-        imp.header.add_controller(click);
+        area.add_controller(focus);
     }
 
     /// Make pills of every recipient in `field`, after the others.
     fn push(&self, field: &str) {
-        let imp = self.imp();
         for (name, addr) in crate::worker::parse_recipients(&normalise_separators(field)) {
             if addr.is_empty() {
                 continue;
             }
             let recipient = crate::worker::format_recipient(&name, &addr);
-            let pill = self.pill(&name, &addr, &recipient);
-            imp.flow.insert_before_text(&pill);
-            imp.pills.borrow_mut().push((pill.upcast(), recipient));
+            let at = self.imp().pills.borrow().len();
+            self.insert_pill(at, &name, &addr, &recipient);
         }
+    }
+
+    /// Make a pill of one recipient and put it `at` that place among the
+    /// others.
+    fn insert_pill(&self, at: usize, name: &str, addr: &str, recipient: &str) -> gtk::Widget {
+        let imp = self.imp();
+        let pill = self.pill(name, addr, recipient).upcast::<gtk::Widget>();
+        let next = imp.pills.borrow().get(at).map(|(p, _)| p.clone());
+        imp.flow.place(&pill, next.as_ref());
+        let mut pills = imp.pills.borrow_mut();
+        let at = at.min(pills.len());
+        pills.insert(at, (pill.clone(), recipient.to_string()));
+        pill
     }
 
     fn pill(&self, name: &str, addr: &str, recipient: &str) -> gtk::Box {
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         pill.add_css_class("recipient-pill");
+        // Focusable for the keyboard (see `pill_key`), but Tab passes over
+        // the pills (see the flow's `focus`).
+        pill.set_focusable(true);
         let valid = crate::worker::invalid_recipient(recipient).is_none();
         if !valid {
             pill.add_css_class("invalid");
         }
         let shown = if name.is_empty() { addr } else { name };
+        pill.update_property(&[gtk::accessible::Property::Label(shown)]);
         let label = gtk::Label::new(Some(shown));
         label.set_ellipsize(gtk::pango::EllipsizeMode::End);
         label.set_max_width_chars(32);
@@ -374,21 +479,269 @@ impl RecipientRow {
         });
         pill.append(&remove);
 
-        // A double click edits the pill: it becomes the text, and what was
-        // being typed is kept as a pill of its own first.
+        // A click selects the pill, for the keyboard; a double click edits
+        // it: it becomes the text, and what was being typed is kept as a
+        // pill of its own first.
         let click = gtk::GestureClick::new();
         let weak = self.downgrade();
         let weak_pill = pill.downgrade();
-        click.connect_pressed(move |gesture, n, _, _| {
-            if n != 2 {
+        click.connect_pressed(move |gesture, n, x, y| {
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let on_remove = pill.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| w.ancestor(gtk::Button::static_type()).is_some());
+            if on_remove {
                 return;
             }
-            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            row.edit_pill(pill.upcast_ref());
+            if n == 2 {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                row.edit_pill(pill.upcast_ref());
+            } else {
+                pill.grab_focus();
+            }
         });
         pill.add_controller(click);
+
+        let menu = gtk::GestureClick::new();
+        menu.set_button(gdk::BUTTON_SECONDARY);
+        let weak = self.downgrade();
+        let weak_pill = pill.downgrade();
+        menu.connect_pressed(move |gesture, _, x, y| {
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            pill.grab_focus();
+            row.pill_menu(pill.upcast_ref(), x, y);
+        });
+        pill.add_controller(menu);
+
+        let keys = gtk::EventControllerKey::new();
+        let weak = self.downgrade();
+        let weak_pill = pill.downgrade();
+        keys.connect_key_pressed(move |_, key, _, state| {
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else {
+                return glib::Propagation::Proceed;
+            };
+            row.pill_key(pill.upcast_ref(), key, state)
+        });
+        pill.add_controller(keys);
+
+        // Dragged to another place in this field or into another. The
+        // drag carries the pill itself, which only a recipient field takes.
+        let drag = gtk::DragSource::new();
+        drag.set_actions(gdk::DragAction::MOVE);
+        let weak_pill = pill.downgrade();
+        drag.connect_prepare(move |source, x, y| {
+            let pill = weak_pill.upgrade()?;
+            // The pill as it looks now, before it dims for the drag.
+            let image = gtk::WidgetPaintable::new(Some(&pill)).current_image();
+            source.set_icon(Some(&image), x as i32, y as i32);
+            Some(gdk::ContentProvider::for_value(&pill.upcast::<gtk::Widget>().to_value()))
+        });
+        let weak = self.downgrade();
+        let weak_pill = pill.downgrade();
+        drag.connect_drag_begin(move |_, _| {
+            if let Some(pill) = weak_pill.upgrade() {
+                pill.add_css_class("dragged");
+            }
+            if let Some(row) = weak.upgrade() {
+                row.emit_by_name::<()>("pill-drag", &[&true]);
+            }
+        });
+        let weak = self.downgrade();
+        let weak_pill = pill.downgrade();
+        drag.connect_drag_end(move |_, _, _| {
+            if let Some(pill) = weak_pill.upgrade() {
+                pill.remove_css_class("dragged");
+            }
+            if let Some(row) = weak.upgrade() {
+                row.emit_by_name::<()>("pill-drag", &[&false]);
+            }
+        });
+        pill.add_controller(drag);
         pill
+    }
+
+    /// The other recipient fields, for a pill's menu to move it to.
+    pub fn set_peers(&self, peers: &[&RecipientRow]) {
+        *self.imp().peers.borrow_mut() = peers.iter().filter(|p| **p != self).map(|p| p.downgrade()).collect();
+    }
+
+    /// Called as a pill of this field starts (true) and ends (false) a
+    /// drag.
+    pub fn connect_pill_drag<F: Fn(&Self, bool) + 'static>(&self, f: F) -> glib::SignalHandlerId {
+        self.connect_local("pill-drag", false, move |values| {
+            let row = values[0].get::<Self>().expect("RecipientRow");
+            f(&row, values[1].get::<bool>().unwrap_or(false));
+            None
+        })
+    }
+
+    fn index_of(&self, pill: &gtk::Widget) -> Option<usize> {
+        self.imp().pills.borrow().iter().position(|(p, _)| p == pill)
+    }
+
+    /// Where among the pills a pill let go at `(x, y)` goes: before the
+    /// first pill on the pointer's line that is past it, after those on
+    /// the lines above.
+    fn drop_index(&self, x: f64, y: f64) -> usize {
+        let imp = self.imp();
+        let flow = &imp.flow;
+        let Some(p) = self.compute_point(flow, &gtk::graphene::Point::new(x as f32, y as f32)) else { return 0 };
+        let rtl = flow.direction() == gtk::TextDirection::Rtl;
+        let y = (p.y() as f64).clamp(0.0, (flow.height() - 1).max(0) as f64);
+        imp.pills
+            .borrow()
+            .iter()
+            .filter_map(|(pill, _)| pill.compute_bounds(flow))
+            .filter(|b| {
+                let (top, bottom) = (b.y() as f64, (b.y() + b.height()) as f64);
+                let middle = (b.x() + b.width() / 2.0) as f64;
+                let past = if rtl { (p.x() as f64) > middle } else { (p.x() as f64) < middle };
+                bottom <= y || (top <= y && !past)
+            })
+            .count()
+    }
+
+    /// Move `pill` of this field to place `at` in `to`, which may be this
+    /// field again. A field that already has the address only loses it
+    /// here. Returns the pill in its new place.
+    fn move_pill(&self, pill: &gtk::Widget, to: &RecipientRow, at: usize) -> Option<gtk::Widget> {
+        let imp = self.imp();
+        let from = self.index_of(pill)?;
+        let focused = pill.is_focus();
+        if to == self {
+            if at == from || at == from + 1 {
+                return Some(pill.clone());
+            }
+            let entry = imp.pills.borrow_mut().remove(from);
+            let at = if at > from { at - 1 } else { at };
+            let next = imp.pills.borrow().get(at).map(|(p, _)| p.clone());
+            imp.flow.place(&entry.0, next.as_ref());
+            imp.pills.borrow_mut().insert(at, entry);
+            self.emit_changed();
+            return Some(pill.clone());
+        }
+        let recipient = imp.pills.borrow()[from].1.clone();
+        let (name, addr) = crate::worker::parse_recipients(&recipient).into_iter().next()?;
+        imp.pills.borrow_mut().remove(from);
+        imp.flow.remove(pill);
+        self.emit_changed();
+        let there = to.imp().pills.borrow().iter().find_map(|(p, r)| {
+            let other = crate::worker::parse_recipients(r).into_iter().next().map(|(_, a)| a);
+            other.is_some_and(|a| a.eq_ignore_ascii_case(&addr)).then(|| p.clone())
+        });
+        let moved = match there {
+            Some(p) => p,
+            None => {
+                let p = to.insert_pill(at, &name, &addr, &recipient);
+                to.emit_changed();
+                p
+            }
+        };
+        if focused {
+            moved.grab_focus();
+        }
+        Some(moved)
+    }
+
+    /// Keys on a focused pill: arrows between pills and back to the text,
+    /// Delete or Backspace removes it, Return edits it, the menu key opens
+    /// its menu, and a letter goes to the text.
+    fn pill_key(&self, pill: &gtk::Widget, key: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
+        let imp = self.imp();
+        let Some(i) = self.index_of(pill) else { return glib::Propagation::Proceed };
+        let rtl = self.direction() == gtk::TextDirection::Rtl;
+        let pill_at = |j: usize| imp.pills.borrow().get(j).map(|(p, _)| p.clone());
+        let modified = state.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+        let (back, forward) = if rtl { (gdk::Key::Right, gdk::Key::Left) } else { (gdk::Key::Left, gdk::Key::Right) };
+        match key {
+            _ if modified => return glib::Propagation::Proceed,
+            k if k == back => {
+                if let Some(p) = i.checked_sub(1).and_then(pill_at) {
+                    p.grab_focus();
+                }
+            }
+            k if k == forward => match pill_at(i + 1) {
+                Some(p) => {
+                    p.grab_focus();
+                }
+                None => self.focus_text(),
+            },
+            gdk::Key::Home => {
+                if let Some(p) = pill_at(0) {
+                    p.grab_focus();
+                }
+            }
+            gdk::Key::End => self.focus_text(),
+            gdk::Key::BackSpace | gdk::Key::Delete | gdk::Key::KP_Delete => {
+                // Backspace leaves the focus on the pill before, Delete on
+                // the one after, as they would on letters.
+                let next = if key == gdk::Key::BackSpace && i > 0 { pill_at(i - 1) } else { pill_at(i + 1) };
+                let next = next.or_else(|| i.checked_sub(1).and_then(pill_at));
+                self.remove_pill(pill);
+                match next {
+                    Some(p) => {
+                        p.grab_focus();
+                    }
+                    None => self.focus_text(),
+                }
+            }
+            gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter | gdk::Key::F2 => self.edit_pill(pill),
+            gdk::Key::Menu => self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64),
+            gdk::Key::F10 if state.contains(gdk::ModifierType::SHIFT_MASK) => {
+                self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64)
+            }
+            // Typing goes on in the text, after the pills.
+            _ => match key.to_unicode().filter(|c| !c.is_control()) {
+                Some(c) => {
+                    self.focus_text();
+                    let text = &imp.text;
+                    let mut end = text.text().chars().count() as i32;
+                    text.insert_text(&c.to_string(), &mut end);
+                    text.set_position(end);
+                }
+                None => return glib::Propagation::Proceed,
+            },
+        }
+        glib::Propagation::Stop
+    }
+
+    /// The pill's menu, at `(x, y)` in the pill: move it to another field,
+    /// edit it, remove it.
+    fn pill_menu(&self, pill: &gtk::Widget, x: f64, y: f64) {
+        use crate::ui::context_menu::{show_context_menu, MenuEntry};
+        let Some(p) = pill.compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32)) else { return };
+        let mut moves = Vec::new();
+        for peer in self.imp().peers.borrow().iter().filter_map(|p| p.upgrade()) {
+            let label = i18n_f("Move to {name}", &[("name", &peer.title())]);
+            let (row, pill) = (self.downgrade(), pill.downgrade());
+            moves.push(MenuEntry::new(label, move || {
+                let (Some(row), Some(pill)) = (row.upgrade(), pill.upgrade()) else { return };
+                peer.set_visible(true);
+                let at = peer.imp().pills.borrow().len();
+                if let Some(moved) = row.move_pill(&pill, &peer, at) {
+                    moved.grab_focus();
+                }
+            }));
+        }
+        let (row, weak) = (self.downgrade(), pill.downgrade());
+        let edit = MenuEntry::new(i18n("Edit"), move || {
+            if let (Some(row), Some(pill)) = (row.upgrade(), weak.upgrade()) {
+                row.edit_pill(&pill);
+            }
+        });
+        let (row, weak) = (self.downgrade(), pill.downgrade());
+        let remove = MenuEntry::new(i18n("Remove"), move || {
+            if let (Some(row), Some(pill)) = (row.upgrade(), weak.upgrade()) {
+                row.remove_pill(&pill);
+                row.focus_text();
+            }
+        });
+        show_context_menu(self, p.x() as f64, p.y() as f64, vec![moves, vec![edit, remove]]);
+    }
+
+    fn focus_text(&self) {
+        let text = &self.imp().text;
+        text.grab_focus();
+        text.set_position(-1);
     }
 
     fn remove_pill(&self, pill: &gtk::Widget) {
@@ -441,6 +794,18 @@ impl RecipientRow {
             self.remove_css_class("focused");
         }
     }
+}
+
+/// Whether `widget` is a pill or inside one.
+fn is_in_pill(widget: &gtk::Widget) -> bool {
+    let mut w = Some(widget.clone());
+    while let Some(c) = w {
+        if c.has_css_class("recipient-pill") {
+            return true;
+        }
+        w = c.parent();
+    }
+    false
 }
 
 /// What to do with text about to go into the field, when it is more than
@@ -553,6 +918,12 @@ mod flow_imp {
     #[derive(Default)]
     pub struct PillFlow {
         pub text: RefCell<Option<gtk::Widget>>,
+        /// The line showing where a dragged pill would go, outside the
+        /// layout.
+        pub marker: gtk::Box,
+        /// The pill the marker stands before; the number of pills puts it
+        /// after the last.
+        pub marker_at: Cell<Option<usize>>,
     }
 
     #[glib::object_subclass]
@@ -563,6 +934,14 @@ mod flow_imp {
     }
 
     impl ObjectImpl for PillFlow {
+        fn constructed(&self) {
+            self.parent_constructed();
+            self.marker.add_css_class("pill-drop-marker");
+            self.marker.set_can_target(false);
+            self.marker.set_visible(false);
+            self.marker.set_parent(&*self.obj());
+        }
+
         fn dispose(&self) {
             while let Some(c) = self.obj().first_child() {
                 c.unparent();
@@ -599,12 +978,46 @@ mod flow_imp {
 
         fn size_allocate(&self, width: i32, _height: i32, _baseline: i32) {
             let obj = self.obj();
+            let rtl = obj.direction() == gtk::TextDirection::Rtl;
+            // Each child's place before mirroring, for the marker.
+            let mut placed = Vec::new();
             for line in obj.lines(width) {
                 for (child, x, w, h) in line.items {
                     let y = line.y + (line.h - h) / 2;
-                    let x = if obj.direction() == gtk::TextDirection::Rtl { width - x - w } else { x };
+                    placed.push((obj.is_text(&child), x, y, w, h));
+                    let x = if rtl { width - x - w } else { x };
                     child.size_allocate(&gtk::Allocation::new(x, y, w, h), -1);
                 }
+            }
+            if let Some(at) = self.marker_at.get() {
+                let pills: Vec<_> = placed.iter().filter(|p| !p.0).collect();
+                let (w, _, _, _) = self.marker.measure(gtk::Orientation::Horizontal, -1);
+                let w = w.max(2);
+                // In the gap before the pill, or after the last one, or at
+                // the start of the text when there is none.
+                let (x, y, h) = match (pills.get(at), pills.last(), placed.iter().find(|p| p.0)) {
+                    (Some(p), _, _) => (p.1 - (SPACING + w) / 2, p.2, p.4),
+                    (None, Some(p), _) => (p.1 + p.3 + (SPACING - w) / 2, p.2, p.4),
+                    (None, None, Some(t)) => (t.1, t.2, t.4),
+                    _ => (0, 0, 0),
+                };
+                let x = x.clamp(0, (width - w).max(0));
+                let x = if rtl { width - x - w } else { x };
+                self.marker.size_allocate(&gtk::Allocation::new(x, y, w, h), -1);
+            }
+        }
+
+        /// Tab goes to the text and on out of the field, never through the
+        /// pills, which the arrow keys reach from the text.
+        fn focus(&self, direction: gtk::DirectionType) -> bool {
+            match direction {
+                gtk::DirectionType::TabForward | gtk::DirectionType::TabBackward => {
+                    if self.obj().focus_child().is_some() {
+                        return false;
+                    }
+                    self.text.borrow().as_ref().is_some_and(|t| t.grab_focus())
+                }
+                _ => self.parent_focus(direction),
             }
         }
     }
@@ -636,10 +1049,23 @@ impl PillFlow {
         self.imp().text.replace(Some(text.clone().upcast()));
     }
 
-    fn insert_before_text(&self, pill: &impl IsA<gtk::Widget>) {
+    /// Put a pill before `next`, or after the others; a pill already here
+    /// moves.
+    fn place(&self, pill: &impl IsA<gtk::Widget>, next: Option<&gtk::Widget>) {
         let text = self.imp().text.borrow().clone();
-        pill.insert_before(self, text.as_ref());
+        pill.insert_before(self, next.or(text.as_ref()));
         self.queue_resize();
+    }
+
+    /// Show the drop marker before pill `at`, or hide it.
+    fn set_marker(&self, at: Option<usize>) {
+        let imp = self.imp();
+        if imp.marker_at.get() == at {
+            return;
+        }
+        imp.marker_at.set(at);
+        imp.marker.set_visible(at.is_some());
+        self.queue_allocate();
     }
 
     fn remove(&self, child: &impl IsA<gtk::Widget>) {
@@ -658,7 +1084,7 @@ impl PillFlow {
         let mut child = self.first_child();
         while let Some(c) = child {
             child = c.next_sibling();
-            if c.is_visible() {
+            if c.is_visible() && c != *self.imp().marker.upcast_ref::<gtk::Widget>() {
                 out.push(c);
             }
         }

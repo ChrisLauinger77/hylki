@@ -1754,6 +1754,31 @@ impl Component for Compose {
             focus.connect_leave(move |_| s.input_sender().emit(ComposeInput::CompletionClose));
             row.add_controller(focus);
         }
+        // A pill moves between these by drag or by its menu (#492). While
+        // one is dragged, the hidden Cc and Bcc show, to be dropped on;
+        // those still empty when it ends hide again.
+        {
+            let rows = [widgets.to_row.clone(), widgets.cc_row.clone(), widgets.bcc_row.clone()];
+            let shown: std::rc::Rc<std::cell::RefCell<Vec<RecipientRow>>> = Default::default();
+            for row in &rows {
+                row.set_peers(&[&rows[0], &rows[1], &rows[2]]);
+                let (cc, bcc, shown) = (rows[1].clone(), rows[2].clone(), shown.clone());
+                row.connect_pill_drag(move |_, on| {
+                    if on {
+                        for r in [&cc, &bcc].into_iter().filter(|r| !r.is_visible()) {
+                            r.set_visible(true);
+                            shown.borrow_mut().push(r.clone());
+                        }
+                    } else {
+                        for r in shown.take() {
+                            if r.text().is_empty() {
+                                r.set_visible(false);
+                            }
+                        }
+                    }
+                });
+            }
+        }
         widgets.reply_to_row.connect_changed(|row| row.remove_css_class("error"));
         // Subject edits also count as dirtying the draft.
         let s = sender.clone();
