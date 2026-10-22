@@ -922,21 +922,26 @@ impl RowShared {
         std::mem::take(&mut *self.wanted.borrow_mut())
     }
 
+    /// The selected rows, in list order, for a drag's cards.
+    fn selected_rows(&self) -> Vec<Rc<RowData>> {
+        let set = self.selection.selection();
+        let rows = self.model.imp().rows.borrow();
+        let Some((iter, first)) = gtk::BitsetIter::init_first(&set) else { return Vec::new() };
+        std::iter::once(first).chain(iter).filter_map(|pos| rows.get(pos as usize).cloned()).collect()
+    }
+
     /// The keys of the selected rows, in list order, for a drag.
     fn selected_drag_keys(&self) -> Vec<(u32, u32, u32, u32)> {
-        let set = self.selection.selection();
-        let mut out = Vec::new();
-        let rows = self.model.imp().rows.borrow();
-        if let Some((iter, first)) = gtk::BitsetIter::init_first(&set) {
-            for pos in std::iter::once(first).chain(iter) {
-                if let Some(r) = rows.get(pos as usize) {
-                    out.push((r.msg.account_id, r.msg.folder_id, r.msg.uid, r.msg.id));
-                }
-            }
-        }
-        out
+        self.selected_rows().iter().map(|r| (r.msg.account_id, r.msg.folder_id, r.msg.uid, r.msg.id)).collect()
     }
 }
+
+/// How many cards a dragged selection draws at most; the count says the rest.
+const DRAG_STACK: usize = 5;
+/// How far each card behind sits from the one in front, down and right.
+const DRAG_STACK_STEP: i32 = 5;
+/// The width of every card in a dragged selection's stack.
+const DRAG_CARD_WIDTH: i32 = 300;
 
 /// How many rows the view's spares hold at most. A long list keeps about
 /// two hundred rows made, far more than a window shows: GTK's list view
@@ -3074,22 +3079,55 @@ impl Row {
         });
     }
 
-    /// What a drag of this row carries under the pointer: the row's
-    /// circle, the subject over who it is from (to, in Sent), and how many
-    /// messages go when the row is one of a selection.
-    fn drag_card(&self) -> Option<gtk::Box> {
+    /// What a drag of this row carries under the pointer: the row's card,
+    /// and when the row is one of a selection, the cards of the others
+    /// stacked behind it, at most [`DRAG_STACK`] deep, with the full count.
+    fn drag_card(&self) -> Option<gtk::Widget> {
         let (data, shared) = (self.data()?, self.shared()?);
         let look = shared.look.borrow().clone();
+        let me = (data.msg.account_id, data.msg.id);
+        let selected = shared.selected_rows();
+        if selected.len() < 2 || !selected.iter().any(|r| (r.msg.account_id, r.msg.id) == me) {
+            let card = self.message_card(&data, &look, self.w.avatar.custom_image());
+            return Some(card.upcast());
+        }
+        let front = self.message_card(&data, &look, self.w.avatar.custom_image());
+        let count = gtk::Label::new(Some(&selected.len().to_string()));
+        count.add_css_class("message-drag-count");
+        count.set_valign(gtk::Align::Center);
+        front.append(&count);
+        let behind: Vec<_> = selected
+            .iter()
+            .filter(|r| (r.msg.account_id, r.msg.id) != me)
+            .take(DRAG_STACK - 1)
+            .map(|r| self.message_card(r, &look, None))
+            .collect();
+        // One width for every card, so the edges behind run parallel.
+        let stack = gtk::Fixed::new();
+        for (depth, card) in behind.iter().enumerate().rev() {
+            card.set_size_request(DRAG_CARD_WIDTH, -1);
+            let at = ((depth + 1) as i32 * DRAG_STACK_STEP) as f64;
+            stack.put(card, at, at);
+        }
+        front.set_size_request(DRAG_CARD_WIDTH, -1);
+        stack.put(&front, 0.0, 0.0);
+        Some(stack.upcast())
+    }
+
+    /// One message as a drag card: its circle, the subject over who it is
+    /// from (to, in Sent).
+    fn message_card(&self, data: &RowData, look: &RowLook, image: Option<gtk::gdk::Paintable>) -> gtk::Box {
         let card = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         card.add_css_class("message-drag-card");
-        let name = self.face_name(&data, &look);
-        let email = self.face_email(&data, &look);
+        let name = self.face_name(data, look);
+        let email = self.face_email(data, look);
         let avatar = adw::Avatar::new(34, Some(&name), true);
-        avatar.set_custom_image(self.w.avatar.custom_image().as_ref());
+        avatar.set_custom_image(image.as_ref());
         avatar.set_valign(gtk::Align::Center);
         card.append(&avatar);
         let text = gtk::Box::new(gtk::Orientation::Vertical, 3);
         text.set_valign(gtk::Align::Center);
+        text.set_hexpand(true);
         let subject = if data.msg.subject.trim().is_empty() { i18n("(no subject)") } else { data.msg.subject.clone() };
         let title = gtk::Label::new(Some(&subject));
         title.set_xalign(0.0);
@@ -3109,15 +3147,7 @@ impl Row {
         text.append(&title);
         text.append(&subtitle);
         card.append(&text);
-        let me = (data.msg.account_id, data.msg.id);
-        let selected = shared.selected_drag_keys();
-        if selected.len() > 1 && selected.iter().any(|k| (k.0, k.3) == me) {
-            let count = gtk::Label::new(Some(&selected.len().to_string()));
-            count.add_css_class("message-drag-count");
-            count.set_valign(gtk::Align::Center);
-            card.append(&count);
-        }
-        Some(card)
+        card
     }
 
     fn drag_payload(&self) -> Option<gtk::gdk::ContentProvider> {
