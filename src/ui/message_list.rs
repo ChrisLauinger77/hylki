@@ -537,6 +537,32 @@ const PREVIEW_ROWS: usize = 2000;
 /// quick enough to do in place.
 const THREADS_OFF_MAIN: usize = 4000;
 
+/// A list at least this long is searched on another thread
+/// ([`MessageList::start_search`]).
+const SEARCH_OFF_MAIN: usize = 4000;
+
+/// What a search looks in for one message, lowercased: its subject, its
+/// sender's name and address, and its preview, apart, so a query never
+/// matches across two of them.
+pub(crate) fn search_text_of(m: &Message) -> Box<str> {
+    [m.subject.as_str(), &m.from_name, &m.from_addr, &m.preview].join("\u{0}").to_lowercase().into_boxed_str()
+}
+
+/// [`search_text_of`] for each message of a list, and which messages they
+/// were, so that a changed one is noticed and made again.
+struct SearchText {
+    of: Vec<*const Message>,
+    text: std::sync::Arc<Vec<Box<str>>>,
+}
+
+/// What a search run on another thread matched: for `query`, a flag for
+/// each entry of `text`, which says which messages they were.
+struct SearchHits {
+    query: String,
+    text: std::sync::Arc<Vec<Box<str>>>,
+    hits: Vec<bool>,
+}
+
 /// [`compute_thread_keys`] over everything a list holds, with each
 /// conversation's members as positions in that same slice.
 pub struct SourceThreads {
@@ -645,6 +671,14 @@ pub struct MessageList {
     search_pool: Vec<Rc<Message>>,
     /// The pool's folders, by `(account_id, folder_id)`.
     pool_folders: Rc<std::collections::HashMap<(u32, u32), PoolFolder>>,
+    /// What a search looks in, for the folder (`[0]`) and for the pool
+    /// (`[1]`), made once for a search rather than at every keystroke.
+    search_text: std::cell::RefCell<[Option<SearchText>; 2]>,
+    /// The newest search sent to another thread. One still running for an
+    /// older query sees it has been overtaken and stops (#515).
+    search_gen: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// The answer of the last search that ran on another thread.
+    search_hits: Option<SearchHits>,
     /// Which messages the search field filters over.
     scope: SearchScope,
     /// The search scope's button and popover.
@@ -1432,8 +1466,12 @@ pub enum MessageListInput {
     /// Change the search scope (all folders vs. the current folder).
     SetScope(SearchScope),
     /// Replace the cross-folder search pool (all folders, all accounts). Sent by
-    /// the app when a search begins; cleared to empty when it ends.
-    SetSearchPool(Vec<Message>, std::collections::HashMap<(u32, u32), PoolFolder>),
+    /// the app when a search begins; cleared to empty when it ends. The
+    /// pool's [`search_text_of`], worked out where the pool was put together,
+    /// comes with it.
+    SetSearchPool(Vec<Message>, std::collections::HashMap<(u32, u32), PoolFolder>, Vec<Box<str>>),
+    /// What a search matched on another thread ([`MessageList::start_search`]).
+    SearchMatched { gen: u64, query: String, text: std::sync::Arc<Vec<Box<str>>>, hits: Vec<bool> },
     /// The reader's selection: mirror whichever of these the list has rows for,
     /// so everything that acts on the list's selection acts on the messages the
     /// user pointed at. The reader is already showing them, so this must not
@@ -1972,6 +2010,9 @@ impl SimpleComponent for MessageList {
             all: Vec::new(),
             search_pool: Vec::new(),
             pool_folders: Default::default(),
+            search_text: Default::default(),
+            search_gen: Default::default(),
+            search_hits: None,
             scope: SearchScope::AllFolders,
             search_entry: None,
             scope_picker: None,
@@ -2600,8 +2641,24 @@ impl SimpleComponent for MessageList {
                 if was_active != now_active {
                     let _ = sender.output(MessageListOutput::SearchActive(now_active));
                 }
-                self.rebuild();
-                self.scroll_top();
+                if self.query.is_empty() {
+                    *self.search_text.borrow_mut() = Default::default();
+                    self.search_hits = None;
+                }
+                // A large list is searched on another thread, and its rows
+                // stay as they are until the answer is in: typing held the
+                // main loop for as long as each search took (#515).
+                if !self.start_search() {
+                    self.rebuild();
+                    self.scroll_top();
+                }
+            }
+            MessageListInput::SearchMatched { gen, query, text, hits } => {
+                if gen == self.search_gen.load(std::sync::atomic::Ordering::Relaxed) && query == self.query {
+                    self.search_hits = Some(SearchHits { query, text, hits });
+                    self.rebuild();
+                    self.scroll_top();
+                }
             }
             MessageListInput::SetScope(scope) => {
                 if let Some(picker) = &self.scope_picker {
@@ -2623,8 +2680,12 @@ impl SimpleComponent for MessageList {
                     }
                 }
             }
-            MessageListInput::SetSearchPool(pool, folders) => {
+            MessageListInput::SetSearchPool(pool, folders, text) => {
                 self.search_pool = pool.into_iter().map(Rc::new).collect();
+                self.search_text.borrow_mut()[1] = (text.len() == self.search_pool.len() && !text.is_empty()).then(|| SearchText {
+                    of: self.search_pool.iter().map(Rc::as_ptr).collect(),
+                    text: std::sync::Arc::new(text),
+                });
                 self.pool_folders = Rc::new(folders);
                 self.drop_threads();
                 self.sync_look();
@@ -4835,6 +4896,9 @@ impl MessageList {
 
     fn drop_threads(&self) {
         self.source_threads.take();
+        // A message's address says which it is only while the list lasts:
+        // the next one may be put where an old one was.
+        self.search_text.borrow_mut()[0] = None;
         self.threads_gen.set(self.threads_gen.get() + 1);
     }
 
@@ -4910,6 +4974,9 @@ impl MessageList {
             let _ = sender.output(MessageListOutput::SearchActive(false));
         }
         self.query.clear();
+        self.search_gen.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.search_hits = None;
+        *self.search_text.borrow_mut() = Default::default();
         if let Some(e) = &self.search_entry {
             e.set_text("");
         }
@@ -4918,6 +4985,13 @@ impl MessageList {
     /// What the search field and the quick filters let through.
     fn filter(&self) -> impl Fn(&Message) -> bool {
         let q = self.query.to_lowercase();
+        let besides = self.filter_besides_text();
+        move |m: &Message| besides(m) && (q.is_empty() || search_text_of(m).contains(&q))
+    }
+
+    /// What the quick filters and the search's scope let through, the
+    /// search's text aside.
+    fn filter_besides_text(&self) -> impl Fn(&Message) -> bool {
         let quick = QuickFilterContext {
             filters: self.quick,
             own: if self.quick.has(QuickFilter::ToMe) { self.own_addresses.clone() } else { Default::default() },
@@ -4933,15 +5007,87 @@ impl MessageList {
         } else {
             Default::default()
         };
-        move |m: &Message| {
-            !left_out.contains(&(m.account_id, m.folder_id))
-                && quick.passes(m)
-                && (q.is_empty()
-                    || m.subject.to_lowercase().contains(&q)
-                    || m.from_name.to_lowercase().contains(&q)
-                    || m.from_addr.to_lowercase().contains(&q)
-                    || m.preview.to_lowercase().contains(&q))
+        move |m: &Message| !left_out.contains(&(m.account_id, m.folder_id)) && quick.passes(m)
+    }
+
+    /// [`search_text_of`] for the source a search goes through, made again
+    /// only for the messages that changed since.
+    fn source_text(&self) -> std::sync::Arc<Vec<Box<str>>> {
+        let source = self.active_source();
+        let mut texts = self.search_text.borrow_mut();
+        let slot = &mut texts[usize::from(self.searching_pool())];
+        match slot {
+            Some(t) if t.of.len() == source.len() => {
+                let stale: Vec<usize> =
+                    (0..source.len()).filter(|&i| t.of[i] != Rc::as_ptr(&source[i])).collect();
+                if !stale.is_empty() {
+                    let text = std::sync::Arc::make_mut(&mut t.text);
+                    for i in stale {
+                        t.of[i] = Rc::as_ptr(&source[i]);
+                        text[i] = search_text_of(&source[i]);
+                    }
+                }
+            }
+            _ => {
+                *slot = Some(SearchText {
+                    of: source.iter().map(Rc::as_ptr).collect(),
+                    text: std::sync::Arc::new(source.iter().map(|m| search_text_of(m)).collect()),
+                });
+            }
         }
+        slot.as_ref().map(|t| t.text.clone()).unwrap_or_default()
+    }
+
+    /// Search a large source on another thread, answered with
+    /// [`MessageListInput::SearchMatched`]; `false` for a source small
+    /// enough to search in place, or no search at all. Either way a search
+    /// still running is overtaken.
+    fn start_search(&self) -> bool {
+        let gen = self.search_gen.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        if self.query.is_empty() || self.active_source().len() < SEARCH_OFF_MAIN {
+            return false;
+        }
+        let text = self.source_text();
+        let query = self.query.clone();
+        let latest = self.search_gen.clone();
+        let sender = self.input.clone();
+        std::thread::spawn(move || {
+            let t = std::time::Instant::now();
+            let needle = query.to_lowercase();
+            let mut hits = Vec::with_capacity(text.len());
+            for (i, haystack) in text.iter().enumerate() {
+                if i % 4096 == 0 && latest.load(std::sync::atomic::Ordering::Relaxed) != gen {
+                    return;
+                }
+                hits.push(haystack.contains(&needle));
+            }
+            tracing::debug!("list: searched {} messages off the main loop in {:?}", text.len(), t.elapsed());
+            let _ = sender.send(MessageListInput::SearchMatched { gen, query, text, hits });
+        });
+        true
+    }
+
+    /// The messages of the source that the search and the quick filters
+    /// let through, in the source's order.
+    fn source_matches(&self) -> Vec<Rc<Message>> {
+        let source = self.active_source();
+        let besides = self.filter_besides_text();
+        if self.query.is_empty() {
+            return source.iter().filter(|m| besides(m)).cloned().collect();
+        }
+        let text = self.source_text();
+        let hits = self
+            .search_hits
+            .as_ref()
+            .filter(|h| h.query == self.query && std::sync::Arc::ptr_eq(&h.text, &text))
+            .map(|h| &h.hits);
+        let query = self.query.to_lowercase();
+        source
+            .iter()
+            .enumerate()
+            .filter(|(i, m)| hits.map_or_else(|| text[*i].contains(&query), |h| h[*i]) && besides(m))
+            .map(|(_, m)| m.clone())
+            .collect()
     }
 
     /// Who took part in a conversation (#334), for its Correspondents
@@ -5209,16 +5355,15 @@ impl MessageList {
     fn compute_rows(&mut self, offscreen: bool) -> Built {
         let passes = self.filter();
         let source_len = self.active_source().len();
-        let mut matches: Vec<Rc<Message>> = self.active_source().iter().filter(|m| passes(m)).cloned().collect();
+        let mut matches = self.source_matches();
         if self.searching() {
             tracing::debug!("list: search matched {} of {} messages ({:?})", matches.len(), source_len, self.scope);
         }
-        let mut filtered = matches.len() != source_len;
         // A large list's conversations are worked out on a background
         // thread (`threads_pending`). Until they are in, its newest messages
         // go on screen at once, grouped among themselves; the whole list
         // follows when the answer comes.
-        let preview = self.threading && !filtered && self.threads_pending();
+        let preview = self.threading && self.threads_pending();
         self.listed_folders = matches.iter().map(|m| (m.account_id, m.folder_id)).collect();
         let graph_in_view = self.listed_folders.iter().any(|(a, _)| self.graph_accounts.contains(a));
         if !offscreen && graph_in_view != self.graph_in_view {
@@ -5242,52 +5387,60 @@ impl MessageList {
         self.total_matches = matches.len();
         if preview {
             matches.truncate(PREVIEW_ROWS);
-            filtered = true;
         }
 
         // Group into conversations by reply headers (Message-ID / In-Reply-To /
         // References) across the whole list, preserving the sort's order of
         // threads. With threading off, every message is its own group.
-        // Unfiltered, the list is the folder, whose grouping is kept.
+        // A search or a quick filter keeps the conversations of the list it
+        // narrows: working them out again from the matches took a large
+        // mailbox's search most of its time at every keystroke (#515).
         let kept_threads;
         let own_keys;
         let empty = std::collections::HashMap::new();
         let keys = if !self.threading {
             &empty
-        } else if !filtered {
+        } else if !preview {
             kept_threads = self.source_threads();
             &kept_threads.keys
         } else {
             own_keys = compute_thread_keys(&matches, &self.thread_links);
             &own_keys
         };
-        let key_for = |m: &Message| -> (u32, String) {
-            keys.get(&thread_slot(m))
-                .cloned()
-                .unwrap_or_else(|| (m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)))
-        };
-        let mut order: Vec<(u32, String)> = Vec::new();
-        let mut groups: std::collections::HashMap<(u32, String), Vec<Rc<Message>>> =
-            std::collections::HashMap::new();
+        // The conversations in the order of their first message in the
+        // sort. The keys are borrowed: a String per message was the larger
+        // part of grouping a long list.
+        let mut grouped: Vec<((u32, String), Vec<Rc<Message>>)> = Vec::with_capacity(matches.len());
+        let mut at: std::collections::HashMap<&(u32, String), usize> =
+            std::collections::HashMap::with_capacity(if keys.is_empty() { 0 } else { matches.len() });
+        let mut alone: std::collections::HashMap<(u32, u32, u32), usize> =
+            std::collections::HashMap::with_capacity(if keys.is_empty() { matches.len() } else { 0 });
         for m in matches {
-            let key = key_for(&m);
-            if let Some(v) = groups.get_mut(&key) {
-                v.push(m);
-            } else {
-                order.push(key.clone());
-                groups.insert(key, vec![m]);
-            }
+            let slot = thread_slot(&m);
+            let i = match keys.get(&slot) {
+                Some(key) => *at.entry(key).or_insert_with(|| {
+                    grouped.push((key.clone(), Vec::new()));
+                    grouped.len() - 1
+                }),
+                None => *alone.entry(slot).or_insert_with(|| {
+                    grouped.push(((m.account_id, format!("\u{0}uid{}/{}", m.folder_id, m.uid)), Vec::new()));
+                    grouped.len() - 1
+                }),
+            };
+            grouped[i].1.push(m);
         }
+        drop((at, alone));
         // Correspondents sort by the whole conversation's writers, as the
         // column names them, which no single message knows (#443). The
         // conversations are in date order beneath, newest first, from the
         // sort above.
         if sort == SortOrder::Correspondents {
-            let people: std::collections::HashMap<&(u32, String), String> =
-                order.iter().map(|k| (k, self.people_of(k, &groups[k]).to_lowercase())).collect();
-            let mut sorted = order.clone();
-            sorted.sort_by(|a, b| flip(text_key_cmp(&people[a], &people[b])));
-            order = sorted;
+            let people: Vec<String> =
+                grouped.iter().map(|(k, msgs)| self.people_of(k, msgs).to_lowercase()).collect();
+            let mut by: Vec<usize> = (0..grouped.len()).collect();
+            by.sort_by(|a, b| flip(text_key_cmp(&people[*a], &people[*b])));
+            let mut slots: Vec<Option<((u32, String), Vec<Rc<Message>>)>> = grouped.into_iter().map(Some).collect();
+            grouped = by.into_iter().filter_map(|i| slots[i].take()).collect();
         }
 
         // A reply that is sliding open, or shut, keeps doing so.
@@ -5305,8 +5458,8 @@ impl MessageList {
         let day_starts = by_date.then(|| crate::datefmt::day_starts(crate::datefmt::now()));
 
         // Flatten back into display order, recording per-row thread metadata.
-        let mut shown: Vec<Rc<Message>> = Vec::new();
-        let mut rows: Vec<Rc<RowData>> = Vec::new();
+        let mut shown: Vec<Rc<Message>> = Vec::with_capacity(grouped.len());
+        let mut rows: Vec<Rc<RowData>> = Vec::with_capacity(grouped.len());
         let mut thread_drag = crate::ui::message_row::ThreadDragKeys::new();
         // The last rebuild's maps go after the frame: for a large folder,
         // freeing them is tens of milliseconds of the switch.
@@ -5316,12 +5469,15 @@ impl MessageList {
             std::mem::take(&mut self.nested),
             std::mem::take(&mut self.groups),
         ));
+        if self.threading {
+            self.groups.reserve(grouped.len());
+        }
         let mut any_expanded = false;
         let full_rows = self.window.max(LIST_WINDOW);
         let mut unseen: std::collections::HashSet<(u32, u32)> =
             self.selected_ids.iter().copied().chain(self.selected_id).collect();
-        for key in &order {
-            let mut msgs = groups.remove(key).unwrap();
+        for (key, mut msgs) in grouped {
+            let key = &key;
             let section = day_starts.as_ref().map_or(DaySection::None, |d| DaySection::of(msgs[0].timestamp, d));
             // A conversation reads like a transcript: the message that started it
             // is the row on screen, and its replies descend beneath it to the
@@ -6351,5 +6507,23 @@ mod tests {
         assert!(!ctx(all.with(QuickFilter::Unread, true).with(QuickFilter::Unread, false).with(QuickFilter::Attachment, true)).passes(&m));
         m.timestamp = 800;
         assert!(!ctx(all.with(QuickFilter::Today, true)).passes(&m));
+    }
+
+    /// #515: what a search looks in is made once, lowercased, and a query
+    /// matches inside one field, never across two.
+    #[test]
+    fn search_text_keeps_the_fields_apart() {
+        let mut m = msg(1, "a", "");
+        m.subject = "Quarterly REPORT".into();
+        m.from_name = "Ada Lovelace".into();
+        m.from_addr = "ada@example.com".into();
+        m.preview = "Figures attached.".into();
+        let text = super::search_text_of(&m);
+        for hit in ["report", "ada lovelace", "ada@example", "figures", "QUARTERLY".to_lowercase().as_str()] {
+            assert!(text.contains(hit), "{hit}");
+        }
+        assert!(!text.contains("report ada"));
+        assert!(!text.contains("reportada"));
+        assert!(!text.contains("REPORT"));
     }
 }

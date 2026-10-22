@@ -7,6 +7,15 @@
   a Gmail label called `\All` showed as `\\All` and the server answered that
   no such folder exists.
 
+- **Fixed: typing in the search field held up the window** (#515, reported
+  by 3v1n0). Each keystroke searched, sorted and regrouped every message of
+  every folder on the main loop, half a second for a large mailbox, and the
+  cross-folder pool was copied there twice as a search began. The pool is
+  now put together on another thread, a large list is searched on another
+  thread against text lowercased once per search, a newer query stops one
+  still running, and a search keeps the list's conversations instead of
+  working them out again from the matches.
+
 ## 1.45.0 — 2026-10-22
 
 Everything from 1.45.0-beta.1 to 1.45.0-beta.4: a Debian package with its

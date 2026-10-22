@@ -783,7 +783,7 @@ pub struct AppModel {
     /// (account_id, folder_id) → last-seen message list, shown instantly on
     /// revisit while a fresh sync runs in the background. Only folders
     /// listed whole this run: a cross-folder search reads the rest from disk.
-    message_cache: HashMap<(u32, u32), Vec<Message>>,
+    message_cache: HashMap<(u32, u32), FolderMessages>,
     /// Bumped as a search starts and ends, so a pool read from disk for a
     /// search already over is dropped (#472).
     search_gen: u64,
@@ -1634,6 +1634,8 @@ pub enum AppMsg {
     /// The indexes of the folders not opened this run, read from disk for
     /// the search `gen` started (#472).
     SearchPoolLoaded { gen: u64, lists: Vec<((u32, u32), Vec<Message>)> },
+    /// The pool [`AppModel::build_search_pool`] put together.
+    SearchPoolBuilt { gen: u64, pool: Vec<Message>, text: Vec<Box<str>> },
     /// The message list has no selection to show (e.g. the last message was
     /// removed), so the reader should clear.
     ClearReader,
@@ -7045,8 +7047,12 @@ impl SimpleComponent for AppModel {
                         self.apply_pending_tags(account_id, folder_id, messages)
                     })
                     .collect();
-                let pool = self.search_pool(lists);
-                self.message_list.emit(MessageListInput::SetSearchPool(pool, self.pool_folders()));
+                self.build_search_pool(gen, lists, &sender);
+            }
+            AppMsg::SearchPoolBuilt { gen, pool, text } => {
+                if gen == self.search_gen {
+                    self.message_list.emit(MessageListInput::SetSearchPool(pool, self.pool_folders(), text));
+                }
             }
             AppMsg::OpenedByKey { already_open } => {
                 if already_open {
@@ -7067,13 +7073,9 @@ impl SimpleComponent for AppModel {
             AppMsg::SearchActive(active) => {
                 self.search_gen += 1;
                 if active {
-                    // Snapshot every folder's indexed messages so the search can
-                    // span the whole mailbox: the folders opened this run at
-                    // once, the rest when the disk has answered.
-                    self.message_list.emit(MessageListInput::SetSearchPool(
-                        self.search_pool(Vec::new()),
-                        self.pool_folders(),
-                    ));
+                    // Every folder's indexed messages, so the search can span
+                    // the whole mailbox: the folders opened this run and the
+                    // rest from disk, put together off the main loop (#515).
                     self.load_search_pool(&sender);
                     // Results span accounts; tint rows by account (as in the unified
                     // inbox) so their origin is legible.
@@ -7082,7 +7084,7 @@ impl SimpleComponent for AppModel {
                     }
                 } else {
                     self.message_list
-                        .emit(MessageListInput::SetSearchPool(Vec::new(), HashMap::new()));
+                        .emit(MessageListInput::SetSearchPool(Vec::new(), HashMap::new(), Vec::new()));
                     // Restore the tint state the underlying view wants.
                     self.message_list
                         .emit(MessageListInput::SetColorize(self.unified));
@@ -10136,7 +10138,7 @@ impl SimpleComponent for AppModel {
                         // The folder on show had only its newest so far.
                         self.message_list.emit(MessageListInput::SetMessages { messages: messages.clone() });
                     }
-                    self.message_cache.insert((account_id, folder_id), messages);
+                    self.message_cache.insert((account_id, folder_id), messages.into());
                 }
                 // A view left before its folders landed.
                 self.shed_large_folders();
@@ -11821,7 +11823,7 @@ impl SimpleComponent for AppModel {
                 let next_after_vanish = if vanished {
                     let cur_uid = self.current.as_ref().unwrap().uid;
                     next_after_vanish(
-                        self.message_cache.get(&(account_id, folder_id)),
+                        self.message_cache.get(&(account_id, folder_id)).map(|c| &**c),
                         &messages,
                         cur_uid,
                     )
@@ -11906,7 +11908,7 @@ impl SimpleComponent for AppModel {
                 // changed list is worth re-threading and re-emitting: a
                 // rebuild of a large (or merged) list is not free, and it
                 // used to happen several times over per visit.
-                let unchanged = self.message_cache.get(&(account_id, folder_id)) == Some(&messages);
+                let unchanged = self.message_cache.get(&(account_id, folder_id)).map(|c| &**c) == Some(&messages);
                 // What the badge counts when it counts arrivals (#431): the
                 // same new inbox mail as the notification above, whatever
                 // the notification settings, and only what is still in the
@@ -11943,7 +11945,7 @@ impl SimpleComponent for AppModel {
                     if self.message_cache.contains_key(&key)
                         || !self.too_large_off_screen(key, messages.len(), &on_show)
                     {
-                        self.message_cache.insert(key, messages.clone());
+                        self.message_cache.insert(key, messages.clone().into());
                     }
                     self.shed_large_folders();
                 }
@@ -14105,7 +14107,7 @@ impl AppModel {
         let same = |c: &Message| c.account_id == account_id && c.folder_id == fid && c.uid == uid;
         let mark = |c: &mut Message| if forwarded { c.forwarded = on } else { c.answered = on };
         let mut id = None;
-        for msgs in [self.message_cache.get_mut(&(account_id, fid)), self.unified_slices.get_mut(&(account_id, fid))]
+        for msgs in [self.message_cache.get_mut(&(account_id, fid)).map(|c| &mut **c), self.unified_slices.get_mut(&(account_id, fid))]
             .into_iter()
             .flatten()
         {
@@ -14420,7 +14422,7 @@ impl AppModel {
             if let Some(inbox) = folders.iter().find(|f| f.kind == FolderKind::Inbox) {
                 let messages = cache.load_messages(account_id, &inbox.path, inbox.id);
                 if !messages.is_empty() {
-                    self.message_cache.insert((account_id, inbox.id), messages.clone());
+                    self.message_cache.insert((account_id, inbox.id), messages.clone().into());
                     self.unified_slices.insert((account_id, inbox.id), messages);
                 }
             }
@@ -14437,7 +14439,7 @@ impl AppModel {
             for f in counted {
                 let messages = cache.load_messages(account_id, &f.path, f.id);
                 if !messages.is_empty() {
-                    self.message_cache.insert((account_id, f.id), messages);
+                    self.message_cache.insert((account_id, f.id), messages.into());
                 }
             }
             for f in &folders {
@@ -15292,7 +15294,7 @@ impl AppModel {
             .find(same)
             .or_else(|| {
                 self.message_cache
-                    .get(&(account_id, folder_id))
+                    .get(&(account_id, folder_id)).map(|c| &**c)
                     .into_iter()
                     .chain(self.unified_slices.get(&(account_id, folder_id)))
                     .flatten()
@@ -17477,7 +17479,7 @@ impl AppModel {
         self.show_message(None, false);
         match self.message_cache.get(&(account_id, folder_id)) {
             Some(cached) => self.message_list.emit(MessageListInput::SetMessages {
-                messages: cached.clone(),
+                messages: cached.to_vec(),
             }),
             None => {
                 // Not in memory: the folder's newest from the index at once,
@@ -18054,16 +18056,30 @@ impl AppModel {
     }
 
     /// The cross-folder search pool: the folders opened this run as they
-    /// are now, and `from_disk` for the rest.
-    fn search_pool(&self, from_disk: Vec<Vec<Message>>) -> Vec<Message> {
+    /// are now, and `from_disk` for the rest, answered with
+    /// [`AppMsg::SearchPoolBuilt`]. Copying a mailbox's messages took the
+    /// main loop for a good part of a second as a search began (#515), so
+    /// the folders go to another thread shared, not copied.
+    fn build_search_pool(&self, gen: u64, from_disk: Vec<Vec<Message>>, sender: &ComponentSender<Self>) {
         let kinds: HashMap<(u32, u32), FolderKind> = self
             .folders
             .iter()
             .flat_map(|(aid, fs)| fs.iter().map(move |f| ((*aid, f.id), f.kind)))
             .collect();
-        build_search_pool(self.message_cache.values().chain(from_disk.iter()), |m| {
-            pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
-        })
+        let opened: Vec<FolderMessages> = self.message_cache.values().cloned().collect();
+        let s = sender.clone();
+        std::thread::spawn(move || {
+            let t = std::time::Instant::now();
+            let pool = build_search_pool(opened.iter().map(|f| &**f).chain(from_disk.iter()), |m| {
+                pool_rank(kinds.get(&(m.account_id, m.folder_id)).copied())
+            });
+            // Let go of the folders before the answer is in, or the next
+            // change to one of them copies it.
+            drop(opened);
+            let text = pool.iter().map(crate::ui::message_list::search_text_of).collect();
+            tracing::debug!("search: pool of {} messages put together in {:?}", pool.len(), t.elapsed());
+            s.input(AppMsg::SearchPoolBuilt { gen, pool, text });
+        });
     }
 
     /// Read the folders not opened this run from the disk cache, where the
@@ -18071,7 +18087,9 @@ impl AppModel {
     /// search with [`AppMsg::SearchPoolLoaded`] (#472). Gmail's All Mail is
     /// the one archived mail lives in, and it is rarely opened.
     fn load_search_pool(&self, sender: &ComponentSender<Self>) {
+        let gen = self.search_gen;
         if self.cache.is_none() {
+            self.build_search_pool(gen, Vec::new(), sender);
             return;
         }
         let unopened: Vec<(u32, u32, String)> = self
@@ -18082,12 +18100,15 @@ impl AppModel {
             .map(|(aid, f)| (aid, f.id, f.path.clone()))
             .collect();
         if unopened.is_empty() {
+            self.build_search_pool(gen, Vec::new(), sender);
             return;
         }
-        let gen = self.search_gen;
         let s = sender.clone();
         std::thread::spawn(move || {
-            let Ok(cache) = crate::cache::Cache::open() else { return };
+            let Ok(cache) = crate::cache::Cache::open() else {
+                s.input(AppMsg::SearchPoolLoaded { gen, lists: Vec::new() });
+                return;
+            };
             let t = std::time::Instant::now();
             let lists: Vec<((u32, u32), Vec<Message>)> = unopened
                 .into_iter()
@@ -19095,7 +19116,7 @@ impl AppModel {
         let mut templates = Vec::new();
         for (account_id, folder) in self.templates_folders() {
             let list = match self.message_cache.get(&(account_id, folder.id)) {
-                Some(l) => l.clone(),
+                Some(l) => l.to_vec(),
                 None => self
                     .cache
                     .as_ref()
@@ -19175,7 +19196,7 @@ impl AppModel {
         let mut out = Vec::new();
         for (account_id, drafts) in self.drafts_folders() {
             let list = match self.message_cache.get(&(account_id, drafts.id)) {
-                Some(l) => l.clone(),
+                Some(l) => l.to_vec(),
                 None => self
                     .cache
                     .as_ref()
@@ -19215,7 +19236,7 @@ impl AppModel {
                     continue;
                 }
                 let list = match self.message_cache.get(&(account_id, f.id)) {
-                    Some(l) => l.clone(),
+                    Some(l) => l.to_vec(),
                     None if f.kind == FolderKind::Inbox => self
                         .cache
                         .as_ref()
@@ -21776,7 +21797,7 @@ impl AppModel {
         for key in std::mem::take(&mut self.unified_unfilled) {
             match self.message_cache.get(&key) {
                 Some(c) if !c.is_empty() => {
-                    self.unified_slices.insert(key, c.clone());
+                    self.unified_slices.insert(key, c.to_vec());
                 }
                 _ => {
                     self.unified_slices.remove(&key);
@@ -22336,7 +22357,7 @@ impl AppModel {
             self.show_smart_view();
         } else if let Some(sel) = self.selected.as_ref() {
             if let Some(msgs) = self.message_cache.get(&(sel.account_id, sel.folder_id)) {
-                self.message_list.emit(MessageListInput::SetMessages { messages: msgs.clone() });
+                self.message_list.emit(MessageListInput::SetMessages { messages: msgs.to_vec() });
             }
         }
     }
@@ -23410,7 +23431,7 @@ impl AppModel {
         }
         let key = (m.account_id, self.inbox_of(m.account_id)?.id);
         self.message_cache
-            .get(&key)
+            .get(&key).map(|c| &**c)
             .into_iter()
             .chain(self.unified_slices.get(&key))
             .flatten()
@@ -25193,11 +25214,13 @@ impl AppModel {
     /// a UID names a different message in each folder, and marking every
     /// folder's message with this UID read set the wrong mail read (#333).
     fn set_cached_unread(&mut self, account_id: u32, folder_id: u32, message_id: u32, unread: bool) {
-        for cache in [&mut self.message_cache, &mut self.unified_slices] {
-            if let Some(msgs) = cache.get_mut(&(account_id, folder_id)) {
-                if let Some(m) = msgs.iter_mut().find(|m| m.id == message_id) {
-                    m.unread = unread;
-                }
+        let lists = [
+            self.message_cache.get_mut(&(account_id, folder_id)).map(|c| &mut **c),
+            self.unified_slices.get_mut(&(account_id, folder_id)),
+        ];
+        for msgs in lists.into_iter().flatten() {
+            if let Some(m) = msgs.iter_mut().find(|m| m.id == message_id) {
+                m.unread = unread;
             }
         }
         if let Some(path) = self.folder_path(account_id, folder_id) {
@@ -28091,6 +28114,47 @@ fn kind_label(kind: FolderKind) -> String {
     }
 }
 
+/// A folder's messages as [`AppModel::message_cache`] keeps them: shared,
+/// not copied, with a search pool being put together on another thread
+/// (#515). A change copies the folder only while such a pool still holds it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct FolderMessages(std::sync::Arc<Vec<Message>>);
+
+impl std::ops::Deref for FolderMessages {
+    type Target = Vec<Message>;
+    fn deref(&self) -> &Vec<Message> {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for FolderMessages {
+    fn deref_mut(&mut self) -> &mut Vec<Message> {
+        std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
+impl<'a> IntoIterator for &'a FolderMessages {
+    type Item = &'a Message;
+    type IntoIter = std::slice::Iter<'a, Message>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut FolderMessages {
+    type Item = &'a mut Message;
+    type IntoIter = std::slice::IterMut<'a, Message>;
+    fn into_iter(self) -> Self::IntoIter {
+        std::sync::Arc::make_mut(&mut self.0).iter_mut()
+    }
+}
+
+impl From<Vec<Message>> for FolderMessages {
+    fn from(messages: Vec<Message>) -> Self {
+        Self(std::sync::Arc::new(messages))
+    }
+}
+
 /// Flatten every folder's indexed messages into one pool for cross-folder search.
 ///
 /// Gmail files one message under every label it carries, so an archived mail
@@ -29246,6 +29310,22 @@ mod tests {
         let mut other = copy(3, 31, "only@x");
         other.from_addr = "spam@x".into();
         assert_eq!(build_search_pool([&all_mail, &vec![other]], rank).len(), 4);
+    }
+
+    /// #515: a search pool shares a folder rather than copying it, and a
+    /// change made while it does reaches only the app's own copy.
+    #[test]
+    fn a_shared_folder_is_copied_only_when_changed() {
+        let mut folder = FolderMessages::from(vec![msg(1, 1, 10), msg(1, 1, 11)]);
+        let pool_copy = folder.clone();
+        assert!(std::sync::Arc::ptr_eq(&folder.0, &pool_copy.0));
+        folder[0].unread = !pool_copy[0].unread;
+        assert!(!std::sync::Arc::ptr_eq(&folder.0, &pool_copy.0));
+        assert_ne!(folder[0].unread, pool_copy[0].unread);
+        for m in &mut folder {
+            m.starred = true;
+        }
+        assert!(folder.iter().all(|m| m.starred) && !pool_copy.iter().any(|m| m.starred));
     }
 
     /// The credits metafiles are read at build time and shown in About, so a
