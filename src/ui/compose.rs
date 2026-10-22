@@ -1754,14 +1754,14 @@ impl Component for Compose {
             focus.connect_leave(move |_| s.input_sender().emit(ComposeInput::CompletionClose));
             row.add_controller(focus);
         }
-        // A pill moves between these by drag or by its menu (#492). While
-        // one is dragged, the hidden Cc and Bcc show, to be dropped on;
-        // those still empty when it ends hide again.
+        // Pills are selected across these and move between them by drag
+        // or by their menu (#492). While some are dragged, the hidden Cc and
+        // Bcc show, to be dropped on; those still empty after hide again.
         {
             let rows = [widgets.to_row.clone(), widgets.cc_row.clone(), widgets.bcc_row.clone()];
             let shown: std::rc::Rc<std::cell::RefCell<Vec<RecipientRow>>> = Default::default();
             for row in &rows {
-                row.set_peers(&[&rows[0], &rows[1], &rows[2]]);
+                row.set_fields(&[&rows[0], &rows[1], &rows[2]]);
                 let (cc, bcc, shown) = (rows[1].clone(), rows[2].clone(), shown.clone());
                 row.connect_pill_drag(move |_, on| {
                     if on {

@@ -140,10 +140,12 @@ meanings below.
 In To, Cc and Bcc, a space after an address, <kbd>Return</kbd> or a comma
 makes it a pill, and <kbd>Backspace</kbd> on an empty field turns the last
 pill back into text. <kbd>Left</kbd> at the start of the field selects the
-last pill; on a selected pill, <kbd>Left</kbd> and <kbd>Right</kbd> move
-between pills, <kbd>Delete</kbd> removes it, <kbd>Return</kbd> edits it, and
-<kbd>Menu</kbd> or <kbd>Shift+F10</kbd> opens its menu, which moves it to
-another field. See [Addresses as pills](DOCUMENTATION.md#addresses-as-pills).
+last pill, and <kbd>Ctrl+A</kbd> on an empty field selects all of them. On a
+selected pill, <kbd>Left</kbd> and <kbd>Right</kbd> select the next one
+(<kbd>Shift</kbd> extends the selection), <kbd>Delete</kbd> removes the
+selection, <kbd>Return</kbd> edits the pill, and <kbd>Menu</kbd> or
+<kbd>Shift+F10</kbd> opens the menu, which moves the selection to another
+field. See [Addresses as pills](DOCUMENTATION.md#addresses-as-pills).
 
 In the body, <kbd>Return</kbd> starts a new line and <kbd>Shift+Return</kbd>
 a new paragraph; **Settings → Composing → Return starts a new paragraph**

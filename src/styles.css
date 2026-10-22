@@ -1656,18 +1656,23 @@ headerbar.compose-toolbar button.image-button {
   color: @error_color;
 }
 
-/* A pill selected for the keyboard (#492). */
-.recipient-pill:focus {
+/* Selected pills (#492), and the one with the keyboard focus. */
+.recipient-pill.selected {
   background-color: @accent_bg_color;
   color: @accent_fg_color;
 }
 
-.recipient-pill.invalid:focus {
+.recipient-pill.invalid.selected {
   background-color: @error_bg_color;
   color: @error_fg_color;
 }
 
-/* The pill being dragged stays in place, faded, until it is let go. */
+.recipient-pill:focus-visible {
+  outline: 2px solid alpha(@accent_color, 0.5);
+  outline-offset: 1px;
+}
+
+/* Pills being dragged stay in place, faded, until they are let go. */
 .recipient-pill.dragged {
   opacity: 0.35;
 }

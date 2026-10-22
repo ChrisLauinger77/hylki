@@ -4,9 +4,11 @@
 //! a comma. Backspace on an empty line turns the last pill back into text to
 //! edit, until the next space, Return or comma.
 //!
-//! A pill drags to another place in its field or to another field, and
-//! takes the keyboard (arrows from the start of the text, Delete, Return,
-//! the menu key), whose menu moves it to another field too (#492).
+//! Pills are selected like files: a click, Ctrl+click and Shift+click, or
+//! the arrow keys from the start of the text, with Shift to extend, across
+//! To, Cc and Bcc. The selection drags to another place in its field or to
+//! another field, and its menu (right click, the menu key) moves it to
+//! another field too; Delete removes it (#492).
 //!
 //! Built from libadwaita's own entry-row markup and class names (`row.entry`,
 //! `.editable-area`, `.title`, `.subtitle`, `.edit-icon`, `.focused`), so the
@@ -48,9 +50,11 @@ mod imp {
         /// for typing.
         pub busy: Cell<bool>,
         pub focused: Cell<bool>,
-        /// The other recipient fields of the composer, which a pill's menu
-        /// offers to move it to.
-        pub peers: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
+        /// Every recipient field of the composer, this one included, in
+        /// order: a selection spans them, and a pill's menu moves to them.
+        pub fields: RefCell<Vec<glib::WeakRef<super::RecipientRow>>>,
+        /// The pill a Shift+click or Shift+arrow selects from.
+        pub anchor: RefCell<Option<gtk::Widget>>,
     }
 
     #[glib::object_subclass]
@@ -298,29 +302,42 @@ impl RecipientRow {
             row.emit_changed();
         });
 
-        // Left from the start of the text goes to the last pill, to move
-        // through them with the keyboard.
+        // Left from the start of the text selects the last pill, to go
+        // through them with the keyboard, and Ctrl+A on an empty line
+        // selects them all.
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = self.downgrade();
         keys.connect_key_pressed(move |_, key, _, state| {
             let Some(row) = weak.upgrade() else { return glib::Propagation::Proceed };
             let text = &row.imp().text;
+            let Some(last) = row.pill_list().pop() else { return glib::Propagation::Proceed };
+            let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
+            if ctrl && matches!(key, gdk::Key::a | gdk::Key::A) && text.text().is_empty() {
+                row.select_all();
+                last.grab_focus();
+                return glib::Propagation::Stop;
+            }
             let towards = if row.direction() == gtk::TextDirection::Rtl { gdk::Key::Right } else { gdk::Key::Left };
-            let plain = !state.intersects(gdk::ModifierType::SHIFT_MASK | gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
-            if key != towards || !plain || text.position() != 0 || text.selection_bounds().is_some() {
+            let other = state.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+            if key != towards || other || text.position() != 0 || text.selection_bounds().is_some() {
                 return glib::Propagation::Proceed;
             }
-            let last = row.imp().pills.borrow().last().map(|(p, _)| p.clone());
-            match last {
-                Some(pill) => {
-                    pill.grab_focus();
-                    glib::Propagation::Stop
-                }
-                None => glib::Propagation::Proceed,
-            }
+            row.select_only(&last);
+            last.grab_focus();
+            glib::Propagation::Stop
         });
         text.add_controller(keys);
+
+        // Going back to typing lets go of the selection.
+        let focus = gtk::EventControllerFocus::new();
+        let weak = self.downgrade();
+        focus.connect_enter(move |_| {
+            if let Some(row) = weak.upgrade() {
+                row.clear_selection();
+            }
+        });
+        text.add_controller(focus);
 
         // A click anywhere on the row, pills aside, types into it.
         let click = gtk::GestureClick::new();
@@ -354,10 +371,10 @@ impl RecipientRow {
             let Some(row) = weak.upgrade() else { return gdk::DragAction::empty() };
             let dragged = target.value().and_then(|v| v.get::<gtk::Widget>().ok());
             let at = row.drop_index(x, y);
-            // No marker where the pill already is, since letting go there
-            // leaves it as it was, nor in a field with no pills, where the
-            // field's own highlight says enough.
-            let stays = dragged.as_ref().and_then(|p| row.index_of(p)).is_some_and(|i| at == i || at == i + 1);
+            // No marker where letting go leaves the pills as they are, nor
+            // in a field with no pills, where its own highlight says enough.
+            let moving = dragged.as_ref().map(|p| acting_on(p)).unwrap_or_default();
+            let stays = row.would_stay(&moving, at);
             let empty = row.imp().pills.borrow().is_empty();
             row.imp().flow.set_marker((!stays && !empty).then_some(at));
             gdk::DragAction::MOVE
@@ -373,8 +390,7 @@ impl RecipientRow {
             let Some(row) = weak.upgrade() else { return false };
             row.imp().flow.set_marker(None);
             let Ok(pill) = value.get::<gtk::Widget>() else { return false };
-            let Some(from) = pill.ancestor(Self::static_type()).and_downcast::<Self>() else { return false };
-            from.move_pill(&pill, &row, row.drop_index(x, y));
+            row.take_pills(acting_on(&pill), row.drop_index(x, y));
             true
         });
         self.add_controller(target);
@@ -404,6 +420,14 @@ impl RecipientRow {
             let weak = row.downgrade();
             glib::idle_add_local_once(move || {
                 let Some(row) = weak.upgrade() else { return };
+                // The selection goes when the focus goes somewhere else:
+                // not to a pill of another field, nor to the pills' menu,
+                // nor nowhere for a moment as that menu closes.
+                let focus = row.root().and_then(|r| r.focus());
+                let gone = focus.is_some_and(|w| !is_in_pill(&w) && w.ancestor(gtk::Popover::static_type()).is_none());
+                if gone {
+                    row.clear_selection();
+                }
                 let active = row.root().and_downcast::<gtk::Window>().is_some_and(|w| w.is_active());
                 let typed = row.typed();
                 if active && !row.imp().focused.get() && is_whole_address(&typed) {
@@ -479,25 +503,53 @@ impl RecipientRow {
         });
         pill.append(&remove);
 
-        // A click selects the pill, for the keyboard; a double click edits
-        // it: it becomes the text, and what was being typed is kept as a
-        // pill of its own first.
+        // A click selects the pill, Ctrl+click adds it to the selection or
+        // takes it out, and Shift+click selects from the last one clicked.
+        // A plain click on a pill already selected keeps the others until
+        // the button is up, so they can all be dragged. A double click
+        // edits the pill: it becomes the text, and what was being typed is
+        // kept as a pill of its own first.
         let click = gtk::GestureClick::new();
+        let collapse = std::rc::Rc::new(Cell::new(false));
         let weak = self.downgrade();
         let weak_pill = pill.downgrade();
+        let c = collapse.clone();
         click.connect_pressed(move |gesture, n, x, y| {
             let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            let pill = pill.upcast::<gtk::Widget>();
             let on_remove = pill.pick(x, y, gtk::PickFlags::DEFAULT).is_some_and(|w| w.ancestor(gtk::Button::static_type()).is_some());
             if on_remove {
                 return;
             }
-            if n == 2 {
+            let state = gesture.current_event_state();
+            c.set(false);
+            if state.contains(gdk::ModifierType::CONTROL_MASK) {
+                set_selected(&pill, !is_selected(&pill));
+                row.imp().anchor.replace(Some(pill.clone()));
+            } else if state.contains(gdk::ModifierType::SHIFT_MASK) {
+                row.select_range(&pill);
+            } else if n == 2 {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
-                row.edit_pill(pill.upcast_ref());
+                row.edit_pill(&pill);
+                return;
+            } else if is_selected(&pill) {
+                c.set(true);
             } else {
-                pill.grab_focus();
+                row.select_only(&pill);
+            }
+            pill.grab_focus();
+        });
+        let weak = self.downgrade();
+        let weak_pill = pill.downgrade();
+        let c = collapse.clone();
+        click.connect_released(move |_, _, _, _| {
+            let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
+            if c.take() {
+                row.select_only(pill.upcast_ref());
             }
         });
+        // Past the click's distance it is a drag, which takes them all.
+        click.connect_stopped(move |_| collapse.set(false));
         pill.add_controller(click);
 
         let menu = gtk::GestureClick::new();
@@ -507,8 +559,12 @@ impl RecipientRow {
         menu.connect_pressed(move |gesture, _, x, y| {
             let (Some(row), Some(pill)) = (weak.upgrade(), weak_pill.upgrade()) else { return };
             gesture.set_state(gtk::EventSequenceState::Claimed);
+            let pill = pill.upcast::<gtk::Widget>();
+            if !is_selected(&pill) {
+                row.select_only(&pill);
+            }
             pill.grab_focus();
-            row.pill_menu(pill.upcast_ref(), x, y);
+            row.pill_menu(&pill, x, y);
         });
         pill.add_controller(menu);
 
@@ -523,45 +579,63 @@ impl RecipientRow {
         });
         pill.add_controller(keys);
 
-        // Dragged to another place in this field or into another. The
-        // drag carries the pill itself, which only a recipient field takes.
+        // Dragged to another place in this field or into another, with the
+        // rest of the selection when it is part of one. The drag carries
+        // the pill itself, which only a recipient field takes.
         let drag = gtk::DragSource::new();
         drag.set_actions(gdk::DragAction::MOVE);
+        let weak = self.downgrade();
         let weak_pill = pill.downgrade();
         drag.connect_prepare(move |source, x, y| {
-            let pill = weak_pill.upgrade()?;
+            let row = weak.upgrade()?;
+            let pill = weak_pill.upgrade()?.upcast::<gtk::Widget>();
+            if !is_selected(&pill) {
+                row.select_only(&pill);
+            }
             // The pill as it looks now, before it dims for the drag.
             let image = gtk::WidgetPaintable::new(Some(&pill)).current_image();
-            source.set_icon(Some(&image), x as i32, y as i32);
-            Some(gdk::ContentProvider::for_value(&pill.upcast::<gtk::Widget>().to_value()))
+            source.set_icon(Some(&drag_icon(&image, acting_on(&pill).len())), x as i32, y as i32);
+            Some(gdk::ContentProvider::for_value(&pill.to_value()))
         });
         let weak = self.downgrade();
         let weak_pill = pill.downgrade();
         drag.connect_drag_begin(move |_, _| {
             if let Some(pill) = weak_pill.upgrade() {
-                pill.add_css_class("dragged");
+                for (_, p) in acting_on(pill.upcast_ref()) {
+                    p.add_css_class("dragged");
+                }
             }
             if let Some(row) = weak.upgrade() {
                 row.emit_by_name::<()>("pill-drag", &[&true]);
             }
         });
         let weak = self.downgrade();
-        let weak_pill = pill.downgrade();
         drag.connect_drag_end(move |_, _, _| {
-            if let Some(pill) = weak_pill.upgrade() {
-                pill.remove_css_class("dragged");
+            let Some(row) = weak.upgrade() else { return };
+            for field in row.fields() {
+                for p in field.pill_list() {
+                    p.remove_css_class("dragged");
+                }
             }
-            if let Some(row) = weak.upgrade() {
-                row.emit_by_name::<()>("pill-drag", &[&false]);
-            }
+            row.emit_by_name::<()>("pill-drag", &[&false]);
         });
         pill.add_controller(drag);
         pill
     }
 
-    /// The other recipient fields, for a pill's menu to move it to.
-    pub fn set_peers(&self, peers: &[&RecipientRow]) {
-        *self.imp().peers.borrow_mut() = peers.iter().filter(|p| **p != self).map(|p| p.downgrade()).collect();
+    /// Every recipient field of the composer, this one among them, in
+    /// order, for a selection to span and a pill's menu to move it to.
+    pub fn set_fields(&self, fields: &[&RecipientRow]) {
+        *self.imp().fields.borrow_mut() = fields.iter().map(|f| f.downgrade()).collect();
+    }
+
+    fn fields(&self) -> Vec<RecipientRow> {
+        let fields: Vec<_> = self.imp().fields.borrow().iter().filter_map(|f| f.upgrade()).collect();
+        if fields.is_empty() {
+            vec![self.clone()]
+        } else {
+            fields
+        }
     }
 
     /// Called as a pill of this field starts (true) and ends (false) a
@@ -574,8 +648,55 @@ impl RecipientRow {
         })
     }
 
+    fn pill_list(&self) -> Vec<gtk::Widget> {
+        self.imp().pills.borrow().iter().map(|(p, _)| p.clone()).collect()
+    }
+
     fn index_of(&self, pill: &gtk::Widget) -> Option<usize> {
         self.imp().pills.borrow().iter().position(|(p, _)| p == pill)
+    }
+
+    /// Unselect every pill of every field.
+    fn clear_selection(&self) {
+        for field in self.fields() {
+            for p in field.pill_list().iter().filter(|p| is_selected(p)) {
+                set_selected(p, false);
+            }
+        }
+    }
+
+    /// Select `pill` and nothing else, in any field.
+    fn select_only(&self, pill: &gtk::Widget) {
+        self.clear_selection();
+        set_selected(pill, true);
+        self.imp().anchor.replace(Some(pill.clone()));
+    }
+
+    /// Select every pill of this field, and none of the others.
+    fn select_all(&self) {
+        self.clear_selection();
+        let pills = self.pill_list();
+        for p in &pills {
+            set_selected(p, true);
+        }
+        self.imp().anchor.replace(pills.first().cloned());
+    }
+
+    /// Select the pills of this field from the anchor to `pill`, and none
+    /// of the others.
+    fn select_range(&self, pill: &gtk::Widget) {
+        let pills = self.pill_list();
+        let Some(to) = pills.iter().position(|p| p == pill) else { return };
+        let anchor = self.imp().anchor.borrow().clone();
+        let from = anchor.and_then(|a| pills.iter().position(|p| *p == a));
+        if from.is_none() {
+            self.imp().anchor.replace(Some(pill.clone()));
+        }
+        let from = from.unwrap_or(to);
+        self.clear_selection();
+        for p in &pills[from.min(to)..=from.max(to)] {
+            set_selected(p, true);
+        }
     }
 
     /// Where among the pills a pill let go at `(x, y)` goes: before the
@@ -600,85 +721,141 @@ impl RecipientRow {
             .count()
     }
 
-    /// Move `pill` of this field to place `at` in `to`, which may be this
-    /// field again. A field that already has the address only loses it
-    /// here. Returns the pill in its new place.
-    fn move_pill(&self, pill: &gtk::Widget, to: &RecipientRow, at: usize) -> Option<gtk::Widget> {
-        let imp = self.imp();
-        let from = self.index_of(pill)?;
-        let focused = pill.is_focus();
-        if to == self {
-            if at == from || at == from + 1 {
-                return Some(pill.clone());
-            }
-            let entry = imp.pills.borrow_mut().remove(from);
-            let at = if at > from { at - 1 } else { at };
-            let next = imp.pills.borrow().get(at).map(|(p, _)| p.clone());
-            imp.flow.place(&entry.0, next.as_ref());
-            imp.pills.borrow_mut().insert(at, entry);
-            self.emit_changed();
-            return Some(pill.clone());
+    /// The order this field's pills would have with `moving` put at place
+    /// `at`, or `None` when some come from another field.
+    fn order_after(&self, moving: &[(RecipientRow, gtk::Widget)], at: usize) -> Option<Vec<gtk::Widget>> {
+        if moving.iter().any(|(f, _)| f != self) {
+            return None;
         }
-        let recipient = imp.pills.borrow()[from].1.clone();
-        let (name, addr) = crate::worker::parse_recipients(&recipient).into_iter().next()?;
-        imp.pills.borrow_mut().remove(from);
-        imp.flow.remove(pill);
-        self.emit_changed();
-        let there = to.imp().pills.borrow().iter().find_map(|(p, r)| {
-            let other = crate::worker::parse_recipients(r).into_iter().next().map(|(_, a)| a);
-            other.is_some_and(|a| a.eq_ignore_ascii_case(&addr)).then(|| p.clone())
-        });
-        let moved = match there {
-            Some(p) => p,
-            None => {
-                let p = to.insert_pill(at, &name, &addr, &recipient);
-                to.emit_changed();
-                p
-            }
-        };
-        if focused {
-            moved.grab_focus();
-        }
-        Some(moved)
+        let pills = self.pill_list();
+        let is_moving = |p: &gtk::Widget| moving.iter().any(|(_, m)| m == p);
+        let next = pills.iter().skip(at).find(|p| !is_moving(p));
+        let mut order: Vec<_> = pills.iter().filter(|p| !is_moving(p)).cloned().collect();
+        let i = next.and_then(|n| order.iter().position(|p| p == n)).unwrap_or(order.len());
+        order.splice(i..i, moving.iter().map(|(_, p)| p.clone()));
+        Some(order)
     }
 
-    /// Keys on a focused pill: arrows between pills and back to the text,
-    /// Delete or Backspace removes it, Return edits it, the menu key opens
-    /// its menu, and a letter goes to the text.
-    fn pill_key(&self, pill: &gtk::Widget, key: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
+    /// Whether putting `moving` at place `at` leaves this field as it is.
+    fn would_stay(&self, moving: &[(RecipientRow, gtk::Widget)], at: usize) -> bool {
+        !moving.is_empty() && self.order_after(moving, at).is_some_and(|o| o == self.pill_list())
+    }
+
+    /// Move `moving`, pills of any field this one included, to place `at`
+    /// among this field's pills, in their order. An address this field
+    /// already has is not added twice. The pills stay selected in their new
+    /// place, and the one that had the focus keeps it. Returns them in
+    /// their new place, in order.
+    fn take_pills(&self, moving: Vec<(RecipientRow, gtk::Widget)>, at: usize) -> Vec<gtk::Widget> {
+        if moving.is_empty() || self.would_stay(&moving, at) {
+            return moving.into_iter().map(|(_, p)| p).collect();
+        }
         let imp = self.imp();
+        let next = self.pill_list().into_iter().skip(at).find(|p| !moving.iter().any(|(_, m)| m == p));
+        let mut taken = Vec::new();
+        let mut changed = vec![self.clone()];
+        for (field, pill) in &moving {
+            let Some(i) = field.index_of(pill) else { continue };
+            let recipient = field.imp().pills.borrow()[i].1.clone();
+            // One that does not read as an address stays where it is
+            // rather than be lost.
+            let Some((name, addr)) = crate::worker::parse_recipients(&recipient).into_iter().next() else { continue };
+            let focused = pill.is_focus();
+            field.imp().pills.borrow_mut().remove(i);
+            field.imp().flow.remove(pill);
+            if !changed.contains(field) {
+                changed.push(field.clone());
+            }
+            taken.push((name, addr, recipient, focused));
+        }
+        let mut at = next.and_then(|n| self.index_of(&n)).unwrap_or(imp.pills.borrow().len());
+        let mut focus = None;
+        let mut first = None;
+        let mut placed = Vec::new();
+        for (name, addr, recipient, focused) in taken {
+            let have = imp.pills.borrow().iter().find_map(|(p, r)| {
+                let other = crate::worker::parse_recipients(r).into_iter().next().map(|(_, a)| a);
+                other.is_some_and(|a| a.eq_ignore_ascii_case(&addr)).then(|| p.clone())
+            });
+            let pill = have.unwrap_or_else(|| {
+                let p = self.insert_pill(at, &name, &addr, &recipient);
+                at += 1;
+                p
+            });
+            set_selected(&pill, true);
+            first.get_or_insert_with(|| pill.clone());
+            placed.push(pill.clone());
+            if focused {
+                focus = Some(pill);
+            }
+        }
+        imp.anchor.replace(first);
+        for field in changed {
+            field.emit_changed();
+        }
+        if let Some(p) = focus {
+            p.grab_focus();
+        }
+        placed
+    }
+
+    /// Keys on a focused pill: the arrows, Home and End select another
+    /// (Shift to extend the selection) or go back to the text, Ctrl+A
+    /// selects the field's pills, Delete or Backspace removes the
+    /// selection, Return edits the pill, the menu key opens its menu, and a
+    /// letter goes to the text.
+    fn pill_key(&self, pill: &gtk::Widget, key: gdk::Key, state: gdk::ModifierType) -> glib::Propagation {
         let Some(i) = self.index_of(pill) else { return glib::Propagation::Proceed };
+        let pills = self.pill_list();
         let rtl = self.direction() == gtk::TextDirection::Rtl;
-        let pill_at = |j: usize| imp.pills.borrow().get(j).map(|(p, _)| p.clone());
-        let modified = state.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK);
+        let shift = state.contains(gdk::ModifierType::SHIFT_MASK);
+        let ctrl = state.contains(gdk::ModifierType::CONTROL_MASK);
         let (back, forward) = if rtl { (gdk::Key::Right, gdk::Key::Left) } else { (gdk::Key::Left, gdk::Key::Right) };
+        // Select the pill at `j`, alone or from the anchor with Shift.
+        let go = |j: usize| {
+            let p = &pills[j];
+            if shift {
+                if self.imp().anchor.borrow().is_none() {
+                    self.imp().anchor.replace(Some(pill.clone()));
+                }
+                self.select_range(p);
+            } else {
+                self.select_only(p);
+            }
+            p.grab_focus();
+        };
         match key {
-            _ if modified => return glib::Propagation::Proceed,
+            gdk::Key::a | gdk::Key::A if ctrl => self.select_all(),
+            _ if ctrl || state.contains(gdk::ModifierType::ALT_MASK) => return glib::Propagation::Proceed,
             k if k == back => {
-                if let Some(p) = i.checked_sub(1).and_then(pill_at) {
-                    p.grab_focus();
+                if i > 0 {
+                    go(i - 1);
                 }
             }
-            k if k == forward => match pill_at(i + 1) {
-                Some(p) => {
-                    p.grab_focus();
-                }
-                None => self.focus_text(),
-            },
-            gdk::Key::Home => {
-                if let Some(p) = pill_at(0) {
-                    p.grab_focus();
+            k if k == forward => {
+                if i + 1 < pills.len() {
+                    go(i + 1);
+                } else if !shift {
+                    self.focus_text();
                 }
             }
+            gdk::Key::Home => go(0),
+            gdk::Key::End if shift => go(pills.len() - 1),
             gdk::Key::End => self.focus_text(),
             gdk::Key::BackSpace | gdk::Key::Delete | gdk::Key::KP_Delete => {
+                let gone = acting_on(pill);
+                let stays = |p: &&gtk::Widget| !gone.iter().any(|(_, g)| g == *p);
                 // Backspace leaves the focus on the pill before, Delete on
                 // the one after, as they would on letters.
-                let next = if key == gdk::Key::BackSpace && i > 0 { pill_at(i - 1) } else { pill_at(i + 1) };
-                let next = next.or_else(|| i.checked_sub(1).and_then(pill_at));
-                self.remove_pill(pill);
+                let before = pills[..i].iter().rev().find(stays).cloned();
+                let after = pills[i + 1..].iter().find(stays).cloned();
+                let next = if key == gdk::Key::BackSpace { before.or(after) } else { after.or(before) };
+                for (field, p) in &gone {
+                    field.remove_pill(p);
+                }
                 match next {
                     Some(p) => {
+                        self.select_only(&p);
                         p.grab_focus();
                     }
                     None => self.focus_text(),
@@ -686,14 +863,12 @@ impl RecipientRow {
             }
             gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::ISO_Enter | gdk::Key::F2 => self.edit_pill(pill),
             gdk::Key::Menu => self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64),
-            gdk::Key::F10 if state.contains(gdk::ModifierType::SHIFT_MASK) => {
-                self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64)
-            }
+            gdk::Key::F10 if shift => self.pill_menu(pill, pill.width() as f64 / 2.0, pill.height() as f64),
             // Typing goes on in the text, after the pills.
             _ => match key.to_unicode().filter(|c| !c.is_control()) {
                 Some(c) => {
                     self.focus_text();
-                    let text = &imp.text;
+                    let text = &self.imp().text;
                     let mut end = text.text().chars().count() as i32;
                     text.insert_text(&c.to_string(), &mut end);
                     text.set_position(end);
@@ -704,22 +879,32 @@ impl RecipientRow {
         glib::Propagation::Stop
     }
 
-    /// The pill's menu, at `(x, y)` in the pill: move it to another field,
-    /// edit it, remove it.
+    /// The menu of `pill` and the rest of the selection, at `(x, y)` in the
+    /// pill: move them to another field, edit the pill, remove them.
     fn pill_menu(&self, pill: &gtk::Widget, x: f64, y: f64) {
         use crate::ui::context_menu::{show_context_menu, MenuEntry};
         let Some(p) = pill.compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32)) else { return };
+        let acting = acting_on(pill);
         let mut moves = Vec::new();
-        for peer in self.imp().peers.borrow().iter().filter_map(|p| p.upgrade()) {
-            let label = i18n_f("Move to {name}", &[("name", &peer.title())]);
-            let (row, pill) = (self.downgrade(), pill.downgrade());
+        for field in self.fields().into_iter().filter(|f| f != self) {
+            let label = i18n_f("Move to {name}", &[("name", &field.title())]);
+            let acting = acting.clone();
+            let which = acting.iter().position(|(_, p)| p == pill).unwrap_or(0);
             moves.push(MenuEntry::new(label, move || {
-                let (Some(row), Some(pill)) = (row.upgrade(), pill.upgrade()) else { return };
-                peer.set_visible(true);
-                let at = peer.imp().pills.borrow().len();
-                if let Some(moved) = row.move_pill(&pill, &peer, at) {
-                    moved.grab_focus();
-                }
+                field.set_visible(true);
+                let at = field.imp().pills.borrow().len();
+                let placed = field.take_pills(acting.clone(), at);
+                // The menu hands the focus back to the field's text as it
+                // closes, which lets go of the selection: once it has, the
+                // moved pills are selected again, and the one the menu was
+                // opened on takes the focus.
+                let Some(focus) = placed.get(which).or(placed.first()).cloned() else { return };
+                glib::idle_add_local_once(move || {
+                    focus.grab_focus();
+                    for p in &placed {
+                        set_selected(p, true);
+                    }
+                });
             }));
         }
         let (row, weak) = (self.downgrade(), pill.downgrade());
@@ -727,11 +912,14 @@ impl RecipientRow {
             if let (Some(row), Some(pill)) = (row.upgrade(), weak.upgrade()) {
                 row.edit_pill(&pill);
             }
-        });
-        let (row, weak) = (self.downgrade(), pill.downgrade());
+        })
+        .enabled(acting.len() == 1);
+        let row = self.downgrade();
         let remove = MenuEntry::new(i18n("Remove"), move || {
-            if let (Some(row), Some(pill)) = (row.upgrade(), weak.upgrade()) {
-                row.remove_pill(&pill);
+            for (field, p) in &acting {
+                field.remove_pill(p);
+            }
+            if let Some(row) = row.upgrade() {
                 row.focus_text();
             }
         });
@@ -794,6 +982,54 @@ impl RecipientRow {
             self.remove_css_class("focused");
         }
     }
+}
+
+fn is_selected(pill: &gtk::Widget) -> bool {
+    pill.has_css_class("selected")
+}
+
+fn set_selected(pill: &gtk::Widget, on: bool) {
+    if on {
+        pill.add_css_class("selected");
+    } else {
+        pill.remove_css_class("selected");
+    }
+    pill.update_state(&[gtk::accessible::State::Selected(Some(on))]);
+}
+
+/// The pills an action on `pill` takes: every selected pill of every
+/// field, in order, when `pill` is one of them, or else `pill` alone.
+fn acting_on(pill: &gtk::Widget) -> Vec<(RecipientRow, gtk::Widget)> {
+    let Some(row) = pill.ancestor(RecipientRow::static_type()).and_downcast::<RecipientRow>() else { return Vec::new() };
+    if !is_selected(pill) {
+        return vec![(row, pill.clone())];
+    }
+    let mut out = Vec::new();
+    for field in row.fields() {
+        for p in field.pill_list().into_iter().filter(is_selected) {
+            out.push((field.clone(), p));
+        }
+    }
+    out
+}
+
+/// The drag icon: the pill dragged, drawn as a stack when others go with
+/// it.
+fn drag_icon(pill: &gdk::Paintable, count: usize) -> gdk::Paintable {
+    if count < 2 {
+        return pill.clone();
+    }
+    let (w, h) = (pill.intrinsic_width() as f32, pill.intrinsic_height() as f32);
+    let snapshot = gtk::Snapshot::new();
+    // The others as a pill's edge behind it.
+    snapshot.save();
+    snapshot.translate(&gtk::graphene::Point::new(4.0, 4.0));
+    snapshot.push_opacity(0.5);
+    pill.snapshot(&snapshot, w as f64, h as f64);
+    snapshot.pop();
+    snapshot.restore();
+    pill.snapshot(&snapshot, w as f64, h as f64);
+    snapshot.to_paintable(Some(&gtk::graphene::Size::new(w + 4.0, h + 4.0))).unwrap_or_else(|| pill.clone())
 }
 
 /// Whether `widget` is a pill or inside one.

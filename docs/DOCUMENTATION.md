@@ -1039,16 +1039,23 @@ edit, until the next space, <kbd>Return</kbd> or comma. A double click does the
 same for any pill, and its × removes it. A pill that is not an email address
 is red.
 
-A pill can be dragged to another place in its field, or into another field.
-While one is dragged, Cc and Bcc show if they were hidden, and a line marks
-where it will go; a field it was not dropped in hides again. Its right-click
-menu moves it to the end of another field, edits it or removes it.
+Pills are selected as files are: a click selects one, <kbd>Ctrl</kbd>+click
+adds one to the selection or takes it out, and <kbd>Shift</kbd>+click selects
+the pills between. A selection can take pills from To, Cc and Bcc at once.
+
+The selection can be dragged to another place in its field, or into another
+field. While it is dragged, Cc and Bcc show if they were hidden, and a line
+marks where it will go; a field it was not dropped in hides again. The
+right-click menu moves the selection to the end of another field, edits a
+single pill, or removes the selection.
 
 From the keyboard, <kbd>Left</kbd> at the start of a field selects the last
-pill, and <kbd>Left</kbd> and <kbd>Right</kbd> move between pills and back to
-the text. On a selected pill, <kbd>Delete</kbd> or <kbd>Backspace</kbd>
-removes it, <kbd>Return</kbd> edits it, and <kbd>Menu</kbd> or
-<kbd>Shift+F10</kbd> opens its menu. <kbd>Tab</kbd> passes over the pills to
+pill, and <kbd>Ctrl+A</kbd> on an empty field selects them all. On a selected
+pill, <kbd>Left</kbd> and <kbd>Right</kbd> select the next one, with
+<kbd>Shift</kbd> to extend the selection, and <kbd>Right</kbd> past the last
+goes back to the text. <kbd>Delete</kbd> or <kbd>Backspace</kbd> removes the
+selection, <kbd>Return</kbd> edits the pill, and <kbd>Menu</kbd> or
+<kbd>Shift+F10</kbd> opens the menu. <kbd>Tab</kbd> passes over the pills to
 the next field.
 
 ### The From address
